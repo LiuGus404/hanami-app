@@ -63,7 +63,7 @@ export default function AIHubPage() {
         'deepseek-r1-8b': '你好，我是策策，專長是數據分析與邏輯規劃，有什麼資料要幫你解讀？',
         'llava-v1.6-7b': '你好，我是米米，擅長圖片理解與多模態分析，請給我圖片或任務吧！',
       };
-      setMessages([{ sender: 'ai', text: greetingMap[model] || '你好，有什麼可以幫你？', model }]);
+      setMessages([{ sender: 'ai' as 'ai', text: greetingMap[model] || '你好，有什麼可以幫你？', model }]);
       setHasGreeted(true);
     }
   }, [model, hasGreeted, assistantOptions]);
@@ -109,7 +109,7 @@ export default function AIHubPage() {
                   };
                   setMessages(prev => [
                     ...prev,
-                    { sender: 'ai', text: greetingMap[pendingModel] || '你好，有什麼可以幫你？', model: pendingModel }
+                    { sender: 'ai' as 'ai', text: greetingMap[pendingModel] || '你好，有什麼可以幫你？', model: pendingModel }
                   ]);
                   setPopupOpen(false);
                 }}
@@ -217,11 +217,11 @@ export default function AIHubPage() {
               className="px-4 py-2 bg-[#EBC9A4] text-[#2B3A3B] font-semibold rounded-lg ml-2"
               onClick={() => {
                 if (!input.trim()) return;
-                const newMessages = [...messages, { sender: 'user', text: input, model }];
+                const newMessages = [...messages, { sender: 'user' as 'user', text: input, model }];
                 setMessages(newMessages);
                 setInput('');
                 const assistantLabel = assistantOptions.find(opt => opt.value === model)?.label || '';
-                setMessages(prev => [...prev, { sender: 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
+                setMessages(prev => [...prev, { sender: 'ai' as 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
                 const webhookMap: Record<string, string> = {
                   'llama3-custom': 'http://10.147.19.122:5678/webhook/d5c7aec9-194c-4f70-812e-d62ae4984e95',
                   'deepseek-r1-8b': 'http://10.147.19.122:5678/webhook/895a02fe-e4e3-4b95-b362-778ab66a82b3',
@@ -248,7 +248,7 @@ export default function AIHubPage() {
                       ) {
                         updated[lastIndex] = { ...updated[lastIndex], text: replyText };
                       } else {
-                        updated.push({ sender: 'ai', text: replyText, model });
+                        updated.push({ sender: 'ai' as 'ai', text: replyText, model });
                       }
                       return updated;
                     });
@@ -264,7 +264,7 @@ export default function AIHubPage() {
                       ) {
                         updated[lastIndex] = { ...updated[lastIndex], text: '出現錯誤，請稍後再試' };
                       } else {
-                        updated.push({ sender: 'ai', text: '出現錯誤，請稍後再試', model });
+                        updated.push({ sender: 'ai' as 'ai', text: '出現錯誤，請稍後再試', model });
                       }
                       return updated;
                     });
@@ -290,12 +290,12 @@ export default function AIHubPage() {
               className="px-4 py-2 bg-[#EBC9A4] text-[#2B3A3B] font-semibold rounded-r-lg"
               onClick={() => {
                 if (!input.trim()) return;
-                const newMessages = [...messages, { sender: 'user', text: input, model }];
+                const newMessages = [...messages, { sender: 'user' as 'user', text: input, model }];
                 setMessages(newMessages);
                 setInput('');
 
                 const assistantLabel = assistantOptions.find(opt => opt.value === model)?.label || '';
-                setMessages(prev => [...prev, { sender: 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
+                setMessages(prev => [...prev, { sender: 'ai' as 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
 
                 const webhookMap: Record<string, string> = {
                   'llama3-custom': 'http://10.147.19.122:5678/webhook/d5c7aec9-194c-4f70-812e-d62ae4984e95',
@@ -347,7 +347,7 @@ export default function AIHubPage() {
                       ) {
                         updated[lastIndex] = { ...updated[lastIndex], text: replyText };
                       } else {
-                        updated.push({ sender: 'ai', text: replyText, model });
+                        updated.push({ sender: 'ai' as 'ai', text: replyText, model });
                       }
                       return updated;
                     });
@@ -364,7 +364,7 @@ export default function AIHubPage() {
                       ) {
                         updated[lastIndex] = { ...updated[lastIndex], text: '抱歉，他的大腦當機了，請稍後再試' };
                       } else {
-                        updated.push({ sender: 'ai', text: '抱歉，他的大腦當機了，請稍後再試', model });
+                        updated.push({ sender: 'ai' as 'ai', text: '抱歉，他的大腦當機了，請稍後再試', model });
                       }
                       return updated;
                     });
@@ -374,7 +374,7 @@ export default function AIHubPage() {
                   setTimeout(() => {
                     setMessages((msgs) => [
                       ...msgs,
-                      { sender: 'ai', text: '抱歉，他正在忙碌中...，請稍後再試', model }
+                      { sender: 'ai' as 'ai', text: '抱歉，他正在忙碌中...，請稍後再試', model }
                     ]);
                   }, 1000);
                 }
@@ -406,12 +406,12 @@ export default function AIHubPage() {
               className="px-4 py-2 bg-[#EBC9A4] text-[#2B3A3B] font-semibold rounded-lg ml-2"
               onClick={() => {
                 if (!input.trim()) return;
-                const newMessages = [...messages, { sender: 'user', text: input, model }];
+                const newMessages = [...messages, { sender: 'user' as 'user', text: input, model }];
                 setMessages(newMessages);
                 setInput('');
 
                 const assistantLabel = assistantOptions.find(opt => opt.value === model)?.label || '';
-                setMessages(prev => [...prev, { sender: 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
+                setMessages(prev => [...prev, { sender: 'ai' as 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
 
                 const webhookMap: Record<string, string> = {
                   'llama3-custom': 'http://10.147.19.122:5678/webhook/d5c7aec9-194c-4f70-812e-d62ae4984e95',
@@ -463,7 +463,7 @@ export default function AIHubPage() {
                       ) {
                         updated[lastIndex] = { ...updated[lastIndex], text: replyText };
                       } else {
-                        updated.push({ sender: 'ai', text: replyText, model });
+                        updated.push({ sender: 'ai' as 'ai', text: replyText, model });
                       }
                       return updated;
                     });
@@ -480,7 +480,7 @@ export default function AIHubPage() {
                       ) {
                         updated[lastIndex] = { ...updated[lastIndex], text: '抱歉，他的大腦當機了，請稍後再試' };
                       } else {
-                        updated.push({ sender: 'ai', text: '抱歉，他的大腦當機了，請稍後再試', model });
+                        updated.push({ sender: 'ai' as 'ai', text: '抱歉，他的大腦當機了，請稍後再試', model });
                       }
                       return updated;
                     });
@@ -490,7 +490,7 @@ export default function AIHubPage() {
                   setTimeout(() => {
                     setMessages((msgs) => [
                       ...msgs,
-                      { sender: 'ai', text: '抱歉，他正在忙碌中...，請稍後再試', model }
+                      { sender: 'ai' as 'ai', text: '抱歉，他正在忙碌中...，請稍後再試', model }
                     ]);
                   }, 1000);
                 }
@@ -541,7 +541,7 @@ export default function AIHubPage() {
                 <img src={photoPreview} alt="preview" className="w-40 rounded border mb-2" />
                 <button
                   onClick={async () => {
-                    setMessages(prev => [...prev, { sender: 'user', text: '已上傳相片，等待回應...', model }]);
+                    setMessages(prev => [...prev, { sender: 'user' as 'user', text: '已上傳相片，等待回應...', model }]);
                     const webhookURL = 'http://10.147.19.122:5678/webhook/a94f62fe-81df-4139-bde9-4538a8dcc5ed';
                     const payload = new FormData();
                     const blob = await (await fetch(photoPreview)).blob();
@@ -563,7 +563,7 @@ export default function AIHubPage() {
                       ) {
                         updated[lastIndex] = { ...updated[lastIndex], text: replyText };
                       } else {
-                        updated.push({ sender: 'ai', text: replyText, model });
+                        updated.push({ sender: 'ai' as 'ai', text: replyText, model });
                       }
                       return updated;
                     });
@@ -579,7 +579,7 @@ export default function AIHubPage() {
                       ) {
                         updated[lastIndex] = { ...updated[lastIndex], text: '圖片處理時發生錯誤' };
                       } else {
-                        updated.push({ sender: 'ai', text: '圖片處理時發生錯誤', model });
+                        updated.push({ sender: 'ai' as 'ai', text: '圖片處理時發生錯誤', model });
                       }
                       return updated;
                     });
