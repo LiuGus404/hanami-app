@@ -195,7 +195,7 @@ export default function StudentManagementPage() {
     
     // 處理常規學生的星期
     const regularWeekdays = Array.isArray(student.regular_weekday)
-      ? student.regular_weekday.map((d) => d.toString())
+      ? student.regular_weekday.map((d: string | number) => d.toString())
       : typeof student.regular_weekday === 'string'
         ? [student.regular_weekday]
         : typeof student.regular_weekday === 'number'
