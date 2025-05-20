@@ -220,7 +220,7 @@ export default function StudentManagementPage() {
 
     const weekdayMatch =
       selectedWeekdays.length === 0 ||
-      regularWeekdays.some((day) => selectedWeekdays.includes(day)) ||
+      regularWeekdays.some((day: string) => selectedWeekdays.includes(day)) ||
       (trialWeekday && selectedWeekdays.includes(trialWeekday))
 
     const lessonMatch =
