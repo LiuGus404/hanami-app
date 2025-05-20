@@ -98,7 +98,7 @@ export default function AIHubPage() {
                   value: opt.value
                 }))}
                 selected={pendingModel}
-                onChange={(val) => setPendingModel(val)}
+                onChange={(val) => setPendingModel(val as string)}
                 onConfirm={() => {
                   setModel(pendingModel);
                   const greetingMap: Record<string, string> = {
