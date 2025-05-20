@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, ReactNode } from 'react'
 import { Sprout } from 'lucide-react'
 
 export type PopupSelectProps = {
   title: string
-  options: { label: string; value: string }[]
+  options: { label: ReactNode; value: string }[]
   selected: string[] | string
   onChange: (newSelected: string[] | string) => void
   onConfirm?: () => void
