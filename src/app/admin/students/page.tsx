@@ -290,7 +290,13 @@ export default function StudentManagementPage() {
                     { label: '試堂', value: '試堂' },
                   ]}
                   selected={selectedCourses}
-                  onChange={setSelectedCourses}
+                  onChange={(value) => {
+                    if (Array.isArray(value)) {
+                      setSelectedCourses(value);
+                    } else if (typeof value === 'string') {
+                      setSelectedCourses([value]);
+                    }
+                  }}
                   onConfirm={() => { console.log('父層 confirm'); setDropdownOpen(false) }}
                   onCancel={() => { console.log('父層 cancel'); setDropdownOpen(false) }}
                 />
