@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import AIChatPanel from '@/components/AIChatPanel'
+import AIControlPanel from '@/components/AIControlPanel'
 import PopupSelect from '@/components/ui/PopupSelect'
 
 type MessageType = {
