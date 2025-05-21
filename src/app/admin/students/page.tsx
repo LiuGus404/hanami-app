@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Checkbox } from '@/components/ui/checkbox'
-import PopupSelect from '@/components/ui/PopupSelect'
+import { PopupSelect } from '@/components/ui/PopupSelect'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import StudentCard from '@/components/ui/StudentCard'
@@ -230,7 +230,7 @@ export default function StudentManagementPage() {
           ? Number(student.remaining_lessons) > 2
           : selectedLessonFilter === 'lte2'
             ? Number(student.remaining_lessons) <= 2
-            : typeof customLessonCount === 'number'
+            : isCustomLessonFilterActive(selectedLessonFilter, customLessonCount)
               ? Number(student.remaining_lessons) === customLessonCount
               : true
 
@@ -323,7 +323,7 @@ export default function StudentManagementPage() {
                     { label: '星期日', value: '0' },
                   ]}
                   selected={selectedWeekdays}
-                  onChange={setSelectedWeekdays}
+                  onChange={value => setSelectedWeekdays(Array.isArray(value) ? value : [value])}
                   onConfirm={() => { console.log('父層 confirm'); setWeekdayDropdownOpen(false) }}
                   onCancel={() => { console.log('父層 cancel'); setWeekdayDropdownOpen(false) }}
                 />
@@ -386,20 +386,20 @@ export default function StudentManagementPage() {
             {(selectedCourses.length > 0 ||
               selectedWeekdays.length > 0 ||
               selectedLessonFilter !== 'all' ||
-              (selectedLessonFilter === 'custom' && customLessonCount !== '')) && (
-              <div className="mb-4">
-                <button
-                  onClick={() => {
-                    setSelectedCourses([])
-                    setSelectedWeekdays([])
-                    setSelectedLessonFilter('all')
-                    setCustomLessonCount('')
-                  }}
-                  className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#A68A64] shadow-sm hover:bg-[#f7f3ec]"
-                >
-                  清除條件
-                </button>
-              </div>
+              isCustomLessonFilterActive(selectedLessonFilter, customLessonCount)) && (
+                <div className="mb-4">
+                  <button
+                    onClick={() => {
+                      setSelectedCourses([])
+                      setSelectedWeekdays([])
+                      setSelectedLessonFilter('all')
+                      setCustomLessonCount('')
+                    }}
+                    className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#A68A64] shadow-sm hover:bg-[#f7f3ec]"
+                  >
+                    清除條件
+                  </button>
+                </div>
             )}
           </div>
         </div>
@@ -508,7 +508,7 @@ export default function StudentManagementPage() {
           </div>
         </div>
 
-        {console.log('👀 篩選後的學生列表:', sortedStudents)}
+        {/* Filtered students list */}
         {displayMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {sortedStudents
@@ -600,7 +600,6 @@ export default function StudentManagementPage() {
                       </motion.div>
                     )}
                     <StudentCard
-                      gender={student.gender}
                       name={student.full_name || '未命名學生'}
                       selected={selectedStudents.includes(student.id)}
                       avatar={
@@ -710,7 +709,7 @@ export default function StudentManagementPage() {
                     const months = ageInMonths % 12
                     const weekdays = ['日', '一', '二', '三', '四', '五', '六']
                     const regularWeekdays = Array.isArray(student.regular_weekday)
-                      ? student.regular_weekday.map(d => weekdays[Number(d)]).join('、')
+                      ? student.regular_weekday.map((d: string | number) => weekdays[Number(d)]).join('、')
                       : typeof student.regular_weekday === 'string'
                         ? weekdays[Number(student.regular_weekday)]
                         : '—'
@@ -733,7 +732,6 @@ export default function StudentManagementPage() {
                                 setSelectedStudents(selectedStudents.filter(id => id !== student.id))
                               }
                             }}
-                            onClick={(e) => e.stopPropagation()}
                           />
                         </td>
                         <td className="p-3 text-sm text-[#2B3A3B]">{index + 1}</td>
@@ -849,4 +847,8 @@ export default function StudentManagementPage() {
       </div>
     </div>
   )
+}
+
+function isCustomLessonFilterActive(filter: 'all' | 'gt2' | 'lte2' | 'custom', count: number | ''): boolean {
+  return filter === 'custom' && count !== '' && count !== null && count !== undefined;
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import PopupSelect from '@/components/ui/PopupSelect'
+import { PopupSelect } from '@/components/ui/PopupSelect'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Database } from '@/lib/database.types'
 import { useRouter } from 'next/navigation'

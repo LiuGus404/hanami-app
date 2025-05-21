@@ -868,6 +868,87 @@ export type Database = {
           },
         ]
       }
+      hanami_teacher_schedule: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          scheduled_date: string;
+          start_time: string;
+          end_time: string;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          scheduled_date: string;
+          start_time: string;
+          end_time: string;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Update: {
+          id?: string;
+          teacher_id?: string;
+          scheduled_date?: string;
+          start_time?: string;
+          end_time?: string;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Relationships: []
+      }
+      hanami_lesson_plan: {
+        Row: {
+          id: string;
+          created_at: string;
+          lesson_date: string;
+          timeslot: string;
+          course_type: string;
+          topic: string;
+          objectives: string[];
+          materials: string[];
+          teacher_ids: string[];
+          teacher_names: string[];
+          teacher_ids_1: string[];
+          teacher_ids_2: string[];
+          theme: string;
+          notes: string;
+        }
+        Insert: {
+          id?: string;
+          created_at?: string;
+          lesson_date: string;
+          timeslot: string;
+          course_type: string;
+          topic: string;
+          objectives: string[];
+          materials: string[];
+          teacher_ids: string[];
+          teacher_names: string[];
+          teacher_ids_1: string[];
+          teacher_ids_2: string[];
+          theme: string;
+          notes: string;
+        }
+        Update: {
+          id?: string;
+          created_at?: string;
+          lesson_date?: string;
+          timeslot?: string;
+          course_type?: string;
+          topic?: string;
+          objectives?: string[];
+          materials?: string[];
+          teacher_ids?: string[];
+          teacher_names?: string[];
+          teacher_ids_1?: string[];
+          teacher_ids_2?: string[];
+          theme?: string;
+          notes?: string;
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

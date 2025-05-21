@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import PopupSelect from './PopupSelect'
+import { PopupSelect } from './PopupSelect'
+import { Student, Teacher } from '@/types'
 
 const weekdays = [
   { label: '星期日', value: 0 },
@@ -12,32 +13,42 @@ const weekdays = [
   { label: '星期六', value: 6 },
 ]
 
-interface Student {
+interface StudentFormData {
   id: string;
+  student_oid: string | null;
   full_name: string;
-  gender: string;
-  course_type: string;
-  student_type: string;
-  regular_weekday?: string | null;
-  regular_timeslot?: string;
-  student_dob?: string;
-  school?: string;
-  address?: string;
-  student_teacher?: string;
-  student_preference?: string;
-  remaining_lessons?: number;
-  started_date?: string;
-  duration_months?: number;
-  contact_number?: string;
-  parent_email?: string;
-  health_notes?: string;
-  student_oid?: string;
-  trial_date?: string;
-  trial_time?: string;
-  lesson_date?: string;
-  actual_timeslot?: string;
-  student_age?: number;
-  [key: string]: any; // 添加索引簽名
+  nick_name: string | null;
+  gender: string | null;
+  contact_number: string;
+  student_dob: string | null;
+  student_age: number | null;
+  parent_email: string | null;
+  health_notes: string | null;
+  student_remarks: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  address: string | null;
+  course_type: string | null;
+  duration_months: number | null;
+  regular_timeslot: string | null;
+  regular_weekday: number | null;
+  remaining_lessons: number | null;
+  school: string | null;
+  started_date: string | null;
+  student_email: string | null;
+  student_password: string | null;
+  student_preference: string | null;
+  student_teacher: string | null;
+  student_type: string | null;
+  lesson_date: string | null;
+  actual_timeslot: string | null;
+}
+
+interface FormField {
+  name: keyof StudentFormData;
+  label: string;
+  type: string;
+  required: boolean;
 }
 
 type Props = {
@@ -48,7 +59,36 @@ type Props = {
 
 export default function StudentBasicInfo({ student, onUpdate, visibleFields = [] }: Props) {
   const [editMode, setEditMode] = useState(false)
-  const [formData, setFormData] = useState<Student>(student)
+  const [formData, setFormData] = useState<StudentFormData>({
+    id: student?.id || '',
+    full_name: student?.full_name || '',
+    student_age: student?.student_age || null,
+    gender: student?.gender || null,
+    course_type: student?.course_type || null,
+    regular_weekday: student?.regular_weekday || null,
+    regular_timeslot: student?.regular_timeslot || null,
+    student_teacher: student?.student_teacher || null,
+    created_at: student?.created_at || '',
+    updated_at: student?.updated_at || '',
+    student_oid: student?.student_oid || null,
+    nick_name: student?.nick_name || null,
+    contact_number: student?.contact_number || '',
+    student_dob: student?.student_dob || null,
+    parent_email: student?.parent_email || null,
+    health_notes: student?.health_notes || null,
+    student_remarks: student?.student_remarks || null,
+    address: student?.address || null,
+    duration_months: student?.duration_months || null,
+    school: student?.school || null,
+    started_date: student?.started_date || null,
+    student_email: student?.student_email || null,
+    student_password: student?.student_password || null,
+    student_preference: student?.student_preference || null,
+    lesson_date: student?.lesson_date || null,
+    actual_timeslot: student?.actual_timeslot || null,
+    remaining_lessons: student?.remaining_lessons || null,
+    student_type: student?.student_type || null,
+  })
   const [originalData, setOriginalData] = useState<Student>(student)
   const [courseOptions, setCourseOptions] = useState<string[] | null>(null)
   const [showGenderSelect, setShowGenderSelect] = useState(false)
@@ -118,17 +158,53 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     return true
   }
 
-  const handleChange = (field: keyof Student, value: any) => {
-    setFormData({ ...formData, [field]: value })
+  const handleChange = (field: keyof StudentFormData, value: string | number | null) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  }
+
+  function studentToFormData(student: Student): StudentFormData {
+    return {
+      id: student.id,
+      student_oid: student.student_oid ?? null,
+      full_name: student.full_name,
+      nick_name: student.nick_name ?? null,
+      gender: student.gender ?? null,
+      contact_number: student.contact_number ?? '',
+      student_dob: student.student_dob ?? null,
+      student_age: student.student_age ?? null,
+      parent_email: student.parent_email ?? null,
+      health_notes: student.health_notes ?? null,
+      student_remarks: student.student_remarks ?? null,
+      created_at: student.created_at ?? null,
+      updated_at: student.updated_at ?? null,
+      address: student.address ?? null,
+      course_type: student.course_type ?? null,
+      duration_months: student.duration_months ?? null,
+      regular_timeslot: student.regular_timeslot ?? null,
+      regular_weekday: student.regular_weekday ?? null,
+      remaining_lessons: student.remaining_lessons ?? null,
+      school: student.school ?? null,
+      started_date: student.started_date ?? null,
+      student_email: student.student_email ?? null,
+      student_password: student.student_password ?? null,
+      student_preference: student.student_preference ?? null,
+      student_teacher: student.student_teacher ?? null,
+      student_type: student.student_type ?? null,
+      lesson_date: student.lesson_date ?? null,
+      actual_timeslot: student.actual_timeslot ?? null,
+    }
   }
 
   const handleCancel = () => {
-    setFormData(originalData)
+    setFormData(studentToFormData(originalData))
     setEditMode(false)
   }
 
   const handleUndo = () => {
-    setFormData(originalData)
+    setFormData(studentToFormData(originalData))
   }
 
   const calculateAge = (birthDate: string) => {
@@ -147,23 +223,51 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   }
 
   const handleSave = async () => {
-    const requiredFields = ['full_name', 'gender', 'course_type', 'student_type']
-    const missingFields = requiredFields.filter(field => !formData[field])
-    
-    // 只有常規學生需要填寫固定上課時間
+    const missingFields: (keyof StudentFormData)[] = [];
+    const requiredFields: (keyof StudentFormData)[] = ['full_name', 'gender', 'course_type', 'student_type'];
+    requiredFields.forEach(field => {
+      if (!formData[field]) missingFields.push(field);
+    });
     if (formData.student_type === '常規') {
-      if (!formData.regular_weekday) missingFields.push('固定上課星期數')
-      if (!formData.regular_timeslot) missingFields.push('固定上課時段')
+      if (!formData.regular_weekday) missingFields.push('regular_weekday');
+      if (!formData.regular_timeslot) missingFields.push('regular_timeslot');
     }
-    
-    // 試堂學生需要檢查試堂時間
     if (formData.student_type === '試堂') {
-      if (!formData.lesson_date) missingFields.push('試堂日期')
-      if (!formData.actual_timeslot) missingFields.push('試堂時間')
+      if (!formData.lesson_date) missingFields.push('lesson_date');
+      if (!formData.actual_timeslot) missingFields.push('actual_timeslot');
     }
-
+    const fieldLabels: Record<keyof StudentFormData, string> = {
+      id: 'ID',
+      student_oid: '學生編號',
+      full_name: '姓名',
+      nick_name: '暱稱',
+      gender: '性別',
+      contact_number: '聯絡電話',
+      student_dob: '生日',
+      student_age: '年齡',
+      parent_email: '家長Email',
+      health_notes: '健康/過敏',
+      student_remarks: '備註',
+      created_at: '建立時間',
+      updated_at: '更新時間',
+      address: '地址',
+      course_type: '課程',
+      duration_months: '報讀時長',
+      regular_timeslot: '固定上課時段',
+      regular_weekday: '固定上課星期數',
+      remaining_lessons: '剩餘堂數',
+      school: '學校',
+      started_date: '入學日期',
+      student_email: '學生Email',
+      student_password: '學生密碼',
+      student_preference: '偏好',
+      student_teacher: '負責老師',
+      student_type: '類別',
+      lesson_date: '試堂日期',
+      actual_timeslot: '試堂時間',
+    };
     if (missingFields.length > 0) {
-      alert(`請填寫以下欄位：${missingFields.join(', ')}`)
+      alert(`請填寫以下欄位：${missingFields.map(f => fieldLabels[f] || f).join(', ')}`)
       return
     }
 
@@ -182,13 +286,23 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     if (formData.student_type === '試堂') {
       const { error: trialError } = await supabase
         .from('hanami_trial_students')
-        .update(formData)
+        .update({
+          ...formData,
+          duration_months: formData.duration_months !== undefined && formData.duration_months !== null ? String(formData.duration_months) : null,
+          regular_weekday: formData.regular_weekday !== undefined && formData.regular_weekday !== null ? String(formData.regular_weekday) : null,
+          created_at: formData.created_at || undefined
+        })
         .eq('id', formData.id)
       error = trialError;
     } else {
       const { error: studentError } = await supabase
         .from('Hanami_Students')
-        .update(formData)
+        .update({
+          ...formData,
+          duration_months: formData.duration_months ?? null,
+          regular_weekday: formData.regular_weekday ?? null,
+          created_at: formData.created_at || undefined
+        })
         .eq('id', formData.id)
       error = studentError;
     }
@@ -232,7 +346,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         {isVisible('student_oid') && (
           <>
             <div className="font-medium">學生編號：</div>
-            <div>{formData.student_oid || '—'}</div>
+            <div>{student.student_oid || '—'}</div>
           </>
         )}
 
@@ -255,7 +369,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                         { label: '男', value: 'male' },
                         { label: '女', value: 'female' }
                       ]}
-                      selected={tempGender}
+                      selected={tempGender || ''}
                       onChange={(value) => setTempGender(value as string)}
                       onConfirm={() => {
                         handleChange('gender', tempGender)
@@ -349,7 +463,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                       <PopupSelect
                         title="選擇課程"
                         options={courseOptions.map(c => ({ label: c, value: c }))}
-                        selected={tempCourse}
+                        selected={tempCourse || ''}
                         onChange={(value) => setTempCourse(value as string)}
                         onConfirm={() => {
                           handleChange('course_type', tempCourse)

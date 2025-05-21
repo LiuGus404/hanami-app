@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel'
-import PopupSelect from '@/components/ui/PopupSelect'
+import { PopupSelect } from '@/components/ui/PopupSelect'
 
 export default function TeacherSchedulePage() {
   const [teachers, setTeachers] = useState<any[]>([])

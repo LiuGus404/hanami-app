@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import PopupSelect from '@/components/ui/PopupSelect'
+import { PopupSelect } from '@/components/ui/PopupSelect'
+import { Teacher } from '@/types'
 
 function translateRole(role: string): string {
   switch (role) {
@@ -20,13 +21,34 @@ function translateRole(role: string): string {
   }
 }
 
+function normalizeTeacher(data: any): Teacher {
+  return {
+    id: data.id,
+    teacher_fullname: data.teacher_fullname ?? '',
+    teacher_nickname: data.teacher_nickname ?? '',
+    teacher_role: data.teacher_role ?? null,
+    teacher_status: data.teacher_status ?? null,
+    teacher_email: data.teacher_email ?? null,
+    teacher_phone: data.teacher_phone ?? null,
+    teacher_address: data.teacher_address ?? null,
+    teacher_gender: data.teacher_gender ?? null,
+    teacher_dob: data.teacher_dob ?? null,
+    teacher_hsalary: typeof data.teacher_hsalary === 'number' ? data.teacher_hsalary : null,
+    teacher_msalary: typeof data.teacher_msalary === 'number' ? data.teacher_msalary : null,
+    teacher_background: data.teacher_background ?? null,
+    teacher_bankid: data.teacher_bankid ?? null,
+    created_at: data.created_at ?? null,
+    updated_at: data.updated_at ?? null,
+  };
+}
+
 export default function TeacherDetailPage() {
   const { id } = useParams()
   const router = useRouter()
-  const [teacher, setTeacher] = useState<any>(null)
+  const [teacher, setTeacher] = useState<Teacher | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [editData, setEditData] = useState<any>({})
+  const [editData, setEditData] = useState<Teacher | null>(null)
   const [saving, setSaving] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [showRoleSelect, setShowRoleSelect] = useState(false)
@@ -65,8 +87,9 @@ export default function TeacherDetailPage() {
         setLoading(false)
         return
       }
-      setTeacher(data)
-      setEditData(data)
+      const normalized = normalizeTeacher(data);
+      setTeacher(normalized);
+      setEditData(normalized);
       setLoading(false)
     }
     fetchTeacher()
@@ -74,17 +97,18 @@ export default function TeacherDetailPage() {
 
   useEffect(() => {
     if (editMode) {
-      setTempRole(editData.teacher_role || '')
-      setTempStatus(editData.teacher_status || '')
+      setTempRole(editData?.teacher_role || '')
+      setTempStatus(editData?.teacher_status || '')
     }
   }, [editMode])
 
-  const handleChange = (field: string, value: any) => {
-    setEditData((prev: any) => ({ ...prev, [field]: value }))
+  const handleChange = (field: keyof Teacher, value: string | number | null) => {
+    setEditData((prev) => prev ? { ...prev, [field]: value } : prev)
   }
 
   const handleSave = async () => {
     setSaving(true)
+    if (!editData) return;
     const { error } = await supabase
       .from('hanami_employee')
       .update(editData)
@@ -104,7 +128,7 @@ export default function TeacherDetailPage() {
   if (error) {
     return <div className="flex items-center justify-center min-h-screen text-red-500">{error}</div>
   }
-  if (!teacher) {
+  if (!teacher || !editData) {
     return <div className="flex items-center justify-center min-h-screen">找不到老師資料</div>
   }
 
@@ -244,7 +268,7 @@ export default function TeacherDetailPage() {
           <label className="flex flex-col gap-1">
             <span>月薪</span>
             {editMode ? (
-              <input className="border rounded px-3 py-2" type="number" value={editData.teacher_msalary ?? ''} onChange={e => handleChange('teacher_msalary', e.target.value ? Number(e.target.value) : null)} />
+              <input className="border rounded px-3 py-2" type="number" value={editData.teacher_msalary != null ? String(editData.teacher_msalary) : ''} onChange={e => handleChange('teacher_msalary', e.target.value === '' ? null : Number(e.target.value))} />
             ) : (
               <div className="px-3 py-2">{editData.teacher_msalary ?? '—'}</div>
             )}
@@ -252,7 +276,7 @@ export default function TeacherDetailPage() {
           <label className="flex flex-col gap-1">
             <span>時薪</span>
             {editMode ? (
-              <input className="border rounded px-3 py-2" type="number" value={editData.teacher_hsalary ?? ''} onChange={e => handleChange('teacher_hsalary', e.target.value ? Number(e.target.value) : null)} />
+              <input className="border rounded px-3 py-2" type="number" value={editData.teacher_hsalary != null ? String(editData.teacher_hsalary) : ''} onChange={e => handleChange('teacher_hsalary', e.target.value === '' ? null : Number(e.target.value))} />
             ) : (
               <div className="px-3 py-2">{editData.teacher_hsalary ?? '—'}</div>
             )}

@@ -6,13 +6,13 @@ import { supabase } from '@/lib/supabase'
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-function getTodayISO() {
+function getTodayISO(): string {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return today.toISOString().slice(0, 10)
 }
 
-function formatAge(months: number | null | undefined) {
+function formatAge(months: number | null | undefined): string {
   if (!months || isNaN(months)) return ''
   const y = Math.floor(months / 12)
   const m = months % 12
@@ -22,7 +22,7 @@ function formatAge(months: number | null | undefined) {
   return `${y}歲${m}月`
 }
 
-function calculateAgeRange(students: TrialStudent[]): string {
+function calculateAgeRange(students: { student_age: number | null | undefined }[]): string {
   const ages = students
     .map(s => s.student_age)
     .filter((age): age is number => age !== null && age !== undefined)
@@ -36,23 +36,32 @@ function calculateAgeRange(students: TrialStudent[]): string {
   return `${formatAge(minAge)}-${formatAge(maxAge)}`
 }
 
-type Slot = {
-  weekday: number // 0–6
-  time: string
-  max: number
-  current: number
-  duration?: string | null
-  trial_students?: TrialStudent[]
-  regular_students_ages?: number[]
+interface Slot {
+  time: string;
+  course: string;
+  weekday: number;
+  max: number;
+  current: number;
+  duration: string | null;
+  trial_students: TrialStudent[];
+  regular_students_ages: number[];
 }
 
-type TrialStudent = {
-  id: string
-  full_name: string | null
-  student_age: number | null
-  lesson_date: string | null
-  actual_timeslot: string | null
-  weekday: string | null
+interface TrialStudent {
+  id: string;
+  full_name: string;
+  student_age: number | null;
+  lesson_date: string;
+  actual_timeslot: string | null;
+  weekday: number;
+}
+
+interface ScheduleData {
+  weekday: number;
+  timeslot: string;
+  max_students: number;
+  current_students: number;
+  duration: string | null;
 }
 
 export default function LessonAvailabilityDashboard() {
@@ -99,7 +108,13 @@ export default function LessonAvailabilityDashboard() {
           if (!t.actual_timeslot || t.weekday === null || t.weekday === undefined) continue
           const key = `${t.weekday}_${t.actual_timeslot}`
           if (!trialMap[key]) trialMap[key] = []
-          trialMap[key].push(t)
+          trialMap[key].push({
+            ...t,
+            full_name: t.full_name || '',
+            lesson_date: t.lesson_date || '',
+            actual_timeslot: t.actual_timeslot || '',
+            weekday: typeof t.weekday === 'string' ? parseInt(t.weekday) : t.weekday,
+          })
         }
         // 5. 將常規學生依 regular_weekday+regular_timeslot 分組，收集年齡
         const regularAgeMap: { [key: string]: number[] } = {}
@@ -112,18 +127,27 @@ export default function LessonAvailabilityDashboard() {
           }
         }
         // 6. 合併到 slot
-        const mapped: Slot[] = (slotData || []).map((d) => {
-          const key = `${d.weekday}_${d.timeslot}`
-          return {
-            weekday: d.weekday,
-            time: d.timeslot,
-            max: d.max_students ?? 0,
-            current: d.current_students ?? 0,
-            duration: d.duration ?? null,
-            trial_students: trialMap[key] || [],
-            regular_students_ages: regularAgeMap[key] || [],
-          }
-        })
+        let mapped: Slot[] = [];
+        if (Array.isArray(slotData) && !(slotData.length > 0 && 'error' in slotData[0])) {
+          mapped = ((slotData as unknown) as ScheduleData[])
+            .filter(slot =>
+              slot &&
+              typeof slot.timeslot === 'string' &&
+              typeof slot.weekday === 'number' &&
+              typeof slot.max_students === 'number' &&
+              typeof slot.current_students === 'number'
+            )
+            .map(slot => ({
+              time: slot.timeslot,
+              course: '',
+              weekday: slot.weekday,
+              max: slot.max_students,
+              current: slot.current_students,
+              duration: slot.duration,
+              trial_students: trialMap[`${slot.weekday}_${slot.timeslot}`] || [],
+              regular_students_ages: regularAgeMap[`${slot.weekday}_${slot.timeslot}`] || []
+            }))
+        }
         setSlots(mapped)
       } catch (err) {
         setError('系統錯誤，請稍後再試')
@@ -142,7 +166,7 @@ export default function LessonAvailabilityDashboard() {
   })
 
   // 格式化時段顯示：09:15-10:15（不含秒數）
-  function formatTimeslot(time: string, duration: string | null | undefined) {
+  function formatTimeslot(time: string, duration: string | null | undefined): string {
     if (!duration) return time.slice(0, 5)
     const start = time.slice(0, 5)
     const end = (() => {
@@ -251,7 +275,7 @@ export default function LessonAvailabilityDashboard() {
                     </div>
                   ))
                 ) : (
-                  <div className="text-gray-300 p-2">—</div>
+                  <div className="flex-1 border-b border-[#EADBC8]" />
                 )}
               </div>
             ))}

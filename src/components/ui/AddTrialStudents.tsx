@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Image from 'next/image'
+import { TrialLesson } from '@/types'
 
 export default function TrialQueueForm() {
   const [form, setForm] = useState({
@@ -20,8 +21,11 @@ export default function TrialQueueForm() {
 
   const [submitted, setSubmitted] = useState(false)
 
-  const handleChange = (field: string, value: any) => {
-    setForm({ ...form, [field]: value })
+  const handleChange = (field: keyof TrialLesson, value: any) => {
+    setForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
   }
 
   const handleSubmit = async () => {
@@ -45,8 +49,8 @@ export default function TrialQueueForm() {
       '星期六': '6',
     }
     const convertedPreferTime = form.prefer_time.map((entry) => {
-      const [dayText, time] = entry.split(' ')
-      const weekday = dayMap[dayText] ?? dayText
+      const [dayText, time] = (entry as string).split(' ')
+      const weekday = dayMap[dayText as keyof typeof dayMap] ?? dayText
       return `${weekday} ${time}`
     })
     const id = form.id || crypto.randomUUID()
@@ -176,7 +180,7 @@ export default function TrialQueueForm() {
                           ...form.prefer_time,
                           ...slots.map((slot) => `${day} ${slot}`),
                         ].filter((v, i, arr) => arr.indexOf(v) === i) // 去重
-                        handleChange('prefer_time', updated)
+                        handleChange('prefer_time', updated as string[])
                       }}
                       className="px-1.5 py-0.5 text-xs bg-white text-[#4B4036] border border-[#D8CDBF] rounded-md hover:bg-[#f5f5f5] transition"
                     >
@@ -186,7 +190,7 @@ export default function TrialQueueForm() {
                       type="button"
                       onClick={() => {
                         const updated = form.prefer_time.filter((v) => !slots.map((slot) => `${day} ${slot}`).includes(v))
-                        handleChange('prefer_time', updated)
+                        handleChange('prefer_time', updated as string[])
                       }}
                       className="px-1.5 py-0.5 text-xs bg-white text-[#87704e] border border-[#D8CDBF] rounded-md hover:bg-[#f5f5f5] transition"
                     >
@@ -202,13 +206,13 @@ export default function TrialQueueForm() {
                         key={label}
                         onClick={() => {
                           const current = form.prefer_time
-                          const updated = current.includes(label)
-                            ? current.filter((v) => v !== label)
-                            : [...current, label]
-                          handleChange('prefer_time', updated)
+                          const updated = (current as string[]).includes(label)
+                            ? (current as string[]).filter((v) => v !== label)
+                            : [...(current as string[]), label]
+                          handleChange('prefer_time', updated as string[])
                         }}
                         className={`px-3 py-1 rounded-full text-sm border ${
-                          form.prefer_time.includes(label)
+                          (form.prefer_time as string[]).includes(label)
                             ? 'bg-[#FDE6C2] border-[#E4B888] text-[#4B4036]'
                             : 'bg-white border-[#D8CDBF] text-[#87704e]'
                         }`}

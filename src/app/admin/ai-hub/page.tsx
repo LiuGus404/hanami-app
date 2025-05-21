@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import AIControlPanel from '@/components/AIControlPanel'
-import PopupSelect from '@/components/ui/PopupSelect'
+import { PopupSelect } from '@/components/ui/PopupSelect'
 
 type MessageType = {
   sender: 'user' | 'ai';
@@ -89,12 +89,7 @@ export default function AIHubPage() {
               <PopupSelect
                 title="選擇 AI 助理"
                 options={assistantOptions.map(opt => ({
-                  label: (
-                    <div className="flex items-center gap-2">
-                      <Image src={opt.image} alt={opt.label} width={24} height={24} />
-                      <span>{opt.label}</span>
-                    </div>
-                  ),
+                  label: opt.label,
                   value: opt.value
                 }))}
                 selected={pendingModel}

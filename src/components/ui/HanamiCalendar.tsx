@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
-import PopupSelect from '@/components/ui/PopupSelect';
+import { PopupSelect } from '@/components/ui/PopupSelect';
+import { TrialLesson } from '@/types'
 
 // 固定香港時區的 Date 產生器
 const getHongKongDate = (date = new Date()) => {
@@ -20,24 +21,49 @@ type TrialStudent = {
   created_at: string;
   lesson_date: string;
   actual_timeslot: string;
-  course_type: string;
+  course_type: string | null;
   weekday: string | null;
 };
 
 type RegularLesson = {
   id: string;
-  student_id: string;
+  student_id: string | null;
   lesson_date: string;
   regular_timeslot: string;
-  course_type: string;
+  course_type: string | null;
   lesson_status: string | null;
   Hanami_Students: {
     full_name: string;
     student_age: number | null;
-  };
+    remaining_lessons: number | null;
+  } | null;
 };
 
-type Lesson = {
+interface GroupedDetail {
+  time: string;
+  course: string;
+  names: {
+    name: string;
+    student_id: string;
+    age: string;
+    is_trial?: boolean;
+    remaining_lessons?: number | null;
+  }[];
+}
+
+interface GroupedLesson {
+  time: string;
+  course: string;
+  names: {
+    name: string;
+    student_id: string;
+    age: string;
+    is_trial?: boolean;
+    remaining_lessons?: number | null;
+  }[];
+}
+
+interface Lesson {
   id: string;
   student_id: string;
   lesson_date: string;
@@ -46,28 +72,15 @@ type Lesson = {
   full_name: string;
   student_age: number | null;
   lesson_status: string | null;
-  is_trial?: boolean;
+  remaining_lessons: number | null;
+  is_trial: boolean;
   age_display?: string;
-  remaining_lessons?: number;
-};
-
-type GroupedLesson = {
-  time: string;
-  course: string;
-  lessons: Lesson[];
-};
-
-type GroupedDetail = {
-  time: string;
-  course: string;
-  names: {
-    name: string;
-    student_id: string;
-    age: string;
-    is_trial?: boolean;
-    remaining_lessons?: number;
-  }[];
-};
+  Hanami_Students?: {
+    full_name: string;
+    student_age: number;
+    remaining_lessons: number;
+  } | null;
+}
 
 type StudentNameObj = {
   name: string;
@@ -81,6 +94,12 @@ type SelectedDetail = {
   groups: GroupedDetail[];
 };
 
+// 修改 holidays 型別
+type Holiday = {
+  date: string;
+  title: string;
+};
+
 const HanamiCalendar = () => {
   const [view, setView] = useState<'day' | 'week' | 'month'>('day');
   const [currentDate, setCurrentDate] = useState(getHongKongDate());
@@ -91,12 +110,21 @@ const HanamiCalendar = () => {
   const [popupInfo, setPopupInfo] = useState<{ lessonId: string } | null>(null);
   const [popupSelected, setPopupSelected] = useState<string>('');
   // 節日資料
-  const [holidays, setHolidays] = useState<{ date: string; title: string }[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   // 抓取節日資料
   useEffect(() => {
     const fetchHolidays = async () => {
       const { data, error } = await supabase.from('hanami_holidays').select('date, title');
-      if (!error && data) setHolidays(data);
+      if (!error && data) {
+        // 確保資料符合 Holiday 型別
+        const validHolidays: Holiday[] = data
+          .filter((h): h is Holiday => h.date !== null && h.title !== null)
+          .map(h => ({
+            date: h.date,
+            title: h.title
+          }));
+        setHolidays(validHolidays);
+      }
     };
     fetchHolidays();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,64 +190,71 @@ const HanamiCalendar = () => {
         }
 
         // 處理常規學生數據
-        const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => {
-          console.log('處理常規學生課堂:', lesson);
-          return {
-            id: lesson.id,
-            student_id: lesson.student_id,
-            lesson_date: lesson.lesson_date,
-            regular_timeslot: lesson.regular_timeslot,
-            course_type: lesson.course_type,
-            full_name: lesson.Hanami_Students?.full_name || '未命名學生',
-            student_age: lesson.Hanami_Students?.student_age || null,
-            lesson_status: lesson.lesson_status,
-            remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
-            is_trial: false
-          };
-        });
+        const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
+          id: lesson.id,
+          student_id: lesson.student_id ?? '',
+          lesson_date: lesson.lesson_date,
+          regular_timeslot: lesson.regular_timeslot,
+          course_type: lesson.course_type || '',
+          full_name: lesson.Hanami_Students?.full_name || '未命名學生',
+          student_age: lesson.Hanami_Students?.student_age || null,
+          lesson_status: lesson.lesson_status,
+          remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+          is_trial: false
+        }));
 
         // 處理試堂學生數據
         const processedTrialLessons = (trialLessonsData || []).map((trial: any) => {
           // 計算年齡
           let ageDisplay = '';
-          if (trial.student_age) {
-            const months = parseInt(trial.student_age);
-            const years = Math.floor(months / 12);
-            const remainingMonths = months % 12;
+          let studentAge = 0;
+          if (trial.student_age !== null && trial.student_age !== undefined) {
+            studentAge = typeof trial.student_age === 'string' ? parseInt(trial.student_age) : trial.student_age;
+            const years = Math.floor(studentAge / 12);
+            const remainingMonths = studentAge % 12;
             ageDisplay = `${years}Y${remainingMonths}M`;
           }
-
           return {
             id: trial.id,
             student_id: trial.id,
             lesson_date: trial.lesson_date,
             regular_timeslot: trial.actual_timeslot,
-            course_type: trial.course_type,
+            course_type: trial.course_type || '',
             full_name: trial.full_name || '未命名學生',
-            student_age: trial.student_age,
+            student_age: studentAge,
             age_display: ageDisplay,
             lesson_status: null,
-            is_trial: true
-          };
+            remaining_lessons: null,
+            is_trial: true,
+            health_note: trial.health_note ?? null
+          } as Lesson;
         });
 
         // 合併常規和試堂學生的課堂
-        const allLessons = [...processedRegularLessons, ...processedTrialLessons];
-        console.log('合併後的課堂:', allLessons);
-        setLessons(allLessons);
+        let allLessons: Lesson[] = [...processedRegularLessons, ...processedTrialLessons];
 
-        // 獲取所有學生資料
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('Hanami_Students')
-          .select('id, full_name, student_age');
+        // 分組處理
+        const grouped = allLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
+          const key = `${l.regular_timeslot}_${l.course_type}`;
+          if (!acc[key]) {
+            acc[key] = {
+              time: l.regular_timeslot,
+              course: l.course_type,
+              names: []
+            };
+          }
+          acc[key].names.push({
+            name: l.full_name,
+            student_id: l.student_id,
+            age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
+            is_trial: l.is_trial,
+            remaining_lessons: l.remaining_lessons
+          });
+          return acc;
+        }, {});
 
-        if (studentsError) {
-          console.error('Fetch students error:', studentsError);
-          setStudents([]);
-          return;
-        }
-
-        setStudents(studentsData || []);
+        const groupedArray: GroupedLesson[] = Object.values(grouped);
+        setSelectedDetail({ date: currentDate, groups: groupedArray });
       };
       fetchDay();
     } else if (view === 'week') {
@@ -267,10 +302,10 @@ const HanamiCalendar = () => {
         // 處理常規學生數據
         const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
           id: lesson.id,
-          student_id: lesson.student_id,
+          student_id: lesson.student_id ?? '',
           lesson_date: lesson.lesson_date,
           regular_timeslot: lesson.regular_timeslot,
-          course_type: lesson.course_type,
+          course_type: lesson.course_type || '',
           full_name: lesson.Hanami_Students?.full_name || '未命名學生',
           student_age: lesson.Hanami_Students?.student_age || null,
           lesson_status: lesson.lesson_status,
@@ -292,7 +327,7 @@ const HanamiCalendar = () => {
         }));
 
         // 合併常規和試堂學生的課堂
-        const allLessons = [...processedRegularLessons, ...processedTrialLessons];
+        let allLessons = [...processedRegularLessons, ...processedTrialLessons];
         setLessons(allLessons);
 
         // 獲取所有學生資料
@@ -350,10 +385,10 @@ const HanamiCalendar = () => {
         // 處理常規學生數據
         const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
           id: lesson.id,
-          student_id: lesson.student_id,
+          student_id: lesson.student_id ?? '',
           lesson_date: lesson.lesson_date,
           regular_timeslot: lesson.regular_timeslot,
-          course_type: lesson.course_type,
+          course_type: lesson.course_type || '',
           full_name: lesson.Hanami_Students?.full_name || '未命名學生',
           student_age: lesson.Hanami_Students?.student_age || null,
           lesson_status: lesson.lesson_status,
@@ -375,7 +410,7 @@ const HanamiCalendar = () => {
         }));
 
         // 合併常規和試堂學生的課堂
-        const allLessons = [...processedRegularLessons, ...processedTrialLessons];
+        let allLessons = [...processedRegularLessons, ...processedTrialLessons];
         setLessons(allLessons);
 
         // 獲取所有學生資料
@@ -475,49 +510,48 @@ const HanamiCalendar = () => {
     }
 
     // 處理常規學生數據
-    const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => {
-      console.log('處理常規學生課堂:', lesson);
-      return {
-        id: lesson.id,
-        student_id: lesson.student_id,
-        lesson_date: lesson.lesson_date,
-        regular_timeslot: lesson.regular_timeslot,
-        course_type: lesson.course_type,
-        full_name: lesson.Hanami_Students?.full_name || '未命名學生',
-        student_age: lesson.Hanami_Students?.student_age || null,
-        lesson_status: lesson.lesson_status,
-        remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
-        is_trial: false
-      };
-    });
+    const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
+      id: lesson.id,
+      student_id: lesson.student_id ?? '',
+      lesson_date: lesson.lesson_date,
+      regular_timeslot: lesson.regular_timeslot,
+      course_type: lesson.course_type || '',
+      full_name: lesson.Hanami_Students?.full_name || '未命名學生',
+      student_age: lesson.Hanami_Students?.student_age || null,
+      lesson_status: lesson.lesson_status,
+      remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+      is_trial: false
+    }));
 
     // 處理試堂學生數據
     const processedTrialLessons = (trialLessonsData || []).map((trial: any) => {
       // 計算年齡
       let ageDisplay = '';
-      if (trial.student_age) {
-        const months = parseInt(trial.student_age);
-        const years = Math.floor(months / 12);
-        const remainingMonths = months % 12;
+      let studentAge = 0;
+      if (trial.student_age !== null && trial.student_age !== undefined) {
+        studentAge = typeof trial.student_age === 'string' ? parseInt(trial.student_age) : trial.student_age;
+        const years = Math.floor(studentAge / 12);
+        const remainingMonths = studentAge % 12;
         ageDisplay = `${years}Y${remainingMonths}M`;
       }
-
       return {
         id: trial.id,
         student_id: trial.id,
         lesson_date: trial.lesson_date,
         regular_timeslot: trial.actual_timeslot,
-        course_type: trial.course_type,
+        course_type: trial.course_type || '',
         full_name: trial.full_name || '未命名學生',
-        student_age: trial.student_age,
+        student_age: studentAge,
         age_display: ageDisplay,
         lesson_status: null,
-        is_trial: true
-      };
+        remaining_lessons: null,
+        is_trial: true,
+        health_note: trial.health_note ?? null
+      } as Lesson;
     });
 
     // 合併常規和試堂學生的課堂
-    let allLessons = [...processedRegularLessons, ...processedTrialLessons];
+    let allLessons: Lesson[] = [...processedRegularLessons, ...processedTrialLessons];
 
     // 如果有指定課程和時間，進行過濾
     if (course && time) {
@@ -527,7 +561,7 @@ const HanamiCalendar = () => {
     }
 
     // 分組處理
-    const grouped = allLessons.reduce((acc: Record<string, GroupedDetail>, l: Lesson) => {
+    const grouped = allLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
       const key = `${l.regular_timeslot}_${l.course_type}`;
       if (!acc[key]) {
         acc[key] = {
@@ -536,26 +570,18 @@ const HanamiCalendar = () => {
           names: []
         };
       }
-
-      let age = '';
-      if (l.is_trial) {
-        age = l.age_display || '';
-      } else {
-        age = getStudentAge(l.student_id);
-      }
-
       acc[key].names.push({
         name: l.full_name,
         student_id: l.student_id,
-        age,
+        age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
         is_trial: l.is_trial,
         remaining_lessons: l.remaining_lessons
       });
       return acc;
     }, {});
 
-    const groupsArray = Object.values(grouped).sort((a, b) => a.time.localeCompare(b.time));
-    setSelectedDetail({ date, groups: groupsArray });
+    const groupedArray: GroupedLesson[] = Object.values(grouped);
+    setSelectedDetail({ date, groups: groupedArray });
   };
 
   const handleUpdateStatus = async (lessonId: string, status: string) => {
@@ -780,53 +806,37 @@ const HanamiCalendar = () => {
                       acc[key] = {
                         time: l.regular_timeslot,
                         course: l.course_type,
-                        lessons: []
+                        names: []
                       };
                     }
-                    acc[key].lessons.push(l);
+                    acc[key].names.push({
+                      name: l.full_name,
+                      student_id: l.student_id,
+                      age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
+                      is_trial: l.is_trial,
+                      remaining_lessons: l.remaining_lessons
+                    });
                     return acc;
                   }, {});
 
-                  const groupedArray = Object.values(grouped).sort((a, b) => a.time.localeCompare(b.time));
+                  const groupedArray: GroupedLesson[] = Object.values(grouped);
                   console.log('分組後的課堂:', groupedArray);
 
-                  return groupedArray.map((g, i) => {
-                    const endTime = (() => {
-                      const [h, m] = g.time.split(':').map(Number);
-                      let duration = 45;
-                      if (g.course === '音樂專注力') duration = 60;
-                      const end = getHongKongDate();
-                      end.setHours(h, m + duration);
-                      return end.toTimeString().slice(0, 5);
-                    })();
+                  return groupedArray.map((g) => {
                     return (
-                      <div key={`${g.time}-${g.course}-${i}`} className="border-l-2 pl-4">
-                        <div className="text-[#4B4036] font-bold">
-                          {g.time.slice(0,5)}-{endTime} {g.course} ({g.lessons.length})
-                        </div>
-                        <div className="ml-4 text-sm text-[#4B4036]">
-                          {g.lessons.map((lesson, j) => {
-                            // 根據學生類型選擇不同的年齡獲取方式
-                          let age = '';
-                          if (lesson.is_trial) {
-                            age = lesson.age_display ? String(parseInt(lesson.age_display)) : '';
-                          } else {
-                            age = getStudentAge(lesson.student_id);
-                          }
-
-                          const nameObj = {
-                            name: lesson.full_name,
-                            student_id: lesson.student_id,
-                            age,
-                            is_trial: lesson.is_trial
-                          };
-                          return (
-                            <div key={`${lesson.id}-${j}`}>
-                              {renderStudentButton(nameObj, lesson)}
-                            </div>
-                          );
-                          })}
-                        </div>
+                      <div
+                        key={`${g.time}-${g.course}`}
+                        className={`p-2 rounded-lg cursor-pointer ${
+                          g.course === '鋼琴' ? '#E1E8F0' :
+                          g.course === '音樂專注力' ? '#E9F2DA' :
+                          '#F0F0F0'
+                        }`}
+                        onClick={async () => await handleOpenDetail(currentDate, g.course, g.time)}
+                      >
+                        <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.names.length})</div>
+                        {g.names.map((nameObj, j) => (
+                          <div key={j}>{renderStudentButton(nameObj)}</div>
+                        ))}
                       </div>
                     );
                   });
@@ -852,7 +862,7 @@ const HanamiCalendar = () => {
                          lessonDate.getMonth() === date.getMonth() &&
                          lessonDate.getDate() === date.getDate();
                 });
-                const grouped = dayLessons.reduce((acc: Record<string, GroupedDetail>, l: Lesson) => {
+                const grouped = dayLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
                   const key = `${l.regular_timeslot}_${l.course_type}`;
                   if (!acc[key]) {
                     acc[key] = {
@@ -861,22 +871,16 @@ const HanamiCalendar = () => {
                       names: []
                     };
                   }
-                  let age = '';
-                  if (l.is_trial) {
-                    age = (l as any).age_display ? String(parseInt((l as any).age_display)) : '';
-                  } else {
-                    age = getStudentAge(l.student_id);
-                  }
                   acc[key].names.push({
                     name: l.full_name,
                     student_id: l.student_id,
-                    age,
+                    age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
                     is_trial: l.is_trial,
                     remaining_lessons: l.remaining_lessons
                   });
                   return acc;
                 }, {});
-                const groupedArray = Object.values(grouped).sort((a, b) => a.time.localeCompare(b.time));
+                const groupedArray: GroupedLesson[] = Object.values(grouped);
                 return (
                   <div
                     key={i}
@@ -895,22 +899,22 @@ const HanamiCalendar = () => {
                       />
                     )}
                     <div>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]}</div>
-                    {groupedArray.map((g, j) => {
-                      const bgColor =
-                        g.course === '鋼琴' ? '#E1E8F0' :
-                        g.course === '音樂專注力' ? '#E9F2DA' :
-                        '#FCE8D5';
-                      return (
-                        <div
-                          key={j}
-                          className="text-xs mt-1 rounded-xl p-1 cursor-pointer"
-                          style={{ backgroundColor: bgColor }}
-                          onClick={async () => await handleOpenDetail(date, g.course, g.time)}
-                        >
-                          <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.names.length})</div>
-                        </div>
-                      );
-                    })}
+                    {groupedArray.map((g) => (
+                      <div
+                        key={`${g.time}-${g.course}`}
+                        className={`p-2 rounded-lg cursor-pointer ${
+                          g.course === '鋼琴' ? '#E1E8F0' :
+                          g.course === '音樂專注力' ? '#E9F2DA' :
+                          '#F0F0F0'
+                        }`}
+                        onClick={async () => await handleOpenDetail(date, g.course, g.time)}
+                      >
+                        <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.names.length})</div>
+                        {g.names.map((nameObj, j) => (
+                          <div key={j}>{renderStudentButton(nameObj)}</div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 );
               });
@@ -944,7 +948,7 @@ const HanamiCalendar = () => {
                            lessonDate.getMonth() === date.getMonth() &&
                            lessonDate.getDate() === date.getDate();
                   });
-                  const grouped = dayLessons.reduce((acc: Record<string, GroupedDetail>, l: Lesson) => {
+                  const grouped = dayLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
                     const key = `${l.regular_timeslot}_${l.course_type}`;
                     if (!acc[key]) {
                       acc[key] = {
@@ -953,22 +957,16 @@ const HanamiCalendar = () => {
                         names: []
                       };
                     }
-                  let age = '';
-                  if (l.is_trial) {
-                    age = (l as any).age_display ? String(parseInt((l as any).age_display)) : '';
-                  } else {
-                    age = getStudentAge(l.student_id);
-                  }
-                  acc[key].names.push({
-                    name: l.full_name,
-                    student_id: l.student_id,
-                    age,
-                    is_trial: l.is_trial,
-                    remaining_lessons: l.remaining_lessons
-                  });
+                    acc[key].names.push({
+                      name: l.full_name,
+                      student_id: l.student_id,
+                      age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
+                      is_trial: l.is_trial,
+                      remaining_lessons: l.remaining_lessons
+                    });
                     return acc;
                   }, {});
-                  const groupedArray = Object.values(grouped).sort((a, b) => a.time.localeCompare(b.time));
+                  const groupedArray: GroupedLesson[] = Object.values(grouped);
                   // 統一休息日底色與邊框
                   let bgColor;
                   if (holiday) {
@@ -995,15 +993,13 @@ const HanamiCalendar = () => {
                         />
                       )}
                       <div>{dayNum}</div>
-                      {/* {groupedArray.length > 0 && (
-                        <div className="text-xs mt-1">
-                          {groupedArray.map((g, i) => (
-                            <div key={i} className="truncate">
-                              {g.time.slice(0, 5)} {g.course} ({g.names.length})
-                            </div>
+                      {groupedArray.map((g) => (
+                        <div key={`${g.time}-${g.course}`}>
+                          {g.names.map((nameObj, j) => (
+                            <div key={j}>{renderStudentButton(nameObj)}</div>
                           ))}
                         </div>
-                      )} */}
+                      ))}
                     </div>
                   );
                 });
@@ -1038,7 +1034,7 @@ const HanamiCalendar = () => {
                         {group.time.slice(0, 5)}-{endTime} {group.course} ({group.names.length})
                       </div>
                       <div className="flex flex-wrap gap-2 ml-2 mt-1">
-                        {group.names.map((nameObj: any, j: number) => {
+                        {group.names.map((nameObj, j) => {
                           const lesson = lessons.find(
                             l =>
                               l.student_id === nameObj.student_id &&

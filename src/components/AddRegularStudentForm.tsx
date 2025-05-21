@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { v4 as uuidv4 } from 'uuid'
-import PopupSelect from '@/components/ui/PopupSelect'
+import { PopupSelect } from '@/components/ui/PopupSelect'
 import TimePicker from '@/components/ui/TimePicker'
+import { CourseType, Teacher } from '@/types'
 
 export default function AddRegularStudentForm() {
   const [loading, setLoading] = useState(false)
@@ -76,7 +77,7 @@ export default function AddRegularStudentForm() {
     // fetch Hanami_CourseTypes
     supabase.from('Hanami_CourseTypes').select('name').then(({ data }) => {
       if (data) {
-        setCourseOptions(data.map((item: any) => ({ label: item.name, value: item.name })))
+        setCourseOptions(data.map((item: { name: string | null }) => ({ label: item.name || '', value: item.name || '' })))
       }
     })
     // fetch hanami_employee
@@ -84,19 +85,19 @@ export default function AddRegularStudentForm() {
       if (data) {
         setTeacherOptions([
           { label: '未分配', value: '未分配' },
-          ...data.map((item: any) => ({ label: item.teacher_nickname, value: item.teacher_nickname }))
+          ...data.map((item: { teacher_nickname: string }) => ({ label: item.teacher_nickname, value: item.teacher_nickname }))
         ])
       }
     })
   }, [])
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handlePopupOpen = (field) => {
-    setPopupSelected(formData[field])
+  const handlePopupOpen = (field: string) => {
+    setPopupSelected(formData[field as keyof typeof formData] || '')
     setShowPopup({ field, open: true })
   }
 
@@ -109,7 +110,7 @@ export default function AddRegularStudentForm() {
     setShowPopup({ field: '', open: false })
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     // 必填欄位檢查
@@ -145,11 +146,8 @@ export default function AddRegularStudentForm() {
       let table = 'Hanami_Students';
       if (formData.student_type === '試堂') {
         table = 'hanami_trial_students';
-        // 對應資料表欄位
         const trialDateHK = new Date((formData.trial_date || '') + 'T00:00:00+08:00');
         const weekdayNumber = formData.trial_date ? trialDateHK.getUTCDay().toString() : '';
-        
-        // 設置試堂學生特定欄位，移除 student_remarks
         processedData = {
           id: processedData.id,
           student_oid: processedData.student_oid,
@@ -172,14 +170,14 @@ export default function AddRegularStudentForm() {
           access_role: processedData.access_role,
           student_email: processedData.student_email,
           student_password: processedData.student_password,
-          lesson_date: formData.trial_date || null,
-          actual_timeslot: formData.trial_time || null,
+          trial_date: formData.trial_date || '',
+          trial_time: formData.trial_time || '',
           trial_remarks: formData.trial_remarks || '',
-          weekday: weekdayNumber,
           regular_weekday: weekdayNumber,
+          regular_timeslot: '',
+          student_remarks: '',
         };
       } else {
-        // 常規學生只保留相關欄位，移除 trial_remarks
         processedData = {
           id: processedData.id,
           student_oid: processedData.student_oid,
@@ -205,10 +203,13 @@ export default function AddRegularStudentForm() {
           student_email: processedData.student_email,
           student_password: processedData.student_password,
           student_remarks: processedData.student_remarks || '',
+          trial_date: '',
+          trial_time: '',
+          trial_remarks: '',
         };
       }
       
-      const { error } = await supabase.from(table).upsert([processedData], { onConflict: ['id'] });
+      const { error } = await supabase.from(table as 'Hanami_Students' | 'hanami_trial_students').upsert([processedData], { onConflict: "id" });
       if (error) {
         alert('新增或更新失敗：' + error.message);
       } else {
@@ -272,7 +273,7 @@ export default function AddRegularStudentForm() {
             []
           }
           selected={popupSelected}
-          onChange={setPopupSelected}
+          onChange={(value: string | string[]) => setPopupSelected(Array.isArray(value) ? value[0] ?? '' : value ?? '')}
           onConfirm={handlePopupConfirm}
           onCancel={handlePopupCancel}
           mode="single"
@@ -297,7 +298,7 @@ export default function AddRegularStudentForm() {
           <input
             name="full_name"
             value={formData.full_name}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -306,7 +307,7 @@ export default function AddRegularStudentForm() {
           <input
             name="nick_name"
             value={formData.nick_name}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -325,7 +326,7 @@ export default function AddRegularStudentForm() {
           <input
             name="contact_number"
             value={formData.contact_number}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -335,7 +336,7 @@ export default function AddRegularStudentForm() {
             type="date"
             name="student_dob"
             value={formData.student_dob}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -345,7 +346,7 @@ export default function AddRegularStudentForm() {
             <input
               name="student_age"
               value={formData.student_age}
-              onChange={handleChange}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
               className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
             />
           </div>
@@ -370,7 +371,7 @@ export default function AddRegularStudentForm() {
           <input
             name="parent_email"
             value={formData.parent_email}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -379,7 +380,7 @@ export default function AddRegularStudentForm() {
           <input
             name="health_notes"
             value={formData.health_notes}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -388,7 +389,7 @@ export default function AddRegularStudentForm() {
           <input
             name="student_preference"
             value={formData.student_preference}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -397,7 +398,7 @@ export default function AddRegularStudentForm() {
           <input
             name="address"
             value={formData.address}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -406,7 +407,7 @@ export default function AddRegularStudentForm() {
           <input
             name="school"
             value={formData.school}
-            onChange={handleChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
             className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
           />
         </div>
@@ -447,7 +448,7 @@ export default function AddRegularStudentForm() {
                 type="date"
                 name="trial_date"
                 value={formData.trial_date}
-                onChange={handleChange}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
                 className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
               />
             </div>
@@ -458,7 +459,7 @@ export default function AddRegularStudentForm() {
                 type="time"
                 name="trial_time"
                 value={formData.trial_time}
-                onChange={handleChange}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e)}
                 className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
               />
             </div>
@@ -536,7 +537,12 @@ export default function AddRegularStudentForm() {
         <textarea
           name={formData.student_type === '試堂' ? 'trial_remarks' : 'student_remarks'}
           value={formData.student_type === '試堂' ? formData.trial_remarks : formData.student_remarks}
-          onChange={handleChange}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange({
+            target: {
+              name: e.target.name,
+              value: e.target.value
+            }
+          } as React.ChangeEvent<HTMLInputElement>)}
           className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A68A64] focus:border-transparent"
           rows={3}
           placeholder="請輸入備註..."

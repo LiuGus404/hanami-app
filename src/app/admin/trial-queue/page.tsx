@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Image from "next/image";
-import PopupSelect from "@/components/ui/PopupSelect"; // 新增引入 PopupSelect
+import { PopupSelect } from "@/components/ui/PopupSelect"; // 新增引入 PopupSelect
 
 // 欄目設計參考 LessonAvailabilityDashboard
 const columns = [
@@ -16,7 +16,7 @@ const columns = [
   { label: "登記時間", key: "created_at" },
 ];
 
-function formatAge(months) {
+function formatAge(months: number | null | undefined): string {
   if (!months || isNaN(months)) return "";
   const y = Math.floor(months / 12);
   const m = months % 12;
@@ -27,9 +27,9 @@ function formatAge(months) {
 }
 
 export default function TrialQueueListPage() {
-  const [queue, setQueue] = useState([]);
+  const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
@@ -54,7 +54,7 @@ export default function TrialQueueListPage() {
   }, []);
 
   // 搜尋過濾
-  const filteredQueue = queue.filter((stu) =>
+  const filteredQueue = queue.filter((stu: any) =>
     stu.full_name?.toLowerCase().includes(searchTerm.trim().toLowerCase())
   );
 
@@ -102,7 +102,7 @@ export default function TrialQueueListPage() {
                   { label: '全部', value: 'all' },
                 ]}
                 selected={tempPageSize}
-                onChange={(v) => setTempPageSize(v)}
+                onChange={(v: string | string[]) => setTempPageSize(Array.isArray(v) ? v[0] : v)}
                 onConfirm={() => {
                   setPageSize(tempPageSize === 'all' ? Infinity : Number(tempPageSize));
                   setCurrentPage(1);
@@ -159,7 +159,7 @@ export default function TrialQueueListPage() {
                     </td>
                   </tr>
                 ) : (
-                  pagedQueue.map((stu, idx) => (
+                  pagedQueue.map((stu: any, idx: number) => (
                     <tr key={stu.id} className="border-b border-[#EADBC8] hover:bg-[#FFFCEB]">
                       <td className="p-3 text-sm text-[#2B3A3B]">{(currentPage - 1) * pageSize + idx + 1}</td>
                       <td className="p-3 text-sm text-[#2B3A3B]">{stu.full_name}</td>

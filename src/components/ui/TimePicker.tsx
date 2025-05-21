@@ -1,10 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
-export default function TimePicker({ label = "選擇時間", value, onChange }: {
-  label?: string,
-  value: string,
-  onChange: (val: string) => void
-}) {
+interface TimePickerProps {
+  label?: string;
+  value: string;
+  onChange: (val: string) => void;
+}
+
+export default function TimePicker({ label = "選擇時間", value, onChange }: TimePickerProps) {
   const [selectedHour, setSelectedHour] = useState(() => {
     const [h] = (value || '00:00').split(':')
     return h.padStart(2, '0')
@@ -14,13 +16,27 @@ export default function TimePicker({ label = "選擇時間", value, onChange }: 
     return m?.padStart(2, '0') || '00'
   })
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (value && value.includes(':')) {
       const [h, m] = value.split(':')
       setSelectedHour(h.padStart(2, '0'))
       setSelectedMinute(m.padStart(2, '0'))
     }
   }, [value])
+
+  const handleHourChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const num = Math.min(23, Math.max(0, parseInt(e.target.value) || 0))
+    const h = String(num).padStart(2, '0')
+    setSelectedHour(h)
+    onChange(`${h}:${selectedMinute}`)
+  }
+
+  const handleMinuteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const num = Math.min(59, Math.max(0, parseInt(e.target.value) || 0))
+    const m = String(num).padStart(2, '0')
+    setSelectedMinute(m)
+    onChange(`${selectedHour}:${m}`)
+  }
 
   return (
     <div className="flex flex-col gap-1">
@@ -34,12 +50,7 @@ export default function TimePicker({ label = "選擇時間", value, onChange }: 
               min="0"
               max="23"
               value={selectedHour}
-              onChange={(e) => {
-                const num = Math.min(23, Math.max(0, parseInt(e.target.value) || 0));
-                const h = String(num).padStart(2, '0');
-                setSelectedHour(h);
-                onChange(`${h}:${selectedMinute}`);
-              }}
+              onChange={handleHourChange}
               className="w-12 text-2xl font-bold text-[#8A6E47] text-center bg-transparent border-none focus:outline-none"
             />
             <span className="text-2xl font-bold text-[#8A6E47]">:</span>
@@ -48,12 +59,7 @@ export default function TimePicker({ label = "選擇時間", value, onChange }: 
               min="0"
               max="59"
               value={selectedMinute}
-              onChange={(e) => {
-                const num = Math.min(59, Math.max(0, parseInt(e.target.value) || 0));
-                const m = String(num).padStart(2, '0');
-                setSelectedMinute(m);
-                onChange(`${selectedHour}:${m}`);
-              }}
+              onChange={handleMinuteChange}
               className="w-12 text-2xl font-bold text-[#8A6E47] text-center bg-transparent border-none focus:outline-none"
             />
           </div>

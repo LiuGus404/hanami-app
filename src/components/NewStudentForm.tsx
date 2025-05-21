@@ -96,7 +96,13 @@ const NewStudentForm: React.FC = () => {
       <input name="contact_numb" placeholder="聯絡電話" value={form.contact_numb} onChange={handleChange} className="input" />
       <input name="parent_email" placeholder="家長電郵" value={form.parent_email} onChange={handleChange} className="input" />
       <input name="address" placeholder="地址" value={form.address} onChange={handleChange} className="input" />
-      <textarea name="health_notes" placeholder="健康備註" value={form.health_notes} onChange={handleChange} className="input" />
+      <textarea 
+        name="health_notes" 
+        placeholder="健康備註" 
+        value={form.health_notes} 
+        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange(e as unknown as React.ChangeEvent<HTMLInputElement>)} 
+        className="input" 
+      />
 
       <input name="student_type" placeholder="學生類型 (常規/試堂)" value={form.student_type} onChange={handleChange} className="input" />
       <input name="student_teacher" placeholder="負責老師" value={form.student_teacher} onChange={handleChange} className="input" />

@@ -1,77 +1,119 @@
 'use client'
 
-import { useState, ReactNode } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Sprout } from 'lucide-react'
 
-export type PopupSelectProps = {
+interface PopupSelectProps {
   title: string
-  options: { label: ReactNode; value: string }[]
+  options: { label: string; value: string }[]
   selected: string[] | string
   onChange: (newSelected: string[] | string) => void
   onConfirm?: () => void
   onCancel?: () => void
   mode?: 'multi' | 'single'
+  disabled?: boolean
 }
 
-export default function PopupSelect({
+export const PopupSelect: React.FC<PopupSelectProps> = ({
   title,
   options,
   selected,
   onChange,
   onConfirm,
   onCancel,
-  mode = 'multi',
-}: PopupSelectProps) {
-  const isSelected = (value: string) =>
-    Array.isArray(selected) ? selected.includes(value) : selected === value
+  mode = 'single',
+  disabled = false
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [tempSelected, setTempSelected] = useState<string[] | string>(selected)
 
-  const toggleOption = (value: string) => {
-    if (mode === 'multi') {
-      const current = Array.isArray(selected) ? selected : []
-      const updated = current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value]
-      onChange(updated)
+  useEffect(() => {
+    setTempSelected(selected)
+  }, [selected])
+
+  const handleToggle = (value: string) => {
+    if (mode === 'single') {
+      setTempSelected(value)
     } else {
-      onChange(value)
+      const currentSelected = Array.isArray(tempSelected) ? tempSelected : []
+      if (currentSelected.includes(value)) {
+        setTempSelected(currentSelected.filter(v => v !== value))
+      } else {
+        setTempSelected([...currentSelected, value])
+      }
     }
   }
 
+  const handleConfirm = () => {
+    if (mode === 'multi') {
+      onChange(Array.isArray(tempSelected) ? tempSelected : [String(tempSelected)])
+    } else {
+      onChange(typeof tempSelected === 'string' ? tempSelected : (tempSelected[0] || ''))
+    }
+    setIsOpen(false)
+    onConfirm?.()
+  }
+
+  const handleCancel = () => {
+    setTempSelected(selected)
+    setIsOpen(false)
+    onCancel?.()
+  }
+
+  const selectedArray = Array.isArray(selected) ? selected : [selected]
+  const tempSelectedArray = Array.isArray(tempSelected) ? tempSelected : [tempSelected]
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center">
-      <div className="bg-[#FFFDF8] border border-[#D8CDBF] rounded-[24px] w-80 p-6 shadow-xl text-[#4B4B4B] max-h-[80vh] flex flex-col">
-        <h2 className="text-xl font-bold text-center mb-4">{title}</h2>
-        <div className="space-y-3 overflow-y-auto flex-1 pr-2">
-          {options.map(({ label, value }) => (
-            <div
-              key={value}
-              className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition ${
-                isSelected(value) ? 'bg-[#E8E3D5]' : 'bg-white hover:bg-[#F3F0E5]'
-              }`}
-              onClick={() => toggleOption(value)}
-            >
-              <div className="flex items-center gap-3">
-                <Sprout className={`w-5 h-5 ${isSelected(value) ? 'text-green-600' : 'text-[#D8CDBF]'}`} />
-                <span className="text-base font-medium">{label}</span>
-              </div>
+    <div className="relative">
+      <button
+        onClick={() => !disabled && setIsOpen(true)}
+        className={`w-full px-4 py-2 text-left border rounded-lg ${
+          disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:border-blue-500'
+        }`}
+        disabled={disabled}
+      >
+        {selectedArray.length > 0
+          ? options
+              .filter(opt => selectedArray.includes(opt.value))
+              .map(opt => opt.label)
+              .join(', ')
+          : '請選擇'}
+      </button>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-md p-4 bg-white rounded-lg shadow-lg">
+            <h3 className="mb-4 text-lg font-medium">{title}</h3>
+            <div className="max-h-60 overflow-y-auto">
+              {options.map(option => (
+                <div
+                  key={option.value}
+                  className={`p-2 cursor-pointer hover:bg-gray-100 ${
+                    tempSelectedArray.includes(option.value) ? 'bg-blue-50' : ''
+                  }`}
+                  onClick={() => handleToggle(option.value)}
+                >
+                  {option.label}
+                </div>
+              ))}
             </div>
-          ))}
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={handleCancel}
+                className="px-4 py-2 text-gray-600 border rounded hover:bg-gray-100"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600"
+              >
+                確認
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex justify-around mt-6 pt-4 border-t border-[#D8CDBF]">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border border-[#D8CDBF] rounded-xl hover:bg-[#F3F0E5]"
-          >
-            取消
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-6 py-2 bg-[#A68A64] text-white font-semibold rounded-xl hover:bg-[#937654]"
-          >
-            確定
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

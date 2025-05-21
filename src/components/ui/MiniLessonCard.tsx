@@ -1,21 +1,38 @@
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface Student {
+  name: string;
+  age?: string;
+  isTrial?: boolean;
+  remainingLessons?: number;
+  avatar?: string;
+  id?: string;
+  teacher?: string;
+}
 
 interface MiniLessonCardProps {
   time: string;
-  course: { name: string; icon?: string; activities?: string[] };
-  students: { name: string; isTrial?: boolean; remainingLessons?: number; age?: string }[];
+  course: {
+    name: string;
+  };
+  students: Student[];
   plan?: {
-    teacherNames1?: string[];
-    teacherNames2?: string[];
+    teacherNames: string[];
+    teacherNames1: string[];
+    teacherNames2: string[];
     objectives: string[];
     materials: string[];
+    theme?: string;
+    notes?: string;
   };
-  onClick: () => void;
-  onEdit: () => void;
-  duration?: string;
-  allShowTeachers?: boolean;
-  allShowStudents?: boolean;
+  showTeachers?: boolean;
+  showPlan?: boolean;
   allShowPlan?: boolean;
+  startTime?: string;
+  duration?: string;
+  onClick?: () => void;
+  onEdit?: () => void;
 }
 
 const getStudentBg = (remainingLessons?: number, isTrial?: boolean) => {
@@ -30,31 +47,31 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
   course,
   students,
   plan,
+  showTeachers = true,
+  showPlan = false,
+  allShowPlan = false,
+  startTime,
+  duration,
   onClick,
   onEdit,
-  duration,
-  allShowTeachers = true,
-  allShowStudents = true,
-  allShowPlan = true,
 }) => {
+  const router = useRouter();
   const [showStudents, setShowStudents] = useState(true);
-  const [showPlan, setShowPlan] = useState(true);
-  const [showTeachers, setShowTeachers] = useState(true);
+  const [showPlanState, setShowPlanState] = useState(showPlan);
+  const [showTeachersState, setShowTeachersState] = useState(showTeachers);
 
   // 全局開關同步
   React.useEffect(() => {
-    setShowTeachers(allShowTeachers);
-  }, [allShowTeachers]);
+    setShowTeachersState(showTeachers);
+  }, [showTeachers]);
   React.useEffect(() => {
-    setShowStudents(allShowStudents);
-  }, [allShowStudents]);
-  React.useEffect(() => {
-    setShowPlan(allShowPlan);
-  }, [allShowPlan]);
+    setShowPlanState(showPlan);
+  }, [showPlan]);
 
   let timeDisplay = time;
-  if (time && duration) {
+  if (time) {
     const [h, m] = time.split(':').map(Number);
+    const duration = course.name === '音樂專注力' ? '01:00' : '00:45';
     const [dh, dm] = duration.split(':').map(Number);
     const startDate = new Date(2000, 0, 1, h, m);
     const endDate = new Date(startDate.getTime() + (dh * 60 + dm) * 60000);
@@ -69,15 +86,17 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
       onClick={onClick}
     >
       {/* 編輯按鈕 */}
-      <button
-        className="absolute top-1 right-1 z-10 bg-[#FFFDF8] rounded-full p-1 shadow hover:bg-[#F5E7D4]"
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit();
-        }}
-      >
-        <img src="/icons/edit-pencil.png" alt="Edit" className="w-4 h-4" />
-      </button>
+      {onEdit && (
+        <button
+          className="absolute top-1 right-1 z-10 bg-[#FFFDF8] rounded-full p-1 shadow hover:bg-[#F5E7D4]"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+        >
+          <img src="/icons/edit-pencil.png" alt="Edit" className="w-4 h-4" />
+        </button>
+      )}
 
       <div className="mb-0.5">
         <div className="flex flex-col leading-none">
@@ -94,18 +113,18 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setShowTeachers(!showTeachers);
+            setShowTeachersState(!showTeachersState);
           }}
           className="ml-1 text-[9px] underline text-[#4B4036]"
         >
-          {showTeachers ? '收起' : '展開'}
+          {showTeachersState ? '收起' : '展開'}
         </button>
       </div>
-      {showTeachers && (
-        <div className="flex items-start gap-1 text-[10px] text-[#4B4036] mb-1 ml-0.5">
-          <div className="flex flex-col justify-center items-start">
-            <div>（1）{plan?.teacherNames1?.length > 0 ? plan.teacherNames1.join('、') : '未分配'}</div>
-            <div>（2）{plan?.teacherNames2?.length > 0 ? plan.teacherNames2.join('、') : '未分配'}</div>
+      {showTeachersState && (
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-col">
+            <div>（1）{plan && Array.isArray(plan.teacherNames1) && plan.teacherNames1.length > 0 ? plan.teacherNames1.join('、') : '未分配'}</div>
+            <div>（2）{plan && Array.isArray(plan.teacherNames2) && plan.teacherNames2.length > 0 ? plan.teacherNames2.join('、') : '未分配'}</div>
           </div>
         </div>
       )}
@@ -156,25 +175,23 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setShowPlan((prev) => !prev);
+            setShowPlanState(!showPlanState);
           }}
           className="ml-1 text-[9px] underline text-[#4B4036]"
         >
-          {showPlan ? '收起' : '展開'}
+          {showPlanState ? '收起' : '展開'}
         </button>
       </div>
-      {showPlan && (
+      {showPlanState && (
         <div className="flex flex-col gap-1">
-          {plan?.materials?.length > 0 ? (
+          {plan?.materials && plan.materials.length > 0 ? (
             plan.materials.map((activity, idx) => (
-              <div key={idx} className="flex flex-col">
-                <div className="text-[10px] text-[#4B4036] bg-[#F0ECE6] px-2 py-0.5 rounded-full w-fit">
-                  {activity}
-                </div>
+              <div key={idx} className="text-[10px] text-[#4B4036]">
+                {activity}
               </div>
             ))
           ) : (
-            <div className="text-[10px] text-[#87704e] italic">未安排</div>
+            <div className="text-[10px] text-[#4B4036]">—</div>
           )}
         </div>
       )}

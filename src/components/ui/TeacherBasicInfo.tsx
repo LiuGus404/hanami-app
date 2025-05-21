@@ -1,219 +1,186 @@
-import { useState, useEffect } from 'react'
-import PopupSelect from '@/components/ui/PopupSelect'
-import { supabase } from '@/lib/supabase'
+import React, { useState, useEffect } from 'react'
+import { PopupSelect } from '@/components/ui/PopupSelect'
+import { getSupabaseClient } from '@/lib/supabase'
+import { Teacher } from '@/types'
 
-interface Teacher {
+interface TeacherFormData {
   id: string;
   teacher_fullname: string;
-  teacher_nickname?: string;
-  teacher_gender?: 'male' | 'female';
-  teacher_role?: string;
-  teacher_status?: string;
-  teacher_phone?: string;
-  teacher_email?: string;
-  teacher_msalary?: number;
-  teacher_hsalary?: number;
-  [key: string]: any;
+  teacher_nickname: string;
+  teacher_role: string | null;
+  teacher_status: string | null;
+  teacher_email: string | null;
+  teacher_phone: string | null;
+  teacher_address: string | null;
+  teacher_gender: string | null;
+  teacher_dob: string | null;
+  teacher_hsalary: number | null;
+  teacher_msalary: number | null;
+  teacher_background: string | null;
+  teacher_bankid: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
-type Props = {
+interface TeacherBasicInfoProps {
   teacher: Teacher;
-  onUpdate: (newData: Teacher) => void;
+  onSave: (teacher: Teacher) => void;
 }
 
-export default function TeacherBasicInfo({ teacher, onUpdate }: Props) {
-  const [editMode, setEditMode] = useState(false)
-  const [formData, setFormData] = useState<Teacher>(teacher)
-  const [originalData, setOriginalData] = useState<Teacher>(teacher)
-  const [showRoleSelect, setShowRoleSelect] = useState(false)
-  const [showStatusSelect, setShowStatusSelect] = useState(false)
+export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoProps) {
+  const [formData, setFormData] = useState<TeacherFormData>({
+    id: teacher.id,
+    teacher_fullname: teacher.teacher_fullname,
+    teacher_nickname: teacher.teacher_nickname,
+    teacher_role: teacher.teacher_role,
+    teacher_status: teacher.teacher_status,
+    teacher_email: teacher.teacher_email,
+    teacher_phone: teacher.teacher_phone,
+    teacher_address: teacher.teacher_address,
+    teacher_gender: teacher.teacher_gender,
+    teacher_dob: teacher.teacher_dob,
+    teacher_hsalary: teacher.teacher_hsalary,
+    teacher_msalary: teacher.teacher_msalary,
+    teacher_background: teacher.teacher_background,
+    teacher_bankid: teacher.teacher_bankid,
+    created_at: teacher.created_at,
+    updated_at: teacher.updated_at
+  });
 
-  const handleChange = (field: keyof Teacher, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+  const requiredFields: (keyof TeacherFormData)[] = ['teacher_fullname', 'teacher_nickname'];
+  const supabase = getSupabaseClient();
 
-  const handleSave = async () => {
-    const { error } = await supabase
-      .from('hanami_employee')
-      .update(formData)
-      .eq('id', formData.id)
+  const handleChange = (field: keyof TeacherFormData, value: string | number | null) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
-    if (error) {
-      alert('儲存失敗：' + error.message)
-    } else {
-      alert('已成功儲存')
-      setEditMode(false)
-      onUpdate(formData)
-      setOriginalData(formData)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const missingFields = requiredFields.filter(field => !formData[field]);
+    if (missingFields.length > 0) {
+      alert(`請填寫必填欄位：${missingFields.join(', ')}`);
+      return;
     }
-  }
 
-  const handleCancel = () => {
-    setFormData(originalData)
-    setEditMode(false)
-  }
+    try {
+      const { error } = await supabase
+        .from('hanami_employee')
+        .update(formData)
+        .eq('id', teacher.id);
+
+      if (error) throw error;
+      onSave(formData as Teacher);
+    } catch (err) {
+      console.error('Error updating teacher:', err);
+      alert('更新老師資料時發生錯誤');
+    }
+  };
 
   return (
-    <div className="bg-[#FFFDF8] border border-[#EADBC8] rounded-2xl p-6 w-full max-w-md mx-auto text-[#4B4B4B]">
-      <div className="flex flex-col items-center gap-2 mb-4">
+    <div className="p-6 bg-white rounded-lg shadow">
+      <div className="flex items-center gap-4 mb-6">
         <img
           src={formData.teacher_gender === 'female' ? '/girl.png' : '/teacher.png'}
-          alt="頭像"
-          className="w-24 h-24 rounded-full"
+          alt="Teacher"
+          className="w-16 h-16 rounded-full"
         />
-        <div className="text-xl font-semibold">
-          {formData.teacher_fullname || '未命名'}
-        </div>
-        <div className="text-[#A68A64]">{formData.teacher_nickname || '—'}</div>
-      </div>
-
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-bold">基本資料</h2>
-        {!editMode && (
-          <button
-            onClick={() => setEditMode(true)}
-            className="text-sm text-[#A68A64] hover:underline flex items-center gap-1"
-          >
-            <img src="/icons/edit-pencil.png" alt="編輯" className="w-4 h-4" /> 編輯
-          </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-y-3 text-sm">
-        <div className="font-medium">職位：</div>
         <div>
-          {editMode ? (
-            <>
-              <button
-                onClick={() => setShowRoleSelect(true)}
-                className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2"
-              >
-                {formData.teacher_role || '請選擇'}
-              </button>
-              {showRoleSelect && (
-                <PopupSelect
-                  title="選擇職位"
-                  options={[
-                    { label: '主任', value: '主任' },
-                    { label: '導師', value: '導師' },
-                    { label: '助教', value: '助教' },
-                  ]}
-                  selected={formData.teacher_role || ''}
-                  onChange={(value) => handleChange('teacher_role', value)}
-                  onConfirm={() => setShowRoleSelect(false)}
-                  onCancel={() => setShowRoleSelect(false)}
-                  mode="single"
-                />
-              )}
-            </>
-          ) : (
-            formData.teacher_role || '—'
-          )}
-        </div>
-
-        <div className="font-medium">狀態：</div>
-        <div>
-          {editMode ? (
-            <>
-              <button
-                onClick={() => setShowStatusSelect(true)}
-                className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2"
-              >
-                {formData.teacher_status || '請選擇'}
-              </button>
-              {showStatusSelect && (
-                <PopupSelect
-                  title="選擇狀態"
-                  options={[
-                    { label: '在職', value: '在職' },
-                    { label: '離職', value: '離職' }
-                  ]}
-                  selected={formData.teacher_status || ''}
-                  onChange={(value) => handleChange('teacher_status', value)}
-                  onConfirm={() => setShowStatusSelect(false)}
-                  onCancel={() => setShowStatusSelect(false)}
-                  mode="single"
-                />
-              )}
-            </>
-          ) : (
-            formData.teacher_status || '—'
-          )}
-        </div>
-
-        <div className="font-medium">電話：</div>
-        <div>
-          {editMode ? (
-            <input
-              type="text"
-              value={formData.teacher_phone || ''}
-              onChange={(e) => handleChange('teacher_phone', e.target.value)}
-              className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full"
-            />
-          ) : (
-            formData.teacher_phone || '—'
-          )}
-        </div>
-
-        <div className="font-medium">Email：</div>
-        <div>
-          {editMode ? (
-            <input
-              type="email"
-              value={formData.teacher_email || ''}
-              onChange={(e) => handleChange('teacher_email', e.target.value)}
-              className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full"
-            />
-          ) : (
-            formData.teacher_email || '—'
-          )}
-        </div>
-
-        <div className="font-medium">月薪：</div>
-        <div>
-          {editMode ? (
-            <input
-              type="number"
-              value={formData.teacher_msalary ?? ''}
-              onChange={(e) => handleChange('teacher_msalary', e.target.value ? Number(e.target.value) : null)}
-              className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full"
-            />
-          ) : (
-            formData.teacher_msalary != null ? `$${formData.teacher_msalary}` : '—'
-          )}
-        </div>
-
-        <div className="font-medium">時薪：</div>
-        <div>
-          {editMode ? (
-            <input
-              type="number"
-              value={formData.teacher_hsalary ?? ''}
-              onChange={(e) => handleChange('teacher_hsalary', e.target.value ? Number(e.target.value) : null)}
-              className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full"
-            />
-          ) : (
-            formData.teacher_hsalary != null ? `$${formData.teacher_hsalary}` : '—'
-          )}
+          <h2 className="text-xl font-semibold">
+            {formData.teacher_fullname || '未命名'}
+          </h2>
+          <p className="text-gray-600">{formData.teacher_nickname}</p>
         </div>
       </div>
 
-      {editMode && (
-        <div className="flex justify-end gap-2 mt-4">
-          <button
-            onClick={handleSave}
-            className="bg-[#A68A64] text-white rounded-full px-5 py-2 text-sm shadow hover:bg-[#91765a]"
-          >
-            儲存
-          </button>
-          <button
-            onClick={handleCancel}
-            className="bg-[#F5F2EC] text-[#A68A64] border border-[#D8CDBF] rounded-full px-5 py-2 text-sm shadow hover:bg-[#E6DFD2]"
-          >
-            取消
-          </button>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">老師身份</label>
+          <PopupSelect
+            title="老師身份"
+            options={[
+              { label: '全職', value: 'full-time' },
+              { label: '兼職', value: 'part-time' }
+            ]}
+            selected={formData.teacher_role || ''}
+            onChange={(value) => handleChange('teacher_role', value as string)}
+          />
         </div>
-      )}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">在職狀態</label>
+          <PopupSelect
+            title="在職狀態"
+            options={[
+              { label: '在職', value: 'active' },
+              { label: '離職', value: 'inactive' }
+            ]}
+            selected={formData.teacher_status || ''}
+            onChange={(value) => handleChange('teacher_status', value as string)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">電子郵件</label>
+          <input
+            type="email"
+            value={formData.teacher_email || ''}
+            onChange={(e) => handleChange('teacher_email', e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">電話</label>
+          <input
+            type="tel"
+            value={formData.teacher_phone || ''}
+            onChange={(e) => handleChange('teacher_phone', e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700">地址</label>
+          <input
+            type="text"
+            value={formData.teacher_address || ''}
+            onChange={(e) => handleChange('teacher_address', e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">時薪</label>
+          <input
+            type="number"
+            value={formData.teacher_hsalary || ''}
+            onChange={(e) => handleChange('teacher_hsalary', e.target.value ? Number(e.target.value) : null)}
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">月薪</label>
+          <input
+            type="number"
+            value={formData.teacher_msalary || ''}
+            onChange={(e) => handleChange('teacher_msalary', e.target.value ? Number(e.target.value) : null)}
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end mt-6">
+        <button
+          onClick={handleSubmit}
+          className="px-4 py-2 text-white bg-blue-500 rounded-lg hover:bg-blue-600"
+        >
+          儲存
+        </button>
+      </div>
     </div>
   )
 }

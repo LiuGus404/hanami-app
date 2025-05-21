@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import PopupSelect from '@/components/ui/PopupSelect'
+import { PopupSelect } from '@/components/ui/PopupSelect'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import TeacherCard from '@/components/ui/TeacherCard'
@@ -37,7 +37,7 @@ export default function TeacherManagementPage() {
     const fetchRoles = async () => {
       const { data, error } = await supabase
         .from('hanami_employee')
-        .select('teacher_role', { distinct: true })
+        .select('teacher_role')
         .not('teacher_role', 'is', null)
       if (!error && data) {
         const roleMap = new Map<string, string>()
@@ -45,7 +45,9 @@ export default function TeacherManagementPage() {
           const raw = r.teacher_role
           const normalized = raw?.trim().toLowerCase()
           if (normalized && !roleMap.has(normalized)) {
-            roleMap.set(normalized, raw.trim())
+            if (raw) {
+              roleMap.set(normalized, raw.trim())
+            }
           }
         })
         setRoleOptions(Array.from(roleMap.values()))
@@ -114,7 +116,7 @@ export default function TeacherManagementPage() {
                     ...roleOptions.map(role => ({ label: role, value: role })),
                   ]}
                   selected={tempRole}
-                  onChange={(value) => setTempRole(value)}
+                  onChange={(value: string | string[]) => setTempRole(Array.isArray(value) ? value[0] : value)}
                   onConfirm={() => {
                     setFilterRole(tempRole)
                     setRoleDropdownOpen(false)
@@ -145,7 +147,7 @@ export default function TeacherManagementPage() {
                     { label: '兼職', value: 'part time' },
                   ]}
                   selected={tempStatus}
-                  onChange={(value) => setTempStatus(value)}
+                  onChange={(value: string | string[]) => setTempStatus(Array.isArray(value) ? value[0] : value)}
                   onConfirm={() => {
                     setFilterStatus(tempStatus)
                     setStatusDropdownOpen(false)
@@ -268,7 +270,6 @@ export default function TeacherManagementPage() {
                             setSelectedTeachers(selectedTeachers.filter(id => id !== teacher.id))
                           }
                         }}
-                        onClick={(e) => e.stopPropagation()}
                       />
                     </td>
                     <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_fullname || '—'}</td>
