@@ -387,19 +387,19 @@ export default function StudentManagementPage() {
               selectedWeekdays.length > 0 ||
               selectedLessonFilter !== 'all' ||
               isCustomLessonFilterActive(selectedLessonFilter, customLessonCount)) && (
-                <div className="mb-4">
-                  <button
-                    onClick={() => {
-                      setSelectedCourses([])
-                      setSelectedWeekdays([])
-                      setSelectedLessonFilter('all')
-                      setCustomLessonCount('')
-                    }}
-                    className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#A68A64] shadow-sm hover:bg-[#f7f3ec]"
-                  >
-                    清除條件
-                  </button>
-                </div>
+              <div className="mb-4">
+                <button
+                  onClick={() => {
+                    setSelectedCourses([])
+                    setSelectedWeekdays([])
+                    setSelectedLessonFilter('all')
+                    setCustomLessonCount('')
+                  }}
+                  className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#A68A64] shadow-sm hover:bg-[#f7f3ec]"
+                >
+                  清除條件
+                </button>
+              </div>
             )}
           </div>
         </div>

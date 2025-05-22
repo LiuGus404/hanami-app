@@ -50,19 +50,19 @@ export const useLessonPlans = ({ lessonDate, timeslot, courseType }: UseLessonPl
     };
 
     const fetchPlans = async () => {
-      try {
+    try {
         const { data: planData, error } = await supabase
-          .from('hanami_lesson_plan')
-          .select('*')
+        .from('hanami_lesson_plan')
+        .select('*')
           .eq('lesson_date', lessonDate)
           .eq('timeslot', timeslot)
           .eq('course_type', courseType);
 
-        if (error) throw error;
+      if (error) throw error;
 
         if (planData) {
           const formattedPlans: LessonPlan[] = planData.map(plan => ({
-            ...plan,
+        ...plan,
             teacher_names: plan.teacher_ids.map(id => {
               const teacher = teachers.find(t => t.id === id);
               return teacher ? teacher.teacher_nickname : '未知老師';
@@ -75,15 +75,15 @@ export const useLessonPlans = ({ lessonDate, timeslot, courseType }: UseLessonPl
               const teacher = teachers.find(t => t.id === id);
               return teacher ? teacher.teacher_nickname : '未知老師';
             })
-          }));
+      }));
           setPlans(formattedPlans);
         }
-      } catch (error) {
-        console.error('Error fetching lesson plans:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    } catch (error) {
+      console.error('Error fetching lesson plans:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchTeachers();
     fetchPlans();

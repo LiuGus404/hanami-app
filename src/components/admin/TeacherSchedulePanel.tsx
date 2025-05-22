@@ -250,19 +250,19 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
     if (error) {
       setErrorMsg('無法儲存老師排班：' + error.message)
     } else {
-      // Refresh data
+    // Refresh data
       const { data: newSchedule, error: fetchError } = await supabase
         .from('hanami_teacher_schedule')
-        .select('id, teacher_id, scheduled_date, start_time, end_time')
-        .eq('scheduled_date', dateStr)
+      .select('id, teacher_id, scheduled_date, start_time, end_time')
+      .eq('scheduled_date', dateStr)
         .eq('teacher_id', selectedTeacher.teacher_id)
         .single()
 
-      if (fetchError) {
+    if (fetchError) {
         setErrorMsg('無法獲取新排班資料：' + fetchError.message)
       } else if (newSchedule) {
         setSchedules([...schedules, newSchedule as Schedule])
-        setSelectedTeacher({ teacher_id: '', start_time: '09:00', end_time: '18:00' })
+      setSelectedTeacher({ teacher_id: '', start_time: '09:00', end_time: '18:00' })
         setShowTeacherSelect(false)
       }
     }
@@ -298,7 +298,7 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
         s.scheduled_date,
         s.start_time,
         s.end_time
-      ])
+    ])
     ].map(row => row.join(',')).join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -365,21 +365,21 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1">
-        {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+          {['日', '一', '二', '三', '四', '五', '六'].map(day => (
           <div key={day} className="text-center font-semibold p-2">
-            {day}
-          </div>
-        ))}
+              {day}
+            </div>
+          ))}
         {daysInMonth.map((day, index) => {
-          const dateStr = format(day, 'yyyy-MM-dd')
-          const scheduledTeachers = schedulesByDate[dateStr] || []
-          const lessonCount = lessonsCountByDate[dateStr] || 0
+            const dateStr = format(day, 'yyyy-MM-dd')
+            const scheduledTeachers = schedulesByDate[dateStr] || []
+            const lessonCount = lessonsCountByDate[dateStr] || 0
           const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr
 
-          return (
-            <div
-              key={dateStr}
-              onClick={() => handleDateClick(day)}
+            return (
+              <div
+                key={dateStr}
+                onClick={() => handleDateClick(day)}
               className={`p-2 border rounded cursor-pointer hover:bg-gray-50 ${
                 isToday ? 'bg-blue-50' : ''
               }`}
@@ -394,7 +394,7 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                         className="px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs"
                       >
                         {getInitials(teacher.teacher_nickname)}
-                      </span>
+                              </span>
                     ))}
                   </div>
                 )}
@@ -403,11 +403,11 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                     {lessonCount} 堂
                   </div>
                 )}
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
 
       {/* Selected Date Detail */}
       {selectedDetail && (
@@ -423,9 +423,9 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
               新增老師
             </button>
           </div>
-
+            
           {/* Teacher List */}
-          <div className="mb-4">
+            <div className="mb-4">
             <h4 className="font-medium mb-2">已排班老師</h4>
             <div className="flex flex-wrap gap-2">
               {selectedDetail.teachers.map(teacher => (
@@ -434,36 +434,36 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                   className="flex items-center gap-2 p-2 bg-gray-100 rounded"
                 >
                   <span>{teacher.teacher_nickname}</span>
-                  <button
+                        <button
                     onClick={() => handleDeleteTeacherSchedule(teacher.id)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    ×
-                  </button>
-                </div>
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </div>
               ))}
+              </div>
             </div>
-          </div>
 
           {/* Lesson Groups */}
-          <div>
+            <div>
             <h4 className="font-medium mb-2">課堂安排</h4>
             <div className="space-y-2">
               {selectedDetail.groups.map((group, index) => (
                 <div key={index} className="p-2 bg-gray-50 rounded">
                   <div className="font-medium">
                     {group.time} - {group.course}
-                  </div>
+                    </div>
                   <div className="text-sm text-gray-600">
                     {group.students.map(student => (
                       <div key={student.student_id}>
                         {student.name}
                         {student.age && ` (${student.age}歲)`}
-                      </div>
-                    ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         </div>
@@ -479,8 +479,8 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                 <label className="block text-sm font-medium text-gray-700">
                   選擇老師
                 </label>
-                <PopupSelect
-                  title="選擇老師"
+                  <PopupSelect
+                    title="選擇老師"
                   options={teachers.map(t => ({
                     label: t.teacher_nickname,
                     value: t.id
@@ -490,8 +490,8 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                     ...prev,
                     teacher_id: typeof val === 'string' ? val : val[0]
                   }))}
-                  mode="single"
-                />
+                    mode="single"
+                  />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">

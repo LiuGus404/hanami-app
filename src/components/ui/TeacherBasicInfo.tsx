@@ -66,9 +66,9 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
     }
 
     try {
-      const { error } = await supabase
-        .from('hanami_employee')
-        .update(formData)
+    const { error } = await supabase
+      .from('hanami_employee')
+      .update(formData)
         .eq('id', teacher.id);
 
       if (error) throw error;
@@ -89,7 +89,7 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
         />
         <div>
           <h2 className="text-xl font-semibold">
-            {formData.teacher_fullname || '未命名'}
+          {formData.teacher_fullname || '未命名'}
           </h2>
           <p className="text-gray-600">{formData.teacher_nickname}</p>
         </div>
@@ -98,38 +98,38 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">老師身份</label>
-          <PopupSelect
+                <PopupSelect
             title="老師身份"
-            options={[
+                  options={[
               { label: '全職', value: 'full-time' },
               { label: '兼職', value: 'part-time' }
-            ]}
-            selected={formData.teacher_role || ''}
+                  ]}
+                  selected={formData.teacher_role || ''}
             onChange={(value) => handleChange('teacher_role', value as string)}
-          />
+                />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">在職狀態</label>
-          <PopupSelect
+                <PopupSelect
             title="在職狀態"
-            options={[
+                  options={[
               { label: '在職', value: 'active' },
               { label: '離職', value: 'inactive' }
-            ]}
-            selected={formData.teacher_status || ''}
+                  ]}
+                  selected={formData.teacher_status || ''}
             onChange={(value) => handleChange('teacher_status', value as string)}
-          />
+                />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">電子郵件</label>
-          <input
+            <input
             type="email"
             value={formData.teacher_email || ''}
             onChange={(e) => handleChange('teacher_email', e.target.value)}
             className="w-full px-3 py-2 border rounded-lg"
-          />
+            />
         </div>
 
         <div>
@@ -144,43 +144,43 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
 
         <div className="col-span-2">
           <label className="block text-sm font-medium text-gray-700">地址</label>
-          <input
+            <input
             type="text"
             value={formData.teacher_address || ''}
             onChange={(e) => handleChange('teacher_address', e.target.value)}
             className="w-full px-3 py-2 border rounded-lg"
-          />
+            />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">時薪</label>
-          <input
-            type="number"
+            <input
+              type="number"
             value={formData.teacher_hsalary || ''}
             onChange={(e) => handleChange('teacher_hsalary', e.target.value ? Number(e.target.value) : null)}
             className="w-full px-3 py-2 border rounded-lg"
-          />
+            />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">月薪</label>
-          <input
-            type="number"
+            <input
+              type="number"
             value={formData.teacher_msalary || ''}
             onChange={(e) => handleChange('teacher_msalary', e.target.value ? Number(e.target.value) : null)}
             className="w-full px-3 py-2 border rounded-lg"
-          />
+            />
         </div>
       </div>
 
       <div className="flex justify-end mt-6">
-        <button
+          <button
           onClick={handleSubmit}
           className="px-4 py-2 text-white bg-blue-500 rounded-lg hover:bg-blue-600"
-        >
-          儲存
-        </button>
-      </div>
+          >
+            儲存
+          </button>
+        </div>
     </div>
   )
 }

@@ -45,16 +45,16 @@ export default function LessonPlanModal({
 
   const handleSave = async () => {
     const plan: Omit<LessonPlan, 'id' | 'created_at'> = {
-      lesson_date: lessonDate.toISOString().split('T')[0],
-      timeslot,
-      course_type: courseType,
+        lesson_date: lessonDate.toISOString().split('T')[0],
+        timeslot,
+        course_type: courseType,
       topic: '',
       objectives,
       materials,
       teacher_ids: [...selectedTeacher1, ...selectedTeacher2],
       teacher_names: [],
-      teacher_ids_1: selectedTeacher1,
-      teacher_ids_2: selectedTeacher2,
+        teacher_ids_1: selectedTeacher1,
+        teacher_ids_2: selectedTeacher2,
       teacherNames1: selectedTeacher1.map(id => teachers.find(t => t.id === id)?.teacher_nickname || ''),
       teacherNames2: selectedTeacher2.map(id => teachers.find(t => t.id === id)?.teacher_nickname || ''),
       theme,
@@ -101,7 +101,7 @@ export default function LessonPlanModal({
 
           <div className="flex flex-col gap-4">
             {/* 老師選擇 */}
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700">
                 老師（1）
               </label>
@@ -112,9 +112,9 @@ export default function LessonPlanModal({
                 onChange={(val) => setSelectedTeacher1(Array.isArray(val) ? val : [val])}
                 mode="multi"
               />
-            </div>
+          </div>
 
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700">
                 老師（2）
               </label>
@@ -128,7 +128,7 @@ export default function LessonPlanModal({
             </div>
 
             {/* 課堂主題 */}
-            <div>
+                <div>
               <label className="block text-sm font-medium text-gray-700">
                 課堂主題
               </label>
@@ -138,10 +138,10 @@ export default function LessonPlanModal({
                 onChange={(e) => setTheme(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               />
-            </div>
+                </div>
 
             {/* 課堂目標 */}
-            <div>
+                <div>
               <label className="block text-sm font-medium text-gray-700">
                 課堂目標
               </label>
@@ -164,19 +164,19 @@ export default function LessonPlanModal({
                 rows={3}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               />
-            </div>
+          </div>
 
             {/* 課堂備註 */}
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700">
                 課堂備註
               </label>
-              <textarea
+            <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              />
+            />
             </div>
           </div>
 

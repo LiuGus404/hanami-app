@@ -86,32 +86,32 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
             <h3 className="mb-4 text-lg font-medium">{title}</h3>
             <div className="max-h-60 overflow-y-auto">
               {options.map(option => (
-                <div
+            <div
                   key={option.value}
                   className={`p-2 cursor-pointer hover:bg-gray-100 ${
                     tempSelectedArray.includes(option.value) ? 'bg-blue-50' : ''
-                  }`}
+              }`}
                   onClick={() => handleToggle(option.value)}
-                >
+            >
                   {option.label}
-                </div>
-              ))}
             </div>
+          ))}
+        </div>
             <div className="flex justify-end gap-2 mt-4">
-              <button
+          <button
                 onClick={handleCancel}
                 className="px-4 py-2 text-gray-600 border rounded hover:bg-gray-100"
-              >
-                取消
-              </button>
-              <button
+          >
+            取消
+          </button>
+          <button
                 onClick={handleConfirm}
                 className="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600"
-              >
+          >
                 確認
-              </button>
-            </div>
-          </div>
+          </button>
+        </div>
+      </div>
         </div>
       )}
     </div>

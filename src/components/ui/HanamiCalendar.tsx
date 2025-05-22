@@ -44,9 +44,9 @@ interface GroupedDetail {
   course: string;
   names: {
     name: string;
-    student_id: string;
+  student_id: string;
     age: string;
-    is_trial?: boolean;
+  is_trial?: boolean;
     remaining_lessons?: number | null;
   }[];
 }
@@ -191,16 +191,16 @@ const HanamiCalendar = () => {
 
         // 處理常規學生數據
         const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
-          id: lesson.id,
+            id: lesson.id,
           student_id: lesson.student_id ?? '',
-          lesson_date: lesson.lesson_date,
-          regular_timeslot: lesson.regular_timeslot,
+            lesson_date: lesson.lesson_date,
+            regular_timeslot: lesson.regular_timeslot,
           course_type: lesson.course_type || '',
-          full_name: lesson.Hanami_Students?.full_name || '未命名學生',
-          student_age: lesson.Hanami_Students?.student_age || null,
-          lesson_status: lesson.lesson_status,
-          remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
-          is_trial: false
+            full_name: lesson.Hanami_Students?.full_name || '未命名學生',
+            student_age: lesson.Hanami_Students?.student_age || null,
+            lesson_status: lesson.lesson_status,
+            remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+            is_trial: false
         }));
 
         // 處理試堂學生數據
@@ -511,16 +511,16 @@ const HanamiCalendar = () => {
 
     // 處理常規學生數據
     const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
-      id: lesson.id,
+        id: lesson.id,
       student_id: lesson.student_id ?? '',
-      lesson_date: lesson.lesson_date,
-      regular_timeslot: lesson.regular_timeslot,
+        lesson_date: lesson.lesson_date,
+        regular_timeslot: lesson.regular_timeslot,
       course_type: lesson.course_type || '',
-      full_name: lesson.Hanami_Students?.full_name || '未命名學生',
-      student_age: lesson.Hanami_Students?.student_age || null,
-      lesson_status: lesson.lesson_status,
-      remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
-      is_trial: false
+        full_name: lesson.Hanami_Students?.full_name || '未命名學生',
+        student_age: lesson.Hanami_Students?.student_age || null,
+        lesson_status: lesson.lesson_status,
+        remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+        is_trial: false
     }));
 
     // 處理試堂學生數據
@@ -903,17 +903,17 @@ const HanamiCalendar = () => {
                       <div
                         key={`${g.time}-${g.course}`}
                         className={`p-2 rounded-lg cursor-pointer ${
-                          g.course === '鋼琴' ? '#E1E8F0' :
-                          g.course === '音樂專注力' ? '#E9F2DA' :
+                        g.course === '鋼琴' ? '#E1E8F0' :
+                        g.course === '音樂專注力' ? '#E9F2DA' :
                           '#F0F0F0'
                         }`}
-                        onClick={async () => await handleOpenDetail(date, g.course, g.time)}
-                      >
-                        <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.names.length})</div>
+                          onClick={async () => await handleOpenDetail(date, g.course, g.time)}
+                        >
+                          <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.names.length})</div>
                         {g.names.map((nameObj, j) => (
                           <div key={j}>{renderStudentButton(nameObj)}</div>
                         ))}
-                      </div>
+                        </div>
                     ))}
                   </div>
                 );
@@ -956,14 +956,14 @@ const HanamiCalendar = () => {
                         course: l.course_type,
                         names: []
                       };
-                    }
-                    acc[key].names.push({
-                      name: l.full_name,
-                      student_id: l.student_id,
+                  }
+                  acc[key].names.push({
+                    name: l.full_name,
+                    student_id: l.student_id,
                       age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
-                      is_trial: l.is_trial,
-                      remaining_lessons: l.remaining_lessons
-                    });
+                    is_trial: l.is_trial,
+                    remaining_lessons: l.remaining_lessons
+                  });
                     return acc;
                   }, {});
                   const groupedArray: GroupedLesson[] = Object.values(grouped);
@@ -998,8 +998,8 @@ const HanamiCalendar = () => {
                           {g.names.map((nameObj, j) => (
                             <div key={j}>{renderStudentButton(nameObj)}</div>
                           ))}
-                        </div>
-                      ))}
+                            </div>
+                          ))}
                     </div>
                   );
                 });

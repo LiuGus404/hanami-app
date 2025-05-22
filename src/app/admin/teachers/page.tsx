@@ -46,7 +46,7 @@ export default function TeacherManagementPage() {
           const normalized = raw?.trim().toLowerCase()
           if (normalized && !roleMap.has(normalized)) {
             if (raw) {
-              roleMap.set(normalized, raw.trim())
+            roleMap.set(normalized, raw.trim())
             }
           }
         })

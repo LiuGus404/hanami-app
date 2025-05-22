@@ -87,15 +87,15 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
     >
       {/* 編輯按鈕 */}
       {onEdit && (
-        <button
-          className="absolute top-1 right-1 z-10 bg-[#FFFDF8] rounded-full p-1 shadow hover:bg-[#F5E7D4]"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-        >
-          <img src="/icons/edit-pencil.png" alt="Edit" className="w-4 h-4" />
-        </button>
+      <button
+        className="absolute top-1 right-1 z-10 bg-[#FFFDF8] rounded-full p-1 shadow hover:bg-[#F5E7D4]"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit();
+        }}
+      >
+        <img src="/icons/edit-pencil.png" alt="Edit" className="w-4 h-4" />
+      </button>
       )}
 
       <div className="mb-0.5">
@@ -187,7 +187,7 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
           {plan?.materials && plan.materials.length > 0 ? (
             plan.materials.map((activity, idx) => (
               <div key={idx} className="text-[10px] text-[#4B4036]">
-                {activity}
+                  {activity}
               </div>
             ))
           ) : (

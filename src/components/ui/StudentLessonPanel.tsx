@@ -70,8 +70,8 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
 
   const fetchLessons = async () => {
     try {
-      const { data, error } = await supabase
-        .from('hanami_student_lesson')
+    const { data, error } = await supabase
+      .from('hanami_student_lesson')
         .select(`
           *,
           Hanami_CourseTypes(*)
@@ -299,7 +299,7 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
         .from('hanami_student_lesson')
         .upsert([dbLessonData], { onConflict: 'id' });
 
-      if (error) {
+    if (error) {
         console.error('Error saving lesson:', error);
         toast.error('儲存失敗');
         return;
@@ -307,10 +307,10 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
 
       if (data) {
         toast.success('儲存成功');
-        await fetchLessons();
-        setIsModalOpen(false);
-        setEditingLesson(null);
-      }
+      await fetchLessons();
+      setIsModalOpen(false);
+      setEditingLesson(null);
+    }
     } catch (error) {
       console.error('Error saving lesson:', error);
       toast.error('儲存失敗');
@@ -338,18 +338,18 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
             onConfirm={handleVisibleCountConfirm}
             onCancel={handleVisibleCountCancel}
           />
-          <PopupSelect
+            <PopupSelect
             title="選擇類別"
-            options={[
-              { label: '全部', value: 'all' },
+              options={[
+                { label: '全部', value: 'all' },
               { label: '即將到來', value: 'upcoming' },
               { label: '已過期', value: 'past' },
               { label: '今天', value: 'today' },
-              { label: '請假', value: 'sick' },
-              { label: '補課', value: 'makeup' },
-              { label: '缺席', value: 'absent' }
-            ]}
-            selected={tempCategoryFilter}
+                { label: '請假', value: 'sick' },
+                { label: '補課', value: 'makeup' },
+                { label: '缺席', value: 'absent' }
+              ]}
+              selected={tempCategoryFilter}
             onChange={(value) => {
               if (Array.isArray(value)) {
                 setTempCategoryFilter(value)
@@ -358,13 +358,13 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
             onConfirm={() => {
               setCategoryFilter(tempCategoryFilter)
               setCategorySelectOpen(false)
-            }}
-            onCancel={() => {
-              setTempCategoryFilter(categoryFilter)
-              setCategorySelectOpen(false)
-            }}
+              }}
+              onCancel={() => {
+                setTempCategoryFilter(categoryFilter)
+                setCategorySelectOpen(false)
+              }}
             mode="multi"
-          />
+            />
         </div>
         <div className="flex gap-2">
           <button
@@ -432,13 +432,13 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
                   {typeof lesson.course_type === 'string' ? lesson.course_type : lesson.course_type?.name}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <PopupSelect
+                        <PopupSelect
                     title="選擇狀態"
-                    options={[
+                          options={[
                       { label: '已完成', value: 'completed' },
                       { label: '未完成', value: 'pending' },
                       { label: '取消', value: 'cancelled' }
-                    ]}
+                          ]}
                     selected={lesson.lesson_status || ''}
                     onChange={(value) => {
                       if (typeof value === 'string') {
@@ -446,7 +446,7 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
                       }
                     }}
                     onConfirm={() => setStatusPopupOpen(null)}
-                    onCancel={() => setStatusPopupOpen(null)}
+                          onCancel={() => setStatusPopupOpen(null)}
                   />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -467,16 +467,16 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
       </div>
 
       {isModalOpen && (
-        <LessonEditorModal
+      <LessonEditorModal
           isOpen={isModalOpen}
-          onClose={() => {
+        onClose={() => {
             setIsModalOpen(false)
             setEditingLesson(null)
-          }}
-          lesson={editingLesson}
+        }}
+        lesson={editingLesson}
           onSaved={handleAddLesson}
           teachers={teacherOptions}
-        />
+      />
       )}
 
       {isDeleteConfirmOpen && (

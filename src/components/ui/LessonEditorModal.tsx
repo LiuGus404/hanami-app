@@ -87,78 +87,78 @@ export default function LessonEditorModal({
     }
   }, [lesson])
 
-  useEffect(() => {
-    fetchCourseTypes()
-    fetchTeachers()
-  }, [])
+useEffect(() => {
+  fetchCourseTypes()
+  fetchTeachers()
+}, [])
 
-  // 從 Supabase 撈取該學生最近一筆課堂記錄的 regular_timeslot、actual_timeslot 及 lesson_date
-  const fetchRegularTimeslot = async () => {
-    const { data, error } = await supabase
-      .from('hanami_student_lesson')
-      .select('regular_timeslot, actual_timeslot, lesson_date')
+// 從 Supabase 撈取該學生最近一筆課堂記錄的 regular_timeslot、actual_timeslot 及 lesson_date
+const fetchRegularTimeslot = async () => {
+  const { data, error } = await supabase
+    .from('hanami_student_lesson')
+    .select('regular_timeslot, actual_timeslot, lesson_date')
       .eq('student_id', form.student_id || '')
-      .order('lesson_date', { ascending: false })
-      .limit(1)
-      .single()
+    .order('lesson_date', { ascending: false })
+    .limit(1)
+    .single()
 
-    if (data) {
-      setForm(prev => ({
-        ...prev,
-        regular_timeslot: data.regular_timeslot || '',
-        actual_timeslot: data.actual_timeslot || ''
-      }))
-    }
+  if (data) {
+    setForm(prev => ({
+      ...prev,
+      regular_timeslot: data.regular_timeslot || '',
+      actual_timeslot: data.actual_timeslot || ''
+    }))
   }
+}
 
-  // 從歷史課堂記錄撈取最常見的課程類別
-  const fetchHistoricalCourseType = async () => {
-    const { data, error } = await supabase
-      .from('hanami_student_lesson')
-      .select('course_type')
+// 從歷史課堂記錄撈取最常見的課程類別
+const fetchHistoricalCourseType = async () => {
+  const { data, error } = await supabase
+    .from('hanami_student_lesson')
+    .select('course_type')
       .eq('student_id', form.student_id || '')
-    if (data && data.length > 0) {
-      const countMap: Record<string, number> = {}
-      data.forEach(item => {
+  if (data && data.length > 0) {
+    const countMap: Record<string, number> = {}
+    data.forEach(item => {
         const key = typeof item.course_type === 'string' ? item.course_type : '';
-        countMap[key] = (countMap[key] || 0) + 1
-      })
-      const mostCommon = Object.entries(countMap)
-        .filter(([key]) => key)
-        .sort((a, b) => b[1] - a[1])[0]?.[0] || ''
-      if (mostCommon) {
-        setForm(prev => ({ ...prev, course_type: mostCommon }))
-      }
+      countMap[key] = (countMap[key] || 0) + 1
+    })
+    const mostCommon = Object.entries(countMap)
+      .filter(([key]) => key)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || ''
+    if (mostCommon) {
+      setForm(prev => ({ ...prev, course_type: mostCommon }))
     }
   }
+}
 
-  const fetchTeachers = async () => {
-    const { data, error } = await supabase
-      .from('hanami_employee')
-      .select('teacher_nickname')
-    if (data) {
+const fetchTeachers = async () => {
+  const { data, error } = await supabase
+    .from('hanami_employee')
+    .select('teacher_nickname')
+  if (data) {
       const options = data.map((item: { teacher_nickname: string }) => ({
-        label: item.teacher_nickname,
-        value: item.teacher_nickname,
-      }))
-      setTeacherOptions(options)
-    }
+      label: item.teacher_nickname,
+      value: item.teacher_nickname,
+    }))
+    setTeacherOptions(options)
   }
+}
 
-  useEffect(() => {
+useEffect(() => {
     if (isOpen && form.student_id && !lesson) {
-      const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
       const defaultForm: Lesson = {
         id: '',
         student_id: '',
-        lesson_date: today,
-        regular_timeslot: '',
-        actual_timeslot: '',
+      lesson_date: today,
+      regular_timeslot: '',
+      actual_timeslot: '',
         course_type: '',
-        lesson_status: '',
-        lesson_teacher: '',
-        progress_notes: '',
-        video_url: '',
+      lesson_status: '',
+      lesson_teacher: '',
+      progress_notes: '',
+      video_url: '',
         lesson_count: 1,
         lesson_duration: null,
         regular_weekday: null,
@@ -174,13 +174,13 @@ export default function LessonEditorModal({
         access_role: null,
         remarks: null,
         student_oid: null
-      }
-      setForm(defaultForm)
-      setInitialFormState(defaultForm)
-      fetchRegularTimeslot()
-      fetchHistoricalCourseType()
-      fetchCourseTypeFromStudent()
     }
+    setForm(defaultForm)
+    setInitialFormState(defaultForm)
+    fetchRegularTimeslot()
+    fetchHistoricalCourseType()
+    fetchCourseTypeFromStudent()
+  }
   }, [isOpen, form.student_id, lesson])
 
   const fetchCourseTypes = async () => {
@@ -211,7 +211,7 @@ export default function LessonEditorModal({
 
   useEffect(() => {
     if (form.lesson_count && form.lesson_count > 0) {
-      const baseDate = form.lesson_date ? new Date(form.lesson_date) : new Date()
+    const baseDate = form.lesson_date ? new Date(form.lesson_date) : new Date()
       const previews = Array.from({ length: form.lesson_count }, (_, i) => {
         const newDate = new Date(baseDate)
         newDate.setDate(baseDate.getDate() + 7 * i)
@@ -241,8 +241,8 @@ export default function LessonEditorModal({
   const handleSave = async () => {
     if (!form.student_id) {
       alert('缺少學生ID');
-      return;
-    }
+        return;
+      }
     const payload = {
       ...form,
       id: form.id || '',
@@ -283,8 +283,8 @@ export default function LessonEditorModal({
           .eq('id', form.id)
       } else {
         await supabase
-          .from('hanami_student_lesson')
-          .insert(payload)
+            .from('hanami_student_lesson')
+            .insert(payload)
       }
       onSaved(payload as Lesson);
       onClose();
@@ -342,33 +342,33 @@ export default function LessonEditorModal({
                 onChange={handleChange}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               />
-            </div>
+          </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">課程類別</label>
-              <PopupSelect
+                <PopupSelect
                 title="選擇課程類別"
-                options={courseTypeOptions}
+                  options={courseTypeOptions}
                 selected={typeof form.course_type === 'string' ? [form.course_type] : []}
                 onChange={(selected) => setForm({ ...form, course_type: selected[0] })}
                 onConfirm={() => setCourseTypeDropdownOpen(false)}
                 onCancel={() => setCourseTypeDropdownOpen(false)}
-                mode="single"
-              />
+                  mode="single"
+                />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">老師</label>
-              <PopupSelect
+                  <PopupSelect
                 title="選擇老師"
                 options={teacherOptions}
                 selected={form.lesson_teacher ? [form.lesson_teacher] : []}
                 onChange={(selected) => setForm({ ...form, lesson_teacher: selected[0] })}
                 onConfirm={() => setTeacherDropdownOpen(false)}
                 onCancel={() => setTeacherDropdownOpen(false)}
-                mode="single"
-              />
-            </div>
+                    mode="single"
+                  />
+              </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">課堂狀態</label>
@@ -384,8 +384,8 @@ export default function LessonEditorModal({
                 onConfirm={() => setStatusDropdownOpen(false)}
                 onCancel={() => setStatusDropdownOpen(false)}
                 mode="single"
-              />
-            </div>
+                />
+              </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">進度筆記</label>
@@ -396,7 +396,7 @@ export default function LessonEditorModal({
                 rows={4}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               />
-            </div>
+                </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">影片連結</label>
@@ -411,23 +411,23 @@ export default function LessonEditorModal({
           </div>
 
           <div className="mt-6 flex justify-end space-x-3">
-            <button
+              <button
               type="button"
               onClick={handleCancel}
               className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              取消
-            </button>
-            <button
+                  >
+                    取消
+                  </button>
+                  <button
               type="button"
               onClick={handleSave}
               className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              儲存
-            </button>
+                  >
+                    儲存
+                  </button>
+              </div>
+            </Dialog.Panel>
           </div>
-        </Dialog.Panel>
-      </div>
     </Dialog>
   )
-}
+  }
