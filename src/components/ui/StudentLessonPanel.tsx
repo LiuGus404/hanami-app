@@ -529,11 +529,8 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
           }}
           lesson={editingLesson}
           studentId={studentId}
-          onSaved={async (newLesson) => {
-            await fetchLessons();
-            setStatusPopupOpen(null);
-            setIsModalOpen(false);
-            setEditingLesson(null);
+          onSaved={() => {
+            fetchLessons()
           }}
           mode={editingLesson ? 'edit' : 'add'}
         />

@@ -110,7 +110,7 @@ export default function AddRegularStudentForm() {
     setShowPopup({ field: '', open: false })
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     // 必填欄位檢查
@@ -137,7 +137,7 @@ export default function AddRegularStudentForm() {
       return
     }
     try {
-      let table = 'Hanami_Students';
+      let table: 'Hanami_Students' | 'hanami_trial_students' = 'Hanami_Students';
       let payload;
       if (formData.student_type === '試堂') {
         table = 'hanami_trial_students';

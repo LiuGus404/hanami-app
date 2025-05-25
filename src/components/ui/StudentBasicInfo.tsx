@@ -304,7 +304,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       ];
       const studentPayload: Partial<StudentFormData> = {};
       hanamiStudentFields.forEach((key) => {
-        studentPayload[key] = formData[key];
+        studentPayload[key] = formData[key] === null ? undefined : formData[key];
       });
       const { error: studentError } = await supabase
         .from('Hanami_Students')
