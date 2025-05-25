@@ -7,6 +7,9 @@ import { supabase } from '@/lib/supabase'
 import StudentBasicInfo from '@/components/ui/StudentBasicInfo'
 import StudentLessonPanel from '@/components/ui/StudentLessonPanel'
 import { useUser } from '@/lib/useUser'
+import { PopupSelect } from '@/components/ui/PopupSelect'
+import LessonEditorModal from '@/components/ui/LessonEditorModal'
+import { Lesson } from '@/types'
 
 export default function StudentDetailPage() {
   const { id } = useParams()
@@ -15,6 +18,14 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
+  const [showPopup, setShowPopup] = useState(false)
+  const [statusPopupOpen, setStatusPopupOpen] = useState<string | null>(null)
+  const [showCategoryPopup, setShowCategoryPopup] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState<string[]>(['all'])
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingLesson, setEditingLesson] = useState<any>(null)
+  const [tempCategoryFilter, setTempCategoryFilter] = useState<string[]>(['all'])
+  const [categorySelectOpen, setCategorySelectOpen] = useState(false)
 
   useEffect(() => {
     setPageLoading(true);
@@ -115,6 +126,20 @@ export default function StudentDetailPage() {
             <StudentLessonPanel studentId={student.id} />
           </div>
         )}
+        <LessonEditorModal
+          open={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingLesson(null);
+          }}
+          lesson={editingLesson}
+          onSaved={() => {
+            setIsModalOpen(false);
+            setEditingLesson(null);
+          }}
+          studentId={student.id}
+          mode={editingLesson ? 'edit' : 'add'}
+        />
       </div>
     </div>
   )

@@ -35,8 +35,8 @@ export default function AddRegularStudentForm() {
     student_password: uuidv4().slice(0, 8),
     trial_date: '',
     trial_time: '',
-    student_remarks: '', // 常規學生使用 student_remarks
-    trial_remarks: '',   // 試堂學生使用 trial_remarks
+    student_remarks: '',
+    trial_remarks: '',
     // 可選: 可加入 duration_months, remaining_lessons 若有需要
   })
 
@@ -110,7 +110,7 @@ export default function AddRegularStudentForm() {
     setShowPopup({ field: '', open: false })
   }
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     // 必填欄位檢查
@@ -137,79 +137,93 @@ export default function AddRegularStudentForm() {
       return
     }
     try {
-      let processedData = {
-        ...formData,
-        student_age: formData.student_age === '' ? null : parseInt(formData.student_age),
-        student_dob: formData.student_dob === '' ? null : formData.student_dob,
-      };
-      
       let table = 'Hanami_Students';
+      let payload;
       if (formData.student_type === '試堂') {
         table = 'hanami_trial_students';
-        const trialDateHK = new Date((formData.trial_date || '') + 'T00:00:00+08:00');
-        const weekdayNumber = formData.trial_date ? trialDateHK.getUTCDay().toString() : '';
-        processedData = {
-          id: processedData.id,
-          student_oid: processedData.student_oid,
-          full_name: processedData.full_name,
-          nick_name: processedData.nick_name,
-          gender: processedData.gender,
-          contact_number: processedData.contact_number,
-          student_dob: processedData.student_dob,
-          student_age: processedData.student_age,
-          parent_email: processedData.parent_email,
-          health_notes: processedData.health_notes,
-          student_preference: processedData.student_preference,
-          address: processedData.address,
-          school: processedData.school,
-          course_type: processedData.course_type,
-          student_type: processedData.student_type,
-          student_teacher: processedData.student_teacher,
-          created_at: processedData.created_at,
-          updated_at: processedData.updated_at,
-          access_role: processedData.access_role,
-          student_email: processedData.student_email,
-          student_password: processedData.student_password,
-          trial_date: formData.trial_date || '',
-          trial_time: formData.trial_time || '',
+        const weekdayNumber = formData.trial_date
+          ? (new Date(formData.trial_date + 'T00:00:00+08:00')).getUTCDay().toString()
+          : '';
+        payload = {
+          id: formData.id,
+          student_oid: formData.student_oid,
+          full_name: formData.full_name,
+          nick_name: formData.nick_name,
+          gender: formData.gender,
+          contact_number: formData.contact_number,
+          student_dob: formData.student_dob || null,
+          student_age: formData.student_age === '' ? null : parseInt(formData.student_age),
+          parent_email: formData.parent_email,
+          health_notes: formData.health_notes,
+          student_preference: formData.student_preference,
+          address: formData.address,
+          school: formData.school,
+          course_type: formData.course_type,
+          student_type: formData.student_type,
+          student_teacher: formData.student_teacher,
+          created_at: formData.created_at,
+          updated_at: formData.updated_at,
+          access_role: formData.access_role,
+          student_email: formData.student_email,
+          student_password: formData.student_password,
+          lesson_date: formData.trial_date || null,
+          actual_timeslot: formData.trial_time || null,
           trial_remarks: formData.trial_remarks || '',
+          weekday: weekdayNumber,
           regular_weekday: weekdayNumber,
-          regular_timeslot: '',
-          student_remarks: '',
         };
       } else {
-        processedData = {
-          id: processedData.id,
-          student_oid: processedData.student_oid,
-          full_name: processedData.full_name,
-          nick_name: processedData.nick_name,
-          gender: processedData.gender,
-          contact_number: processedData.contact_number,
-          student_dob: processedData.student_dob,
-          student_age: processedData.student_age,
-          parent_email: processedData.parent_email,
-          health_notes: processedData.health_notes,
-          student_preference: processedData.student_preference,
-          address: processedData.address,
-          school: processedData.school,
-          course_type: processedData.course_type,
-          regular_weekday: processedData.regular_weekday,
-          regular_timeslot: processedData.regular_timeslot,
-          student_type: processedData.student_type,
-          student_teacher: processedData.student_teacher,
-          created_at: processedData.created_at,
-          updated_at: processedData.updated_at,
-          access_role: processedData.access_role,
-          student_email: processedData.student_email,
-          student_password: processedData.student_password,
-          student_remarks: processedData.student_remarks || '',
-          trial_date: '',
-          trial_time: '',
-          trial_remarks: '',
+        payload = {
+          id: formData.id,
+          student_oid: formData.student_oid,
+          full_name: formData.full_name,
+          nick_name: formData.nick_name,
+          gender: formData.gender,
+          contact_number: formData.contact_number,
+          student_dob: formData.student_dob || null,
+          student_age: formData.student_age === '' ? null : parseInt(formData.student_age),
+          parent_email: formData.parent_email,
+          health_notes: formData.health_notes,
+          student_preference: formData.student_preference,
+          address: formData.address,
+          school: formData.school,
+          course_type: formData.course_type,
+          regular_weekday: formData.regular_weekday,
+          regular_timeslot: formData.regular_timeslot,
+          student_type: formData.student_type,
+          student_teacher: formData.student_teacher,
+          created_at: formData.created_at,
+          updated_at: formData.updated_at,
+          access_role: formData.access_role,
+          student_email: formData.student_email,
+          student_password: formData.student_password,
+          student_remarks: formData.student_remarks || '',
         };
       }
-      
-      const { error } = await supabase.from(table as 'Hanami_Students' | 'hanami_trial_students').upsert([processedData], { onConflict: "id" });
+
+      // 先檢查是否已存在
+      const { data: existingData } = await supabase
+        .from(table)
+        .select('id')
+        .eq('id', formData.id)
+        .single();
+
+      let error;
+      if (existingData) {
+        // 如果存在，則更新
+        const { error: updateError } = await supabase
+          .from(table)
+          .update(payload)
+          .eq('id', formData.id);
+        error = updateError;
+      } else {
+        // 如果不存在，則插入
+        const { error: insertError } = await supabase
+          .from(table)
+          .insert([payload]);
+        error = insertError;
+      }
+
       if (error) {
         alert('新增或更新失敗：' + error.message);
       } else {
@@ -281,6 +295,38 @@ export default function AddRegularStudentForm() {
       )}
       <form onSubmit={handleSubmit} className="bg-[#FFFDF8] p-6 rounded-2xl shadow-xl space-y-6 max-w-lg mx-auto">
       <h2 className="text-2xl font-bold text-center text-[#4B4036]">新增常規學生</h2>
+      {/* 一鍵填入測試資料按鈕 */}
+      <div className="flex justify-center mb-2">
+        <button
+          type="button"
+          className="px-4 py-1 bg-[#EBC9A4] text-[#2B3A3B] rounded-full hover:bg-[#e5ba8e] text-sm"
+          onClick={() => {
+            setFormData(prev => ({
+              ...prev,
+              full_name: '測試學生',
+              nick_name: '小測',
+              gender: '女',
+              contact_number: '98765432',
+              student_dob: '2018-05-01',
+              student_age: '6',
+              parent_email: 'parent@example.com',
+              health_notes: '無',
+              student_preference: '喜歡畫畫',
+              address: '九龍測試路1號',
+              school: '測試小學',
+              course_type: courseOptions[0]?.value || '鋼琴',
+              regular_weekday: '2',
+              regular_timeslot: '15:00',
+              student_type: '常規',
+              student_teacher: teacherOptions[0]?.value || '未分配',
+              student_remarks: '這是測試用學生',
+              trial_remarks: '',
+            }))
+          }}
+        >
+          一鍵填入測試資料
+        </button>
+      </div>
 
       {/* 🧩 基本資料與聯絡資訊 */}
       <fieldset className="space-y-3">

@@ -6,11 +6,12 @@ import TimePicker from '@/components/ui/TimePicker'
 import { Lesson, CourseType, Teacher } from '@/types'
 
 interface LessonEditorModalProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   lesson: Lesson | null;
-  onSaved: (newLesson: Lesson) => Promise<void>;
-  teachers: { label: string; value: string; }[];
+  studentId: string;
+  onSaved: () => void;
+  mode?: 'edit' | 'add';
 }
 
 interface CourseTypeOption {
@@ -18,12 +19,27 @@ interface CourseTypeOption {
   value: string;
 }
 
+function toStatus(val: string | null | undefined): "attended" | "absent" | "makeup" | "cancelled" | "sick_leave" | "personal_leave" | null {
+  if (
+    val === 'attended' ||
+    val === 'absent' ||
+    val === 'makeup' ||
+    val === 'cancelled' ||
+    val === 'sick_leave' ||
+    val === 'personal_leave'
+  ) {
+    return val
+  }
+  return null
+}
+
 export default function LessonEditorModal({
-  isOpen,
+  open,
   onClose,
   lesson,
+  studentId,
   onSaved,
-  teachers,
+  mode = 'add'
 }: LessonEditorModalProps) {
   const supabase = getSupabaseClient()
   const [form, setForm] = useState<Partial<Lesson>>({
@@ -32,21 +48,21 @@ export default function LessonEditorModal({
     student_oid: lesson?.student_oid || null,
     lesson_date: lesson?.lesson_date || '',
     regular_timeslot: lesson?.regular_timeslot || '',
-    actual_timeslot: lesson?.actual_timeslot || null,
-    lesson_status: lesson?.lesson_status || null,
-    course_type: lesson?.course_type || null,
+    actual_timeslot: lesson?.actual_timeslot || '',
+    lesson_status: lesson?.lesson_status || '',
+    course_type: lesson?.course_type || '',
     lesson_duration: lesson?.lesson_duration || null,
     regular_weekday: lesson?.regular_weekday || null,
-    lesson_count: lesson?.lesson_count || 0,
+    lesson_count: lesson?.lesson_count ?? 1,
     remaining_lessons: lesson?.remaining_lessons || null,
     is_trial: lesson?.is_trial || false,
-    lesson_teacher: lesson?.lesson_teacher || null,
+    lesson_teacher: lesson?.lesson_teacher || '',
     package_id: lesson?.package_id || null,
     status: lesson?.status || null,
     notes: lesson?.notes || null,
     next_target: lesson?.next_target || null,
     progress_notes: lesson?.progress_notes || null,
-    video_url: lesson?.video_url || null,
+    video_url: lesson?.video_url || '',
     full_name: lesson?.full_name || null,
     created_at: lesson?.created_at || null,
     updated_at: lesson?.updated_at || null,
@@ -80,8 +96,8 @@ export default function LessonEditorModal({
     if (lesson) {
       setForm(lesson)
       setInitialFormState(lesson)
-      setPendingCourseType(typeof lesson.course_type === 'string' ? lesson.course_type : lesson.course_type?.name || '')
-      setPendingLessonCount(lesson.lesson_count.toString())
+      setPendingCourseType(typeof lesson.course_type === 'string' ? lesson.course_type : '')
+      setPendingLessonCount(lesson.lesson_count?.toString() ?? '1')
       setPendingStatus(lesson.lesson_status || '')
       setPendingTeacher(lesson.lesson_teacher || '')
     }
@@ -97,7 +113,7 @@ const fetchRegularTimeslot = async () => {
   const { data, error } = await supabase
     .from('hanami_student_lesson')
     .select('regular_timeslot, actual_timeslot, lesson_date')
-      .eq('student_id', form.student_id || '')
+      .eq('student_id', studentId)
     .order('lesson_date', { ascending: false })
     .limit(1)
     .single()
@@ -116,7 +132,7 @@ const fetchHistoricalCourseType = async () => {
   const { data, error } = await supabase
     .from('hanami_student_lesson')
     .select('course_type')
-      .eq('student_id', form.student_id || '')
+      .eq('student_id', studentId)
   if (data && data.length > 0) {
     const countMap: Record<string, number> = {}
     data.forEach(item => {
@@ -146,7 +162,7 @@ const fetchTeachers = async () => {
 }
 
 useEffect(() => {
-    if (isOpen && form.student_id && !lesson) {
+    if (open && studentId && !lesson) {
     const today = new Date().toISOString().split('T')[0];
       const defaultForm: Lesson = {
         id: '',
@@ -181,7 +197,7 @@ useEffect(() => {
     fetchHistoricalCourseType()
     fetchCourseTypeFromStudent()
   }
-  }, [isOpen, form.student_id, lesson])
+  }, [open, studentId, lesson])
 
   const fetchCourseTypes = async () => {
     const { data, error } = await supabase.from('Hanami_CourseTypes').select('*')
@@ -198,7 +214,7 @@ useEffect(() => {
     const { data, error } = await supabase
       .from('Hanami_Students')
       .select('course_type')
-      .eq('id', form.student_id || '')
+      .eq('id', studentId)
       .single()
 
     if (data?.course_type) {
@@ -238,67 +254,158 @@ useEffect(() => {
     }
   }
 
-  const handleSave = async () => {
-    if (!form.student_id) {
-      alert('缺少學生ID');
+  const handleSubmit = async () => {
+    try {
+      // 驗證必填欄位
+      if (!form.lesson_date) {
+        alert('請選擇課堂日期');
         return;
       }
-    const payload = {
-      ...form,
-      id: form.id || '',
-      student_id: form.student_id,
-      lesson_date: form.lesson_date || '',
-      regular_timeslot: form.regular_timeslot || '',
-      course_type: typeof form.course_type === 'string' ? form.course_type : '',
-      lesson_count: form.lesson_count ?? 0,
-      is_trial: form.is_trial || false,
-      created_at: form.created_at ?? new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      regular_weekday: form.regular_weekday !== null && form.regular_weekday !== undefined ? String(form.regular_weekday) : null,
-      lesson_duration: form.lesson_duration ?? null,
-      lesson_teacher: form.lesson_teacher ?? null,
-      package_id: form.package_id ?? null,
-      status: (form.status && ['attended','absent','makeup','cancelled','sick_leave','personal_leave'].includes(form.status)
-        ? form.status 
-        : null) as ('attended' | 'absent' | 'makeup' | 'cancelled' | 'sick_leave' | 'personal_leave' | null),
-      notes: form.notes ?? null,
-      next_target: form.next_target ?? null,
-      progress_notes: form.progress_notes ?? null,
-      video_url: form.video_url ?? null,
-      full_name: form.full_name ?? null,
-      access_role: form.access_role ?? null,
-      remarks: form.remarks ?? null,
-      student_oid: form.student_oid ?? null,
-      remaining_lessons: form.remaining_lessons ?? null,
-      lesson_activities: form.lesson_activities ?? null,
-      actual_timeslot: form.actual_timeslot ?? null,
-      lesson_status: form.lesson_status || null
-    };
 
-    try {
-      if (form.id) {
-        await supabase
+      // 1. 從 Supabase 取得學生資料
+      let studentData = null;
+      try {
+        const { data } = await supabase
+          .from('Hanami_Students')
+          .select('student_oid, regular_weekday, full_name')
+          .eq('id', studentId)
+          .single();
+        studentData = data;
+      } catch (e) {
+        console.error('Error fetching student data:', e);
+      }
+
+      // 自動設置 lesson_duration
+      const autoLessonDuration =
+        form.course_type === '鋼琴'
+          ? '00:45:00'
+          : form.course_type === '音樂專注力'
+          ? '01:00:00'
+          : null;
+
+      // 準備 payload，型別全部正確
+      const payload = {
+        id: form.id,
+        student_id: studentId,
+        student_oid: studentData?.student_oid ?? null,
+        full_name: studentData?.full_name ?? '',
+        lesson_date: form.lesson_date,
+        regular_timeslot: form.regular_timeslot ?? '',
+        actual_timeslot: form.actual_timeslot ?? '',
+        course_type: typeof form.course_type === 'string' ? form.course_type : (form.course_type && typeof form.course_type === 'object' && 'name' in form.course_type ? String((form.course_type as { name: string }).name) : ''),
+        lesson_status: form.lesson_status ?? '',
+        lesson_teacher: form.lesson_teacher ?? '',
+        progress_notes: form.progress_notes ?? '',
+        video_url: form.video_url ?? '',
+        lesson_duration: autoLessonDuration,
+        regular_weekday: studentData?.regular_weekday !== undefined && studentData?.regular_weekday !== null ? String(studentData.regular_weekday) : null,
+        package_id: form.package_id && form.package_id !== '' ? form.package_id : null,
+        status: toStatus(form.status),
+        notes: form.notes ?? null,
+        next_target: form.next_target ?? null,
+        created_at: form.created_at || new Date().toISOString(),
+        updated_at: form.updated_at || new Date().toISOString(),
+        access_role: form.access_role ?? null,
+        remarks: form.remarks ?? null,
+        lesson_activities: form.lesson_activities ?? null,
+      };
+
+      if (lesson) {
+        const { error } = await supabase
           .from('hanami_student_lesson')
           .update(payload)
-          .eq('id', form.id)
+          .eq('id', lesson.id)
+        
+        if (error) {
+          console.error('Error updating lesson:', error)
+          alert('更新課堂記錄失敗，請稍後再試\n' + error.message)
+          return
+        }
+        alert(
+          '課堂已成功更新！\n' +
+          '日期：' + payload.lesson_date + '\n' +
+          '時間：' + (payload.actual_timeslot || payload.regular_timeslot)
+        );
       } else {
-        await supabase
+        // 新增多堂課的情況
+        if ((form.lesson_count ?? 1) > 1) {
+          const nowISOString = new Date().toISOString();
+          const newLessons = previewDates.map(dt => ({
+            student_id: studentId,
+            student_oid: (!studentData?.student_oid || studentData.student_oid === '') ? null : studentData.student_oid,
+            full_name: studentData?.full_name ?? '',
+            lesson_date: dt.split(' ')[0],
+            regular_timeslot: dt.split(' ')[1],
+            actual_timeslot: dt.split(' ')[1],
+            course_type: typeof form.course_type === 'string' ? form.course_type : (form.course_type && typeof form.course_type === 'object' && 'name' in form.course_type ? String((form.course_type as { name: string }).name) : ''),
+            lesson_status: form.lesson_status ?? '',
+            lesson_teacher: form.lesson_teacher ?? '',
+            progress_notes: form.progress_notes ?? '',
+            video_url: form.video_url ?? '',
+            lesson_duration: autoLessonDuration,
+            regular_weekday: studentData?.regular_weekday !== undefined && studentData?.regular_weekday !== null ? String(studentData.regular_weekday) : null,
+            package_id: (!form.package_id || form.package_id === '') ? null : form.package_id,
+            status: toStatus(form.status),
+            notes: form.notes ?? null,
+            next_target: form.next_target ?? null,
+            created_at: nowISOString,
+            updated_at: nowISOString,
+            access_role: form.access_role ?? null,
+            remarks: form.remarks ?? null,
+            lesson_activities: form.lesson_activities ?? null,
+          }))
+          const { data, error } = await supabase
             .from('hanami_student_lesson')
-            .insert(payload)
+            .insert(newLessons)
+            .select()
+          if (error) {
+            console.error('Error inserting multiple lessons:', error)
+            alert('新增多堂課記錄失敗，請稍後再試\n' + error.message)
+            return
+          }
+          if (data) {
+            const summary = data
+              .map(d => '日期：' + d.lesson_date + ' 時間：' + (d.actual_timeslot || d.regular_timeslot))
+              .join('\n');
+            alert('課堂已成功新增！\n' + summary);
+          }
+        } else {
+          // 新增單堂課
+          const nowISOString = new Date().toISOString();
+          const singlePayload = {
+            ...payload,
+            created_at: nowISOString,
+            updated_at: nowISOString,
+          };
+          const { data, error } = await supabase
+            .from('hanami_student_lesson')
+            .insert(singlePayload)
+            .select()
+          if (error) {
+            console.error('Error inserting single lesson:', error)
+            alert('新增課堂記錄失敗，請稍後再試\n' + error.message)
+            return
+          }
+          if (data && data[0]) {
+            alert(
+              '課堂已成功新增！\n' +
+              '日期：' + data[0].lesson_date + '\n' +
+              '時間：' + (data[0].actual_timeslot || data[0].regular_timeslot)
+            );
+          }
+        }
       }
-      onSaved(payload as Lesson);
-      onClose();
-    } catch (error) {
-      console.error('Error saving lesson:', error);
-      alert('儲存失敗');
+      onSaved()
+      onClose()
+    } catch (err) {
+      console.error('Unexpected error during save:', err)
+      alert('儲存失敗，請稍後再試\n' + (err instanceof Error ? err.message : ''))
     }
-  };
+  }
 
   const handleCancel = () => {
-    if (initialFormState) {
-      setForm(initialFormState);
-    }
-    onClose();
+    setForm(initialFormState || {})
+    onClose()
   }
 
   const handleLessonCountChange = (value: string) => {
@@ -317,117 +424,344 @@ useEffect(() => {
     }
   };
 
-  if (!isOpen) return null;
+  // handlePreviewDateChange/handlePreviewTimeChange 放在這裡
+  const handlePreviewDateChange = (index: number, newDate: string) => {
+    setPreviewDates(prev => {
+      const copy = [...prev]
+      const [, time] = copy[index].split(' ')
+      copy[index] = `${newDate} ${time}`
+      return copy
+    })
+  }
+  const handlePreviewTimeChange = (index: number, newTime: string) => {
+    setPreviewDates(prev => {
+      const copy = [...prev]
+      const [date] = copy[index].split(' ')
+      copy[index] = `${date} ${newTime}`
+      return copy
+    })
+  }
+
+  const handleDelete = async () => {
+    if (lesson?.id) {
+      await supabase.from('hanami_student_lesson').delete().eq('id', lesson.id)
+      onSaved()
+      onClose()
+    }
+  }
+
+  if (!open) return null;
 
   return (
     <Dialog
-      open={isOpen}
+      open={open}
       onClose={handleCancel}
-      className="relative z-50"
+      className="fixed z-10 inset-0 overflow-y-auto"
     >
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-2xl rounded-lg bg-white p-6">
-          <Dialog.Title className="text-lg font-medium mb-4">
-            {lesson ? '編輯課堂' : '新增課堂'}
-          </Dialog.Title>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">課堂日期</label>
-              <input
-                type="date"
-                name="lesson_date"
-                value={form.lesson_date}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              />
+      <div className="flex items-center justify-center min-h-screen px-4">
+        <Dialog.Panel className="bg-[#FFFDF8] p-6 rounded-2xl shadow-xl w-full max-w-md border border-[#F3EAD9]">
+          <div className="flex justify-between items-center mb-4">
+            <Dialog.Title className="text-lg font-bold"> {lesson ? '編輯課堂記錄' : '新增課堂記錄'} </Dialog.Title>
+            {(form.lesson_count ?? 1) > 1 && (
+              <button
+                onClick={() => setShowPreview((prev) => !prev)}
+                className="text-sm text-[#4B4036] underline hover:text-[#2B3A3B]"
+              >
+                {showPreview ? '隱藏預覽' : '預覽課堂時間'}
+              </button>
+            )}
           </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">課程類別</label>
+          <div className="space-y-3">
+            <div className="mb-3">
+              <button
+                onClick={() => {
+                  setPendingCourseType(typeof form.course_type === 'string' ? form.course_type : '')
+                  setCourseTypeDropdownOpen(true)
+                }}
+                className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] text-left bg-white"
+              >
+                {form.course_type ? `課堂類別：${form.course_type}` : '請選擇課堂類別'}
+              </button>
+              {courseTypeDropdownOpen && (
                 <PopupSelect
-                title="選擇課程類別"
+                  title="選擇課堂類別"
                   options={courseTypeOptions}
-                selected={typeof form.course_type === 'string' ? [form.course_type] : []}
-                onChange={(selected) => setForm({ ...form, course_type: selected[0] })}
-                onConfirm={() => setCourseTypeDropdownOpen(false)}
-                onCancel={() => setCourseTypeDropdownOpen(false)}
+                  selected={pendingCourseType}
                   mode="single"
+                  onChange={(val) => setPendingCourseType(Array.isArray(val) ? val[0] : val || '')}
+                  onConfirm={() => {
+                    setForm({ ...form, course_type: pendingCourseType })
+                    setCourseTypeDropdownOpen(false)
+                  }}
+                  onCancel={() => setCourseTypeDropdownOpen(false)}
                 />
+              )}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">老師</label>
+            {mode === 'add' && (
+              <div className="mb-3">
+                <button
+                  onClick={() => {
+                    setLessonCountDropdownOpen(true)
+                    setPendingLessonCount(form.lesson_count?.toString() || '1')
+                  }}
+                  className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] text-left bg-white"
+                >
+                  新增堂數：{form.lesson_count || 1} 堂
+                </button>
+                {lessonCountDropdownOpen && (
                   <PopupSelect
-                title="選擇老師"
-                options={teacherOptions}
-                selected={form.lesson_teacher ? [form.lesson_teacher] : []}
-                onChange={(selected) => setForm({ ...form, lesson_teacher: selected[0] })}
-                onConfirm={() => setTeacherDropdownOpen(false)}
-                onCancel={() => setTeacherDropdownOpen(false)}
+                    title="選擇堂數"
+                    options={[
+                      { label: '1 堂', value: '1' },
+                      { label: '4 堂', value: '4' },
+                      { label: '8 堂', value: '8' },
+                      { label: '12 堂', value: '12' },
+                      { label: '16 堂', value: '16' },
+                      { label: '自訂', value: 'custom' },
+                    ]}
+                    selected={pendingLessonCount}
+                    onChange={(val) => setPendingLessonCount(Array.isArray(val) ? val[0] : val || '')}
+                    onConfirm={() => {
+                      setForm({
+                        ...form,
+                        lesson_count: pendingLessonCount === 'custom' ? customLessonCount : Number(pendingLessonCount)
+                      })
+                      setLessonCountDropdownOpen(false)
+                    }}
+                    onCancel={() => setLessonCountDropdownOpen(false)}
                     mode="single"
                   />
+                )}
+                {pendingLessonCount === 'custom' && (
+                  <input
+                    type="number"
+                    value={customLessonCount}
+                    onChange={(e) => setCustomLessonCount(Number(e.target.value))}
+                    className="mt-2 w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B]"
+                    placeholder="請輸入自訂堂數"
+                  />
+                )}
               </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">課堂狀態</label>
-              <PopupSelect
-                title="選擇課堂狀態"
-                options={[
-                  { label: '已完成', value: 'completed' },
-                  { label: '未完成', value: 'pending' },
-                  { label: '取消', value: 'cancelled' }
-                ]}
-                selected={form.lesson_status ? [form.lesson_status] : []}
-                onChange={(selected) => setForm({ ...form, lesson_status: selected[0] })}
-                onConfirm={() => setStatusDropdownOpen(false)}
-                onCancel={() => setStatusDropdownOpen(false)}
-                mode="single"
+            )}
+            <input type="date" name="lesson_date" value={form.lesson_date || ''} onChange={handleChange} className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] placeholder-[#aaa]" />
+            {form.lesson_count === 1 ? (
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-[#4B4036]">常規時間（不可修改）</label>
+                <input
+                  type="time"
+                  value={form.regular_timeslot || ''}
+                  readOnly
+                  className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] bg-gray-100 cursor-not-allowed"
                 />
               </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">進度筆記</label>
-              <textarea
-                name="progress_notes"
-                value={form.progress_notes || ''}
-                onChange={handleChange}
-                rows={4}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            ) : (
+              <>
+                <TimePicker
+                  label="常規時間"
+                  value={form.regular_timeslot || ''}
+                  onChange={(val) => setForm({ ...form, regular_timeslot: val })}
+                />
+                {(form.lesson_count ?? 1) > 1 && previewDates.length > 0 && (
+                  <div className="mt-2 text-sm text-[#4B4036] space-y-1">
+                    <p className="font-semibold">課堂日期時間</p>
+                    {previewDates.map((d, i) => (
+                      <div key={i}>{d}</div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            {form.lesson_count === 1 && (
+              <TimePicker
+                label="實際時間"
+                value={form.actual_timeslot || ''}
+                onChange={(val) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    actual_timeslot: val,
+                    regular_timeslot: val,
+                  }))
+                }
               />
+            )}
+            {form.lesson_count === 1 && (
+              <>
+                <div className="mb-3">
+                  <button
+                    onClick={() => {
+                      setPendingStatus(form.lesson_status || '')
+                      setStatusDropdownOpen(true)
+                    }}
+                    className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] text-left bg-white"
+                  >
+                    {form.lesson_status ? `出席狀況：${form.lesson_status}` : '請選擇出席狀況'}
+                  </button>
+                  {statusDropdownOpen && (
+                    <PopupSelect
+                      title="選擇出席狀況"
+                      options={[
+                        { label: '出席', value: 'attended' },
+                        { label: '缺席', value: 'absent' },
+                        { label: '補堂', value: 'makeup' },
+                        { label: '病假', value: 'sick_leave' },
+                        { label: '事假', value: 'personal_leave' },
+                      ]}
+                      selected={pendingStatus}
+                      mode="single"
+                      onChange={(val) => setPendingStatus(Array.isArray(val) ? val[0] : val || '')}
+                      onConfirm={() => {
+                        setForm({ ...form, lesson_status: pendingStatus })
+                        setStatusDropdownOpen(false)
+                      }}
+                      onCancel={() => setStatusDropdownOpen(false)}
+                    />
+                  )}
                 </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">影片連結</label>
-              <input
-                type="text"
-                name="video_url"
-                value={form.video_url || ''}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              />
+              </>
+            )}
+            <div className="mb-3">
+              <button
+                onClick={() => {
+                  setPendingTeacher(form.lesson_teacher || '')
+                  setTeacherDropdownOpen(true)
+                }}
+                className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] text-left bg-white"
+              >
+                {form.lesson_teacher ? `負責老師：${form.lesson_teacher}` : '請選擇負責老師'}
+              </button>
+              {teacherDropdownOpen && (
+                <PopupSelect
+                  title="選擇負責老師"
+                  options={teacherOptions}
+                  selected={pendingTeacher}
+                  mode="single"
+                  onChange={(val) => setPendingTeacher(Array.isArray(val) ? val[0] : val || '')}
+                  onConfirm={() => {
+                    setForm({ ...form, lesson_teacher: pendingTeacher })
+                    setTeacherDropdownOpen(false)
+                  }}
+                  onCancel={() => setTeacherDropdownOpen(false)}
+                />
+              )}
             </div>
+            <textarea name="progress_notes" value={form.progress_notes || ''} onChange={handleChange} placeholder="備註" className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] placeholder-[#aaa]" />
+            <input type="text" name="video_url" value={form.video_url || ''} onChange={handleChange} placeholder="影片連結" className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] placeholder-[#aaa]" />
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="mt-6 flex justify-end gap-2">
+            <button onClick={handleCancel} className="px-4 py-2 border border-[#EADBC8] text-sm text-[#A68A64] bg-white rounded-full hover:bg-[#f7f3ec]">取消</button>
+            <button onClick={handleSubmit} className="px-4 py-2 bg-[#EBC9A4] text-sm text-[#2B3A3B] rounded-full hover:bg-[#e5ba8e]">儲存</button>
+            {mode === 'edit' && lesson && (
               <button
-              type="button"
-              onClick={handleCancel}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                onClick={handleDelete}
+                className="px-4 py-2 border border-red-200 text-sm text-red-600 bg-white rounded-full hover:bg-red-50"
+              >
+                刪除
+              </button>
+            )}
+          </div>
+        </Dialog.Panel>
+      </div>
+      {/* Overlay Preview Dialog */}
+      
+      {showPreview && (
+        <Dialog open={true} onClose={() => setShowPreview(false)} className="fixed z-50 inset-0 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <Dialog.Panel className="bg-[#FFFDF8] p-6 rounded-2xl shadow-xl w-full max-w-md border border-[#F3EAD9]">
+              <Dialog.Title className="text-lg font-bold mb-2">預覽課堂時間</Dialog.Title>
+              {previewDates.length > 0 ? (
+                <>
+                  <p className="text-sm font-semibold text-[#4B4036] mb-1">課堂時間</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-[#4B4036]">
+                    {previewDates.map((d, i) => {
+                      const [dateStr, timeStr] = d.split(' ')
+                      return (
+                        <li key={i} className="flex items-center gap-2 mb-2">
+                          <input
+                            type="date"
+                            value={dateStr}
+                            onChange={e => handlePreviewDateChange(i, e.target.value)}
+                            className="border border-[#EADBC8] rounded px-2 py-1"
+                          />
+                          <TimePicker
+                            label=""
+                            value={timeStr}
+                            onChange={val => handlePreviewTimeChange(i, val)}
+                          />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">尚無可預覽的課堂時間。</p>
+              )}
+              {/* 新增重設/關閉/儲存按鈕區塊 */}
+              <div className="mt-4 flex justify-between items-center">
+                <button
+                  onClick={() => {
+                    // 重設為原始時間
+                    const baseDate = form.lesson_date ? new Date(form.lesson_date) : new Date()
+                    if ((form.lesson_count ?? 1) > 0) {
+                      const previews = Array.from({ length: form.lesson_count ?? 1 }, (_, i) => {
+                        const newDate = new Date(baseDate)
+                        newDate.setDate(newDate.getDate() + 7 * i)
+                        const formattedTime = form.regular_timeslot ? to24Hour(form.regular_timeslot) : '未設定時間'
+                        return `${newDate.toISOString().split('T')[0]} ${formattedTime}`
+                      })
+                      setPreviewDates(previews as string[])
+                    }
+                  }}
+                  className="px-4 py-2 border border-[#EADBC8] text-sm text-[#A68A64] bg-white rounded-full hover:bg-[#f7f3ec]"
+                >
+                  重設
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      // Restore previewDates to the previously finalized state, not changing lesson_count
+                      const restoredPreviews = finalizedDates.length > 0
+                        ? [...finalizedDates]
+                        : Array.from({ length: form.lesson_count ?? 1 }, (_, i) => {
+                            const newDate = new Date(form.lesson_date || new Date())
+                            newDate.setDate(newDate.getDate() + 7 * i)
+                            const formattedTime = form.regular_timeslot || '未設定時間'
+                            return `${newDate.toISOString().split('T')[0]} ${formattedTime}`
+                          })
+                      setPreviewDates(restoredPreviews)
+                      setShowPreview(false)
+                    }}
+                    className="px-4 py-2 border border-[#EADBC8] text-sm text-[#A68A64] bg-white rounded-full hover:bg-[#f7f3ec]"
                   >
                     取消
                   </button>
                   <button
-              type="button"
-              onClick={handleSave}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    onClick={() => {
+                      // 儲存預覽的所有日期到 finalizedDates
+                      setFinalizedDates(previewDates)
+                      setShowPreview(false)
+                      // 若是單堂課，將第一筆同步到 form
+                      if (form.lesson_count === 1 && previewDates.length > 0) {
+                        const [date, time] = previewDates[0].split(' ')
+                        setForm(prev => ({
+                          ...prev,
+                          lesson_date: date,
+                          regular_timeslot: time,
+                          actual_timeslot: time,
+                        }))
+                      }
+                    }}
+                    className="px-4 py-2 bg-[#EBC9A4] text-sm text-[#2B3A3B] rounded-full hover:bg-[#e5ba8e]"
                   >
                     儲存
                   </button>
+                </div>
               </div>
             </Dialog.Panel>
           </div>
+        </Dialog>
+      )}
     </Dialog>
   )
-  }
+}

@@ -295,10 +295,21 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         .eq('id', formData.id)
       error = trialError;
     } else {
+      // 只傳 Hanami_Students 有的欄位
+      const hanamiStudentFields: (keyof StudentFormData)[] = [
+        'id', 'student_oid', 'full_name', 'nick_name', 'gender', 'contact_number', 'student_dob', 'student_age',
+        'parent_email', 'health_notes', 'student_remarks', 'created_at', 'updated_at', 'address', 'course_type',
+        'duration_months', 'regular_timeslot', 'regular_weekday', 'remaining_lessons', 'school', 'started_date',
+        'student_email', 'student_password', 'student_preference', 'student_teacher', 'student_type'
+      ];
+      const studentPayload: Partial<StudentFormData> = {};
+      hanamiStudentFields.forEach((key) => {
+        studentPayload[key] = formData[key];
+      });
       const { error: studentError } = await supabase
         .from('Hanami_Students')
         .update({
-          ...formData,
+          ...studentPayload,
           duration_months: formData.duration_months ?? null,
           regular_weekday: formData.regular_weekday ?? null,
           created_at: formData.created_at || undefined

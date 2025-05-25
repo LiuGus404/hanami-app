@@ -54,13 +54,7 @@ interface GroupedDetail {
 interface GroupedLesson {
   time: string;
   course: string;
-  names: {
-    name: string;
-    student_id: string;
-    age: string;
-    is_trial?: boolean;
-    remaining_lessons?: number | null;
-  }[];
+  lessons: Lesson[];
 }
 
 interface Lesson {
@@ -106,11 +100,14 @@ const HanamiCalendar = () => {
   const supabase = getSupabaseClient();
   const [lessons, setLessons] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
-  const [selectedDetail, setSelectedDetail] = useState<SelectedDetail | null>(null);
   const [popupInfo, setPopupInfo] = useState<{ lessonId: string } | null>(null);
   const [popupSelected, setPopupSelected] = useState<string>('');
   // 節日資料
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [selectedDetail, setSelectedDetail] = useState<SelectedDetail | null>(null);
+  const [statusPopupOpen, setStatusPopupOpen] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   // 抓取節日資料
   useEffect(() => {
     const fetchHolidays = async () => {
@@ -240,21 +237,15 @@ const HanamiCalendar = () => {
             acc[key] = {
               time: l.regular_timeslot,
               course: l.course_type,
-              names: []
+              lessons: []
             };
           }
-          acc[key].names.push({
-            name: l.full_name,
-            student_id: l.student_id,
-            age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
-            is_trial: l.is_trial,
-            remaining_lessons: l.remaining_lessons
-          });
+          acc[key].lessons.push(l);
           return acc;
         }, {});
 
-        const groupedArray: GroupedLesson[] = Object.values(grouped);
-        setSelectedDetail({ date: currentDate, groups: groupedArray });
+        const groupedArray: GroupedLesson[] = Object.values(grouped) as GroupedLesson[];
+        groupedArray.sort((a, b) => a.time.localeCompare(b.time));
       };
       fetchDay();
     } else if (view === 'week') {
@@ -434,6 +425,10 @@ const HanamiCalendar = () => {
     }
   }, [view, currentDate]);
 
+  useEffect(() => {
+    if (isModalOpen) setStatusPopupOpen(null);
+  }, [isModalOpen]);
+
   const handlePrev = () => {
     const newDate = new Date(currentDate);
     if (view === 'day') newDate.setDate(newDate.getDate() - 1);
@@ -505,7 +500,6 @@ const HanamiCalendar = () => {
 
     if (regularLessonsError || trialLessonsError) {
       console.error('Fetch lessons error:', regularLessonsError || trialLessonsError);
-      setSelectedDetail(null);
       return;
     }
 
@@ -567,48 +561,90 @@ const HanamiCalendar = () => {
         acc[key] = {
           time: l.regular_timeslot,
           course: l.course_type,
-          names: []
+          lessons: []
         };
       }
-      acc[key].names.push({
-        name: l.full_name,
-        student_id: l.student_id,
-        age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
-        is_trial: l.is_trial,
-        remaining_lessons: l.remaining_lessons
-      });
+      acc[key].lessons.push(l);
       return acc;
     }, {});
 
-    const groupedArray: GroupedLesson[] = Object.values(grouped);
-    setSelectedDetail({ date, groups: groupedArray });
+    const groupedArray: GroupedLesson[] = Object.values(grouped) as GroupedLesson[];
+    groupedArray.sort((a, b) => a.time.localeCompare(b.time));
   };
 
   const handleUpdateStatus = async (lessonId: string, status: string) => {
-    const { error } = await supabase
+    try {
+      // 1. 使用 PATCH 只更新狀態欄位
+      const { error: updateError } = await supabase
       .from('hanami_student_lesson')
-      .update({ lesson_status: status })
+        .update({
+          lesson_status: status,
+          updated_at: new Date().toISOString()
+        })
       .eq('id', lessonId);
-    if (error) {
-      console.error('Update lesson status error:', error);
-      return;
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        alert('更新失敗：' + updateError.message);
+        return false;
     }
-    // Refresh lessons for current view and date range
-    let start: Date, end: Date;
+
+      // 2. 查詢更新後的資料
+      const { data: updatedLesson, error: fetchError } = await supabase
+        .from('hanami_student_lesson')
+        .select(`
+          *,
+          Hanami_Students!hanami_student_lesson_student_id_fkey (
+            full_name,
+            student_age,
+            remaining_lessons
+          )
+        `)
+        .eq('id', lessonId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('Fetch error:', fetchError);
+        return false;
+      }
+
+      // 3. 更新本地狀態
+      if (updatedLesson) {
+        setLessons(prevLessons => 
+          prevLessons.map(lesson => 
+            lesson.id === lessonId 
+              ? { ...lesson, ...updatedLesson }
+              : lesson
+          )
+        );
+
+        // 4. 重新獲取當前視圖的課堂
     if (view === 'day') {
-      start = new Date(currentDate);
-      end = new Date(currentDate);
-    } else if (view === 'week') {
-      start = new Date(currentDate);
-      start.setDate(start.getDate() - start.getDay());
-      end = new Date(start);
-      end.setDate(end.getDate() + 6);
-    } else {
-      // for month or others, just fetch empty or do nothing
-      return;
+          const dateStr = getDateString(currentDate);
+          const { data: refreshedLessons } = await supabase
+            .from('hanami_student_lesson')
+            .select(`
+              *,
+              Hanami_Students!hanami_student_lesson_student_id_fkey (
+                full_name,
+                student_age,
+                remaining_lessons
+              )
+            `)
+            .eq('lesson_date', dateStr);
+
+          if (refreshedLessons) {
+            setLessons(refreshedLessons);
+          }
+        }
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      alert('發生未預期的錯誤，請稍後再試');
+      return false;
     }
-    await fetchLessons(start, end);
-    // alert('狀態已成功更新！'); // 刪除這行
   };
 
   // Helper: check if date string is today or in the past (date portion only)
@@ -685,6 +721,35 @@ const HanamiCalendar = () => {
         )}
       </div>
     );
+  };
+
+  const handleEdit = (lesson: Lesson) => {
+    setStatusPopupOpen(null);
+    setPopupInfo(null);
+    setSelectedDetail({
+      date: new Date(lesson.lesson_date),
+      groups: [
+        {
+          time: lesson.regular_timeslot,
+          course: lesson.course_type,
+          names: [
+            {
+              name: lesson.full_name,
+              student_id: lesson.student_id,
+              age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
+              is_trial: lesson.is_trial,
+              remaining_lessons: lesson.remaining_lessons
+            }
+          ]
+        }
+      ]
+    });
+  };
+
+  const handleAdd = () => {
+    setStatusPopupOpen(null);
+    setPopupInfo(null);
+    setSelectedDetail(null);
   };
 
   return (
@@ -783,15 +848,11 @@ const HanamiCalendar = () => {
                   />
                 )}
                 {(() => {
-                  console.log('當前課堂數據:', lessons);
                   const filteredLessons = lessons.filter(l => {
                     const lessonDateStr = l.lesson_date;
                     const currentDateStr = getDateString(currentDate);
-                    console.log('比較日期:', { lessonDateStr, currentDateStr });
                     return lessonDateStr === currentDateStr;
                   });
-                  console.log('過濾後的課堂:', filteredLessons);
-
                   if (filteredLessons.length === 0) {
                     return (
                       <div className="text-center text-[#A68A64] py-8">
@@ -799,44 +860,57 @@ const HanamiCalendar = () => {
                       </div>
                     );
                   }
-
+                  // group by time+course
                   const grouped = filteredLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
                     const key = `${l.regular_timeslot}_${l.course_type}`;
                     if (!acc[key]) {
                       acc[key] = {
                         time: l.regular_timeslot,
                         course: l.course_type,
-                        names: []
+                        lessons: []
                       };
                     }
-                    acc[key].names.push({
-                      name: l.full_name,
-                      student_id: l.student_id,
-                      age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
-                      is_trial: l.is_trial,
-                      remaining_lessons: l.remaining_lessons
-                    });
+                    acc[key].lessons.push(l);
                     return acc;
                   }, {});
-
-                  const groupedArray: GroupedLesson[] = Object.values(grouped);
-                  console.log('分組後的課堂:', groupedArray);
-
-                  return groupedArray.map((g) => {
+                  // 以課堂時間排序
+                  const groupedArray: GroupedLesson[] = Object.values(grouped) as GroupedLesson[];
+                  groupedArray.sort((a, b) => a.time.localeCompare(b.time));
+                  return groupedArray.map((g, i) => {
+                    const endTime = (() => {
+                      const [h, m] = g.time.split(':').map(Number);
+                      let duration = 45;
+                      if (g.course === '音樂專注力') duration = 60;
+                      const end = getHongKongDate();
+                      end.setHours(h, m + duration);
+                      return end.toTimeString().slice(0, 5);
+                    })();
                     return (
-                      <div
-                        key={`${g.time}-${g.course}`}
-                        className={`p-2 rounded-lg cursor-pointer ${
-                          g.course === '鋼琴' ? '#E1E8F0' :
-                          g.course === '音樂專注力' ? '#E9F2DA' :
-                          '#F0F0F0'
-                        }`}
-                        onClick={async () => await handleOpenDetail(currentDate, g.course, g.time)}
-                      >
-                        <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.names.length})</div>
-                        {g.names.map((nameObj, j) => (
-                          <div key={j}>{renderStudentButton(nameObj)}</div>
-                        ))}
+                      <div key={`${g.time}-${g.course}-${i}`} className="border-l-2 pl-4">
+                        <div className="text-[#4B4036] font-bold">
+                          {g.time.slice(0,5)}-{endTime} {g.course} ({g.lessons.length})
+                        </div>
+                        <div className="ml-4 text-sm text-[#4B4036]">
+                          {g.lessons.map((lesson: Lesson, j: number) => {
+                          let age = '';
+                          if (lesson.is_trial) {
+                            age = lesson.age_display ? String(parseInt(lesson.age_display)) : '';
+                          } else {
+                            age = getStudentAge(lesson.student_id);
+                          }
+                          const nameObj = {
+                            name: lesson.full_name,
+                            student_id: lesson.student_id,
+                            age,
+                            is_trial: lesson.is_trial
+                          };
+                          return (
+                            <div key={`${lesson.id}-${j}`}>
+                              {renderStudentButton(nameObj, lesson)}
+                            </div>
+                          );
+                          })}
+                        </div>
                       </div>
                     );
                   });
@@ -862,25 +936,21 @@ const HanamiCalendar = () => {
                          lessonDate.getMonth() === date.getMonth() &&
                          lessonDate.getDate() === date.getDate();
                 });
+                // group by time+course
                 const grouped = dayLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
                   const key = `${l.regular_timeslot}_${l.course_type}`;
                   if (!acc[key]) {
                     acc[key] = {
                       time: l.regular_timeslot,
                       course: l.course_type,
-                      names: []
+                      lessons: []
                     };
                   }
-                  acc[key].names.push({
-                    name: l.full_name,
-                    student_id: l.student_id,
-                    age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
-                    is_trial: l.is_trial,
-                    remaining_lessons: l.remaining_lessons
-                  });
+                  acc[key].lessons.push(l);
                   return acc;
                 }, {});
-                const groupedArray: GroupedLesson[] = Object.values(grouped);
+                const groupedArray = Object.values(grouped) as GroupedLesson[];
+                groupedArray.sort((a, b) => a.time.localeCompare(b.time));
                 return (
                   <div
                     key={i}
@@ -899,20 +969,39 @@ const HanamiCalendar = () => {
                       />
                     )}
                     <div>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]}</div>
-                    {groupedArray.map((g) => (
-                      <div
-                        key={`${g.time}-${g.course}`}
-                        className={`p-2 rounded-lg cursor-pointer ${
-                        g.course === '鋼琴' ? '#E1E8F0' :
-                        g.course === '音樂專注力' ? '#E9F2DA' :
-                          '#F0F0F0'
-                        }`}
-                          onClick={async () => await handleOpenDetail(date, g.course, g.time)}
+                    {groupedArray.map((g, j) => (
+                        <div
+                          key={j}
+                        className="text-xs mt-1 rounded-xl p-1 cursor-pointer hover:bg-[#FFE5B4]"
+                        style={{
+                          backgroundColor:
+                            g.course === '音樂專注力'
+                              ? '#D1E7DD'
+                              : g.course === '鋼琴'
+                              ? '#CCE5FF'
+                              : '#F3EAD9'
+                        }}
+                        onClick={() => {
+                          // 點擊時 setSelectedDetail，彈窗顯示學生
+                          setSelectedDetail({
+                            date,
+                            groups: [
+                              {
+                                time: g.time,
+                                course: g.course,
+                                names: g.lessons.map(lesson => ({
+                                  name: lesson.full_name,
+                                  student_id: lesson.student_id,
+                                  age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
+                                  is_trial: lesson.is_trial,
+                                  remaining_lessons: lesson.remaining_lessons
+                                }))
+                              }
+                            ]
+                          });
+                        }}
                         >
-                          <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.names.length})</div>
-                        {g.names.map((nameObj, j) => (
-                          <div key={j}>{renderStudentButton(nameObj)}</div>
-                        ))}
+                        <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.lessons.length})</div>
                         </div>
                     ))}
                   </div>
@@ -948,25 +1037,21 @@ const HanamiCalendar = () => {
                            lessonDate.getMonth() === date.getMonth() &&
                            lessonDate.getDate() === date.getDate();
                   });
+                  // group by time+course
                   const grouped = dayLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
                     const key = `${l.regular_timeslot}_${l.course_type}`;
                     if (!acc[key]) {
                       acc[key] = {
                         time: l.regular_timeslot,
                         course: l.course_type,
-                        names: []
+                        lessons: []
                       };
                   }
-                  acc[key].names.push({
-                    name: l.full_name,
-                    student_id: l.student_id,
-                      age: l.is_trial ? (l.age_display ? String(parseInt(l.age_display)) : '') : getStudentAge(l.student_id),
-                    is_trial: l.is_trial,
-                    remaining_lessons: l.remaining_lessons
-                  });
+                    acc[key].lessons.push(l);
                     return acc;
                   }, {});
-                  const groupedArray: GroupedLesson[] = Object.values(grouped);
+                  const groupedArray = Object.values(grouped) as GroupedLesson[];
+                  groupedArray.sort((a, b) => a.time.localeCompare(b.time));
                   // 統一休息日底色與邊框
                   let bgColor;
                   if (holiday) {
@@ -982,7 +1067,23 @@ const HanamiCalendar = () => {
                         backgroundColor: bgColor,
                         border: holiday ? '1px solid #FFB3B3' : undefined
                       }}
-                      onClick={async () => await handleOpenDetail(date)}
+                      onClick={() => {
+                        // 點擊格子時 setSelectedDetail，彈窗顯示該天所有班別與學生
+                        setSelectedDetail({
+                          date,
+                          groups: groupedArray.map(g => ({
+                            time: g.time,
+                            course: g.course,
+                            names: g.lessons.map(lesson => ({
+                              name: lesson.full_name,
+                              student_id: lesson.student_id,
+                              age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
+                              is_trial: lesson.is_trial,
+                              remaining_lessons: lesson.remaining_lessons
+                            }))
+                          }))
+                        });
+                      }}
                     >
                       {/* 印章圖示 */}
                       {holiday && (
@@ -993,13 +1094,9 @@ const HanamiCalendar = () => {
                         />
                       )}
                       <div>{dayNum}</div>
-                      {groupedArray.map((g) => (
-                        <div key={`${g.time}-${g.course}`}>
-                          {g.names.map((nameObj, j) => (
-                            <div key={j}>{renderStudentButton(nameObj)}</div>
-                          ))}
-                            </div>
-                          ))}
+                      {groupedArray.length > 0 && (
+                        <div className="text-xs mt-1 text-[#A68A64] flex justify-center">（{groupedArray.length}）</div>
+                      )}
                     </div>
                   );
                 });
@@ -1008,8 +1105,37 @@ const HanamiCalendar = () => {
           </>
         )}
       </div>
+      {popupInfo && (
+        <PopupSelect
+          title="選擇出席狀態"
+          options={[
+            { label: '出席', value: '出席' },
+            { label: '缺席', value: '缺席' },
+            { label: '病假', value: '病假' },
+            { label: '事假', value: '事假' },
+            { label: '未設定', value: '未設定' }
+          ]}
+          selected={popupSelected}
+          onChange={(value) => setPopupSelected(value as string)}
+          onConfirm={async () => {
+            if (popupInfo.lessonId && popupSelected) {
+              const success = await handleUpdateStatus(popupInfo.lessonId, popupSelected);
+              if (success) {
+                alert('已儲存更改！');
+              }
+            }
+            setPopupInfo(null);
+            setPopupSelected('');
+          }}
+          onCancel={() => {
+            setPopupInfo(null);
+            setPopupSelected('');
+          }}
+          mode="single"
+        />
+      )}
       {selectedDetail && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 overflow-y-auto">
+        <div className="fixed inset-0 flex items-center justify-center z-30 overflow-y-auto">
           <div className="bg-[#FFFDF8] p-6 rounded-xl shadow-xl w-80 text-[#4B4036] max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-2">
               {formatDate(selectedDetail.date)} 課堂學生
@@ -1024,7 +1150,6 @@ const HanamiCalendar = () => {
                     let duration = 45;
                     if (group.course === '音樂專注力') duration = 60;
                     const end = getHongKongDate();
-                    // setMinutes handles overflow, so add duration to m
                     end.setHours(h, m + duration);
                     return end.toTimeString().slice(0, 5);
                   })();
@@ -1034,7 +1159,7 @@ const HanamiCalendar = () => {
                         {group.time.slice(0, 5)}-{endTime} {group.course} ({group.names.length})
                       </div>
                       <div className="flex flex-wrap gap-2 ml-2 mt-1">
-                        {group.names.map((nameObj, j) => {
+                        {group.names.map((nameObj: any, j: number) => {
                           const lesson = lessons.find(
                             l =>
                               l.student_id === nameObj.student_id &&
@@ -1042,8 +1167,6 @@ const HanamiCalendar = () => {
                               l.course_type === group.course &&
                               getHongKongDate(new Date(l.lesson_date)).toDateString() === getHongKongDate(selectedDetail.date).toDateString()
                           );
-                          const lessonStatus = lesson?.lesson_status;
-                          const isPastOrTodayDay = isPastOrToday(selectedDetail.date.toISOString());
                           return (
                             <div key={j} className="flex items-center">
                               {renderStudentButton(nameObj, lesson)}
@@ -1063,34 +1186,6 @@ const HanamiCalendar = () => {
             </button>
           </div>
         </div>
-      )}
-      {popupInfo && (
-        <PopupSelect
-          title="選擇出席狀態"
-          options={[
-            { label: '出席', value: '出席' },
-            { label: '缺席', value: '缺席' },
-            { label: '病假', value: '病假' },
-            { label: '事假', value: '事假' }
-          ]}
-          selected={popupSelected}
-          onChange={(value) => {
-            setPopupSelected(value as string);
-          }}
-          onConfirm={async () => {
-            if (popupInfo.lessonId && popupSelected) {
-              await handleUpdateStatus(popupInfo.lessonId, popupSelected);
-              alert('已儲存更改！');
-            }
-            setPopupInfo(null);
-            setPopupSelected('');
-          }}
-          onCancel={() => {
-            setPopupInfo(null);
-            setPopupSelected('');
-          }}
-          mode="single"
-        />
       )}
     </div>
   );
