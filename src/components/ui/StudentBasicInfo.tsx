@@ -302,9 +302,9 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         'duration_months', 'regular_timeslot', 'regular_weekday', 'remaining_lessons', 'school', 'started_date',
         'student_email', 'student_password', 'student_preference', 'student_teacher', 'student_type'
       ];
-      const studentPayload: Partial<StudentFormData> = {};
+      const studentPayload: Record<string, any> = {};
       hanamiStudentFields.forEach((key) => {
-        studentPayload[key] = formData[key] === null ? undefined : formData[key];
+        studentPayload[key] = formData[key] === null ? null : formData[key];
       });
       const { error: studentError } = await supabase
         .from('Hanami_Students')
