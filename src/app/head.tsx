@@ -16,35 +16,11 @@ export default function Head() {
         <meta name="apple-mobile-web-app-title" content="Hanami Music" />
         
         {/* Icons for iOS */}
-        <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72.png" />
-        <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96.png" />
-        <link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128.png" />
-        <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144.png" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
-        
-        {/* Splash Screens for iOS */}
-        <link
-          rel="apple-touch-startup-image"
-          media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
-          href="/splash/iPhone_14_Pro_Max_landscape.png"
-        />
-        <link
-          rel="apple-touch-startup-image"
-          media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"
-          href="/splash/iPhone_14_Pro_landscape.png"
-        />
-        <link
-          rel="apple-touch-startup-image"
-          media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)"
-          href="/splash/iPhone_14_Plus__iPhone_13_Pro_Max__iPhone_12_Pro_Max_landscape.png"
-        />
         
         {/* Favicon */}
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
-        <link rel="shortcut icon" type="image/png" href="/icons/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
         
         {/* Safari specific */}
         <link rel="mask-icon" href="/icons/icon-512.png" color="#fffaf5" />
