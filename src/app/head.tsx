@@ -11,23 +11,9 @@ export default function Head() {
         <link rel="manifest" href="/manifest.json" />
         
         {/* Safari/iOS specific */}
+        <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Hanami Music" />
-        
-        {/* Icons for iOS */}
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
-        
-        {/* Favicon */}
-        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
-        
-        {/* Safari specific */}
-        <link rel="mask-icon" href="/icons/icon-512.png" color="#fffaf5" />
-        
-        {/* Microsoft */}
-        <meta name="msapplication-TileColor" content="#fffaf5" />
-        <meta name="msapplication-TileImage" content="/icons/icon-144.png" />
       </>
     );
   }
