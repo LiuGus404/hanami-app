@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { PopupSelect } from '@/components/ui/PopupSelect'
-import { getSupabaseClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { Teacher } from '@/types'
 
 interface TeacherFormData {
@@ -48,7 +48,7 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
   });
 
   const requiredFields: (keyof TeacherFormData)[] = ['teacher_fullname', 'teacher_nickname'];
-  const supabase = getSupabaseClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
   const handleChange = (field: keyof TeacherFormData, value: string | number | null) => {
     setFormData(prev => ({
@@ -65,27 +65,58 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
       return;
     }
 
+    const allowedFields: (keyof Teacher)[] = [
+      'teacher_fullname',
+      'teacher_nickname',
+      'teacher_role',
+      'teacher_status',
+      'teacher_email',
+      'teacher_phone',
+      'teacher_address',
+      'teacher_dob',
+      'teacher_hsalary',
+      'teacher_msalary',
+      'teacher_background',
+      'teacher_bankid',
+    ];
+
+    const updateData: any = {};
+    allowedFields.forEach((key) => {
+      let value = formData[key];
+      if (typeof value === 'string' && value.trim() === '') value = null;
+      if ((key === 'teacher_hsalary' || key === 'teacher_msalary') && value !== null && value !== undefined) {
+        value = Number(value);
+        if (isNaN(value)) value = null;
+      }
+      updateData[key] = value;
+    });
+
+    console.log('updateData', updateData);
+
     try {
     const { error } = await supabase
       .from('hanami_employee')
-      .update(formData)
+        .update(updateData)
         .eq('id', teacher.id);
 
       if (error) throw error;
-      onSave(formData as Teacher);
+      onSave({ ...teacher, ...updateData });
     } catch (err) {
       console.error('Error updating teacher:', err);
       alert('更新老師資料時發生錯誤');
     }
   };
 
+  console.log('SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL)
+  console.log('SUPABASE_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+
   return (
     <div className="p-6 bg-white rounded-lg shadow">
       <div className="flex items-center gap-4 mb-6">
         <img
-          src={formData.teacher_gender === 'female' ? '/girl.png' : '/teacher.png'}
-          alt="Teacher"
-          className="w-16 h-16 rounded-full"
+          src={'/teacher.png'}
+          alt="頭像"
+          className="w-24 h-24 rounded-full border border-[#EADBC8]"
         />
         <div>
           <h2 className="text-xl font-semibold">

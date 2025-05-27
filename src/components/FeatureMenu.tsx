@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 const features = [
   { icon: '/icons/star.png', label: 'Dashboard', href: '/dashboard' },
@@ -12,7 +13,16 @@ export default function FeatureMenu() {
     <nav className="flex justify-around mt-6 mb-2 px-4">
       {features.map((f) => (
         <Link key={f.label} href={f.href} className="flex flex-col items-center">
-          <img src={f.icon} alt={f.label} className="w-12 h-12 mb-1" />
+          <div className="relative w-12 h-12 mb-1">
+            <Image
+              src={f.icon}
+              alt={f.label}
+              fill
+              sizes="(max-width: 768px) 48px, 48px"
+              className="object-contain"
+              priority
+            />
+          </div>
           <span className="text-brown-700 text-sm font-medium">{f.label}</span>
         </Link>
       ))}

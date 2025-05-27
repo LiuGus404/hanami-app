@@ -70,11 +70,11 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
 
   const fetchLessons = async () => {
     try {
-      const { data, error } = await supabase
-        .from('hanami_student_lesson')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('lesson_date', { ascending: false });
+    const { data, error } = await supabase
+      .from('hanami_student_lesson')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('lesson_date', { ascending: false });
       if (error) throw error;
       // Ensure all required fields for Lesson
       setLessons((data || []).map((item: Record<string, unknown>) => ({
@@ -320,250 +320,250 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
   return (
     <div className="w-full px-4">
       <div className="bg-[#FFFDF8] p-6 rounded-xl shadow-inner max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-[#4B4036]">課堂情況</h2>
-          <div className="flex items-center gap-3">
-            <button
-              className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
-              onClick={() => {
-                fetchLessons();
-                alert('刷新成功');
-              }}
-            >
-              刷新
-            </button>
-            <button
-              className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
-              onClick={() => setCategorySelectOpen(true)}
-            >
-              類別
-            </button>
-            {categorySelectOpen && (
-              <PopupSelect
-                title="類別"
-                options={[
-                  { label: '全部', value: 'all' },
-                  { label: '未上課堂', value: 'upcoming' },
-                  { label: '過往課堂', value: 'past' },
-                  { label: '今日課堂', value: 'today' },
-                  { label: '請假', value: 'sick' },
-                  { label: '補課', value: 'makeup' },
-                  { label: '缺席', value: 'absent' }
-                ]}
-                selected={tempCategoryFilter}
-                onChange={(selected) => {
-                  if (selected.length === 0 || selected.includes('all')) {
-                    setTempCategoryFilter(['all'])
-                  } else {
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-[#4B4036]">課堂情況</h2>
+        <div className="flex items-center gap-3">
+          <button
+            className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
+            onClick={() => {
+              fetchLessons();
+              alert('刷新成功');
+            }}
+          >
+            刷新
+          </button>
+          <button
+            className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
+            onClick={() => setCategorySelectOpen(true)}
+          >
+            類別
+          </button>
+          {categorySelectOpen && (
+            <PopupSelect
+              title="類別"
+              options={[
+                { label: '全部', value: 'all' },
+                { label: '未上課堂', value: 'upcoming' },
+                { label: '過往課堂', value: 'past' },
+                { label: '今日課堂', value: 'today' },
+                { label: '請假', value: 'sick' },
+                { label: '補課', value: 'makeup' },
+                { label: '缺席', value: 'absent' }
+              ]}
+              selected={tempCategoryFilter}
+              onChange={(selected) => {
+                if (selected.length === 0 || selected.includes('all')) {
+                  setTempCategoryFilter(['all'])
+                } else {
                     setTempCategoryFilter(selected as string[])
-                  }
-                }}
-                onCancel={() => {
-                  setTempCategoryFilter(categoryFilter)
-                  setCategorySelectOpen(false)
-                }}
-                onConfirm={() => {
-                  setCategoryFilter(tempCategoryFilter)
-                  setCategorySelectOpen(false)
-                }}
+                }
+              }}
+              onCancel={() => {
+                setTempCategoryFilter(categoryFilter)
+                setCategorySelectOpen(false)
+              }}
+              onConfirm={() => {
+                setCategoryFilter(tempCategoryFilter)
+                setCategorySelectOpen(false)
+              }}
                 mode="multi"
-              />
-            )}
-            <button
-              className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
-              onClick={() => setVisibleCountSelectOpen(true)}
-            >
-              顯示筆數：{visibleCount === lessons.length ? '全部' : visibleCount}
-            </button>
-            {visibleCountSelectOpen && (
-              <PopupSelect
-                title="顯示筆數"
-                options={[
-                  { label: '5 筆', value: '5' },
-                  { label: '10 筆', value: '10' },
-                  { label: '15 筆', value: '15' },
-                  { label: '20 筆', value: '20' },
-                  { label: '全部', value: 'all' },
-                ]}
-                selected={tempVisibleCount}
-                onChange={(selected) => {
-                  if (typeof selected === 'string') {
-                    setTempVisibleCount(selected)
-                  } else if (Array.isArray(selected) && selected.length > 0) {
-                    setTempVisibleCount(String(selected[0]))
-                  }
-                }}
-                onCancel={handleVisibleCountCancel}
-                onConfirm={handleVisibleCountConfirm}
+            />
+          )}
+          <button
+            className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
+            onClick={() => setVisibleCountSelectOpen(true)}
+          >
+            顯示筆數：{visibleCount === lessons.length ? '全部' : visibleCount}
+          </button>
+          {visibleCountSelectOpen && (
+            <PopupSelect
+              title="顯示筆數"
+              options={[
+                { label: '5 筆', value: '5' },
+                { label: '10 筆', value: '10' },
+                { label: '15 筆', value: '15' },
+                { label: '20 筆', value: '20' },
+                { label: '全部', value: 'all' },
+              ]}
+              selected={tempVisibleCount}
+              onChange={(selected) => {
+                if (typeof selected === 'string') {
+                  setTempVisibleCount(selected)
+                } else if (Array.isArray(selected) && selected.length > 0) {
+                  setTempVisibleCount(String(selected[0]))
+                }
+              }}
+              onCancel={handleVisibleCountCancel}
+              onConfirm={handleVisibleCountConfirm}
                 mode="multi"
-              />
-            )}
-          </div>
+            />
+          )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[#4B4036]">
-            <thead>
-              <tr className="border-b border-[#E9E2D6]">
-                <th>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[#4B4036]">
+          <thead>
+            <tr className="border-b border-[#E9E2D6]">
+              <th>
+                <input
+                  type="checkbox"
+                  className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
+                  onChange={(e) => {
+                    if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id))
+                    else setSelected([])
+                  }}
+                />
+              </th>
+              <th className="text-[15px] font-medium px-2 py-2 text-left">日期</th>
+              <th className="text-[15px] font-medium px-2 py-2 text-left">課堂</th>
+              <th className="text-[15px] font-medium px-2 py-2 text-left">上課時間</th>
+              <th className="text-[15px] font-medium px-2 py-2 text-left">負責老師</th>
+              <th className="text-[15px] font-medium px-2 py-2 text-left">出席狀況</th>
+              <th className="px-2 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLessons.slice(0, visibleCount).map((lesson) => (
+              <tr key={lesson.id} className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6]">
+                <td className="px-2 py-2">
                   <input
                     type="checkbox"
                     className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
-                    onChange={(e) => {
-                      if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id))
-                      else setSelected([])
-                    }}
+                    checked={selected.includes(lesson.id)}
+                    onChange={() => toggleSelect(lesson.id)}
                   />
-                </th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">日期</th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">課堂</th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">上課時間</th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">負責老師</th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">出席狀況</th>
-                <th className="px-2 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLessons.slice(0, visibleCount).map((lesson) => (
-                <tr key={lesson.id} className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6]">
-                  <td className="px-2 py-2">
-                    <input
-                      type="checkbox"
-                      className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
-                      checked={selected.includes(lesson.id)}
-                      onChange={() => toggleSelect(lesson.id)}
-                    />
-                  </td>
-                  <td className="text-[15px] font-medium px-2 py-2">{format(new Date(lesson.lesson_date), 'yyyy/MM/dd')}</td>
+                </td>
+                <td className="text-[15px] font-medium px-2 py-2">{format(new Date(lesson.lesson_date), 'yyyy/MM/dd')}</td>
                   <td className="text-[15px] font-medium px-2 py-2">{typeof lesson.course_type === 'string' ? lesson.course_type : ''}</td>
-                  <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>
-                  <td className="text-[15px] font-medium px-2 py-2">{lesson.lesson_teacher}</td>
-                  <td className="text-[15px] font-medium px-2 py-2">
-                    {format(new Date(lesson.lesson_date), 'yyyy-MM-dd') === todayStr ? (
-                      <>
-                        <button
-                          className="underline text-sm"
+                <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>
+                <td className="text-[15px] font-medium px-2 py-2">{lesson.lesson_teacher}</td>
+                <td className="text-[15px] font-medium px-2 py-2">
+                  {format(new Date(lesson.lesson_date), 'yyyy-MM-dd') === todayStr ? (
+                    <>
+                      <button
+                        className="underline text-sm"
                           onClick={() => handleStatusClick(lesson.id, lesson.lesson_status)}
-                        >
-                          {lesson.lesson_status || '-'}
-                        </button>
+                      >
+                        {lesson.lesson_status || '-'}
+                      </button>
                         {statusPopupOpen === lesson.id && !isModalOpen && (
-                          <PopupSelect
-                            title="選擇出席狀況"
-                            options={[
-                              { label: '出席', value: '出席' },
-                              { label: '缺席', value: '缺席' },
-                              { label: '病假', value: '病假' },
-                              { label: '事假', value: '事假' }
-                            ]}
-                            selected={tempStatus}
+                        <PopupSelect
+                          title="選擇出席狀況"
+                          options={[
+                            { label: '出席', value: '出席' },
+                            { label: '缺席', value: '缺席' },
+                            { label: '病假', value: '病假' },
+                            { label: '事假', value: '事假' }
+                          ]}
+                          selected={tempStatus}
                             onChange={handleStatusChange}
                             onCancel={handleStatusPopupClose}
-                            onConfirm={async () => {
-                              await supabase
-                                .from('hanami_student_lesson')
-                                .update({ lesson_status: tempStatus })
-                                .eq('id', lesson.id);
-                              await fetchLessons();
+                          onConfirm={async () => {
+                            await supabase
+                              .from('hanami_student_lesson')
+                              .update({ lesson_status: tempStatus })
+                              .eq('id', lesson.id);
+                            await fetchLessons();
                               handleStatusPopupClose();
-                            }}
+                          }}
                             mode="multi"
-                          />
-                        )}
-                      </>
-                    ) : format(new Date(lesson.lesson_date), 'yyyy-MM-dd') > todayStr ? (
-                      '-'
-                    ) : (
-                      lesson.lesson_status || '-'
-                    )}
-                  </td>
-                  <td className="px-2 py-2">
-                    <button
-                      onClick={() => handleEdit(lesson)}
-                      className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
-                    >
-                      編輯
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex gap-3 mt-4">
-          <button
+                        />
+                      )}
+                    </>
+                  ) : format(new Date(lesson.lesson_date), 'yyyy-MM-dd') > todayStr ? (
+                    '-'
+                  ) : (
+                    lesson.lesson_status || '-'
+                  )}
+                </td>
+                <td className="px-2 py-2">
+                  <button
+                    onClick={() => handleEdit(lesson)}
+                    className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
+                  >
+                    編輯
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex gap-3 mt-4">
+        <button
             onClick={() => {
               setEditingLesson(null);
               setIsModalOpen(true);
             }}
-            className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
-          >
-            新增課堂
-          </button>
-          {selected.length > 0 && (
-            <>
-              <button
-                onClick={() => {
-                  setSelected([])
-                  const checkbox = document.querySelector<HTMLInputElement>('th input[type="checkbox"]')
-                  if (checkbox) checkbox.checked = false
-                }}
-                className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
-              >
-                清除選擇
-              </button>
-              <button
-                onClick={() => setIsDeleteConfirmOpen(true)}
-                className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
-              >
-                刪除
-              </button>
-            </>
-          )}
-        </div>
-        <LessonEditorModal
-          open={isModalOpen}
-          onClose={() => {
+          className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
+        >
+          新增課堂
+        </button>
+        {selected.length > 0 && (
+          <>
+            <button
+              onClick={() => {
+                setSelected([])
+                const checkbox = document.querySelector<HTMLInputElement>('th input[type="checkbox"]')
+                if (checkbox) checkbox.checked = false
+              }}
+              className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
+            >
+              清除選擇
+            </button>
+            <button
+              onClick={() => setIsDeleteConfirmOpen(true)}
+              className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
+            >
+              刪除
+            </button>
+          </>
+        )}
+      </div>
+      <LessonEditorModal
+        open={isModalOpen}
+        onClose={() => {
             setStatusPopupOpen(null);
-            setIsModalOpen(false);
-            setEditingLesson(null);
-          }}
-          lesson={editingLesson}
-          studentId={studentId}
+          setIsModalOpen(false);
+          setEditingLesson(null);
+        }}
+        lesson={editingLesson}
+        studentId={studentId}
           onSaved={() => {
             fetchLessons()
-          }}
-          mode={editingLesson ? 'edit' : 'add'}
-        />
-        {isDeleteConfirmOpen && (
+        }}
+        mode={editingLesson ? 'edit' : 'add'}
+      />
+      {isDeleteConfirmOpen && (
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-white/80 z-50"
+          onClick={() => setIsDeleteConfirmOpen(false)}
+        >
           <div
-            className="fixed inset-0 flex items-center justify-center bg-white/80 z-50"
-            onClick={() => setIsDeleteConfirmOpen(false)}
+            className="bg-white rounded-xl p-6 shadow-lg max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className="bg-white rounded-xl p-6 shadow-lg max-w-sm w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="text-[#4B4036] text-base mb-4">確定要刪除選取的課堂記錄嗎？</p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setIsDeleteConfirmOpen(false)}
-                  className="px-4 py-2 text-sm rounded-full bg-[#F0ECE1] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={async () => {
-                    setIsDeleteConfirmOpen(false);
-                    await confirmDelete();
-                  }}
-                  className="px-4 py-2 text-sm rounded-full bg-[#FBEAE5] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]"
-                >
-                  確定刪除
-                </button>
-              </div>
+            <p className="text-[#4B4036] text-base mb-4">確定要刪除選取的課堂記錄嗎？</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="px-4 py-2 text-sm rounded-full bg-[#F0ECE1] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]"
+              >
+                取消
+              </button>
+              <button
+                onClick={async () => {
+                  setIsDeleteConfirmOpen(false);
+                  await confirmDelete();
+                }}
+                className="px-4 py-2 text-sm rounded-full bg-[#FBEAE5] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]"
+              >
+                確定刪除
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   )

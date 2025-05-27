@@ -200,7 +200,7 @@ export default function AddRegularStudentForm() {
           student_remarks: formData.student_remarks || '',
         };
       }
-
+      
       // 先檢查是否已存在
       const { data: existingData } = await supabase
         .from(table)

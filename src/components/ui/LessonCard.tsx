@@ -6,26 +6,31 @@ import { useRouter } from 'next/navigation';
  * - time: string (如 '09:30–10:15')
  * - course: { name: string, icon?: string }
  * - teachers: { name: string, avatar?: string }[]
- * - students: { name: string, age?: string, isTrial?: boolean, remainingLessons?: number, avatar?: string, teacher?: string, id?: string }[]
- * - plan?: { teacherNames: string[], objectives: string, materials: string }
+ * - students: { id: string; name: string; age?: string; isTrial?: boolean; remainingLessons?: number; avatar?: string }[]
+ * - plan?: { teacherNames: string[], objectives: string[], materials: string[] }
  * - onEdit: () => void
  * - startTime?: string
  * - duration?: string
  * - onClose?: () => void
- * - allShowTeachers?: boolean
- * - allShowStudents?: boolean
- * - allShowPlan?: boolean
  */
 
 interface LessonCardProps {
   time: string;
   course: { name: string; icon?: string };
   teachers: { name: string; avatar?: string }[];
-  students: { name: string; age?: string; isTrial?: boolean; remainingLessons?: number; avatar?: string; teacher?: string; id?: string }[];
+  students: { 
+    id: string; 
+    name: string; 
+    age?: string; 
+    isTrial?: boolean; 
+    remainingLessons?: number; 
+    avatar?: string;
+    teacher?: string;
+  }[];
   plan?: {
     teacherNames: string[];
-    teacherNames1: string[];
-    teacherNames2: string[];
+    teacherNames1?: string[];
+    teacherNames2?: string[];
     objectives: string[];
     materials: string[];
     theme?: string;
@@ -35,9 +40,6 @@ interface LessonCardProps {
   startTime?: string;
   duration?: string;
   onClose?: () => void;
-  allShowTeachers?: boolean;
-  allShowStudents?: boolean;
-  allShowPlan?: boolean;
 }
 
 const getStudentBg = (remainingLessons?: number, isTrial?: boolean) => {
@@ -57,14 +59,11 @@ const LessonCard: React.FC<LessonCardProps> = ({
   startTime,
   duration,
   onClose,
-  allShowTeachers = true,
-  allShowStudents = true,
-  allShowPlan = true,
 }) => {
   const router = useRouter();
-  const [showTeachers, setShowTeachers] = useState(allShowTeachers);
-  const [showStudents, setShowStudents] = useState(allShowStudents);
-  const [showPlan, setShowPlan] = useState(allShowPlan);
+  const [showTeachers, setShowTeachers] = useState(true);
+  const [showStudents, setShowStudents] = useState(true);
+  const [showPlan, setShowPlan] = useState(true);
 
   // 計算時間區間顯示
   let timeDisplay = time;
@@ -132,10 +131,10 @@ const LessonCard: React.FC<LessonCardProps> = ({
         </button>
       </div>
       {showTeachers && (
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-col">
-            <div>（1）{plan && Array.isArray(plan.teacherNames1) && plan.teacherNames1.length > 0 ? plan.teacherNames1.join('、') : '未分配'}</div>
-            <div>（2）{plan && Array.isArray(plan.teacherNames2) && plan.teacherNames2.length > 0 ? plan.teacherNames2.join('、') : '未分配'}</div>
+        <div className="flex items-start gap-1 text-[10px] text-[#4B4036] mb-1 ml-0.5">
+          <div className="flex flex-col justify-center items-start">
+            <div>（1）{plan?.teacherNames1 && plan.teacherNames1.length > 0 ? plan.teacherNames1.join('、') : '未分配'}</div>
+            <div>（2）{plan?.teacherNames2 && plan.teacherNames2.length > 0 ? plan.teacherNames2.join('、') : '未分配'}</div>
           </div>
         </div>
       )}
@@ -207,7 +206,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
           {/* 課堂主題 */}
           <div>
             <span className="font-semibold text-[11px] text-[#7A6654]">課堂主題：</span>
-            <span className="text-[10px] text-[#4B4036]">{plan?.theme || '未設定'}</span>
+            <span className="text-[10px] text-[#4B4036]">{plan?.theme ? plan.theme : '未設定'}</span>
           </div>
           {/* 課堂目標 */}
           <div>
@@ -238,7 +237,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
           {/* 課堂備註 */}
           <div>
             <span className="font-semibold text-[11px] text-[#7A6654]">課堂備註：</span>
-            <span className="text-[10px] text-[#4B4036]">{plan?.notes || '—'}</span>
+            <span className="text-[10px] text-[#4B4036]">{plan?.notes ? plan.notes : '—'}</span>
           </div>
         </div>
       )}

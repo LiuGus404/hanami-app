@@ -103,15 +103,44 @@ export default function TeacherDetailPage() {
   }, [editMode])
 
   const handleChange = (field: keyof Teacher, value: string | number | null) => {
-    setEditData((prev) => prev ? { ...prev, [field]: value } : prev)
+    if (!editData) return;
+    const newData = { ...editData };
+    (newData as any)[field] = value;
+    setEditData(newData);
   }
 
   const handleSave = async () => {
     setSaving(true)
     if (!editData) return;
+    const allowedFields = [
+      'teacher_fullname',
+      'teacher_nickname',
+      'teacher_role',
+      'teacher_status',
+      'teacher_email',
+      'teacher_phone',
+      'teacher_address',
+      'teacher_dob',
+      'teacher_hsalary',
+      'teacher_msalary',
+      'teacher_background',
+      'teacher_bankid',
+    ];
+
+    const updateData: any = {};
+    allowedFields.forEach((key) => {
+      let value = (editData as any)[key];
+      if (typeof value === 'string' && value.trim() === '') value = null;
+      if ((key === 'teacher_hsalary' || key === 'teacher_msalary') && value !== null && value !== undefined) {
+        value = Number(value);
+        if (isNaN(value)) value = null;
+      }
+      updateData[key] = value;
+    });
+
     const { error } = await supabase
       .from('hanami_employee')
-      .update(editData)
+      .update(updateData)
       .eq('id', id as string)
     setSaving(false)
     if (error) {

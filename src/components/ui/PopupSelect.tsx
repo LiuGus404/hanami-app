@@ -11,6 +11,7 @@ export type PopupSelectProps = {
   onConfirm?: () => void
   onCancel?: () => void
   mode?: 'multi' | 'single'
+  errorMsg?: string
 }
 
 export const PopupSelect: React.FC<PopupSelectProps> = ({
@@ -21,6 +22,7 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
   onConfirm,
   onCancel,
   mode = 'multi',
+  errorMsg,
 }) => {
   const isSelected = (value: string) =>
     Array.isArray(selected) ? selected.includes(value) : selected === value
@@ -33,7 +35,7 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
         updated = ['all']
       } else {
         updated = current.includes(value)
-          ? current.filter((v) => v !== value)
+        ? current.filter((v) => v !== value)
           : [...current.filter((v) => v !== 'all'), value]
         if (updated.length === 0) updated = ['all']
       }
@@ -47,6 +49,9 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
     <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center">
       <div className="bg-[#FFFDF8] border border-[#D8CDBF] rounded-[24px] w-80 p-6 shadow-xl text-[#4B4B4B] max-h-[80vh] flex flex-col">
         <h2 className="text-xl font-bold text-center mb-4">{title}</h2>
+        {errorMsg && (
+          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">{errorMsg}</div>
+        )}
         <div className="space-y-3 overflow-y-auto flex-1 pr-2">
           {options.map(({ label, value }) => (
             <div

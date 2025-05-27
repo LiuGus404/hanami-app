@@ -3,10 +3,23 @@ import { useEffect, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import LessonPlanModal from '@/components/ui/LessonPlanModal';
-import { useLessonPlans } from '@/hooks/useLessonPlans';
 import { Lesson, Teacher, CourseType, Student } from '@/types';
 import LessonCard from './LessonCard';
 import MiniLessonCard from './MiniLessonCard';
+
+interface ProcessedLesson {
+  id: string;
+  student_id: string;
+  lesson_date: string;
+  regular_timeslot: string;
+  course_type: string;
+  full_name: string;
+  student_age: number | null;
+  lesson_status: string | null;
+  remaining_lessons: number | null;
+  is_trial: boolean;
+  lesson_duration: string | null;
+}
 
 interface Group {
   time: string;
@@ -33,16 +46,29 @@ interface UseLessonPlansProps {
   courseType: string;
 }
 
+interface LessonPlanModalProps {
+  open: boolean;
+  onClose: () => void;
+  lessonDate: Date;
+  timeslot: string;
+  courseType: string;
+  existingPlan?: any;
+  onSaved?: () => void;
+  teachers: { id: string; name: string }[];
+}
+
 const getHongKongDate = (date = new Date()): Date => {
-  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
-  return new Date(utc + 8 * 3600000);
+  // 移除額外的時區轉換，直接使用本地時間
+  return new Date(date);
 };
 
 const HanamiTC = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const supabase = getSupabaseClient();
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [lessons, setLessons] = useState<ProcessedLesson[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedDetail, setSelectedDetail] = useState<SelectedDetail | null>(null);
   const [popupInfo, setPopupInfo] = useState<{ field: string; open: boolean }>({ field: '', open: false });
   const [popupSelected, setPopupSelected] = useState('');
@@ -51,13 +77,28 @@ const HanamiTC = () => {
     date: Date;
     time: string;
     course: string;
+    plan?: any;
   } | null>(null);
-  const { plans, teachers, loading, savePlan, updatePlan } = useLessonPlans({
-    lessonDate: currentDate.toISOString().split('T')[0],
-    timeslot: '',
-    courseType: ''
-  });
-  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [selectedLesson, setSelectedLesson] = useState<{
+    time: string;
+    course: { name: string };
+    teachers: Teacher[];
+    students: {
+      id: string;
+      name: string;
+      age?: string;
+      isTrial?: boolean;
+      remainingLessons?: number;
+      avatar?: string;
+    }[];
+    plan?: {
+      teacherNames1: string[];
+      teacherNames2: string[];
+      objectives: string[];
+      materials: string[];
+    };
+    onEdit: () => void;
+  } | null>(null);
   const [selectedTeacher1, setSelectedTeacher1] = useState<string[]>([]);
   const [selectedTeacher2, setSelectedTeacher2] = useState<string[]>([]);
   const [showPopup, setShowPopup] = useState<'main' | 'assist' | null>(null);
@@ -70,127 +111,84 @@ const HanamiTC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const getDateString = (date: Date): string => {
-    return getHongKongDate(date).toLocaleDateString('sv-SE');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const fetchLessons = async (startDate: Date, endDate: Date): Promise<void> => {
+    const startDateStr = getDateString(startDate);
+    const endDateStr = getDateString(endDate);
+
+    console.log('Fetching lessons between:', { startDateStr, endDateStr });
+
     const { data: regularLessonsData, error: regularLessonsError } = await supabase
       .from('hanami_student_lesson')
       .select(`
         *,
         Hanami_Students!hanami_student_lesson_student_id_fkey (
-          id,
           full_name,
           student_age,
-          student_oid,
-          nick_name,
-          gender,
-          contact_number,
-          student_dob,
-          parent_email,
-          health_notes,
-          student_remarks,
-          created_at,
-          updated_at,
-          address,
-          course_type,
-          duration_months,
-          regular_timeslot,
-          regular_weekday,
-          remaining_lessons,
-          school,
-          started_date,
-          student_email,
-          student_password,
-          student_preference,
-          student_teacher,
-          student_type,
-          actual_timeslot
+          remaining_lessons
         )
       `)
-      .gte('lesson_date', startDate.toISOString())
-      .lte('lesson_date', endDate.toISOString());
+      .gte('lesson_date', startDateStr)
+      .lte('lesson_date', endDateStr);
 
     const { data: trialLessonsData, error: trialLessonsError } = await supabase
       .from('hanami_trial_students')
       .select('*')
-      .gte('lesson_date', startDate.toISOString())
-      .lte('lesson_date', endDate.toISOString());
+      .gte('lesson_date', startDateStr)
+      .lte('lesson_date', endDateStr);
 
     if (regularLessonsError || trialLessonsError) {
       console.error('Fetch error:', regularLessonsError || trialLessonsError);
       return;
     }
 
+    console.log('Fetched regular lessons:', regularLessonsData);
+    console.log('Fetched trial lessons:', trialLessonsData);
+
     // 處理常規學生數據
-    const processedRegularLessons = (regularLessonsData || []).map((lesson) => {
-      const student = lesson.Hanami_Students as any;
-      return {
-        id: lesson.id,
-        student_id: String(lesson.student_id ?? ''),
-        student_oid: typeof student?.student_oid === 'string' ? student.student_oid : null,
-        lesson_date: lesson.lesson_date,
-        regular_timeslot: lesson.regular_timeslot ?? '',
-        actual_timeslot: lesson.actual_timeslot ?? null,
-        lesson_status: lesson.lesson_status ?? null,
-        course_type: typeof lesson.course_type === 'string' ? lesson.course_type : '',
-        lesson_duration: lesson.lesson_duration ?? null,
-        regular_weekday: lesson.regular_weekday !== undefined && lesson.regular_weekday !== null ? Number(lesson.regular_weekday) : null,
-        lesson_count: typeof (lesson as any).lesson_count === 'number' ? (lesson as any).lesson_count : 0,
-        remaining_lessons: typeof student?.remaining_lessons === 'number' ? student.remaining_lessons : null,
-        is_trial: false,
-        lesson_teacher: lesson.lesson_teacher ?? null,
-        package_id: lesson.package_id ?? null,
-        status: lesson.status ?? null,
-        notes: lesson.notes ?? null,
-        next_target: lesson.next_target ?? null,
-        progress_notes: lesson.progress_notes ?? null,
-        video_url: lesson.video_url ?? null,
-        full_name: typeof student?.full_name === 'string' ? student.full_name : '',
-        created_at: lesson.created_at ?? null,
-        updated_at: lesson.updated_at ?? null,
-        access_role: lesson.access_role ?? null,
-        remarks: lesson.remarks ?? null
-      }
-    });
+    const processedRegularLessons: ProcessedLesson[] = (regularLessonsData || []).map((lesson) => ({
+      id: lesson.id,
+      student_id: lesson.student_id || '',
+      lesson_date: lesson.lesson_date || '',
+      regular_timeslot: lesson.regular_timeslot || '',
+      course_type: lesson.course_type || '',
+      full_name: lesson.Hanami_Students?.full_name || '未命名學生',
+      student_age: lesson.Hanami_Students?.student_age || null,
+      lesson_status: lesson.lesson_status,
+      remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+      is_trial: false,
+      lesson_duration: lesson.lesson_duration || null,
+    }));
 
     // 處理試堂學生數據
-    const processedTrialLessons = (trialLessonsData || []).map((trial) => ({
+    const processedTrialLessons: ProcessedLesson[] = (trialLessonsData || []).map((trial) => ({
       id: trial.id,
-      student_id: String(trial.id),
-      student_oid: null,
-      lesson_date: trial.lesson_date ?? '',
-      regular_timeslot: trial.actual_timeslot ?? '',
-      actual_timeslot: trial.actual_timeslot ?? null,
+      student_id: trial.id,
+      lesson_date: trial.lesson_date || '',
+      regular_timeslot: trial.actual_timeslot || '',
+      course_type: trial.course_type || '',
+      full_name: trial.full_name || '未命名學生',
+      student_age: trial.student_age,
       lesson_status: null,
-      course_type: typeof trial.course_type === 'string' ? trial.course_type : '',
-      lesson_duration: trial.lesson_duration ?? null,
-      regular_weekday: trial.regular_weekday !== undefined && trial.regular_weekday !== null ? Number(trial.regular_weekday) : null,
-      lesson_count: 0,
       remaining_lessons: null,
       is_trial: true,
-      lesson_teacher: null,
-      package_id: null,
-      status: null,
-      notes: null,
-      next_target: null,
-      progress_notes: null,
-      video_url: null,
-      full_name: typeof trial.full_name === 'string' ? trial.full_name : '',
-      created_at: trial.created_at ?? null,
-      updated_at: trial.updated_at ?? null,
-      access_role: trial.access_role ?? null,
-      remarks: null
+      lesson_duration: trial.lesson_duration || null,
     }));
 
     // 合併常規和試堂學生的課堂
-    const allLessons: Lesson[] = [...processedRegularLessons, ...processedTrialLessons];
+    const allLessons = [...processedRegularLessons, ...processedTrialLessons];
+    console.log('All processed lessons:', allLessons);
     setLessons(allLessons);
 
     // 獲取所有學生資料
     const { data: studentsData, error: studentsError } = await supabase
       .from('Hanami_Students')
-      .select('*');
+      .select('id, full_name, student_age');
 
     if (studentsError) {
       console.error('Fetch students error:', studentsError);
@@ -198,48 +196,86 @@ const HanamiTC = () => {
       return;
     }
 
-    setStudents((studentsData || []).map((s: any) => ({
-      id: s.id,
-      student_oid: s.student_oid ?? null,
-      full_name: s.full_name ?? '',
-      nick_name: s.nick_name ?? null,
-      gender: s.gender ?? null,
-      contact_number: s.contact_number ?? '',
-      student_dob: s.student_dob ?? null,
-      student_age: s.student_age ?? null,
-      parent_email: s.parent_email ?? null,
-      health_notes: s.health_notes ?? null,
-      student_remarks: s.student_remarks ?? null,
-      created_at: s.created_at ?? null,
-      updated_at: s.updated_at ?? null,
-      address: s.address ?? null,
-      course_type: s.course_type ?? null,
-      duration_months: s.duration_months ?? null,
-      regular_timeslot: s.regular_timeslot ?? null,
-      regular_weekday: s.regular_weekday ?? null,
-      remaining_lessons: s.remaining_lessons ?? null,
-      school: s.school ?? null,
-      started_date: s.started_date ?? null,
-      student_email: s.student_email ?? null,
-      student_password: s.student_password ?? null,
-      student_preference: s.student_preference ?? null,
-      student_teacher: s.student_teacher ?? null,
-      student_type: s.student_type ?? null,
-      lesson_date: s.lesson_date ?? null,
-      actual_timeslot: s.actual_timeslot ?? null
-    })));
+    // 轉換為 Student 類型
+    const processedStudents: Student[] = (studentsData || []).map(student => ({
+      id: student.id,
+      student_oid: '',
+      full_name: student.full_name || '',
+      nick_name: '',
+      gender: '',
+      contact_number: '',
+      parent_name: '',
+      parent_phone: '',
+      parent_email: '',
+      address: '',
+      student_age: student.student_age,
+      student_dob: null,
+      health_notes: '',
+      student_remarks: '',
+      created_at: null,
+      updated_at: null
+    }));
+
+    setStudents(processedStudents);
+  };
+
+  const fetchPlans = async (startDate: Date, endDate: Date) => {
+    const startDateStr = getDateString(startDate);
+    const endDateStr = getDateString(endDate);
+
+    console.log('Fetching plans between:', { startDateStr, endDateStr });
+
+    const { data } = await supabase
+      .from('hanami_lesson_plan')
+      .select('*')
+      .gte('lesson_date', startDateStr)
+      .lte('lesson_date', endDateStr);
+
+    console.log('Fetched plans:', data);
+    setPlans(data || []);
   };
 
   const fetchTeachers = async (): Promise<void> => {
     try {
-      await supabase
+      const { data } = await supabase
         .from('hanami_employee')
-        .select('*')
+        .select('id, teacher_fullname, teacher_nickname, teacher_role, teacher_status, teacher_email, teacher_phone, teacher_address, teacher_dob, teacher_hsalary, teacher_msalary, teacher_background, teacher_bankid, created_at, updated_at')
         .eq('teacher_status', 'active');
-      // 不 setTeachers，直接用 useLessonPlans 的 teachers
+      
+      if (data) {
+        // 轉換為 Teacher 類型
+        const processedTeachers: Teacher[] = data.map(teacher => ({
+          id: teacher.id,
+          teacher_fullname: teacher.teacher_fullname || '',
+          teacher_nickname: teacher.teacher_nickname || '',
+          teacher_role: teacher.teacher_role || null,
+          teacher_status: teacher.teacher_status || null,
+          teacher_email: teacher.teacher_email || null,
+          teacher_phone: teacher.teacher_phone || null,
+          teacher_address: teacher.teacher_address || null,
+          teacher_dob: teacher.teacher_dob || null,
+          teacher_hsalary: teacher.teacher_hsalary || null,
+          teacher_msalary: teacher.teacher_msalary || null,
+          teacher_background: teacher.teacher_background || null,
+          teacher_bankid: teacher.teacher_bankid || null,
+          teacher_gender: 'unknown',
+          created_at: teacher.created_at,
+          updated_at: teacher.updated_at
+        }));
+        setTeachers(processedTeachers);
+      }
     } catch (error) {
       console.error('Unexpected error in fetchTeachers:', error);
     }
+  };
+
+  const updatePlan = async (startDate: Date, endDate: Date) => {
+    const { data } = await supabase
+      .from('hanami_lesson_plan')
+      .select('*')
+      .gte('lesson_date', startDate.toISOString())
+      .lte('lesson_date', endDate.toISOString());
+    setPlans(data || []);
   };
 
   useEffect(() => {
@@ -248,6 +284,7 @@ const HanamiTC = () => {
     const weekEnd = getHongKongDate(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
     fetchLessons(weekStart, weekEnd);
+    fetchPlans(weekStart, weekEnd);
     fetchTeachers();
   }, [currentDate]);
 
@@ -289,7 +326,7 @@ const HanamiTC = () => {
     return `${years}`;
   };
 
-  const renderStudentButton = (nameObj: { name: string; student_id: string; age: string; is_trial: boolean; remaining_lessons?: number | null }, lesson: Lesson): React.ReactElement => {
+  const renderStudentButton = (nameObj: { name: string; student_id: string; age: string; is_trial: boolean; remaining_lessons?: number | null }, lesson: ProcessedLesson): React.ReactElement => {
     // 根據剩餘堂數決定背景顏色
     let bgColor = nameObj.is_trial ? '#FFF7D6' : '#F5E7D4';
     if (!nameObj.is_trial && lesson?.remaining_lessons !== undefined && lesson?.remaining_lessons !== null) {
@@ -321,10 +358,10 @@ const HanamiTC = () => {
   const handleDeleteTeacherSchedule = async (teacherId: string) => {
     try {
       const { error } = await supabase
-        .from('hanami_teacher_schedule')
+        .from('hanami_lesson_plan')
         .delete()
         .eq('teacher_id', teacherId)
-        .eq('date', currentDate.toISOString().split('T')[0]);
+        .eq('lesson_date', currentDate.toISOString().split('T')[0]);
 
       if (error) throw error;
 
@@ -335,235 +372,342 @@ const HanamiTC = () => {
         .eq('id', teacherId);
 
       if (fetchError) throw fetchError;
-      // 不 setTeachers
     } catch (err) {
       console.error('Error deleting teacher schedule:', err);
       alert('刪除失敗');
     }
   };
 
+  const renderDayLessons = (date: Date) => {
+    const dateStr = getDateString(date);
+    
+    console.log('Checking lessons for date:', dateStr);
+    
+    const dayLessons = lessons.filter(l => {
+      const lessonDateStr = l.lesson_date;
+      console.log('Comparing:', { lessonDateStr, dateStr });
+      return lessonDateStr === dateStr;
+    });
+    
+    console.log('Filtered dayLessons:', dayLessons);
+    
+    dayLessons.sort((a, b) => a.regular_timeslot.localeCompare(b.regular_timeslot));
+    
+    const grouped = dayLessons.reduce<Record<string, Group>>((acc, l) => {
+      const key = `${l.regular_timeslot}_${l.course_type}`;
+      if (!acc[key]) {
+        acc[key] = {
+          time: l.regular_timeslot,
+          course: l.course_type,
+          students: []
+        };
+      }
+      let age = '';
+      if (l.student_age !== null && l.student_age !== undefined) {
+        age = (typeof l.student_age === 'string' ? parseInt(l.student_age) : l.student_age).toString();
+      }
+      acc[key].students.push({
+        name: l.full_name,
+        student_id: l.student_id,
+        age,
+        is_trial: l.is_trial,
+        remaining_lessons: l.remaining_lessons
+      });
+      return acc;
+    }, {});
+    
+    return Object.values(grouped);
+  };
+
   return (
-    <div className="w-full">
-      {/* Calendar Header */}
+    <div className="bg-white min-h-screen flex flex-col items-center py-0">
+      <div className="bg-[#FFFDF8] rounded-xl shadow p-4 w-full max-w-5xl">
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrev}
-            className="p-2 hover:bg-gray-100 rounded"
-          >
-            ←
-          </button>
-          <h2 className="text-lg font-semibold">
-            {formatDate(currentDate)}
-          </h2>
-          <button
-            onClick={handleNext}
-            className="p-2 hover:bg-gray-100 rounded"
-          >
-            →
-          </button>
+          <div className="flex gap-2 items-center">
+            <button onClick={handlePrev} className="px-2 py-1 bg-[#EBC9A4] rounded-full text-[#4B4036]">◀</button>
+          {view === 'day' ? (
+            <input
+              type="date"
+              value={getDateString(currentDate)}
+                onChange={e => {
+                const [year, month, day] = e.target.value.split('-').map(Number);
+                  setCurrentDate(new Date(year, month - 1, day));
+              }}
+              className="border px-2 py-1 rounded"
+              style={{ width: '120px' }}
+            />
+          ) : (
+              <span className="font-semibold text-[#4B4036]">{formatDate(currentDate)}</span>
+          )}
+            <button onClick={handleNext} className="px-2 py-1 bg-[#EBC9A4] rounded-full text-[#4B4036]">▶</button>
+            {view === 'day' && (
+              <span className="ml-2 text-[#4B4036] text-sm font-semibold">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][currentDate.getDay()]}
+              </span>
+            )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setView('week')}
-            className={`px-3 py-1 rounded ${
-              view === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-100'
-            }`}
-          >
-            週
+            <button className={`px-3 py-1 rounded-full border ${view === 'day' ? 'bg-[#EBC9A4]' : 'bg-white border-[#EADBC8]'} text-[#4B4036]`} onClick={() => setView('day')}>日</button>
+            <button className={`px-3 py-1 rounded-full border ${view === 'week' ? 'bg-[#EBC9A4]' : 'bg-white border-[#EADBC8]'} text-[#4B4036]`} onClick={() => setView('week')}>週</button>
+            <button className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EADBC8] text-[#4B4036]" onClick={() => setAllShowTeachers((prev) => !prev)}>
+            <img src="/teacher.png" alt="老師" className="w-4 h-4" />
+            <span className="text-xs">{allShowTeachers ? '收起老師' : '展示老師'}</span>
+          </button>
+            <button className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EADBC8] text-[#4B4036]" onClick={() => setAllShowStudents((prev) => !prev)}>
+            <img src="/icons/penguin-face.png" alt="學生" className="w-4 h-4" />
+            <span className="text-xs">{allShowStudents ? '收起學生' : '展示學生'}</span>
+          </button>
+            <button className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EADBC8] text-[#4B4036]" onClick={() => setAllShowPlan((prev) => !prev)}>
+            <img src="/details.png" alt="課堂活動" className="w-4 h-4" />
+            <span className="text-xs">{allShowPlan ? '收起活動' : '展示活動'}</span>
           </button>
           <button
-            onClick={() => setView('day')}
-            className={`px-3 py-1 rounded ${
-              view === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-100'
-            }`}
+            onClick={async (e) => {
+                const btn = e.currentTarget.querySelector('img');
+              if (btn) {
+                  btn.classList.add('animate-spin');
+                  setTimeout(() => btn.classList.remove('animate-spin'), 1000);
+              }
+                const weekStart = getHongKongDate(currentDate);
+                weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+                const weekEnd = getHongKongDate(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                await fetchLessons(weekStart, weekEnd);
+                await fetchPlans(weekStart, weekEnd);
+              await fetchTeachers();
+            }}
+              className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EBC9A4] text-[#4B4036] hover:bg-[#f7f3ec]"
+              title="刷新資料"
           >
-            日
+              <img src="/refresh.png" alt="Refresh" className="w-4 h-4" />
           </button>
         </div>
       </div>
-
-      {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-1">
-        {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-          <div key={day} className="text-center font-semibold p-2">
-            {day}
-          </div>
-        ))}
-        {Array.from({ length: view === 'week' ? 7 : 1 }, (_, i) => {
-          const date = new Date(currentDate);
-          date.setDate(date.getDate() + i);
-          const dateStr = getDateString(date);
-          const dayLessons = lessons.filter(l => l.lesson_date === dateStr);
-          const groupedLessons = dayLessons.reduce((acc: Record<string, Group>, lesson) => {
-            const key = `${lesson.regular_timeslot}_${typeof lesson.course_type === 'string' ? lesson.course_type : (lesson.course_type as CourseType)?.id ?? ''}`;
-            if (!acc[key]) {
-              acc[key] = {
-                time: lesson.regular_timeslot ?? '',
-                course: typeof lesson.course_type === 'string' ? lesson.course_type : (lesson.course_type as CourseType)?.id ?? '',
-                students: []
-              };
-            }
-            acc[key].students.push({
-              name: lesson.full_name ?? '',
-              student_id: lesson.student_id ?? '',
-              age: (lesson as any).student_age?.toString() ?? '',
-              is_trial: lesson.is_trial ?? false,
-              remaining_lessons: lesson.remaining_lessons ?? null
-            });
-            return acc;
-          }, {});
-
-          return (
-            <div key={dateStr} className="border rounded p-2">
-              <div className="text-sm font-medium mb-2">
-                {date.getMonth() + 1}/{date.getDate()}
-              </div>
-              <div className="space-y-2">
-                {Object.values(groupedLessons).map((group, index) => (
-                  <div key={index} className="p-2 bg-gray-50 rounded">
-                    <div className="font-medium">
-                      {group.time} - {group.course}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {group.students.map(student => (
-                        <div key={student.student_id}>
-                          {student.name}
-                          {student.age && ` (${student.age}歲)`}
-                          {student.is_trial && ' (試堂)'}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Selected Date Detail */}
-      {selectedDetail && (
-        <div className="mt-4 p-4 border rounded">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">
-              {formatDate(currentDate)}
-            </h3>
-            <button
-              onClick={() => setShowPopup('main')}
-              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              新增老師
-            </button>
-          </div>
-
-          {/* Teacher List */}
-          <div className="mb-4">
-            <h4 className="font-medium mb-2">已排班老師</h4>
-            <div className="flex flex-wrap gap-2">
-              {selectedDetail.teachers.map(teacher => (
-                <div
-                  key={teacher.id}
-                  className="flex items-center gap-2 p-2 bg-gray-100 rounded"
-                >
-                  <span>{teacher.teacher_nickname}</span>
-                  <button
-                    onClick={() => handleDeleteTeacherSchedule(teacher.id)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Lesson Groups */}
-          <div>
-            <h4 className="font-medium mb-2">課堂安排</h4>
-            <div className="space-y-2">
-              {selectedDetail.groups.map((group, index) => (
-                <div key={index} className="p-2 bg-gray-50 rounded">
-                  <div className="font-medium">
-                    {group.time} - {group.course}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {group.students.map(student => (
-                      <div key={student.student_id}>
-                        {student.name}
-                        {student.age && ` (${student.age}歲)`}
-                        {student.is_trial && ' (試堂)'}
-                      </div>
-                    ))}
+        {/* 日曆內容 */}
+        <div className="w-full overflow-x-auto">
+          {view === 'week' ? (
+          <div className="grid grid-cols-7 gap-2 min-w-[700px] sm:min-w-0">
+            {Array.from({ length: 7 }, (_, i) => {
+              const weekStart = getHongKongDate(currentDate);
+              weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+              const date = getHongKongDate(weekStart);
+              date.setDate(date.getDate() + i);
+              const groupedArray = renderDayLessons(date);
+              
+              return (
+                <div key={i} className="p-2 rounded-xl text-center text-[#4B4036] text-sm bg-[#FFFDF8] flex flex-col items-center">
+                  <div className="font-semibold">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i]}</div>
+                  <div className="text-xs text-gray-500">{date.getDate()}</div>
+                  <div className="flex flex-col items-center gap-2 mt-1 w-full">
+                    {groupedArray.map((group, j) => {
+                      const matchedPlan = (plans || []).find(
+                        p =>
+                          p.lesson_date === getDateString(date) &&
+                          p.timeslot === group.time &&
+                          p.course_type === group.course
+                      );
+                      
+                      const teacherNames1 = (matchedPlan?.teacher_names_1 || []) as string[];
+                      const teacherNames2 = (matchedPlan?.teacher_names_2 || []) as string[];
+                      
+                      const plan = matchedPlan
+                        ? {
+                            teacherNames1,
+                            teacherNames2,
+                            objectives: matchedPlan.objectives || [],
+                            materials: matchedPlan.materials || [],
+                          }
+                        : undefined;
+                      
+                      return (
+                        <MiniLessonCard
+                          key={j}
+                          time={group.time?.slice(0, 5) || ''}
+                          course={{ name: group.course }}
+                          students={group.students.map(student => ({
+                            id: student.student_id,
+                            name: student.name,
+                            age: student.age,
+                            isTrial: student.is_trial,
+                            remainingLessons: student.remaining_lessons ?? undefined,
+                            avatar: undefined
+                          }))}
+                          plan={plan}
+                          onEdit={() => {
+                            const matchedPlan = (plans || []).find(
+                              p =>
+                                p.lesson_date === getDateString(date) &&
+                                p.timeslot === group.time &&
+                                p.course_type === group.course
+                            );
+                            setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
+                            setIsModalOpen(true);
+                          }}
+                          onClick={() => {
+                            setSelectedLesson({
+                              time: group.time?.slice(0, 5) || '',
+                              course: { name: group.course },
+                              teachers: teachers,
+                              students: group.students.map(student => ({
+                                id: student.student_id,
+                                name: student.name,
+                                age: student.age,
+                                isTrial: student.is_trial,
+                                remainingLessons: student.remaining_lessons ?? undefined,
+                                avatar: undefined
+                              })),
+                              plan,
+                              onEdit: () => {
+                                setModalInfo({ date, time: group.time, course: group.course });
+                                setIsModalOpen(true);
+                              }
+                            });
+                          }}
+                          duration={lessons.find(l =>
+                            l.regular_timeslot === group.time &&
+                            l.course_type === group.course &&
+                            getDateString(new Date(l.lesson_date)) === getDateString(date)
+                          )?.lesson_duration || undefined}
+                          allShowTeachers={allShowTeachers}
+                          allShowStudents={allShowStudents}
+                          allShowPlan={allShowPlan}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              );
+            })}
         </div>
-      )}
-
-      {/* Teacher Select Popup */}
-      {showPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-4 rounded-lg w-96">
-            <h3 className="text-lg font-semibold mb-4">
-              {showPopup === 'main' ? '選擇主導老師' : '選擇輔助老師'}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  選擇老師
-                </label>
-                <PopupSelect
-                  title={showPopup === 'main' ? '選擇主導老師' : '選擇輔助老師'}
-                  options={teachers.map(t => ({
-                    label: t.teacher_nickname,
-                    value: t.id
-                  }))}
-                  selected={showPopup === 'main' ? tempSelectedTeacher1 : tempSelectedTeacher2}
-                  onChange={(val) => {
-                    if (showPopup === 'main') {
-                      setTempSelectedTeacher1(Array.isArray(val) ? val : [val]);
-                    } else {
-                      setTempSelectedTeacher2(Array.isArray(val) ? val : [val]);
-                    }
-                  }}
-                  mode="multi"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setShowPopup(null)}
-                className="px-4 py-2 text-gray-600 border rounded hover:bg-gray-100"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  if (showPopup === 'main') {
-                    setSelectedTeacher1(tempSelectedTeacher1);
-                  } else {
-                    setSelectedTeacher2(tempSelectedTeacher2);
+      ) : (
+            // day view
+            (() => {
+                const date = getHongKongDate(currentDate);
+                const dayLessons = lessons.filter(l => getDateString(new Date(l.lesson_date)) === getDateString(date));
+                dayLessons.sort((a, b) => a.regular_timeslot.localeCompare(b.regular_timeslot));
+                const grouped = dayLessons.reduce<Record<string, Group>>((acc, l) => {
+                  const key = `${l.regular_timeslot}_${l.course_type}`;
+                  if (!acc[key]) {
+                    acc[key] = {
+                      time: l.regular_timeslot,
+                      course: l.course_type,
+                      students: []
+                    };
                   }
-                  setShowPopup(null);
-                }}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                確認
-              </button>
+                  let age = '';
+                  if (l.student_age !== null && l.student_age !== undefined) {
+                    age = (typeof l.student_age === 'string' ? parseInt(l.student_age) : l.student_age).toString();
+                  }
+                  acc[key].students.push({
+                    name: l.full_name,
+                    student_id: l.student_id,
+                    age,
+                    is_trial: l.is_trial,
+                    remaining_lessons: l.remaining_lessons
+                  });
+                  return acc;
+                }, {});
+                const groupedArray = Object.values(grouped) as Group[];
+                  return (
+                <div className="flex flex-col gap-2 items-center w-full">
+                  {groupedArray.map((group, j) => (
+                        <MiniLessonCard
+                      key={j}
+                          time={group.time?.slice(0, 5) || ''}
+                          course={{ name: group.course }}
+                      students={group.students.map(student => ({
+                        id: student.student_id,
+                        name: student.name,
+                        age: student.age,
+                        isTrial: student.is_trial,
+                        remainingLessons: student.remaining_lessons ?? undefined,
+                        avatar: undefined
+                      }))}
+                          onEdit={() => {
+                            const matchedPlan = (plans || []).find(
+                              p =>
+                                p.lesson_date === getDateString(date) &&
+                                p.timeslot === group.time &&
+                                p.course_type === group.course
+                            );
+                            setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
+                            setIsModalOpen(true);
+                          }}
+                          onClick={() => {
+                            setSelectedLesson({
+                          time: group.time?.slice(0, 5) || '',
+                              course: { name: group.course },
+                          teachers: (teachers || []) as Teacher[],
+                          students: group.students.map(student => ({
+                            id: student.student_id,
+                            name: student.name,
+                            age: student.age,
+                            isTrial: student.is_trial,
+                            remainingLessons: student.remaining_lessons ?? undefined,
+                            avatar: undefined
+                          })),
+                              onEdit: () => {
+                                setModalInfo({ date, time: group.time, course: group.course });
+                                setIsModalOpen(true);
+                              }
+                            });
+                          }}
+                          duration={lessons.find(l =>
+                            l.regular_timeslot === group.time &&
+                            l.course_type === group.course &&
+                            getDateString(new Date(l.lesson_date)) === getDateString(date)
+                          )?.lesson_duration || undefined}
+                          allShowTeachers={allShowTeachers}
+                          allShowStudents={allShowStudents}
+                          allShowPlan={allShowPlan}
+                        />
+                  ))}
+                      </div>
+              );
+            })()
+          )}
+            </div>
+        {/* LessonCard 彈窗 */}
+        {selectedLesson && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={() => setSelectedLesson(null)}>
+            <div className="max-w-md w-full relative" onClick={e => e.stopPropagation()}>
+              <LessonCard 
+                time={selectedLesson.time}
+                course={selectedLesson.course}
+                teachers={selectedLesson.teachers.map(t => ({
+                  name: t.teacher_fullname,
+                  avatar: undefined
+                }))}
+                students={selectedLesson.students}
+                plan={selectedLesson.plan ? {
+                  teacherNames: [...selectedLesson.plan.teacherNames1, ...selectedLesson.plan.teacherNames2],
+                  objectives: selectedLesson.plan.objectives,
+                  materials: selectedLesson.plan.materials
+                } : undefined}
+                onEdit={selectedLesson.onEdit}
+                onClose={() => setSelectedLesson(null)}
+              />
             </div>
           </div>
+        )}
+        {modalInfo && (
+          <LessonPlanModal
+            open={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            lessonDate={modalInfo.date}
+            timeslot={modalInfo.time}
+            courseType={modalInfo.course}
+            existingPlan={modalInfo.plan}
+            onSaved={async () => {
+              const weekStart = getHongKongDate(currentDate);
+              weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+              const weekEnd = getHongKongDate(weekStart);
+              weekEnd.setDate(weekEnd.getDate() + 6);
+              await updatePlan(weekStart, weekEnd);
+            }}
+          />
+        )}
         </div>
-      )}
-
-      {/* Error Message */}
-      {errorMsg && (
-        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
-          {errorMsg}
-        </div>
-      )}
     </div>
   );
 };

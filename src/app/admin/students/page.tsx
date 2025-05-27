@@ -10,6 +10,7 @@ import StudentCard from '@/components/ui/StudentCard'
 import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2 } from 'lucide-react'
 import { useUser } from '@/hooks/useUser'
 import { useParams } from 'next/navigation'
+import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel'
 
 export default function StudentManagementPage() {
   const searchParams = useSearchParams()
