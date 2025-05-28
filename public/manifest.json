@@ -1,13 +1,23 @@
 {
-    "name": "Hanami Music",
-    "short_name": "Hanami",
-    "description": "Hanami Music - 讓我們一起陪孩子快樂成長",
-    "icons": [
-      { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-      { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-    ],
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#fffaf5",
-    "theme_color": "#fffaf5"
-  }
+  "name": "Hanami Music",
+  "short_name": "Hanami",
+  "description": "Hanami Web Application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+} 
