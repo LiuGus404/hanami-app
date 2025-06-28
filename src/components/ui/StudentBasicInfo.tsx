@@ -55,9 +55,10 @@ type Props = {
   student: Student;
   onUpdate: (newData: Student) => void;
   visibleFields?: string[];
+  isInactive?: boolean;
 }
 
-export default function StudentBasicInfo({ student, onUpdate, visibleFields = [] }: Props) {
+export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false }: Props) {
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState<StudentFormData>({
     id: student?.id || '',
@@ -138,6 +139,11 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   const isVisible = (field: string) => visibleFields.length === 0 || visibleFields.includes(field)
 
   const isEditable = (field: string) => {
+    // 停用學生不可編輯
+    if (isInactive) {
+      return false
+    }
+    
     if (formData.student_type === '試堂') {
       const editableFields = [
         'gender',
@@ -223,6 +229,12 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   }
 
   const handleSave = async () => {
+    // 停用學生不可編輯
+    if (isInactive) {
+      alert('停用學生不可編輯')
+      return
+    }
+
     const missingFields: (keyof StudentFormData)[] = [];
     const requiredFields: (keyof StudentFormData)[] = ['full_name', 'gender', 'course_type', 'student_type'];
     requiredFields.forEach(field => {
@@ -343,7 +355,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">基本資料</h2>
-        {!editMode && (
+        {!editMode && !isInactive && (
           <button
             onClick={() => setEditMode(true)}
             className="text-sm text-[#A68A64] hover:underline flex items-center gap-1"

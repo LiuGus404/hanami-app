@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, supabase } from '@/lib/supabase';
 
 export type LessonPlan = {
   id: string;
@@ -166,5 +166,95 @@ export const useTeachers = () => {
     fetch();
   }, []);
 
+  useEffect(() => {
+    const subscription = supabase
+      .channel('hanami_admin_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'hanami_admin'
+        },
+        async (payload) => {
+          // 處理資料變更
+          if (payload.eventType === 'UPDATE') {
+            // 更新本地狀態
+            const { data, error } = await supabase
+              .from('hanami_admin')
+              .select('*')
+              .eq('id', payload.new.id)
+              .single()
+            
+            if (!error && data) {
+              // 更新相關狀態
+              // 例如：更新用戶資訊、重新驗證等
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
   return { teachers, loading };
 };
+
+const handleLogin = async (email: string, password: string) => {
+  try {
+    // 先檢查 hanami_admin 表
+    const { data: adminData, error: adminError } = await supabase
+      .from('hanami_admin')
+      .select('*')
+      .eq('admin_email', email)
+      .single()
+
+    if (adminError || !adminData) {
+      throw new Error('Invalid credentials')
+    }
+
+    // 使用 Supabase Auth 進行認證
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (error) throw error
+
+    // 登入成功後的處理
+    // ...
+  } catch (error) {
+    console.error('Login error:', error)
+    // 錯誤處理
+  }
+}
+
+const syncAdminData = async (retries = 3) => {
+  try {
+    const { data, error } = await supabase
+      .from('hanami_admin')
+      .select('*')
+    
+    if (error) throw error
+    
+    // 處理資料同步
+    // ...
+  } catch (error) {
+    if (retries > 0) {
+      // 重試
+      setTimeout(() => syncAdminData(retries - 1), 1000)
+    } else {
+      console.error('Failed to sync admin data:', error)
+      // 通知用戶同步失敗
+    }
+  }
+}
+
+const { data, error } = await supabase.auth.admin.createUser({
+  email: 'vicky@hanami.com',
+  password: 'Am98271410',
+  user_metadata: { role: 'admin' }
+});

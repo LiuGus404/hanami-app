@@ -26,11 +26,13 @@ export default function StudentDetailPage() {
   const [editingLesson, setEditingLesson] = useState<any>(null)
   const [tempCategoryFilter, setTempCategoryFilter] = useState<string[]>(['all'])
   const [categorySelectOpen, setCategorySelectOpen] = useState(false)
+  const [isInactiveStudent, setIsInactiveStudent] = useState(false)
 
   useEffect(() => {
     setPageLoading(true);
     setStudent(null);
     setError(null);
+    setIsInactiveStudent(false);
 
     const checkAuth = async () => {
       if (loading) return
@@ -42,7 +44,30 @@ export default function StudentDetailPage() {
       }
 
       try {
-        // 先檢查是否為試堂學生
+        // 先檢查是否為停用學生
+        const { data: inactiveData, error: inactiveError } = await supabase
+          .from('inactive_student_list')
+          .select('*')
+          .eq('id', id as string)
+          .single()
+
+        if (inactiveData) {
+          // 將停用學生資料轉換為標準格式
+          const convertedStudent = {
+            ...inactiveData,
+            id: inactiveData.original_id, // 使用原始ID
+            student_type: inactiveData.student_type === 'regular' ? '常規' : '試堂',
+            is_inactive: true,
+            inactive_date: inactiveData.inactive_date,
+            inactive_reason: inactiveData.inactive_reason
+          }
+          setStudent(convertedStudent)
+          setIsInactiveStudent(true)
+          setPageLoading(false)
+          return
+        }
+
+        // 檢查是否為試堂學生
         const { data: trialData, error: trialError } = await supabase
           .from('hanami_trial_students')
           .select('*')
@@ -115,13 +140,36 @@ export default function StudentDetailPage() {
   return (
     <div className="min-h-screen bg-[#FFFCF2] p-6">
       <div className="max-w-4xl mx-auto">
+        {/* 停用學生警告 */}
+        {isInactiveStudent && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">
+                  此學生已停用
+                </h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
+                  <p>停用原因：{student.inactive_reason}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <StudentBasicInfo 
           student={student} 
           onUpdate={(newData) => {
             setStudent(newData)
           }}
+          isInactive={isInactiveStudent}
         />
-        {student && student.student_type !== '試堂' && (
+        {student && student.student_type !== '試堂' && !isInactiveStudent && (
           <div className="mt-8">
             <StudentLessonPanel studentId={student.id} />
           </div>

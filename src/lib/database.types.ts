@@ -949,6 +949,75 @@ export type Database = {
         }
         Relationships: []
       }
+      inactive_student_list: {
+        Row: {
+          id: string;
+          original_id: string;
+          student_type: string;
+          full_name: string | null;
+          student_age: number | null;
+          student_preference: string | null;
+          course_type: string | null;
+          remaining_lessons: number | null;
+          regular_weekday: number | null;
+          gender: string | null;
+          student_oid: string | null;
+          contact_number: string | null;
+          regular_timeslot: string | null;
+          health_notes: string | null;
+          lesson_date: string | null;
+          actual_timeslot: string | null;
+          inactive_date: string;
+          inactive_reason: string;
+          created_at: string;
+          updated_at: string;
+        }
+        Insert: {
+          id?: string;
+          original_id: string;
+          student_type: string;
+          full_name?: string | null;
+          student_age?: number | null;
+          student_preference?: string | null;
+          course_type?: string | null;
+          remaining_lessons?: number | null;
+          regular_weekday?: number | null;
+          gender?: string | null;
+          student_oid?: string | null;
+          contact_number?: string | null;
+          regular_timeslot?: string | null;
+          health_notes?: string | null;
+          lesson_date?: string | null;
+          actual_timeslot?: string | null;
+          inactive_date?: string;
+          inactive_reason?: string;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Update: {
+          id?: string;
+          original_id?: string;
+          student_type?: string;
+          full_name?: string | null;
+          student_age?: number | null;
+          student_preference?: string | null;
+          course_type?: string | null;
+          remaining_lessons?: number | null;
+          regular_weekday?: number | null;
+          gender?: string | null;
+          student_oid?: string | null;
+          contact_number?: string | null;
+          regular_timeslot?: string | null;
+          health_notes?: string | null;
+          lesson_date?: string | null;
+          actual_timeslot?: string | null;
+          inactive_date?: string;
+          inactive_reason?: string;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
