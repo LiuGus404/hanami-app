@@ -369,50 +369,36 @@ export default function StudentManagementPage() {
       const regularStudents = selectedStudentData.filter(s => s.student_type !== '試堂')
       const trialStudents = selectedStudentData.filter(s => s.student_type === '試堂')
 
+      // 如果有試堂學生，提示用戶試堂學生只能刪除不能停用
+      if (trialStudents.length > 0) {
+        alert(`試堂學生只能刪除不能停用。請先取消選擇試堂學生，或使用刪除功能。`)
+        setIsLoading(false)
+        return
+      }
+
       // 將學生資料插入 inactive_student_list 表
-      const inactiveStudentsData = [
-        ...regularStudents.map(s => ({
-          original_id: s.id,
-          student_type: 'regular',
-          full_name: s.full_name,
-          student_age: s.student_age,
-          student_preference: s.student_preference,
-          course_type: s.course_type,
-          remaining_lessons: s.remaining_lessons,
-          regular_weekday: s.regular_weekday,
-          gender: s.gender,
-          student_oid: s.student_oid,
-          contact_number: s.contact_number,
-          regular_timeslot: s.regular_timeslot,
-          health_notes: s.health_notes,
-          inactive_date: new Date().toISOString(),
-          inactive_reason: '管理員停用'
-        })),
-        ...trialStudents.map(s => ({
-          original_id: s.id,
-          student_type: 'trial',
-          full_name: s.full_name,
-          student_age: s.student_age,
-          student_preference: s.student_preference,
-          course_type: s.course_type,
-          remaining_lessons: s.remaining_lessons,
-          regular_weekday: s.regular_weekday,
-          gender: s.gender,
-          student_oid: s.student_oid,
-          contact_number: s.contact_number,
-          regular_timeslot: s.regular_timeslot,
-          health_notes: s.health_notes,
-          lesson_date: s.lesson_date,
-          actual_timeslot: s.actual_timeslot,
-          inactive_date: new Date().toISOString(),
-          inactive_reason: '管理員停用'
-        }))
-      ]
+      const inactiveStudentsData = regularStudents.map(s => ({
+        original_id: s.id,
+        student_type: 'regular',
+        full_name: s.full_name,
+        student_age: s.student_age,
+        student_preference: s.student_preference,
+        course_type: s.course_type,
+        remaining_lessons: s.remaining_lessons,
+        regular_weekday: s.regular_weekday,
+        gender: s.gender,
+        student_oid: s.student_oid,
+        contact_number: s.contact_number,
+        regular_timeslot: s.regular_timeslot,
+        health_notes: s.health_notes,
+        inactive_date: new Date().toISOString(),
+        inactive_reason: '管理員停用'
+      }))
 
       // 插入 inactive_student_list 表
       const { error: insertError } = await supabase
         .from('inactive_student_list')
-        .insert(inactiveStudents)
+        .insert(inactiveStudentsData)
 
       if (insertError) {
         console.error('Error inserting inactive students:', insertError)
@@ -487,26 +473,10 @@ export default function StudentManagementPage() {
         }
       }
 
-      if (trialStudents.length > 0) {
-        const trialIds = trialStudents.map(s => s.id)
-        
-        // 試堂學生通常沒有複雜的外鍵依賴，直接刪除
-        const { error: trialError } = await supabase
-          .from('hanami_trial_students')
-          .delete()
-          .in('id', trialIds)
-        
-        if (trialError) {
-          console.error('Error deleting trial students:', trialError)
-          alert(`刪除試堂學生時發生錯誤: ${trialError.message}`)
-          return
-        }
-      }
-
       // 更新本地狀態
       setStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)))
       setSelectedStudents([])
-      alert(`成功停用 ${selectedStudents.length} 位學生`)
+      alert(`成功停用 ${regularStudents.length} 位常規學生`)
       
       // 重新獲取停用學生數據
       const { data: inactiveStudentData } = await supabase
@@ -895,7 +865,8 @@ export default function StudentManagementPage() {
         } else if (selected === '試堂') {
           return student.student_type === '試堂'
         } else if (selected === '停用學生') {
-          return student.is_inactive === true
+          // 當顯示停用學生時，所有學生都應該顯示（因為 currentStudents 已經是 inactiveStudents）
+          return isShowingInactiveStudents || student.is_inactive === true
         }
         return false
       })
@@ -1073,22 +1044,36 @@ export default function StudentManagementPage() {
                   </div>
                 ) : (
                   <>
-                    <button
-                      onClick={handleInactiveStudents}
-                      disabled={isLoading}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#FDE6B8] text-[#A64B2A] rounded-full border border-[#EAC29D] hover:bg-[#fce2c8] transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <UserX className="w-4 h-4" />
-                      <span>停用學生</span>
-                    </button>
-                    <button
-                      onClick={handleDeleteStudents}
-                      disabled={isLoading}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full border border-red-200 hover:bg-red-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>刪除學生</span>
-                    </button>
+                    {/* 檢查選中的學生中是否包含試堂學生 */}
+                    {(() => {
+                      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id))
+                      const hasTrialStudents = selectedStudentData.some(s => s.student_type === '試堂')
+                      const hasRegularStudents = selectedStudentData.some(s => s.student_type !== '試堂')
+                      
+                      return (
+                        <>
+                          {/* 只有當選中的學生包含常規學生時才顯示停用按鈕 */}
+                          {hasRegularStudents && (
+                            <button
+                              onClick={handleInactiveStudents}
+                              disabled={isLoading}
+                              className="flex items-center gap-2 px-4 py-2 bg-[#FDE6B8] text-[#A64B2A] rounded-full border border-[#EAC29D] hover:bg-[#fce2c8] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <UserX className="w-4 h-4" />
+                              <span>停用學生</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={handleDeleteStudents}
+                            disabled={isLoading}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full border border-red-200 hover:bg-red-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>刪除學生</span>
+                          </button>
+                        </>
+                      )
+                    })()}
                   </>
                 )}
               </div>
