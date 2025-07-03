@@ -9,7 +9,7 @@ interface TimePickerProps {
 export default function TimePicker({ label = "選擇時間", value, onChange }: TimePickerProps) {
   const [selectedHour, setSelectedHour] = useState(() => {
     const [h] = (value || '00:00').split(':')
-    return h.padStart(2, '0')
+    return h?.padStart(2, '0') || '00'
   })
   const [selectedMinute, setSelectedMinute] = useState(() => {
     const [, m] = (value || '00:00').split(':')

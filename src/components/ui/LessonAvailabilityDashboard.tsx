@@ -25,7 +25,7 @@ function formatAge(months: number | null | undefined): string {
 function calculateAgeRange(students: { student_age: number | null | undefined }[]): string {
   const ages = students
     .map(s => s.student_age)
-    .filter((age): age is number => age !== null && age !== undefined)
+    .filter((age): age is number => age !== null && age !== undefined && !isNaN(age))
   
   if (ages.length === 0) return ''
   
@@ -60,7 +60,6 @@ interface ScheduleData {
   weekday: number;
   timeslot: string;
   max_students: number;
-  current_students: number;
   duration: string | null;
 }
 
@@ -74,59 +73,118 @@ export default function LessonAvailabilityDashboard() {
       setLoading(true)
       setError(null)
       try {
-        // 1. 取得所有時段
+        // 1. 取得所有時段（移除 current_students 欄位查詢）
         const { data: slotData, error: slotError } = await supabase
           .from('hanami_schedule')
-          .select('weekday, timeslot, max_students, current_students, duration')
+          .select('weekday, timeslot, max_students, duration')
           .order('weekday', { ascending: true })
           .order('timeslot', { ascending: true })
+        
+        console.log('🔍 查詢 hanami_schedule 結果:', { slotData, slotError })
+        
         if (slotError) {
           setError('無法載入資料：' + slotError.message)
           return
         }
+        
         // 2. 取得所有今天或之後的試堂學生
         const todayISO = getTodayISO()
         const { data: trialData, error: trialError } = await supabase
           .from('hanami_trial_students')
           .select('id, full_name, student_age, lesson_date, actual_timeslot, weekday')
           .gte('lesson_date', todayISO)
+          .not('actual_timeslot', 'is', null) // 確保有設定試堂時間
+          .not('weekday', 'is', null) // 確保有設定試堂日
+        
+        console.log('🔍 查詢試堂學生結果:', { trialData, trialError })
+        
         if (trialError) {
           setError('無法載入試堂學生：' + trialError.message)
           return
         }
-        // 3. 取得所有常規學生
+        
+        // 3. 取得所有常規學生（只計算 active 學生）
         const { data: regularData, error: regularError } = await supabase
           .from('Hanami_Students')
-          .select('id, full_name, student_age, regular_weekday, regular_timeslot')
+          .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type')
+          .in('student_type', ['常規', '試堂']) // 只包含常規和試堂學生
+          .not('regular_weekday', 'is', null) // 確保有設定上課日
+          .not('regular_timeslot', 'is', null) // 確保有設定上課時間
+        
+        console.log('🔍 查詢常規學生結果:', { regularData, regularError })
+        
         if (regularError) {
           setError('無法載入常規學生：' + regularError.message)
           return
         }
+        
         // 4. 將試堂學生依 weekday+timeslot 分組
         const trialMap: { [key: string]: TrialStudent[] } = {}
         for (const t of trialData || []) {
           if (!t.actual_timeslot || t.weekday === null || t.weekday === undefined) continue
-          const key = `${t.weekday}_${t.actual_timeslot}`
+          
+          // 處理 weekday 欄位，確保是數字格式
+          let weekdayNum: number
+          if (typeof t.weekday === 'string') {
+            weekdayNum = parseInt(t.weekday)
+            if (isNaN(weekdayNum)) continue
+          } else {
+            weekdayNum = t.weekday
+          }
+          
+          const key = `${weekdayNum}_${t.actual_timeslot}`
           if (!trialMap[key]) trialMap[key] = []
           trialMap[key].push({
             ...t,
             full_name: t.full_name || '',
             lesson_date: t.lesson_date || '',
             actual_timeslot: t.actual_timeslot || '',
-            weekday: typeof t.weekday === 'string' ? parseInt(t.weekday) : t.weekday,
+            weekday: weekdayNum,
+            student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : t.student_age,
           })
         }
+        
+        console.log('🔍 試堂學生分組結果:', trialMap)
+        
         // 5. 將常規學生依 regular_weekday+regular_timeslot 分組，收集年齡
         const regularAgeMap: { [key: string]: number[] } = {}
+        const regularCountMap: { [key: string]: number } = {}
         for (const s of regularData || []) {
           if (!s.regular_timeslot || s.regular_weekday === null || s.regular_weekday === undefined) continue
-          const key = `${s.regular_weekday}_${s.regular_timeslot}`
+          
+          // 處理 regular_weekday 欄位，確保是數字格式
+          let weekdayNum: number
+          if (typeof s.regular_weekday === 'string') {
+            weekdayNum = parseInt(s.regular_weekday)
+            if (isNaN(weekdayNum)) continue
+          } else {
+            weekdayNum = s.regular_weekday
+          }
+          
+          const key = `${weekdayNum}_${s.regular_timeslot}`
           if (!regularAgeMap[key]) regularAgeMap[key] = []
+          if (!regularCountMap[key]) regularCountMap[key] = 0
+          regularCountMap[key]++
           if (s.student_age !== null && s.student_age !== undefined) {
-            regularAgeMap[key].push(s.student_age)
+            const age = typeof s.student_age === 'string' ? parseInt(s.student_age) : s.student_age
+            if (!isNaN(age)) {
+              regularAgeMap[key].push(age)
+            }
           }
         }
-        // 6. 合併到 slot
+        
+        console.log('🔍 常規學生分組結果:', { regularAgeMap, regularCountMap })
+        
+        // 統計資訊
+        const totalRegularStudents = Object.values(regularCountMap).reduce((sum, count) => sum + count, 0)
+        const totalTrialStudents = Object.values(trialMap).reduce((sum, students) => sum + students.length, 0)
+        console.log('📊 統計資訊:', {
+          常規學生總數: totalRegularStudents,
+          試堂學生總數: totalTrialStudents,
+          課堂時段數: slotData?.length || 0
+        })
+        
+        // 6. 合併到 slot，動態計算當前學生數量
         let mapped: Slot[] = [];
         if (Array.isArray(slotData) && !(slotData.length > 0 && 'error' in slotData[0])) {
           mapped = ((slotData as unknown) as ScheduleData[])
@@ -134,22 +192,38 @@ export default function LessonAvailabilityDashboard() {
               slot &&
               typeof slot.timeslot === 'string' &&
               typeof slot.weekday === 'number' &&
-              typeof slot.max_students === 'number' &&
-              typeof slot.current_students === 'number'
+              typeof slot.max_students === 'number'
             )
-            .map(slot => ({
-              time: slot.timeslot,
-              course: '',
-              weekday: slot.weekday,
-              max: slot.max_students,
-              current: slot.current_students,
-              duration: slot.duration,
-              trial_students: trialMap[`${slot.weekday}_${slot.timeslot}`] || [],
-              regular_students_ages: regularAgeMap[`${slot.weekday}_${slot.timeslot}`] || []
-            }))
+            .map(slot => {
+              const key = `${slot.weekday}_${slot.timeslot}`
+              const regularCount = regularCountMap[key] || 0
+              const trialCount = (trialMap[key] || []).length
+              const currentTotal = regularCount + trialCount
+              
+              console.log(`🔍 時段 ${slot.weekday}_${slot.timeslot}:`, {
+                常規學生: regularCount,
+                試堂學生: trialCount,
+                總計: currentTotal,
+                上限: slot.max_students
+              })
+              
+              return {
+                time: slot.timeslot,
+                course: '',
+                weekday: slot.weekday,
+                max: slot.max_students,
+                current: currentTotal,
+                duration: slot.duration,
+                trial_students: trialMap[key] || [],
+                regular_students_ages: regularAgeMap[key] || []
+              }
+            })
         }
+        
+        console.log('🔍 最終處理結果:', mapped)
         setSlots(mapped)
       } catch (err) {
+        console.error('❌ 系統錯誤:', err)
         setError('系統錯誤，請稍後再試')
       } finally {
         setLoading(false)
@@ -197,6 +271,27 @@ export default function LessonAvailabilityDashboard() {
     )
   }
 
+  // 檢查是否有課堂資料
+  if (slots.length === 0) {
+    return (
+      <div className="w-full flex flex-col items-center px-4">
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-lg font-bold text-[#4B4036]">課堂空缺情況</h2>
+          <Image src="/rabbit.png" alt="icon" width={24} height={24} />
+        </div>
+        <div className="text-center p-8 bg-[#FFFDF7] border border-[#EADBC8] rounded-xl">
+          <div className="text-[#4B4036] mb-2">目前沒有課堂資料</div>
+          <div className="text-sm text-[#87704e] mb-4">請確認以下項目：</div>
+          <div className="text-sm text-[#87704e] text-left space-y-1">
+            <div>• hanami_schedule 表中有設定課堂時段</div>
+            <div>• Hanami_Students 表中有常規學生且設定了 regular_weekday 和 regular_timeslot</div>
+            <div>• 或點擊「插入測試資料」按鈕來查看示例</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full flex flex-col items-center px-4">
       <div className="flex items-center gap-2 mb-3">
@@ -236,25 +331,36 @@ export default function LessonAvailabilityDashboard() {
                       {slot.trial_students && slot.trial_students.length > 0 && (
                         <div className="flex flex-col gap-1 mt-1">
                           {[...slot.trial_students]
-                            .sort((a, b) => (a.lesson_date || '').localeCompare(b.lesson_date || ''))
+                            .sort((a, b) => {
+                              // 確保日期格式正確進行排序
+                              const dateA = a.lesson_date ? new Date(a.lesson_date).getTime() : 0
+                              const dateB = b.lesson_date ? new Date(b.lesson_date).getTime() : 0
+                              return dateA - dateB
+                            })
                             .map((stu) => {
                               // 格式化日期 dd/MM
                               let dateStr = ''
                               if (stu.lesson_date) {
-                                const d = new Date(stu.lesson_date)
-                                dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}`
+                                try {
+                                  const d = new Date(stu.lesson_date)
+                                  if (!isNaN(d.getTime())) {
+                                    dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}`
+                                  }
+                                } catch (err) {
+                                  console.error('日期格式化錯誤:', err)
+                                }
                               }
                               return (
                                 <a
                                   key={stu.id}
-                                  href={`/admin/students/${stu.id}`}
+                                  href={`/admin/add-trial-students?id=${stu.id}`}
                                   className="inline-block px-2 py-1 rounded bg-yellow-100 text-xs text-[#4B4036] hover:bg-yellow-200 transition leading-snug"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
                                   <div>{stu.full_name}</div>
                                   <div className="mt-[2px] flex items-center gap-2 text-[10px] text-[#87704e]">
-                                    {(stu.student_age !== null && stu.student_age !== undefined) && (
+                                    {(stu.student_age !== null && stu.student_age !== undefined && !isNaN(stu.student_age)) && (
                                       <span className="inline-flex items-center gap-1">
                                         <Image src="/age.png" alt="age" width={16} height={16} />
                                         {formatAge(stu.student_age)}
@@ -282,10 +388,20 @@ export default function LessonAvailabilityDashboard() {
           </div>
         </div>
         {/* 圖例說明 */}
-        <div className="mt-4 flex gap-4 justify-center text-sm bg-[#FFF8EF] border border-[#EADBC8] rounded-xl px-4 py-2">
+        <div className="mt-4 flex flex-wrap gap-4 justify-center text-sm bg-[#FFF8EF] border border-[#EADBC8] rounded-xl px-4 py-2">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-white border border-gray-300 rounded"></div>
-            <span>時段（現有/可容納人數），下方顯示即將試堂學生</span>
+            <div className="w-4 h-4 bg-[#FFE5D2] border border-[#EADBC8] rounded"></div>
+            <span>有空缺的時段</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-[#FFFAF2] border border-[#EADBC8] rounded"></div>
+            <span>已滿的時段</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>格式：現有/可容納人數</span>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-[#87704e]">
+            <span>※ 現有人數 = 常規學生 + 即將試堂學生</span>
           </div>
         </div>
       </div>

@@ -14,8 +14,16 @@ export default function TeacherSchedulePage() {
 
   useEffect(() => {
     const fetchTeachers = async () => {
-      const { data, error } = await supabase.from('hanami_employee').select('id, teacher_nickname')
-      if (!error && data) setTeachers(data)
+      try {
+        const { data, error } = await supabase.from('hanami_employee').select('id, teacher_nickname')
+        if (error) {
+          console.warn('Warning fetching teachers:', error.message)
+        } else if (data) {
+          setTeachers(data)
+        }
+      } catch (error) {
+        console.warn('Unexpected error fetching teachers:', error)
+      }
     }
     fetchTeachers()
   }, [])

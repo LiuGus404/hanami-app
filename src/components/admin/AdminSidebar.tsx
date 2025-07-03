@@ -66,6 +66,22 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
           </button>
 
           <button
+            onClick={() => router.push('/admin/class-management')}
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+          >
+            <Image src="/icons/book-elephant.PNG" alt="班別管理" width={24} height={24} className="mr-2 w-6 h-6" />
+            班別管理
+          </button>
+
+          <button
+            onClick={() => router.push('/admin/lesson-availability')}
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+          >
+            <Image src="/rabbit.png" alt="課堂空缺" width={24} height={24} className="mr-2 w-6 h-6" />
+            課堂空缺
+          </button>
+
+          <button
             onClick={() => {
               router.back()
               setTimeout(() => window.location.reload(), 500)
