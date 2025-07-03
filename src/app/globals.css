@@ -24,3 +24,195 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Hanami 可愛圓角動畫按鈕 - 優化版 */
+.hanami-btn {
+  @apply rounded-full px-4 py-2 font-bold text-[#4B4036] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] shadow-lg transition-all duration-300 ease-out transform;
+  box-shadow: 0 4px 12px 0 #ebc9a42a, 0 2px 4px 0 #ebc9a415;
+  border: 2px solid #EAC29D;
+}
+
+.hanami-btn:hover {
+  @apply bg-gradient-to-br from-[#EBC9A4] to-[#FDE6B8] scale-105 shadow-xl;
+  box-shadow: 0 8px 25px 0 #ebc9a440, 0 4px 8px 0 #ebc9a425;
+  transform: translateY(-2px) scale(1.05);
+}
+
+.hanami-btn:active {
+  @apply bg-gradient-to-br from-[#FFFDF8] to-[#F5E7D4] scale-95 shadow-md;
+  transform: translateY(0px) scale(0.95);
+}
+
+.hanami-btn:focus {
+  @apply outline-none ring-2 ring-[#FFD59A] ring-offset-2;
+}
+
+.hanami-btn:disabled {
+  @apply opacity-60 cursor-not-allowed bg-gradient-to-br from-[#F5E7D4] to-[#F0E0C8] transform-none;
+  box-shadow: 0 2px 4px 0 #ebc9a415;
+}
+
+/* 可愛動畫按鈕變體 */
+.hanami-btn-cute {
+  @apply rounded-full px-4 py-2 font-bold text-[#4B4036] bg-gradient-to-br from-[#FFB6C1] to-[#FFC0CB] shadow-lg transition-all duration-300 ease-out transform;
+  box-shadow: 0 4px 12px 0 #ffb6c12a, 0 2px 4px 0 #ffb6c115;
+  border: 2px solid #FFB6C1;
+}
+
+.hanami-btn-cute:hover {
+  @apply bg-gradient-to-br from-[#FFC0CB] to-[#FFB6C1] scale-105 shadow-xl;
+  box-shadow: 0 8px 25px 0 #ffb6c140, 0 4px 8px 0 #ffb6c125;
+  transform: translateY(-2px) scale(1.05) rotate(1deg);
+}
+
+.hanami-btn-cute:active {
+  @apply bg-gradient-to-br from-[#FFF0F5] to-[#FFE4E1] scale-95 shadow-md;
+  transform: translateY(0px) scale(0.95) rotate(-1deg);
+}
+
+/* 柔軟動畫按鈕 */
+.hanami-btn-soft {
+  @apply rounded-full px-4 py-2 font-bold text-[#2B3A3B] bg-gradient-to-br from-[#F5E7D4] to-[#F0E0C8] shadow-lg transition-all duration-300 ease-out transform;
+  box-shadow: 0 4px 12px 0 #f5e7d42a, 0 2px 4px 0 #f5e7d415;
+  border: 2px solid #EADBC8;
+}
+
+.hanami-btn-soft:hover {
+  @apply bg-gradient-to-br from-[#F0E0C8] to-[#F5E7D4] scale-105 shadow-xl;
+  box-shadow: 0 8px 25px 0 #f5e7d440, 0 4px 8px 0 #f5e7d425;
+  transform: translateY(-2px) scale(1.05);
+}
+
+.hanami-btn-soft:active {
+  @apply bg-gradient-to-br from-[#FFFDF8] to-[#F5E7D4] scale-95 shadow-md;
+  transform: translateY(0px) scale(0.95);
+}
+
+/* 成功動畫按鈕 */
+.hanami-btn-success {
+  @apply rounded-full px-4 py-2 font-bold text-[#2B3A3B] bg-gradient-to-br from-[#E0F2E0] to-[#D4F2D4] shadow-lg transition-all duration-300 ease-out transform;
+  box-shadow: 0 4px 12px 0 #e0f2e02a, 0 2px 4px 0 #e0f2e015;
+  border: 2px solid #C8EAC8;
+}
+
+.hanami-btn-success:hover {
+  @apply bg-gradient-to-br from-[#D4F2D4] to-[#C8EAC8] scale-105 shadow-xl;
+  box-shadow: 0 8px 25px 0 #e0f2e040, 0 4px 8px 0 #e0f2e025;
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* 危險動畫按鈕 */
+.hanami-btn-danger {
+  @apply rounded-full px-4 py-2 font-bold text-[#A64B2A] bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] shadow-lg transition-all duration-300 ease-out transform;
+  box-shadow: 0 4px 12px 0 #ffe0e02a, 0 2px 4px 0 #ffe0e015;
+  border: 2px solid #EAC29D;
+}
+
+.hanami-btn-danger:hover {
+  @apply bg-gradient-to-br from-[#FFD4D4] to-[#FFC8C8] scale-105 shadow-xl;
+  box-shadow: 0 8px 25px 0 #ffe0e040, 0 4px 8px 0 #ffe0e025;
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* 自定義動畫 */
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0) scale(1.05);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.05);
+  }
+}
+
+@keyframes press {
+  0% {
+    transform: scale(1.05);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(2deg);
+  }
+  75% {
+    transform: rotate(-2deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 4px 12px 0 #ebc9a42a, 0 2px 4px 0 #ebc9a415;
+  }
+  50% {
+    box-shadow: 0 8px 25px 0 #ebc9a440, 0 4px 8px 0 #ebc9a425;
+  }
+}
+
+/* 動畫類別 */
+.animate-bounce-subtle {
+  animation: bounce-subtle 0.6s ease-in-out;
+}
+
+.animate-press {
+  animation: press 0.2s ease-in-out;
+}
+
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* 響應式按鈕尺寸 */
+@media (max-width: 640px) {
+  .hanami-btn,
+  .hanami-btn-cute,
+  .hanami-btn-soft,
+  .hanami-btn-success,
+  .hanami-btn-danger {
+    @apply px-3 py-1.5 text-sm;
+  }
+}
+
+/* 按鈕群組樣式 */
+.hanami-btn-group {
+  @apply flex gap-2 flex-wrap;
+}
+
+.hanami-btn-group .hanami-btn,
+.hanami-btn-group .hanami-btn-cute,
+.hanami-btn-group .hanami-btn-soft,
+.hanami-btn-group .hanami-btn-success,
+.hanami-btn-group .hanami-btn-danger {
+  @apply flex-1 min-w-0;
+}
+
+/* 浮動按鈕 */
+.hanami-btn-floating {
+  @apply fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] shadow-xl transition-all duration-300 ease-out transform;
+  box-shadow: 0 8px 25px 0 #ebc9a440, 0 4px 8px 0 #ebc9a425;
+  border: 2px solid #EAC29D;
+  z-index: 1000;
+}
+
+.hanami-btn-floating:hover {
+  @apply bg-gradient-to-br from-[#EBC9A4] to-[#FDE6B8] scale-110 shadow-2xl;
+  box-shadow: 0 12px 35px 0 #ebc9a450, 0 6px 12px 0 #ebc9a430;
+  transform: translateY(-4px) scale(1.1);
+}
+
+.hanami-btn-floating:active {
+  @apply bg-gradient-to-br from-[#FFFDF8] to-[#F5E7D4] scale-95 shadow-lg;
+  transform: translateY(0px) scale(0.95);
+}

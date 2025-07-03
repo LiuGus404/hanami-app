@@ -217,7 +217,7 @@ export default function AIControlPanel({
                       </button>
                     </>
                   )}
-                  <button onClick={() => setShowPopup(true)} className="px-3 py-1 rounded-full bg-[#FFF8E6] border border-[#DDD2BA] text-[#2B3A3B] text-sm font-semibold">篩選：{statusFilter.join(', ')}</button>
+                  <button onClick={() => setShowPopup(true)} className="hanami-btn-soft px-3 py-1 text-[#2B3A3B] text-sm font-semibold">篩選：{statusFilter.join(', ')}</button>
                 </div>
               </div>
               <div className="space-y-4">

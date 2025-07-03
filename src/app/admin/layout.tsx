@@ -1,13 +1,30 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Database } from '@/lib/database.types'
-import { getUserRole } from '@/utils/getUserRole'
+import { getUserSession, clearUserSession } from '@/lib/authUtils'
 import { Spinner } from '@/components/ui/spinner'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import Breadcrumb from '@/components/ui/Breadcrumb'
 import '../globals.css'
+
+// 動態設定頁面標題
+const setPageTitle = (pathname: string) => {
+  const titleMap: Record<string, string> = {
+    '/admin': '管理面板 - Hanami 教育管理系統',
+    '/admin/students': '學生管理 - Hanami 教育管理系統',
+    '/admin/teachers': '老師管理 - Hanami 教育管理系統',
+    '/admin/permissions': '權限管理 - Hanami 教育管理系統',
+    '/admin/hanami-tc': '課堂管理 - Hanami 教育管理系統',
+    '/admin/ai-select': 'AI 助理 - Hanami 教育管理系統',
+    '/admin/lesson-availability': '課堂空缺 - Hanami 教育管理系統',
+  }
+  
+  const title = titleMap[pathname] || '管理面板 - Hanami 教育管理系統'
+  if (typeof document !== 'undefined') {
+    document.title = title
+  }
+}
 
 export default function AdminLayout({
   children,
@@ -16,127 +33,99 @@ export default function AdminLayout({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const mounted = useRef(false)
-  const supabase = createClientComponentClient<Database>()
+  const sessionChecked = useRef(false)
   const isLoginPage = pathname === '/admin/login'
-  const authChecked = useRef(false)
-  const redirecting = useRef(false)
-
-  const redirectToLogin = useCallback(() => {
-    if (!isLoginPage && !redirecting.current) {
-      redirecting.current = true
-      router.replace('/admin/login')
-    }
-  }, [isLoginPage, router])
-
-  const checkAuth = useCallback(async () => {
-    if (!mounted.current || authChecked.current) return
-
-    try {
-      authChecked.current = true
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      
-      if (userError || !user) {
-        console.error('User error:', userError)
-        if (!isLoginPage) {
-          redirectToLogin()
-        }
-        return
-      }
-
-      // 直接從 user metadata 獲取角色
-      const role = user.user_metadata?.role || null
-      if (!mounted.current) return
-      
-      setUserRole(role)
-      console.log('Current role:', role)
-
-      if (role !== 'admin') {
-        if (!isLoginPage) {
-          redirectToLogin()
-        }
-      } else if (isLoginPage) {
-        router.replace('/admin/dashboard')
-      }
-    } catch (error) {
-      console.error('Auth check error:', error)
-      if (!isLoginPage) {
-        redirectToLogin()
-      }
-    } finally {
-      if (mounted.current) {
-        setIsLoading(false)
-      }
-    }
-  }, [supabase, redirectToLogin, isLoginPage, router])
 
   useEffect(() => {
     mounted.current = true
-    
-    const initAuth = async () => {
+
+    // 設定頁面標題
+    setPageTitle(pathname)
+
+    const checkAuth = async () => {
+      // 防止重複檢查
+      if (sessionChecked.current) return;
+      sessionChecked.current = true;
+
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError) throw sessionError
+        // 檢查用戶會話
+        const userSession = getUserSession()
         
-        if (!session) {
-          if (!isLoginPage) {
-            redirectToLogin()
+        if (!userSession || userSession.role !== 'admin') {
+          // 清除無效會話
+          if (userSession) {
+            clearUserSession()
           }
-          setIsLoading(false)
-          return
+          
+          if (!isLoginPage && mounted.current) {
+            router.replace('/admin/login')
+          }
+        } else if (isLoginPage && mounted.current) {
+          // 如果已登入且當前在登入頁面，重定向到管理面板
+          router.replace('/admin')
         }
-        
-        await checkAuth()
       } catch (error) {
-        console.error('Init auth error:', error)
-        if (!isLoginPage) {
-          redirectToLogin()
+        console.error('Auth check error:', error)
+        clearUserSession()
+        if (!isLoginPage && mounted.current) {
+          router.replace('/admin/login')
         }
-        setIsLoading(false)
+      } finally {
+        if (mounted.current) {
+          setIsLoading(false)
+        }
       }
     }
 
-    initAuth()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event)
-      if (event === 'SIGNED_OUT') {
-        setUserRole(null)
-        if (!isLoginPage) {
-          redirectToLogin()
-        }
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        authChecked.current = false
-        await checkAuth()
-      }
-    })
+    checkAuth()
 
     return () => {
       mounted.current = false
-      subscription.unsubscribe()
     }
-  }, [supabase, checkAuth, redirectToLogin, isLoginPage])
+  }, []) // 移除 router 和 isLoginPage 依賴
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Spinner className="h-8 w-8" />
+      <div className="flex h-screen items-center justify-center bg-[#FFF9F2]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto"></div>
+          <p className="mt-4 text-[#2B3A3B]">載入中...</p>
+        </div>
       </div>
     )
   }
 
-  // 如果是登入頁面，或者已經確認有權限，就顯示內容
-  if (isLoginPage || userRole === 'admin') {
+  // 如果是登入頁面，直接顯示內容
+  if (isLoginPage) {
     return (
-        <div className="min-h-screen bg-gray-50">
-          {children}
-          {!isLoginPage && <AdminSidebar isLoggedIn={!!userRole} />}
-        </div>
+      <div className="min-h-screen bg-[#FFF9F2]">
+        {children}
+      </div>
     )
   }
 
-  // 其他情況返回 null
-  return null
+  // 檢查是否有有效的管理員會話
+  const userSession = getUserSession()
+  if (!userSession || userSession.role !== 'admin') {
+    return null
+  }
+
+  // 顯示管理員頁面內容
+  return (
+    <div className="min-h-screen bg-[#FFF9F2]">
+      {/* 麵包屑導航 */}
+      <div className="pt-4">
+        <Breadcrumb />
+      </div>
+      
+      {/* 主要內容 */}
+      <main className="pb-20">
+        {children}
+      </main>
+      
+      <AdminSidebar isLoggedIn={true} />
+    </div>
+  )
 }

@@ -118,10 +118,10 @@ const NewStudentForm: React.FC = () => {
       <input name="upcoming_less" placeholder="即將到來堂數" value={form.upcoming_less} onChange={handleChange} className="input" />
 
       <div className="flex justify-between">
-        <button type="button" className="px-4 py-2 bg-white border border-[#EADBC8] rounded-full text-[#4B4036] hover:bg-[#f7f3ec]" onClick={() => window.history.back()}>
+        <button type="button" className="hanami-btn-soft px-4 py-2 text-[#4B4036]" onClick={() => window.history.back()}>
           取消
         </button>
-        <button type="submit" className="px-4 py-2 bg-[#EBC9A4] text-[#2B3A3B] rounded-full hover:bg-[#e5ba8e]">
+        <button type="submit" className="hanami-btn px-4 py-2 text-[#2B3A3B]">
           儲存
         </button>
       </div>

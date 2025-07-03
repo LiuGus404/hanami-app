@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { PopupSelect } from '@/components/ui/PopupSelect'
 import { Teacher } from '@/types'
+import BackButton from '@/components/ui/BackButton'
 
 function translateRole(role: string): string {
   switch (role) {

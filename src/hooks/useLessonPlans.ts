@@ -166,41 +166,10 @@ export const useTeachers = () => {
     fetch();
   }, []);
 
-  useEffect(() => {
-    const subscription = supabase
-      .channel('hanami_admin_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'hanami_admin'
-        },
-        async (payload) => {
-          // 處理資料變更
-          if (payload.eventType === 'UPDATE') {
-            // 更新本地狀態
-            const { data, error } = await supabase
-              .from('hanami_admin')
-              .select('*')
-              .eq('id', payload.new.id)
-              .single()
-            
-            if (!error && data) {
-              // 更新相關狀態
-              // 例如：更新用戶資訊、重新驗證等
-            }
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  return { teachers, loading };
+  return {
+    teachers,
+    loading,
+  };
 };
 
 const handleLogin = async (email: string, password: string) => {

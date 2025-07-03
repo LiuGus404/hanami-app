@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import LessonPlanModal from '@/components/ui/LessonPlanModal';
@@ -110,6 +110,12 @@ const HanamiTC = () => {
   const [view, setView] = useState<'week' | 'day'>('week');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 添加防抖機制
+  const lessonsFetchedRef = useRef(false);
+  const currentViewRef = useRef<string>('');
+  const currentDateRef = useRef<string>('');
+  const loadingRef = useRef(false);
+
   const getDateString = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -199,21 +205,33 @@ const HanamiTC = () => {
     // 轉換為 Student 類型
     const processedStudents: Student[] = (studentsData || []).map(student => ({
       id: student.id,
-      student_oid: '',
-      full_name: student.full_name || '',
-      nick_name: '',
-      gender: '',
-      contact_number: '',
-      parent_name: '',
-      parent_phone: '',
-      parent_email: '',
-      address: '',
+      full_name: student.full_name || '未命名學生',
       student_age: student.student_age,
+      student_type: '常規',
+      course_type: null,
+      regular_weekday: null,
+      regular_timeslot: null,
+      remaining_lessons: null,
+      contact_number: null,
+      health_notes: null,
+      student_oid: null,
+      nick_name: null,
+      gender: null,
       student_dob: null,
-      health_notes: '',
-      student_remarks: '',
+      parent_email: null,
+      student_remarks: null,
       created_at: null,
-      updated_at: null
+      updated_at: null,
+      address: null,
+      duration_months: null,
+      school: null,
+      started_date: null,
+      student_email: null,
+      student_password: null,
+      student_preference: null,
+      student_teacher: null,
+      lesson_date: null,
+      actual_timeslot: null,
     }));
 
     setStudents(processedStudents);
@@ -278,15 +296,63 @@ const HanamiTC = () => {
     setPlans(data || []);
   };
 
+  // 主要資料載入邏輯
   useEffect(() => {
-    const weekStart = getHongKongDate(currentDate);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const weekEnd = getHongKongDate(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    fetchLessons(weekStart, weekEnd);
-    fetchPlans(weekStart, weekEnd);
-    fetchTeachers();
-  }, [currentDate]);
+    // 如果 view 和 currentDate 沒有變化且已經載入過，不重複載入
+    const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
+    if (currentViewRef.current === viewKey && lessonsFetchedRef.current) return;
+    
+    // 防止重複載入
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    
+    // 更新當前 view 和 date
+    currentViewRef.current = viewKey;
+    currentDateRef.current = currentDate.toISOString().split('T')[0];
+
+    const loadData = async () => {
+      try {
+        if (view === 'week') {
+          const startOfWeek = new Date(currentDate);
+          startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+          await Promise.all([
+            fetchLessons(startOfWeek, endOfWeek),
+            fetchPlans(startOfWeek, endOfWeek),
+            fetchTeachers()
+          ]);
+        } else if (view === 'day') {
+          const startOfDay = new Date(currentDate);
+          const endOfDay = new Date(currentDate);
+
+          await Promise.all([
+            fetchLessons(startOfDay, endOfDay),
+            fetchPlans(startOfDay, endOfDay),
+            fetchTeachers()
+          ]);
+        }
+
+        lessonsFetchedRef.current = true;
+        loadingRef.current = false;
+      } catch (error) {
+        console.error('Error loading data:', error);
+        loadingRef.current = false;
+      }
+    };
+
+    loadData();
+  }, [view, currentDate]);
+
+  // 當 view 或 currentDate 變化時重置防抖狀態
+  useEffect(() => {
+    const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
+    if (currentViewRef.current !== viewKey) {
+      lessonsFetchedRef.current = false;
+      loadingRef.current = false;
+    }
+  }, [view, currentDate]);
 
   const handlePrev = (): void => {
     const newDate = new Date(currentDate);
@@ -424,7 +490,7 @@ const HanamiTC = () => {
       <div className="bg-[#FFFDF8] rounded-xl shadow p-4 w-full max-w-5xl">
       <div className="flex justify-between items-center mb-4">
           <div className="flex gap-2 items-center">
-            <button onClick={handlePrev} className="px-2 py-1 bg-[#EBC9A4] rounded-full text-[#4B4036]">◀</button>
+            <button onClick={handlePrev} className="hanami-btn-cute px-2 py-1 text-[#4B4036]">◀</button>
           {view === 'day' ? (
             <input
               type="date"
@@ -433,13 +499,13 @@ const HanamiTC = () => {
                 const [year, month, day] = e.target.value.split('-').map(Number);
                   setCurrentDate(new Date(year, month - 1, day));
               }}
-              className="border px-2 py-1 rounded"
+              className="border-2 border-[#EAC29D] px-3 py-2 rounded-full bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200"
               style={{ width: '120px' }}
             />
           ) : (
               <span className="font-semibold text-[#4B4036]">{formatDate(currentDate)}</span>
           )}
-            <button onClick={handleNext} className="px-2 py-1 bg-[#EBC9A4] rounded-full text-[#4B4036]">▶</button>
+            <button onClick={handleNext} className="hanami-btn-cute px-2 py-1 text-[#4B4036]">▶</button>
             {view === 'day' && (
               <span className="ml-2 text-[#4B4036] text-sm font-semibold">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][currentDate.getDay()]}
@@ -447,17 +513,17 @@ const HanamiTC = () => {
             )}
         </div>
         <div className="flex items-center gap-2">
-            <button className={`px-3 py-1 rounded-full border ${view === 'day' ? 'bg-[#EBC9A4]' : 'bg-white border-[#EADBC8]'} text-[#4B4036]`} onClick={() => setView('day')}>日</button>
-            <button className={`px-3 py-1 rounded-full border ${view === 'week' ? 'bg-[#EBC9A4]' : 'bg-white border-[#EADBC8]'} text-[#4B4036]`} onClick={() => setView('week')}>週</button>
-            <button className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EADBC8] text-[#4B4036]" onClick={() => setAllShowTeachers((prev) => !prev)}>
+            <button className={`px-3 py-1 ${view === 'day' ? 'hanami-btn' : 'hanami-btn-soft'} text-[#4B4036]`} onClick={() => setView('day')}>日</button>
+            <button className={`px-3 py-1 ${view === 'week' ? 'hanami-btn' : 'hanami-btn-soft'} text-[#4B4036]`} onClick={() => setView('week')}>週</button>
+            <button className="flex items-center gap-1 px-2 py-1 hanami-btn-soft text-[#4B4036]" onClick={() => setAllShowTeachers((prev) => !prev)}>
             <img src="/teacher.png" alt="老師" className="w-4 h-4" />
             <span className="text-xs">{allShowTeachers ? '收起老師' : '展示老師'}</span>
           </button>
-            <button className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EADBC8] text-[#4B4036]" onClick={() => setAllShowStudents((prev) => !prev)}>
+            <button className="flex items-center gap-1 px-2 py-1 hanami-btn-soft text-[#4B4036]" onClick={() => setAllShowStudents((prev) => !prev)}>
             <img src="/icons/penguin-face.png" alt="學生" className="w-4 h-4" />
             <span className="text-xs">{allShowStudents ? '收起學生' : '展示學生'}</span>
           </button>
-            <button className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EADBC8] text-[#4B4036]" onClick={() => setAllShowPlan((prev) => !prev)}>
+            <button className="flex items-center gap-1 px-2 py-1 hanami-btn-soft text-[#4B4036]" onClick={() => setAllShowPlan((prev) => !prev)}>
             <img src="/details.png" alt="課堂活動" className="w-4 h-4" />
             <span className="text-xs">{allShowPlan ? '收起活動' : '展示活動'}</span>
           </button>

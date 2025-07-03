@@ -4,14 +4,12 @@ import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { ChevronUp, X } from 'lucide-react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Database } from '@/lib/database.types'
+import { clearUserSession } from '@/lib/authUtils'
 
 export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClientComponentClient<Database>()
 
   if (pathname === '/admin/login') return null
   return (
@@ -36,11 +34,19 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
           )}
 
           <button
-            onClick={() => router.push('/admin/dashboard')}
+            onClick={() => router.push('/admin')}
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
           >
             <Image src="/girl.png" alt="中心總覽" width={24} height={24} className="mr-2 w-6 h-6" />
             中心總覽
+          </button>
+
+          <button
+            onClick={() => router.push('/admin/permissions')}
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+          >
+            <span className="mr-2 text-lg">👥</span>
+            帳戶管理
           </button>
 
           <button
@@ -73,7 +79,7 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
           {isLoggedIn && (
             <button
               onClick={async () => {
-                await supabase.auth.signOut()
+                clearUserSession()
                 router.push('/admin/login')
               }}
               className="flex items-center px-5 py-3 rounded-xl bg-[#FFE0E0] text-[#2B3A3B] text-sm font-semibold shadow"

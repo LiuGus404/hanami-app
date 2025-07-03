@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { PopupSelect } from '@/components/ui/PopupSelect';
-import { TrialLesson } from '@/types'
+import { TrialLesson } from '@/types';
+import { Spinner } from '@/components/ui/spinner';
 
 // 固定香港時區的 Date 產生器
 const getHongKongDate = (date = new Date()) => {
@@ -107,6 +108,14 @@ const HanamiCalendar = () => {
   const [selectedDetail, setSelectedDetail] = useState<SelectedDetail | null>(null);
   const [statusPopupOpen, setStatusPopupOpen] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // 添加 loading 狀態
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 添加防抖機制
+  const lessonsFetchedRef = useRef(false);
+  const currentViewRef = useRef<string>('');
+  const currentDateRef = useRef<string>('');
+  const loadingRef = useRef(false);
 
   // 抓取節日資料
   useEffect(() => {
@@ -147,281 +156,279 @@ const HanamiCalendar = () => {
   };
 
   useEffect(() => {
+    // 如果 view 和 currentDate 沒有變化且已經載入過，不重複載入
+    const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
+    if (currentViewRef.current === viewKey && lessonsFetchedRef.current) return
+    
+    // 防止重複載入
+    if (loadingRef.current) return
+    
+    // 設置 loading 狀態
+    loadingRef.current = true;
+    setIsLoading(true);
+    
+    // 更新當前 view 和 date
+    currentViewRef.current = viewKey;
+    currentDateRef.current = currentDate.toISOString().split('T')[0];
+    
     if (view === 'day') {
       // 查詢當天課堂
       const fetchDay = async () => {
-        const dateStr = getDateString(currentDate);
-        console.log('查詢日期:', dateStr);
-        
-        // 獲取常規學生的課堂，明確指定關聯關係
-        const { data: regularLessonsData, error: regularLessonsError } = await supabase
-          .from('hanami_student_lesson')
-          .select(`
-            *,
-            Hanami_Students!hanami_student_lesson_student_id_fkey (
-              full_name,
-              student_age,
-              remaining_lessons
-            )
-          `)
-          .eq('lesson_date', dateStr);
+        try {
+          const dateStr = getDateString(currentDate);
+          console.log('查詢日期:', dateStr);
+          
+          // 獲取常規學生的課堂，明確指定關聯關係
+          const { data: regularLessonsData, error: regularLessonsError } = await supabase
+            .from('hanami_student_lesson')
+            .select(`
+              *,
+              Hanami_Students!hanami_student_lesson_student_id_fkey (
+                full_name,
+                student_age,
+                remaining_lessons
+              )
+            `)
+            .eq('lesson_date', dateStr);
 
-        console.log('常規學生課堂:', regularLessonsData);
+          console.log('常規學生課堂:', regularLessonsData);
 
-        // 獲取試堂學生的課堂
-        const { data: trialLessonsData, error: trialLessonsError } = await supabase
-          .from('hanami_trial_students')
-          .select('*')
-          .eq('lesson_date', dateStr);
+          // 獲取試堂學生的課堂
+          const { data: trialLessonsData, error: trialLessonsError } = await supabase
+            .from('hanami_trial_students')
+            .select('*')
+            .eq('lesson_date', dateStr);
 
-        console.log('試堂學生課堂:', trialLessonsData);
+          console.log('試堂學生課堂:', trialLessonsData);
 
-        if (regularLessonsError) {
-          console.error('Fetch regular lessons error:', regularLessonsError);
-          return;
-        }
+          if (regularLessonsError) {
+            console.error('Fetch regular lessons error:', regularLessonsError);
+            return;
+          }
 
-        if (trialLessonsError) {
-          console.error('Fetch trial lessons error:', trialLessonsError);
-          return;
-        }
+          if (trialLessonsError) {
+            console.error('Fetch trial lessons error:', trialLessonsError);
+            return;
+          }
 
-        // 處理常規學生數據
-        const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
+          // 處理常規學生數據
+          const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
             id: lesson.id,
-          student_id: lesson.student_id ?? '',
-            lesson_date: lesson.lesson_date,
-            regular_timeslot: lesson.regular_timeslot,
-          course_type: lesson.course_type || '',
+            student_id: lesson.student_id || '',
+            lesson_date: lesson.lesson_date || '',
+            regular_timeslot: lesson.regular_timeslot || '',
+            course_type: lesson.course_type || '',
             full_name: lesson.Hanami_Students?.full_name || '未命名學生',
             student_age: lesson.Hanami_Students?.student_age || null,
             lesson_status: lesson.lesson_status,
             remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
-            is_trial: false
-        }));
+            is_trial: false,
+            lesson_duration: lesson.lesson_duration || null,
+          }));
 
-        // 處理試堂學生數據
-        const processedTrialLessons = (trialLessonsData || []).map((trial: any) => {
-          // 計算年齡
-          let ageDisplay = '';
-          let studentAge = 0;
-          if (trial.student_age !== null && trial.student_age !== undefined) {
-            studentAge = typeof trial.student_age === 'string' ? parseInt(trial.student_age) : trial.student_age;
-            const years = Math.floor(studentAge / 12);
-            const remainingMonths = studentAge % 12;
-            ageDisplay = `${years}Y${remainingMonths}M`;
-          }
-          return {
+          // 處理試堂學生數據
+          const processedTrialLessons = (trialLessonsData || []).map((trial) => ({
             id: trial.id,
             student_id: trial.id,
-            lesson_date: trial.lesson_date,
-            regular_timeslot: trial.actual_timeslot,
+            lesson_date: trial.lesson_date || '',
+            regular_timeslot: trial.actual_timeslot || '',
             course_type: trial.course_type || '',
             full_name: trial.full_name || '未命名學生',
-            student_age: studentAge,
-            age_display: ageDisplay,
+            student_age: trial.student_age,
             lesson_status: null,
             remaining_lessons: null,
             is_trial: true,
-            health_note: trial.health_note ?? null
-          } as Lesson;
-        });
+            lesson_duration: trial.lesson_duration || null,
+          }));
 
-        // 合併常規和試堂學生的課堂
-        let allLessons: Lesson[] = [...processedRegularLessons, ...processedTrialLessons];
-
-        // 分組處理
-        const grouped = allLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
-          const key = `${l.regular_timeslot}_${l.course_type}`;
-          if (!acc[key]) {
-            acc[key] = {
-              time: l.regular_timeslot,
-              course: l.course_type,
-              lessons: []
-            };
-          }
-          acc[key].lessons.push(l);
-          return acc;
-        }, {});
-
-        const groupedArray: GroupedLesson[] = Object.values(grouped) as GroupedLesson[];
-        groupedArray.sort((a, b) => a.time.localeCompare(b.time));
+          // 合併常規和試堂學生的課堂
+          const allLessons = [...processedRegularLessons, ...processedTrialLessons];
+          console.log('All processed lessons:', allLessons);
+          setLessons(allLessons);
+          lessonsFetchedRef.current = true;
+        } catch (error) {
+          console.error('Error fetching day lessons:', error);
+        } finally {
+          loadingRef.current = false;
+          setIsLoading(false);
+        }
       };
+
       fetchDay();
     } else if (view === 'week') {
       // 查詢當週課堂
       const fetchWeek = async () => {
-        const weekStart = getHongKongDate(currentDate);
-        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-        const weekEnd = getHongKongDate(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
+        try {
+          const startOfWeek = new Date(currentDate);
+          startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
 
-        const weekStartStr = getDateString(weekStart);
-        const weekEndStr = getDateString(weekEnd);
+          const startDateStr = getDateString(startOfWeek);
+          const endDateStr = getDateString(endOfWeek);
 
-        // 獲取常規學生的課堂，明確指定關聯關係
-        const { data: regularLessonsData, error: regularLessonsError } = await supabase
-          .from('hanami_student_lesson')
-          .select(`
-            *,
-            Hanami_Students!hanami_student_lesson_student_id_fkey (
-              full_name,
-              student_age,
-              remaining_lessons
-            )
-          `)
-          .gte('lesson_date', weekStartStr)
-          .lte('lesson_date', weekEndStr);
+          console.log('查詢週期:', { startDateStr, endDateStr });
 
-        // 獲取試堂學生的課堂
-        const { data: trialLessonsData, error: trialLessonsError } = await supabase
-          .from('hanami_trial_students')
-          .select('*')
-          .gte('lesson_date', weekStartStr)
-          .lte('lesson_date', weekEndStr);
+          // 獲取常規學生的課堂
+          const { data: regularLessonsData, error: regularLessonsError } = await supabase
+            .from('hanami_student_lesson')
+            .select(`
+              *,
+              Hanami_Students!hanami_student_lesson_student_id_fkey (
+                full_name,
+                student_age,
+                remaining_lessons
+              )
+            `)
+            .gte('lesson_date', startDateStr)
+            .lte('lesson_date', endDateStr);
 
-        if (regularLessonsError) {
-          console.error('Fetch regular lessons error:', regularLessonsError);
-          return;
+          // 獲取試堂學生的課堂
+          const { data: trialLessonsData, error: trialLessonsError } = await supabase
+            .from('hanami_trial_students')
+            .select('*')
+            .gte('lesson_date', startDateStr)
+            .lte('lesson_date', endDateStr);
+
+          if (regularLessonsError || trialLessonsError) {
+            console.error('Fetch error:', regularLessonsError || trialLessonsError);
+            return;
+          }
+
+          // 處理常規學生數據
+          const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
+            id: lesson.id,
+            student_id: lesson.student_id || '',
+            lesson_date: lesson.lesson_date || '',
+            regular_timeslot: lesson.regular_timeslot || '',
+            course_type: lesson.course_type || '',
+            full_name: lesson.Hanami_Students?.full_name || '未命名學生',
+            student_age: lesson.Hanami_Students?.student_age || null,
+            lesson_status: lesson.lesson_status,
+            remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+            is_trial: false,
+            lesson_duration: lesson.lesson_duration || null,
+          }));
+
+          // 處理試堂學生數據
+          const processedTrialLessons = (trialLessonsData || []).map((trial) => ({
+            id: trial.id,
+            student_id: trial.id,
+            lesson_date: trial.lesson_date || '',
+            regular_timeslot: trial.actual_timeslot || '',
+            course_type: trial.course_type || '',
+            full_name: trial.full_name || '未命名學生',
+            student_age: trial.student_age,
+            lesson_status: null,
+            remaining_lessons: null,
+            is_trial: true,
+            lesson_duration: trial.lesson_duration || null,
+          }));
+
+          // 合併常規和試堂學生的課堂
+          const allLessons = [...processedRegularLessons, ...processedTrialLessons];
+          setLessons(allLessons);
+          lessonsFetchedRef.current = true;
+        } catch (error) {
+          console.error('Error fetching week lessons:', error);
+        } finally {
+          loadingRef.current = false;
+          setIsLoading(false);
         }
-
-        if (trialLessonsError) {
-          console.error('Fetch trial lessons error:', trialLessonsError);
-          return;
-        }
-
-        // 處理常規學生數據
-        const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
-          id: lesson.id,
-          student_id: lesson.student_id ?? '',
-          lesson_date: lesson.lesson_date,
-          regular_timeslot: lesson.regular_timeslot,
-          course_type: lesson.course_type || '',
-          full_name: lesson.Hanami_Students?.full_name || '未命名學生',
-          student_age: lesson.Hanami_Students?.student_age || null,
-          lesson_status: lesson.lesson_status,
-          remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
-          is_trial: false
-        }));
-
-        // 處理試堂學生數據
-        const processedTrialLessons = (trialLessonsData || []).map((trial: any) => ({
-          id: trial.id,
-          student_id: trial.id,
-          lesson_date: trial.lesson_date,
-          regular_timeslot: trial.actual_timeslot,
-          course_type: trial.course_type,
-          full_name: trial.full_name || '未命名學生',
-          student_age: trial.student_age,
-          lesson_status: null,
-          is_trial: true
-        }));
-
-        // 合併常規和試堂學生的課堂
-        let allLessons = [...processedRegularLessons, ...processedTrialLessons];
-        setLessons(allLessons);
-
-        // 獲取所有學生資料
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('Hanami_Students')
-          .select('id, full_name, student_age');
-
-        if (studentsError) {
-          console.error('Fetch students error:', studentsError);
-          setStudents([]);
-          return;
-        }
-
-        setStudents(studentsData || []);
       };
+
       fetchWeek();
     } else if (view === 'month') {
       // 查詢當月課堂
       const fetchMonth = async () => {
-        const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-        const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        const monthStartStr = getDateString(monthStart);
-        const monthEndStr = getDateString(monthEnd);
+        try {
+          const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+          const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
-        // 獲取常規學生的課堂，明確指定關聯關係
-        const { data: regularLessonsData, error: regularLessonsError } = await supabase
-          .from('hanami_student_lesson')
-          .select(`
-            *,
-            Hanami_Students!hanami_student_lesson_student_id_fkey (
-              full_name,
-              student_age,
-              remaining_lessons
-            )
-          `)
-          .gte('lesson_date', monthStartStr)
-          .lte('lesson_date', monthEndStr);
+          const startDateStr = getDateString(startOfMonth);
+          const endDateStr = getDateString(endOfMonth);
 
-        // 獲取試堂學生的課堂
-        const { data: trialLessonsData, error: trialLessonsError } = await supabase
-          .from('hanami_trial_students')
-          .select('*')
-          .gte('lesson_date', monthStartStr)
-          .lte('lesson_date', monthEndStr);
+          console.log('查詢月份:', { startDateStr, endDateStr });
 
-        if (regularLessonsError) {
-          console.error('Fetch regular lessons error:', regularLessonsError);
-          return;
+          // 獲取常規學生的課堂
+          const { data: regularLessonsData, error: regularLessonsError } = await supabase
+            .from('hanami_student_lesson')
+            .select(`
+              *,
+              Hanami_Students!hanami_student_lesson_student_id_fkey (
+                full_name,
+                student_age,
+                remaining_lessons
+              )
+            `)
+            .gte('lesson_date', startDateStr)
+            .lte('lesson_date', endDateStr);
+
+          // 獲取試堂學生的課堂
+          const { data: trialLessonsData, error: trialLessonsError } = await supabase
+            .from('hanami_trial_students')
+            .select('*')
+            .gte('lesson_date', startDateStr)
+            .lte('lesson_date', endDateStr);
+
+          if (regularLessonsError || trialLessonsError) {
+            console.error('Fetch error:', regularLessonsError || trialLessonsError);
+            return;
+          }
+
+          // 處理常規學生數據
+          const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
+            id: lesson.id,
+            student_id: lesson.student_id || '',
+            lesson_date: lesson.lesson_date || '',
+            regular_timeslot: lesson.regular_timeslot || '',
+            course_type: lesson.course_type || '',
+            full_name: lesson.Hanami_Students?.full_name || '未命名學生',
+            student_age: lesson.Hanami_Students?.student_age || null,
+            lesson_status: lesson.lesson_status,
+            remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+            is_trial: false,
+            lesson_duration: lesson.lesson_duration || null,
+          }));
+
+          // 處理試堂學生數據
+          const processedTrialLessons = (trialLessonsData || []).map((trial) => ({
+            id: trial.id,
+            student_id: trial.id,
+            lesson_date: trial.lesson_date || '',
+            regular_timeslot: trial.actual_timeslot || '',
+            course_type: trial.course_type || '',
+            full_name: trial.full_name || '未命名學生',
+            student_age: trial.student_age,
+            lesson_status: null,
+            remaining_lessons: null,
+            is_trial: true,
+            lesson_duration: trial.lesson_duration || null,
+          }));
+
+          // 合併常規和試堂學生的課堂
+          const allLessons = [...processedRegularLessons, ...processedTrialLessons];
+          setLessons(allLessons);
+          lessonsFetchedRef.current = true;
+        } catch (error) {
+          console.error('Error fetching month lessons:', error);
+        } finally {
+          loadingRef.current = false;
+          setIsLoading(false);
         }
-        if (trialLessonsError) {
-          console.error('Fetch trial lessons error:', trialLessonsError);
-          return;
-        }
-
-        // 處理常規學生數據
-        const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
-          id: lesson.id,
-          student_id: lesson.student_id ?? '',
-          lesson_date: lesson.lesson_date,
-          regular_timeslot: lesson.regular_timeslot,
-          course_type: lesson.course_type || '',
-          full_name: lesson.Hanami_Students?.full_name || '未命名學生',
-          student_age: lesson.Hanami_Students?.student_age || null,
-          lesson_status: lesson.lesson_status,
-          remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
-          is_trial: false
-        }));
-
-        // 處理試堂學生數據
-        const processedTrialLessons = (trialLessonsData || []).map((trial: any) => ({
-          id: trial.id,
-          student_id: trial.id,
-          lesson_date: trial.lesson_date,
-          regular_timeslot: trial.actual_timeslot,
-          course_type: trial.course_type,
-          full_name: trial.full_name || '未命名學生',
-          student_age: trial.student_age,
-          lesson_status: null,
-          is_trial: true
-        }));
-
-        // 合併常規和試堂學生的課堂
-        let allLessons = [...processedRegularLessons, ...processedTrialLessons];
-        setLessons(allLessons);
-
-        // 獲取所有學生資料
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('Hanami_Students')
-          .select('id, full_name, student_age');
-
-        if (studentsError) {
-          console.error('Fetch students error:', studentsError);
-          setStudents([]);
-          return;
-        }
-
-        setStudents(studentsData || []);
       };
+
       fetchMonth();
-    } else {
-      // 其他 view 不查詢
-      setLessons([]);
-      setStudents([]);
+    }
+  }, [view, currentDate]);
+
+  // 當 view 或 currentDate 變化時重置防抖狀態
+  useEffect(() => {
+    const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
+    if (currentViewRef.current !== viewKey) {
+      lessonsFetchedRef.current = false;
+      loadingRef.current = false;
+      setIsLoading(false);
     }
   }, [view, currentDate]);
 
@@ -570,6 +577,22 @@ const HanamiCalendar = () => {
 
     const groupedArray: GroupedLesson[] = Object.values(grouped) as GroupedLesson[];
     groupedArray.sort((a, b) => a.time.localeCompare(b.time));
+    
+    // 設置選中的詳細資訊
+    setSelectedDetail({
+      date,
+      groups: groupedArray.map(g => ({
+        time: g.time,
+        course: g.course,
+        names: g.lessons.map(lesson => ({
+          name: lesson.full_name,
+          student_id: lesson.student_id,
+          age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
+          is_trial: lesson.is_trial,
+          remaining_lessons: lesson.remaining_lessons
+        }))
+      }))
+    });
   };
 
   const handleUpdateStatus = async (lessonId: string, status: string) => {
@@ -656,10 +679,6 @@ const HanamiCalendar = () => {
     return date <= today;
   };
 
-  const firstDayOfWeek = getHongKongDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)).getDay();
-
-  const daysInMonth = getHongKongDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)).getDate();
-
   // 修改渲染部分，為試堂學生添加特殊標記
   const renderStudentButton = (nameObj: StudentNameObj, lesson?: Lesson) => {
     const lessonIsTodayOrPast = lesson ? isPastOrToday(lesson.lesson_date) : false;
@@ -674,11 +693,16 @@ const HanamiCalendar = () => {
       }
     }
 
+    // 動畫 class
+    const baseBtnClass = `inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs transition-all duration-200 flex items-center shadow-sm hover:scale-105 hover:shadow-lg active:scale-95 focus:outline-none`;
+    const statusBtnClass = `ml-2 px-2 py-0.5 rounded text-xs transition-all duration-200 shadow-sm hover:scale-105 hover:shadow-lg active:scale-95 focus:outline-none`;
+    const unsetBtnClass = `ml-2 px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-600 border border-gray-300 transition-all duration-200 shadow-sm hover:scale-105 hover:bg-yellow-100 hover:shadow-lg active:scale-95 focus:outline-none`;
+
     return (
       <div className="flex items-center">
         <button
           onClick={() => window.location.href = `/admin/students/${nameObj.student_id}`}
-          className={`inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs hover:bg-[#d0ab7d] transition flex items-center`}
+          className={baseBtnClass}
           style={{ 
             minWidth: '60px',
             backgroundColor: bgColor
@@ -699,12 +723,14 @@ const HanamiCalendar = () => {
         {(lessonIsTodayOrPast && lesson?.lesson_status) ? (
           <button
             onClick={() => setPopupInfo({ lessonId: lesson.id })}
-            className={`ml-2 px-2 py-0.5 rounded text-xs hover:opacity-80 transition ${
-              lesson.lesson_status === '出席' ? 'bg-[#DFFFD6]' :
-              lesson.lesson_status === '缺席' ? 'bg-[#FFC1C1]' :
-              (lesson.lesson_status === '病假' || lesson.lesson_status === '事假') ? 'bg-[#FFE5B4]' :
-              'bg-gray-200'
-            }`}
+            className={
+              statusBtnClass + ' ' + (
+                lesson.lesson_status === '出席' ? 'bg-[#DFFFD6] text-green-800' :
+                lesson.lesson_status === '缺席' ? 'bg-[#FFC1C1] text-red-700' :
+                (lesson.lesson_status === '病假' || lesson.lesson_status === '事假') ? 'bg-[#FFE5B4] text-yellow-700' :
+                'bg-gray-200 text-gray-600'
+              )
+            }
           >
             {lesson.lesson_status}
           </button>
@@ -712,10 +738,10 @@ const HanamiCalendar = () => {
           lessonIsTodayOrPast && !nameObj.is_trial && lesson && (
             <button
               onClick={() => setPopupInfo({ lessonId: lesson.id })}
-              className="ml-2 px-1 py-0.5 rounded bg-green-400 text-white text-xs"
+              className={unsetBtnClass}
               title="設定出席狀態"
             >
-              ⚙️
+              未設定
             </button>
           )
         )}
@@ -754,64 +780,40 @@ const HanamiCalendar = () => {
 
   return (
     <div className="bg-[#FFFDF8] p-4 rounded-xl shadow-md">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex gap-2">
-          <button onClick={handlePrev} className="px-2 py-1 bg-[#EBC9A4] rounded-full">{'◀'}</button>
-          {view === 'day' ? (
-            <input
-              type="date"
-              value={getDateString(currentDate)}
-              onChange={(e) => {
-                const [year, month, day] = e.target.value.split('-').map(Number);
-                const newDate = getHongKongDate(new Date(year, month - 1, day));
-                setCurrentDate(newDate);
-              }}
-              className="border px-2 py-1 rounded"
-              style={{ width: '120px' }}
-            />
-          ) : (
-            <span className="font-semibold">{formatDate(currentDate)}</span>
-          )}
-          <button onClick={handleNext} className="px-2 py-1 bg-[#EBC9A4] rounded-full">{'▶'}</button>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setView('day')} className={`px-3 py-1 rounded-full border ${view === 'day' ? 'bg-[#EBC9A4]' : 'bg-white border-[#EBC9A4]'}`}>日</button>
-          <button onClick={() => setView('week')} className={`px-3 py-1 rounded-full border ${view === 'week' ? 'bg-[#EBC9A4]' : 'bg-white border-[#EBC9A4]'}`}>週</button>
-          <button onClick={() => setView('month')} className={`px-3 py-1 rounded-full border ${view === 'month' ? 'bg-[#EBC9A4]' : 'bg-white border-[#EBC9A4]'}`}>月</button>
-        </div>
-      </div>
-
-      {/* 刷新按鈕靠右，位於日週月按鈕下方，與日週月按鈕樣式一致 */}
-      <div className="flex justify-end mb-2">
+      <div className="flex flex-wrap gap-2 items-center mb-4 overflow-x-auto">
         <button
-          disabled
-          className={`px-3 py-1 rounded-full border bg-white border-[#EBC9A4] opacity-60 cursor-default`}
-        >
-          學生: {lessons.filter(l => !l.is_trial).length}
-        </button>
-        <button
-          disabled
-          className={`px-3 py-1 rounded-full border bg-white border-[#EBC9A4] opacity-60 cursor-default ml-2`}
-        >
-          試堂: {lessons.filter(l => l.is_trial).length}
-        </button>
-        {view !== 'month' && (
-          <button
-            disabled
-            className={`px-3 py-1 rounded-full border bg-white border-[#EBC9A4] opacity-60 cursor-default ml-2`}
-          >
-            剩1堂: {lessons.filter(l => l.remaining_lessons === 1).length}
-          </button>
+          onClick={handlePrev}
+          className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
+        >{'◀'}</button>
+        {view === 'day' ? (
+          <input
+            type="date"
+            value={getDateString(currentDate)}
+            onChange={(e) => {
+              const [year, month, day] = e.target.value.split('-').map(Number);
+              const newDate = getHongKongDate(new Date(year, month - 1, day));
+              setCurrentDate(newDate);
+            }}
+            className="border-2 border-[#EAC29D] px-3 py-2 rounded-full w-[120px] bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200"
+            style={{ minWidth: '100px' }}
+          />
+        ) : (
+          <span className="font-semibold w-fit min-w-0 max-w-[120px] truncate text-[#4B4036]">{formatDate(currentDate)}</span>
         )}
         <button
+          onClick={handleNext}
+          className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
+        >{'▶'}</button>
+        <button onClick={() => setView('day')} className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'day' ? 'hanami-btn' : 'hanami-btn-soft'}`}>日</button>
+        <button onClick={() => setView('week')} className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'week' ? 'hanami-btn' : 'hanami-btn-soft'}`}>週</button>
+        <button onClick={() => setView('month')} className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'month' ? 'hanami-btn' : 'hanami-btn-soft'}`}>月</button>
+        <button
           onClick={async () => {
-            const start = new Date(currentDate);
-            const end = new Date(currentDate);
-            if (view === 'week') {
-              start.setDate(start.getDate() - start.getDay());
-              end.setDate(start.getDate() + 6);
-            }
-            await fetchLessons(start, end);
+            lessonsFetchedRef.current = false;
+            loadingRef.current = false;
+            setIsLoading(true);
+            const newDate = new Date(currentDate);
+            setCurrentDate(newDate);
             const btn = document.getElementById('refresh-btn');
             if (btn) {
               btn.classList.add('animate-spin');
@@ -819,7 +821,7 @@ const HanamiCalendar = () => {
             }
           }}
           id="refresh-btn"
-          className={`px-3 py-1 rounded-full border bg-white border-[#EBC9A4] ml-2`}
+          className="hanami-btn-soft w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ml-2"
           title="刷新資料"
         >
           <img src="/refresh.png" alt="Refresh" className="w-4 h-4" />
@@ -827,7 +829,13 @@ const HanamiCalendar = () => {
       </div>
 
       <div className="mt-4">
-        {view === 'day' && (
+        {isLoading && (
+          <div className="flex justify-center items-center py-8">
+            <Spinner className="h-8 w-8 border-[#EBC9A4] text-[#EBC9A4]" />
+            <span className="ml-2 text-[#4B4036]">載入中...</span>
+          </div>
+        )}
+        {!isLoading && view === 'day' && (
           (() => {
             const dateStr = getDateString(currentDate);
             const holiday = isHoliday(dateStr);
@@ -920,7 +928,7 @@ const HanamiCalendar = () => {
           })()
         )}
 
-        {view === 'week' && (
+        {!isLoading && view === 'week' && (
           <div className="grid grid-cols-7 gap-2">
             {(() => {
               const weekStart = getHongKongDate(currentDate);
@@ -1011,7 +1019,7 @@ const HanamiCalendar = () => {
           </div>
         )}
 
-        {view === 'month' && (
+        {!isLoading && view === 'month' && (
           <>
             <div className="grid grid-cols-7 gap-2 mb-2">
               {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (

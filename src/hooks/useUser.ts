@@ -1,6 +1,6 @@
 // src/hooks/useUser.ts
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getUserSession } from '@/lib/authUtils'
 
 export function useUser() {
   const [user, setUser] = useState<any>(null)
@@ -9,11 +9,22 @@ export function useUser() {
 
   useEffect(() => {
     const fetch = async () => {
-      const { data } = await supabase.auth.getSession()
-      const currentUser = data?.session?.user || null
-      setUser(currentUser)
-      setRole(currentUser?.user_metadata?.role || null)
-      setLoading(false)
+      try {
+        const userSession = getUserSession()
+        if (userSession) {
+          setUser(userSession)
+          setRole(userSession.role)
+        } else {
+          setUser(null)
+          setRole(null)
+        }
+      } catch (error) {
+        console.error('Error fetching user session:', error)
+        setUser(null)
+        setRole(null)
+      } finally {
+        setLoading(false)
+      }
     }
     fetch()
   }, [])

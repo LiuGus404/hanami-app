@@ -1,26 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Database } from '@/lib/database.types'
-import { getUserRole } from '@/utils/getUserRole'
+import { getUserSession } from '@/lib/authUtils'
 
 export function useUser() {
   const [user, setUser] = useState<any>(null)
   const [role, setRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClientComponentClient<Database>()
 
   useEffect(() => {
     let mounted = true
 
     const fetchUser = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        const userSession = getUserSession()
         
-        if (sessionError) throw sessionError
-
-        if (!session) {
+        if (!userSession) {
           if (mounted) {
             setUser(null)
             setRole(null)
@@ -29,20 +24,16 @@ export function useUser() {
           return
         }
 
-        const userRole = await getUserRole(supabase)
-        
         if (mounted) {
-          setUser(session.user)
-          setRole(userRole)
+          setUser(userSession)
+          setRole(userSession.role)
+          setLoading(false)
         }
       } catch (error) {
         console.error('Error fetching user:', error)
         if (mounted) {
           setUser(null)
           setRole(null)
-        }
-      } finally {
-        if (mounted) {
           setLoading(false)
         }
       }
@@ -50,26 +41,10 @@ export function useUser() {
 
     fetchUser()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        if (mounted) {
-          setUser(null)
-          setRole(null)
-        }
-      } else if (session) {
-        const userRole = await getUserRole(supabase)
-        if (mounted) {
-          setUser(session.user)
-          setRole(userRole)
-        }
-      }
-    })
-
     return () => {
       mounted = false
-      subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [])
 
   return {
     user,

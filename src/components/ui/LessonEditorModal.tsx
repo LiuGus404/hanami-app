@@ -285,7 +285,6 @@ useEffect(() => {
 
       // 準備 payload，型別全部正確
       const payload = {
-        id: form.id,
         student_id: studentId,
         student_oid: studentData?.student_oid ?? null,
         full_name: studentData?.full_name ?? '',
@@ -311,9 +310,14 @@ useEffect(() => {
       };
 
       if (lesson) {
+        const updatePayload = {
+          ...payload,
+          id: lesson.id // 只在更新時包含id
+        };
+        
         const { error } = await supabase
           .from('hanami_student_lesson')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', lesson.id)
         
         if (error) {
@@ -650,8 +654,8 @@ useEffect(() => {
           </div>
 
           <div className="mt-6 flex justify-end gap-2">
-            <button onClick={handleCancel} className="px-4 py-2 border border-[#EADBC8] text-sm text-[#A68A64] bg-white rounded-full hover:bg-[#f7f3ec]">取消</button>
-            <button onClick={handleSubmit} className="px-4 py-2 bg-[#EBC9A4] text-sm text-[#2B3A3B] rounded-full hover:bg-[#e5ba8e]">儲存</button>
+                    <button onClick={handleCancel} className="hanami-btn-soft px-4 py-2 text-sm text-[#A68A64]">取消</button>
+        <button onClick={handleSubmit} className="hanami-btn px-4 py-2 text-sm text-[#2B3A3B]">儲存</button>
             {mode === 'edit' && lesson && (
               <button
                 onClick={handleDelete}

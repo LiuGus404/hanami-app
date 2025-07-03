@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getSupabaseClient } from '@/lib/supabase'
 import { format } from 'date-fns'
 import LessonEditorModal from '@/components/ui/LessonEditorModal'
@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast'
 
 interface StudentLessonPanelProps {
   studentId: string;
+  studentType?: string; // 添加學生類型參數
 }
 
 interface LessonData {
@@ -41,7 +42,7 @@ interface LessonData {
   remarks: string | null;
 }
 
-export default function StudentLessonPanel({ studentId }: StudentLessonPanelProps) {
+export default function StudentLessonPanel({ studentId, studentType }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient()
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -63,36 +64,160 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
   const [teacherOptions, setTeacherOptions] = useState<{ label: string; value: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // 添加防抖機制
+  const lessonsFetchedRef = useRef(false)
+  const currentStudentIdRef = useRef<string | null>(null)
+  const loadingRef = useRef(false)
 
   useEffect(() => {
+    // 如果 studentId 沒有變化且已經載入過，不重複載入
+    if (currentStudentIdRef.current === studentId && lessonsFetchedRef.current) return
+    
+    // 防止重複載入
+    if (loadingRef.current) return
+    loadingRef.current = true
+    
+    // 更新當前 studentId
+    currentStudentIdRef.current = studentId
+    
     fetchLessons()
   }, [studentId])
 
   const fetchLessons = async () => {
     try {
-    const { data, error } = await supabase
-      .from('hanami_student_lesson')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('lesson_date', { ascending: false });
-      if (error) throw error;
-      // Ensure all required fields for Lesson
-      setLessons((data || []).map((item: Record<string, unknown>) => ({
-        lesson_count: typeof item.lesson_count === 'number' ? item.lesson_count : 1,
-        remaining_lessons: typeof item.remaining_lessons === 'number' ? item.remaining_lessons : 0,
-        is_trial: typeof item.is_trial === 'boolean' ? item.is_trial : false,
-        ...item
-      }) as Lesson));
-    } catch (err) {
-      if (err instanceof Error) {
-        console.error('Error:', err.message);
-        alert('載入課堂資料失敗：' + err.message);
+      setLoading(true)
+      setError(null) // 清除之前的錯誤
+      console.log('🔍 開始載入課堂資料，studentId:', studentId, 'studentType:', studentType)
+      
+      let lessonsData: any[] = []
+      
+      // 根據學生類型決定查詢哪個表
+      if (studentType === '試堂' || studentType === 'trial') {
+        // 試堂學生：查詢 hanami_trial_students 表
+        console.log('📋 查詢試堂學生課堂資料...')
+        const { data, error } = await supabase
+          .from('hanami_trial_students')
+          .select('*')
+          .eq('id', studentId)
+          .not('lesson_date', 'is', null); // 只查詢有課堂日期的記錄
+        
+        if (error) {
+          console.error('❌ 查詢試堂學生課堂資料失敗:', error)
+          setError(error.message)
+          return
+        }
+        
+        // 將試堂學生資料轉換為課堂格式
+        lessonsData = (data || []).map((trialStudent: any) => ({
+          id: trialStudent.id,
+          student_id: trialStudent.id,
+          lesson_date: trialStudent.lesson_date,
+          course_type: trialStudent.course_type,
+          actual_timeslot: trialStudent.actual_timeslot,
+          regular_timeslot: trialStudent.regular_timeslot,
+          lesson_teacher: trialStudent.student_teacher,
+          lesson_status: '試堂', // 試堂學生的狀態
+          lesson_duration: trialStudent.lesson_duration,
+          full_name: trialStudent.full_name,
+          lesson_count: 1,
+          remaining_lessons: 0,
+          is_trial: true,
+          // 其他必要欄位
+          package_id: null,
+          status: null,
+          notes: null,
+          next_target: null,
+          progress_notes: null,
+          video_url: null,
+          created_at: trialStudent.created_at,
+          updated_at: trialStudent.updated_at,
+          access_role: trialStudent.access_role,
+          remarks: trialStudent.trial_remarks,
+          student_oid: trialStudent.student_oid,
+          regular_weekday: trialStudent.regular_weekday,
+          lesson_activities: null
+        })) as Lesson[];
+        
+        console.log('✅ 試堂學生課堂資料載入完成，共', lessonsData.length, '筆記錄')
       } else {
-        console.error('Unknown error:', err);
-        alert('載入課堂資料失敗：未知錯誤');
+        // 常規學生：查詢 hanami_student_lesson 表
+        console.log('📋 查詢常規學生課堂資料...')
+        const { data, error } = await supabase
+          .from('hanami_student_lesson')
+          .select('*')
+          .eq('student_id', studentId);
+        
+        if (error) {
+          console.error('❌ 查詢常規學生課堂資料失敗:', error)
+          if (error.code === 'PGRST116' || error.message.includes('401')) {
+            setError('權限不足，無法訪問課堂資料。請聯繫管理員檢查RLS權限設置。')
+          } else {
+            setError(error.message)
+          }
+          return
+        }
+        
+        // 簡化資料處理
+        lessonsData = (data || []).map((item: any) => ({
+          id: item.id,
+          lesson_date: item.lesson_date,
+          course_type: item.course_type,
+          actual_timeslot: item.actual_timeslot,
+          regular_timeslot: item.regular_timeslot,
+          lesson_teacher: item.lesson_teacher,
+          lesson_status: item.lesson_status,
+          lesson_count: 1,
+          remaining_lessons: 0,
+          is_trial: false,
+          // 其他必要欄位
+          student_id: item.student_id,
+          lesson_duration: item.lesson_duration,
+          full_name: item.full_name,
+          package_id: item.package_id,
+          status: item.status,
+          notes: item.notes,
+          next_target: item.next_target,
+          progress_notes: item.progress_notes,
+          video_url: item.video_url,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          access_role: item.access_role,
+          remarks: item.remarks,
+          student_oid: item.student_oid,
+          regular_weekday: item.regular_weekday,
+          lesson_activities: item.lesson_activities
+        })) as Lesson[];
+        
+        console.log('✅ 常規學生課堂資料載入完成，共', lessonsData.length, '筆記錄')
       }
+      
+      console.log('📊 課堂資料載入結果:', { 
+        dataCount: lessonsData.length, 
+        error: '無錯誤',
+        studentId,
+        studentType
+      })
+      
+      setLessons(lessonsData)
+      lessonsFetchedRef.current = true
+      loadingRef.current = false
+    } catch (err) {
+      console.error('❌ 載入課堂資料失敗：', err)
+      setError(err instanceof Error ? err.message : '未知錯誤')
+      loadingRef.current = false
+    } finally {
+      setLoading(false)
     }
   }
+
+  // 當 studentId 變化時重置防抖狀態
+  useEffect(() => {
+    if (currentStudentIdRef.current !== studentId) {
+      lessonsFetchedRef.current = false
+      loadingRef.current = false
+    }
+  }, [studentId])
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
@@ -400,95 +525,147 @@ export default function StudentLessonPanel({ studentId }: StudentLessonPanelProp
           )}
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-[#4B4036]">
-          <thead>
-            <tr className="border-b border-[#E9E2D6]">
-              <th>
-                <input
-                  type="checkbox"
-                  className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
-                  onChange={(e) => {
-                    if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id))
-                    else setSelected([])
-                  }}
-                />
-              </th>
-              <th className="text-[15px] font-medium px-2 py-2 text-left">日期</th>
-              <th className="text-[15px] font-medium px-2 py-2 text-left">課堂</th>
-              <th className="text-[15px] font-medium px-2 py-2 text-left">上課時間</th>
-              <th className="text-[15px] font-medium px-2 py-2 text-left">負責老師</th>
-              <th className="text-[15px] font-medium px-2 py-2 text-left">出席狀況</th>
-              <th className="px-2 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLessons.slice(0, visibleCount).map((lesson) => (
-              <tr key={lesson.id} className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6]">
-                <td className="px-2 py-2">
+      
+      {/* 載入狀態 */}
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FCD58B] mx-auto"></div>
+            <p className="mt-2 text-[#2B3A3B] text-sm">載入課堂資料中...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* 錯誤狀態 */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">載入課堂資料失敗</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 無資料狀態 */}
+      {!loading && !error && lessons.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">暫無課堂資料</h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>此學生目前沒有任何課堂記錄</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 課堂資料表格 */}
+      {!loading && !error && lessons.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[#4B4036]">
+            <thead>
+              <tr className="border-b border-[#E9E2D6]">
+                <th>
                   <input
                     type="checkbox"
                     className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
-                    checked={selected.includes(lesson.id)}
-                    onChange={() => toggleSelect(lesson.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id))
+                      else setSelected([])
+                    }}
                   />
-                </td>
-                <td className="text-[15px] font-medium px-2 py-2">{format(new Date(lesson.lesson_date), 'yyyy/MM/dd')}</td>
-                  <td className="text-[15px] font-medium px-2 py-2">{typeof lesson.course_type === 'string' ? lesson.course_type : ''}</td>
-                <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>
-                <td className="text-[15px] font-medium px-2 py-2">{lesson.lesson_teacher}</td>
-                <td className="text-[15px] font-medium px-2 py-2">
-                  {format(new Date(lesson.lesson_date), 'yyyy-MM-dd') === todayStr ? (
-                    <>
-                      <button
-                        className="underline text-sm"
-                          onClick={() => handleStatusClick(lesson.id, lesson.lesson_status)}
-                      >
-                        {lesson.lesson_status || '-'}
-                      </button>
-                        {statusPopupOpen === lesson.id && !isModalOpen && (
-                        <PopupSelect
-                          title="選擇出席狀況"
-                          options={[
-                            { label: '出席', value: '出席' },
-                            { label: '缺席', value: '缺席' },
-                            { label: '病假', value: '病假' },
-                            { label: '事假', value: '事假' }
-                          ]}
-                          selected={tempStatus}
-                            onChange={handleStatusChange}
-                            onCancel={handleStatusPopupClose}
-                          onConfirm={async () => {
-                            await supabase
-                              .from('hanami_student_lesson')
-                              .update({ lesson_status: tempStatus })
-                              .eq('id', lesson.id);
-                            await fetchLessons();
-                              handleStatusPopupClose();
-                          }}
-                            mode="multi"
-                        />
-                      )}
-                    </>
-                  ) : format(new Date(lesson.lesson_date), 'yyyy-MM-dd') > todayStr ? (
-                    '-'
-                  ) : (
-                    lesson.lesson_status || '-'
-                  )}
-                </td>
-                <td className="px-2 py-2">
-                  <button
-                    onClick={() => handleEdit(lesson)}
-                    className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
-                  >
-                    編輯
-                  </button>
-                </td>
+                </th>
+                <th className="text-[15px] font-medium px-2 py-2 text-left">日期</th>
+                <th className="text-[15px] font-medium px-2 py-2 text-left">課堂</th>
+                <th className="text-[15px] font-medium px-2 py-2 text-left">上課時間</th>
+                <th className="text-[15px] font-medium px-2 py-2 text-left">負責老師</th>
+                <th className="text-[15px] font-medium px-2 py-2 text-left">出席狀況</th>
+                <th className="px-2 py-2"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {filteredLessons.slice(0, visibleCount).map((lesson) => (
+                <tr key={lesson.id} className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6]">
+                  <td className="px-2 py-2">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
+                      checked={selected.includes(lesson.id)}
+                      onChange={() => toggleSelect(lesson.id)}
+                    />
+                  </td>
+                  <td className="text-[15px] font-medium px-2 py-2">{format(new Date(lesson.lesson_date), 'yyyy/MM/dd')}</td>
+                    <td className="text-[15px] font-medium px-2 py-2">{typeof lesson.course_type === 'string' ? lesson.course_type : ''}</td>
+                  <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>
+                  <td className="text-[15px] font-medium px-2 py-2">{lesson.lesson_teacher}</td>
+                  <td className="text-[15px] font-medium px-2 py-2">
+                    {format(new Date(lesson.lesson_date), 'yyyy-MM-dd') === todayStr ? (
+                      <>
+                        <button
+                          className="underline text-sm"
+                            onClick={() => handleStatusClick(lesson.id, lesson.lesson_status)}
+                        >
+                          {lesson.lesson_status || '-'}
+                        </button>
+                          {statusPopupOpen === lesson.id && !isModalOpen && (
+                          <PopupSelect
+                            title="選擇出席狀況"
+                            options={[
+                              { label: '出席', value: '出席' },
+                              { label: '缺席', value: '缺席' },
+                              { label: '病假', value: '病假' },
+                              { label: '事假', value: '事假' }
+                            ]}
+                            selected={tempStatus}
+                              onChange={handleStatusChange}
+                              onCancel={handleStatusPopupClose}
+                            onConfirm={async () => {
+                              await supabase
+                                .from('hanami_student_lesson')
+                                .update({ lesson_status: tempStatus })
+                                .eq('id', lesson.id);
+                              await fetchLessons();
+                                handleStatusPopupClose();
+                            }}
+                              mode="multi"
+                          />
+                        )}
+                      </>
+                    ) : format(new Date(lesson.lesson_date), 'yyyy-MM-dd') > todayStr ? (
+                      '-'
+                    ) : (
+                      lesson.lesson_status || '-'
+                    )}
+                  </td>
+                  <td className="px-2 py-2">
+                    <button
+                      onClick={() => handleEdit(lesson)}
+                      className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
+                    >
+                      編輯
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div className="flex gap-3 mt-4">
         <button
             onClick={() => {

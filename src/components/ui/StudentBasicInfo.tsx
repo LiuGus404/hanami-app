@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PopupSelect } from './PopupSelect'
 import { Student, Teacher } from '@/types'
@@ -12,6 +12,12 @@ const weekdays = [
   { label: '星期五', value: 5 },
   { label: '星期六', value: 6 },
 ]
+
+// 全局快取
+let courseOptionsCache: string[] | null = null
+let teacherOptionsCache: { label: string, value: string }[] | null = null
+let courseOptionsLoading = false
+let teacherOptionsLoading = false
 
 interface StudentFormData {
   id: string;
@@ -100,14 +106,35 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   const [tempTeacher, setTempTeacher] = useState<string>('')
 
   const [teacherOptions, setTeacherOptions] = useState<{ label: string, value: string }[]>([])
+  
+  // 添加防抖機制
+  const courseOptionsFetchedRef = useRef(false)
+  const teacherOptionsFetchedRef = useRef(false)
+
   useEffect(() => {
+    // 如果已經載入過老師選項，直接使用快取
+    if (teacherOptionsCache) {
+      setTeacherOptions(teacherOptionsCache)
+      return
+    }
+
+    // 防止重複載入
+    if (teacherOptionsFetchedRef.current || teacherOptionsLoading) return
+    teacherOptionsFetchedRef.current = true
+    teacherOptionsLoading = true
+
     supabase.from('hanami_employee').select('teacher_nickname').then(({ data }) => {
       if (data) {
-        setTeacherOptions(data.map((item: any) => ({
+        const options = data.map((item: any) => ({
           label: item.teacher_nickname,
           value: item.teacher_nickname
-        })))
+        }))
+        setTeacherOptions(options)
+        teacherOptionsCache = options // 快取結果
       }
+      teacherOptionsLoading = false
+    }).catch(() => {
+      teacherOptionsLoading = false
     })
   }, [])
 
@@ -117,6 +144,17 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   }, [formData.gender, formData.course_type])
 
   useEffect(() => {
+    // 如果已經載入過課程選項，直接使用快取
+    if (courseOptionsCache) {
+      setCourseOptions(courseOptionsCache)
+      return
+    }
+
+    // 防止重複載入
+    if (courseOptionsFetchedRef.current || courseOptionsLoading) return
+    courseOptionsFetchedRef.current = true
+    courseOptionsLoading = true
+
     const fetchCourseOptions = async () => {
       setCourseOptions(null) // 標示正在載入中
       const { data, error } = await supabase
@@ -127,10 +165,13 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       console.log('📦 課程載入結果：', data, error)
 
       if (!error && data) {
-        setCourseOptions(data.map((c) => c.name).filter((name): name is string => name !== null))
+        const options = data.map((c) => c.name).filter((name): name is string => name !== null)
+        setCourseOptions(options)
+        courseOptionsCache = options // 快取結果
       } else {
         setCourseOptions([]) // 若出錯則設為空陣列避免卡住
       }
+      courseOptionsLoading = false
     }
 
     fetchCourseOptions()

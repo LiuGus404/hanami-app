@@ -8,6 +8,7 @@ import TeacherCard from '@/components/ui/TeacherCard'
 import { LayoutGrid, List } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Checkbox } from '@/components/ui/checkbox'
+import BackButton from '@/components/ui/BackButton'
 
 export default function TeacherManagementPage() {
   const [teachers, setTeachers] = useState<any[]>([])

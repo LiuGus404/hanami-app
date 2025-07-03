@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Checkbox } from '@/components/ui/checkbox'
 import { PopupSelect } from '@/components/ui/PopupSelect'
@@ -11,6 +11,7 @@ import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRi
 import { useUser } from '@/hooks/useUser'
 import { useParams } from 'next/navigation'
 import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel'
+import BackButton from '@/components/ui/BackButton'
 
 export default function StudentManagementPage() {
   const searchParams = useSearchParams()
@@ -65,7 +66,9 @@ export default function StudentManagementPage() {
   const { user, loading: userLoading } = useUser()
   const { id } = useParams()
 
-  console.log('user:', user, 'userLoading:', userLoading, 'id:', id)
+  // 添加防抖機制
+  const dataFetchedRef = useRef(false)
+  const loadingRef = useRef(false)
 
   // 基本欄位（強制顯示，但不在選單中）
   // { label: '學生編號', value: 'student_oid' },
@@ -93,31 +96,23 @@ export default function StudentManagementPage() {
   ]
 
   useEffect(() => {
-    if (!user && !userLoading) {
-      router.push('/login')
-      return
-    }
-    if (user && !['admin', 'manager'].includes(user.role)) {
+    // 如果正在載入或沒有用戶，不執行
+    if (userLoading || !user) return
+    
+    // 如果用戶沒有權限，重定向
+    if (!['admin', 'manager'].includes(user.role)) {
       router.push('/')
       return
     }
 
+    // 如果已經載入過數據，不重複載入
+    if (dataFetchedRef.current) return
+    
+    // 防止重複載入
+    if (loadingRef.current) return
+    loadingRef.current = true
+
     const checkAndFetch = async () => {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const user = sessionData?.session?.user
-
-      if (!user) {
-        router.push('/admin/login')
-        return
-      }
-
-      if (user.user_metadata?.role !== 'admin') {
-        alert('無權限存取，僅限管理員登入')
-        await supabase.auth.signOut()
-        router.push('/admin/login')
-        return
-      }
-
       try {
         // 獲取常規學生數據
         const { data: studentData, error: studentError } = await supabase
@@ -136,16 +131,19 @@ export default function StudentManagementPage() {
 
         if (studentError) {
           console.error('Error fetching regular students:', studentError)
+          loadingRef.current = false
           return
         }
 
         if (trialStudentError) {
           console.error('Error fetching trial students:', trialStudentError)
+          loadingRef.current = false
           return
         }
 
         if (inactiveStudentError) {
           console.error('Error fetching inactive students:', inactiveStudentError)
+          loadingRef.current = false
           return
         }
 
@@ -168,12 +166,12 @@ export default function StudentManagementPage() {
             student_age = years * 12 + months
           }
 
-          // 計算星期
+          // 計算星期 - 修復試堂學生的星期計算邏輯
           let weekday = null
           if (trial.lesson_date) {
             const trialDate = new Date(trial.lesson_date)
-            const hkTime = new Date(trialDate.getTime() + 8 * 60 * 60 * 1000)
-            weekday = hkTime.getDay().toString()
+            // 不需要加8小時，直接使用本地時間
+            weekday = trialDate.getDay().toString()
           }
 
           return {
@@ -192,7 +190,15 @@ export default function StudentManagementPage() {
             student_oid: trial.student_oid || null,
             contact_number: trial.contact_number || null,
             regular_timeslot: trial.regular_timeslot || null,
-            health_notes: trial.health_notes || null
+            health_notes: trial.health_notes || null,
+            // 添加試堂學生特有的欄位
+            school: trial.school || null,
+            address: trial.address || null,
+            student_teacher: trial.student_teacher || null,
+            parent_email: trial.parent_email || null,
+            student_dob: trial.student_dob || null,
+            started_date: trial.lesson_date || null, // 試堂學生的入學日期就是試堂日期
+            duration_months: trial.duration_months || null
           }
         })
 
@@ -200,40 +206,52 @@ export default function StudentManagementPage() {
         const inactiveStudents = (inactiveStudentData || []).map((inactive) => {
           return {
             id: inactive.id,
-            original_id: inactive.original_id,
             full_name: inactive.full_name,
             student_age: inactive.student_age,
-            student_preference: inactive.student_preference,
-            course_type: inactive.course_type,
-            remaining_lessons: inactive.remaining_lessons,
-            regular_weekday: inactive.regular_weekday,
-            gender: inactive.gender,
-            student_type: inactive.student_type === 'regular' ? '常規' : '試堂',
-            lesson_date: inactive.lesson_date,
-            actual_timeslot: inactive.actual_timeslot,
-            student_oid: inactive.student_oid,
-            contact_number: inactive.contact_number,
-            regular_timeslot: inactive.regular_timeslot,
-            health_notes: inactive.health_notes,
+            student_preference: inactive.student_preference || null,
+            course_type: inactive.course_type || null,
+            remaining_lessons: inactive.remaining_lessons ?? null,
+            regular_weekday: inactive.regular_weekday ? [inactive.regular_weekday.toString()] : [],
+            gender: inactive.gender || null,
+            student_type: '停用學生',
+            student_oid: inactive.student_oid || null,
+            contact_number: inactive.contact_number || null,
+            regular_timeslot: inactive.regular_timeslot || null,
+            health_notes: inactive.health_notes || null,
+            school: (inactive as any).school || null,
+            address: (inactive as any).address || null,
+            student_teacher: (inactive as any).student_teacher || null,
+            parent_email: (inactive as any).parent_email || null,
+            student_dob: (inactive as any).student_dob || null,
+            started_date: (inactive as any).started_date || null,
+            duration_months: (inactive as any).duration_months || null,
             inactive_date: inactive.inactive_date,
-            inactive_reason: inactive.inactive_reason,
-            is_inactive: true
+            inactive_reason: inactive.inactive_reason
           }
         })
 
         // 合併所有學生數據
-        const allStudents = [...regularStudents, ...trialStudents]
-        console.log('🧒 全部學生資料：', allStudents)
-        console.log('🚫 停用學生資料：', inactiveStudents)
+        const allStudents = [...regularStudents, ...trialStudents, ...inactiveStudents]
         setStudents(allStudents)
         setInactiveStudents(inactiveStudents)
-      } catch (err) {
-        console.error('Error:', err)
+        dataFetchedRef.current = true
+        loadingRef.current = false
+      } catch (error) {
+        console.error('Error in checkAndFetch:', error)
+        loadingRef.current = false
       }
     }
 
     checkAndFetch()
-  }, [])
+  }, [user, userLoading, router])
+
+  // 當用戶變化時重置防抖狀態
+  useEffect(() => {
+    if (user) {
+      dataFetchedRef.current = false
+      loadingRef.current = false
+    }
+  }, [user])
 
   // 刪除學生功能
   const handleDeleteStudents = async () => {
@@ -644,8 +662,8 @@ export default function StudentManagementPage() {
           let weekday = null
           if (trial.lesson_date) {
             const trialDate = new Date(trial.lesson_date)
-            const hkTime = new Date(trialDate.getTime() + 8 * 60 * 60 * 1000)
-            weekday = hkTime.getDay().toString()
+            // 不需要加8小時，直接使用本地時間
+            weekday = trialDate.getDay().toString()
           }
 
           return {
@@ -664,7 +682,15 @@ export default function StudentManagementPage() {
             student_oid: trial.student_oid || null,
             contact_number: trial.contact_number || null,
             regular_timeslot: trial.regular_timeslot || null,
-            health_notes: trial.health_notes || null
+            health_notes: trial.health_notes || null,
+            // 添加試堂學生特有的欄位
+            school: trial.school || null,
+            address: trial.address || null,
+            student_teacher: trial.student_teacher || null,
+            parent_email: trial.parent_email || null,
+            student_dob: trial.student_dob || null,
+            started_date: trial.lesson_date || null, // 試堂學生的入學日期就是試堂日期
+            duration_months: trial.duration_months || null
           }
         })
 
@@ -840,6 +866,8 @@ export default function StudentManagementPage() {
   const isShowingInactiveStudents = selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('停用學生')
   const currentStudents = isShowingInactiveStudents ? inactiveStudents : students
 
+
+
   const filteredStudents = currentStudents.filter((student) => {
     const type = student.course_type?.trim() || ''
     
@@ -852,7 +880,7 @@ export default function StudentManagementPage() {
           ? [student.regular_weekday.toString()]
           : []
 
-    // 處理試堂學生的星期
+    // 處理試堂學生的星期 - 修復試堂學生的星期處理邏輯
     const trialWeekday = student.weekday?.toString()
 
     const courseMatch =
@@ -889,8 +917,14 @@ export default function StudentManagementPage() {
 
     const nameMatch = student.full_name?.includes(searchTerm.trim())
 
-    return courseMatch && weekdayMatch && lessonMatch && nameMatch
+    const isMatch = courseMatch && weekdayMatch && lessonMatch && nameMatch
+    
+
+
+    return isMatch
   })
+
+
 
   // 排序學生數據
   const sortStudents = (students: any[]) => {
@@ -1007,6 +1041,8 @@ export default function StudentManagementPage() {
       <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold text-[#2B3A3B] mb-2">學生資料管理</h1>
 
+
+
         {/* 操作按鈕區域 */}
         {selectedStudents.length > 0 && (
           <div className="mb-4 p-4 bg-white rounded-xl border border-[#EADBC8] shadow-sm">
@@ -1028,7 +1064,7 @@ export default function StudentManagementPage() {
                     <button
                       onClick={handleRestoreStudents}
                       disabled={isLoading}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full border border-green-200 hover:bg-green-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="hanami-btn-success flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RotateCcw className="w-4 h-4" />
                       <span>回復學生</span>
@@ -1036,7 +1072,7 @@ export default function StudentManagementPage() {
                     <button
                       onClick={handleDeleteInactiveStudents}
                       disabled={isLoading}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full border border-red-200 hover:bg-red-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>刪除學生</span>
@@ -1057,7 +1093,7 @@ export default function StudentManagementPage() {
                             <button
                               onClick={handleInactiveStudents}
                               disabled={isLoading}
-                              className="flex items-center gap-2 px-4 py-2 bg-[#FDE6B8] text-[#A64B2A] rounded-full border border-[#EAC29D] hover:bg-[#fce2c8] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <UserX className="w-4 h-4" />
                               <span>停用學生</span>
@@ -1066,7 +1102,7 @@ export default function StudentManagementPage() {
                           <button
                             onClick={handleDeleteStudents}
                             disabled={isLoading}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full border border-red-200 hover:bg-red-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-4 h-4" />
                             <span>刪除學生</span>
@@ -1096,7 +1132,7 @@ export default function StudentManagementPage() {
             <div className="mb-4">
               <button
                 onClick={() => setDropdownOpen(true)}
-                className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#2B3A3B] shadow-sm"
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
               >
                 篩選課程
               </button>
@@ -1128,7 +1164,7 @@ export default function StudentManagementPage() {
             <div className="mb-4">
               <button
                 onClick={() => setWeekdayDropdownOpen(true)}
-                className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#2B3A3B] shadow-sm"
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
               >
                 篩選星期
               </button>
@@ -1155,7 +1191,7 @@ export default function StudentManagementPage() {
             <div className="mb-4">
               <button
                 onClick={() => setLessonDropdownOpen(true)}
-                className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#2B3A3B] shadow-sm"
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
               >
                 篩選堂數
               </button>
@@ -1189,7 +1225,7 @@ export default function StudentManagementPage() {
             <div className="mb-4">
               <button
                 onClick={() => setDisplayMode(displayMode === 'grid' ? 'list' : 'grid')}
-                className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#2B3A3B] shadow-sm flex items-center gap-2"
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2"
               >
                 {displayMode === 'grid' ? (
                   <>
@@ -1217,7 +1253,7 @@ export default function StudentManagementPage() {
                     setSelectedLessonFilter('all')
                     setCustomLessonCount('')
                   }}
-                  className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#A68A64] shadow-sm hover:bg-[#f7f3ec]"
+                  className="hanami-btn-danger text-sm px-4 py-2 text-[#A64B2A]"
                 >
                   清除條件
                 </button>
@@ -1252,7 +1288,7 @@ export default function StudentManagementPage() {
             <span className="text-sm text-[#2B3A3B]">每頁顯示：</span>
             <button
               onClick={() => setPageSizeDropdownOpen(true)}
-              className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#2B3A3B] shadow-sm"
+              className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
             >
               {pageSize === Infinity ? '全部' : pageSize}
             </button>
@@ -1279,7 +1315,7 @@ export default function StudentManagementPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setColumnSelectorOpen(true)}
-              className="bg-white border border-[#EADBC8] text-sm px-4 py-2 rounded-full text-[#2B3A3B] shadow-sm flex items-center gap-2"
+              className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2"
             >
               <Settings2 className="w-4 h-4" />
               <span>顯示欄位</span>
@@ -1340,8 +1376,17 @@ export default function StudentManagementPage() {
                 const years = Math.floor(ageInMonths / 12)
                 const months = ageInMonths % 12
 
-                if (!student.gender) {
-                  console.warn(`學生 ${student.full_name || student.id} 缺少 gender，avatar 預設為 boy.png`)
+                // 移除頻繁的警告日誌，改為只在開發環境下顯示一次
+                if (!student.gender && process.env.NODE_ENV === 'development') {
+                  // 使用 Set 來避免重複警告
+                  if (!(window as any).genderWarnings) {
+                    (window as any).genderWarnings = new Set();
+                  }
+                  const warningKey = `${student.full_name || student.id}`;
+                  if (!(window as any).genderWarnings.has(warningKey)) {
+                    console.warn(`學生 ${student.full_name || student.id} 缺少 gender，avatar 預設為 boy.png`);
+                    (window as any).genderWarnings.add(warningKey);
+                  }
                 }
 
                 const isTrialStudent = student.student_type === '試堂'
@@ -1754,7 +1799,7 @@ export default function StudentManagementPage() {
                                   const studentId = student.is_inactive ? student.id : student.id
                                   router.push(`/admin/students/${studentId}`)
                                 }}
-                                className="p-1 hover:bg-[#EADBC8] rounded-full transition-colors"
+                                className="hanami-btn-soft p-1 transition-all duration-200 hover:scale-110"
                               >
                                 <img
                                   src="/icons/edit-pencil.png"

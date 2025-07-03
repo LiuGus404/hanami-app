@@ -1,7 +1,7 @@
 // app/admin/students/[id]/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import StudentBasicInfo from '@/components/ui/StudentBasicInfo'
@@ -10,6 +10,7 @@ import { useUser } from '@/lib/useUser'
 import { PopupSelect } from '@/components/ui/PopupSelect'
 import LessonEditorModal from '@/components/ui/LessonEditorModal'
 import { Lesson } from '@/types'
+import BackButton from '@/components/ui/BackButton'
 
 export default function StudentDetailPage() {
   const { id } = useParams()
@@ -27,22 +28,39 @@ export default function StudentDetailPage() {
   const [tempCategoryFilter, setTempCategoryFilter] = useState<string[]>(['all'])
   const [categorySelectOpen, setCategorySelectOpen] = useState(false)
   const [isInactiveStudent, setIsInactiveStudent] = useState(false)
+  
+  // 添加防抖機制
+  const dataFetchedRef = useRef(false)
+  const currentIdRef = useRef<string | null>(null)
+  const loadingRef = useRef(false)
 
   useEffect(() => {
+    // 如果正在載入或沒有用戶，不執行
+    if (loading || !user) return
+    
+    // 如果用戶不是管理員，重定向
+    if (role !== 'admin') {
+      alert('無權限訪問')
+      router.push('/admin/login')
+      return
+    }
+
+    // 如果 ID 沒有變化且已經載入過，不重複載入
+    if (currentIdRef.current === id && dataFetchedRef.current) return
+    
+    // 防止重複載入
+    if (loadingRef.current) return
+    loadingRef.current = true
+    
+    // 更新當前 ID
+    currentIdRef.current = id as string
+    
     setPageLoading(true);
     setStudent(null);
     setError(null);
     setIsInactiveStudent(false);
 
     const checkAuth = async () => {
-      if (loading) return
-
-      if (!user || role !== 'admin') {
-        alert('無權限訪問')
-        router.push('/admin/login')
-        return
-      }
-
       try {
         // 先檢查是否為停用學生
         const { data: inactiveData, error: inactiveError } = await supabase
@@ -56,6 +74,7 @@ export default function StudentDetailPage() {
           const convertedStudent = {
             ...inactiveData,
             id: inactiveData.original_id, // 使用原始ID
+            original_id: inactiveData.original_id, // 保留original_id欄位
             student_type: inactiveData.student_type === 'regular' ? '常規' : '試堂',
             is_inactive: true,
             inactive_date: inactiveData.inactive_date,
@@ -64,6 +83,11 @@ export default function StudentDetailPage() {
           setStudent(convertedStudent)
           setIsInactiveStudent(true)
           setPageLoading(false)
+          dataFetchedRef.current = true
+          loadingRef.current = false
+          
+          // 檢查課堂資料
+          await checkLessonData(convertedStudent.id)
           return
         }
 
@@ -77,6 +101,11 @@ export default function StudentDetailPage() {
         if (trialData) {
           setStudent(trialData)
           setPageLoading(false)
+          dataFetchedRef.current = true
+          loadingRef.current = false
+          
+          // 檢查課堂資料
+          await checkLessonData(trialData.id)
           return
         }
 
@@ -91,20 +120,85 @@ export default function StudentDetailPage() {
           console.error('Error fetching student:', studentError)
           setError('無法獲取學生資料')
           setPageLoading(false)
+          loadingRef.current = false
           return
         }
 
         setStudent(studentData)
         setPageLoading(false)
+        dataFetchedRef.current = true
+        loadingRef.current = false
+        
+        // 檢查課堂資料
+        await checkLessonData(studentData.id)
       } catch (err) {
         console.error('Error:', err)
         setError('發生錯誤，請稍後再試')
         setPageLoading(false)
+        loadingRef.current = false
+      }
+    }
+
+    // 檢查課堂資料的輔助函數
+    const checkLessonData = async (studentId: string) => {
+      try {
+        console.log('🔍 檢查課堂資料表...')
+        
+        // 檢查表是否存在資料
+        const { data: allLessons, error: allError } = await supabase
+          .from('hanami_student_lesson')
+          .select('*')
+          .limit(5)
+        
+        console.log('📊 課堂資料表檢查:', { 
+          hasData: allLessons && allLessons.length > 0,
+          totalRecords: allLessons?.length || 0,
+          sampleData: allLessons?.slice(0, 2).map(l => ({ id: l.id, student_id: l.student_id, lesson_date: l.lesson_date })),
+          error: allError?.message || '無錯誤'
+        })
+        
+        // 檢查特定學生的課堂資料
+        const { data: studentLessons, error: studentError } = await supabase
+          .from('hanami_student_lesson')
+          .select('id, lesson_date, course_type, student_id')
+          .eq('student_id', studentId)
+          .limit(5)
+        
+        console.log('📋 學生課堂資料檢查:', {
+          studentId,
+          lessonCount: studentLessons?.length || 0,
+          lessons: studentLessons?.map(l => ({ id: l.id, date: l.lesson_date, type: l.course_type, student_id: l.student_id })),
+          error: studentError?.message || '無錯誤'
+        })
+        
+        // 檢查是否有其他學生的課堂資料
+        if (!studentLessons || studentLessons.length === 0) {
+          const { data: otherLessons, error: otherError } = await supabase
+            .from('hanami_student_lesson')
+            .select('student_id, lesson_date')
+            .limit(3)
+          
+          console.log('🔍 其他學生課堂資料:', {
+            otherLessons: otherLessons?.map(l => ({ student_id: l.student_id, date: l.lesson_date })),
+            error: otherError?.message || '無錯誤'
+          })
+        }
+        
+      } catch (err) {
+        console.error('❌ 檢查課堂資料失敗:', err)
       }
     }
 
     checkAuth()
-  }, [user, role, loading, id, router])
+  }, [user, role, loading, id]) // 移除 router 依賴
+
+  // 當 ID 變化時重置防抖狀態
+  useEffect(() => {
+    if (currentIdRef.current !== id) {
+      dataFetchedRef.current = false
+      loadingRef.current = false
+    }
+  }, [id])
 
   if (pageLoading) {
     return (
@@ -169,9 +263,24 @@ export default function StudentDetailPage() {
           }}
           isInactive={isInactiveStudent}
         />
-        {student && student.student_type !== '試堂' && !isInactiveStudent && (
+        {student && student.student_type !== '試堂' && (
           <div className="mt-8">
-            <StudentLessonPanel studentId={student.id} />
+            {(() => {
+              const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id
+              console.log('🎯 準備載入課堂資料:', {
+                lessonStudentId: lessonStudentId,
+                isInactiveStudent,
+                studentOriginalId: student.original_id,
+                currentStudentId: student.id,
+                studentType: student.student_type
+              })
+              return (
+                <StudentLessonPanel 
+                  studentId={lessonStudentId} 
+                  studentType={student.student_type}
+                />
+              )
+            })()}
           </div>
         )}
         <LessonEditorModal

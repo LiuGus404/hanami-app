@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import AIControlPanel from '@/components/AIControlPanel';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/lib/database.types';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/spinner';
+import { getUserSession } from '@/lib/authUtils';
 
 const mockTasks = [
   { id: '1', model: 'Lulu', icon: '🦊', status: 'processing', description: '任務描述略' },
@@ -24,22 +23,21 @@ const ControlPage = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState('');
-  const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
     let mounted = true;
 
     const checkAuth = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const userSession = getUserSession();
         
-        if (userError || !user) {
-          console.error('User error:', userError);
+        if (!userSession) {
+          console.error('No user session found');
           router.replace('/admin/login');
           return;
         }
 
-        const role = user.user_metadata?.role || '';
+        const role = userSession.role || '';
         
         if (mounted) {
           if (role !== 'admin') {
@@ -59,19 +57,21 @@ const ControlPage = () => {
 
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'SIGNED_OUT') {
-        router.replace('/admin/login');
-      } else if (event === 'SIGNED_IN') {
-        await checkAuth();
+    // 監聽 cookie 變化
+    const checkSession = () => {
+      if (mounted) {
+        checkAuth();
       }
-    });
+    };
+
+    // 每 5 秒檢查一次會話狀態
+    const interval = setInterval(checkSession, 5000);
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      clearInterval(interval);
     };
-  }, [supabase, router]);
+  }, [router]);
 
   const handleCreateTask = () => console.log("Create Task");
   const handleCancelTask = () => console.log("Cancel Task");

@@ -1,60 +1,118 @@
 'use client'
 
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Database } from '@/lib/database.types'
+import { Spinner } from '@/components/ui/spinner'
+import HanamiLoginForm from '@/components/ui/HanamiLoginForm'
+import { validateUserCredentials, setUserSession, getUserSession, clearUserSession } from '@/lib/authUtils'
 
 export default function ParentLoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClientComponentClient<Database>()
+  const mounted = useRef(false)
+  const redirecting = useRef(false)
+  const sessionChecked = useRef(false)
 
-  const handleLogin = async () => {
-    setError('')
-    setSuccess('')
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    if (error) {
-      setError(error.message)
-    } else {
-      setSuccess('登入成功')
+  useEffect(() => {
+    mounted.current = true
+
+    const checkSession = async () => {
+      // 防止重複檢查
+      if (sessionChecked.current || redirecting.current) return
+      sessionChecked.current = true
+
+      try {
+        // 檢查本地會話
+        const userSession = getUserSession()
+        if (userSession && userSession.role === 'parent' && mounted.current && !redirecting.current) {
+          redirecting.current = true
+          router.replace('/parent/dashboard')
+          return
+        }
+
+        // 清除無效會話
+        if (userSession && userSession.role !== 'parent') {
+          clearUserSession()
+        }
+      } catch (error) {
+        console.error('Session check error:', error)
+        clearUserSession()
+      }
+
+      if (mounted.current) {
+        setIsLoading(false)
+      }
+    }
+
+    checkSession()
+
+    return () => {
+      mounted.current = false
+    }
+  }, []) // 移除 router 依賴
+
+  const handleLogin = async (email: string, password: string) => {
+    if (!email || !password) {
+      setError('請輸入帳號和密碼')
+      return
+    }
+
+    try {
+      setError('')
+      setIsLoading(true)
+
+      // 使用新的認證系統
+      const result = await validateUserCredentials(email, password)
+
+      if (result.success && result.user) {
+        // 檢查用戶角色
+        if (result.user.role !== 'parent') {
+          setError('無權限：僅限家長登入')
+          setIsLoading(false)
+          return
+        }
+
+        // 設置用戶會話
+        setUserSession(result.user)
+
+        if (mounted.current && !redirecting.current) {
+          redirecting.current = true
+          router.replace('/parent/dashboard')
+        }
+      } else {
+        setError(result.error || '登入失敗')
+        setIsLoading(false)
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      if (mounted.current) {
+        setError(error instanceof Error ? error.message : '登入失敗')
+        setIsLoading(false)
+      }
     }
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFFCEB] font-['Quicksand',_sans-serif]">
-      <div className="bg-white shadow-xl rounded-[30px] p-8 w-[350px] border border-[#FDE6B8]">
-        <h1 className="text-2xl font-extrabold text-center text-[#2B3A3B] mb-4">
-          Hanami 家長登入
-        </h1>
-        <p className="text-sm text-center text-[#7B7B7B] mb-6">
-          歡迎回來！請輸入登入資料 🐾
-        </p>
-        <input
-          type="email"
-          placeholder="電子郵件"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full mb-3 px-4 py-2 border border-[#EADBC8] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#FCD58B]"
-        />
-        <input
-          type="password"
-          placeholder="密碼"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-4 px-4 py-2 border border-[#EADBC8] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#FCD58B]"
-        />
-        <button
-          onClick={handleLogin}
-          className="w-full bg-[#FCD58B] text-[#2B3A3B] font-bold py-2 rounded-full hover:bg-[#fbc161] transition"
-        >
-          登入
-        </button>
-        {error && <p className="text-red-400 mt-3 text-sm text-center">{error}</p>}
-        {success && <p className="text-green-500 mt-3 text-sm text-center">{success}</p>}
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#FFF9F2] font-['Quicksand',_sans-serif] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto"></div>
+          <p className="mt-4 text-brown-700">載入中...</p>
+        </div>
       </div>
-    </div>
+    )
+  }
+
+  return (
+    <HanamiLoginForm
+      userType="parent"
+      onSubmit={handleLogin}
+      loading={isLoading}
+      error={error}
+    />
   )
 }
