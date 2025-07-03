@@ -1,17 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { runSimpleSchemaScan, SimpleDatabaseSchema } from '@/utils/simpleSchemaScanner'
-import { runAdvancedSchemaScan, AdvancedDatabaseSchema } from '@/utils/advancedSchemaScanner'
 import { supabase } from '@/lib/supabase'
 
-type ScanMode = 'simple' | 'advanced'
+type ScanMode = 'simple'
 
 export default function SchemaScannerPage() {
   const [isScanning, setIsScanning] = useState(false)
   const [scanMode, setScanMode] = useState<ScanMode>('simple')
-  const [simpleSchema, setSimpleSchema] = useState<SimpleDatabaseSchema | null>(null)
-  const [advancedSchema, setAdvancedSchema] = useState<AdvancedDatabaseSchema | null>(null)
   const [report, setReport] = useState<string>('')
   const [error, setError] = useState<string>('')
   const [scanResult, setScanResult] = useState<string>('')
@@ -20,9 +16,6 @@ export default function SchemaScannerPage() {
   const handleScan = async () => {
     setIsScanning(true)
     setError('')
-    setSimpleSchema(null)
-    setAdvancedSchema(null)
-    setReport('')
 
     try {
       // 簡化掃描功能，直接使用 scanDatabase
@@ -48,8 +41,6 @@ export default function SchemaScannerPage() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
-
-  const schema = simpleSchema || advancedSchema
 
   const scanDatabase = async () => {
     setLoading(true)
@@ -303,16 +294,7 @@ export default function SchemaScannerPage() {
               />
               <span>簡單掃描 (基本資訊)</span>
             </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                value="advanced"
-                checked={scanMode === 'advanced'}
-                onChange={(e) => setScanMode(e.target.value as ScanMode)}
-                className="mr-2"
-              />
-              <span>進階掃描 (完整資訊，需要 RPC 函數)</span>
-            </label>
+
           </div>
         </div>
         
@@ -322,7 +304,7 @@ export default function SchemaScannerPage() {
             disabled={isScanning}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isScanning ? '掃描中...' : `開始${scanMode === 'simple' ? '簡單' : '進階'}掃描`}
+            {isScanning ? '掃描中...' : '開始簡單掃描'}
           </button>
           
           {report && (
@@ -341,249 +323,8 @@ export default function SchemaScannerPage() {
           </div>
         )}
 
-        {scanMode === 'advanced' && (
-          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-6">
-            <strong>注意:</strong> 進階掃描需要先在 Supabase 中執行 <code>supabase_schema_scanner_functions.sql</code> 腳本來建立必要的 RPC 函數。
-          </div>
-        )}
+
       </div>
-
-      {schema && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">📊 掃描摘要</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{schema.summary.total_tables}</div>
-              <div className="text-sm text-gray-600">總表格數</div>
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{schema.summary.total_columns}</div>
-              <div className="text-sm text-gray-600">總欄位數</div>
-            </div>
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">{schema.summary.tables_with_rls.length}</div>
-              <div className="text-sm text-gray-600">啟用 RLS 的表格</div>
-            </div>
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">{schema.summary.tables_without_rls.length}</div>
-              <div className="text-sm text-gray-600">未啟用 RLS 的表格</div>
-            </div>
-          </div>
-
-          {/* 進階掃描的額外統計 */}
-          {advancedSchema && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div className="bg-indigo-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-indigo-600">{advancedSchema.summary.total_relationships}</div>
-                <div className="text-sm text-gray-600">總關聯數</div>
-              </div>
-              <div className="bg-pink-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-pink-600">{advancedSchema.summary.total_policies}</div>
-                <div className="text-sm text-gray-600">總策略數</div>
-              </div>
-              <div className="bg-teal-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-teal-600">{advancedSchema.summary.total_enums}</div>
-                <div className="text-sm text-gray-600">總枚舉數</div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {schema && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">🔐 RLS 狀態</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-2 text-green-600">
-                ✅ 啟用 RLS 的表格 ({schema.summary.tables_with_rls.length})
-              </h3>
-              <div className="bg-green-50 p-4 rounded-lg">
-                {schema.summary.tables_with_rls.length > 0 ? (
-                  <ul className="space-y-1">
-                    {schema.summary.tables_with_rls.map(table => (
-                      <li key={table} className="text-sm">• {table}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-gray-500">沒有啟用 RLS 的表格</p>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-2 text-orange-600">
-                ⚠️ 未啟用 RLS 的表格 ({schema.summary.tables_without_rls.length})
-              </h3>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                {schema.summary.tables_without_rls.length > 0 ? (
-                  <ul className="space-y-1">
-                    {schema.summary.tables_without_rls.map(table => (
-                      <li key={table} className="text-sm">• {table}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-gray-500">所有表格都已啟用 RLS</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 枚舉類型 (僅進階掃描) */}
-      {advancedSchema && advancedSchema.enums.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">🔤 枚舉類型</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {advancedSchema.enums.map(enumType => (
-              <div key={enumType.enum_name} className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">{enumType.enum_name}</h3>
-                <div className="text-sm text-gray-600">
-                  值: {enumType.enum_values.join(', ')}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {schema && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">📋 表格詳細資訊</h2>
-          <div className="space-y-6">
-            {(simpleSchema?.tables || advancedSchema?.tables || []).map(table => (
-              <div key={table.table_name} className="border rounded-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold">🗂️ {table.table_name}</h3>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-600">欄位數: {table.column_count}</span>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      table.has_rls 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-orange-100 text-orange-800'
-                    }`}>
-                      {table.has_rls ? '✅ RLS 已啟用' : '⚠️ RLS 未啟用'}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* 欄位資訊 */}
-                <div>
-                  <h4 className="text-lg font-medium mb-2">欄位</h4>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white border border-gray-200">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">欄位名稱</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">資料型別</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">可為空</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">預設值</th>
-                          {advancedSchema && (
-                            <>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">主鍵</th>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">外鍵</th>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">參考表格</th>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">參考欄位</th>
-                            </>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {table.columns.map(column => (
-                          <tr key={column.column_name} className="border-t border-gray-200">
-                            <td className="px-4 py-2 text-sm font-medium">{column.column_name}</td>
-                            <td className="px-4 py-2 text-sm">{column.data_type}</td>
-                            <td className="px-4 py-2 text-sm">{column.is_nullable}</td>
-                            <td className="px-4 py-2 text-sm">{column.column_default || '-'}</td>
-                            {advancedSchema && (
-                              <>
-                                <td className="px-4 py-2 text-sm">{(column as any).is_primary_key ? '🔑' : ''}</td>
-                                <td className="px-4 py-2 text-sm">{(column as any).is_foreign_key ? '🔗' : ''}</td>
-                                <td className="px-4 py-2 text-sm">{(column as any).foreign_table_name || '-'}</td>
-                                <td className="px-4 py-2 text-sm">{(column as any).foreign_column_name || '-'}</td>
-                              </>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 進階掃描的額外資訊 */}
-                {advancedSchema && (
-                  <>
-                    {/* 關聯資訊 */}
-                    {(table as any).relationships?.length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="text-lg font-medium mb-2">🔗 關聯 ({(table as any).relationships.length})</h4>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full bg-white border border-gray-200">
-                            <thead>
-                              <tr className="bg-gray-50">
-                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">約束名稱</th>
-                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">欄位</th>
-                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">參考表格</th>
-                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">參考欄位</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(table as any).relationships.map((rel: any) => (
-                                <tr key={rel.constraint_name} className="border-t border-gray-200">
-                                  <td className="px-4 py-2 text-sm">{rel.constraint_name}</td>
-                                  <td className="px-4 py-2 text-sm">{rel.column_name}</td>
-                                  <td className="px-4 py-2 text-sm">{rel.foreign_table_name}</td>
-                                  <td className="px-4 py-2 text-sm">{rel.foreign_column_name}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* RLS 策略 */}
-                    <div className="mt-4">
-                      <h4 className="text-lg font-medium mb-2">
-                        🔐 RLS 策略 ({(table as any).policies?.length || 0})
-                      </h4>
-                      {(table as any).policies?.length > 0 ? (
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full bg-white border border-gray-200">
-                            <thead>
-                              <tr className="bg-gray-50">
-                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">策略名稱</th>
-                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">操作</th>
-                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">條件</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(table as any).policies.map((policy: any) => (
-                                <tr key={policy.policyname} className="border-t border-gray-200">
-                                  <td className="px-4 py-2 text-sm">{policy.policyname}</td>
-                                  <td className="px-4 py-2 text-sm">{policy.cmd}</td>
-                                  <td className="px-4 py-2 text-sm">
-                                    {policy.qual || policy.with_check || '無條件'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                          <p className="text-sm text-orange-700">⚠️ 此表格未設置 RLS 策略</p>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {report && (
         <div className="mb-8">

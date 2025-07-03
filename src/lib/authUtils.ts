@@ -172,7 +172,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
   
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    if (!user || !user.email) return null;
 
     const role = await getUserRole();
     if (!role) return null;
