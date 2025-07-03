@@ -123,19 +123,22 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     teacherOptionsFetchedRef.current = true
     teacherOptionsLoading = true
 
-    supabase.from('hanami_employee').select('teacher_nickname').then(({ data }) => {
-      if (data) {
-        const options = data.map((item: any) => ({
-          label: item.teacher_nickname,
-          value: item.teacher_nickname
-        }))
-        setTeacherOptions(options)
-        teacherOptionsCache = options // 快取結果
+    const fetchTeacherOptions = async () => {
+      try {
+        const { data } = await supabase.from('hanami_employee').select('teacher_nickname')
+        if (data) {
+          const options = data.map((item: any) => ({
+            label: item.teacher_nickname,
+            value: item.teacher_nickname
+          }))
+          setTeacherOptions(options)
+          teacherOptionsCache = options // 快取結果
+        }
+      } finally {
+        teacherOptionsLoading = false
       }
-      teacherOptionsLoading = false
-    }).catch(() => {
-      teacherOptionsLoading = false
-    })
+    }
+    fetchTeacherOptions()
   }, [])
 
   useEffect(() => {

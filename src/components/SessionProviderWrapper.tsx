@@ -41,7 +41,10 @@ export default function SessionProviderWrapper({
           email: initialSession.email || '',
           user_metadata: {
             role: initialSession.role
-          }
+          },
+          app_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString()
         }
       } as Session
     : initialSession;

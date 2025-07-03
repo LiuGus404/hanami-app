@@ -131,7 +131,7 @@ export async function getUserRole(): Promise<UserRole | null> {
   
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    if (!user || !user.email) return null;
 
     // 檢查是否為管理員
     const { data: adminData } = await supabase

@@ -194,7 +194,7 @@ const HanamiTC = () => {
     // 獲取所有學生資料
     const { data: studentsData, error: studentsError } = await supabase
       .from('Hanami_Students')
-      .select('id, full_name, student_age');
+      .select('id, full_name, student_age, contact_number');
 
     if (studentsError) {
       console.error('Fetch students error:', studentsError);
@@ -212,7 +212,7 @@ const HanamiTC = () => {
       regular_weekday: null,
       regular_timeslot: null,
       remaining_lessons: null,
-      contact_number: null,
+      contact_number: student.contact_number || '',
       health_notes: null,
       student_oid: null,
       nick_name: null,
