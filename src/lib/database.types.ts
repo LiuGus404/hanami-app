@@ -1018,6 +1018,47 @@ export type Database = {
         }
         Relationships: []
       }
+      teacher_schedule: {
+        Row: {
+          id: string
+          teacher_id: string
+          scheduled_date: string
+          start_time: string
+          end_time: string
+          note: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          teacher_id: string
+          scheduled_date: string
+          start_time: string
+          end_time: string
+          note?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          teacher_id?: string
+          scheduled_date?: string
+          start_time?: string
+          end_time?: string
+          note?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_schedule_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_employee"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
