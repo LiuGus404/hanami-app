@@ -6,19 +6,21 @@ import Image from 'next/image'
 
 interface ClassType {
   id: string
-  name: string
-  status: boolean
+  name: string | null
+  status: boolean | null
   created_at: string
 }
 
 interface ScheduleSlot {
   id: string
-  weekday: number
-  timeslot: string
-  max_students: number
-  duration: string
-  course_type: string
-  assigned_teachers: string
+  weekday: number | null
+  timeslot: string | null
+  max_students: number | null
+  duration: string | null
+  course_type: string | null
+  assigned_teachers: string | null
+  created_at?: string
+  updated_at?: string | null
 }
 
 export default function ClassManagementPanel() {
@@ -190,7 +192,7 @@ export default function ClassManagementPanel() {
 
   const handleEditClass = (classType: ClassType) => {
     setEditingClass(classType)
-    setEditClassName(classType.name)
+    setEditClassName(classType.name || '')
     setShowEditClass(true)
   }
 
@@ -276,11 +278,11 @@ export default function ClassManagementPanel() {
     console.log('🔍 可用班別:', classTypes)
     setEditingSlot(slot)
     setEditSlot({
-      weekday: slot.weekday,
-      timeslot: slot.timeslot,
-      max_students: slot.max_students,
-      duration: slot.duration,
-      course_type: slot.course_type,
+      weekday: slot.weekday || 1,
+      timeslot: slot.timeslot || '09:00',
+      max_students: slot.max_students || 4,
+      duration: slot.duration || '00:45',
+      course_type: slot.course_type || '',
       assigned_teachers: slot.assigned_teachers || ''
     })
     setShowEditSlot(true)
@@ -365,11 +367,11 @@ export default function ClassManagementPanel() {
 
   const handleCopySlot = (slot: ScheduleSlot) => {
     setNewSlot({
-      weekday: slot.weekday,
-      timeslot: slot.timeslot,
-      max_students: slot.max_students,
-      duration: slot.duration,
-      course_type: slot.course_type,
+      weekday: slot.weekday || 1,
+      timeslot: slot.timeslot || '09:00',
+      max_students: slot.max_students || 4,
+      duration: slot.duration || '00:45',
+      course_type: slot.course_type || '',
       assigned_teachers: slot.assigned_teachers || ''
     })
     setShowAddSlot(true)
@@ -545,11 +547,11 @@ export default function ClassManagementPanel() {
                       className="w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
                     />
                   </td>
-                  <td className="p-2">{weekdays[slot.weekday]}</td>
-                  <td className="p-2">{slot.timeslot}</td>
-                  <td className="p-2">{slot.course_type}</td>
-                  <td className="p-2">{slot.max_students}</td>
-                  <td className="p-2">{slot.duration}</td>
+                  <td className="p-2">{weekdays[slot.weekday || 1]}</td>
+                  <td className="p-2">{slot.timeslot || ''}</td>
+                  <td className="p-2">{slot.course_type || ''}</td>
+                  <td className="p-2">{slot.max_students || 0}</td>
+                  <td className="p-2">{slot.duration || ''}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-1">
                       <button
@@ -679,7 +681,7 @@ export default function ClassManagementPanel() {
                 >
                   <option value="">請選擇班別</option>
                   {classTypes.map((classType) => (
-                    <option key={classType.id} value={classType.name}>{classType.name}</option>
+                    <option key={classType.id} value={classType.name || ''}>{classType.name || ''}</option>
                   ))}
                 </select>
               </div>
@@ -778,7 +780,7 @@ export default function ClassManagementPanel() {
                 >
                   <option value="">請選擇班別</option>
                   {classTypes.map((classType) => (
-                    <option key={classType.id} value={classType.name}>{classType.name}</option>
+                    <option key={classType.id} value={classType.name || ''}>{classType.name || ''}</option>
                   ))}
                 </select>
                 <div className="text-xs text-gray-500 mt-1">

@@ -770,15 +770,15 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                       <div
                         key={t.id}
                         className={`w-full max-w-full bg-[#FFE8C2] rounded-md shadow flex flex-col items-center p-1 overflow-hidden border border-[#EADBC8] ${
-                          editMode && 'confirmed' in schedule && schedule.confirmed ? 'bg-green-50 border-green-300' : ''
+                          editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'bg-green-50 border-green-300' : ''
                         }`}
                         style={{ zIndex: 10, marginBottom: 2 }}
                         onClick={e => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-between w-full">
                           <span className={`text-xs font-bold truncate ${
-                            editMode && 'confirmed' in schedule && schedule.confirmed ? 'text-green-700' : ''
-                          }`}>{editMode && '✅ '}{t.teacher_nickname}</span>
+                            editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'text-green-700' : ''
+                          }`}>{editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? '✅ ' : ''}{t.teacher_nickname}</span>
                           {editMode && (
                             <div className="flex gap-0.5 ml-1 pointer-events-auto">
                               <button
