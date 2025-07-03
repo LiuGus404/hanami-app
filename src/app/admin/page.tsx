@@ -42,23 +42,25 @@ export default function AdminPage() {
       try {
         setError(null);
         
-        // 獲取學生數量
-        const { data: students, error: studentsError } = await supabase
+        // 只宣告一次 today
+        const today = new Date().toISOString().split('T')[0];
+        // 獲取常規學生數量（Hanami_Students 表中 student_type = '常規' 的學生）
+        const { data: regularStudents, error: regularError } = await supabase
           .from('Hanami_Students')
-          .select('id');
+          .select('id, student_type')
+          .eq('student_type', '常規');
         
-        if (studentsError) {
-          console.error('Error fetching students:', studentsError);
-          setError('無法獲取學生數據');
-        } else if (Array.isArray(students)) {
-          setStudentCount(students.filter(s => s.id).length);
+        if (regularError) {
+          console.error('Error fetching regular students:', regularError);
+          setError('無法獲取常規學生數據');
+        } else if (Array.isArray(regularStudents)) {
+          setStudentCount(regularStudents.length);
         }
 
-        // 獲取試堂學生數量
-        const today = new Date().toISOString().split('T')[0];
+        // 獲取今日及之後的試堂學生數量
         const { data: trialStudents, error: trialError } = await supabase
           .from('hanami_trial_students')
-          .select('lesson_date')
+          .select('id, lesson_date')
           .gte('lesson_date', today);
         
         if (trialError) {
@@ -67,15 +69,45 @@ export default function AdminPage() {
           setTrialStudentCount(trialStudents.length);
         }
 
-        // 獲取最後一堂課學生數量
-        const { data: lastLessonStudents, error: lastLessonError } = await supabase
+        // 先獲取所有常規學生
+        const { data: regularStudentsForLesson, error: regularStudentsError } = await supabase
           .from('Hanami_Students')
-          .select('remaining_lessons');
+          .select('id, student_oid, full_name, student_type')
+          .eq('student_type', '常規');
         
-        if (lastLessonError) {
-          console.error('Error fetching last lesson students:', lastLessonError);
-        } else if (Array.isArray(lastLessonStudents)) {
-          setLastLessonCount(lastLessonStudents.filter(s => s.remaining_lessons === 1).length);
+        if (regularStudentsError) {
+          console.error('Error fetching regular students for lesson count:', regularStudentsError);
+        } else if (Array.isArray(regularStudentsForLesson)) {
+          // 獲取每個常規學生的課堂記錄
+          const studentIds = regularStudentsForLesson.map(s => s.id);
+          const { data: lessonRecords, error: lessonError } = await supabase
+            .from('hanami_student_lesson')
+            .select('student_id, lesson_date, status')
+            .in('student_id', studentIds)
+            .gte('lesson_date', today)
+            .order('lesson_date');
+          
+          if (lessonError) {
+            console.error('Error fetching lesson records:', lessonError);
+          } else if (Array.isArray(lessonRecords)) {
+            // 計算每個學生的剩餘堂數
+            const studentLessonCounts = new Map();
+            
+            lessonRecords.forEach(lesson => {
+              const studentId = lesson.student_id;
+              if (!studentLessonCounts.has(studentId)) {
+                studentLessonCounts.set(studentId, 0);
+              }
+              studentLessonCounts.set(studentId, studentLessonCounts.get(studentId) + 1);
+            });
+            
+            // 計算剩餘堂數為1的學生數量
+            const studentsWithOneLessonLeft = Array.from(studentLessonCounts.entries())
+              .filter(([studentId, count]) => count === 1)
+              .length;
+            
+            setLastLessonCount(studentsWithOneLessonLeft);
+          }
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);

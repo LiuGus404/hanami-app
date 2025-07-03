@@ -65,6 +65,10 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
+  // 排序相關狀態
+  const [sortField, setSortField] = useState<string>('')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false)
   const currentStudentIdRef = useRef<string | null>(null)
@@ -83,6 +87,90 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
     
     fetchLessons()
   }, [studentId])
+
+  // 排序功能
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      // 如果點擊的是同一個欄位，切換排序方向
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // 如果點擊的是新欄位，設置為升序
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  // 獲取排序圖標
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return (
+        <div className="flex flex-col items-center space-y-0.5">
+          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 3L3 10h14L10 3z" />
+          </svg>
+          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 17L3 10h14L10 17z" />
+          </svg>
+        </div>
+      )
+    }
+    return sortDirection === 'asc' ? 
+      <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M10 3L3 10h14L10 3z" />
+      </svg> : 
+      <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M10 17L3 10h14L10 17z" />
+      </svg>
+  }
+
+  // 排序課堂數據
+  const sortLessons = (lessonsData: Lesson[]) => {
+    if (!sortField) {
+      return lessonsData
+    }
+
+    return [...lessonsData].sort((a, b) => {
+      let aValue = a[sortField as keyof Lesson]
+      let bValue = b[sortField as keyof Lesson]
+
+      // 處理特殊欄位的排序
+      switch (sortField) {
+        case 'lesson_date':
+          // 日期按日期排序
+          aValue = aValue ? new Date(aValue as string).getTime() : 0
+          bValue = bValue ? new Date(bValue as string).getTime() : 0
+          break
+        case 'actual_timeslot':
+        case 'regular_timeslot':
+          // 時間按字符串排序
+          aValue = String(aValue || '').toLowerCase()
+          bValue = String(bValue || '').toLowerCase()
+          break
+        case 'course_type':
+        case 'lesson_teacher':
+        case 'lesson_status':
+          // 其他欄位按字符串排序
+          aValue = String(aValue || '').toLowerCase()
+          bValue = String(bValue || '').toLowerCase()
+          break
+        default:
+          // 其他欄位按字符串排序
+          aValue = String(aValue || '').toLowerCase()
+          bValue = String(bValue || '').toLowerCase()
+      }
+
+      if (aValue < bValue) {
+        return sortDirection === 'asc' ? -1 : 1
+      }
+      if (aValue > bValue) {
+        return sortDirection === 'asc' ? 1 : -1
+      }
+      return 0
+    })
+  }
+
+  // 獲取排序後的課堂數據
+  const sortedLessons = sortLessons(lessons)
 
   const fetchLessons = async () => {
     try {
@@ -273,7 +361,7 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
 
-  const filteredLessons = lessons.filter((lesson) => {
+  const filteredLessons = sortedLessons.filter((lesson) => {
     if (categoryFilter.includes('all')) return true
 
     const lessonDateStr = format(new Date(lesson.lesson_date), 'yyyy-MM-dd')
@@ -585,21 +673,61 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
                     type="checkbox"
                     className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
                     onChange={(e) => {
-                      if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id))
+                      if (e.target.checked) setSelected(sortedLessons.slice(0, visibleCount).map(l => l.id))
                       else setSelected([])
                     }}
                   />
                 </th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">日期</th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">課堂</th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">上課時間</th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">負責老師</th>
-                <th className="text-[15px] font-medium px-2 py-2 text-left">出席狀況</th>
+                <th 
+                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('lesson_date')}
+                >
+                  <div className="flex items-center gap-1">
+                    日期
+                    {getSortIcon('lesson_date')}
+                  </div>
+                </th>
+                <th 
+                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('course_type')}
+                >
+                  <div className="flex items-center gap-1">
+                    課堂
+                    {getSortIcon('course_type')}
+                  </div>
+                </th>
+                <th 
+                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('actual_timeslot')}
+                >
+                  <div className="flex items-center gap-1">
+                    上課時間
+                    {getSortIcon('actual_timeslot')}
+                  </div>
+                </th>
+                <th 
+                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('lesson_teacher')}
+                >
+                  <div className="flex items-center gap-1">
+                    負責老師
+                    {getSortIcon('lesson_teacher')}
+                  </div>
+                </th>
+                <th 
+                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('lesson_status')}
+                >
+                  <div className="flex items-center gap-1">
+                    出席狀況
+                    {getSortIcon('lesson_status')}
+                  </div>
+                </th>
                 <th className="px-2 py-2"></th>
               </tr>
             </thead>
             <tbody>
-              {filteredLessons.slice(0, visibleCount).map((lesson) => (
+              {sortedLessons.slice(0, visibleCount).map((lesson) => (
                 <tr key={lesson.id} className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6]">
                   <td className="px-2 py-2">
                     <input

@@ -83,7 +83,7 @@ export default function StudentManagementPage() {
     { label: '地址', value: 'address' },
     { label: '負責老師', value: 'student_teacher' },
     { label: '偏好', value: 'student_preference' },
-    { label: '上課日', value: 'regular_weekday' },
+    { label: '星期', value: 'regular_weekday' },
     { label: '上課時間', value: 'regular_timeslot' },
     { label: '剩餘堂數', value: 'remaining_lessons' },
     { label: '入學日期', value: 'started_date' },
@@ -1268,7 +1268,7 @@ export default function StudentManagementPage() {
             selectedCourses.length > 0 && `課程：${selectedCourses.join('、')}`,
             selectedWeekdays.length > 0 &&
               `星期：${selectedWeekdays
-                .map((day) => ['日', '一', '二', '三', '四', '五', '六'][Number(day)])
+                .map((day) => `星期${['日', '一', '二', '三', '四', '五', '六'][Number(day)]}`)
                 .join('、')}`,
             selectedLessonFilter === 'custom' && typeof customLessonCount === 'number'
               ? `剩餘堂數 = ${customLessonCount}`
@@ -1644,7 +1644,7 @@ export default function StudentManagementPage() {
                       onClick={() => handleSort('regular_weekday')}
                     >
                       <div className="flex items-center gap-1">
-                        上課日
+                      星期
                         {getSortIcon('regular_weekday')}
                       </div>
                     </th>
@@ -1759,9 +1759,9 @@ export default function StudentManagementPage() {
                     const months = ageInMonths % 12
                     const weekdays = ['日', '一', '二', '三', '四', '五', '六']
                     const regularWeekdays = Array.isArray(student.regular_weekday)
-                      ? student.regular_weekday.map((d: string | number) => weekdays[Number(d)]).join('、')
+                      ? student.regular_weekday.map((d: string | number) => `星期${weekdays[Number(d)]}`).join('、')
                       : typeof student.regular_weekday === 'string'
-                        ? weekdays[Number(student.regular_weekday)]
+                        ? `星期${weekdays[Number(student.regular_weekday)]}`
                         : '—'
 
                     return (
@@ -1844,7 +1844,25 @@ export default function StudentManagementPage() {
                           <td className="p-3 text-sm text-[#2B3A3B]">{student.student_preference || '—'}</td>
                         )}
                         {selectedColumns.includes('regular_weekday') && (
-                          <td className="p-3 text-sm text-[#2B3A3B]">{regularWeekdays}</td>
+                          <td className="p-3 text-sm text-[#2B3A3B]">
+                            {
+                              (() => {
+                                const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+                                let regularWeekdays = '—';
+                                const val = student.regular_weekday;
+                                if (val !== undefined && val !== null && val !== '') {
+                                  if (Array.isArray(val)) {
+                                    regularWeekdays = val
+                                      .filter((d: any) => d !== null && d !== undefined && d !== '')
+                                      .map((d: any) => weekdays[Number(d)]).join('、');
+                                  } else if (!isNaN(Number(val))) {
+                                    regularWeekdays = weekdays[Number(val)];
+                                  }
+                                }
+                                return regularWeekdays;
+                              })()
+                            }
+                          </td>
                         )}
                         {selectedColumns.includes('regular_timeslot') && (
                           <td className="p-3 text-sm text-[#2B3A3B]">

@@ -20,7 +20,7 @@ export default function AccountIcon({ type, size = 'md', className = '' }: Accou
       case 'teacher':
         return (
           <div className={`${sizeClasses[size]} bg-[#FFF3E0] rounded-full flex items-center justify-center ${className}`}>
-            <span className="text-[#A64B2A] text-lg">👨‍🏫</span>
+            <img src="/teacher.png" alt="teacher" className="w-6 h-6" />
           </div>
         );
       case 'student':

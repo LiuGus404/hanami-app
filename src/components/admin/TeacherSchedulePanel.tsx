@@ -639,7 +639,10 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       {editMode && viewMode === 'calendar' && (
         <div className="mb-4 p-4 bg-[#FFFCEB] rounded-lg border border-[#EADBC8] shadow-sm">
           <h3 className="text-lg font-bold mb-3 text-[#4B4036] flex items-center gap-2">
-            <span>📅 拖拽老師到日期安排排班</span>
+                            <span className="flex items-center gap-1">
+                  <img src="/calendar.png" alt="calendar" className="w-4 h-4" />
+                  拖拽老師到日期安排排班
+                </span>
             <span className="text-sm font-normal text-[#A68A64]">(拖拽後可調整時間)</span>
           </h3>
           <div className="flex flex-wrap gap-3">
@@ -651,7 +654,8 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                 onDragEnd={handleTeacherDragEnd}
                 className="px-4 py-3 bg-[#FFE8C2] text-[#4B4036] rounded-lg cursor-move hover:bg-[#EADBC8] border-2 border-[#EADBC8] hover:border-[#A68A64] transition-all duration-200 shadow-sm hover:shadow-md font-medium"
               >
-                👨‍🏫 {teacher.teacher_nickname}
+                <img src="/teacher.png" alt="teacher" className="w-4 h-4" />
+                {teacher.teacher_nickname}
               </div>
             ))}
           </div>
@@ -740,7 +744,7 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
               .filter(s => s.scheduled_date === dateStr)
               .map(s => filteredTeachers.find(t => t.id === s.teacher_id))
               .filter(Boolean) as Teacher[]
-            const lessonCount = filteredLessons.filter(l => l.lesson_date === dateStr).length
+            const lessonCount = lessonsCountByDate[dateStr] || 0
             
             return (
               <div
@@ -778,7 +782,12 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                         <div className="flex items-center justify-between w-full">
                           <span className={`text-xs font-bold truncate ${
                             editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'text-green-700' : ''
-                          }`}>{editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? '✅ ' : ''}{t.teacher_nickname}</span>
+                          }`}>
+                  {editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? (
+                    <img src="/leaf-sprout.png" alt="confirmed" className="w-3 h-3 inline mr-1" />
+                  ) : null}
+                  {t.teacher_nickname}
+                </span>
                           {editMode && (
                             <div className="flex gap-0.5 ml-1 pointer-events-auto">
                               <button
@@ -992,9 +1001,9 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
         }`}>
           <div className="flex items-center gap-2">
             {errorMsg.includes('已安排到') || errorMsg.includes('儲存成功') ? (
-              <span className="text-green-600">✅</span>
+              <img src="/leaf-sprout.png" alt="success" className="w-4 h-4" />
             ) : (
-              <span className="text-red-600">⚠️</span>
+              <img src="/close.png" alt="warning" className="w-4 h-4" />
             )}
             <span>{errorMsg}</span>
           </div>

@@ -29,6 +29,10 @@ export default function ClassManagementPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
+  // 排序相關狀態
+  const [sortField, setSortField] = useState<string>('')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
   // 新增班別狀態
   const [showAddClass, setShowAddClass] = useState(false)
   const [newClassName, setNewClassName] = useState('')
@@ -65,11 +69,99 @@ export default function ClassManagementPanel() {
   const [selectedSlots, setSelectedSlots] = useState<string[]>([])
   const [selectAll, setSelectAll] = useState(false)
 
-  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 
   useEffect(() => {
     fetchData()
   }, [])
+
+  // 排序功能
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      // 如果點擊的是同一個欄位，切換排序方向
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // 如果點擊的是新欄位，設置為升序
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  // 獲取排序圖標
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return (
+        <div className="flex flex-col items-center space-y-0.5">
+          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 3L3 10h14L10 3z" />
+          </svg>
+          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 17L3 10h14L10 17z" />
+          </svg>
+        </div>
+      )
+    }
+    return sortDirection === 'asc' ? 
+      <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M10 3L3 10h14L10 3z" />
+      </svg> : 
+      <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M10 17L3 10h14L10 17z" />
+      </svg>
+  }
+
+  // 排序時段數據
+  const sortScheduleSlots = (slots: ScheduleSlot[]) => {
+    if (!sortField) {
+      return slots
+    }
+
+    return [...slots].sort((a, b) => {
+      let aValue = a[sortField as keyof ScheduleSlot]
+      let bValue = b[sortField as keyof ScheduleSlot]
+
+      // 處理特殊欄位的排序
+      switch (sortField) {
+        case 'weekday':
+          // 星期按數字排序
+          aValue = Number(aValue) || 0
+          bValue = Number(bValue) || 0
+          break
+        case 'max_students':
+          // 人數上限按數字排序
+          aValue = Number(aValue) || 0
+          bValue = Number(bValue) || 0
+          break
+        case 'timeslot':
+        case 'duration':
+          // 時間按字符串排序
+          aValue = String(aValue || '').toLowerCase()
+          bValue = String(bValue || '').toLowerCase()
+          break
+        case 'course_type':
+        case 'assigned_teachers':
+          // 其他欄位按字符串排序
+          aValue = String(aValue || '').toLowerCase()
+          bValue = String(bValue || '').toLowerCase()
+          break
+        default:
+          // 其他欄位按字符串排序
+          aValue = String(aValue || '').toLowerCase()
+          bValue = String(bValue || '').toLowerCase()
+      }
+
+      if (aValue < bValue) {
+        return sortDirection === 'asc' ? -1 : 1
+      }
+      if (aValue > bValue) {
+        return sortDirection === 'asc' ? 1 : -1
+      }
+      return 0
+    })
+  }
+
+  // 獲取排序後的時段數據
+  const sortedScheduleSlots = sortScheduleSlots(scheduleSlots)
 
   const fetchData = async () => {
     setLoading(true)
@@ -528,16 +620,56 @@ export default function ClassManagementPanel() {
                     className="w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
                   />
                 </th>
-                <th className="text-left p-2">星期</th>
-                <th className="text-left p-2">時間</th>
-                <th className="text-left p-2">班別</th>
-                <th className="text-left p-2">人數上限</th>
-                <th className="text-left p-2">時長</th>
+                <th 
+                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('weekday')}
+                >
+                  <div className="flex items-center gap-1">
+                    星期
+                    {getSortIcon('weekday')}
+                  </div>
+                </th>
+                <th 
+                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('timeslot')}
+                >
+                  <div className="flex items-center gap-1">
+                    時間
+                    {getSortIcon('timeslot')}
+                  </div>
+                </th>
+                <th 
+                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('course_type')}
+                >
+                  <div className="flex items-center gap-1">
+                    班別
+                    {getSortIcon('course_type')}
+                  </div>
+                </th>
+                <th 
+                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('max_students')}
+                >
+                  <div className="flex items-center gap-1">
+                    人數上限
+                    {getSortIcon('max_students')}
+                  </div>
+                </th>
+                <th 
+                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  onClick={() => handleSort('duration')}
+                >
+                  <div className="flex items-center gap-1">
+                    時長
+                    {getSortIcon('duration')}
+                  </div>
+                </th>
                 <th className="text-left p-2">操作</th>
               </tr>
             </thead>
             <tbody>
-              {scheduleSlots.map((slot) => (
+              {sortedScheduleSlots.map((slot) => (
                 <tr key={slot.id} className="border-b border-[#EADBC8]">
                   <td className="p-2">
                     <input
@@ -547,7 +679,7 @@ export default function ClassManagementPanel() {
                       className="w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
                     />
                   </td>
-                  <td className="p-2">{weekdays[slot.weekday || 1]}</td>
+                  <td className="p-2">{slot.weekday !== null && slot.weekday !== undefined ? `星期${weekdays[slot.weekday]}` : ''}</td>
                   <td className="p-2">{slot.timeslot || ''}</td>
                   <td className="p-2">{slot.course_type || ''}</td>
                   <td className="p-2">{slot.max_students || 0}</td>

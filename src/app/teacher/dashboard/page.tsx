@@ -263,7 +263,7 @@ export default function TeacherDashboard() {
       tabs={[
         { id: 'overview', name: '概覽', icon: '📊' },
         { id: 'students', name: '學生管理', icon: '👥' },
-        { id: 'schedule', name: '課程安排', icon: '📅' },
+        { id: 'schedule', name: '課程安排', icon: 'calendar' },
         { id: 'reports', name: '報告', icon: '📈' }
       ]}
     >
