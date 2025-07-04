@@ -110,6 +110,7 @@ const HanamiCalendar = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   // 添加 loading 狀態
   const [isLoading, setIsLoading] = useState(false);
+  const [todayTeachers, setTodayTeachers] = useState<{name: string, start: string, end: string}[]>([]);
 
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
@@ -778,6 +779,33 @@ const HanamiCalendar = () => {
     setSelectedDetail(null);
   };
 
+  useEffect(() => {
+    const fetchTodayTeachers = async () => {
+      const supabase = getSupabaseClient();
+      const today = getHongKongDate();
+      const todayStr = today.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+      const { data, error } = await supabase
+        .from('teacher_schedule')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          hanami_employee:teacher_id (teacher_nickname)
+        `)
+        .eq('scheduled_date', todayStr);
+      if (!error && data) {
+        const list: {name: string, start: string, end: string}[] = [];
+        data.forEach((row: any) => {
+          if (row.hanami_employee && row.hanami_employee.teacher_nickname && row.start_time && row.end_time) {
+            list.push({ name: row.hanami_employee.teacher_nickname, start: row.start_time, end: row.end_time });
+          }
+        });
+        setTodayTeachers(list);
+      }
+    };
+    fetchTodayTeachers();
+  }, []);
+
   return (
     <div className="bg-[#FFFDF8] p-4 rounded-xl shadow-md">
       <div className="flex flex-wrap gap-2 items-center mb-4 overflow-x-auto">
@@ -827,7 +855,24 @@ const HanamiCalendar = () => {
           <img src="/refresh.png" alt="Refresh" className="w-4 h-4" />
         </button>
       </div>
-
+      {/* 今日上班老師圓角按鈕區塊 */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {todayTeachers.length > 0 ? (
+          todayTeachers.map((item, idx) => (
+            <button
+              key={idx}
+              className="rounded-full bg-[#FFF7D6] text-[#4B4036] px-4 py-2 shadow-md font-semibold text-sm hover:bg-[#FFE5B4] transition-all duration-150"
+              onClick={() => {
+                window.location.href = `/admin/teachers/teacher-schedule?teacher_name=${encodeURIComponent(item.name)}`;
+              }}
+            >
+              {item.name}（{item.start.slice(0,5)}~{item.end.slice(0,5)}）
+            </button>
+          ))
+        ) : (
+          <span className="text-[#A68A64]">今日無上班老師</span>
+        )}
+      </div>
       <div className="mt-4">
         {isLoading && (
           <div className="flex justify-center items-center py-8">

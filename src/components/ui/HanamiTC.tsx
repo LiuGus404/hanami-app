@@ -110,6 +110,7 @@ const HanamiTC = () => {
   const [view, setView] = useState<'week' | 'day'>('week');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
   const currentViewRef = useRef<string>('');
@@ -261,7 +262,7 @@ const HanamiTC = () => {
         .eq('teacher_status', 'active');
       
       if (data) {
-        // 轉換為 Teacher 類型
+        // 轉換為 Teacher 型別，顯示名稱用 teacher_nickname
         const processedTeachers: Teacher[] = data.map(teacher => ({
           id: teacher.id,
           teacher_fullname: teacher.teacher_fullname || '',
@@ -294,6 +295,84 @@ const HanamiTC = () => {
       .gte('lesson_date', startDate.toISOString())
       .lte('lesson_date', endDate.toISOString());
     setPlans(data || []);
+  };
+
+  const fetchTodayTeachers = async (date: Date) => {
+    const supabase = getSupabaseClient();
+    const dateStr = date.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    const { data, error } = await supabase
+      .from('teacher_schedule')
+      .select(`
+        id,
+        start_time,
+        end_time,
+        hanami_employee:teacher_id (teacher_nickname)
+      `)
+      .eq('scheduled_date', dateStr);
+    if (!error && data) {
+      const list: {name: string, start: string, end: string}[] = [];
+      data.forEach((row: any) => {
+        if (row.hanami_employee && row.hanami_employee.teacher_nickname && row.start_time && row.end_time) {
+          list.push({ name: row.hanami_employee.teacher_nickname, start: row.start_time, end: row.end_time });
+        }
+      });
+      return list;
+    }
+    return [];
+  };
+
+  // 今日上班老師元件
+  const TodayTeachersSection = ({ date }: { date: Date }) => {
+    const [teachers, setTeachers] = useState<{name: string, start: string, end: string}[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      const loadTeachers = async () => {
+        setLoading(true);
+        const teacherList = await fetchTodayTeachers(date);
+        setTeachers(teacherList);
+        setLoading(false);
+      };
+      loadTeachers();
+    }, [date]);
+
+    if (loading) {
+      return <div className="text-xs text-[#A68A64] mt-1">載入中...</div>;
+    }
+
+    if (teachers.length === 0) {
+      return <div className="text-xs text-[#A68A64] mt-1">無上班老師</div>;
+    }
+
+    return (
+      <div className="w-full flex flex-col items-center mb-1">
+        <div className="flex flex-row flex-wrap gap-1 w-full justify-center">
+          {teachers.map((teacher, idx) => (
+            <button
+              key={idx}
+              className="rounded-full bg-[#FFF7D6] text-[#4B4036] px-2 py-1 shadow-sm font-semibold text-xs hover:bg-[#FFE5B4] transition-all duration-150 truncate max-w-full"
+              onClick={() => {
+                window.location.href = `/admin/teachers/teacher-schedule?teacher_name=${encodeURIComponent(teacher.name)}`;
+              }}
+              title={teacher.name}
+            >
+              {teacher.name}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-row flex-wrap gap-1 w-full justify-center mt-1">
+          {teachers.map((teacher, idx) => (
+            <span
+              key={idx}
+              className="rounded-full bg-[#EADBC8] text-[#7A6654] px-2 py-0.5 font-mono text-xs min-w-[60px] text-center"
+              title={`${teacher.start.slice(0,5)}~${teacher.end.slice(0,5)}`}
+            >
+              {teacher.start.slice(0,5)}~{teacher.end.slice(0,5)}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   // 主要資料載入邏輯
@@ -485,6 +564,97 @@ const HanamiTC = () => {
     return Object.values(grouped);
   };
 
+  let dailyViewContent = null;
+  if (view === 'day') {
+    const date = getHongKongDate(currentDate);
+    const dayLessons = lessons.filter(l => getDateString(new Date(l.lesson_date)) === getDateString(date));
+    dayLessons.sort((a, b) => a.regular_timeslot.localeCompare(b.regular_timeslot));
+    const grouped = dayLessons.reduce<Record<string, Group>>((acc, l) => {
+      const key = `${l.regular_timeslot}_${l.course_type}`;
+      if (!acc[key]) {
+        acc[key] = {
+          time: l.regular_timeslot,
+          course: l.course_type,
+          students: []
+        };
+      }
+      let age = '';
+      if (l.student_age !== null && l.student_age !== undefined) {
+        age = (typeof l.student_age === 'string' ? parseInt(l.student_age) : l.student_age).toString();
+      }
+      acc[key].students.push({
+        name: l.full_name,
+        student_id: l.student_id,
+        age,
+        is_trial: l.is_trial,
+        remaining_lessons: l.remaining_lessons
+      });
+      return acc;
+    }, {});
+    const groupedArray = Object.values(grouped) as Group[];
+    dailyViewContent = (
+      <div className="flex flex-col items-center w-full">
+        <div className="font-semibold text-[#4B4036] text-lg mb-1">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]}</div>
+        <div className="text-xs text-gray-500">{date.getDate()}</div>
+        <TodayTeachersSection date={date} />
+        <div className="flex flex-col items-center gap-2 mt-1 w-full">
+          {groupedArray.map((group, j) => (
+            <MiniLessonCard
+              key={j}
+              time={group.time?.slice(0, 5) || ''}
+              course={{ name: group.course }}
+              students={group.students.map(student => ({
+                id: student.student_id,
+                name: student.name,
+                age: student.age,
+                isTrial: student.is_trial,
+                remainingLessons: student.remaining_lessons ?? undefined,
+                avatar: undefined
+              }))}
+              onEdit={() => {
+                const matchedPlan = (plans || []).find(
+                  p =>
+                    p.lesson_date === getDateString(date) &&
+                    p.timeslot === group.time &&
+                    p.course_type === group.course
+                );
+                setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
+                setIsModalOpen(true);
+              }}
+              onClick={() => {
+                setSelectedLesson({
+                  time: group.time?.slice(0, 5) || '',
+                  course: { name: group.course },
+                  teachers: (teachers || []) as Teacher[],
+                  students: group.students.map(student => ({
+                    id: student.student_id,
+                    name: student.name,
+                    age: student.age,
+                    isTrial: student.is_trial,
+                    remainingLessons: student.remaining_lessons ?? undefined,
+                    avatar: undefined
+                  })),
+                  onEdit: () => {
+                    setModalInfo({ date, time: group.time, course: group.course });
+                    setIsModalOpen(true);
+                  }
+                });
+              }}
+              duration={lessons.find(l =>
+                l.regular_timeslot === group.time &&
+                l.course_type === group.course &&
+                getDateString(new Date(l.lesson_date)) === getDateString(date)
+              )?.lesson_duration || undefined}
+              allShowTeachers={allShowTeachers}
+              allShowStudents={allShowStudents}
+              allShowPlan={allShowPlan}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white min-h-screen flex flex-col items-center py-0">
       <div className="bg-[#FFFDF8] rounded-xl shadow p-4 w-full max-w-5xl">
@@ -555,16 +725,17 @@ const HanamiTC = () => {
           <div className="grid grid-cols-7 gap-2 min-w-[700px] sm:min-w-0">
             {Array.from({ length: 7 }, (_, i) => {
               const weekStart = getHongKongDate(currentDate);
-              weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+              weekStart.setDate(currentDate.getDate() - currentDate.getDay());
               const date = getHongKongDate(weekStart);
               date.setDate(date.getDate() + i);
               const groupedArray = renderDayLessons(date);
               
               return (
-                <div key={i} className="p-2 rounded-xl text-center text-[#4B4036] text-sm bg-[#FFFDF8] flex flex-col items-center">
+                <div key={i} className="p-2 rounded-xl text-center text-[#4B4036] text-sm bg-[#FFFDF8] flex flex-col items-center h-full">
                   <div className="font-semibold">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i]}</div>
                   <div className="text-xs text-gray-500">{date.getDate()}</div>
-                  <div className="flex flex-col items-center gap-2 mt-1 w-full">
+                  <TodayTeachersSection date={date} />
+                  <div className="flex flex-row flex-wrap gap-2 justify-center mt-1 w-full">
                     {groupedArray.map((group, j) => {
                       const matchedPlan = (plans || []).find(
                         p =>
@@ -646,91 +817,7 @@ const HanamiTC = () => {
             })}
         </div>
       ) : (
-            // day view
-            (() => {
-                const date = getHongKongDate(currentDate);
-                const dayLessons = lessons.filter(l => getDateString(new Date(l.lesson_date)) === getDateString(date));
-                dayLessons.sort((a, b) => a.regular_timeslot.localeCompare(b.regular_timeslot));
-                const grouped = dayLessons.reduce<Record<string, Group>>((acc, l) => {
-                  const key = `${l.regular_timeslot}_${l.course_type}`;
-                  if (!acc[key]) {
-                    acc[key] = {
-                      time: l.regular_timeslot,
-                      course: l.course_type,
-                      students: []
-                    };
-                  }
-                  let age = '';
-                  if (l.student_age !== null && l.student_age !== undefined) {
-                    age = (typeof l.student_age === 'string' ? parseInt(l.student_age) : l.student_age).toString();
-                  }
-                  acc[key].students.push({
-                    name: l.full_name,
-                    student_id: l.student_id,
-                    age,
-                    is_trial: l.is_trial,
-                    remaining_lessons: l.remaining_lessons
-                  });
-                  return acc;
-                }, {});
-                const groupedArray = Object.values(grouped) as Group[];
-                  return (
-                <div className="flex flex-col gap-2 items-center w-full">
-                  {groupedArray.map((group, j) => (
-                        <MiniLessonCard
-                      key={j}
-                          time={group.time?.slice(0, 5) || ''}
-                          course={{ name: group.course }}
-                      students={group.students.map(student => ({
-                        id: student.student_id,
-                        name: student.name,
-                        age: student.age,
-                        isTrial: student.is_trial,
-                        remainingLessons: student.remaining_lessons ?? undefined,
-                        avatar: undefined
-                      }))}
-                          onEdit={() => {
-                            const matchedPlan = (plans || []).find(
-                              p =>
-                                p.lesson_date === getDateString(date) &&
-                                p.timeslot === group.time &&
-                                p.course_type === group.course
-                            );
-                            setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
-                            setIsModalOpen(true);
-                          }}
-                          onClick={() => {
-                            setSelectedLesson({
-                          time: group.time?.slice(0, 5) || '',
-                              course: { name: group.course },
-                          teachers: (teachers || []) as Teacher[],
-                          students: group.students.map(student => ({
-                            id: student.student_id,
-                            name: student.name,
-                            age: student.age,
-                            isTrial: student.is_trial,
-                            remainingLessons: student.remaining_lessons ?? undefined,
-                            avatar: undefined
-                          })),
-                              onEdit: () => {
-                                setModalInfo({ date, time: group.time, course: group.course });
-                                setIsModalOpen(true);
-                              }
-                            });
-                          }}
-                          duration={lessons.find(l =>
-                            l.regular_timeslot === group.time &&
-                            l.course_type === group.course &&
-                            getDateString(new Date(l.lesson_date)) === getDateString(date)
-                          )?.lesson_duration || undefined}
-                          allShowTeachers={allShowTeachers}
-                          allShowStudents={allShowStudents}
-                          allShowPlan={allShowPlan}
-                        />
-                  ))}
-                      </div>
-              );
-            })()
+            dailyViewContent
           )}
             </div>
         {/* LessonCard 彈窗 */}
@@ -773,6 +860,7 @@ const HanamiTC = () => {
             }}
           />
         )}
+
         </div>
     </div>
   );

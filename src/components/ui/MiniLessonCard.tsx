@@ -67,7 +67,7 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
 
   return (
     <div
-      className="bg-[#FFFDF8] rounded-xl shadow p-2 flex flex-col items-start gap-1 border border-[#EADBC8] cursor-pointer hover:shadow-lg transition min-w-[110px] max-w-[140px] relative"
+      className="bg-[#FFFDF8] rounded-xl shadow p-2 flex flex-col items-start gap-1 border border-[#EADBC8] cursor-pointer hover:shadow-lg transition relative w-full sm:w-[120px] md:w-[140px] min-w-0"
       onClick={onClick}
     >
       {/* 編輯按鈕 */}
@@ -130,22 +130,19 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
           {students.map((stu, i) => (
             <div
               key={i}
-              className={`flex items-center px-2 py-0.5 rounded-full text-[#4B4036] text-[10px] font-semibold ${getStudentBg(stu.remainingLessons, stu.isTrial)}`}
+              className={`flex flex-col items-center px-2 py-0.5 rounded-full text-[#4B4036] text-[10px] font-semibold bg-opacity-80 ${getStudentBg(stu.remainingLessons, stu.isTrial)}`}
+              style={{ minWidth: 0, maxWidth: '100%' }}
             >
-              {stu.name}
+              <div className="break-all w-full text-center">{stu.name}</div>
               {stu.age && (
-                <span className="ml-1 text-[10px] text-[#87704e]">
-                  ({(() => {
-                    const months = typeof stu.age === 'string' ? parseInt(stu.age) : stu.age;
-                    if (isNaN(months)) return '';
-                    
-                    const years = Math.floor(months / 12);
-                    const remainingMonths = months % 12;
-                    
-                    if (years === 0) return `${remainingMonths}M`;
-                    return `${years}Y${remainingMonths ? remainingMonths + 'M' : ''}`;
-                  })()})
-                </span>
+                <div className="w-full text-center text-[#87704e] text-[10px]">{(() => {
+                  const months = typeof stu.age === 'string' ? parseInt(stu.age) : stu.age;
+                  if (isNaN(months)) return '';
+                  const years = Math.floor(months / 12);
+                  const remainingMonths = months % 12;
+                  if (years === 0) return `${remainingMonths}M`;
+                  return `${years}Y${remainingMonths ? remainingMonths + 'M' : ''}`;
+                })()}</div>
               )}
               {stu.isTrial && <img src="/trial.png" alt="Trial" className="ml-1 w-3 h-3" />}
             </div>
