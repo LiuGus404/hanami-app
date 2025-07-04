@@ -66,7 +66,7 @@ export default function RemoveBgToolPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fffceb] px-6 py-8 font-['Quicksand',_sans-serif]">
+    <div className="min-h-screen bg-[#FFF9F2] px-6 py-8 font-['Quicksand',_sans-serif]">
       <div className="max-w-xl mx-auto bg-white p-6 rounded-2xl shadow border border-[#EADBC8]">
         <h2 className="text-xl font-bold text-[#2B3A3B] mb-4">圖片去背景工具</h2>
 

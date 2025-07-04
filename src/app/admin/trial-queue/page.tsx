@@ -67,7 +67,7 @@ export default function TrialQueueListPage() {
       : filteredQueue.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
-    <div className="min-h-screen bg-[#FFFCEB] px-4 py-6 font-['Quicksand',_sans-serif]">
+    <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-2 mb-6">
           <h2 className="text-2xl font-bold text-[#4B4036]">輪候中學生列表</h2>
@@ -118,14 +118,14 @@ export default function TrialQueueListPage() {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className={`px-2 py-1 rounded-full ml-1 ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-[#2B3A3B] hover:bg-[#FFFCEB]'}`}
+                              className={`px-2 py-1 rounded-full ml-1 ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-[#2B3A3B] hover:bg-[#FFF9F2]'}`}
             >
               &lt;
             </button>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className={`px-2 py-1 rounded-full ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-[#2B3A3B] hover:bg-[#FFFCEB]'}`}
+              className={`px-2 py-1 rounded-full ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-[#2B3A3B] hover:bg-[#FFF9F2]'}`}
             >
               &gt;
             </button>
@@ -139,7 +139,7 @@ export default function TrialQueueListPage() {
           <div className="overflow-x-auto bg-white rounded-xl border border-[#EADBC8]">
             <table className="min-w-full">
               <thead>
-                <tr className="bg-[#FFFCEB] border-b border-[#EADBC8]">
+                <tr className="bg-[#FFF9F2] border-b border-[#EADBC8]">
                   <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">#</th>
                   {columns.map((col) => (
                     <th
@@ -160,7 +160,7 @@ export default function TrialQueueListPage() {
                   </tr>
                 ) : (
                   pagedQueue.map((stu: any, idx: number) => (
-                    <tr key={stu.id} className="border-b border-[#EADBC8] hover:bg-[#FFFCEB]">
+                    <tr key={stu.id} className="border-b border-[#EADBC8] hover:bg-[#FFF9F2]">
                       <td className="p-3 text-sm text-[#2B3A3B]">{(currentPage - 1) * pageSize + idx + 1}</td>
                       <td className="p-3 text-sm text-[#2B3A3B]">{stu.full_name}</td>
                       <td className="p-3 text-sm text-[#2B3A3B]">{stu.student_dob ? new Date(stu.student_dob).toLocaleDateString('zh-HK') : ''}</td>

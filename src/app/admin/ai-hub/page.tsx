@@ -73,7 +73,7 @@ export default function AIHubPage() {
   }, [messages]);
 
   return (
-    <div className="min-h-screen bg-[#FFFCEB] p-6 font-['Quicksand',sans-serif] max-w-2xl mx-auto">
+    <div className="min-h-screen bg-[#FFF9F2] p-6 font-['Quicksand',sans-serif] max-w-2xl mx-auto">
       {/* 左側：對話面板 */}
       <div className="bg-white rounded-xl shadow-md p-4 flex flex-col h-[90vh]">
         <div className="mb-4">

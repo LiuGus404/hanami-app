@@ -28,6 +28,7 @@ export default function StudentDetailPage() {
   const [tempCategoryFilter, setTempCategoryFilter] = useState<string[]>(['all'])
   const [categorySelectOpen, setCategorySelectOpen] = useState(false)
   const [isInactiveStudent, setIsInactiveStudent] = useState(false)
+  const [isRestoring, setIsRestoring] = useState(false)
   
   // 添加防抖機制
   const dataFetchedRef = useRef(false)
@@ -200,6 +201,82 @@ export default function StudentDetailPage() {
     }
   }, [id])
 
+  // 回復學生功能
+  const handleRestoreStudent = async () => {
+    if (!student || !isInactiveStudent) return
+    
+    if (!confirm('確定要回復此學生嗎？')) {
+      return
+    }
+
+    setIsRestoring(true)
+    try {
+      // 將學生資料移回原表
+      const studentData = {
+        id: student.original_id,
+        full_name: student.full_name,
+        student_age: student.student_age,
+        student_preference: student.student_preference,
+        course_type: student.course_type,
+        remaining_lessons: student.remaining_lessons,
+        regular_weekday: student.regular_weekday, // 從inactive_student_list恢復
+        gender: student.gender,
+        student_oid: student.student_oid,
+        contact_number: student.contact_number,
+        regular_timeslot: student.regular_timeslot, // 從inactive_student_list恢復
+        health_notes: student.health_notes,
+        student_dob: student.student_dob,
+        parent_email: student.parent_email,
+        address: student.address,
+        school: student.school,
+        started_date: student.started_date,
+        duration_months: student.duration_months,
+        access_role: student.access_role,
+        student_email: student.student_email,
+        student_password: student.student_password,
+        ongoing_lessons: student.ongoing_lessons,
+        upcoming_lessons: student.upcoming_lessons,
+        student_teacher: student.student_teacher,
+        nick_name: student.nick_name,
+        student_remarks: student.student_remarks
+      }
+
+      // 使用 upsert 而不是 insert
+      const { error: restoreError } = await supabase
+        .from('Hanami_Students')
+        .upsert(studentData, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        })
+      
+      if (restoreError) {
+        console.error('Error restoring student:', restoreError)
+        alert(`回復學生時發生錯誤: ${restoreError.message}`)
+        return
+      }
+
+      // 從 inactive_student_list 表中刪除
+      const { error: deleteError } = await supabase
+        .from('inactive_student_list')
+        .delete()
+        .eq('id', id as string)
+
+      if (deleteError) {
+        console.error('Error deleting from inactive list:', deleteError)
+        alert(`從停用列表刪除時發生錯誤: ${deleteError.message}`)
+        return
+      }
+
+      alert('成功回復學生')
+      router.push('/admin/students')
+    } catch (error) {
+      console.error('Error restoring student:', error)
+      alert(`回復學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setIsRestoring(false)
+    }
+  }
+
   if (pageLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -232,26 +309,35 @@ export default function StudentDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFCF2] p-6">
+    <div className="min-h-screen bg-[#FFF9F2] p-6">
       <div className="max-w-4xl mx-auto">
         {/* 停用學生警告 */}
         {isInactiveStudent && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">
-                  此學生已停用
-                </h3>
-                <div className="mt-2 text-sm text-yellow-700">
-                  <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
-                  <p>停用原因：{student.inactive_reason}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">
+                    此學生已停用
+                  </h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
+                    <p>停用原因：{student.inactive_reason}</p>
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={handleRestoreStudent}
+                disabled={isRestoring}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRestoring ? '回復中...' : '回復學生'}
+              </button>
             </div>
           </div>
         )}

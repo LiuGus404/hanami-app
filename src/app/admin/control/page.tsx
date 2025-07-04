@@ -146,7 +146,7 @@ const ControlPage = () => {
   });
 
   return (
-    <div className="bg-[#FFFCF2] font-sans text-gray-800 min-h-screen">
+    <div className="bg-[#FFF9F2] font-sans text-gray-800 min-h-screen">
       <div className="max-w-5xl mx-auto p-6">
         <AIControlPanel
           models={mockModels}

@@ -707,7 +707,7 @@ export default function PermissionManagementPanel() {
           <HanamiCard>
             <div className="space-y-3">
               {getFilteredData().map((user) => (
-                <div key={user.id} className="bg-[#FFFCEB] rounded-xl p-4 border border-[#EADBC8]">
+                <div key={user.id} className="bg-[#FFF9F2] rounded-xl p-4 border border-[#EADBC8]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <AccountIcon 

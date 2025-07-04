@@ -29,7 +29,7 @@ export default function TeacherSchedulePage() {
   }, [])
 
   return (
-    <div className="p-6 bg-[#FFFCF2] min-h-screen">
+    <div className="p-6 bg-[#FFF9F2] min-h-screen">
       <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow border border-[#EADBC8]">
         <h1 className="text-xl font-bold mb-4">教師排班管理</h1>
         <div className="mb-4">

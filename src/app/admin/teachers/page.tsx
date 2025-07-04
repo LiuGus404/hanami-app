@@ -80,7 +80,7 @@ export default function TeacherManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFCEB] px-4 py-6 font-['Quicksand',_sans-serif]">
+    <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
       <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold text-[#2B3A3B] mb-2">老師資料管理</h1>
         <div className="flex justify-between items-center mb-4">
@@ -230,7 +230,7 @@ export default function TeacherManagementPage() {
           <div className="bg-white rounded-xl border border-[#EADBC8] overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="bg-[#FFFCEB] border-b border-[#EADBC8]">
+                <tr className="bg-[#FFF9F2] border-b border-[#EADBC8]">
                   <th className="w-12 p-3 text-left text-sm font-medium text-[#2B3A3B]">
                     <Checkbox
                       checked={selectedTeachers.length === filteredTeachers.length}
@@ -260,7 +260,7 @@ export default function TeacherManagementPage() {
                 ) : filteredTeachers.length === 0 ? (
                   <tr><td colSpan={10} className="text-center p-6">沒有符合條件的老師</td></tr>
                 ) : filteredTeachers.map(teacher => (
-                  <tr key={teacher.id} className="border-b border-[#EADBC8] hover:bg-[#FFFCEB] cursor-pointer">
+                      <tr key={teacher.id} className="border-b border-[#EADBC8] hover:bg-[#FFF9F2] cursor-pointer">
                     <td className="p-3">
                       <Checkbox
                         checked={selectedTeachers.includes(teacher.id)}

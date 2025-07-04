@@ -637,7 +637,7 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
 
       {/* 編輯模式老師列表 */}
       {editMode && viewMode === 'calendar' && (
-        <div className="mb-4 p-4 bg-[#FFFCEB] rounded-lg border border-[#EADBC8] shadow-sm">
+        <div className="mb-4 p-4 bg-[#FFF9F2] rounded-lg border border-[#EADBC8] shadow-sm">
           <h3 className="text-lg font-bold mb-3 text-[#4B4036] flex items-center gap-2">
                             <span className="flex items-center gap-1">
                   <img src="/calendar.png" alt="calendar" className="w-4 h-4" />
@@ -681,7 +681,7 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                   >複製 Markdown</button>
                 </div>
                 <table className="min-w-full border border-[#EADBC8] rounded-xl">
-                  <thead className="bg-[#FFFCEB]">
+                  <thead className="bg-[#FFF9F2]">
                     <tr>
                       <th className="p-2 border-b border-[#EADBC8] text-left">日期</th>
                       <th className="p-2 border-b border-[#EADBC8] text-left">老師</th>

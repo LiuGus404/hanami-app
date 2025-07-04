@@ -3,6 +3,7 @@
 import React from 'react';
 import { HanamiCard, HanamiButton, HanamiInput } from './index';
 import AccountIcon from './AccountIcon';
+import Link from 'next/link';
 
 interface HanamiLoginFormProps {
   userType: 'admin' | 'teacher' | 'parent';
@@ -122,9 +123,21 @@ export default function HanamiLoginForm({
             </HanamiButton>
           </form>
 
+          {/* 註冊按鈕 */}
+          <div className="mt-6 space-y-3">
+            <div className="text-center">
+              <p className="text-sm text-brown-600 mb-3">
+                還沒有帳號？{' '}
+                <Link href="/register" className="font-medium text-brown-700 hover:text-brown-800 underline">
+                  立即註冊
+                </Link>
+              </p>
+            </div>
+          </div>
+
           {/* 返回首頁 */}
           {onBackToHome && (
-            <div className="mt-6">
+            <div className="mt-4">
               <button
                 onClick={onBackToHome}
                 className="text-brown-600 hover:text-brown-700 text-sm transition-colors"

@@ -18,46 +18,46 @@ export default function Home() {
     if (sessionChecked.current) return;
     sessionChecked.current = true;
 
-    // 檢查是否已有登入會話
+    // 檢查是否已有登入會話，但不自動重定向
     const userSession = getUserSession()
     if (userSession) {
-      // 檢查 URL 參數，如果用戶明確要訪問首頁，則不重定向
-      const urlParams = new URLSearchParams(window.location.search);
-      const skipRedirect = urlParams.get('skipRedirect');
-      
-      if (skipRedirect === 'true') {
-        // 用戶明確要訪問首頁，不重定向
-        return;
-      }
-
-      // 根據用戶角色重定向到對應的儀表板
-      switch (userSession.role) {
-        case 'admin':
-          router.replace('/admin')
-          break
-        case 'teacher':
-          router.replace('/teacher/dashboard')
-          break
-        case 'parent':
-          router.replace('/parent/dashboard')
-          break
-        default:
-          break
-      }
+      console.log('用戶已登入:', userSession.role);
+      // 不再自動重定向，讓用戶自己選擇
     }
   }, []) // 移除 router 依賴
 
   const handleLoginClick = (userType: 'admin' | 'teacher' | 'parent') => {
-    switch (userType) {
-      case 'admin':
-        router.push('/admin/login')
-        break
-      case 'teacher':
-        router.push('/teacher/login')
-        break
-      case 'parent':
-        router.push('/parent/login')
-        break
+    // 檢查用戶是否已登入
+    const userSession = getUserSession()
+    
+    if (userSession) {
+      // 如果已登入，直接跳轉到對應的儀表板
+      switch (userType) {
+        case 'admin':
+          if (userSession.role === 'admin') {
+            router.push('/admin')
+          } else {
+            alert('您沒有管理員權限')
+          }
+          break
+        case 'teacher':
+          if (userSession.role === 'teacher') {
+            router.push('/teacher/dashboard')
+          } else {
+            alert('您沒有教師權限')
+          }
+          break
+        case 'parent':
+          if (userSession.role === 'parent') {
+            router.push('/parent/dashboard')
+          } else {
+            alert('您沒有家長權限')
+          }
+          break
+      }
+    } else {
+      // 如果未登入，跳轉到統一的登入頁面
+      router.push('/login')
     }
   }
 
@@ -160,7 +160,7 @@ export default function Home() {
 
       {/* 登入入口區 */}
       <section className="mt-12 px-4">
-        <h2 className="text-xl md:text-2xl font-semibold text-brown-700 mb-6 text-center">登入系統</h2>
+        <h2 className="text-xl md:text-2xl font-semibold text-brown-700 mb-6 text-center">系統入口</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
           {/* 管理員登入 */}
           <div

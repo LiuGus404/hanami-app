@@ -50,6 +50,14 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
           </button>
 
           <button
+            onClick={() => router.push('/admin/registration-requests')}
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+          >
+            <span className="mr-2 text-lg">📝</span>
+            註冊申請
+          </button>
+
+          <button
             onClick={() => router.push('/admin/ai-select')}
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
           >
@@ -79,6 +87,14 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
           >
             <Image src="/rabbit.png" alt="課堂空缺" width={24} height={24} className="mr-2 w-6 h-6" />
             課堂空缺
+          </button>
+
+          <button
+            onClick={() => router.push('/admin/student-progress')}
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+          >
+            <Image src="/icons/book-elephant.PNG" alt="學生進度" width={24} height={24} className="mr-2 w-6 h-6" />
+            學生進度
           </button>
 
           <button

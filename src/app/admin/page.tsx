@@ -312,6 +312,15 @@ export default function AdminPage() {
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">課堂空缺</h3>
               </div>
             </div>
+            {/* 學生進度管理按鈕 */}
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/student-progress')}>
+              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
+                <div className="w-12 h-12 mb-2">
+                  <img src="/icons/book-elephant.PNG" alt="學生進度" className="w-full h-full object-contain" />
+                </div>
+                <h3 className="text-lg font-semibold text-[#2B3A3B]">學生進度</h3>
+              </div>
+            </div>
           </div>
         </div>
       </div>

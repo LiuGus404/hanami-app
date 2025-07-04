@@ -42,7 +42,7 @@ export default function LessonAvailabilityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFCEB] px-4 py-6 font-['Quicksand',_sans-serif]">
+    <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
       <div className="max-w-6xl mx-auto">
         <div className="mb-4 flex justify-end pr-4 gap-3">
           <button
