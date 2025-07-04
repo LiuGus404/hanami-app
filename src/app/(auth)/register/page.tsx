@@ -22,7 +22,11 @@ const registerSchema = z.object({
   teacherAddress: z.string().optional(),
   teacherDob: z.string().optional(),
   parentStudentName: z.string().optional(),
-  parentStudentAge: z.string().optional().transform((val) => val ? parseInt(val) : undefined),
+  parentStudentAge: z.preprocess((val) => {
+    if (typeof val === 'string' && val !== '') return parseInt(val, 10);
+    if (typeof val === 'number') return val;
+    return undefined;
+  }, z.number().optional().transform(val => (typeof val === 'number' ? val : undefined))),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "密碼不匹配",
   path: ["confirmPassword"],
@@ -50,7 +54,7 @@ export default function RegisterPage() {
     handleSubmit,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterFormData>({
+  } = useForm({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       role: 'parent',

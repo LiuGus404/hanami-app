@@ -107,7 +107,21 @@ export default function StudentProgressPage() {
           return
         }
 
-        setProgressRecords(progressData || [])
+        // 將 lesson_type 中文轉英文
+        const lessonTypeMap: Record<string, StudentProgress['lesson_type']> = {
+          '正常課': 'piano',
+          '補課': 'practice',
+          '評估課': 'theory',
+          '考試課': 'theory',
+          '比賽課': 'music_focus',
+          '拍片課': 'music_focus',
+        }
+        const mappedData = (progressData || []).map((item: any) => ({
+          ...item,
+          lesson_type: item.lesson_type ? lessonTypeMap[item.lesson_type] ?? null : null,
+        }))
+
+        setProgressRecords(mappedData)
         dataFetchedRef.current = true
         loadingRef.current = false
       } catch (error) {
