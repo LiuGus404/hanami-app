@@ -160,9 +160,8 @@ const LessonCard: React.FC<LessonCardProps> = ({
             <div
               key={i}
               className="inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs transition-all duration-200 flex items-center shadow-sm"
-              style={{ backgroundColor: getStudentBg(stu.remainingLessons, stu.isTrial) }}
-              onClick={() => router.push(`/admin/students/${stu.id}`)}
               style={{ cursor: 'pointer', backgroundColor: getStudentBg(stu.remainingLessons, stu.isTrial) }}
+              onClick={() => router.push(`/admin/students/${stu.id}`)}
             >
               {stu.name}
               {stu.age && (

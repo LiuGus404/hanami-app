@@ -50,6 +50,7 @@ export interface Student {
   student_type?: string | null;
   lesson_date?: string | null;
   actual_timeslot?: string | null;
+  remaining_lessons?: number | null;
 }
 
 export interface Lesson {

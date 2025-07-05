@@ -158,7 +158,7 @@ const HanamiTC = () => {
     console.log('Fetched trial lessons:', trialLessonsData);
 
     // 使用現有的 calculateRemainingLessonsBatch 函數計算剩餘堂數
-    const regularStudentIds = [...new Set((regularLessonsData || []).map(lesson => lesson.student_id).filter(Boolean))];
+    const regularStudentIds = [...new Set((regularLessonsData || []).map(lesson => lesson.student_id).filter((id): id is string => Boolean(id)))];
     const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
 
     console.log('Remaining lessons map:', remainingLessonsMap);
@@ -556,7 +556,7 @@ const HanamiTC = () => {
         student_id: l.student_id,
         age,
         is_trial: l.is_trial,
-        remaining_lessons: l.remaining_lessons
+        remaining_lessons: l.remaining_lessons ?? undefined
       });
       return acc;
     }, {});
@@ -587,8 +587,7 @@ const HanamiTC = () => {
         student_id: l.student_id,
         age,
         is_trial: l.is_trial,
-        remaining_lessons: l.remaining_lessons,
-        avatar: undefined
+        remaining_lessons: l.remaining_lessons ?? undefined,
       });
       return acc;
     }, {});
@@ -609,8 +608,7 @@ const HanamiTC = () => {
                 name: student.name,
                 age: student.age,
                 isTrial: student.is_trial,
-                remainingLessons: student.remaining_lessons,
-                avatar: undefined
+                remainingLessons: student.remaining_lessons ?? undefined,
               }))}
               onEdit={() => {
                 const matchedPlan = (plans || []).find(
@@ -632,8 +630,7 @@ const HanamiTC = () => {
                     name: student.name,
                     age: student.age,
                     isTrial: student.is_trial,
-                    remainingLessons: student.remaining_lessons,
-                    avatar: undefined
+                    remainingLessons: student.remaining_lessons ?? undefined,
                   })),
                   onEdit: () => {
                     setModalInfo({ date, time: group.time, course: group.course });
@@ -767,8 +764,7 @@ const HanamiTC = () => {
                               name: student.name,
                               age: student.age,
                               isTrial: student.is_trial,
-                              remainingLessons: student.remaining_lessons,
-                              avatar: undefined
+                              remainingLessons: student.remaining_lessons ?? undefined,
                             }))}
                           plan={plan}
                           onEdit={() => {
@@ -791,8 +787,7 @@ const HanamiTC = () => {
                                 name: student.name,
                                 age: student.age,
                                 isTrial: student.is_trial,
-                                remainingLessons: student.remaining_lessons,
-                                avatar: undefined
+                                remainingLessons: student.remaining_lessons ?? undefined,
                               })),
                               plan,
                               onEdit: () => {
@@ -830,7 +825,6 @@ const HanamiTC = () => {
                 course={selectedLesson.course}
                 teachers={selectedLesson.teachers.map(t => ({
                   name: t.teacher_fullname,
-                  avatar: undefined
                 }))}
                 students={selectedLesson.students}
                 plan={selectedLesson.plan ? {

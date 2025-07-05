@@ -236,7 +236,9 @@ export default function ParentDashboard() {
             </div>
             <div>
               <p className="text-sm text-brown-500">剩餘課程</p>
-              <p className="font-medium text-brown-700">{selectedChild.remaining_lessons}堂</p>
+              <p className="font-medium text-brown-700">
+                {packages.reduce((total, pkg) => total + pkg.remaining_lessons, 0)}堂
+              </p>
             </div>
             <div>
               <p className="text-sm text-brown-500">固定上課時間</p>

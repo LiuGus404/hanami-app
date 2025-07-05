@@ -300,17 +300,17 @@ export default function StudentManagementPage() {
           return
         }
 
-        // 2. 刪除相關的進度記錄 (hanami_student_lesson)
-        const { error: progressError } = await supabase
-          .from('hanami_student_lesson')
-          .delete()
-          .in('student_id', regularIds)
+        // 2. 進度記錄存在於 hanami_student_lesson 表的 progress_notes 欄位中，會隨課程記錄一起刪除
+        // const { error: progressError } = await supabase
+        //   .from('hanami_student_progress')
+        //   .delete()
+        //   .in('student_id', regularIds)
         
-        if (progressError) {
-          console.error('Error deleting progress records:', progressError)
-          alert(`刪除進度記錄時發生錯誤: ${progressError.message}`)
-          return
-        }
+        // if (progressError) {
+        //   console.error('Error deleting progress records:', progressError)
+        //   alert(`刪除進度記錄時發生錯誤: ${progressError.message}`)
+        //   return
+        // }
 
         // 3. 刪除相關的課程包 (Hanami_Student_Package)
         const { error: packageError } = await supabase
@@ -325,15 +325,15 @@ export default function StudentManagementPage() {
         }
 
         // 4. 刪除試堂隊列記錄 (hanami_trial_queue)
-        const { error: queueError } = await supabase
-          .from('hanami_trial_queue')
-          .delete()
-          .in('student_id', regularIds)
-        
-        if (queueError) {
-          console.error('Error deleting trial queue records:', queueError)
-          // 不中斷流程，因為這可能不是必需的
-        }
+        // const { error: queueError } = await supabase
+        //   .from('hanami_trial_queue')
+        //   .delete()
+        //   .in('student_id', regularIds)
+        // if (queueError) {
+        //   console.error('Error deleting trial queue records:', queueError)
+        //   // 不中斷流程，因為這可能不是必需的
+        // }
+        // 註：hanami_trial_queue 表不存在，略過刪除
 
         // 5. 最後刪除學生記錄
         const { error: regularError } = await supabase
@@ -469,17 +469,17 @@ export default function StudentManagementPage() {
           return
         }
 
-        // 2. 刪除相關的進度記錄 (hanami_student_lesson)
-        const { error: progressError } = await supabase
-          .from('hanami_student_lesson')
-          .delete()
-          .in('student_id', regularIds)
+        // 2. 進度記錄存在於 hanami_student_lesson 表的 progress_notes 欄位中，會隨課程記錄一起刪除
+        // const { error: progressError } = await supabase
+        //   .from('hanami_student_progress')
+        //   .delete()
+        //   .in('student_id', regularIds)
         
-        if (progressError) {
-          console.error('Error deleting progress records:', progressError)
-          alert(`刪除進度記錄時發生錯誤: ${progressError.message}`)
-          return
-        }
+        // if (progressError) {
+        //   console.error('Error deleting progress records:', progressError)
+        //   alert(`刪除進度記錄時發生錯誤: ${progressError.message}`)
+        //   return
+        // }
 
         // 3. 刪除相關的課程包 (Hanami_Student_Package)
         const { error: packageError } = await supabase
@@ -494,15 +494,15 @@ export default function StudentManagementPage() {
         }
 
         // 4. 刪除試堂隊列記錄 (hanami_trial_queue)
-        const { error: queueError } = await supabase
-          .from('hanami_trial_queue')
-          .delete()
-          .in('student_id', regularIds)
-        
-        if (queueError) {
-          console.error('Error deleting trial queue records:', queueError)
-          // 不中斷流程，因為這可能不是必需的
-        }
+        // const { error: queueError } = await supabase
+        //   .from('hanami_trial_queue')
+        //   .delete()
+        //   .in('student_id', regularIds)
+        // if (queueError) {
+        //   console.error('Error deleting trial queue records:', queueError)
+        //   // 不中斷流程，因為這可能不是必需的
+        // }
+        // 註：hanami_trial_queue 表不存在，略過刪除
 
         // 5. 最後刪除學生記錄
         const { error: regularError } = await supabase
@@ -824,17 +824,17 @@ export default function StudentManagementPage() {
               return
             }
 
-            // 2. 刪除相關的進度記錄
-            const { error: progressError } = await supabase
-              .from('hanami_student_lesson')
-              .delete()
-              .in('student_id', existingIds)
+            // 2. 進度記錄存在於 hanami_student_lesson 表的 progress_notes 欄位中，會隨課程記錄一起刪除
+            // const { error: progressError } = await supabase
+            //   .from('hanami_student_progress')
+            //   .delete()
+            //   .in('student_id', existingIds)
             
-            if (progressError) {
-              console.error('Error deleting progress records:', progressError)
-              alert(`刪除進度記錄時發生錯誤: ${progressError.message}`)
-              return
-            }
+            // if (progressError) {
+            //   console.error('Error deleting progress records:', progressError)
+            //   alert(`刪除進度記錄時發生錯誤: ${progressError.message}`)
+            //   return
+            // }
 
             // 3. 刪除相關的課程包
             const { error: packageError } = await supabase
@@ -849,15 +849,15 @@ export default function StudentManagementPage() {
             }
 
             // 4. 刪除試堂隊列記錄
-            const { error: queueError } = await supabase
-              .from('hanami_trial_queue')
-              .delete()
-              .in('student_id', existingIds)
-            
-            if (queueError) {
-              console.error('Error deleting trial queue records:', queueError)
-              // 不中斷流程
-            }
+            // const { error: queueError } = await supabase
+            //   .from('hanami_trial_queue')
+            //   .delete()
+            //   .in('student_id', existingIds)
+            // if (queueError) {
+            //   console.error('Error deleting trial queue records:', queueError)
+            //   // 不中斷流程
+            // }
+            // 註：hanami_trial_queue 表不存在，略過刪除
 
             // 5. 刪除原始學生記錄
             const { error: regularError } = await supabase

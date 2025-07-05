@@ -13,14 +13,12 @@ interface ClassType {
 
 interface ScheduleSlot {
   id: string
-  weekday: number | null
-  timeslot: string | null
-  max_students: number | null
-  duration: string | null
-  course_type: string | null
-  assigned_teachers: string | null
+  teacher_id: string
+  scheduled_date: string
+  start_time: string
+  end_time: string
   created_at?: string
-  updated_at?: string | null
+  updated_at?: string
 }
 
 export default function ClassManagementPanel() {
@@ -45,24 +43,24 @@ export default function ClassManagementPanel() {
   // 新增時段狀態
   const [showAddSlot, setShowAddSlot] = useState(false)
   const [newSlot, setNewSlot] = useState({
-    weekday: 1,
-    timeslot: '09:00',
-    max_students: 4,
-    duration: '00:45',
-    course_type: '',
-    assigned_teachers: ''
+    teacher_id: '',
+    scheduled_date: '',
+    start_time: '',
+    end_time: '',
+    created_at: '',
+    updated_at: ''
   })
   
   // 編輯時段狀態
   const [showEditSlot, setShowEditSlot] = useState(false)
   const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
   const [editSlot, setEditSlot] = useState({
-    weekday: 1,
-    timeslot: '09:00',
-    max_students: 4,
-    duration: '00:45',
-    course_type: '',
-    assigned_teachers: ''
+    teacher_id: '',
+    scheduled_date: '',
+    start_time: '',
+    end_time: '',
+    created_at: '',
+    updated_at: ''
   })
   
   // 批量操作狀態
@@ -115,41 +113,12 @@ export default function ClassManagementPanel() {
     if (!sortField) {
       return slots
     }
-
     return [...slots].sort((a, b) => {
       let aValue = a[sortField as keyof ScheduleSlot]
       let bValue = b[sortField as keyof ScheduleSlot]
-
-      // 處理特殊欄位的排序
-      switch (sortField) {
-        case 'weekday':
-          // 星期按數字排序
-          aValue = Number(aValue) || 0
-          bValue = Number(bValue) || 0
-          break
-        case 'max_students':
-          // 人數上限按數字排序
-          aValue = Number(aValue) || 0
-          bValue = Number(bValue) || 0
-          break
-        case 'timeslot':
-        case 'duration':
-          // 時間按字符串排序
-          aValue = String(aValue || '').toLowerCase()
-          bValue = String(bValue || '').toLowerCase()
-          break
-        case 'course_type':
-        case 'assigned_teachers':
-          // 其他欄位按字符串排序
-          aValue = String(aValue || '').toLowerCase()
-          bValue = String(bValue || '').toLowerCase()
-          break
-        default:
-          // 其他欄位按字符串排序
-          aValue = String(aValue || '').toLowerCase()
-          bValue = String(bValue || '').toLowerCase()
-      }
-
+      // 僅針對現有欄位排序
+      aValue = String(aValue || '').toLowerCase()
+      bValue = String(bValue || '').toLowerCase()
       if (aValue < bValue) {
         return sortDirection === 'asc' ? -1 : 1
       }
@@ -179,7 +148,7 @@ export default function ClassManagementPanel() {
       
       // 取得時段資料
       const { data: slotData, error: slotError } = await supabase
-        .from('hanami_schedule')
+        .from('hanami_teacher_schedule')
         .select('*')
         .order('weekday')
         .order('timeslot')
@@ -229,32 +198,28 @@ export default function ClassManagementPanel() {
   }
 
   const handleAddSlot = async () => {
-    if (!newSlot.course_type.trim()) {
-      alert('請選擇班別')
+    if (!newSlot.teacher_id || !newSlot.scheduled_date || !newSlot.start_time || !newSlot.end_time) {
+      alert('請完整填寫所有欄位')
       return
     }
-    
     try {
       const { error } = await supabase
-        .from('hanami_schedule')
+        .from('hanami_teacher_schedule')
         .insert({
-          weekday: newSlot.weekday,
-          timeslot: newSlot.timeslot,
-          max_students: newSlot.max_students,
-          duration: newSlot.duration,
-          course_type: newSlot.course_type,
-          assigned_teachers: newSlot.assigned_teachers || null
+          teacher_id: newSlot.teacher_id,
+          scheduled_date: newSlot.scheduled_date,
+          start_time: newSlot.start_time,
+          end_time: newSlot.end_time,
+          created_at: new Date().toISOString()
         })
-      
       if (error) throw error
-      
       setNewSlot({
-        weekday: 1,
-        timeslot: '09:00',
-        max_students: 4,
-        duration: '00:45',
-        course_type: '',
-        assigned_teachers: ''
+        teacher_id: '',
+        scheduled_date: '',
+        start_time: '',
+        end_time: '',
+        created_at: '',
+        updated_at: ''
       })
       setShowAddSlot(false)
       await fetchData()
@@ -352,7 +317,7 @@ export default function ClassManagementPanel() {
     
     try {
       const { error } = await supabase
-        .from('hanami_schedule')
+        .from('hanami_teacher_schedule')
         .delete()
         .eq('id', id)
       
@@ -366,16 +331,14 @@ export default function ClassManagementPanel() {
   }
 
   const handleEditSlot = (slot: ScheduleSlot) => {
-    console.log('🔍 編輯時段:', slot)
-    console.log('🔍 可用班別:', classTypes)
     setEditingSlot(slot)
     setEditSlot({
-      weekday: slot.weekday || 1,
-      timeslot: slot.timeslot || '09:00',
-      max_students: slot.max_students || 4,
-      duration: slot.duration || '00:45',
-      course_type: slot.course_type || '',
-      assigned_teachers: slot.assigned_teachers || ''
+      teacher_id: slot.teacher_id,
+      scheduled_date: slot.scheduled_date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      created_at: slot.created_at || '',
+      updated_at: slot.updated_at || ''
     })
     setShowEditSlot(true)
   }
@@ -390,81 +353,54 @@ export default function ClassManagementPanel() {
     setShowEditSlot(false)
     setEditingSlot(null)
     setEditSlot({
-      weekday: 1,
-      timeslot: '09:00',
-      max_students: 4,
-      duration: '00:45',
-      course_type: '',
-      assigned_teachers: ''
+      teacher_id: '',
+      scheduled_date: '',
+      start_time: '',
+      end_time: '',
+      created_at: '',
+      updated_at: ''
     })
   }
 
   const handleUpdateSlot = async () => {
-    console.log('🔍 準備更新時段:', { editingSlot, editSlot })
-    
     if (!editingSlot) {
       alert('編輯時段資料遺失，請重新選擇')
       return
     }
-    
-    if (!editSlot.course_type.trim()) {
-      alert('請選擇班別')
+    if (!editSlot.teacher_id || !editSlot.scheduled_date || !editSlot.start_time || !editSlot.end_time) {
+      alert('請完整填寫所有欄位')
       return
     }
-    
     try {
       const updateData = {
-        weekday: editSlot.weekday,
-        timeslot: editSlot.timeslot,
-        max_students: editSlot.max_students,
-        duration: editSlot.duration,
-        course_type: editSlot.course_type,
-        assigned_teachers: editSlot.assigned_teachers || null
+        teacher_id: editSlot.teacher_id,
+        scheduled_date: editSlot.scheduled_date,
+        start_time: editSlot.start_time,
+        end_time: editSlot.end_time,
+        updated_at: new Date().toISOString()
       }
-      
-      console.log('🔍 更新資料:', updateData)
-      
       const { data, error } = await supabase
-        .from('hanami_schedule')
+        .from('hanami_teacher_schedule')
         .update(updateData)
         .eq('id', editingSlot.id)
-        .select()
-      
-      console.log('🔍 更新結果:', { data, error })
-      
-      if (error) {
-        console.error('❌ 更新失敗:', error)
-        throw error
-      }
-      
-      console.log('✅ 更新成功:', data)
-      
-      setEditSlot({
-        weekday: 1,
-        timeslot: '09:00',
-        max_students: 4,
-        duration: '00:45',
-        course_type: '',
-        assigned_teachers: ''
-      })
-      setEditingSlot(null)
+      if (error) throw error
       setShowEditSlot(false)
+      setEditingSlot(null)
       await fetchData()
       alert('時段更新成功！')
     } catch (err: any) {
-      console.error('❌ 更新時發生錯誤:', err)
-      alert('更新失敗：' + (err.message || '未知錯誤'))
+      alert('更新失敗：' + err.message)
     }
   }
 
   const handleCopySlot = (slot: ScheduleSlot) => {
     setNewSlot({
-      weekday: slot.weekday || 1,
-      timeslot: slot.timeslot || '09:00',
-      max_students: slot.max_students || 4,
-      duration: slot.duration || '00:45',
-      course_type: slot.course_type || '',
-      assigned_teachers: slot.assigned_teachers || ''
+      teacher_id: slot.teacher_id,
+      scheduled_date: slot.scheduled_date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      created_at: slot.created_at || '',
+      updated_at: slot.updated_at || ''
     })
     setShowAddSlot(true)
   }
@@ -497,7 +433,7 @@ export default function ClassManagementPanel() {
     
     try {
       const { error } = await supabase
-        .from('hanami_schedule')
+        .from('hanami_teacher_schedule')
         .delete()
         .in('id', selectedSlots)
       
@@ -620,51 +556,11 @@ export default function ClassManagementPanel() {
                     className="w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
                   />
                 </th>
-                <th 
-                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('weekday')}
-                >
-                  <div className="flex items-center gap-1">
-                    星期
-                    {getSortIcon('weekday')}
-                  </div>
-                </th>
-                <th 
-                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('timeslot')}
-                >
-                  <div className="flex items-center gap-1">
-                    時間
-                    {getSortIcon('timeslot')}
-                  </div>
-                </th>
-                <th 
-                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('course_type')}
-                >
-                  <div className="flex items-center gap-1">
-                    班別
-                    {getSortIcon('course_type')}
-                  </div>
-                </th>
-                <th 
-                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('max_students')}
-                >
-                  <div className="flex items-center gap-1">
-                    人數上限
-                    {getSortIcon('max_students')}
-                  </div>
-                </th>
-                <th 
-                  className="text-left p-2 cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('duration')}
-                >
-                  <div className="flex items-center gap-1">
-                    時長
-                    {getSortIcon('duration')}
-                  </div>
-                </th>
+                <th className="text-left p-2">老師ID</th>
+                <th className="text-left p-2">日期</th>
+                <th className="text-left p-2">開始時間</th>
+                <th className="text-left p-2">結束時間</th>
+                <th className="text-left p-2">建立時間</th>
                 <th className="text-left p-2">操作</th>
               </tr>
             </thead>
@@ -679,11 +575,11 @@ export default function ClassManagementPanel() {
                       className="w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
                     />
                   </td>
-                  <td className="p-2">{slot.weekday !== null && slot.weekday !== undefined ? `星期${weekdays[slot.weekday]}` : ''}</td>
-                  <td className="p-2">{slot.timeslot || ''}</td>
-                  <td className="p-2">{slot.course_type || ''}</td>
-                  <td className="p-2">{slot.max_students || 0}</td>
-                  <td className="p-2">{slot.duration || ''}</td>
+                  <td className="p-2">{slot.teacher_id}</td>
+                  <td className="p-2">{slot.scheduled_date}</td>
+                  <td className="p-2">{slot.start_time}</td>
+                  <td className="p-2">{slot.end_time}</td>
+                  <td className="p-2">{slot.created_at || ''}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-1">
                       <button
@@ -779,95 +675,27 @@ export default function ClassManagementPanel() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl w-96 max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">新增時段</h3>
-            
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">星期</label>
-                <select
-                  value={newSlot.weekday}
-                  onChange={(e) => setNewSlot({...newSlot, weekday: parseInt(e.target.value)})}
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                >
-                  {weekdays.map((day, index) => (
-                    <option key={index} value={index}>{day}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium mb-1">老師ID</label>
+                <input type="text" value={newSlot.teacher_id} onChange={e => setNewSlot({...newSlot, teacher_id: e.target.value})} className="w-full p-2 border border-[#EADBC8] rounded" />
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-1">時間</label>
-                <input
-                  type="time"
-                  value={newSlot.timeslot}
-                  onChange={(e) => setNewSlot({...newSlot, timeslot: e.target.value})}
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                />
+                <label className="block text-sm font-medium mb-1">日期</label>
+                <input type="date" value={newSlot.scheduled_date} onChange={e => setNewSlot({...newSlot, scheduled_date: e.target.value})} className="w-full p-2 border border-[#EADBC8] rounded" />
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-1">班別</label>
-                <select
-                  value={newSlot.course_type}
-                  onChange={(e) => setNewSlot({...newSlot, course_type: e.target.value})}
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                >
-                  <option value="">請選擇班別</option>
-                  {classTypes.map((classType) => (
-                    <option key={classType.id} value={classType.name || ''}>{classType.name || ''}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium mb-1">開始時間</label>
+                <input type="time" value={newSlot.start_time} onChange={e => setNewSlot({...newSlot, start_time: e.target.value})} className="w-full p-2 border border-[#EADBC8] rounded" />
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-1">人數上限</label>
-                <input
-                  type="number"
-                  value={newSlot.max_students}
-                  onChange={(e) => setNewSlot({...newSlot, max_students: parseInt(e.target.value)})}
-                  min="1"
-                  max="20"
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">時長</label>
-                <select
-                  value={newSlot.duration}
-                  onChange={(e) => setNewSlot({...newSlot, duration: e.target.value})}
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                >
-                  <option value="00:45">45分鐘</option>
-                  <option value="01:00">60分鐘</option>
-                  <option value="01:30">90分鐘</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">負責老師（選填）</label>
-                <input
-                  type="text"
-                  value={newSlot.assigned_teachers}
-                  onChange={(e) => setNewSlot({...newSlot, assigned_teachers: e.target.value})}
-                  placeholder="請輸入老師姓名"
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                />
+                <label className="block text-sm font-medium mb-1">結束時間</label>
+                <input type="time" value={newSlot.end_time} onChange={e => setNewSlot({...newSlot, end_time: e.target.value})} className="w-full p-2 border border-[#EADBC8] rounded" />
               </div>
             </div>
-            
             <div className="flex gap-2 justify-end mt-6">
-              <button
-                onClick={() => setShowAddSlot(false)}
-                className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAddSlot}
-                className="px-4 py-2 bg-[#4B4036] text-white rounded"
-              >
-                新增
-              </button>
+              <button onClick={() => setShowAddSlot(false)} className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded">取消</button>
+              <button onClick={handleAddSlot} className="px-4 py-2 bg-[#4B4036] text-white rounded">新增</button>
             </div>
           </div>
         </div>
@@ -878,106 +706,27 @@ export default function ClassManagementPanel() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl w-96 max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">編輯時段</h3>
-            
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">星期</label>
-                <select
-                  value={editSlot.weekday}
-                  onChange={(e) => setEditSlot({...editSlot, weekday: parseInt(e.target.value)})}
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                >
-                  {weekdays.map((day, index) => (
-                    <option key={index} value={index}>{day}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium mb-1">老師ID</label>
+                <input type="text" value={editSlot.teacher_id} onChange={e => setEditSlot({...editSlot, teacher_id: e.target.value})} className="w-full p-2 border border-[#EADBC8] rounded" />
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-1">時間</label>
-                <input
-                  type="time"
-                  value={editSlot.timeslot}
-                  onChange={(e) => setEditSlot({...editSlot, timeslot: e.target.value})}
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                />
+                <label className="block text-sm font-medium mb-1">日期</label>
+                <input type="date" value={editSlot.scheduled_date} onChange={e => setEditSlot({...editSlot, scheduled_date: e.target.value})} className="w-full p-2 border border-[#EADBC8] rounded" />
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-1">班別</label>
-                <select
-                  value={editSlot.course_type}
-                  onChange={(e) => setEditSlot({...editSlot, course_type: e.target.value})}
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                >
-                  <option value="">請選擇班別</option>
-                  {classTypes.map((classType) => (
-                    <option key={classType.id} value={classType.name || ''}>{classType.name || ''}</option>
-                  ))}
-                </select>
-                <div className="text-xs text-gray-500 mt-1">
-                  當前選擇: {editSlot.course_type || '未選擇'}
-                </div>
-                <div className="text-xs text-gray-500">
-                  可用班別: {classTypes.map(c => c.name).join(', ') || '無可用班別'}
-                </div>
-                {classTypes.length === 0 && (
-                  <div className="text-xs text-red-500 mt-1">
-                    ⚠️ 沒有可用的班別，請先新增班別
-                  </div>
-                )}
+                <label className="block text-sm font-medium mb-1">開始時間</label>
+                <input type="time" value={editSlot.start_time} onChange={e => setEditSlot({...editSlot, start_time: e.target.value})} className="w-full p-2 border border-[#EADBC8] rounded" />
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-1">人數上限</label>
-                <input
-                  type="number"
-                  value={editSlot.max_students}
-                  onChange={(e) => setEditSlot({...editSlot, max_students: parseInt(e.target.value)})}
-                  min="1"
-                  max="20"
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">時長</label>
-                <select
-                  value={editSlot.duration}
-                  onChange={(e) => setEditSlot({...editSlot, duration: e.target.value})}
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                >
-                  <option value="00:45">45分鐘</option>
-                  <option value="01:00">60分鐘</option>
-                  <option value="01:30">90分鐘</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">負責老師（選填）</label>
-                <input
-                  type="text"
-                  value={editSlot.assigned_teachers}
-                  onChange={(e) => setEditSlot({...editSlot, assigned_teachers: e.target.value})}
-                  placeholder="請輸入老師姓名"
-                  className="w-full p-2 border border-[#EADBC8] rounded"
-                />
+                <label className="block text-sm font-medium mb-1">結束時間</label>
+                <input type="time" value={editSlot.end_time} onChange={e => setEditSlot({...editSlot, end_time: e.target.value})} className="w-full p-2 border border-[#EADBC8] rounded" />
               </div>
             </div>
-            
             <div className="flex gap-2 justify-end mt-6">
-              <button
-                onClick={handleCloseEditSlot}
-                className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleUpdateSlot}
-                className="px-4 py-2 bg-[#4B4036] text-white rounded"
-              >
-                更新
-              </button>
+              <button onClick={handleCloseEditSlot} className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded">取消</button>
+              <button onClick={handleUpdateSlot} className="px-4 py-2 bg-[#4B4036] text-white rounded">更新</button>
             </div>
           </div>
         </div>

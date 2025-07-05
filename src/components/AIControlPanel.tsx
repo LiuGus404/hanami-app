@@ -138,8 +138,8 @@ export default function AIControlPanel({
         created_at: new Date().toISOString(),
         started_at: null,
         finished_at: null,
-        error_message: null,
-        assigned_model: null,
+        error_message: undefined,
+        assigned_model: undefined,
         memory_id: `${selectedModel}-${Date.now()}`
       }
 

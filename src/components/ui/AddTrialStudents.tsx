@@ -55,9 +55,12 @@ export default function TrialQueueForm() {
     })
     const id = form.id || crypto.randomUUID()
     const now = new Date().toISOString()
-    const student_id = form.student_id && form.student_id !== '' ? form.student_id : null
+    const insertData: any = { ...form, prefer_time: convertedPreferTime, id, student_age: ageInMonths, created_at: now }
+    if (form.student_id && form.student_id !== '') {
+      insertData.student_id = form.student_id
+    }
     const { error } = await supabase.from('hanami_trial_queue').insert([
-      { ...form, prefer_time: convertedPreferTime, id, student_id, student_age: ageInMonths, created_at: now }
+      insertData
     ])
     if (!error) {
       setSubmitted(true)

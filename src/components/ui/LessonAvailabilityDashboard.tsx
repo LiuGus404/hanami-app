@@ -75,10 +75,10 @@ export default function LessonAvailabilityDashboard() {
       try {
         // 1. 取得所有時段（移除 current_students 欄位查詢）
         const { data: slotData, error: slotError } = await supabase
-          .from('hanami_schedule')
-          .select('weekday, timeslot, max_students, duration')
-          .order('weekday', { ascending: true })
-          .order('timeslot', { ascending: true })
+          .from('hanami_teacher_schedule')
+          .select('teacher_id, scheduled_date, start_time, end_time, created_at, updated_at')
+          .order('scheduled_date', { ascending: true })
+          .order('start_time', { ascending: true })
         
         console.log('🔍 查詢 hanami_schedule 結果:', { slotData, slotError })
         

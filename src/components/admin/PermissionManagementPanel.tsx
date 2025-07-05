@@ -130,7 +130,13 @@ export default function PermissionManagementPanel() {
         setError(`載入管理員資料失敗: ${adminsError.message}`);
       } else {
         console.log('管理員資料載入成功:', adminsData?.length || 0, '筆');
-        setAdmins(adminsData || []);
+        setAdmins((adminsData || []).map(a => ({
+          ...a,
+          created_at: a.created_at ?? '',
+          admin_name: a.admin_name ?? null,
+          admin_email: a.admin_email ?? null,
+          role: a.role ?? null,
+        })));
       }
 
       // 創建模擬的用戶權限資料

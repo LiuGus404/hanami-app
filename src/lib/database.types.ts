@@ -558,6 +558,36 @@ export type Database = {
         }
         Relationships: []
       }
+      teacher_schedule: {
+        Row: {
+          id: string
+          teacher_id: string
+          scheduled_date: string
+          start_time: string
+          end_time: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Insert: {
+          id?: string
+          teacher_id: string
+          scheduled_date: string
+          start_time: string
+          end_time: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          teacher_id?: string
+          scheduled_date?: string
+          start_time?: string
+          end_time?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       inactive_student_list: {
         Row: {
           id: string
@@ -631,18 +661,96 @@ export type Database = {
         Row: {
           id: string
           student_id: string
+          status: string | null
           created_at: string | null
           updated_at: string | null
         }
         Insert: {
           id?: string
           student_id: string
+          status?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
         Update: {
           id?: string
           student_id?: string
+          status?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hanami_admin: {
+        Row: {
+          id: string
+          admin_email: string
+          admin_name: string
+          role: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          admin_email: string
+          admin_name: string
+          role: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          admin_email?: string
+          admin_name?: string
+          role?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_tasks: {
+        Row: {
+          id: string
+          status: string
+          title: string
+          model: string
+          prompt: string
+          result: string
+          started_at: string | null
+          finished_at: string | null
+          error_message: string
+          assigned_model: string
+          memory_id: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          status: string
+          title: string
+          model: string
+          prompt: string
+          result?: string
+          started_at?: string | null
+          finished_at?: string | null
+          error_message?: string
+          assigned_model?: string
+          memory_id?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          status?: string
+          title?: string
+          model?: string
+          prompt?: string
+          result?: string
+          started_at?: string | null
+          finished_at?: string | null
+          error_message?: string
+          assigned_model?: string
+          memory_id?: string
           created_at?: string | null
           updated_at?: string | null
         }

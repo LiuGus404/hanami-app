@@ -20,6 +20,7 @@ interface Student {
   course_type: string | null;
   regular_timeslot: string | null;
   regular_weekday: number | null;
+  remaining_lessons?: number;
 }
 
 interface Lesson {

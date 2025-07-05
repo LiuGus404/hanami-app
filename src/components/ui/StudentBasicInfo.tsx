@@ -151,7 +151,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     const calculateRemaining = async () => {
       if (student && student.student_type === '常規') {
         try {
-          const remaining = await calculateRemainingLessons(student.id, undefined, new Date())
+          const remaining = await calculateRemainingLessons(student.id, new Date())
           setCalculatedRemainingLessons(remaining)
         } catch (error) {
           console.error('Error calculating remaining lessons:', error)

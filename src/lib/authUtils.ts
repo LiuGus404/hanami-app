@@ -30,14 +30,15 @@ export async function validateUserCredentials(email: string, password: string): 
       .eq('admin_password', password)
       .single();
 
-    if (adminData && !adminError) {
+    if (adminData && !adminError && typeof adminData === 'object' && 'id' in adminData) {
+      const admin = adminData as { id: string; admin_email?: string; admin_name?: string };
       return {
         success: true,
         user: {
-          id: adminData.id,
-          email: adminData.admin_email || email,
+          id: admin.id,
+          email: admin.admin_email || email,
           role: 'admin',
-          name: adminData.admin_name || '管理員'
+          name: admin.admin_name || '管理員'
         }
       };
     }
