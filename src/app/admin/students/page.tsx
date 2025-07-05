@@ -300,9 +300,9 @@ export default function StudentManagementPage() {
           return
         }
 
-        // 2. 刪除相關的進度記錄 (hanami_student_progress)
+        // 2. 刪除相關的進度記錄 (hanami_student_lesson)
         const { error: progressError } = await supabase
-          .from('hanami_student_progress')
+          .from('hanami_student_lesson')
           .delete()
           .in('student_id', regularIds)
         
@@ -469,9 +469,9 @@ export default function StudentManagementPage() {
           return
         }
 
-        // 2. 刪除相關的進度記錄 (hanami_student_progress)
+        // 2. 刪除相關的進度記錄 (hanami_student_lesson)
         const { error: progressError } = await supabase
-          .from('hanami_student_progress')
+          .from('hanami_student_lesson')
           .delete()
           .in('student_id', regularIds)
         
@@ -826,7 +826,7 @@ export default function StudentManagementPage() {
 
             // 2. 刪除相關的進度記錄
             const { error: progressError } = await supabase
-              .from('hanami_student_progress')
+              .from('hanami_student_lesson')
               .delete()
               .in('student_id', existingIds)
             

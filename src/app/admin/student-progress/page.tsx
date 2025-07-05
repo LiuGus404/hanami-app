@@ -105,7 +105,7 @@ export default function StudentProgressPage() {
       
       // 獲取進度記錄，包含學生和課堂資料
       const { data: progressData, error: progressError } = await supabase
-        .from('hanami_student_progress')
+        .from('hanami_student_lesson')
         .select(`
           *,
           student:Hanami_Students(
@@ -113,11 +113,6 @@ export default function StudentProgressPage() {
             student_oid,
             course_type,
             student_type
-          ),
-          lesson:hanami_student_lesson(
-            lesson_date,
-            actual_timeslot,
-            lesson_teacher
           )
         `)
         .order('created_at', { ascending: false })
@@ -128,7 +123,38 @@ export default function StudentProgressPage() {
       }
 
       // 直接使用資料庫中的課堂類型值，不進行映射
-      setProgressRecords(progressData || [])
+      const mappedProgress = (progressData || []).map((item: any) => ({
+        id: item.id,
+        student_id: item.student_id ?? null,
+        lesson_id: null,
+        lesson_date: item.lesson_date ?? null,
+        course_type: item.course_type ?? null,
+        lesson_type: item.lesson_status ?? null,
+        duration_minutes: null,
+        progress_notes: item.progress_notes ?? null,
+        next_goal: item.next_target ?? null,
+        video_url: item.video_url ?? null,
+        created_at: item.created_at,
+        updated_at: item.updated_at ?? null,
+        review_status: 'pending' as const,
+        review_notes: null,
+        reviewed_by: null,
+        reviewed_at: null,
+        is_sent: false,
+        sent_at: null,
+        ai_processed: false,
+        ai_processed_at: null,
+        ai_feedback: null,
+        ai_suggestions: null,
+        student: item.student ? {
+          full_name: item.student.full_name,
+          student_oid: item.student.student_oid,
+          course_type: item.student.course_type,
+          student_type: item.student.student_type,
+        } : undefined,
+        lesson: undefined,
+      }))
+      setProgressRecords(mappedProgress)
       dataFetchedRef.current = true
       loadingRef.current = false
     } catch (error) {
@@ -306,7 +332,7 @@ export default function StudentProgressPage() {
     setIsLoading(true)
     try {
       const { error } = await supabase
-        .from('hanami_student_progress')
+        .from('hanami_student_lesson')
         .delete()
         .in('id', selectedRecords)
 
@@ -336,19 +362,15 @@ export default function StudentProgressPage() {
         return
       }
       const { error } = await supabase
-        .from('hanami_student_progress')
+        .from('hanami_student_lesson')
         .insert([{
           student_id: formData.student_id,
-          lesson_id: formData.lesson_id,
           lesson_date: formData.lesson_date,
           course_type: formData.course_type,
-          lesson_type: formData.lesson_type,
+          lesson_status: formData.lesson_type,
           progress_notes: formData.progress_notes,
-          next_goal: formData.next_goal,
-          video_url: formData.video_url,
-          review_status: 'pending',
-          is_sent: false,
-          ai_processed: false
+          next_target: formData.next_goal,
+          video_url: formData.video_url
         }])
       if (error) {
         console.error('新增進度記錄失敗:', error)
@@ -373,15 +395,14 @@ export default function StudentProgressPage() {
         return
       }
       const { error } = await supabase
-        .from('hanami_student_progress')
+        .from('hanami_student_lesson')
         .update({
           student_id: formData.student_id,
-          lesson_id: formData.lesson_id,
           lesson_date: formData.lesson_date,
           course_type: formData.course_type,
-          lesson_type: formData.lesson_type,
+          lesson_status: formData.lesson_type,
           progress_notes: formData.progress_notes,
-          next_goal: formData.next_goal,
+          next_target: formData.next_goal,
           video_url: formData.video_url,
           updated_at: new Date().toISOString()
         })
@@ -410,12 +431,11 @@ export default function StudentProgressPage() {
       const reviewerId = currentUser.data.user?.id
 
       const { error } = await supabase
-        .from('hanami_student_progress')
+        .from('hanami_student_lesson')
         .update({
-          review_status: reviewStatus,
-          review_notes: reviewNotes,
-          reviewed_by: reviewerId,
-          reviewed_at: new Date().toISOString()
+          status: reviewStatus === 'approved' ? 'attended' : 'absent',
+          notes: reviewNotes,
+          updated_at: new Date().toISOString()
         })
         .eq('id', selectedRecord.id)
 
@@ -440,10 +460,10 @@ export default function StudentProgressPage() {
   const handleMarkAsSent = async (recordId: string) => {
     try {
       const { error } = await supabase
-        .from('hanami_student_progress')
+        .from('hanami_student_lesson')
         .update({
-          is_sent: true,
-          sent_at: new Date().toISOString()
+          remarks: '已發送',
+          updated_at: new Date().toISOString()
         })
         .eq('id', recordId)
 
@@ -465,10 +485,10 @@ export default function StudentProgressPage() {
   const handleMarkAsAiProcessed = async (recordId: string) => {
     try {
       const { error } = await supabase
-        .from('hanami_student_progress')
+        .from('hanami_student_lesson')
         .update({
-          ai_processed: true,
-          ai_processed_at: new Date().toISOString()
+          remarks: 'AI已處理',
+          updated_at: new Date().toISOString()
         })
         .eq('id', recordId)
 
@@ -529,7 +549,7 @@ export default function StudentProgressPage() {
       }
 
       const { error } = await supabase
-        .from('hanami_student_progress')
+        .from('hanami_student_lesson')
         .update(updateData)
         .in('id', selectedRecords)
 
@@ -1498,7 +1518,7 @@ function AddProgressModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
                 {showLessonTypeDropdown && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EADBC8] rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
                     <div className="max-h-48 overflow-y-auto">
-                      {["正常課", "比賽課", "評估課", "補課", "考試課", "拍片課"].map((type) => (
+                      {(["正常課", "比賽課", "評估課", "補課", "考試課", "拍片課"] as Exclude<StudentProgress['lesson_type'], null>[]).map((type) => (
                         <button
                           key={type}
                           type="button"
@@ -1592,6 +1612,13 @@ function ReviewProgressModal({
   reviewStatus: 'approved' | 'rejected'
   setReviewStatus: (status: 'approved' | 'rejected') => void
 }) {
+  // 重新宣告，確保作用域可用
+  function getCourseAndLessonTypeLabel(courseType: string | null, lessonType: string | null) {
+    const course = courseType || '未分類'
+    const lesson = lessonType || '未分類'
+    return `${course}（${lesson}）`
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -1661,7 +1688,16 @@ function EditProgressModal({
   onClose: () => void
   onSubmit: (data: any) => void
 }) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    student_id: string;
+    lesson_id: string;
+    lesson_date: string;
+    course_type: string;
+    lesson_type: StudentProgress['lesson_type'];
+    progress_notes: string;
+    next_goal: string;
+    video_url: string;
+  }>({
     student_id: record.student_id || '',
     lesson_id: record.lesson_id || '',
     lesson_date: record.lesson_date ? record.lesson_date.split('T')[0] : '',
@@ -1999,7 +2035,7 @@ function EditProgressModal({
                 {showLessonTypeDropdown && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EADBC8] rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
                     <div className="max-h-48 overflow-y-auto">
-                      {["正常課", "比賽課", "評估課", "補課", "考試課", "拍片課"].map((type) => (
+                      {(["正常課", "比賽課", "評估課", "補課", "考試課", "拍片課"] as Exclude<StudentProgress['lesson_type'], null>[]).map((type) => (
                         <button
                           key={type}
                           type="button"

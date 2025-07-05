@@ -11,20 +11,16 @@ export default function LessonAvailabilityPage() {
 
   const insertTestData = async () => {
     try {
-      // 插入測試資料到 hanami_schedule 表
+      // 插入測試資料到 hanami_teacher_schedule 表
       const testData = [
-        { weekday: 1, timeslot: '09:00', max_students: 4, duration: '00:45' }, // 星期一 9:00
-        { weekday: 1, timeslot: '10:00', max_students: 4, duration: '00:45' }, // 星期一 10:00
-        { weekday: 2, timeslot: '14:00', max_students: 3, duration: '01:00' }, // 星期二 14:00
-        { weekday: 3, timeslot: '16:00', max_students: 5, duration: '00:45' }, // 星期三 16:00
-        { weekday: 4, timeslot: '15:00', max_students: 4, duration: '01:00' }, // 星期四 15:00
-        { weekday: 5, timeslot: '17:00', max_students: 3, duration: '00:45' }, // 星期五 17:00
-        { weekday: 6, timeslot: '10:30', max_students: 6, duration: '01:00' }, // 星期六 10:30
-        { weekday: 0, timeslot: '11:00', max_students: 4, duration: '00:45' }, // 星期日 11:00
+        { teacher_id: 'test-teacher-1', scheduled_date: '2024-01-01', start_time: '09:00', end_time: '09:45' },
+        { teacher_id: 'test-teacher-2', scheduled_date: '2024-01-01', start_time: '10:00', end_time: '10:45' },
+        { teacher_id: 'test-teacher-1', scheduled_date: '2024-01-02', start_time: '14:00', end_time: '15:00' },
+        { teacher_id: 'test-teacher-3', scheduled_date: '2024-01-03', start_time: '16:00', end_time: '16:45' },
       ]
 
       const { data, error } = await supabase
-        .from('hanami_schedule')
+        .from('hanami_teacher_schedule')
         .insert(testData)
 
       if (error) {

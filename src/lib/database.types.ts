@@ -627,6 +627,27 @@ export type Database = {
         }
         Relationships: []
       }
+      hanami_trial_queue: {
+        Row: {
+          id: string
+          student_id: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
