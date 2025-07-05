@@ -218,7 +218,6 @@ export default function StudentDetailPage() {
         student_age: student.student_age,
         student_preference: student.student_preference,
         course_type: student.course_type,
-        remaining_lessons: student.remaining_lessons,
         regular_weekday: student.regular_weekday, // 從inactive_student_list恢復
         gender: student.gender,
         student_oid: student.student_oid,

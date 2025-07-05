@@ -41,7 +41,6 @@ export interface Student {
   duration_months?: number | null;
   regular_timeslot?: string | null;
   regular_weekday?: number | null;
-  remaining_lessons?: number | null;
   school?: string | null;
   started_date?: string | null;
   student_email?: string | null;
@@ -65,7 +64,6 @@ export interface Lesson {
   lesson_duration: string | null;
   regular_weekday: number | null;
   lesson_count: number;
-  remaining_lessons: number | null;
   is_trial: boolean;
   lesson_teacher: string | null;
   package_id: string | null;
@@ -151,4 +149,40 @@ export interface StudentFormData extends Omit<Student, 'gender' | 'course_type' 
   trial_date?: string | null;
   trial_time?: string | null;
   trial_remarks?: string | null;
+}
+
+export interface StudentProgress {
+  id: string
+  student_id: string | null
+  lesson_id: string | null
+  lesson_date: string | null
+  course_type: string | null
+  lesson_type: '正常課' | '補課' | '評估課' | '考試課' | '比賽課' | '拍片課' | null
+  duration_minutes: number | null
+  progress_notes: string | null
+  next_goal: string | null
+  video_url: string | null
+  created_at: string
+  updated_at: string | null
+  review_status: 'pending' | 'approved' | 'rejected'
+  review_notes: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  is_sent: boolean
+  sent_at: string | null
+  ai_processed: boolean
+  ai_processed_at: string | null
+  ai_feedback: string | null
+  ai_suggestions: string | null
+  student?: {
+    full_name: string
+    student_oid: string | null
+    course_type: string | null
+    student_type: string | null
+  }
+  lesson?: {
+    lesson_date: string
+    actual_timeslot: string | null
+    lesson_teacher: string | null
+  }
 } 

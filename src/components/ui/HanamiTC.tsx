@@ -6,6 +6,7 @@ import LessonPlanModal from '@/components/ui/LessonPlanModal';
 import { Lesson, Teacher, CourseType, Student } from '@/types';
 import LessonCard from './LessonCard';
 import MiniLessonCard from './MiniLessonCard';
+import { calculateRemainingLessonsBatch } from '@/lib/utils';
 
 interface ProcessedLesson {
   id: string;
@@ -136,8 +137,7 @@ const HanamiTC = () => {
         *,
         Hanami_Students!hanami_student_lesson_student_id_fkey (
           full_name,
-          student_age,
-          remaining_lessons
+          student_age
         )
       `)
       .gte('lesson_date', startDateStr)
@@ -157,17 +157,23 @@ const HanamiTC = () => {
     console.log('Fetched regular lessons:', regularLessonsData);
     console.log('Fetched trial lessons:', trialLessonsData);
 
+    // 使用現有的 calculateRemainingLessonsBatch 函數計算剩餘堂數
+    const regularStudentIds = [...new Set((regularLessonsData || []).map(lesson => lesson.student_id).filter(Boolean))];
+    const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+
+    console.log('Remaining lessons map:', remainingLessonsMap);
+
     // 處理常規學生數據
     const processedRegularLessons: ProcessedLesson[] = (regularLessonsData || []).map((lesson) => ({
       id: lesson.id,
       student_id: lesson.student_id || '',
       lesson_date: lesson.lesson_date || '',
-      regular_timeslot: lesson.regular_timeslot || '',
-      course_type: lesson.course_type || '',
+      regular_timeslot: lesson.regular_timeslot && lesson.regular_timeslot !== '' ? lesson.regular_timeslot : '未設定',
+      course_type: lesson.course_type && lesson.course_type !== '' ? lesson.course_type : '未設定',
       full_name: lesson.Hanami_Students?.full_name || '未命名學生',
       student_age: lesson.Hanami_Students?.student_age || null,
       lesson_status: lesson.lesson_status,
-      remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+      remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
       is_trial: false,
       lesson_duration: lesson.lesson_duration || null,
     }));
@@ -177,8 +183,8 @@ const HanamiTC = () => {
       id: trial.id,
       student_id: trial.id,
       lesson_date: trial.lesson_date || '',
-      regular_timeslot: trial.actual_timeslot || '',
-      course_type: trial.course_type || '',
+      regular_timeslot: trial.actual_timeslot && trial.actual_timeslot !== '' ? trial.actual_timeslot : '未設定',
+      course_type: trial.course_type && trial.course_type !== '' ? trial.course_type : '未設定',
       full_name: trial.full_name || '未命名學生',
       student_age: trial.student_age,
       lesson_status: null,
@@ -345,11 +351,10 @@ const HanamiTC = () => {
     }
 
     return (
-      <div className="w-full flex flex-col items-center mb-1">
-        <div className="flex flex-row flex-wrap gap-1 w-full justify-center">
-          {teachers.map((teacher, idx) => (
+      <div className="w-full flex flex-row flex-wrap gap-2 justify-center mb-1">
+        {teachers.map((teacher, idx) => (
+          <div key={idx} className="flex flex-col items-center">
             <button
-              key={idx}
               className="rounded-full bg-[#FFF7D6] text-[#4B4036] px-2 py-1 shadow-sm font-semibold text-xs hover:bg-[#FFE5B4] transition-all duration-150 truncate max-w-full"
               onClick={() => {
                 window.location.href = `/admin/teachers/teacher-schedule?teacher_name=${encodeURIComponent(teacher.name)}`;
@@ -358,19 +363,14 @@ const HanamiTC = () => {
             >
               {teacher.name}
             </button>
-          ))}
-        </div>
-        <div className="flex flex-row flex-wrap gap-1 w-full justify-center mt-1">
-          {teachers.map((teacher, idx) => (
             <span
-              key={idx}
-              className="rounded-full bg-[#EADBC8] text-[#7A6654] px-2 py-0.5 font-mono text-xs min-w-[60px] text-center"
+              className="rounded-full bg-[#EADBC8] text-[#7A6654] px-2 py-0.5 font-mono text-xs min-w-[60px] text-center mt-1"
               title={`${teacher.start.slice(0,5)}~${teacher.end.slice(0,5)}`}
             >
               {teacher.start.slice(0,5)}~{teacher.end.slice(0,5)}
             </span>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
     );
   };
@@ -587,7 +587,8 @@ const HanamiTC = () => {
         student_id: l.student_id,
         age,
         is_trial: l.is_trial,
-        remaining_lessons: l.remaining_lessons
+        remaining_lessons: l.remaining_lessons,
+        avatar: undefined
       });
       return acc;
     }, {});
@@ -608,7 +609,7 @@ const HanamiTC = () => {
                 name: student.name,
                 age: student.age,
                 isTrial: student.is_trial,
-                remainingLessons: student.remaining_lessons ?? undefined,
+                remainingLessons: student.remaining_lessons,
                 avatar: undefined
               }))}
               onEdit={() => {
@@ -631,7 +632,7 @@ const HanamiTC = () => {
                     name: student.name,
                     age: student.age,
                     isTrial: student.is_trial,
-                    remainingLessons: student.remaining_lessons ?? undefined,
+                    remainingLessons: student.remaining_lessons,
                     avatar: undefined
                   })),
                   onEdit: () => {
@@ -761,14 +762,14 @@ const HanamiTC = () => {
                           key={j}
                           time={group.time?.slice(0, 5) || ''}
                           course={{ name: group.course }}
-                          students={group.students.map(student => ({
-                            id: student.student_id,
-                            name: student.name,
-                            age: student.age,
-                            isTrial: student.is_trial,
-                            remainingLessons: student.remaining_lessons ?? undefined,
-                            avatar: undefined
-                          }))}
+                                                      students={group.students.map(student => ({
+                              id: student.student_id,
+                              name: student.name,
+                              age: student.age,
+                              isTrial: student.is_trial,
+                              remainingLessons: student.remaining_lessons,
+                              avatar: undefined
+                            }))}
                           plan={plan}
                           onEdit={() => {
                             const matchedPlan = (plans || []).find(
@@ -790,7 +791,7 @@ const HanamiTC = () => {
                                 name: student.name,
                                 age: student.age,
                                 isTrial: student.is_trial,
-                                remainingLessons: student.remaining_lessons ?? undefined,
+                                remainingLessons: student.remaining_lessons,
                                 avatar: undefined
                               })),
                               plan,

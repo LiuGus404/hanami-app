@@ -10,6 +10,7 @@ import HanamiBadge from '@/components/ui/HanamiBadge';
 import { supabase } from '@/lib/supabase';
 import { getUserSession, clearUserSession } from '@/lib/authUtils';
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
+import { calculateRemainingLessonsBatch } from '@/lib/utils';
 
 interface Student {
   id: string;
@@ -17,7 +18,6 @@ interface Student {
   nick_name: string | null;
   student_age: number | null;
   course_type: string | null;
-  remaining_lessons: number | null;
   regular_timeslot: string | null;
   regular_weekday: number | null;
 }
@@ -94,8 +94,18 @@ export default function TeacherDashboard() {
         .eq('student_teacher', userSession.id);
 
       if (studentsData) {
-        setStudents(studentsData);
-        setStudentCount(studentsData.length);
+        // 計算學生的剩餘堂數
+        const studentIds = studentsData.map(student => student.id);
+        const remainingLessonsMap = await calculateRemainingLessonsBatch(studentIds, new Date());
+        
+        // 為學生添加剩餘堂數
+        const studentsWithRemaining = studentsData.map(student => ({
+          ...student,
+          remaining_lessons: remainingLessonsMap[student.id] || 0
+        }));
+        
+        setStudents(studentsWithRemaining);
+        setStudentCount(studentsWithRemaining.length);
       }
 
       // 獲取最近的課程記錄

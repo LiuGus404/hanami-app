@@ -18,7 +18,6 @@ interface LessonData {
   student_id: string;
   course_type: string | CourseType | null;
   lesson_count: number;
-  remaining_lessons: number | null;
   is_trial: boolean;
   lesson_duration: string | null;
   regular_weekday: number | null;
@@ -209,7 +208,6 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
           lesson_duration: trialStudent.lesson_duration,
           full_name: trialStudent.full_name,
           lesson_count: 1,
-          remaining_lessons: 0,
           is_trial: true,
           // 其他必要欄位
           package_id: null,
@@ -256,7 +254,6 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
           lesson_teacher: item.lesson_teacher,
           lesson_status: item.lesson_status,
           lesson_count: 1,
-          remaining_lessons: 0,
           is_trial: false,
           // 其他必要欄位
           student_id: item.student_id,
@@ -404,7 +401,6 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
       'access_role',
       'student_oid',
       'lesson_count',
-      'remaining_lessons',
       'is_trial'
     ];
     const filtered: any = {};
@@ -470,7 +466,6 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
       access_role: 'admin',
       student_oid: newLesson.student_oid || studentData?.student_oid || studentId,
       lesson_count: newLesson.lesson_count ?? 0,
-      remaining_lessons: newLesson.remaining_lessons ?? null,
       is_trial: newLesson.is_trial ?? false
     };
 

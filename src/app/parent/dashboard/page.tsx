@@ -11,6 +11,7 @@ import HanamiButton from '@/components/ui/HanamiButton';
 import { supabase } from '@/lib/supabase';
 import { getUserSession, clearUserSession } from '@/lib/authUtils';
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
+import { calculateRemainingLessonsBatch } from '@/lib/utils';
 
 interface Student {
   id: string;
@@ -18,7 +19,6 @@ interface Student {
   nick_name: string | null;
   student_age: number | null;
   course_type: string | null;
-  remaining_lessons: number | null;
   regular_timeslot: string | null;
   regular_weekday: number | null;
   parent_email: string | null;
@@ -89,12 +89,22 @@ export default function ParentDashboard() {
         .in('id', userSession.relatedIds || []);
 
       if (childrenData && childrenData.length > 0) {
-        setChildren(childrenData);
-        setSelectedChild(childrenData[0]); // 預設選擇第一個孩子
-        setStudentCount(childrenData.length);
+        // 計算孩子的剩餘堂數
+        const childIds = childrenData.map(child => child.id);
+        const remainingLessonsMap = await calculateRemainingLessonsBatch(childIds, new Date());
+        
+        // 為孩子添加剩餘堂數
+        const childrenWithRemaining = childrenData.map(child => ({
+          ...child,
+          remaining_lessons: remainingLessonsMap[child.id] || 0
+        }));
+        
+        setChildren(childrenWithRemaining);
+        setSelectedChild(childrenWithRemaining[0]); // 預設選擇第一個孩子
+        setStudentCount(childrenWithRemaining.length);
         
         // 載入第一個孩子的資料
-        loadChildData(childrenData[0].id);
+        loadChildData(childrenWithRemaining[0].id);
       } else {
         router.push('/parent/login');
       }

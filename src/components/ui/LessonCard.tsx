@@ -43,10 +43,11 @@ interface LessonCardProps {
 }
 
 const getStudentBg = (remainingLessons?: number, isTrial?: boolean) => {
-  if (isTrial) return 'bg-[#FFF7D6]';
-  if (remainingLessons === 1) return 'bg-[#FFB3B3]';
-  if (remainingLessons === 2) return 'bg-[#FFDF9F]';
-  return 'bg-[#F5E7D4]';
+  if (isTrial) return '#FFF7D6';
+  const num = Number(remainingLessons);
+  if (num === 1) return '#FF8A8A';
+  if (num === 2) return '#FFB67A';
+  return '#F5E7D4';
 };
 
 const LessonCard: React.FC<LessonCardProps> = ({
@@ -156,11 +157,12 @@ const LessonCard: React.FC<LessonCardProps> = ({
       {showStudents && (
         <div className="flex flex-wrap gap-2 mb-2 max-h-[120px] overflow-y-auto">
           {students.map((stu, i) => (
-            <button
+            <div
               key={i}
-              className={`flex items-center px-3 py-1 rounded-full text-[#4B4036] text-[10px] font-semibold shadow-sm ${getStudentBg(stu.remainingLessons, stu.isTrial)}`}
-              style={{ cursor: 'pointer' }}
+              className="inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs transition-all duration-200 flex items-center shadow-sm"
+              style={{ backgroundColor: getStudentBg(stu.remainingLessons, stu.isTrial) }}
               onClick={() => router.push(`/admin/students/${stu.id}`)}
+              style={{ cursor: 'pointer', backgroundColor: getStudentBg(stu.remainingLessons, stu.isTrial) }}
             >
               {stu.name}
               {stu.age && (
@@ -168,10 +170,8 @@ const LessonCard: React.FC<LessonCardProps> = ({
                   ({(() => {
                     const months = typeof stu.age === 'string' ? parseInt(stu.age) : stu.age;
                     if (isNaN(months)) return '';
-                    
                     const years = Math.floor(months / 12);
                     const remainingMonths = months % 12;
-                    
                     if (years === 0) return `${remainingMonths}M`;
                     return `${years}Y${remainingMonths ? remainingMonths + 'M' : ''}`;
                   })()})
@@ -183,7 +183,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
                   {stu.teacher}
                 </span>
               )}
-            </button>
+            </div>
           ))}
         </div>
       )}

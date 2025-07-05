@@ -7,6 +7,7 @@ import { PopupSelect } from '@/components/ui/PopupSelect'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import StudentCard from '@/components/ui/StudentCard'
+import { calculateRemainingLessonsBatch } from '@/lib/utils'
 import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw } from 'lucide-react'
 import { useUser } from '@/hooks/useUser'
 import { useParams } from 'next/navigation'
@@ -118,7 +119,7 @@ export default function StudentManagementPage() {
         // 獲取常規學生數據
         const { data: studentData, error: studentError } = await supabase
           .from('Hanami_Students')
-          .select('id, full_name, student_age, student_preference, course_type, remaining_lessons, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes')
+          .select('id, full_name, student_age, student_preference, course_type, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes')
 
         // 獲取試堂學生數據
         const { data: trialStudentData, error: trialStudentError } = await supabase
@@ -150,6 +151,16 @@ export default function StudentManagementPage() {
 
         // 處理常規學生數據
         const regularStudents = studentData || []
+        
+        // 計算常規學生的剩餘堂數
+        const regularStudentIds = regularStudents.map(student => student.id)
+        const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date())
+        
+        // 為常規學生添加剩餘堂數
+        const regularStudentsWithRemaining = regularStudents.map(student => ({
+          ...student,
+          remaining_lessons: remainingLessonsMap[student.id] || 0
+        }))
 
         // 處理試堂學生數據
         const trialStudents = (trialStudentData || []).map((trial) => {
@@ -227,7 +238,7 @@ export default function StudentManagementPage() {
         })
 
         // 合併所有學生數據
-        const allStudents = [...regularStudents, ...trialStudents, ...inactiveStudents]
+        const allStudents = [...regularStudentsWithRemaining, ...trialStudents, ...inactiveStudents]
         setStudents(allStudents)
         setInactiveStudents(inactiveStudents)
         dataFetchedRef.current = true
@@ -685,7 +696,7 @@ export default function StudentManagementPage() {
       // 重新獲取學生數據
       const { data: studentData } = await supabase
         .from('Hanami_Students')
-        .select('id, full_name, student_age, student_preference, course_type, remaining_lessons, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes')
+        .select('id, full_name, student_age, student_preference, course_type, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes')
 
       const { data: trialStudentData } = await supabase
         .from('hanami_trial_students')
@@ -693,6 +704,17 @@ export default function StudentManagementPage() {
 
       if (studentData) {
         const regularStudents = studentData || []
+        
+        // 計算常規學生的剩餘堂數
+        const regularStudentIds = regularStudents.map(student => student.id)
+        const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date())
+        
+        // 為常規學生添加剩餘堂數
+        const regularStudentsWithRemaining = regularStudents.map(student => ({
+          ...student,
+          remaining_lessons: remainingLessonsMap[student.id] || 0
+        }))
+        
         const trialStudents = (trialStudentData || []).map((trial) => {
           let student_age = 0
           if (trial.student_dob) {
@@ -742,7 +764,7 @@ export default function StudentManagementPage() {
           }
         })
 
-        const allStudents = [...regularStudents, ...trialStudents]
+        const allStudents = [...regularStudentsWithRemaining, ...trialStudents]
         setStudents(allStudents)
       }
     } catch (error) {

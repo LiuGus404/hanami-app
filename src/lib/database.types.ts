@@ -9,283 +9,96 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      ai_task_memory: {
+      Hanami_Students: {
         Row: {
-          content: string | null
-          created_at: string | null
-          id: string
-          task_id: string | null
-          type: string | null
-        }
-        Insert: {
-          content?: string | null
-          created_at?: string | null
-          id?: string
-          task_id?: string | null
-          type?: string | null
-        }
-        Update: {
-          content?: string | null
-          created_at?: string | null
-          id?: string
-          task_id?: string | null
-          type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_task_memory_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "ai_tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ai_tasks: {
-        Row: {
-          assigned_model: string | null
-          created_at: string | null
-          error_message: string | null
-          finished_at: string | null
-          id: string
-          memory_id: string | null
-          model: string | null
-          prompt: string | null
-          result: string | null
-          started_at: string | null
-          status: string | null
-          title: string | null
-        }
-        Insert: {
-          assigned_model?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          finished_at?: string | null
-          id?: string
-          memory_id?: string | null
-          model?: string | null
-          prompt?: string | null
-          result?: string | null
-          started_at?: string | null
-          status?: string | null
-          title?: string | null
-        }
-        Update: {
-          assigned_model?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          finished_at?: string | null
-          id?: string
-          memory_id?: string | null
-          model?: string | null
-          prompt?: string | null
-          result?: string | null
-          started_at?: string | null
-          status?: string | null
-          title?: string | null
-        }
-        Relationships: []
-      }
-      hanami_admin: {
-        Row: {
-          admin_email: string | null
-          admin_name: string | null
-          admin_oid: string | null
-          admin_password: string | null
-          created_at: string
-          id: string
-          role: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          admin_email?: string | null
-          admin_name?: string | null
-          admin_oid?: string | null
-          admin_password?: string | null
-          created_at?: string
-          id?: string
-          role?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          admin_email?: string | null
-          admin_name?: string | null
-          admin_oid?: string | null
-          admin_password?: string | null
-          created_at?: string
-          id?: string
-          role?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      Hanami_CourseTypes: {
-        Row: {
-          created_at: string
-          id: string
-          name: string | null
-          status: boolean | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name?: string | null
-          status?: boolean | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string | null
-          status?: boolean | null
-        }
-        Relationships: []
-      }
-      hanami_employee: {
-        Row: {
-          created_at: string | null
-          id: string
-          teacher_address: string | null
-          teacher_background: string | null
-          teacher_bankid: string | null
-          teacher_dob: string | null
-          teacher_email: string | null
-          teacher_fullname: string | null
-          teacher_hsalary: number | null
-          teacher_msalary: number | null
-          teacher_nickname: string
-          teacher_password: string | null
-          teacher_phone: string | null
-          teacher_role: string | null
-          teacher_status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          teacher_address?: string | null
-          teacher_background?: string | null
-          teacher_bankid?: string | null
-          teacher_dob?: string | null
-          teacher_email?: string | null
-          teacher_fullname?: string | null
-          teacher_hsalary?: number | null
-          teacher_msalary?: number | null
-          teacher_nickname: string
-          teacher_password?: string | null
-          teacher_phone?: string | null
-          teacher_role?: string | null
-          teacher_status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          teacher_address?: string | null
-          teacher_background?: string | null
-          teacher_bankid?: string | null
-          teacher_dob?: string | null
-          teacher_email?: string | null
-          teacher_fullname?: string | null
-          teacher_hsalary?: number | null
-          teacher_msalary?: number | null
-          teacher_nickname?: string
-          teacher_password?: string | null
-          teacher_phone?: string | null
-          teacher_role?: string | null
-          teacher_status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      hanami_holidays: {
-        Row: {
-          created_at: string
-          date: string | null
-          id: string
-          is_closed: boolean | null
-          title: string | null
-        }
-        Insert: {
-          created_at?: string
-          date?: string | null
-          id?: string
-          is_closed?: boolean | null
-          title?: string | null
-        }
-        Update: {
-          created_at?: string
-          date?: string | null
-          id?: string
-          is_closed?: boolean | null
-          title?: string | null
-        }
-        Relationships: []
-      }
-      hanami_lesson_activity_log: {
-        Row: {
-          activity_name: string | null
-          learning_focus: string | null
-          lesson_id: string
-          materials_used: string | null
-          teacher_reflection: string | null
-        }
-        Insert: {
-          activity_name?: string | null
-          learning_focus?: string | null
-          lesson_id: string
-          materials_used?: string | null
-          teacher_reflection?: string | null
-        }
-        Update: {
-          activity_name?: string | null
-          learning_focus?: string | null
-          lesson_id?: string
-          materials_used?: string | null
-          teacher_reflection?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hanami_lesson_activity_log_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: true
-            referencedRelation: "hanami_student_lesson"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hanami_schedule: {
-        Row: {
-          assigned_teachers: string | null
+          access_role: string | null
+          address: string | null
+          contact_number: string
           course_type: string | null
-          created_at: string
-          duration: string | null
+          created_at: string | null
+          duration_months: number | null
+          full_name: string
+          gender: string | null
+          health_notes: string | null
           id: string
-          max_students: number | null
-          timeslot: string | null
+          nick_name: string | null
+          ongoing_lessons: number | null
+          parent_email: string | null
+          regular_timeslot: string | null
+          regular_weekday: number | null
+          school: string | null
+          started_date: string | null
+          student_age: number | null
+          student_dob: string | null
+          student_email: string | null
+          student_oid: string | null
+          student_password: string | null
+          student_preference: string | null
+          student_remarks: string | null
+          student_teacher: string | null
+          student_type: string | null
+          upcoming_lessons: number | null
           updated_at: string | null
-          weekday: number | null
         }
         Insert: {
-          assigned_teachers?: string | null
+          access_role?: string | null
+          address?: string | null
+          contact_number: string
           course_type?: string | null
-          created_at?: string
-          duration?: string | null
+          created_at?: string | null
+          duration_months?: number | null
+          full_name: string
+          gender?: string | null
+          health_notes?: string | null
           id?: string
-          max_students?: number | null
-          timeslot?: string | null
+          nick_name?: string | null
+          ongoing_lessons?: number | null
+          parent_email?: string | null
+          regular_timeslot?: string | null
+          regular_weekday?: number | null
+          school?: string | null
+          started_date?: string | null
+          student_age?: number | null
+          student_dob?: string | null
+          student_email?: string | null
+          student_oid?: string | null
+          student_password?: string | null
+          student_preference?: string | null
+          student_remarks?: string | null
+          student_teacher?: string | null
+          student_type?: string | null
+          upcoming_lessons?: number | null
           updated_at?: string | null
-          weekday?: number | null
         }
         Update: {
-          assigned_teachers?: string | null
+          access_role?: string | null
+          address?: string | null
+          contact_number?: string
           course_type?: string | null
-          created_at?: string
-          duration?: string | null
+          created_at?: string | null
+          duration_months?: number | null
+          full_name?: string
+          gender?: string | null
+          health_notes?: string | null
           id?: string
-          max_students?: number | null
-          timeslot?: string | null
+          nick_name?: string | null
+          ongoing_lessons?: number | null
+          parent_email?: string | null
+          regular_timeslot?: string | null
+          regular_weekday?: number | null
+          school?: string | null
+          started_date?: string | null
+          student_age?: number | null
+          student_dob?: string | null
+          student_email?: string | null
+          student_oid?: string | null
+          student_password?: string | null
+          student_preference?: string | null
+          student_remarks?: string | null
+          student_teacher?: string | null
+          student_type?: string | null
+          upcoming_lessons?: number | null
           updated_at?: string | null
-          weekday?: number | null
         }
         Relationships: []
       }
@@ -389,100 +202,6 @@ export type Database = {
           },
         ]
       }
-      hanami_student_lesson_duplicate: {
-        Row: {
-          access_role: string | null
-          actual_timeslot: string | null
-          course_type: string | null
-          created_at: string
-          id: string
-          lesson_date: string
-          lesson_duration: string | null
-          lesson_status: string | null
-          next_target: string | null
-          notes: string | null
-          package_id: string | null
-          progress_notes: string | null
-          regular_timeslot: string | null
-          regular_weekday: string | null
-          remarks: string | null
-          status: Database["public"]["Enums"]["lesson_status_type"] | null
-          student_id: string | null
-          student_name: string | null
-          student_oid: string | null
-          updated_at: string | null
-          video_url: string | null
-        }
-        Insert: {
-          access_role?: string | null
-          actual_timeslot?: string | null
-          course_type?: string | null
-          created_at?: string
-          id?: string
-          lesson_date: string
-          lesson_duration?: string | null
-          lesson_status?: string | null
-          next_target?: string | null
-          notes?: string | null
-          package_id?: string | null
-          progress_notes?: string | null
-          regular_timeslot?: string | null
-          regular_weekday?: string | null
-          remarks?: string | null
-          status?: Database["public"]["Enums"]["lesson_status_type"] | null
-          student_id?: string | null
-          student_name?: string | null
-          student_oid?: string | null
-          updated_at?: string | null
-          video_url?: string | null
-        }
-        Update: {
-          access_role?: string | null
-          actual_timeslot?: string | null
-          course_type?: string | null
-          created_at?: string
-          id?: string
-          lesson_date?: string
-          lesson_duration?: string | null
-          lesson_status?: string | null
-          next_target?: string | null
-          notes?: string | null
-          package_id?: string | null
-          progress_notes?: string | null
-          regular_timeslot?: string | null
-          regular_weekday?: string | null
-          remarks?: string | null
-          status?: Database["public"]["Enums"]["lesson_status_type"] | null
-          student_id?: string | null
-          student_name?: string | null
-          student_oid?: string | null
-          updated_at?: string | null
-          video_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hanami_student_lesson_duplicate_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "Hanami_Student_Package"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hanami_student_lesson_duplicate_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "Hanami_Students"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hanami_student_lesson_duplicate_student_oid_fkey"
-            columns: ["student_oid"]
-            isOneToOne: false
-            referencedRelation: "Hanami_Students"
-            referencedColumns: ["student_oid"]
-          },
-        ]
-      }
       Hanami_Student_Package: {
         Row: {
           access_role: string | null
@@ -547,186 +266,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      hanami_student_progress: {
-        Row: {
-          created_at: string
-          duration_minutes: number | null
-          id: string
-          lesson_date: string | null
-          lesson_id: string | null
-          lesson_type: Database["public"]["Enums"]["lesson_type_enum"] | null
-          next_goal: string | null
-          progress_notes: string | null
-          student_id: string | null
-          updated_at: string | null
-          video_url: string | null
-        }
-        Insert: {
-          created_at?: string
-          duration_minutes?: number | null
-          id?: string
-          lesson_date?: string | null
-          lesson_id?: string | null
-          lesson_type?: Database["public"]["Enums"]["lesson_type_enum"] | null
-          next_goal?: string | null
-          progress_notes?: string | null
-          student_id?: string | null
-          updated_at?: string | null
-          video_url?: string | null
-        }
-        Update: {
-          created_at?: string
-          duration_minutes?: number | null
-          id?: string
-          lesson_date?: string | null
-          lesson_id?: string | null
-          lesson_type?: Database["public"]["Enums"]["lesson_type_enum"] | null
-          next_goal?: string | null
-          progress_notes?: string | null
-          student_id?: string | null
-          updated_at?: string | null
-          video_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hanami_student_progress_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: false
-            referencedRelation: "hanami_student_lesson"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hanami_student_progress_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "Hanami_Students"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      Hanami_Students: {
-        Row: {
-          access_role: string | null
-          address: string | null
-          contact_number: string
-          course_type: string | null
-          created_at: string | null
-          duration_months: number | null
-          full_name: string
-          gender: string | null
-          health_notes: string | null
-          id: string
-          nick_name: string | null
-          ongoing_lessons: number | null
-          parent_email: string | null
-          regular_timeslot: string | null
-          regular_weekday: number | null
-          remaining_lessons: number | null
-          school: string | null
-          started_date: string | null
-          student_age: number | null
-          student_dob: string | null
-          student_email: string | null
-          student_oid: string | null
-          student_password: string | null
-          student_preference: string | null
-          student_remarks: string | null
-          student_teacher: string | null
-          student_type: string | null
-          upcoming_lessons: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          access_role?: string | null
-          address?: string | null
-          contact_number: string
-          course_type?: string | null
-          created_at?: string | null
-          duration_months?: number | null
-          full_name: string
-          gender?: string | null
-          health_notes?: string | null
-          id?: string
-          nick_name?: string | null
-          ongoing_lessons?: number | null
-          parent_email?: string | null
-          regular_timeslot?: string | null
-          regular_weekday?: number | null
-          remaining_lessons?: number | null
-          school?: string | null
-          started_date?: string | null
-          student_age?: number | null
-          student_dob?: string | null
-          student_email?: string | null
-          student_oid?: string | null
-          student_password?: string | null
-          student_preference?: string | null
-          student_remarks?: string | null
-          student_teacher?: string | null
-          student_type?: string | null
-          upcoming_lessons?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          access_role?: string | null
-          address?: string | null
-          contact_number?: string
-          course_type?: string | null
-          created_at?: string | null
-          duration_months?: number | null
-          full_name?: string
-          gender?: string | null
-          health_notes?: string | null
-          id?: string
-          nick_name?: string | null
-          ongoing_lessons?: number | null
-          parent_email?: string | null
-          regular_timeslot?: string | null
-          regular_weekday?: number | null
-          remaining_lessons?: number | null
-          school?: string | null
-          started_date?: string | null
-          student_age?: number | null
-          student_dob?: string | null
-          student_email?: string | null
-          student_oid?: string | null
-          student_password?: string | null
-          student_preference?: string | null
-          student_remarks?: string | null
-          student_teacher?: string | null
-          student_type?: string | null
-          upcoming_lessons?: number | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      hanami_trial_queue: {
-        Row: {
-          created_at: string
-          id: string
-          notes: string | null
-          preferred_timeslots: Json | null
-          status: string | null
-          student_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          notes?: string | null
-          preferred_timeslots?: Json | null
-          status?: string | null
-          student_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          notes?: string | null
-          preferred_timeslots?: Json | null
-          status?: string | null
-          student_id?: string | null
-        }
-        Relationships: []
       }
       hanami_trial_students: {
         Row: {
@@ -836,198 +375,168 @@ export type Database = {
         }
         Relationships: []
       }
-      model_status: {
+      hanami_employee: {
         Row: {
-          assigned_task_id: string | null
-          model_name: string
-          port: number | null
-          status: string | null
+          created_at: string | null
+          id: string
+          teacher_address: string | null
+          teacher_background: string | null
+          teacher_bankid: string | null
+          teacher_dob: string | null
+          teacher_email: string | null
+          teacher_fullname: string | null
+          teacher_hsalary: number | null
+          teacher_msalary: number | null
+          teacher_nickname: string
+          teacher_password: string | null
+          teacher_phone: string | null
+          teacher_role: string | null
+          teacher_status: string | null
           updated_at: string | null
         }
         Insert: {
-          assigned_task_id?: string | null
-          model_name: string
-          port?: number | null
-          status?: string | null
+          created_at?: string | null
+          id?: string
+          teacher_address?: string | null
+          teacher_background?: string | null
+          teacher_bankid?: string | null
+          teacher_dob?: string | null
+          teacher_email?: string | null
+          teacher_fullname?: string | null
+          teacher_hsalary?: number | null
+          teacher_msalary?: number | null
+          teacher_nickname: string
+          teacher_password?: string | null
+          teacher_phone?: string | null
+          teacher_role?: string | null
+          teacher_status?: string | null
           updated_at?: string | null
         }
         Update: {
-          assigned_task_id?: string | null
-          model_name?: string
-          port?: number | null
-          status?: string | null
+          created_at?: string | null
+          id?: string
+          teacher_address?: string | null
+          teacher_background?: string | null
+          teacher_bankid?: string | null
+          teacher_dob?: string | null
+          teacher_email?: string | null
+          teacher_fullname?: string | null
+          teacher_hsalary?: number | null
+          teacher_msalary?: number | null
+          teacher_nickname?: string
+          teacher_password?: string | null
+          teacher_phone?: string | null
+          teacher_role?: string | null
+          teacher_status?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "model_status_assigned_task_id_fkey"
-            columns: ["assigned_task_id"]
-            isOneToOne: false
-            referencedRelation: "ai_tasks"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
-      hanami_teacher_schedule: {
+      Hanami_CourseTypes: {
         Row: {
-          id: string;
-          teacher_id: string;
-          scheduled_date: string;
-          start_time: string;
-          end_time: string;
-          created_at?: string;
-          updated_at?: string;
+          created_at: string
+          id: string
+          name: string | null
+          status: boolean | null
         }
         Insert: {
-          id?: string;
-          teacher_id: string;
-          scheduled_date: string;
-          start_time: string;
-          end_time: string;
-          created_at?: string;
-          updated_at?: string;
+          created_at?: string
+          id?: string
+          name?: string | null
+          status?: boolean | null
         }
         Update: {
-          id?: string;
-          teacher_id?: string;
-          scheduled_date?: string;
-          start_time?: string;
-          end_time?: string;
-          created_at?: string;
-          updated_at?: string;
+          created_at?: string
+          id?: string
+          name?: string | null
+          status?: boolean | null
+        }
+        Relationships: []
+      }
+      hanami_holidays: {
+        Row: {
+          created_at: string
+          date: string | null
+          id: string
+          is_closed: boolean | null
+          title: string | null
+        }
+        Insert: {
+          created_at?: string
+          date?: string | null
+          id?: string
+          is_closed?: boolean | null
+          title?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string | null
+          id?: string
+          is_closed?: boolean | null
+          title?: string | null
         }
         Relationships: []
       }
       hanami_lesson_plan: {
         Row: {
-          id: string;
-          created_at: string;
-          lesson_date: string;
-          timeslot: string;
-          course_type: string;
-          topic: string;
-          objectives: string[];
-          materials: string[];
-          teacher_ids: string[];
-          teacher_names: string[];
-          teacher_ids_1: string[];
-          teacher_ids_2: string[];
-          theme: string;
-          notes: string;
+          id: string
+          created_at: string
+          lesson_date: string
+          timeslot: string
+          course_type: string
+          topic: string
+          objectives: string[]
+          materials: string[]
+          teacher_ids: string[]
+          teacher_names: string[]
+          teacher_ids_1: string[]
+          teacher_ids_2: string[]
+          theme: string
+          notes: string
         }
         Insert: {
-          id?: string;
-          created_at?: string;
-          lesson_date: string;
-          timeslot: string;
-          course_type: string;
-          topic: string;
-          objectives: string[];
-          materials: string[];
-          teacher_ids: string[];
-          teacher_names: string[];
-          teacher_ids_1: string[];
-          teacher_ids_2: string[];
-          theme: string;
-          notes: string;
+          id?: string
+          created_at?: string
+          lesson_date: string
+          timeslot: string
+          course_type: string
+          topic: string
+          objectives: string[]
+          materials: string[]
+          teacher_ids: string[]
+          teacher_names: string[]
+          teacher_ids_1: string[]
+          teacher_ids_2: string[]
+          theme: string
+          notes: string
         }
         Update: {
-          id?: string;
-          created_at?: string;
-          lesson_date?: string;
-          timeslot?: string;
-          course_type?: string;
-          topic?: string;
-          objectives?: string[];
-          materials?: string[];
-          teacher_ids?: string[];
-          teacher_names?: string[];
-          teacher_ids_1?: string[];
-          teacher_ids_2?: string[];
-          theme?: string;
-          notes?: string;
+          id?: string
+          created_at?: string
+          lesson_date?: string
+          timeslot?: string
+          course_type?: string
+          topic?: string
+          objectives?: string[]
+          materials?: string[]
+          teacher_ids?: string[]
+          teacher_names?: string[]
+          teacher_ids_1?: string[]
+          teacher_ids_2?: string[]
+          theme?: string
+          notes?: string
         }
         Relationships: []
       }
-      inactive_student_list: {
-        Row: {
-          id: string;
-          original_id: string;
-          student_type: string;
-          full_name: string | null;
-          student_age: number | null;
-          student_preference: string | null;
-          course_type: string | null;
-          remaining_lessons: number | null;
-          regular_weekday: number | null;
-          gender: string | null;
-          student_oid: string | null;
-          contact_number: string | null;
-          regular_timeslot: string | null;
-          health_notes: string | null;
-          lesson_date: string | null;
-          actual_timeslot: string | null;
-          inactive_date: string;
-          inactive_reason: string;
-          created_at: string;
-          updated_at: string;
-        }
-        Insert: {
-          id?: string;
-          original_id: string;
-          student_type: string;
-          full_name?: string | null;
-          student_age?: number | null;
-          student_preference?: string | null;
-          course_type?: string | null;
-          remaining_lessons?: number | null;
-          regular_weekday?: number | null;
-          gender?: string | null;
-          student_oid?: string | null;
-          contact_number?: string | null;
-          regular_timeslot?: string | null;
-          health_notes?: string | null;
-          lesson_date?: string | null;
-          actual_timeslot?: string | null;
-          inactive_date?: string;
-          inactive_reason?: string;
-          created_at?: string;
-          updated_at?: string;
-        }
-        Update: {
-          id?: string;
-          original_id?: string;
-          student_type?: string;
-          full_name?: string | null;
-          student_age?: number | null;
-          student_preference?: string | null;
-          course_type?: string | null;
-          remaining_lessons?: number | null;
-          regular_weekday?: number | null;
-          gender?: string | null;
-          student_oid?: string | null;
-          contact_number?: string | null;
-          regular_timeslot?: string | null;
-          health_notes?: string | null;
-          lesson_date?: string | null;
-          actual_timeslot?: string | null;
-          inactive_date?: string;
-          inactive_reason?: string;
-          created_at?: string;
-          updated_at?: string;
-        }
-        Relationships: []
-      }
-      teacher_schedule: {
+      hanami_teacher_schedule: {
         Row: {
           id: string
           teacher_id: string
           scheduled_date: string
           start_time: string
           end_time: string
-          note: string | null
-          created_at: string | null
-          updated_at: string | null
+          created_at?: string
+          updated_at?: string
         }
         Insert: {
           id?: string
@@ -1035,9 +544,8 @@ export type Database = {
           scheduled_date: string
           start_time: string
           end_time: string
-          note?: string | null
-          created_at?: string | null
-          updated_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -1045,19 +553,79 @@ export type Database = {
           scheduled_date?: string
           start_time?: string
           end_time?: string
-          note?: string | null
-          created_at?: string | null
-          updated_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "teacher_schedule_teacher_id_fkey"
-            columns: ["teacher_id"]
-            isOneToOne: false
-            referencedRelation: "hanami_employee"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
+      }
+      inactive_student_list: {
+        Row: {
+          id: string
+          original_id: string
+          student_type: string
+          full_name: string | null
+          student_age: number | null
+          student_preference: string | null
+          course_type: string | null
+          remaining_lessons: number | null
+          regular_weekday: number | null
+          gender: string | null
+          student_oid: string | null
+          contact_number: string | null
+          regular_timeslot: string | null
+          health_notes: string | null
+          lesson_date: string | null
+          actual_timeslot: string | null
+          inactive_date: string
+          inactive_reason: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          original_id: string
+          student_type: string
+          full_name?: string | null
+          student_age?: number | null
+          student_preference?: string | null
+          course_type?: string | null
+          remaining_lessons?: number | null
+          regular_weekday?: number | null
+          gender?: string | null
+          student_oid?: string | null
+          contact_number?: string | null
+          regular_timeslot?: string | null
+          health_notes?: string | null
+          lesson_date?: string | null
+          actual_timeslot?: string | null
+          inactive_date: string
+          inactive_reason: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          original_id?: string
+          student_type?: string
+          full_name?: string | null
+          student_age?: number | null
+          student_preference?: string | null
+          course_type?: string | null
+          remaining_lessons?: number | null
+          regular_weekday?: number | null
+          gender?: string | null
+          student_oid?: string | null
+          contact_number?: string | null
+          regular_timeslot?: string | null
+          health_notes?: string | null
+          lesson_date?: string | null
+          actual_timeslot?: string | null
+          inactive_date?: string
+          inactive_reason?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -1203,28 +771,4 @@ export type CompositeTypes<
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      lesson_status_type: [
-        "attended",
-        "absent",
-        "makeup",
-        "cancelled",
-        "sick_leave",
-        "personal_leave",
-      ],
-      lesson_type_enum: [
-        "正常課",
-        "補課",
-        "評估課",
-        "考試課",
-        "比賽課",
-        "拍片課",
-      ],
-      package_status_type: ["active", "paused", "completed", "cancelled"],
-    },
-  },
-} as const
+    : never 

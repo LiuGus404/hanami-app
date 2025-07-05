@@ -3,6 +3,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { TrialLesson } from '@/types';
 import { Spinner } from '@/components/ui/spinner';
+import { calculateRemainingLessonsBatch } from '@/lib/utils';
 
 // 固定香港時區的 Date 產生器
 const getHongKongDate = (date = new Date()) => {
@@ -36,7 +37,6 @@ type RegularLesson = {
   Hanami_Students: {
     full_name: string;
     student_age: number | null;
-    remaining_lessons: number | null;
   } | null;
 };
 
@@ -73,7 +73,6 @@ interface Lesson {
   Hanami_Students?: {
     full_name: string;
     student_age: number;
-    remaining_lessons: number;
   } | null;
 }
 
@@ -186,8 +185,7 @@ const HanamiCalendar = () => {
               *,
               Hanami_Students!hanami_student_lesson_student_id_fkey (
                 full_name,
-                student_age,
-                remaining_lessons
+                student_age
               )
             `)
             .eq('lesson_date', dateStr);
@@ -212,6 +210,13 @@ const HanamiCalendar = () => {
             return;
           }
 
+          // 計算常規學生的剩餘堂數
+          const regularStudentIds = (regularLessonsData || [])
+            .filter(lesson => lesson.student_id)
+            .map(lesson => lesson.student_id!);
+          
+          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+
           // 處理常規學生數據
           const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
             id: lesson.id,
@@ -222,7 +227,7 @@ const HanamiCalendar = () => {
             full_name: lesson.Hanami_Students?.full_name || '未命名學生',
             student_age: lesson.Hanami_Students?.student_age || null,
             lesson_status: lesson.lesson_status,
-            remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+            remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
             is_trial: false,
             lesson_duration: lesson.lesson_duration || null,
           }));
@@ -277,8 +282,7 @@ const HanamiCalendar = () => {
               *,
               Hanami_Students!hanami_student_lesson_student_id_fkey (
                 full_name,
-                student_age,
-                remaining_lessons
+                student_age
               )
             `)
             .gte('lesson_date', startDateStr)
@@ -296,6 +300,13 @@ const HanamiCalendar = () => {
             return;
           }
 
+          // 計算常規學生的剩餘堂數
+          const regularStudentIds = (regularLessonsData || [])
+            .filter(lesson => lesson.student_id)
+            .map(lesson => lesson.student_id!);
+          
+          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+
           // 處理常規學生數據
           const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
             id: lesson.id,
@@ -306,7 +317,7 @@ const HanamiCalendar = () => {
             full_name: lesson.Hanami_Students?.full_name || '未命名學生',
             student_age: lesson.Hanami_Students?.student_age || null,
             lesson_status: lesson.lesson_status,
-            remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+            remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
             is_trial: false,
             lesson_duration: lesson.lesson_duration || null,
           }));
@@ -358,8 +369,7 @@ const HanamiCalendar = () => {
               *,
               Hanami_Students!hanami_student_lesson_student_id_fkey (
                 full_name,
-                student_age,
-                remaining_lessons
+                student_age
               )
             `)
             .gte('lesson_date', startDateStr)
@@ -377,6 +387,13 @@ const HanamiCalendar = () => {
             return;
           }
 
+          // 計算常規學生的剩餘堂數
+          const regularStudentIds = (regularLessonsData || [])
+            .filter(lesson => lesson.student_id)
+            .map(lesson => lesson.student_id!);
+          
+          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+
           // 處理常規學生數據
           const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
             id: lesson.id,
@@ -387,7 +404,7 @@ const HanamiCalendar = () => {
             full_name: lesson.Hanami_Students?.full_name || '未命名學生',
             student_age: lesson.Hanami_Students?.student_age || null,
             lesson_status: lesson.lesson_status,
-            remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+            remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
             is_trial: false,
             lesson_duration: lesson.lesson_duration || null,
           }));
@@ -511,6 +528,12 @@ const HanamiCalendar = () => {
       return;
     }
 
+    // 計算常規學生的剩餘堂數
+    const regularStudentIds = (regularLessonsData || [])
+      .filter(lesson => lesson.student_id)
+      .map(lesson => lesson.student_id!);
+    const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+
     // 處理常規學生數據
     const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
         id: lesson.id,
@@ -521,7 +544,7 @@ const HanamiCalendar = () => {
         full_name: lesson.Hanami_Students?.full_name || '未命名學生',
         student_age: lesson.Hanami_Students?.student_age || null,
         lesson_status: lesson.lesson_status,
-        remaining_lessons: lesson.Hanami_Students?.remaining_lessons || null,
+        remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
         is_trial: false
     }));
 
@@ -620,8 +643,7 @@ const HanamiCalendar = () => {
           *,
           Hanami_Students!hanami_student_lesson_student_id_fkey (
             full_name,
-            student_age,
-            remaining_lessons
+            student_age
           )
         `)
         .eq('id', lessonId)
@@ -651,8 +673,7 @@ const HanamiCalendar = () => {
               *,
               Hanami_Students!hanami_student_lesson_student_id_fkey (
                 full_name,
-                student_age,
-                remaining_lessons
+                student_age
               )
             `)
             .eq('lesson_date', dateStr);

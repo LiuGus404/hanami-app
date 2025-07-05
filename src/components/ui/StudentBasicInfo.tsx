@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PopupSelect } from './PopupSelect'
+import { calculateRemainingLessons } from '@/lib/utils'
 import { Student, Teacher } from '@/types'
 
 const weekdays = [
@@ -38,7 +39,6 @@ interface StudentFormData {
   duration_months: number | null;
   regular_timeslot: string | null;
   regular_weekday: number | null;
-  remaining_lessons: number | null;
   school: string | null;
   started_date: string | null;
   student_email: string | null;
@@ -93,7 +93,6 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     student_preference: student?.student_preference || null,
     lesson_date: student?.lesson_date || null,
     actual_timeslot: student?.actual_timeslot || null,
-    remaining_lessons: student?.remaining_lessons || null,
     student_type: student?.student_type || null,
   })
   const [originalData, setOriginalData] = useState<Student>(student)
@@ -106,6 +105,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   const [tempTeacher, setTempTeacher] = useState<string>('')
 
   const [teacherOptions, setTeacherOptions] = useState<{ label: string, value: string }[]>([])
+  const [calculatedRemainingLessons, setCalculatedRemainingLessons] = useState<number | null>(null)
   
   // 添加防抖機制
   const courseOptionsFetchedRef = useRef(false)
@@ -145,6 +145,25 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     setTempGender(formData.gender || '')
     setTempCourse(formData.course_type || '')
   }, [formData.gender, formData.course_type])
+
+  // 計算剩餘堂數
+  useEffect(() => {
+    const calculateRemaining = async () => {
+      if (student && student.student_type === '常規') {
+        try {
+          const remaining = await calculateRemainingLessons(student.id, undefined, new Date())
+          setCalculatedRemainingLessons(remaining)
+        } catch (error) {
+          console.error('Error calculating remaining lessons:', error)
+          setCalculatedRemainingLessons(null)
+        }
+      } else {
+        setCalculatedRemainingLessons(null)
+      }
+    }
+    
+    calculateRemaining()
+  }, [student])
 
   useEffect(() => {
     // 如果已經載入過課程選項，直接使用快取
@@ -235,7 +254,6 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       duration_months: student.duration_months ?? null,
       regular_timeslot: student.regular_timeslot ?? null,
       regular_weekday: student.regular_weekday ?? null,
-      remaining_lessons: student.remaining_lessons ?? null,
       school: student.school ?? null,
       started_date: student.started_date ?? null,
       student_email: student.student_email ?? null,
@@ -311,7 +329,6 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       duration_months: '報讀時長',
       regular_timeslot: '固定上課時段',
       regular_weekday: '固定上課星期數',
-      remaining_lessons: '剩餘堂數',
       school: '學校',
       started_date: '入學日期',
       student_email: '學生Email',
@@ -355,7 +372,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       const hanamiStudentFields: (keyof StudentFormData)[] = [
         'id', 'student_oid', 'full_name', 'nick_name', 'gender', 'contact_number', 'student_dob', 'student_age',
         'parent_email', 'health_notes', 'student_remarks', 'created_at', 'updated_at', 'address', 'course_type',
-        'duration_months', 'regular_timeslot', 'regular_weekday', 'remaining_lessons', 'school', 'started_date',
+        'duration_months', 'regular_timeslot', 'regular_weekday', 'school', 'started_date',
         'student_email', 'student_password', 'student_preference', 'student_teacher', 'student_type'
       ];
       const studentPayload: Record<string, any> = {};
@@ -731,7 +748,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         {isVisible('remaining_lessons') && (
           <>
             <div className="font-medium">剩餘堂數：</div>
-            <div>{`${formData.remaining_lessons ?? '—'}`}</div>
+            <div>{calculatedRemainingLessons !== null ? `${calculatedRemainingLessons} 堂` : '—'}</div>
           </>
         )}
 
