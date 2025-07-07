@@ -193,8 +193,7 @@ export default function LessonAvailabilityDashboard() {
               actual_timeslot: t.actual_timeslot || '',
               weekday: weekdayNum,
               student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : t.student_age,
-              course_type: courseType,
-              _debug_keys: [keyFull, keyNoType, keySimple]
+              course_type: courseType
             })
           }
         }
@@ -298,12 +297,9 @@ export default function LessonAvailabilityDashboard() {
           })
           
           // 輪流分配學生到不同的 schedule
-          const regularStudents = allRegularStudents.filter((_, index) => index % groupSchedules.length === scheduleIndex)
-          const trialStudents = allTrialStudents.filter((_, index) => index % groupSchedules.length === scheduleIndex)
+          let trialStudents = (allTrialStudents as any[]).filter((_, index) => index % groupSchedules.length === scheduleIndex)
           
-
-          
-          const slotRegularAges = regularStudents
+          const slotRegularAges = allRegularStudents
             .map(s => s.student_age)
             .filter((age): age is number => age !== null && age !== undefined && !isNaN(age))
           
@@ -395,11 +391,11 @@ export default function LessonAvailabilityDashboard() {
             course: courseType,
             weekday: weekdayNum,
             max: schedule.max_students,
-            current: regularStudents.length + trialStudents.length,
+            current: allRegularStudents.length + trialStudents.length,
             duration: schedule.duration,
             trial_students: trialStudents,
             regular_students_ages: slotRegularAges,
-            regular_students: regularStudents,
+            regular_students: allRegularStudents,
             available_dates: availableDates
           })
         })
@@ -624,6 +620,20 @@ export default function LessonAvailabilityDashboard() {
                     </button>
                   </div>
                 )}
+                {/* 課程總數統計 */}
+                {slotsByDay[dayIdx] && slotsByDay[dayIdx].length > 0 && (
+                  <div className="flex justify-center mb-1">
+                    <div className="text-xs px-2 py-1 rounded bg-[#FFF0E5] text-[#8B4513] border border-orange-200">
+                      {(() => {
+                        const daySlots = slotsByDay[dayIdx] || [];
+                        const totalRegular = daySlots.reduce((sum, slot) => sum + slot.regular_students.length, 0);
+                        const totalTrial = daySlots.reduce((sum, slot) => sum + slot.trial_students.length, 0);
+                        const totalCapacity = daySlots.reduce((sum, slot) => sum + slot.max, 0);
+                        return `${totalRegular}+${totalTrial}/${totalCapacity}`;
+                      })()}
+                    </div>
+                  </div>
+                )}
                 {queueByDay[dayIdx] && queueByDay[dayIdx].length > 0 && expandedQueue[dayIdx] && (
                   <div className="flex flex-col gap-2 mb-1">
                     {/* 簡化顯示：直接顯示所有輪候學生 */}
@@ -807,6 +817,10 @@ export default function LessonAvailabilityDashboard() {
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-[#FFFAF2] border border-[#EADBC8] rounded"></div>
             <span>已滿的時段</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-[#FFF0E5] border border-orange-200 rounded"></div>
+            <span>課程總數統計（學生數/滿額數）</span>
           </div>
           <div className="flex items-center gap-2">
             <span>格式：常規+試堂/可容納人數</span>

@@ -109,7 +109,7 @@ const HanamiCalendar = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   // 添加 loading 狀態
   const [isLoading, setIsLoading] = useState(false);
-  const [todayTeachers, setTodayTeachers] = useState<{name: string, start: string, end: string}[]>([]);
+  const [selectedDateTeachers, setSelectedDateTeachers] = useState<{name: string, start: string, end: string}[]>([]);
 
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
@@ -157,7 +157,8 @@ const HanamiCalendar = () => {
 
   useEffect(() => {
     // 如果 view 和 currentDate 沒有變化且已經載入過，不重複載入
-    const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
+    const dateStr = getDateString(currentDate);
+    const viewKey = `${view}_${dateStr}`;
     if (currentViewRef.current === viewKey && lessonsFetchedRef.current) return
     
     // 防止重複載入
@@ -169,7 +170,7 @@ const HanamiCalendar = () => {
     
     // 更新當前 view 和 date
     currentViewRef.current = viewKey;
-    currentDateRef.current = currentDate.toISOString().split('T')[0];
+    currentDateRef.current = dateStr;
     
     if (view === 'day') {
       // 查詢當天課堂
@@ -442,7 +443,8 @@ const HanamiCalendar = () => {
 
   // 當 view 或 currentDate 變化時重置防抖狀態
   useEffect(() => {
-    const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
+    const dateStr = getDateString(currentDate);
+    const viewKey = `${view}_${dateStr}`;
     if (currentViewRef.current !== viewKey) {
       lessonsFetchedRef.current = false;
       loadingRef.current = false;
@@ -801,10 +803,9 @@ const HanamiCalendar = () => {
   };
 
   useEffect(() => {
-    const fetchTodayTeachers = async () => {
+    const fetchSelectedDateTeachers = async () => {
       const supabase = getSupabaseClient();
-      const today = getHongKongDate();
-      const todayStr = today.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+      const selectedDateStr = getDateString(currentDate); // 使用現有的 getDateString 函數
       const { data, error } = await supabase
         .from('teacher_schedule')
         .select(`
@@ -813,7 +814,7 @@ const HanamiCalendar = () => {
           end_time,
           hanami_employee:teacher_id (teacher_nickname)
         `)
-        .eq('scheduled_date', todayStr);
+        .eq('scheduled_date', selectedDateStr);
       if (!error && data) {
         const list: {name: string, start: string, end: string}[] = [];
         data.forEach((row: any) => {
@@ -821,11 +822,11 @@ const HanamiCalendar = () => {
             list.push({ name: row.hanami_employee.teacher_nickname, start: row.start_time, end: row.end_time });
           }
         });
-        setTodayTeachers(list);
+        setSelectedDateTeachers(list);
       }
     };
-    fetchTodayTeachers();
-  }, []);
+    fetchSelectedDateTeachers();
+  }, [currentDate]);
 
   return (
     <div className="bg-[#FFFDF8] p-4 rounded-xl shadow-md">
@@ -876,10 +877,10 @@ const HanamiCalendar = () => {
           <img src="/refresh.png" alt="Refresh" className="w-4 h-4" />
         </button>
       </div>
-      {/* 今日上班老師圓角按鈕區塊 */}
+      {/* 選擇日期上班老師圓角按鈕區塊 */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {todayTeachers.length > 0 ? (
-          todayTeachers.map((item, idx) => (
+        {selectedDateTeachers.length > 0 ? (
+          selectedDateTeachers.map((item, idx) => (
             <button
               key={idx}
               className="rounded-full bg-[#FFF7D6] text-[#4B4036] px-4 py-2 shadow-md font-semibold text-sm hover:bg-[#FFE5B4] transition-all duration-150"
@@ -891,7 +892,7 @@ const HanamiCalendar = () => {
             </button>
           ))
         ) : (
-          <span className="text-[#A68A64]">今日無上班老師</span>
+          <span className="text-[#A68A64]">{getDateString(currentDate)} 無上班老師</span>
         )}
       </div>
       <div className="mt-4">
