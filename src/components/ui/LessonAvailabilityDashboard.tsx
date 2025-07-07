@@ -38,6 +38,7 @@ function calculateAgeRange(students: { student_age: number | null | undefined }[
 }
 
 interface Slot {
+  id: string;
   time: string;
   course: string;
   weekday: number;
@@ -56,6 +57,7 @@ interface TrialStudent {
   lesson_date: string;
   actual_timeslot: string | null;
   weekday: number;
+  course_type?: string;
 }
 
 
@@ -93,7 +95,7 @@ export default function LessonAvailabilityDashboard() {
         const todayISO = getTodayISO()
         const { data: trialData, error: trialError } = await supabase
           .from('hanami_trial_students')
-          .select('id, full_name, student_age, lesson_date, actual_timeslot, weekday')
+          .select('id, full_name, student_age, lesson_date, actual_timeslot, weekday, course_type')
           .gte('lesson_date', todayISO)
           .not('actual_timeslot', 'is', null) // 確保有設定試堂時間
           .not('weekday', 'is', null) // 確保有設定試堂日
@@ -108,7 +110,7 @@ export default function LessonAvailabilityDashboard() {
         // 3. 取得所有常規學生（只計算 active 學生）
         const { data: regularData, error: regularError } = await supabase
           .from('Hanami_Students')
-          .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type')
+          .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
           .in('student_type', ['常規', '試堂']) // 只包含常規和試堂學生
           .not('regular_weekday', 'is', null) // 確保有設定上課日
           .not('regular_timeslot', 'is', null) // 確保有設定上課時間
@@ -120,11 +122,10 @@ export default function LessonAvailabilityDashboard() {
           return
         }
         
-        // 4. 將試堂學生依 weekday+timeslot 分組
+        // 4. 將試堂學生依 weekday+timeslot+course_type 分組
         const trialMap: { [key: string]: TrialStudent[] } = {}
         for (const t of trialData || []) {
           if (!t.actual_timeslot || t.weekday === null || t.weekday === undefined) continue
-          
           // 處理 weekday 欄位，確保是數字格式
           let weekdayNum: number
           if (typeof t.weekday === 'string') {
@@ -133,8 +134,9 @@ export default function LessonAvailabilityDashboard() {
           } else {
             weekdayNum = t.weekday
           }
-          
-          const key = `${weekdayNum}_${t.actual_timeslot}`
+          // 取得 course_type
+          const courseType = t.course_type || ''
+          const key = `${weekdayNum}_${t.actual_timeslot}_${courseType}`
           if (!trialMap[key]) trialMap[key] = []
           trialMap[key].push({
             ...t,
@@ -143,12 +145,13 @@ export default function LessonAvailabilityDashboard() {
             actual_timeslot: t.actual_timeslot || '',
             weekday: weekdayNum,
             student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : t.student_age,
+            course_type: courseType,
           })
         }
         
         console.log('🔍 試堂學生分組結果:', trialMap)
         
-        // 5. 將常規學生依 regular_weekday+regular_timeslot 分組，收集年齡
+        // 5. 將常規學生依 regular_weekday+regular_timeslot+course_type 分組
         const regularAgeMap: { [key: string]: number[] } = {}
         const regularCountMap: { [key: string]: number } = {}
         const regularStudentsMap: { [key: string]: any[] } = {}
@@ -165,7 +168,8 @@ export default function LessonAvailabilityDashboard() {
             weekdayNum = s.regular_weekday
           }
           
-          const key = `${weekdayNum}_${s.regular_timeslot}`
+          const courseType = s.course_type || ''
+          const key = `${weekdayNum}_${s.regular_timeslot}_${courseType}`
           if (!regularAgeMap[key]) regularAgeMap[key] = []
           if (!regularCountMap[key]) regularCountMap[key] = 0
           if (!regularStudentsMap[key]) regularStudentsMap[key] = []
@@ -183,43 +187,70 @@ export default function LessonAvailabilityDashboard() {
         
         console.log('🔍 常規學生分組結果:', { regularAgeMap, regularCountMap, regularStudentsMap })
         
-        // 6. 基於 hanami_schedule 表生成時段，並計算當前學生數量
-        const mapped: Slot[] = (scheduleData || []).map(schedule => {
-          const key = `${schedule.weekday}_${schedule.timeslot}`
-          const regularCount = regularCountMap[key] || 0
-          const trialCount = (trialMap[key] || []).length
-          const currentTotal = regularCount + trialCount
-          
-          console.log(`🔍 時段 ${schedule.weekday}_${schedule.timeslot}:`, {
-            常規學生: regularCount,
-            試堂學生: trialCount,
-            總計: currentTotal,
-            上限: schedule.max_students
-          })
-          
-          return {
-            time: schedule.timeslot,
-            course: '',
-            weekday: schedule.weekday,
-            max: schedule.max_students,
-            current: currentTotal,
-            duration: schedule.duration,
-            trial_students: trialMap[key] || [],
-            regular_students_ages: regularAgeMap[key] || [],
-            regular_students: regularStudentsMap[key] || []
-          }
+        // 6. 基於 hanami_schedule 表生成時段，並計算每班學生數量
+        // 先按 weekday+timeslot+course_type 分組所有 schedule 記錄
+        const scheduleGroups: { [key: string]: any[] } = {}
+        scheduleData?.forEach(schedule => {
+          const courseType = schedule.course_type || ''
+          const key = `${schedule.weekday}_${schedule.timeslot}_${courseType}`
+          if (!scheduleGroups[key]) scheduleGroups[key] = []
+          scheduleGroups[key].push(schedule)
         })
         
-        // 統計資訊
-        const totalRegularStudents = Object.values(regularCountMap).reduce((sum, count) => sum + count, 0)
-        const totalTrialStudents = Object.values(trialMap).reduce((sum, students) => sum + students.length, 0)
-        console.log('📊 統計資訊:', {
-          常規學生總數: totalRegularStudents,
-          試堂學生總數: totalTrialStudents,
-          課堂空缺情況數: scheduleData?.length || 0
-        })
+                 // 為每個 schedule 記錄分配學生
+         const mapped: Slot[] = []
+         Object.entries(scheduleGroups).forEach(([groupKey, schedules]) => {
+           const [weekday, timeslot, courseType] = groupKey.split('_')
+           const weekdayNum = parseInt(weekday)
+           
+           // 取得該時段該班級的所有學生
+           const regularStudents = regularStudentsMap[groupKey] || []
+           const trialStudents = trialMap[groupKey] || []
+           
+           // 將學生分配到各個 schedule 記錄中
+           let regularIndex = 0
+           let trialIndex = 0
+           
+           schedules.forEach((schedule, index) => {
+             // 計算這個 schedule 應該分配多少學生
+             const maxStudents = schedule.max_students
+             let regularCount = 0
+             let trialCount = 0
+             
+             // 優先分配常規學生
+             while (regularIndex < regularStudents.length && regularCount < maxStudents) {
+               regularCount++
+               regularIndex++
+             }
+             
+             // 再分配試堂學生
+             while (trialIndex < trialStudents.length && (regularCount + trialCount) < maxStudents) {
+               trialCount++
+               trialIndex++
+             }
+             
+             // 分配對應的學生資料
+             const slotRegularStudents = regularStudents.slice(regularIndex - regularCount, regularIndex)
+             const slotTrialStudents = trialStudents.slice(trialIndex - trialCount, trialIndex)
+             const slotRegularAges = slotRegularStudents
+               .map(s => s.student_age)
+               .filter((age): age is number => age !== null && age !== undefined && !isNaN(age))
+             
+             mapped.push({
+               id: schedule.id,
+               time: schedule.timeslot,
+               course: courseType,
+               weekday: weekdayNum,
+               max: schedule.max_students,
+               current: regularCount + trialCount,
+               duration: schedule.duration,
+               trial_students: slotTrialStudents,
+               regular_students_ages: slotRegularAges,
+               regular_students: slotRegularStudents
+             })
+           })
+         })
         
-        console.log('🔍 最終處理結果:', mapped)
         setSlots(mapped)
 
         // 2. 查詢 hanami_trial_queue 輪候學生
@@ -364,6 +395,7 @@ export default function LessonAvailabilityDashboard() {
   }, [])
 
   // 依據 slots 動態產生每一天的時段
+  // 以 weekday 為主，時段內可有多班（course_type），每班可有多筆記錄
   const slotsByDay: { [weekday: number]: Slot[] } = {}
   slots.forEach(slot => {
     if (!slotsByDay[slot.weekday]) slotsByDay[slot.weekday] = []
@@ -504,13 +536,13 @@ export default function LessonAvailabilityDashboard() {
                 {slotsByDay[dayIdx] && slotsByDay[dayIdx].length > 0 ? (
                   slotsByDay[dayIdx].map((slot, i) => (
                     <div
-                      key={slot.time + i}
+                      key={slot.id || slot.time + slot.course + i}
                       className="border border-[#EADBC8] p-2 text-center text-sm rounded-xl shadow hover:shadow-md transition-all duration-200 my-1 mx-1"
                       style={{ backgroundColor: slot.current < slot.max ? '#FFE5D2' : '#FFFAF2' }}
                     >
-                      <div className="text-[11px] text-gray-500">{formatTimeslot(slot.time, slot.duration)}</div>
+                      <div className="text-[11px] text-gray-500">{formatTimeslot(slot.time, slot.duration)}{slot.course ? `｜${slot.course}` : ''}</div>
                       <div className="font-semibold text-[#4B4036] text-base">
-                        {slot.current}/{slot.max}
+                        {slot.regular_students.length}{slot.trial_students.length > 0 ? `+${slot.trial_students.length}` : ''}/{slot.max}
                       </div>
                       {/* 顯示常規學生年齡範圍 */}
                       {slot.regular_students_ages && slot.regular_students_ages.length > 0 && (
@@ -523,14 +555,14 @@ export default function LessonAvailabilityDashboard() {
                         <div className="flex items-center justify-center gap-2 mt-1">
                           <button
                             className="text-xs px-2 py-1 rounded bg-[#FFF9E2] text-[#4B4036] border border-yellow-200 hover:bg-[#FFEFC2] transition"
-                            onClick={() => setExpandedTrial(prev => ({...prev, [`${slot.weekday}_${slot.time}`]: !prev[`${slot.weekday}_${slot.time}`]}))}
+                            onClick={() => setExpandedTrial(prev => ({...prev, [`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`]: !prev[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`]}))}
                           >
-                            {expandedTrial[`${slot.weekday}_${slot.time}`] ? '收起' : '展開'}試堂學生（{slot.trial_students.length}）
+                            {expandedTrial[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] ? '收起' : '展開'}試堂學生（{slot.trial_students.length}）
                           </button>
                         </div>
                       )}
                       {/* 展開時才顯示名單 */}
-                      {slot.trial_students && slot.trial_students.length > 0 && expandedTrial[`${slot.weekday}_${slot.time}`] && (
+                      {slot.trial_students && slot.trial_students.length > 0 && expandedTrial[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] && (
                         <div className="flex flex-col gap-1 mt-1">
                           {[...slot.trial_students]
                             .sort((a, b) => {
@@ -597,10 +629,10 @@ export default function LessonAvailabilityDashboard() {
             <span>已滿的時段</span>
           </div>
           <div className="flex items-center gap-2">
-            <span>格式：現有/可容納人數</span>
+            <span>格式：常規+試堂/可容納人數</span>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-[#87704e]">
-            <span>※ 現有人數 = 常規學生 + 即將試堂學生</span>
+            <span>※ 例如：3+2/5 表示3個常規學生+2個試堂學生，共可容納5人</span>
           </div>
         </div>
       </div>

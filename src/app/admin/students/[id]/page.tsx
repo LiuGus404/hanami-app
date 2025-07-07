@@ -364,6 +364,7 @@ export default function StudentDetailPage() {
                   studentId={lessonStudentId} 
                   studentType={student.student_type}
                   studentName={student.full_name}
+                  contactNumber={student.contact_number}
                 />
               )
             })()}
