@@ -82,6 +82,14 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
           </button>
 
           <button
+            onClick={() => router.push('/admin/schedule-management')}
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+          >
+            <Image src="/icons/clock.PNG" alt="管理課程" width={24} height={24} className="mr-2 w-6 h-6" />
+            管理課程
+          </button>
+
+          <button
             onClick={() => router.push('/admin/lesson-availability')}
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
           >

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -45,6 +46,7 @@ interface Slot {
   duration: string | null;
   trial_students: TrialStudent[];
   regular_students_ages: number[];
+  regular_students: any[];
 }
 
 interface TrialStudent {
@@ -56,34 +58,34 @@ interface TrialStudent {
   weekday: number;
 }
 
-interface ScheduleData {
-  weekday: number;
-  timeslot: string;
-  max_students: number;
-  duration: string | null;
-}
+
 
 export default function LessonAvailabilityDashboard() {
   const [slots, setSlots] = useState<Slot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter();
+  const [expandedTrial, setExpandedTrial] = useState<{[key:string]: boolean}>({});
+  const [queueByDay, setQueueByDay] = useState<{[weekday: number]: any[]}>({});
+  const [expandedQueue, setExpandedQueue] = useState<{[weekday: number]: boolean}>({});
+  const [expandedCourseTypes, setExpandedCourseTypes] = useState<{[weekday: number]: {[courseType: string]: boolean}}>({});
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       setError(null)
       try {
-        // 1. 取得所有時段（移除 current_students 欄位查詢）
-        const { data: slotData, error: slotError } = await supabase
-          .from('hanami_teacher_schedule')
-          .select('teacher_id, scheduled_date, start_time, end_time, created_at, updated_at')
-          .order('scheduled_date', { ascending: true })
-          .order('start_time', { ascending: true })
+        // 1. 從 hanami_schedule 表取得所有課堂空缺情況設定
+        const { data: scheduleData, error: scheduleError } = await supabase
+          .from('hanami_schedule')
+          .select('*')
+          .order('weekday', { ascending: true })
+          .order('timeslot', { ascending: true })
         
-        console.log('🔍 查詢 hanami_schedule 結果:', { slotData, slotError })
+        console.log('🔍 查詢 hanami_schedule 結果:', { scheduleData, scheduleError })
         
-        if (slotError) {
-          setError('無法載入資料：' + slotError.message)
+        if (scheduleError) {
+          setError('無法載入課堂空缺情況設定：' + scheduleError.message)
           return
         }
         
@@ -149,6 +151,8 @@ export default function LessonAvailabilityDashboard() {
         // 5. 將常規學生依 regular_weekday+regular_timeslot 分組，收集年齡
         const regularAgeMap: { [key: string]: number[] } = {}
         const regularCountMap: { [key: string]: number } = {}
+        const regularStudentsMap: { [key: string]: any[] } = {}
+        
         for (const s of regularData || []) {
           if (!s.regular_timeslot || s.regular_weekday === null || s.regular_weekday === undefined) continue
           
@@ -164,7 +168,11 @@ export default function LessonAvailabilityDashboard() {
           const key = `${weekdayNum}_${s.regular_timeslot}`
           if (!regularAgeMap[key]) regularAgeMap[key] = []
           if (!regularCountMap[key]) regularCountMap[key] = 0
+          if (!regularStudentsMap[key]) regularStudentsMap[key] = []
+          
           regularCountMap[key]++
+          regularStudentsMap[key].push(s)
+          
           if (s.student_age !== null && s.student_age !== undefined) {
             const age = typeof s.student_age === 'string' ? parseInt(s.student_age) : s.student_age
             if (!isNaN(age)) {
@@ -173,7 +181,34 @@ export default function LessonAvailabilityDashboard() {
           }
         }
         
-        console.log('🔍 常規學生分組結果:', { regularAgeMap, regularCountMap })
+        console.log('🔍 常規學生分組結果:', { regularAgeMap, regularCountMap, regularStudentsMap })
+        
+        // 6. 基於 hanami_schedule 表生成時段，並計算當前學生數量
+        const mapped: Slot[] = (scheduleData || []).map(schedule => {
+          const key = `${schedule.weekday}_${schedule.timeslot}`
+          const regularCount = regularCountMap[key] || 0
+          const trialCount = (trialMap[key] || []).length
+          const currentTotal = regularCount + trialCount
+          
+          console.log(`🔍 時段 ${schedule.weekday}_${schedule.timeslot}:`, {
+            常規學生: regularCount,
+            試堂學生: trialCount,
+            總計: currentTotal,
+            上限: schedule.max_students
+          })
+          
+          return {
+            time: schedule.timeslot,
+            course: '',
+            weekday: schedule.weekday,
+            max: schedule.max_students,
+            current: currentTotal,
+            duration: schedule.duration,
+            trial_students: trialMap[key] || [],
+            regular_students_ages: regularAgeMap[key] || [],
+            regular_students: regularStudentsMap[key] || []
+          }
+        })
         
         // 統計資訊
         const totalRegularStudents = Object.values(regularCountMap).reduce((sum, count) => sum + count, 0)
@@ -181,50 +216,146 @@ export default function LessonAvailabilityDashboard() {
         console.log('📊 統計資訊:', {
           常規學生總數: totalRegularStudents,
           試堂學生總數: totalTrialStudents,
-          課堂時段數: slotData?.length || 0
+          課堂空缺情況數: scheduleData?.length || 0
         })
-        
-        // 6. 合併到 slot，動態計算當前學生數量
-        let mapped: Slot[] = [];
-        if (Array.isArray(slotData) && !(slotData.length > 0 && 'error' in slotData[0])) {
-          mapped = ((slotData as unknown) as ScheduleData[])
-            .filter(slot =>
-              slot &&
-              typeof slot.timeslot === 'string' &&
-              typeof slot.weekday === 'number' &&
-              typeof slot.max_students === 'number'
-            )
-            .map(slot => {
-              const key = `${slot.weekday}_${slot.timeslot}`
-              const regularCount = regularCountMap[key] || 0
-              const trialCount = (trialMap[key] || []).length
-              const currentTotal = regularCount + trialCount
-              
-              console.log(`🔍 時段 ${slot.weekday}_${slot.timeslot}:`, {
-                常規學生: regularCount,
-                試堂學生: trialCount,
-                總計: currentTotal,
-                上限: slot.max_students
-              })
-              
-              return {
-                time: slot.timeslot,
-                course: '',
-                weekday: slot.weekday,
-                max: slot.max_students,
-                current: currentTotal,
-                duration: slot.duration,
-                trial_students: trialMap[key] || [],
-                regular_students_ages: regularAgeMap[key] || []
-              }
-            })
-        }
         
         console.log('🔍 最終處理結果:', mapped)
         setSlots(mapped)
+
+        // 2. 查詢 hanami_trial_queue 輪候學生
+        console.log('🔍 開始查詢 hanami_trial_queue...');
+        
+        const { data: queueData, error: queueError } = await supabase
+          .from('hanami_trial_queue')
+          .select('id, full_name, student_age, phone_no, prefer_time, notes, course_types, created_at')
+          .order('created_at', { ascending: true }); // 按舊到新排序
+        
+        console.log('🔍 查詢 hanami_trial_queue 結果:', { queueData, queueError });
+        
+        if (queueError) {
+          console.error('❌ 查詢輪候學生失敗:', queueError);
+          // 不中斷整個流程，只是輪候學生無法顯示
+        }
+        
+        console.log('🔍 queueData 原始資料:', queueData);
+        console.log('🔍 queueData 長度:', queueData?.length);
+        console.log('🔍 queueData 詳細內容:');
+        queueData?.forEach((item, index) => {
+          console.log(`  [${index}] ID: ${item.id}, Prefer_time: ${item.prefer_time}`);
+        });
+        
+        console.log('🔍 查詢排隊名單結果:', { queueData, queueError })
+        
+        if (queueError) {
+          setError('無法載入排隊名單：' + queueError.message)
+          return
+        }
+        
+        // 分組到每個星期，並按班別（課程類型）分組
+        const queueMap: { [weekday: string]: { [courseType: string]: any[] } } = {};
+        console.log('🔍 開始分組處理...');
+        
+        for (const q of queueData || []) {
+          console.log(`🔍 處理項目: ID=${q.id}, prefer_time=${q.prefer_time}, course_types=${q.course_types}`);
+          
+          if (!q.prefer_time) {
+            console.log(`  ❌ 跳過：prefer_time 為空`);
+            continue;
+          }
+          
+          let preferTime;
+          if (typeof q.prefer_time === 'string') {
+            try {
+              preferTime = JSON.parse(q.prefer_time);
+              console.log(`  ✅ JSON 解析成功:`, preferTime);
+            } catch (err) {
+              console.log(`  ❌ JSON 解析失敗:`, err);
+              continue;
+            }
+          } else {
+            preferTime = q.prefer_time;
+            console.log(`  ✅ 已經是物件:`, preferTime);
+          }
+          
+          // 解析課程類型
+          let courseTypes: string[] = [];
+          if (q.course_types) {
+            if (typeof q.course_types === 'string') {
+              try {
+                courseTypes = JSON.parse(q.course_types);
+              } catch (err) {
+                console.log(`  ❌ 課程類型 JSON 解析失敗:`, err);
+              }
+            } else if (Array.isArray(q.course_types)) {
+              courseTypes = q.course_types;
+            }
+          }
+          
+          // 如果沒有課程類型，使用「未指定課程」
+          if (!courseTypes || courseTypes.length === 0) {
+            courseTypes = ['未指定課程'];
+          }
+          
+          if (preferTime && preferTime.week && Array.isArray(preferTime.week)) {
+            console.log(`  ✅ 找到 week 陣列:`, preferTime.week);
+            for (const weekday of preferTime.week) {
+              const weekdayKey = String(weekday);
+              if (!queueMap[weekdayKey]) queueMap[weekdayKey] = {};
+              
+              // 為每個課程類型分組
+              for (const courseType of courseTypes) {
+                if (!queueMap[weekdayKey][courseType]) queueMap[weekdayKey][courseType] = [];
+                queueMap[weekdayKey][courseType].push({ 
+                  ...q, 
+                  prefer: { weekday, timeslot: preferTime.range || '未指定' },
+                  courseType: courseType
+                });
+                console.log(`  ✅ 分配到 weekday ${weekday}, courseType ${courseType}`);
+              }
+            }
+          } else {
+            console.log(`  ❌ 跳過：preferTime.week 不是陣列或不存在`);
+          }
+        }
+        
+        // 對每個星期每個課程類型的資料按 created_at 排序
+        Object.keys(queueMap).forEach(weekdayKey => {
+          Object.keys(queueMap[weekdayKey]).forEach(courseType => {
+            queueMap[weekdayKey][courseType].sort((a, b) => {
+              const dateA = new Date(a.created_at).getTime();
+              const dateB = new Date(b.created_at).getTime();
+              return dateA - dateB; // 升序排列（最早的在前）
+            });
+          });
+        });
+        console.log('🔍 queueMap 分組後:', queueMap);
+        console.log('🔍 queueMap keys:', Object.keys(queueMap));
+        console.log('🔍 排隊名單分組結果:', queueMap);
+        console.log('🔍 準備 setQueueByDay:', queueMap);
+        console.log('🔍 分組結果詳細:');
+        Object.keys(queueMap).forEach(weekdayKey => {
+          const weekdayData = queueMap[weekdayKey];
+          const totalStudents = Object.values(weekdayData).reduce((sum, arr) => sum + arr.length, 0);
+          console.log(`  weekday ${weekdayKey}: ${totalStudents} 個學生`);
+          
+          Object.entries(weekdayData).forEach(([courseType, students]) => {
+            console.log(`    課程 ${courseType}: ${students.length} 個學生`);
+            students.forEach((q: any, i: number) => {
+              console.log(`      [${i}] ${q.phone_no || q.full_name || '未命名'} (${q.student_age}歲) - ${q.created_at}`);
+            });
+          });
+        });
+
+        // 將 queueMap 的 key 轉為 number，並合併所有課程類型的學生陣列
+        const queueMapNumberKey: { [weekday: number]: any[] } = {};
+        Object.keys(queueMap).forEach((weekdayKey) => {
+          const allStudents = Object.values(queueMap[weekdayKey]).flat();
+          queueMapNumberKey[Number(weekdayKey)] = allStudents;
+        });
+        setQueueByDay(queueMapNumberKey);
       } catch (err) {
         console.error('❌ 系統錯誤:', err)
-        setError('系統錯誤，請稍後再試')
+        setError('系統錯誤：' + (err instanceof Error ? err.message : JSON.stringify(err)))
       } finally {
         setLoading(false)
       }
@@ -238,6 +369,10 @@ export default function LessonAvailabilityDashboard() {
     if (!slotsByDay[slot.weekday]) slotsByDay[slot.weekday] = []
     slotsByDay[slot.weekday].push(slot)
   })
+
+  // Debug: 檢查 queueByDay 內容
+  console.log('🔍 渲染時的 queueByDay:', queueByDay);
+  console.log('🔍 渲染時的 expandedQueue:', expandedQueue);
 
   // 格式化時段顯示：09:15-10:15（不含秒數）
   function formatTimeslot(time: string, duration: string | null | undefined): string {
@@ -283,8 +418,9 @@ export default function LessonAvailabilityDashboard() {
           <div className="text-[#4B4036] mb-2">目前沒有課堂資料</div>
           <div className="text-sm text-[#87704e] mb-4">請確認以下項目：</div>
           <div className="text-sm text-[#87704e] text-left space-y-1">
-            <div>• hanami_schedule 表中有設定課堂時段</div>
+            <div>• hanami_schedule 表中有設定課堂空缺情況</div>
             <div>• Hanami_Students 表中有常規學生且設定了 regular_weekday 和 regular_timeslot</div>
+            <div>• hanami_trial_students 表中有試堂學生且設定了 weekday 和 actual_timeslot</div>
             <div>• 或點擊「插入測試資料」按鈕來查看示例</div>
           </div>
         </div>
@@ -310,6 +446,61 @@ export default function LessonAvailabilityDashboard() {
             {/* 動態產生每一天的時段格子 */}
             {weekdays.map((_, dayIdx) => (
               <div key={dayIdx} className="flex flex-col border-r border-[#EADBC8] min-h-[60px]">
+                {queueByDay[dayIdx] && queueByDay[dayIdx].length > 0 && (
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <button
+                      className="text-xs px-2 py-1 rounded bg-[#E6F0FF] text-[#2B4B6F] border border-blue-100 hover:bg-[#D6E8FF] transition"
+                      onClick={() => setExpandedQueue(prev => ({...prev, [dayIdx]: !prev[dayIdx]}))}
+                    >
+                      {expandedQueue[dayIdx] ? '收起' : '展開'}輪候學生（{Object.values(queueByDay[dayIdx] || {}).reduce((sum, arr) => sum + arr.length, 0)}）
+                    </button>
+                  </div>
+                )}
+                {queueByDay[dayIdx] && queueByDay[dayIdx].length > 0 && expandedQueue[dayIdx] && (
+                  <div className="flex flex-col gap-2 mb-1">
+                    {Object.entries(queueByDay[dayIdx] || {}).map(([courseType, students]) => (
+                      <div key={courseType} className="border border-[#EADBC8] rounded p-1 bg-[#FFF9F2]">
+                        <button
+                          className="text-[10px] font-semibold text-[#4B4036] mb-1 px-1 w-full text-left hover:bg-[#FDE6B8] transition rounded"
+                          onClick={() => setExpandedCourseTypes(prev => ({
+                            ...prev,
+                            [dayIdx]: {
+                              ...(prev[dayIdx] || {}),
+                              [courseType]: !(prev[dayIdx]?.[courseType] || false)
+                            }
+                          }))}
+                        >
+                          {expandedCourseTypes[dayIdx]?.[courseType] ? '▼' : '▶'} {courseType}（{students.length}人）
+                        </button>
+                        {expandedCourseTypes[dayIdx]?.[courseType] && (
+                          <div className="flex flex-col gap-1">
+                            {students.map((q: any, i: number) => (
+                              <button
+                                key={`${q.id}-${i}`}
+                                onClick={() => router.push(`/admin/add-trial-students?id=${q.id}`)}
+                                className="inline-block px-2 py-1 rounded bg-[#F0F6FF] text-xs text-[#2B4B6F] hover:bg-[#E0EDFF] transition leading-snug text-left"
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <div>{q.phone_no || q.full_name || '未命名'}</div>
+                                <div className="flex items-center gap-2 text-[10px] text-[#4B5A6F] mt-0.5">
+                                  {q.student_age !== null && q.student_age !== undefined && !isNaN(q.student_age) && (
+                                    <span>{q.student_age}歲</span>
+                                  )}
+                                  {q.prefer && q.prefer.timeslot && q.prefer.timeslot !== '未指定' && (
+                                    <span>偏好時段: {q.prefer.timeslot}</span>
+                                  )}
+                                  {q.notes && (
+                                    <span>備註: {q.notes}</span>
+                                  )}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {slotsByDay[dayIdx] && slotsByDay[dayIdx].length > 0 ? (
                   slotsByDay[dayIdx].map((slot, i) => (
                     <div
@@ -329,16 +520,25 @@ export default function LessonAvailabilityDashboard() {
                       )}
                       {/* 試堂學生名單 */}
                       {slot.trial_students && slot.trial_students.length > 0 && (
+                        <div className="flex items-center justify-center gap-2 mt-1">
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-[#FFF9E2] text-[#4B4036] border border-yellow-200 hover:bg-[#FFEFC2] transition"
+                            onClick={() => setExpandedTrial(prev => ({...prev, [`${slot.weekday}_${slot.time}`]: !prev[`${slot.weekday}_${slot.time}`]}))}
+                          >
+                            {expandedTrial[`${slot.weekday}_${slot.time}`] ? '收起' : '展開'}試堂學生（{slot.trial_students.length}）
+                          </button>
+                        </div>
+                      )}
+                      {/* 展開時才顯示名單 */}
+                      {slot.trial_students && slot.trial_students.length > 0 && expandedTrial[`${slot.weekday}_${slot.time}`] && (
                         <div className="flex flex-col gap-1 mt-1">
                           {[...slot.trial_students]
                             .sort((a, b) => {
-                              // 確保日期格式正確進行排序
                               const dateA = a.lesson_date ? new Date(a.lesson_date).getTime() : 0
                               const dateB = b.lesson_date ? new Date(b.lesson_date).getTime() : 0
                               return dateA - dateB
                             })
                             .map((stu) => {
-                              // 格式化日期 dd/MM
                               let dateStr = ''
                               if (stu.lesson_date) {
                                 try {
@@ -351,12 +551,11 @@ export default function LessonAvailabilityDashboard() {
                                 }
                               }
                               return (
-                                <a
+                                <button
                                   key={stu.id}
-                                  href={`/admin/add-trial-students?id=${stu.id}`}
+                                  onClick={() => router.push(`/admin/students/${stu.id}`)}
                                   className="inline-block px-2 py-1 rounded bg-yellow-100 text-xs text-[#4B4036] hover:bg-yellow-200 transition leading-snug"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                  style={{ cursor: 'pointer' }}
                                 >
                                   <div>{stu.full_name}</div>
                                   <div className="mt-[2px] flex items-center gap-2 text-[10px] text-[#87704e]">
@@ -373,7 +572,7 @@ export default function LessonAvailabilityDashboard() {
                                       </span>
                                     )}
                                   </div>
-                                </a>
+                                </button>
                               )
                             })}
                         </div>

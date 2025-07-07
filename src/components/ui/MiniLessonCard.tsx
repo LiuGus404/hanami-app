@@ -113,7 +113,7 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
         </div>
       )}
       <div className="flex items-center gap-0 text-[11px] text-[#7A6654]">
-        <img src="/icons/penguin-face.png" alt="students" className="w-4 h-4" />
+                        <img src="/icons/penguin-face.PNG" alt="students" className="w-4 h-4" />
         <span>學生</span>
         <span className="flex items-center gap-0 text-[10px] text-[#4B4036] font-semibold">（{students.length}）</span>
         <button

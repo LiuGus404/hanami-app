@@ -166,7 +166,7 @@ export default function TeacherManagementPage() {
               onClick={() => router.push('/admin/teachers/teacher-schedule')}
               className="flex items-center gap-2 text-sm px-4 py-2 rounded-full border border-[#EADBC8] bg-white text-[#2B3A3B] shadow-sm hover:bg-[#FFFAF0]"
             >
-              <img src="/icons/calendar-schedule.png" alt="排班圖示" className="w-4 h-4" />
+                              <img src="/calendar.png" alt="排班圖示" className="w-4 h-4" />
               排班管理
             </button>
             <input
@@ -220,7 +220,7 @@ export default function TeacherManagementPage() {
                     exit={{ opacity: 0, y: -10 }}
                     className="absolute top-2 right-2"
                   >
-                    <img src="/icons/leaf-sprout.png" alt="選取" className="w-12 h-12" />
+                    <img src="/leaf-sprout.png" alt="選取" className="w-12 h-12" />
                   </motion.div>
                 )}
               </motion.div>

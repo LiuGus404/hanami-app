@@ -158,7 +158,14 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
         if (lessonResult.error) {
           console.warn('Warning fetching lessons:', lessonResult.error.message)
         } else if (lessonResult.data) {
-          setLessons(lessonResult.data as Lesson[])
+          // 類型轉換，確保 Hanami_Students 欄位型別正確
+          const lessons: Lesson[] = lessonResult.data.map((l: any) => ({
+            ...l,
+            Hanami_Students: l.Hanami_Students && Array.isArray(l.Hanami_Students)
+              ? l.Hanami_Students[0]
+              : l.Hanami_Students
+          }));
+          setLessons(lessons)
         }
 
         // Handle schedule data

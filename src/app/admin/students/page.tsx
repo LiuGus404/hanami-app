@@ -1595,7 +1595,7 @@ export default function StudentManagementPage() {
                         exit={{ opacity: 0, y: -10 }}
                         className="absolute top-2 right-2"
                       >
-                        <img src="/icons/leaf-sprout.png" alt="選取" className="w-12 h-12" />
+                        <img src="/leaf-sprout.png" alt="選取" className="w-12 h-12" />
                       </motion.div>
                     )}
                     <StudentCard

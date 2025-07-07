@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast'
 interface StudentLessonPanelProps {
   studentId: string;
   studentType?: string; // 添加學生類型參數
+  studentName?: string; // 添加學生姓名參數
 }
 
 interface LessonData {
@@ -41,7 +42,7 @@ interface LessonData {
   remarks: string | null;
 }
 
-export default function StudentLessonPanel({ studentId, studentType }: StudentLessonPanelProps) {
+export default function StudentLessonPanel({ studentId, studentType, studentName }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient()
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -525,12 +526,109 @@ export default function StudentLessonPanel({ studentId, studentType }: StudentLe
     }
   }, [isModalOpen]);
 
+  // 匯出CSV功能
+  const exportToCSV = () => {
+    // 檢查是否有選中的課堂
+    if (selected.length === 0) {
+      toast.error('請先選擇要匯出的課堂記錄')
+      return
+    }
+
+    // 只匯出選中的課堂
+    const selectedLessons = sortedLessons.filter(lesson => selected.includes(lesson.id))
+    
+    const headers = ['日期', '課堂', '上課時間']
+    const csvData = selectedLessons.map(lesson => [
+      format(new Date(lesson.lesson_date), 'yyyy/MM/dd'),
+      typeof lesson.course_type === 'string' ? lesson.course_type : '',
+      lesson.actual_timeslot || lesson.regular_timeslot || ''
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${studentName || '學生'}_課堂記錄_${format(new Date(), 'yyyyMMdd')}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    toast.success(`已匯出 ${selectedLessons.length} 筆課堂記錄`)
+  }
+
+  // 複製到WhatsApp功能
+  const copyToWhatsApp = () => {
+    // 檢查是否有選中的課堂
+    if (selected.length === 0) {
+      toast.error('請先選擇要複製的課堂記錄')
+      return
+    }
+
+    // 只複製選中的課堂
+    const selectedLessons = sortedLessons.filter(lesson => selected.includes(lesson.id))
+
+    const studentInfo = `${studentName || '學生'} 課堂記錄\n`
+    const lessonRecords = selectedLessons.map(lesson => {
+      const date = format(new Date(lesson.lesson_date), 'yyyy/MM/dd')
+      const courseType = typeof lesson.course_type === 'string' ? lesson.course_type : ''
+      const timeSlot = lesson.actual_timeslot || lesson.regular_timeslot || ''
+      
+      return `${date} - ${courseType} - ${timeSlot}`
+    }).join('\n')
+
+    const fullText = studentInfo + lessonRecords
+
+    navigator.clipboard.writeText(fullText).then(() => {
+      toast.success(`已複製 ${selectedLessons.length} 筆課堂記錄到剪貼簿`)
+    }).catch(() => {
+      // 如果剪貼簿API不可用，使用傳統方法
+      const textArea = document.createElement('textarea')
+      textArea.value = fullText
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      toast.success(`已複製 ${selectedLessons.length} 筆課堂記錄到剪貼簿`)
+    })
+  }
+
   return (
     <div className="w-full px-4">
       <div className="bg-[#FFFDF8] p-6 rounded-xl shadow-inner max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-[#4B4036]">課堂情況</h2>
         <div className="flex items-center gap-3">
+          {/* 匯出CSV按鈕 */}
+          <button
+            onClick={exportToCSV}
+            className="border border-[#DDD2BA] rounded-md px-3 py-1 text-sm text-[#4B4036] bg-white hover:bg-[#F8F5EC] transition-colors flex items-center gap-1"
+            title="匯出選中的課堂記錄為CSV檔案"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            匯出CSV
+          </button>
+          
+          {/* 複製按鈕 */}
+          <button
+            onClick={copyToWhatsApp}
+            className="border border-[#DDD2BA] rounded-md px-3 py-1 text-sm text-[#4B4036] bg-white hover:bg-[#F8F5EC] transition-colors flex items-center gap-1"
+            title="複製選中的課堂記錄到剪貼簿"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+              <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+            </svg>
+            複製
+          </button>
+          
           <button
             className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
             onClick={() => {

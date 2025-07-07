@@ -1,4 +1,17 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
+import dynamic from 'next/dynamic'
+import 'react-time-picker/dist/TimePicker.css'
+import 'react-clock/dist/Clock.css'
+
+// 動態導入以避免 SSR 問題
+const TimePickerLib = dynamic(() => import('react-time-picker'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full p-2 border border-[#EADBC8] rounded bg-white text-[#4B4036] animate-pulse">
+      載入中...
+    </div>
+  )
+})
 
 interface TimePickerProps {
   label?: string;
@@ -7,67 +20,54 @@ interface TimePickerProps {
 }
 
 export default function TimePicker({ label = "選擇時間", value, onChange }: TimePickerProps) {
-  const [selectedHour, setSelectedHour] = useState(() => {
-    const [h] = (value || '00:00').split(':')
-    return h?.padStart(2, '0') || '00'
-  })
-  const [selectedMinute, setSelectedMinute] = useState(() => {
-    const [, m] = (value || '00:00').split(':')
-    return m?.padStart(2, '0') || '00'
-  })
-
-  useEffect(() => {
-    if (value && value.includes(':')) {
-      const [h, m] = value.split(':')
-      setSelectedHour(h.padStart(2, '0'))
-      setSelectedMinute(m.padStart(2, '0'))
-    }
-  }, [value])
-
-  const handleHourChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const num = Math.min(23, Math.max(0, parseInt(e.target.value) || 0))
-    const h = String(num).padStart(2, '0')
-    setSelectedHour(h)
-    onChange(`${h}:${selectedMinute}`)
-  }
-
-  const handleMinuteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const num = Math.min(59, Math.max(0, parseInt(e.target.value) || 0))
-    const m = String(num).padStart(2, '0')
-    setSelectedMinute(m)
-    onChange(`${selectedHour}:${m}`)
-  }
-
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm text-[#4B4036]">{label}</label>
-      <div className="bg-[#FFFDF8] rounded-2xl shadow-xl p-3 w-[200px] text-center">
-        <h2 className="text-sm text-[#4B4036] mb-2">選擇時間</h2>
-        <div className="flex justify-center items-center gap-3 mb-4">
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="0"
-              max="23"
-              value={selectedHour}
-              onChange={handleHourChange}
-              className="w-12 text-2xl font-bold text-[#8A6E47] text-center bg-transparent border-none focus:outline-none"
-            />
-            <span className="text-2xl font-bold text-[#8A6E47]">:</span>
-            <input
-              type="number"
-              min="0"
-              max="59"
-              value={selectedMinute}
-              onChange={handleMinuteChange}
-              className="w-12 text-2xl font-bold text-[#8A6E47] text-center bg-transparent border-none focus:outline-none"
-            />
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-sm text-[#4B4036]">{parseInt(selectedHour) >= 12 ? 'PM' : 'AM'}</span>
-          </div>
-        </div>
+      {label && <label className="text-sm text-[#4B4036] mb-1">{label}</label>}
+      <div className="hanami-timepicker-wrapper">
+        <TimePickerLib
+          value={value}
+          onChange={(val) => { if (typeof val === 'string') onChange(val) }}
+          disableClock={true}
+          format="HH:mm"
+          clearIcon={null}
+          clockIcon={null}
+          locale="zh-TW"
+          className="hanami-timepicker-input"
+        />
       </div>
+      <style jsx global>{`
+        .hanami-timepicker-wrapper .react-time-picker {
+          width: 200px;
+          background: #FFFDF8;
+          border-radius: 1rem;
+          box-shadow: 0 2px 12px #eadbc8aa;
+          border: 1px solid #EADBC8;
+          padding: 12px 16px;
+        }
+        .hanami-timepicker-input .react-time-picker__inputGroup input {
+          background: transparent;
+          border: none;
+          color: #8A6E47;
+          font-size: 1.5rem;
+          font-weight: bold;
+          text-align: center;
+        }
+        .hanami-timepicker-input .react-time-picker__inputGroup__divider {
+          color: #8A6E47;
+          font-size: 1.5rem;
+        }
+        .hanami-timepicker-input .react-time-picker__inputGroup {
+          gap: 0.5rem;
+        }
+        .hanami-timepicker-input .react-time-picker__wrapper {
+          border: none;
+          box-shadow: none;
+        }
+        .hanami-timepicker-input .react-time-picker__clear-button,
+        .hanami-timepicker-input .react-time-picker__clock-button {
+          display: none;
+        }
+      `}</style>
     </div>
   )
 }

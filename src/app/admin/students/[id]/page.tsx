@@ -348,7 +348,7 @@ export default function StudentDetailPage() {
           }}
           isInactive={isInactiveStudent}
         />
-        {student && student.student_type !== '試堂' && (
+        {student && (
           <div className="mt-8">
             {(() => {
               const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id
@@ -363,6 +363,7 @@ export default function StudentDetailPage() {
                 <StudentLessonPanel 
                   studentId={lessonStudentId} 
                   studentType={student.student_type}
+                  studentName={student.full_name}
                 />
               )
             })()}

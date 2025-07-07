@@ -42,7 +42,7 @@ export const useLessonPlans = () => {
       const plansWithNames = (data || []).map(plan => ({
         ...plan,
         teacher_names: (plan.teacher_ids || []).map(
-          id => teachers?.find(t => t.id === id)?.teacher_nickname || '未知老師'
+          (id: string) => teachers?.find(t => t.id === id)?.teacher_nickname || '未知老師'
         ),
       }));
 

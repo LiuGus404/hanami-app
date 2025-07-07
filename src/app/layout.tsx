@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 import { cookies } from "next/headers";
+import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -143,6 +144,17 @@ export default async function RootLayout({
       >
         <SessionProviderWrapper initialSession={userSession}>
           {children}
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background: '#FFFDF8',
+                color: '#4B4036',
+                border: '1px solid #EADBC8',
+              },
+            }}
+          />
         </SessionProviderWrapper>
       </body>
     </html>

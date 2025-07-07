@@ -188,7 +188,7 @@ export default function AdminPage() {
                   }}
                 >
                   <img
-                    src="/icons/bear-face.png"
+                    src="/icons/bear-face.PNG"
                     alt="學生"
                     style={{
                       width: '100%',
@@ -213,7 +213,7 @@ export default function AdminPage() {
                   }}
                 >
                   <img
-                    src="/icons/penguin-face.png"
+                    src="/icons/penguin-face.PNG"
                     alt="試堂"
                     style={{
                       width: '100%',
@@ -238,7 +238,7 @@ export default function AdminPage() {
                   }}
                 >
                   <img
-                    src="/icons/clock.png"
+                    src="/icons/clock.PNG"
                     alt="最後一堂"
                     style={{
                       width: '100%',
@@ -319,6 +319,15 @@ export default function AdminPage() {
                   <img src="/icons/book-elephant.PNG" alt="學生進度" className="w-full h-full object-contain" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">學生進度</h3>
+              </div>
+            </div>
+            {/* 管理課堂按鈕 */}
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/schedule-management')}>
+              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
+                <div className="w-12 h-12 mb-2">
+                  <img src="/icons/clock.PNG" alt="管理課堂" className="w-full h-full object-contain" />
+                </div>
+                <h3 className="text-lg font-semibold text-[#2B3A3B]">管理課堂</h3>
               </div>
             </div>
           </div>

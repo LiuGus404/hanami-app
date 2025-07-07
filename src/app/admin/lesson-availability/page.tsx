@@ -1,26 +1,45 @@
 'use client'
 
 import LessonAvailabilityDashboard from '@/components/ui/LessonAvailabilityDashboard'
-import ClassManagementPanel from '@/components/ui/ClassManagementPanel'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useState } from 'react'
 
 export default function LessonAvailabilityPage() {
-  const [showManagement, setShowManagement] = useState(false)
+  const router = useRouter()
 
   const insertTestData = async () => {
     try {
-      // 插入測試資料到 hanami_teacher_schedule 表
+      // 先檢查是否有現有的教師資料
+      const { data: teachers, error: teacherError } = await supabase
+        .from('hanami_employee')
+        .select('id')
+        .limit(1)
+
+      if (teacherError) {
+        console.error('查詢教師資料失敗:', teacherError)
+        alert('查詢教師資料失敗: ' + teacherError.message)
+        return
+      }
+
+      if (!teachers || teachers.length === 0) {
+        alert('沒有找到教師資料，請先新增教師')
+        return
+      }
+
+      const teacherId = teachers[0].id
+
+      // 插入測試資料到 teacher_schedule 表
       const testData = [
-        { teacher_id: 'test-teacher-1', scheduled_date: '2024-01-01', start_time: '09:00', end_time: '09:45' },
-        { teacher_id: 'test-teacher-2', scheduled_date: '2024-01-01', start_time: '10:00', end_time: '10:45' },
-        { teacher_id: 'test-teacher-1', scheduled_date: '2024-01-02', start_time: '14:00', end_time: '15:00' },
-        { teacher_id: 'test-teacher-3', scheduled_date: '2024-01-03', start_time: '16:00', end_time: '16:45' },
+        { teacher_id: teacherId, scheduled_date: '2024-01-01', start_time: '09:00', end_time: '09:45' },
+        { teacher_id: teacherId, scheduled_date: '2024-01-01', start_time: '10:00', end_time: '10:45' },
+        { teacher_id: teacherId, scheduled_date: '2024-01-02', start_time: '14:00', end_time: '15:00' },
+        { teacher_id: teacherId, scheduled_date: '2024-01-03', start_time: '16:00', end_time: '16:45' },
       ]
 
       const { data, error } = await supabase
-        .from('hanami_teacher_schedule')
+        .from('teacher_schedule')
         .insert(testData)
 
       if (error) {
@@ -42,14 +61,10 @@ export default function LessonAvailabilityPage() {
       <div className="max-w-6xl mx-auto">
         <div className="mb-4 flex justify-end pr-4 gap-3">
           <button
-            onClick={() => setShowManagement(!showManagement)}
-            className={`px-4 py-2 rounded-full text-sm transition-colors ${
-              showManagement 
-                ? 'bg-[#4B4036] text-white' 
-                : 'bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] border border-[#EADBC8]'
-            }`}
+            onClick={() => router.push('/admin/schedule-management')}
+            className="bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] border border-[#EADBC8] px-4 py-2 rounded-full text-sm transition-colors"
           >
-            {showManagement ? '隱藏管理' : '班別時段管理'}
+            管理課程
           </button>
           <button
             onClick={insertTestData}
@@ -71,11 +86,7 @@ export default function LessonAvailabilityPage() {
           </Link>
         </div>
         
-        {showManagement && (
-          <div className="mb-6">
-            <ClassManagementPanel />
-          </div>
-        )}
+
         
         <LessonAvailabilityDashboard />
       </div>

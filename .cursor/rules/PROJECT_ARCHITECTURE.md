@@ -160,7 +160,8 @@ hanami-web/
 - `Hanami_Students`: 學生資料
 - `hanami_student_lesson`: 課程記錄
 - `Hanami_Student_Package`: 課程包
-- `hanami_teacher_schedule`: 教師工作時間表
+- `hanami_schedule`: 課堂時段設定
+- `teacher_schedule`: 教師工作時間表
 
 ### 關聯關係
 - 老師與學生：一對多關係

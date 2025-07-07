@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { Sprout } from 'lucide-react'
+import { createPortal } from 'react-dom'
 
 export type PopupSelectProps = {
   title: string
@@ -45,8 +46,8 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-sm flex items-center justify-center">
       <div className="bg-[#FFFDF8] border border-[#D8CDBF] rounded-[24px] w-80 p-6 shadow-xl text-[#4B4B4B] max-h-[80vh] flex flex-col">
         <h2 className="text-xl font-bold text-center mb-4">{title}</h2>
         {errorMsg && (
@@ -83,6 +84,7 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    typeof window !== 'undefined' ? document.body : (null as any)
   )
 }

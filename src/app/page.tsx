@@ -73,11 +73,12 @@ export default function Home() {
 
       {/* 開心學習插圖 */}
       <div className="mt-4 px-6">
-        <img
-          src="/illustrations/kids-learning-happy.png"
-          alt="開心學習插圖"
-          className="w-full rounded-2xl shadow-md"
-        />
+        <div className="w-full h-48 bg-gradient-to-r from-[#FFD59A] to-[#BFE3FF] rounded-2xl shadow-md flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-4xl mb-2">🎵</div>
+            <div className="text-lg font-semibold text-[#4B4036]">開心學習音樂</div>
+          </div>
+        </div>
       </div>
 
       {/* 搜尋欄 */}
@@ -89,7 +90,7 @@ export default function Home() {
             className="w-full rounded-full border border-[#E0E0E0] py-2 pl-5 pr-10 text-brown-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FFD59A]"
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            <img src="/icons/search.png" alt="search" className="w-5 h-5 opacity-60" />
+            <span className="text-[#4B4036] opacity-60">🔍</span>
           </span>
         </div>
       </div>
@@ -100,7 +101,7 @@ export default function Home() {
       {/* 限時優惠 Banner */}
       <div className="mt-6 mx-4 rounded-xl bg-[#D2E0AA] px-4 py-3 shadow">
         <div className="flex items-center gap-2">
-          <img src="/icons/owl.png" className="w-6 h-6" />
+          <span className="text-2xl">🦉</span>
           <div className="text-brown-700 font-semibold text-sm md:text-base">
             限時優惠：10% off 所有課程
           </div>
@@ -112,13 +113,13 @@ export default function Home() {
         <h2 className="text-xl md:text-2xl font-semibold text-brown-700 mb-4">課程與商品</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <CourseCard
-            icon="/icons/star.png"
+            icon="⭐"
             title="Pre-K Class"
             description="適合3-6歲，啟發音樂潛能，快樂學習。"
             bgColor="#FFD59A"
           />
           <CourseCard
-            icon="/icons/guitar.png"
+            icon="🎸"
             title="Recorded Songs"
             description="精選錄音教材，隨時隨地快樂唱。"
             bgColor="#BFE3FF"
@@ -143,17 +144,17 @@ export default function Home() {
           <TestimonialCard
             name="小彤媽媽"
             comment="第一次見到女兒咁投入唱歌，真係感動～"
-            avatar="/avatars/mom1.png"
+            avatar="👩"
           />
           <TestimonialCard
             name="浩浩爸爸"
             comment="老師好有愛心，小朋友學得開心又專心。"
-            avatar="/avatars/dad1.png"
+            avatar="👨"
           />
           <TestimonialCard
             name="思樂媽媽"
             comment="本來怕分離，依家返學都笑笑口！"
-            avatar="/avatars/mom2.png"
+            avatar="👩"
           />
         </div>
       </section>

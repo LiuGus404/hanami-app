@@ -688,7 +688,7 @@ const HanamiTC = () => {
             <span className="text-xs">{allShowTeachers ? '收起老師' : '展示老師'}</span>
           </button>
             <button className="flex items-center gap-1 px-2 py-1 hanami-btn-soft text-[#4B4036]" onClick={() => setAllShowStudents((prev) => !prev)}>
-            <img src="/icons/penguin-face.png" alt="學生" className="w-4 h-4" />
+            <img src="/icons/penguin-face.PNG" alt="學生" className="w-4 h-4" />
             <span className="text-xs">{allShowStudents ? '收起學生' : '展示學生'}</span>
           </button>
             <button className="flex items-center gap-1 px-2 py-1 hanami-btn-soft text-[#4B4036]" onClick={() => setAllShowPlan((prev) => !prev)}>

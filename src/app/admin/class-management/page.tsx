@@ -9,7 +9,7 @@ export default function ClassManagementPage() {
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-[#4B4036]">班別與時段管理</h1>
+            <h1 className="text-2xl font-bold text-[#4B4036]">班別管理</h1>
             <Link 
               href="/admin/lesson-availability"
               className="bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] font-semibold py-2 px-4 rounded-full border border-[#EADBC8] shadow-sm transition-colors duration-200"
@@ -18,7 +18,7 @@ export default function ClassManagementPage() {
             </Link>
           </div>
           <p className="text-[#87704e] mt-2">
-            管理班別類型和課堂時段設定，這些設定會影響課堂空缺情況的顯示
+            管理班別類型設定
           </p>
         </div>
         

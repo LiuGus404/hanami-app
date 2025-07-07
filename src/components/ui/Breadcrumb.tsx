@@ -70,6 +70,46 @@ function generateBreadcrumbItems(pathname: string, showHome: boolean): Breadcrum
     })
   }
   
+  // 特殊處理 trial-queue 路徑
+  if (pathname === '/admin/trial-queue') {
+    items.push({
+      label: '管理面板',
+      href: '/admin',
+      isCurrent: false
+    })
+    items.push({
+      label: '課堂空缺情況',
+      href: '/admin/lesson-availability',
+      isCurrent: false
+    })
+    items.push({
+      label: '輪候學生列表',
+      href: '/admin/trial-queue',
+      isCurrent: true
+    })
+    return items
+  }
+
+  // 特殊處理 add-trial-students 路徑
+  if (pathname === '/admin/add-trial-students') {
+    items.push({
+      label: '管理面板',
+      href: '/admin',
+      isCurrent: false
+    })
+    items.push({
+      label: '課堂空缺情況',
+      href: '/admin/lesson-availability',
+      isCurrent: false
+    })
+    items.push({
+      label: '新增/編輯輪候學生',
+      href: '/admin/add-trial-students',
+      isCurrent: true
+    })
+    return items
+  }
+  
   // 生成路徑項目
   let currentPath = ''
   segments.forEach((segment, index) => {
@@ -100,9 +140,9 @@ function getBreadcrumbLabel(segment: string, allSegments: string[], index: numbe
     'students': '學生管理',
     'teachers': '老師管理',
     'new': '新增',
-    'trial-queue': '試堂佇列',
+    'trial-queue': '輪候學生列表',
     'add-trial-students': '新增試堂學生',
-    'lesson-availability': '課程時段',
+    'lesson-availability': '課堂空缺情況',
     'control': '控制面板',
     'ai-hub': 'AI 中心',
     'ai-select': 'AI 選擇',

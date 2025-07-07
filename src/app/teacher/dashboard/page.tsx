@@ -138,7 +138,7 @@ export default function TeacherDashboard() {
 
       // 獲取即將到來的課程安排
       const { data: scheduleData } = await supabase
-        .from('hanami_teacher_schedule')
+        .from('teacher_schedule')
         .select('*')
         .eq('teacher_id', userSession.id)
         .gte('scheduled_date', today)

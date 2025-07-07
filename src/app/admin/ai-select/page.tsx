@@ -32,7 +32,7 @@ const assistants = [
   },
   {
     name: '米米 Mimi',
-    avatar: '/Rabbit.png',
+    avatar: '/rabbit.png',
     title: '圖像理解專家',
     personality: '靈巧觀察、熱情好奇，擅長從圖片中找出細節、並說出故事',
     tasks: '幫你解讀截圖、分析圖片內容、結合文字與視覺的回答',
