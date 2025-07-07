@@ -484,53 +484,65 @@ export default function LessonAvailabilityDashboard() {
                       className="text-xs px-2 py-1 rounded bg-[#E6F0FF] text-[#2B4B6F] border border-blue-100 hover:bg-[#D6E8FF] transition"
                       onClick={() => setExpandedQueue(prev => ({...prev, [dayIdx]: !prev[dayIdx]}))}
                     >
-                      {expandedQueue[dayIdx] ? '收起' : '展開'}輪候學生（{Object.values(queueByDay[dayIdx] || {}).reduce((sum, arr) => sum + arr.length, 0)}）
+                      {expandedQueue[dayIdx] ? '收起' : '展開'}輪候學生（{queueByDay[dayIdx]?.length || 0}）
                     </button>
                   </div>
                 )}
                 {queueByDay[dayIdx] && queueByDay[dayIdx].length > 0 && expandedQueue[dayIdx] && (
                   <div className="flex flex-col gap-2 mb-1">
-                    {Object.entries(queueByDay[dayIdx] || {}).map(([courseType, students]) => (
-                      <div key={courseType} className="border border-[#EADBC8] rounded p-1 bg-[#FFF9F2]">
-                        <button
-                          className="text-[10px] font-semibold text-[#4B4036] mb-1 px-1 w-full text-left hover:bg-[#FDE6B8] transition rounded"
-                          onClick={() => setExpandedCourseTypes(prev => ({
-                            ...prev,
-                            [dayIdx]: {
-                              ...(prev[dayIdx] || {}),
-                              [courseType]: !(prev[dayIdx]?.[courseType] || false)
-                            }
-                          }))}
-                        >
-                          {expandedCourseTypes[dayIdx]?.[courseType] ? '▼' : '▶'} {courseType}（{students.length}人）
-                        </button>
-                        {expandedCourseTypes[dayIdx]?.[courseType] && (
-                          <div className="flex flex-col gap-1">
-                            {students.map((q: any, i: number) => (
-                              <button
-                                key={`${q.id}-${i}`}
-                                onClick={() => router.push(`/admin/add-trial-students?id=${q.id}`)}
-                                className="inline-block px-2 py-1 rounded bg-[#F0F6FF] text-xs text-[#2B4B6F] hover:bg-[#E0EDFF] transition leading-snug text-left"
-                                style={{ cursor: 'pointer' }}
-                              >
-                                <div>{q.phone_no || q.full_name || '未命名'}</div>
-                                <div className="flex items-center gap-2 text-[10px] text-[#4B5A6F] mt-0.5">
-                                  {q.student_age !== null && q.student_age !== undefined && !isNaN(q.student_age) && (
-                                    <span>{q.student_age}歲</span>
-                                  )}
-                                  {q.prefer && q.prefer.timeslot && q.prefer.timeslot !== '未指定' && (
-                                    <span>偏好時段: {q.prefer.timeslot}</span>
-                                  )}
-                                  {q.notes && (
-                                    <span>備註: {q.notes}</span>
-                                  )}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {/* 按課程類型分組顯示輪候學生 */}
+                    {(() => {
+                      const students = queueByDay[dayIdx] || []
+                      const courseGroups: { [courseType: string]: any[] } = {}
+                      
+                      students.forEach((student: any) => {
+                        const courseType = student.courseType || '未指定課程'
+                        if (!courseGroups[courseType]) courseGroups[courseType] = []
+                        courseGroups[courseType].push(student)
+                      })
+                      
+                      return Object.entries(courseGroups).map(([courseType, students]) => (
+                        <div key={courseType} className="border border-[#EADBC8] rounded p-1 bg-[#FFF9F2]">
+                          <button
+                            className="text-[10px] font-semibold text-[#4B4036] mb-1 px-1 w-full text-left hover:bg-[#FDE6B8] transition rounded"
+                            onClick={() => setExpandedCourseTypes(prev => ({
+                              ...prev,
+                              [dayIdx]: {
+                                ...(prev[dayIdx] || {}),
+                                [courseType]: !(prev[dayIdx]?.[courseType] || false)
+                              }
+                            }))}
+                          >
+                            {expandedCourseTypes[dayIdx]?.[courseType] ? '▼' : '▶'} {courseType}（{students.length}人）
+                          </button>
+                          {expandedCourseTypes[dayIdx]?.[courseType] && (
+                            <div className="flex flex-col gap-1">
+                              {students.map((q: any, i: number) => (
+                                <button
+                                  key={`${q.id}-${i}`}
+                                  onClick={() => router.push(`/admin/add-trial-students?id=${q.id}`)}
+                                  className="inline-block px-2 py-1 rounded bg-[#F0F6FF] text-xs text-[#2B4B6F] hover:bg-[#E0EDFF] transition leading-snug text-left"
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <div>{q.phone_no || q.full_name || '未命名'}</div>
+                                  <div className="flex items-center gap-2 text-[10px] text-[#4B5A6F] mt-0.5">
+                                    {q.student_age !== null && q.student_age !== undefined && !isNaN(q.student_age) && (
+                                      <span>{q.student_age}歲</span>
+                                    )}
+                                    {q.prefer && q.prefer.timeslot && q.prefer.timeslot !== '未指定' && (
+                                      <span>偏好時段: {q.prefer.timeslot}</span>
+                                    )}
+                                    {q.notes && (
+                                      <span>備註: {q.notes}</span>
+                                    )}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    })()}
                   </div>
                 )}
                 {slotsByDay[dayIdx] && slotsByDay[dayIdx].length > 0 ? (
