@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import LessonPlanModal from '@/components/ui/LessonPlanModal';
+import AITeacherSchedulerModal from '@/components/ui/AITeacherSchedulerModal';
 import { Lesson, Teacher, CourseType, Student } from '@/types';
 import LessonCard from './LessonCard';
 import MiniLessonCard from './MiniLessonCard';
@@ -58,18 +59,21 @@ interface LessonPlanModalProps {
   teachers: { id: string; name: string }[];
 }
 
+interface HanamiTCProps {
+  teachers: Teacher[];
+}
+
 const getHongKongDate = (date = new Date()): Date => {
   // 移除額外的時區轉換，直接使用本地時間
   return new Date(date);
 };
 
-const HanamiTC = () => {
+const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const supabase = getSupabaseClient();
   const [lessons, setLessons] = useState<ProcessedLesson[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedDetail, setSelectedDetail] = useState<SelectedDetail | null>(null);
   const [popupInfo, setPopupInfo] = useState<{ field: string; open: boolean }>({ field: '', open: false });
   const [popupSelected, setPopupSelected] = useState('');
@@ -110,7 +114,7 @@ const HanamiTC = () => {
   const [allShowPlan, setAllShowPlan] = useState(true);
   const [view, setView] = useState<'week' | 'day'>('week');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
+  const [isAISchedulerOpen, setIsAISchedulerOpen] = useState(false);
 
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
@@ -260,49 +264,6 @@ const HanamiTC = () => {
     setPlans(data || []);
   };
 
-  const fetchTeachers = async (): Promise<void> => {
-    try {
-      const { data } = await supabase
-        .from('hanami_employee')
-        .select('id, teacher_fullname, teacher_nickname, teacher_role, teacher_status, teacher_email, teacher_phone, teacher_address, teacher_dob, teacher_hsalary, teacher_msalary, teacher_background, teacher_bankid, created_at, updated_at')
-        .eq('teacher_status', 'active');
-      
-      if (data) {
-        // 轉換為 Teacher 型別，顯示名稱用 teacher_nickname
-        const processedTeachers: Teacher[] = data.map(teacher => ({
-          id: teacher.id,
-          teacher_fullname: teacher.teacher_fullname || '',
-          teacher_nickname: teacher.teacher_nickname || '',
-          teacher_role: teacher.teacher_role || null,
-          teacher_status: teacher.teacher_status || null,
-          teacher_email: teacher.teacher_email || null,
-          teacher_phone: teacher.teacher_phone || null,
-          teacher_address: teacher.teacher_address || null,
-          teacher_dob: teacher.teacher_dob || null,
-          teacher_hsalary: teacher.teacher_hsalary || null,
-          teacher_msalary: teacher.teacher_msalary || null,
-          teacher_background: teacher.teacher_background || null,
-          teacher_bankid: teacher.teacher_bankid || null,
-          teacher_gender: 'unknown',
-          created_at: teacher.created_at,
-          updated_at: teacher.updated_at
-        }));
-        setTeachers(processedTeachers);
-      }
-    } catch (error) {
-      console.error('Unexpected error in fetchTeachers:', error);
-    }
-  };
-
-  const updatePlan = async (startDate: Date, endDate: Date) => {
-    const { data } = await supabase
-      .from('hanami_lesson_plan')
-      .select('*')
-      .gte('lesson_date', startDate.toISOString())
-      .lte('lesson_date', endDate.toISOString());
-    setPlans(data || []);
-  };
-
   const fetchTodayTeachers = async (date: Date) => {
     const supabase = getSupabaseClient();
     const dateStr = date.toISOString().slice(0, 10); // 'YYYY-MM-DD'
@@ -399,8 +360,7 @@ const HanamiTC = () => {
 
           await Promise.all([
             fetchLessons(startOfWeek, endOfWeek),
-            fetchPlans(startOfWeek, endOfWeek),
-            fetchTeachers()
+            fetchPlans(startOfWeek, endOfWeek)
           ]);
         } else if (view === 'day') {
           const startOfDay = new Date(currentDate);
@@ -408,8 +368,7 @@ const HanamiTC = () => {
 
           await Promise.all([
             fetchLessons(startOfDay, endOfDay),
-            fetchPlans(startOfDay, endOfDay),
-            fetchTeachers()
+            fetchPlans(startOfDay, endOfDay)
           ]);
         }
 
@@ -624,7 +583,7 @@ const HanamiTC = () => {
                 setSelectedLesson({
                   time: group.time?.slice(0, 5) || '',
                   course: { name: group.course },
-                  teachers: (teachers || []) as Teacher[],
+                  teachers: teachers,
                   students: group.students.map(student => ({
                     id: student.student_id,
                     name: student.name,
@@ -652,6 +611,16 @@ const HanamiTC = () => {
       </div>
     );
   }
+
+  // 補回 updatePlan
+  const updatePlan = async (startDate: Date, endDate: Date) => {
+    const { data } = await supabase
+      .from('hanami_lesson_plan')
+      .select('*')
+      .gte('lesson_date', startDate.toISOString())
+      .lte('lesson_date', endDate.toISOString());
+    setPlans(data || []);
+  };
 
   return (
     <div className="bg-white min-h-screen flex flex-col items-center py-0">
@@ -708,7 +677,6 @@ const HanamiTC = () => {
                 weekEnd.setDate(weekEnd.getDate() + 6);
                 await fetchLessons(weekStart, weekEnd);
                 await fetchPlans(weekStart, weekEnd);
-              await fetchTeachers();
             }}
               className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EBC9A4] text-[#4B4036] hover:bg-[#f7f3ec]"
               title="刷新資料"
@@ -855,6 +823,13 @@ const HanamiTC = () => {
             }}
           />
         )}
+
+        {/* AI 安排老師模態框 */}
+        <AITeacherSchedulerModal
+          open={isAISchedulerOpen}
+          onClose={() => setIsAISchedulerOpen(false)}
+          teachers={teachers}
+        />
 
         </div>
     </div>

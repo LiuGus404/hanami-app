@@ -2,16 +2,56 @@
 
 import { useRouter } from 'next/navigation'
 import HanamiTC from '@/components/ui/HanamiTC'
+import { useEffect, useState } from 'react';
+import { getSupabaseClient } from '@/lib/supabase';
+import { Teacher } from '@/types';
+import AITeacherSchedulerModal from '@/components/ui/AITeacherSchedulerModal';
 
 export default function HanamiTCPage() {
-  const router = useRouter()
+  const router = useRouter();
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [isAISchedulerOpen, setIsAISchedulerOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      const supabase = getSupabaseClient();
+      const { data } = await supabase
+        .from('hanami_employee')
+        .select('id, teacher_fullname, teacher_nickname, teacher_role, teacher_status, teacher_email, teacher_phone, teacher_address, teacher_gender, teacher_dob, teacher_hsalary, teacher_msalary, teacher_background, teacher_bankid, created_at, updated_at')
+        .eq('teacher_status', 'active');
+      if (data) {
+        // teacher_gender 可能為 undefined，補 null
+        setTeachers(
+          data.map((t: any) => ({
+            ...t,
+            teacher_gender: t.teacher_gender ?? null
+          }))
+        );
+      }
+    };
+    fetchTeachers();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#FFF9F2] font-['Quicksand',_sans-serif] px-6 py-8">
+      <AITeacherSchedulerModal
+        open={isAISchedulerOpen}
+        onClose={() => setIsAISchedulerOpen(false)}
+        teachers={teachers}
+      />
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-2xl p-6 mb-6 border border-[#EADBC8]">
-          <h1 className="text-2xl font-bold text-[#2B3A3B] mb-6">課堂管理</h1>
-          <HanamiTC />
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold text-[#2B3A3B]">課堂管理</h1>
+            <button
+              onClick={() => setIsAISchedulerOpen(true)}
+              className="flex items-center gap-2 hanami-btn px-4 py-2"
+            >
+              <img src="/icons/edit-pencil.png" alt="AI" className="w-5 h-5" />
+              <span className="text-base font-bold">AI 安排老師</span>
+            </button>
+          </div>
+          <HanamiTC teachers={teachers} />
         </div>
       </div>
     </div>
