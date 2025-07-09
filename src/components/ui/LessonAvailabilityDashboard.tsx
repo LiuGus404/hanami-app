@@ -79,7 +79,7 @@ export default function LessonAvailabilityDashboard() {
   const [trialLimitSettings, setTrialLimitSettings] = useState<{[courseTypeId: string]: number}>({})
   const [showTrialLimitModal, setShowTrialLimitModal] = useState(false)
 
-  const fetchData = async () => {
+    const fetchData = async () => {
       setLoading(true)
       setError(null)
       try {
@@ -219,14 +219,14 @@ export default function LessonAvailabilityDashboard() {
           let matched = false
           for (const key of [keyFull, keyNoType, keySimple]) {
             if (allScheduleKeys.includes(key)) {
-              if (!trialMap[key]) trialMap[key] = []
-              trialMap[key].push({
-                ...t,
-                full_name: t.full_name || '',
-                lesson_date: t.lesson_date || '',
-                actual_timeslot: t.actual_timeslot || '',
-                weekday: weekdayNum,
-                student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : t.student_age,
+          if (!trialMap[key]) trialMap[key] = []
+          trialMap[key].push({
+            ...t,
+            full_name: t.full_name || '',
+            lesson_date: t.lesson_date || '',
+            actual_timeslot: t.actual_timeslot || '',
+            weekday: weekdayNum,
+            student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : t.student_age,
                 course_type: courseType, // 使用 course_types 的 ID
               })
               matched = true
@@ -317,9 +317,12 @@ export default function LessonAvailabilityDashboard() {
 
           
           // 取得該時段該課程的所有學生
+          // 取得 schedule 的課程名稱（用於所有比對）
+          const scheduleCourseName = courseTypesMap[courseType] || courseType
+
+          // 取得該時段該課程的所有常規學生
           const allRegularStudents = (regularData || []).filter(s => {
             if (!s.regular_timeslot || s.regular_weekday === null || s.regular_weekday === undefined) return false
-            
             let sWeekdayNum: number
             if (typeof s.regular_weekday === 'string') {
               sWeekdayNum = parseInt(s.regular_weekday)
@@ -327,71 +330,25 @@ export default function LessonAvailabilityDashboard() {
             } else {
               sWeekdayNum = s.regular_weekday
             }
-            
-            // 將學生的課程名稱轉換為課程ID進行匹配
-            const studentCourseName = s.course_type || ''
-            const scheduleCourseType = courseType || ''
-            
-            // 方法1：直接比較課程名稱（如果學生的course_type是課程名稱）
-            const matchByName = sWeekdayNum === weekdayNum && 
-                   s.regular_timeslot === schedule.timeslot && 
-                   studentCourseName === (courseTypesMap[scheduleCourseType] || scheduleCourseType)
-            
-            // 方法2：比較課程ID（如果學生的course_type是課程ID）
-            const matchById = sWeekdayNum === weekdayNum && 
-                   s.regular_timeslot === schedule.timeslot && 
-                   studentCourseName === scheduleCourseType
-            
-            const match = matchByName || matchById
-            
-            // 調試信息：檢查學生匹配
-            if (sWeekdayNum === weekdayNum && s.regular_timeslot === schedule.timeslot) {
-              console.log(`學生匹配檢查 - 學生: ${s.full_name}, 時段: ${schedule.timeslot}, 星期: ${weekdayNum}`)
-              console.log(`  學生課程: ${studentCourseName}, 時段課程ID: ${scheduleCourseType}`)
-              console.log(`  時段課程名稱: ${courseTypesMap[scheduleCourseType] || scheduleCourseType}`)
-              console.log(`  學生星期: ${sWeekdayNum}, 時段星期: ${weekdayNum}`)
-              console.log(`  學生時段: ${s.regular_timeslot}, 時段時段: ${schedule.timeslot}`)
-              console.log(`  按名稱匹配: ${matchByName}, 按ID匹配: ${matchById}`)
-              console.log(`  最終匹配結果: ${match}`)
-            }
-            
-            return match
+            // 只用課程名稱比對
+            return (
+              sWeekdayNum === weekdayNum &&
+              s.regular_timeslot === schedule.timeslot &&
+              (s.course_type === scheduleCourseName)
+            )
           })
-          
+
+          // 取得該時段該課程的所有試堂學生
           const allTrialStudents = (trialData || []).filter(t => {
             if (!t.actual_timeslot || !t.lesson_date) return false
-            
             const lessonDate = new Date(t.lesson_date)
             const tWeekdayNum = lessonDate.getDay()
-            
-            // 將試堂學生的課程名稱轉換為課程ID進行匹配
-            const trialCourseName = t.course_type || ''
-            const scheduleCourseType = courseType || ''
-            
-            // 方法1：直接比較課程名稱（如果試堂學生的course_type是課程名稱）
-            const matchByName = tWeekdayNum === weekdayNum && 
-                   t.actual_timeslot === schedule.timeslot && 
-                   trialCourseName === (courseTypesMap[scheduleCourseType] || scheduleCourseType)
-            
-            // 方法2：比較課程ID（如果試堂學生的course_type是課程ID）
-            const matchById = tWeekdayNum === weekdayNum && 
-                   t.actual_timeslot === schedule.timeslot && 
-                   trialCourseName === scheduleCourseType
-            
-            const match = matchByName || matchById
-            
-            // 調試信息：檢查試堂學生匹配
-            if (tWeekdayNum === weekdayNum && t.actual_timeslot === schedule.timeslot) {
-              console.log(`試堂學生匹配檢查 - 學生: ${t.full_name}, 時段: ${schedule.timeslot}, 星期: ${weekdayNum}`)
-              console.log(`  試堂學生課程: ${trialCourseName}, 時段課程ID: ${scheduleCourseType}`)
-              console.log(`  時段課程名稱: ${courseTypesMap[scheduleCourseType] || scheduleCourseType}`)
-              console.log(`  試堂學生星期: ${tWeekdayNum}, 時段星期: ${weekdayNum}`)
-              console.log(`  試堂學生時段: ${t.actual_timeslot}, 時段時段: ${schedule.timeslot}`)
-              console.log(`  按名稱匹配: ${matchByName}, 按ID匹配: ${matchById}`)
-              console.log(`  最終匹配結果: ${match}`)
-            }
-            
-            return match
+            // 只用課程名稱比對
+            return (
+              tWeekdayNum === weekdayNum &&
+              t.actual_timeslot === schedule.timeslot &&
+              (t.course_type === scheduleCourseName)
+            )
           })
           
           // 調試信息：檢查學生數量
@@ -410,96 +367,44 @@ export default function LessonAvailabilityDashboard() {
           
           // 計算該時段最快有空位的日子
           const availableDates: {date: string, remain: number}[] = []
-          
-          // 獲取該時段所有常規學生的ID
           const regularStudentIds = allRegularStudents.map(s => s.id)
           if (allLessonData && regularStudentIds.length > 0) {
-            // 輸出一筆 lessonData 範例
-            if (allLessonData.length > 0) {
-              console.log('【DEBUG】allLessonData 範例:', allLessonData[0])
-            }
-            // 輸出 allRegularStudents id
-            console.log('【DEBUG】allRegularStudents id:', regularStudentIds)
-            
-            // 查詢這些學生在未來日期的課堂記錄
-            // 需要處理課程類型的比對：lessonData中的course_type可能是課程名稱或ID
-            const studentLessons = allLessonData.filter(lesson => {
-              const lessonCourseType = lesson.course_type || ''
-              const scheduleCourseType = courseType || ''
-              
-              // 方法1：直接比較課程ID
-              const matchById = lesson.course_type === courseType
-              
-              // 方法2：比較課程名稱（如果lesson中的course_type是課程名稱）
-              const matchByName = lessonCourseType === (courseTypesMap[scheduleCourseType] || scheduleCourseType)
-              
-              const courseMatch = matchById || matchByName
-              
-              return lesson.student_id && regularStudentIds.includes(lesson.student_id) && 
-                     lesson.actual_timeslot === schedule.timeslot && 
-                     courseMatch
-            })
+            // 查詢這些學生在未來日期的課堂記錄（只用課程名稱比對）
+            const studentLessons = allLessonData.filter(lesson =>
+              lesson.student_id && regularStudentIds.includes(lesson.student_id) &&
+              lesson.actual_timeslot === schedule.timeslot &&
+              lesson.course_type === scheduleCourseName
+            )
             // 按日期分組，計算每天實際出席的學生數量
             const dailyAttendance: {[date: string]: number} = {}
             studentLessons.forEach(lesson => {
               if (!lesson.lesson_date) return;
-              if (!dailyAttendance[lesson.lesson_date]) {
-                dailyAttendance[lesson.lesson_date] = 0
-              }
+              if (!dailyAttendance[lesson.lesson_date]) dailyAttendance[lesson.lesson_date] = 0
               dailyAttendance[lesson.lesson_date]++
             })
             // 計算每個日期的剩餘空位
             const dateMap: {[date: string]: number} = {}
-            // 檢查未來8週的該星期日期
             const today = new Date()
             for (let week = 0; week < 8; week++) {
               const d = new Date(today)
               d.setDate(d.getDate() + (7 + weekdayNum - d.getDay()) % 7 + (week * 7))
               const dateStr = d.toISOString().slice(0, 10)
-              // 計算該日該時段該課程的試堂學生數
-              // 從 hanami_trial_lesson 表查詢試堂學生的課堂記錄
-              const trialLessons = allLessonData.filter(lesson => {
-                const lessonCourseType = lesson.course_type || ''
-                const scheduleCourseType = courseType || ''
-                
-                // 方法1：直接比較課程ID
-                const matchById = lesson.course_type === courseType
-                
-                // 方法2：比較課程名稱（如果lesson中的course_type是課程名稱）
-                const matchByName = lessonCourseType === (courseTypesMap[scheduleCourseType] || scheduleCourseType)
-                
-                const courseMatch = matchById || matchByName
-                
-                return lesson.lesson_date === dateStr && 
-                       lesson.actual_timeslot === schedule.timeslot && 
-                       courseMatch &&
-                       // 確保是試堂學生的記錄（不在常規學生ID列表中）
-                       lesson.student_id && !regularStudentIds.includes(lesson.student_id)
-              })
-              
+              // 計算該日該時段該課程的試堂學生數（只用課程名稱比對）
+              const trialLessons = allLessonData.filter(lesson =>
+                lesson.lesson_date === dateStr &&
+                lesson.actual_timeslot === schedule.timeslot &&
+                lesson.course_type === scheduleCourseName &&
+                lesson.student_id && !regularStudentIds.includes(lesson.student_id)
+              )
               const trialCount = trialLessons.length
-              
-              // 獲取該課程類型的試堂人數限制
               const trialLimit = trialLimitSettings[courseType] || 0
-              
-              // 計算試堂學生是否已達限制
-              const trialAtLimit = trialCount >= trialLimit
-              // 計算該日實際出席的常規學生數
-              const regularCount = dailyAttendance[dateStr] || 0
-              // 計算剩餘空位
-              const remain = (schedule.max_students || 0) - regularCount - trialCount
-              
-              // 考慮試堂人數限制：如果試堂學生已達限制，則不顯示該日期有空位
               const canAcceptTrial = trialLimit === 0 || trialCount < trialLimit
-              
-              // 詳細 log
-              console.log(`【DEBUG】${dateStr}｜${schedule.timeslot}｜${courseType}：regularCount=${regularCount}，trialCount=${trialCount}，trialLimit=${trialLimit}，canAcceptTrial=${canAcceptTrial}，remain=${remain}`)
-              
+              const regularCount = dailyAttendance[dateStr] || 0
+              const remain = (schedule.max_students || 0) - regularCount - trialCount
               if (remain > 0 && canAcceptTrial) {
                 dateMap[dateStr] = remain
               }
             }
-            // 轉換為陣列並排序，取前5個
             availableDates.push(...Object.entries(dateMap)
               .map(([date, remain]) => ({date, remain}))
               .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -726,8 +631,8 @@ export default function LessonAvailabilityDashboard() {
     <div className="w-full flex flex-col items-center px-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-[#4B4036]">課堂空缺情況</h2>
-          <Image src="/rabbit.png" alt="icon" width={24} height={24} />
+        <h2 className="text-lg font-bold text-[#4B4036]">課堂空缺情況</h2>
+        <Image src="/rabbit.png" alt="icon" width={24} height={24} />
         </div>
         <button
           onClick={() => setShowTrialLimitModal(true)}
@@ -796,7 +701,7 @@ export default function LessonAvailabilityDashboard() {
                                   )}
                               {q.courseType && (
                                 <span>課程: {q.courseType}</span>
-                              )}
+                                  )}
                                   {q.prefer && q.prefer.timeslot && q.prefer.timeslot !== '未指定' && (
                                     <span>偏好時段: {q.prefer.timeslot}</span>
                                   )}

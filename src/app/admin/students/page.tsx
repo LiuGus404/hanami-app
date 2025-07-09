@@ -100,6 +100,9 @@ export default function StudentManagementPage() {
   const [remainingLessonsMap, setRemainingLessonsMap] = useState<Record<string, number>>({});
   const [remainingLoading, setRemainingLoading] = useState(false);
 
+  const [searchInput, setSearchInput] = useState(''); // 用於輸入框
+  const [searchQuery, setSearchQuery] = useState(''); // 真正觸發搜尋的值
+
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
     if (userLoading || !user) return
@@ -942,87 +945,14 @@ export default function StudentManagementPage() {
   // 計算顯示學生數（不包括停用學生）
   const activeStudentsCount = students.filter(s => !s.is_inactive).length
 
-  const filteredStudents = currentStudents.filter((student) => {
-    const type = (student.course_type || '').replace(/\s/g, '').toLowerCase()
-    
-
-    
-    // 處理常規學生的星期
-    const regularWeekdays = Array.isArray(student.regular_weekday)
-      ? student.regular_weekday.map((d: string | number) => d.toString())
-      : typeof student.regular_weekday === 'string'
-        ? [student.regular_weekday]
-        : typeof student.regular_weekday === 'number'
-          ? [student.regular_weekday.toString()]
-          : []
-
-    // 處理試堂學生的星期 - 修復試堂學生的星期處理邏輯
-    const trialWeekday = student.weekday?.toString()
-
-    const courseMatch =
-      !selectedCourses || selectedCourses.length === 0 ||
-      selectedCourses.every((selected) => {
-        const selectedNorm = selected.replace(/\s/g, '').toLowerCase()
-        const studentTypeNorm = (type || '').replace(/\s/g, '').toLowerCase()
-        
-        const courseTypes = [
-          '鋼琴',
-          '音樂專注力',
-          '未分班'
-        ].map(s => s.replace(/\s/g, '').toLowerCase())
-        
-        if (courseTypes.includes(selectedNorm)) {
-          if (selectedNorm === '未分班') {
-            return !type || type === '' || type === null || type === undefined
-          }
-          
-
-          
-          // 更精確的比較：檢查是否包含或完全匹配
-          const isMatch = studentTypeNorm === selectedNorm || 
-                         studentTypeNorm.includes(selectedNorm) || 
-                         selectedNorm.includes(studentTypeNorm)
-          
-
-          
-          return isMatch
-        } else if (selected === '常規') {
-          return student.student_type === '常規'
-        } else if (selected === '試堂') {
-          return student.student_type === '試堂'
-        } else if (selected === '停用學生') {
-          // 當顯示停用學生時，所有學生都應該顯示（因為 currentStudents 已經是 inactiveStudents）
-          return true
-        }
-        return false
-      })
-
-    const weekdayMatch =
-      !selectedWeekdays || selectedWeekdays.length === 0 ||
-      regularWeekdays.some((day: string) => selectedWeekdays.includes(day)) ||
-      (trialWeekday && selectedWeekdays.includes(trialWeekday))
-
-    const lessonMatch =
-      selectedLessonFilter === 'all'
-        ? true
-        : selectedLessonFilter === 'gt2'
-          ? Number(student.remaining_lessons) > 2
-          : selectedLessonFilter === 'lte2'
-            ? Number(student.remaining_lessons) <= 2
-            : isCustomLessonFilterActive(selectedLessonFilter, customLessonCount)
-              ? Number(student.remaining_lessons) === customLessonCount
-              : true
-
-    const nameMatch = student.full_name?.includes(searchTerm.trim())
-
-    const isMatch = courseMatch && weekdayMatch && lessonMatch && nameMatch
-    
-
-
-    return isMatch
-  })
-
-
+  const filteredStudents = useMemo(() => {
+    if (!searchQuery.trim()) return students;
+    const q = searchQuery.trim().toLowerCase();
+    return students.filter(s =>
+      (s.full_name && s.full_name.toLowerCase().includes(q)) ||
+      (s.contact_number && s.contact_number.toLowerCase().includes(q))
+    );
+  }, [students, searchQuery]);
 
   // 排序學生數據
   const sortStudents = (students: any[]) => {
@@ -1092,11 +1022,27 @@ export default function StudentManagementPage() {
 
   // 對試堂學生進行排序
   const sortedStudents = useMemo(() => {
-    // 原本的排序與過濾邏輯
-    // 假設原本有 sort/filter 處理，這裡直接用原本的 sortedStudents 內容
-    // 若有多重排序/篩選，請將原本的排序/篩選邏輯搬進來
-    return students; // 若有排序/篩選，請替換這行
-  }, [students /*, 其他排序/篩選依賴 */]);
+    // 先應用搜尋過濾
+    let result = filteredStudents;
+    
+    // 再應用排序
+    if (sortField) {
+      result = sortStudents(result);
+    } else {
+      // 如果沒有指定排序欄位，保持原有的試堂學生排序邏輯
+      result = [...result].sort((a, b) => {
+        // 檢查是否選中了試堂課程
+        if (selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('試堂')) {
+          const dateA = a.lesson_date ? new Date(a.lesson_date).getTime() : 0
+          const dateB = b.lesson_date ? new Date(b.lesson_date).getTime() : 0
+          return dateB - dateA // 從新到舊排序
+        }
+        return 0
+      })
+    }
+    
+    return result;
+  }, [filteredStudents, sortField, sortDirection, selectedCourses]);
 
   // 排序功能
   const handleSort = (field: string) => {
@@ -1246,14 +1192,128 @@ export default function StudentManagementPage() {
           </div>
         )}
 
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="搜尋學生姓名"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full max-w-sm border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] placeholder-[#aaa]"
-          />
+        {/* 美觀的搜尋區域 - 靠左版 */}
+        <div className="mb-4 flex justify-start">
+          <div className="w-full max-w-xl" style={{ minWidth: 240, width: '50%' }}>
+            <div className="p-3 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center gap-3">
+                {/* 搜尋圖標 */}
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full blur-sm opacity-40 animate-pulse"></div>
+                  <div className="relative w-8 h-8 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full flex items-center justify-center shadow-sm transition-all duration-300 group-hover:scale-110">
+                    <svg 
+                      className="w-4 h-4 text-[#A64B2A] transition-all duration-300 group-hover:scale-110 group-hover:rotate-6" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+                {/* 搜尋輸入框 */}
+                <div className="flex-1 relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#FDE6B8] to-[#FCE2C8] rounded-lg blur-sm opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                  <input
+                    type="text"
+                    className="relative w-full px-4 py-2 bg-white border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-300 text-[#2B3A3B] placeholder-[#999] text-sm shadow-sm group-hover:shadow-md focus:shadow-lg"
+                    placeholder="搜尋學生姓名或電話..."
+                    value={searchInput}
+                    onChange={e => setSearchInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        setSearchQuery(searchInput);
+                        // 添加按鍵動畫效果
+                        const input = e.target as HTMLInputElement;
+                        input.style.transform = 'scale(0.98)';
+                        setTimeout(() => {
+                          input.style.transform = 'scale(1)';
+                        }, 150);
+                      }
+                    }}
+                  />
+                  {/* 輸入框底部的動畫線 */}
+                  <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-[#FDE6B8] to-[#EAC29D] transition-all duration-300 group-hover:w-full group-focus-within:w-full"></div>
+                </div>
+                {/* 搜尋按鈕 */}
+                <button
+                  className="relative group"
+                  onClick={() => {
+                    setSearchQuery(searchInput);
+                    // 添加按鈕動畫效果
+                    const button = document.querySelector('.search-btn') as HTMLButtonElement;
+                    if (button) {
+                      button.style.transform = 'scale(0.95) rotate(3deg)';
+                      setTimeout(() => {
+                        button.style.transform = 'scale(1) rotate(0deg)';
+                      }, 200);
+                    }
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full blur-sm opacity-0 group-hover:opacity-40 transition-opacity duration-300"></div>
+                  <div className="relative search-btn bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] hover:from-[#fce2c8] hover:to-[#fad8b8] text-[#A64B2A] border border-[#EAC29D] rounded-full px-4 py-2 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105 active:scale-95 font-medium text-sm hover:animate-search-glow">
+                    <div className="flex items-center gap-1">
+                      <svg 
+                        className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>搜尋</span>
+                    </div>
+                  </div>
+                </button>
+                {/* 清除搜尋按鈕（當有搜尋內容時顯示） */}
+                {searchInput && (
+                  <button
+                    className="relative group"
+                    onClick={() => {
+                      setSearchInput('');
+                      setSearchQuery('');
+                      // 添加清除動畫效果
+                      const button = document.querySelector('.clear-btn') as HTMLButtonElement;
+                      if (button) {
+                        button.style.transform = 'scale(0.9) rotate(-8deg)';
+                        setTimeout(() => {
+                          button.style.transform = 'scale(1) rotate(0deg)';
+                        }, 200);
+                      }
+                    }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] rounded-full blur-sm opacity-0 group-hover:opacity-40 transition-opacity duration-300"></div>
+                    <div className="relative clear-btn bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] hover:from-[#ffd4d4] hover:to-[#ffc8c8] text-[#A64B2A] border border-[#EAC29D] rounded-full p-2 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105 active:scale-95">
+                      <svg 
+                        className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>
+                  </button>
+                )}
+              </div>
+              {/* 搜尋結果反饋 - 緊湊版 */}
+              {searchQuery && (
+                <div className="mt-2 p-2 bg-gradient-to-r from-[#E0F2E0] to-[#D4F2D4] rounded-lg border border-[#C8EAC8] animate-fade-in">
+                  <div className="flex items-center gap-2 text-[#2B3A3B] text-sm">
+                    <svg className="w-4 h-4 text-[#4CAF50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-medium">找到 <span className="font-bold text-[#4CAF50]">{filteredStudents.length}</span> 位學生</span>
+                    {searchQuery && (
+                      <span className="text-xs text-[#A68A64]">
+                        （「{searchQuery}」）
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-between items-center mb-4">
