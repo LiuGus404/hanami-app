@@ -438,18 +438,21 @@ export type Database = {
           id: string
           name: string | null
           status: boolean | null
+          trial_limit: number | null
         }
         Insert: {
           created_at?: string
           id?: string
           name?: string | null
           status?: boolean | null
+          trial_limit?: number | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string | null
           status?: boolean | null
+          trial_limit?: number | null
         }
         Relationships: []
       }

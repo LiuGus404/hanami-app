@@ -1170,7 +1170,24 @@ const HanamiCalendar = () => {
                       )}
                       <div>{dayNum}</div>
                       {groupedArray.length > 0 && (
-                        <div className="text-xs mt-1 text-[#A68A64] flex justify-center">（{groupedArray.length}）</div>
+                        <div className="mt-1 flex flex-col gap-1">
+                          {groupedArray.map((g, gi) => {
+                            // 計算該 group 的剩餘堂數總和
+                            const totalRemaining = g.lessons
+                              .filter(l => !l.is_trial && typeof l.remaining_lessons === 'number')
+                              .reduce((sum, l) => sum + (l.remaining_lessons ?? 0), 0);
+                            return (
+                              <div key={gi} className="flex items-center justify-center gap-1 text-xs">
+                                <span>{g.time?.slice(0,5) || ''} {g.course || ''}</span>
+                                <span
+                                  style={totalRemaining === 0 ? { color: '#FF5A5A', fontWeight: 'bold' } : { color: '#A68A64' }}
+                                >
+                                  剩餘{totalRemaining}堂
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   );

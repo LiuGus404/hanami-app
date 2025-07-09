@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import TrialLimitSettingsModal from './TrialLimitSettingsModal'
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -75,9 +76,10 @@ export default function LessonAvailabilityDashboard() {
   const [expandedQueue, setExpandedQueue] = useState<{[weekday: number]: boolean}>({});
   const [expandedCourseTypes, setExpandedCourseTypes] = useState<{[weekday: number]: {[courseType: string]: boolean}}>({});
   const [courseTypes, setCourseTypes] = useState<{[id: string]: string}>({})
+  const [trialLimitSettings, setTrialLimitSettings] = useState<{[courseTypeId: string]: number}>({})
+  const [showTrialLimitModal, setShowTrialLimitModal] = useState(false)
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
       setLoading(true)
       setError(null)
       try {
@@ -166,7 +168,7 @@ export default function LessonAvailabilityDashboard() {
         // 4. 查詢 hanami_student_lesson 表獲取最快有空位的日子
         const { data: lessonData, error: lessonError } = await supabase
           .from('hanami_student_lesson')
-          .select('lesson_date, actual_timeslot, course_type, id')
+          .select('lesson_date, actual_timeslot, course_type, student_id')
           .gte('lesson_date', todayISO)
           .order('lesson_date', { ascending: true })
         
@@ -176,6 +178,21 @@ export default function LessonAvailabilityDashboard() {
           console.error('❌ 查詢 hanami_student_lesson 失敗:', lessonError)
           // 不中斷整個流程，只是最快有空位日子無法顯示
         }
+
+        // 試堂學生的課堂記錄直接從 hanami_trial_students 表獲取
+        // 將試堂學生資料轉換為課堂記錄格式
+        const trialLessonData = (trialData || []).map(trial => ({
+          lesson_date: trial.lesson_date,
+          actual_timeslot: trial.actual_timeslot,
+          course_type: trial.course_type,
+          student_id: trial.id
+        }))
+
+        // 合併常規學生和試堂學生的課堂記錄
+        const allLessonData = [
+          ...(lessonData || []),
+          ...trialLessonData
+        ]
         
         // 4. 將試堂學生依 weekday+timeslot+course_type 分組，並加上偵錯 log
         const trialMap: { [key: string]: TrialStudent[] } = {}
@@ -393,85 +410,107 @@ export default function LessonAvailabilityDashboard() {
           
           // 計算該時段最快有空位的日子
           const availableDates: {date: string, remain: number}[] = []
-          if (lessonData) {
+          
+          // 獲取該時段所有常規學生的ID
+          const regularStudentIds = allRegularStudents.map(s => s.id)
+          if (allLessonData && regularStudentIds.length > 0) {
+            // 輸出一筆 lessonData 範例
+            if (allLessonData.length > 0) {
+              console.log('【DEBUG】allLessonData 範例:', allLessonData[0])
+            }
+            // 輸出 allRegularStudents id
+            console.log('【DEBUG】allRegularStudents id:', regularStudentIds)
             
-            
-            // group by lesson_date+actual_timeslot+course_type
-            const lessonGroup: {[key: string]: number} = {}
-            lessonData.forEach(lesson => {
-              const key = `${lesson.lesson_date}_${lesson.actual_timeslot}_${lesson.course_type}`
-              lessonGroup[key] = (lessonGroup[key] || 0) + 1
-            })
-            
-            
-            
-            // 篩選符合該時段和課程的記錄
-            const matchingLessons = Object.entries(lessonGroup).filter(([key, count]) => {
-              const [_date, _time, _type] = key.split('_')
-              // 使用 course_types 的 ID 進行識別
-              const match = _time === schedule.timeslot && _type === courseType
+            // 查詢這些學生在未來日期的課堂記錄
+            // 需要處理課程類型的比對：lessonData中的course_type可能是課程名稱或ID
+            const studentLessons = allLessonData.filter(lesson => {
+              const lessonCourseType = lesson.course_type || ''
+              const scheduleCourseType = courseType || ''
               
-              return match
+              // 方法1：直接比較課程ID
+              const matchById = lesson.course_type === courseType
+              
+              // 方法2：比較課程名稱（如果lesson中的course_type是課程名稱）
+              const matchByName = lessonCourseType === (courseTypesMap[scheduleCourseType] || scheduleCourseType)
+              
+              const courseMatch = matchById || matchByName
+              
+              return lesson.student_id && regularStudentIds.includes(lesson.student_id) && 
+                     lesson.actual_timeslot === schedule.timeslot && 
+                     courseMatch
             })
-            
-            
-            
+            // 按日期分組，計算每天實際出席的學生數量
+            const dailyAttendance: {[date: string]: number} = {}
+            studentLessons.forEach(lesson => {
+              if (!lesson.lesson_date) return;
+              if (!dailyAttendance[lesson.lesson_date]) {
+                dailyAttendance[lesson.lesson_date] = 0
+              }
+              dailyAttendance[lesson.lesson_date]++
+            })
             // 計算每個日期的剩餘空位
             const dateMap: {[date: string]: number} = {}
-            matchingLessons.forEach(([key, booked]) => {
-              const [_date, _time, _type] = key.split('_')
-              // 計算該日期該時段該課程的試堂學生數
-              const trialCount = trialStudents.filter(ts => 
-                ts.lesson_date === _date && 
-                ts.actual_timeslot === _time && 
-                ts.course_type === _type // 使用 course_types 的 ID
-              ).length
+            // 檢查未來8週的該星期日期
+            const today = new Date()
+            for (let week = 0; week < 8; week++) {
+              const d = new Date(today)
+              d.setDate(d.getDate() + (7 + weekdayNum - d.getDay()) % 7 + (week * 7))
+              const dateStr = d.toISOString().slice(0, 10)
+              // 計算該日該時段該課程的試堂學生數
+              // 從 hanami_trial_lesson 表查詢試堂學生的課堂記錄
+              const trialLessons = allLessonData.filter(lesson => {
+                const lessonCourseType = lesson.course_type || ''
+                const scheduleCourseType = courseType || ''
+                
+                // 方法1：直接比較課程ID
+                const matchById = lesson.course_type === courseType
+                
+                // 方法2：比較課程名稱（如果lesson中的course_type是課程名稱）
+                const matchByName = lessonCourseType === (courseTypesMap[scheduleCourseType] || scheduleCourseType)
+                
+                const courseMatch = matchById || matchByName
+                
+                return lesson.lesson_date === dateStr && 
+                       lesson.actual_timeslot === schedule.timeslot && 
+                       courseMatch &&
+                       // 確保是試堂學生的記錄（不在常規學生ID列表中）
+                       lesson.student_id && !regularStudentIds.includes(lesson.student_id)
+              })
               
+              const trialCount = trialLessons.length
               
+              // 獲取該課程類型的試堂人數限制
+              const trialLimit = trialLimitSettings[courseType] || 0
               
-              const remain = (schedule.max_students || 0) - booked - trialCount
+              // 計算試堂學生是否已達限制
+              const trialAtLimit = trialCount >= trialLimit
+              // 計算該日實際出席的常規學生數
+              const regularCount = dailyAttendance[dateStr] || 0
+              // 計算剩餘空位
+              const remain = (schedule.max_students || 0) - regularCount - trialCount
               
+              // 考慮試堂人數限制：如果試堂學生已達限制，則不顯示該日期有空位
+              const canAcceptTrial = trialLimit === 0 || trialCount < trialLimit
               
-              if (remain > 0) {
-                dateMap[_date] = remain
+              // 詳細 log
+              console.log(`【DEBUG】${dateStr}｜${schedule.timeslot}｜${courseType}：regularCount=${regularCount}，trialCount=${trialCount}，trialLimit=${trialLimit}，canAcceptTrial=${canAcceptTrial}，remain=${remain}`)
+              
+              if (remain > 0 && canAcceptTrial) {
+                dateMap[dateStr] = remain
               }
-            })
-            
-            
-            
+            }
             // 轉換為陣列並排序，取前5個
             availableDates.push(...Object.entries(dateMap)
               .map(([date, remain]) => ({date, remain}))
               .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
               .slice(0, 5)
             )
-            
-            // 如果完全沒有 matchingLessons，補上未來5週的該 weekday 日期
-            if (matchingLessons.length === 0) {
-              const today = new Date()
-              let count = 0
-              let d = new Date(today)
-              while (count < 5) {
-                d.setDate(d.getDate() + (7 + weekdayNum - d.getDay()) % 7)
-                const dateStr = d.toISOString().slice(0, 10)
-                // 計算該日該時段該課程的試堂學生數
-                const trialCount = trialStudents.filter(ts => 
-                  ts.lesson_date === dateStr && 
-                  ts.actual_timeslot === schedule.timeslot && 
-                  ts.course_type === courseType // 使用 course_types 的 ID
-                ).length
-                const remain = (schedule.max_students || 0) - trialCount
-                if (remain > 0) {
-                  availableDates.push({ date: dateStr, remain })
-                  count++
-                }
-                d.setDate(d.getDate() + 1) // 避免死循環
-              }
-              // 只取前5個
-              availableDates.splice(5)
-            }
-            
-
+            // 調試信息
+            console.log(`時段 ${schedule.timeslot} 星期 ${weekdayNum} 課程 ${courseType} 的空位計算:`)
+            console.log(`  常規學生ID: ${regularStudentIds}`)
+            console.log(`  學生課堂記錄: ${studentLessons.length} 條`)
+            console.log(`  每日出席記錄:`, dailyAttendance)
+            console.log(`  計算出的空位日期:`, availableDates)
           }
           
           mapped.push({
@@ -511,11 +550,6 @@ export default function LessonAvailabilityDashboard() {
           console.error('❌ 查詢輪候學生失敗:', queueError);
           // 不中斷整個流程，只是輪候學生無法顯示
         }
-        
-
-        queueData?.forEach((item, index) => {
-          console.log(`  [${index}] ID: ${item.id}, Prefer_time: ${item.prefer_time}`);
-        });
         
 
         
@@ -619,6 +653,8 @@ export default function LessonAvailabilityDashboard() {
         setLoading(false)
       }
     }
+
+  useEffect(() => {
     fetchData()
   }, [])
 
@@ -688,9 +724,18 @@ export default function LessonAvailabilityDashboard() {
 
   return (
     <div className="w-full flex flex-col items-center px-4">
-      <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-lg font-bold text-[#4B4036]">課堂空缺情況</h2>
-        <Image src="/rabbit.png" alt="icon" width={24} height={24} />
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-[#4B4036]">課堂空缺情況</h2>
+          <Image src="/rabbit.png" alt="icon" width={24} height={24} />
+        </div>
+        <button
+          onClick={() => setShowTrialLimitModal(true)}
+          className="px-3 py-1.5 bg-[#EADBC8] text-[#4B4036] rounded-lg hover:bg-[#D4C4A8] transition-colors text-sm flex items-center gap-2"
+        >
+          <Image src="/edit-pencil.png" alt="設定" width={16} height={16} />
+          試堂人數設定
+        </button>
       </div>
 
       <div className="w-full overflow-auto">
@@ -862,37 +907,40 @@ export default function LessonAvailabilityDashboard() {
                       )}
                       
                       {/* 最快有空位日子 */}
-                      <div className="flex items-center justify-center gap-2 mt-1">
-                        <button
-                          className="text-xs px-2 py-1 rounded bg-[#E8F5E8] text-[#2D5A2D] border border-green-200 hover:bg-[#D8F0D8] transition"
-                          onClick={() => setExpandedAvailableDates(prev => ({...prev, [`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`]: !prev[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`]}))}
-                        >
-                          {expandedAvailableDates[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] ? '收起' : '展開'}最快有空位日子（{slot.available_dates?.length || 0}個）
-                        </button>
-                      </div>
-                      
-                      {/* 展開時才顯示最快有空位日子 */}
-                      {slot.available_dates && slot.available_dates.length > 0 && expandedAvailableDates[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] && (
-                        <div className="flex flex-col gap-1 mt-1">
-                          <div className="border border-green-200 rounded p-1 bg-green-50">
-                            <div className="text-[10px] font-semibold text-[#2D5A2D] mb-1 px-1">
-                              最快有空位日子
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              {slot.available_dates.map((item, idx) => {
-                                const dateObj = new Date(item.date)
-                                const dateStr = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth()+1).toString().padStart(2, '0')}`
-                                const weekdayStr = ['日','一','二','三','四','五','六'][dateObj.getDay()]
-                                return (
-                                  <div key={`${item.date}_${slot.id}`} className="flex items-center justify-between px-2 py-1 rounded bg-green-100 text-xs text-[#2D5A2D]">
-                                    <span>{dateStr} ({weekdayStr})</span>
-                                    <span>剩餘 {item.remain} 位</span>
-                                  </div>
-                                )
-                              })}
-                            </div>
+                      {slot.available_dates && slot.available_dates.length > 0 && (
+                        <>
+                          <div className="flex items-center justify-center gap-2 mt-1">
+                            <button
+                              className="text-xs px-2 py-1 rounded bg-[#E8F5E8] text-[#2D5A2D] border border-green-200 hover:bg-[#D8F0D8] transition"
+                              onClick={() => setExpandedAvailableDates(prev => ({...prev, [`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`]: !prev[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`]}))}
+                            >
+                              {expandedAvailableDates[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] ? '收起' : '展開'}最快有空位日子（{slot.available_dates?.length || 0}個）
+                            </button>
                           </div>
-                        </div>
+                          {/* 展開時才顯示最快有空位日子 */}
+                          {expandedAvailableDates[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] && (
+                            <div className="flex flex-col gap-1 mt-1">
+                              <div className="border border-green-200 rounded p-1 bg-green-50">
+                                <div className="text-[10px] font-semibold text-[#2D5A2D] mb-1 px-1">
+                                  最快有空位日子
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  {slot.available_dates.map((item, idx) => {
+                                    const dateObj = new Date(item.date)
+                                    const dateStr = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth()+1).toString().padStart(2, '0')}`
+                                    const weekdayStr = ['日','一','二','三','四','五','六'][dateObj.getDay()]
+                                    return (
+                                      <div key={`${item.date}_${slot.id}`} className="flex items-center justify-between px-2 py-1 rounded bg-green-100 text-xs text-[#2D5A2D]">
+                                        <span>{dateStr} ({weekdayStr})</span>
+                                        <span>剩餘 {item.remain} 位</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   ))
@@ -925,6 +973,19 @@ export default function LessonAvailabilityDashboard() {
           </div>
         </div>
       </div>
+      
+      {/* 試堂人數設定模態框 */}
+      <TrialLimitSettingsModal
+        isOpen={showTrialLimitModal}
+        onClose={() => setShowTrialLimitModal(false)}
+        onSave={(settings) => {
+          setTrialLimitSettings(settings)
+          setShowTrialLimitModal(false)
+          // 重新載入資料以更新有位時間計算
+          fetchData()
+        }}
+        currentSettings={trialLimitSettings}
+      />
     </div>
   )
 }

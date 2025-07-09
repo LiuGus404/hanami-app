@@ -209,6 +209,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     
     if (formData.student_type === '試堂') {
       const editableFields = [
+        'full_name',
         'gender',
         'student_dob',
         'course_type',
@@ -357,14 +358,26 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
     let error;
     if (formData.student_type === '試堂') {
+      // 只傳 hanami_trial_students 有的欄位
+      const trialStudentFields: (keyof StudentFormData)[] = [
+        'id', 'student_oid', 'full_name', 'nick_name', 'gender', 'contact_number', 'student_dob', 'student_age',
+        'parent_email', 'health_notes', 'created_at', 'updated_at', 'address', 'course_type',
+        'duration_months', 'regular_timeslot', 'regular_weekday', 'school', 'student_email',
+        'student_password', 'student_preference', 'student_teacher', 'student_type', 'lesson_date', 'actual_timeslot'
+      ];
+      const trialPayload: Record<string, any> = {};
+      trialStudentFields.forEach((key) => {
+        if (key === 'duration_months') {
+          trialPayload[key] = formData[key] !== undefined && formData[key] !== null ? String(formData[key]) : null;
+        } else if (key === 'regular_weekday') {
+          trialPayload[key] = formData[key] !== undefined && formData[key] !== null ? String(formData[key]) : null;
+        } else {
+          trialPayload[key] = formData[key] === null ? null : formData[key];
+        }
+      });
       const { error: trialError } = await supabase
         .from('hanami_trial_students')
-        .update({
-          ...formData,
-          duration_months: formData.duration_months !== undefined && formData.duration_months !== null ? String(formData.duration_months) : null,
-          regular_weekday: formData.regular_weekday !== undefined && formData.regular_weekday !== null ? String(formData.regular_weekday) : null,
-          created_at: formData.created_at || undefined
-        })
+        .update(trialPayload)
         .eq('id', formData.id)
       error = trialError;
     } else {
@@ -377,16 +390,17 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       ];
       const studentPayload: Record<string, any> = {};
       hanamiStudentFields.forEach((key) => {
-        studentPayload[key] = formData[key] === null ? null : formData[key];
+        if (key === 'duration_months') {
+          studentPayload[key] = formData[key] ?? null;
+        } else if (key === 'regular_weekday') {
+          studentPayload[key] = formData[key] ?? null;
+        } else {
+          studentPayload[key] = formData[key] === null ? null : formData[key];
+        }
       });
       const { error: studentError } = await supabase
         .from('Hanami_Students')
-        .update({
-          ...studentPayload,
-          duration_months: formData.duration_months ?? null,
-          regular_weekday: formData.regular_weekday ?? null,
-          created_at: formData.created_at || undefined
-        })
+        .update(studentPayload)
         .eq('id', formData.id)
       error = studentError;
     }
@@ -431,6 +445,25 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           <>
             <div className="font-medium">學生編號：</div>
             <div>{student.student_oid || '—'}</div>
+          </>
+        )}
+
+        {isVisible('full_name') && (
+          <>
+            <div className="font-medium">姓名：</div>
+            <div>
+              {editMode && isEditable('full_name') ? (
+                <input
+                  type="text"
+                  value={formData.full_name || ''}
+                  onChange={(e) => handleChange('full_name', e.target.value)}
+                  className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  placeholder="請輸入學生姓名"
+                />
+              ) : (
+                formData.full_name || '—'
+              )}
+            </div>
           </>
         )}
 

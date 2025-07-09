@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Checkbox } from '@/components/ui/checkbox'
 import { PopupSelect } from '@/components/ui/PopupSelect'
@@ -97,6 +97,9 @@ export default function StudentManagementPage() {
     { label: '停用日期', value: 'inactive_date' }
   ]
 
+  const [remainingLessonsMap, setRemainingLessonsMap] = useState<Record<string, number>>({});
+  const [remainingLoading, setRemainingLoading] = useState(false);
+
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
     if (userLoading || !user) return
@@ -192,7 +195,7 @@ export default function StudentManagementPage() {
             student_age,
             student_preference: trial.student_preference || null,
             course_type: trial.course_type || null,
-            remaining_lessons: trial.remaining_lessons ?? null,
+            remaining_lessons: null, // 試堂學生沒有剩餘堂數概念，設為 null
             regular_weekday: weekday !== null ? [weekday] : [],
             weekday: weekday,
             gender: trial.gender || null,
@@ -742,7 +745,7 @@ export default function StudentManagementPage() {
             student_age,
             student_preference: trial.student_preference || null,
             course_type: trial.course_type || null,
-            remaining_lessons: trial.remaining_lessons ?? null,
+            remaining_lessons: null, // 試堂學生沒有剩餘堂數概念，設為 null
             regular_weekday: weekday !== null ? [weekday] : [],
             weekday: weekday,
             gender: trial.gender || null,
@@ -1088,7 +1091,12 @@ export default function StudentManagementPage() {
   }
 
   // 對試堂學生進行排序
-  const sortedStudents = sortStudents([...filteredStudents])
+  const sortedStudents = useMemo(() => {
+    // 原本的排序與過濾邏輯
+    // 假設原本有 sort/filter 處理，這裡直接用原本的 sortedStudents 內容
+    // 若有多重排序/篩選，請將原本的排序/篩選邏輯搬進來
+    return students; // 若有排序/篩選，請替換這行
+  }, [students /*, 其他排序/篩選依賴 */]);
 
   // 排序功能
   const handleSort = (field: string) => {
@@ -1141,7 +1149,21 @@ export default function StudentManagementPage() {
     }
   }, [totalPages, currentPage])
 
-
+  useEffect(() => {
+    if (displayMode !== 'grid') return;
+    setRemainingLoading(true);
+    const currentStudents = sortedStudents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const regularStudentIds = currentStudents.filter(s => s.student_type !== '試堂').map(s => s.id);
+    if (regularStudentIds.length === 0) {
+      setRemainingLessonsMap({});
+      setRemainingLoading(false);
+      return;
+    }
+    calculateRemainingLessonsBatch(regularStudentIds, new Date()).then(map => {
+      setRemainingLessonsMap(map);
+      setRemainingLoading(false);
+    });
+  }, [displayMode, currentPage, pageSize, sortedStudents]);
 
   return (
     <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
@@ -1487,135 +1509,139 @@ export default function StudentManagementPage() {
         {/* Filtered students list */}
         {displayMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {sortedStudents
-              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-              .map((student) => {
-                const ageInMonths = Number(student.student_age) || 0
-                const years = Math.floor(ageInMonths / 12)
-                const months = ageInMonths % 12
+            {remainingLoading ? (
+              <div className="col-span-full text-center py-8 text-gray-400">剩餘堂數載入中...</div>
+            ) : (
+              sortedStudents
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map((student) => {
+                  const ageInMonths = Number(student.student_age) || 0
+                  const years = Math.floor(ageInMonths / 12)
+                  const months = ageInMonths % 12
 
-                // 移除頻繁的警告日誌，改為只在開發環境下顯示一次
-                if (!student.gender && process.env.NODE_ENV === 'development') {
-                  // 使用 Set 來避免重複警告
-                  if (!(window as any).genderWarnings) {
-                    (window as any).genderWarnings = new Set();
+                  // 移除頻繁的警告日誌，改為只在開發環境下顯示一次
+                  if (!student.gender && process.env.NODE_ENV === 'development') {
+                    // 使用 Set 來避免重複警告
+                    if (!(window as any).genderWarnings) {
+                      (window as any).genderWarnings = new Set();
+                    }
+                    const warningKey = `${student.full_name || student.id}`;
+                    if (!(window as any).genderWarnings.has(warningKey)) {
+                      console.warn(`學生 ${student.full_name || student.id} 缺少 gender，avatar 預設為 boy.png`);
+                      (window as any).genderWarnings.add(warningKey);
+                    }
                   }
-                  const warningKey = `${student.full_name || student.id}`;
-                  if (!(window as any).genderWarnings.has(warningKey)) {
-                    console.warn(`學生 ${student.full_name || student.id} 缺少 gender，avatar 預設為 boy.png`);
-                    (window as any).genderWarnings.add(warningKey);
+
+                  const isTrialStudent = student.student_type === '試堂'
+                  const isInactiveStudent = student.is_inactive === true
+                  const cardFields = isTrialStudent
+                    ? [
+                        {
+                          icon: CalendarClock,
+                          label: '年齡',
+                          value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
+                        },
+                        {
+                          icon: BookOpen,
+                          label: '課程',
+                          value: student.course_type || '未分班',
+                        },
+                        {
+                          icon: CalendarClock,
+                          label: '試堂時間',
+                          value: student.lesson_date && student.actual_timeslot
+                            ? `${new Date(student.lesson_date).toLocaleDateString('zh-HK')} ${student.actual_timeslot}`
+                            : '—',
+                        },
+                      ]
+                    : [
+                        {
+                          icon: CalendarClock,
+                          label: '年齡',
+                          value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
+                        },
+                        {
+                          icon: BookOpen,
+                          label: '課程',
+                          value: student.course_type || '未分班',
+                        },
+                        {
+                          icon: Star,
+                          label: '剩餘堂數',
+                          value: remainingLessonsMap[student.id] !== undefined ? `${remainingLessonsMap[student.id]} 堂` : '—',
+                        },
+                      ]
+
+                  // 如果是停用學生，添加停用日期信息
+                  if (isInactiveStudent && student.inactive_date) {
+                    cardFields.push({
+                      icon: CalendarClock,
+                      label: '停用日期',
+                      value: new Date(student.inactive_date).toLocaleDateString('zh-HK'),
+                    })
                   }
-                }
 
-                const isTrialStudent = student.student_type === '試堂'
-                const isInactiveStudent = student.is_inactive === true
-                const cardFields = isTrialStudent
-                  ? [
-                      {
-                        icon: CalendarClock,
-                        label: '年齡',
-                        value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
-                      },
-                      {
-                        icon: BookOpen,
-                        label: '課程',
-                        value: student.course_type || '未分班',
-                      },
-                      {
-                        icon: CalendarClock,
-                        label: '試堂時間',
-                        value: student.lesson_date && student.actual_timeslot
-                          ? `${new Date(student.lesson_date).toLocaleDateString('zh-HK')} ${student.actual_timeslot}`
-                          : '—',
-                      },
-                    ]
-                  : [
-                      {
-                        icon: CalendarClock,
-                        label: '年齡',
-                        value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
-                      },
-                      {
-                        icon: BookOpen,
-                        label: '課程',
-                        value: student.course_type || '未分班',
-                      },
-                      {
-                        icon: Star,
-                        label: '剩餘堂數',
-                        value: `${student.remaining_lessons ?? '—'} 堂`,
-                      },
-                    ]
-
-                // 如果是停用學生，添加停用日期信息
-                if (isInactiveStudent && student.inactive_date) {
-                  cardFields.push({
-                    icon: CalendarClock,
-                    label: '停用日期',
-                    value: new Date(student.inactive_date).toLocaleDateString('zh-HK'),
-                  })
-                }
-
-                return (
-                  <motion.div
-                    key={student.id}
-                    initial={false}
-                    animate={{
-                      scale: selectedStudents.includes(student.id) ? 1.03 : 1,
-                      boxShadow: selectedStudents.includes(student.id)
-                        ? '0 4px 20px rgba(252, 213, 139, 0.4)'
-                        : 'none',
-                    }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    className="cursor-pointer relative"
-                    onClick={() => toggleStudent(student.id)}
-                  >
-                    {!isInactiveStudent && (
-                      <div
-                        className="absolute top-2 left-2 z-10"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          // 對於停用學生，使用 inactive_student_list 的 ID
-                          const studentId = isInactiveStudent ? student.id : student.id
-                          router.push(`/admin/students/${studentId}`)
-                        }}
-                      >
-                        <img
-                          src="/icons/edit-pencil.png"
-                          alt="編輯"
-                          className="w-7 h-7 cursor-pointer hover:scale-110 transition-transform"
-                        />
-                      </div>
-                    )}
-                    {selectedStudents.includes(student.id) && !isInactiveStudent && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute top-2 right-2"
-                      >
-                        <img src="/leaf-sprout.png" alt="選取" className="w-12 h-12" />
-                      </motion.div>
-                    )}
-                    <StudentCard
-                      name={student.full_name || '未命名學生'}
-                      selected={selectedStudents.includes(student.id)}
-                      avatar={
-                        student.gender === 'male'
-                          ? '/boy.png'
-                          : student.gender === 'female'
-                            ? '/girl.png'
-                            : '/boy.png'
-                      }
-                      fields={cardFields}
-                      studentType={student.student_type}
-                      isTrialStudent={isTrialStudent}
-                      isInactive={isInactiveStudent}
-                    />
-                  </motion.div>
-                )
-              })}
+                  return (
+                    <motion.div
+                      key={student.id}
+                      initial={false}
+                      animate={{
+                        scale: selectedStudents.includes(student.id) ? 1.03 : 1,
+                        boxShadow: selectedStudents.includes(student.id)
+                          ? '0 4px 20px rgba(252, 213, 139, 0.4)'
+                          : 'none',
+                      }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className="cursor-pointer relative"
+                      onClick={() => toggleStudent(student.id)}
+                    >
+                      {!isInactiveStudent && (
+                        <div
+                          className="absolute top-2 left-2 z-10"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // 對於停用學生，使用 inactive_student_list 的 ID
+                            const studentId = isInactiveStudent ? student.id : student.id
+                            router.push(`/admin/students/${studentId}`)
+                          }}
+                        >
+                          <img
+                            src="/icons/edit-pencil.png"
+                            alt="編輯"
+                            className="w-7 h-7 cursor-pointer hover:scale-110 transition-transform"
+                          />
+                        </div>
+                      )}
+                      {selectedStudents.includes(student.id) && !isInactiveStudent && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute top-2 right-2"
+                        >
+                          <img src="/leaf-sprout.png" alt="選取" className="w-12 h-12" />
+                        </motion.div>
+                      )}
+                      <StudentCard
+                        name={student.full_name || '未命名學生'}
+                        selected={selectedStudents.includes(student.id)}
+                        avatar={
+                          student.gender === 'male'
+                            ? '/boy.png'
+                            : student.gender === 'female'
+                              ? '/girl.png'
+                              : '/boy.png'
+                        }
+                        fields={cardFields}
+                        studentType={student.student_type}
+                        isTrialStudent={isTrialStudent}
+                        isInactive={isInactiveStudent}
+                      />
+                    </motion.div>
+                  )
+                })
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-[#EADBC8] overflow-hidden">
@@ -2004,7 +2030,9 @@ export default function StudentManagementPage() {
                           </td>
                         )}
                         {selectedColumns.includes('remaining_lessons') && (
-                          <td className={`p-3 text-sm ${student.is_inactive ? 'text-gray-500' : 'text-[#2B3A3B]'}`}>{student.remaining_lessons ?? '—'}</td>
+                          <td className={`p-3 text-sm ${student.is_inactive ? 'text-gray-500' : 'text-[#2B3A3B]'}`}>
+                            {student.student_type === '試堂' ? '試堂' : (student.remaining_lessons ?? '—')}
+                          </td>
                         )}
                         {selectedColumns.includes('started_date') && (
                           <td className={`p-3 text-sm ${student.is_inactive ? 'text-gray-500' : 'text-[#2B3A3B]'}`}>

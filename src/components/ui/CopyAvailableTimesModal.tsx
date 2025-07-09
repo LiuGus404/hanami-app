@@ -36,6 +36,7 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showTimes, setShowTimes] = useState(false)
+  const [showTrialDates, setShowTrialDates] = useState(false)
 
   const weekdays = [
     { value: 0, name: '星期日', icon: '/icons/bear-face.PNG' },
@@ -208,19 +209,52 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
   }
 
   const handleWeekdayToggle = (weekday: number) => {
-    setSelectedWeekdays(prev => 
-      prev.includes(weekday) 
+    setSelectedWeekdays(prev => {
+      const newSelectedWeekdays = prev.includes(weekday) 
         ? prev.filter(w => w !== weekday)
         : [...prev, weekday]
-    )
+      
+      // 根據選中的星期自動選擇對應的有位時間
+      const newSelectedSlots: string[] = []
+      
+      availableSlots.forEach(slot => {
+        const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
+        
+        // 如果該時段屬於選中的星期，則自動選中
+        if (newSelectedWeekdays.includes(slot.weekday)) {
+          newSelectedSlots.push(slotKey)
+        }
+      })
+      
+      setSelectedSlots(newSelectedSlots)
+      return newSelectedWeekdays
+    })
   }
 
   const handleCourseToggle = (courseId: string) => {
-    setSelectedCourses(prev => 
-      prev.includes(courseId) 
+    setSelectedCourses(prev => {
+      const newSelectedCourses = prev.includes(courseId) 
         ? prev.filter(c => c !== courseId)
         : [...prev, courseId]
-    )
+      
+      // 根據選中的課程和星期自動選擇對應的有位時間
+      const newSelectedSlots: string[] = []
+      
+      availableSlots.forEach(slot => {
+        const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
+        
+        // 如果該時段屬於選中的課程，則自動選中
+        if (newSelectedCourses.includes(slot.course_type || '')) {
+          // 如果同時選中了星期，必須也符合星期條件
+          if (selectedWeekdays.length === 0 || selectedWeekdays.includes(slot.weekday)) {
+            newSelectedSlots.push(slotKey)
+          }
+        }
+      })
+      
+      setSelectedSlots(newSelectedSlots)
+      return newSelectedCourses
+    })
   }
 
   const handleTimeSlotToggle = (timeSlot: string) => {
@@ -249,7 +283,23 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
   }
 
   const handleSelectAll = () => {
-    const allSlotKeys = availableSlots.map(slot => 
+    // 根據當前顯示的時段進行全選
+    const visibleSlots = availableSlots.filter(slot => {
+      // 如果沒有選中任何星期或課程，顯示全部
+      if (selectedWeekdays.length === 0 && selectedCourses.length === 0) {
+        return true
+      }
+      
+      // 如果有選中星期，必須匹配星期
+      const matchesWeekday = selectedWeekdays.length === 0 || selectedWeekdays.includes(slot.weekday)
+      
+      // 如果有選中課程，必須匹配課程
+      const matchesCourse = selectedCourses.length === 0 || selectedCourses.includes(slot.course_type || '')
+      
+      return matchesWeekday && matchesCourse
+    })
+    
+    const allSlotKeys = visibleSlots.map(slot => 
       `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
     )
     setSelectedSlots(allSlotKeys)
@@ -257,21 +307,59 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
 
   const handleClearAll = () => {
     setSelectedSlots([])
+    setSelectedWeekdays([])
+    setSelectedCourses([])
+    setShowTrialDates(false)
+  }
+
+  // 計算未來2個最快可試堂的日期
+  const getNextTrialDates = (weekday: number, count: number = 2): string[] => {
+    const today = new Date()
+    const currentWeekday = today.getDay()
+    const dates: string[] = []
+    
+    // 計算到下一個該星期的天數
+    let daysToAdd = weekday - currentWeekday
+    if (daysToAdd <= 0) {
+      daysToAdd += 7 // 如果今天就是該星期或已經過了，加7天到下週
+    }
+    
+    // 生成未來2個該星期的日期
+    for (let i = 0; i < count; i++) {
+      const nextDate = new Date(today)
+      nextDate.setDate(today.getDate() + daysToAdd + (i * 7))
+      
+      const year = nextDate.getFullYear()
+      const month = String(nextDate.getMonth() + 1).padStart(2, '0')
+      const day = String(nextDate.getDate()).padStart(2, '0')
+      
+      dates.push(`${year}-${month}-${day}`)
+    }
+    
+    return dates
+  }
+
+  const getVisibleSelectedSlots = () => {
+    // 只取目前顯示（符合星期和課程條件）的已選時段
+    return availableSlots.filter(slot => {
+      // 過濾條件
+      if (selectedWeekdays.length > 0 && !selectedWeekdays.includes(slot.weekday)) return false
+      if (selectedCourses.length > 0 && !selectedCourses.includes(slot.course_type || '')) return false
+      // 必須已選中
+      const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
+      return selectedSlots.includes(slotKey)
+    })
   }
 
   const copyToClipboard = () => {
-    if (selectedSlots.length === 0) {
+    const selectedSlotData = getVisibleSelectedSlots()
+    if (selectedSlotData.length === 0) {
       alert('請選擇要複製的項目')
       return
     }
 
-    const selectedSlotData = availableSlots.filter(slot => {
-      const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
-      return selectedSlots.includes(slotKey)
-    })
-
     // 按課程分組
-    const groupedByCourse: { [courseName: string]: { [weekday: string]: Array<{ timeslot: string, available_slots: number }> } } = {}
+    const groupedByCourse: { [courseName: string]: { [weekday: string]: Array<{ timeslot: string, available_slots: number, weekday: number }> } } = {}
     
     selectedSlotData.forEach(slot => {
       const courseName = slot.course_name || '未指定課程'
@@ -287,21 +375,36 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
       
       groupedByCourse[courseName][weekdayName].push({
         timeslot: slot.timeslot,
-        available_slots: slot.available_slots
+        available_slots: slot.available_slots,
+        weekday: slot.weekday
       })
     })
 
     // 生成美觀的文本格式
     let textContent = '📚 有位時間列表\n\n'
     
+    // 添加開頭文字
+    const courseNames = Object.keys(groupedByCourse)
+    if (courseNames.length > 0) {
+      textContent += `暫時${courseNames.join('、')}班時間都比較full，暫時以下時間仲有少量位🥰：\n\n`
+    }
+    
     Object.entries(groupedByCourse).forEach(([courseName, weekdays], courseIndex) => {
-      textContent += `🎯 ${courseName}\n`
+      textContent += `🥳 課程：${courseName}\n`
       
       Object.entries(weekdays).forEach(([weekdayName, timeSlots], weekdayIndex) => {
-        textContent += `  📅 ${weekdayName}\n`
+        textContent += `  📅 星期：${weekdayName}\n`
         
         timeSlots.forEach((timeSlot, timeIndex) => {
-          textContent += `    ⏰ ${timeSlot.timeslot} (剩餘 ${timeSlot.available_slots} 位)\n`
+          textContent += `    ⏰ 時間：${timeSlot.timeslot} (剩餘 ${timeSlot.available_slots} 位)`
+          
+          // 如果啟用試堂日期顯示，添加試堂日期
+          if (showTrialDates) {
+            const trialDates = getNextTrialDates(timeSlot.weekday)
+            textContent += `\n      🗓️ 試堂日期：${trialDates.join('、')}`
+          }
+          
+          textContent += '\n'
         })
         
         if (weekdayIndex < Object.keys(weekdays).length - 1) {
@@ -313,6 +416,9 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         textContent += '\n'
       }
     })
+    
+    // 添加結尾文字
+    textContent += '\n可以睇下邊段時間方便試堂🤤'
 
     navigator.clipboard.writeText(textContent).then(() => {
       alert('已複製到剪貼簿')
@@ -322,18 +428,14 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
   }
 
   const exportToCSV = () => {
-    if (selectedSlots.length === 0) {
+    const selectedSlotData = getVisibleSelectedSlots()
+    if (selectedSlotData.length === 0) {
       alert('請選擇要匯出的項目')
       return
     }
 
-    const selectedSlotData = availableSlots.filter(slot => {
-      const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
-      return selectedSlots.includes(slotKey)
-    })
-
     // 按課程分組
-    const groupedByCourse: { [courseName: string]: { [weekday: string]: Array<{ timeslot: string, available_slots: number, max_students: number, current_students: number }> } } = {}
+    const groupedByCourse: { [courseName: string]: { [weekday: string]: Array<{ timeslot: string, available_slots: number, max_students: number, current_students: number, weekday: number }> } } = {}
     
     selectedSlotData.forEach(slot => {
       const courseName = slot.course_name || '未指定課程'
@@ -351,26 +453,37 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         timeslot: slot.timeslot,
         available_slots: slot.available_slots,
         max_students: slot.max_students,
-        current_students: slot.current_students
+        current_students: slot.current_students,
+        weekday: slot.weekday
       })
     })
 
     // 生成CSV內容
     const csvRows = [
-      ['課程', '星期', '時間', '最大人數', '目前人數', '剩餘名額']
+      showTrialDates 
+        ? ['課程', '星期', '時間', '最大人數', '目前人數', '剩餘名額', '試堂日期']
+        : ['課程', '星期', '時間', '最大人數', '目前人數', '剩餘名額']
     ]
     
     Object.entries(groupedByCourse).forEach(([courseName, weekdays]) => {
       Object.entries(weekdays).forEach(([weekdayName, timeSlots]) => {
         timeSlots.forEach(timeSlot => {
-          csvRows.push([
+          const row = [
             courseName,
             weekdayName,
             timeSlot.timeslot,
             timeSlot.max_students.toString(),
             timeSlot.current_students.toString(),
             timeSlot.available_slots.toString()
-          ])
+          ]
+          
+          // 如果啟用試堂日期顯示，添加試堂日期
+          if (showTrialDates) {
+            const trialDates = getNextTrialDates(timeSlot.weekday)
+            row.push(trialDates.join('、'))
+          }
+          
+          csvRows.push(row)
         })
       })
     })
@@ -463,6 +576,56 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
             </button>
           </div>
 
+          {/* 顯示試堂日期切換 */}
+          <div>
+            <h4 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
+              <Image src="/icons/calendar.png" alt="試堂日期" width={20} height={20} />
+              試堂日期設定
+            </h4>
+            <div className="flex items-center justify-center">
+              <button
+                onClick={() => setShowTrialDates(v => !v)}
+                className={`group relative flex items-center gap-3 px-6 py-3 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] active:scale-98 overflow-hidden ${
+                  showTrialDates
+                    ? 'bg-gradient-to-r from-[#E0F2E0] to-[#D4F2D4] border-[#C8EAC8] shadow-md'
+                    : 'bg-white border-[#EADBC8] hover:border-[#C8EAC8] hover:shadow-sm'
+                }`}
+              >
+                {/* 懸停波紋效果 */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 group-hover:opacity-20 group-hover:animate-pulse transition-opacity duration-300" />
+                
+                <Image 
+                  src="/icons/calendar.png" 
+                  alt="試堂日期" 
+                  width={20} 
+                  height={20}
+                  className={`transition-all duration-300 ${showTrialDates ? 'animate-pulse' : 'group-hover:scale-110 group-hover:rotate-12'}`}
+                />
+                <span className="font-medium text-[#4B4036] relative z-10">
+                  {showTrialDates ? '已啟用試堂日期' : '顯示試堂日期'}
+                </span>
+                {showTrialDates && (
+                  <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center animate-pulse relative z-10">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                )}
+                {/* 動態邊框效果 */}
+                {showTrialDates && (
+                  <div className="absolute inset-0 rounded-xl border-2 border-green-400 animate-ping opacity-20" />
+                )}
+              </button>
+            </div>
+            {/* 狀態說明 */}
+            <div className="text-center mt-2">
+              <p className="text-sm text-[#87704e]">
+                {showTrialDates 
+                  ? '複製時將包含每個時段未來2個最快可試堂的日期' 
+                  : '點擊啟用後，複製內容將包含試堂日期'
+                }
+              </p>
+            </div>
+          </div>
+
           {/* 星期選擇 */}
           <div>
             <h4 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
@@ -542,13 +705,7 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
               aria-expanded={showTimes}
             >
               <span>選擇時間</span>
-              <Image
-                src="/icons/arrow-down.png"
-                alt="展開"
-                width={18}
-                height={18}
-                className={`transition-transform duration-300 ${showTimes ? 'rotate-180' : ''}`}
-              />
+              <div className={`w-4 h-4 border-r-2 border-b-2 border-[#4B4036] transform transition-transform duration-300 ${showTimes ? 'rotate-45' : '-rotate-45'}`} />
             </button>
             <div
               className={`transition-all duration-300 overflow-hidden ${showTimes ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}
@@ -589,7 +746,25 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           <div>
             <h4 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
               <Image src="/icons/teacher.png" alt="有位時間" width={20} height={20} />
-              有位時間 ({selectedSlots.length} 個已選中)
+              {selectedWeekdays.length === 0 && selectedCourses.length === 0 ? (
+                '所有有位時間'
+              ) : (
+                <>
+                  有位時間 
+                  {selectedWeekdays.length > 0 && (
+                    <span className="text-sm font-normal text-[#87704e]">
+                      ({selectedWeekdays.map(w => weekdays.find(day => day.value === w)?.name).join('、')})
+                    </span>
+                  )}
+                  {selectedCourses.length > 0 && (
+                    <span className="text-sm font-normal text-[#87704e]">
+                      {selectedWeekdays.length > 0 ? ' · ' : ''}
+                      ({selectedCourses.map(c => courseTypes.find(ct => ct.id === c)?.name).join('、')})
+                    </span>
+                  )}
+                </>
+              )}
+              ({selectedSlots.length} 個已選中)
             </h4>
             
             {loading ? (
@@ -599,7 +774,22 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
               </div>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {availableSlots.map((slot, index) => (
+                {availableSlots
+                  .filter(slot => {
+                    // 如果沒有選中任何星期或課程，顯示全部
+                    if (selectedWeekdays.length === 0 && selectedCourses.length === 0) {
+                      return true
+                    }
+                    
+                    // 如果有選中星期，必須匹配星期
+                    const matchesWeekday = selectedWeekdays.length === 0 || selectedWeekdays.includes(slot.weekday)
+                    
+                    // 如果有選中課程，必須匹配課程
+                    const matchesCourse = selectedCourses.length === 0 || selectedCourses.includes(slot.course_type || '')
+                    
+                    return matchesWeekday && matchesCourse
+                  })
+                  .map((slot, index) => (
                   <button
                     key={index}
                     onClick={() => handleSlotToggle(slot)}
