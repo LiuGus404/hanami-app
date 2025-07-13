@@ -174,17 +174,12 @@ const withPWA = require('next-pwa')({
 });
 
 const nextConfig = {
-  // 實驗性功能
-  experimental: {
-    // 啟用 App Router
-    appDir: true,
-    // 啟用 Turbopack (開發模式)
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
+  // 啟用 Turbopack (開發模式)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
       },
     },
   },

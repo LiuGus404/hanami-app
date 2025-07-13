@@ -24,7 +24,7 @@ import {
   CircleDot,
 } from 'lucide-react';
 import React, { useState, useRef } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { toast } from 'react-hot-toast';
 
 import { HanamiButton, HanamiInput, HanamiSelect, HanamiCard } from '@/components/ui';
