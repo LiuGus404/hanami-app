@@ -101,6 +101,45 @@ body {
   transform: translateY(-2px) scale(1.05);
 }
 
+/* 主要動畫按鈕 */
+.hanami-btn-primary {
+  @apply rounded-full px-4 py-2 font-bold text-[#A64B2A] bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] shadow-lg transition-all duration-300 ease-out transform;
+  box-shadow: 0 4px 12px 0 #fde6b82a, 0 2px 4px 0 #fde6b815;
+  border: 2px solid #EAC29D;
+}
+
+.hanami-btn-primary:hover {
+  @apply bg-gradient-to-br from-[#FCE2C8] to-[#FAD8B8] scale-105 shadow-xl;
+  box-shadow: 0 8px 25px 0 #fde6b840, 0 4px 8px 0 #fde6b825;
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* 次要動畫按鈕 */
+.hanami-btn-secondary {
+  @apply rounded-full px-4 py-2 font-bold text-[#2B3A3B] bg-gradient-to-br from-white to-[#FFFCEB] shadow-lg transition-all duration-300 ease-out transform;
+  box-shadow: 0 4px 12px 0 #fffceb2a, 0 2px 4px 0 #fffceb15;
+  border: 2px solid #EADBC8;
+}
+
+.hanami-btn-secondary:hover {
+  @apply bg-gradient-to-br from-[#FFFCEB] to-[#FFF8E6] scale-105 shadow-xl;
+  box-shadow: 0 8px 25px 0 #fffceb40, 0 4px 8px 0 #fffceb25;
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* 強調動畫按鈕 */
+.hanami-btn-accent {
+  @apply rounded-full px-4 py-2 font-bold text-[#4B4036] bg-gradient-to-br from-[#FFB6C1] to-[#FFC0CB] shadow-lg transition-all duration-300 ease-out transform;
+  box-shadow: 0 4px 12px 0 #ffb6c12a, 0 2px 4px 0 #ffb6c115;
+  border: 2px solid #FFB6C1;
+}
+
+.hanami-btn-accent:hover {
+  @apply bg-gradient-to-br from-[#FFC0CB] to-[#FFB6C1] scale-105 shadow-xl;
+  box-shadow: 0 8px 25px 0 #ffb6c140, 0 4px 8px 0 #ffb6c125;
+  transform: translateY(-2px) scale(1.05);
+}
+
 /* 危險動畫按鈕 */
 .hanami-btn-danger {
   @apply rounded-full px-4 py-2 font-bold text-[#A64B2A] bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] shadow-lg transition-all duration-300 ease-out transform;

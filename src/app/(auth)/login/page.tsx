@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+
 import HanamiLoginForm from '@/components/ui/HanamiLoginForm';
 import { validateUserCredentials, setUserSession } from '@/lib/authUtils';
 
@@ -90,13 +91,13 @@ export default function LoginPage() {
         )}
 
         <HanamiLoginForm
-          userType="admin"
-          onSubmit={handleLogin}
-          loading={loading}
           error={error || undefined}
-          title="Hanami登入"
+          loading={loading}
           subtitle="請登入"
+          title="Hanami登入"
+          userType="admin"
           onBackToHome={() => router.push('/')}
+          onSubmit={handleLogin}
         />
       </div>
     </div>

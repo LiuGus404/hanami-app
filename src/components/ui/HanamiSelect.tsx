@@ -28,7 +28,7 @@ export default function HanamiSelect({
   disabled = false,
   className = '',
   label,
-  error
+  error,
 }: HanamiSelectProps) {
   const baseClasses = 'w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200 bg-white text-[#2B3A3B]';
   const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed bg-[#F5F5F5]' : '';
@@ -45,11 +45,11 @@ export default function HanamiSelect({
         </label>
       )}
       <select
+        className={classes}
+        disabled={disabled}
+        required={required}
         value={value || ''}
         onChange={onChange}
-        required={required}
-        disabled={disabled}
-        className={classes}
       >
         <option value="">{placeholder}</option>
         {options.map((option) => (

@@ -1,11 +1,13 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect, useCallback } from 'react'
-import Image from 'next/image'
-import { PopupSelect } from '@/components/ui/PopupSelect'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Database } from '@/lib/database.types'
-import { useRouter } from 'next/navigation'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback } from 'react';
+
+import { PopupSelect } from '@/components/ui/PopupSelect';
+import { Database } from '@/lib/database.types';
+
 
 interface Task {
   id: string
@@ -37,23 +39,23 @@ interface Props {
 
 const getModelImage = (name: string) => {
   switch (name.toLowerCase()) {
-    case 'hibi': return '/owlui.png'
-    case 'lulu': return '/foxcat.png'
-    case 'mimi': return '/rabbit.png'
-    case 'taku': return '/polarbear.png'
-    default: return '/owl.png'
+    case 'hibi': return '/owlui.png';
+    case 'lulu': return '/foxcat.png';
+    case 'mimi': return '/rabbit.png';
+    case 'taku': return '/polarbear.png';
+    default: return '/owl.png';
   }
-}
+};
 
 const getModelDisplayName = (name: string) => {
   switch (name.toLowerCase()) {
-    case 'hibi': return '希希'
-    case 'lulu': return '語語'
-    case 'mimi': return '米米'
-    case 'taku': return '策策'
-    default: return ''
+    case 'hibi': return '希希';
+    case 'lulu': return '語語';
+    case 'mimi': return '米米';
+    case 'taku': return '策策';
+    default: return '';
   }
-}
+};
 
 export default function AIControlPanel({
   models,
@@ -61,43 +63,43 @@ export default function AIControlPanel({
   onCancelTask,
   onFilterChange,
 }: Props) {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [filter, setFilter] = useState<'processing' | 'done'>('processing')
-  const [showPopup, setShowPopup] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<string[]>(['進行中'])
-  const [selectedTasks, setSelectedTasks] = useState<string[]>([])
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [selectedModel, setSelectedModel] = useState('hibi')
-  const [showModelSelect, setShowModelSelect] = useState(false)
-  const [taskTitle, setTaskTitle] = useState('')
-  const [taskDescription, setTaskDescription] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [filter, setFilter] = useState<'processing' | 'done'>('processing');
+  const [showPopup, setShowPopup] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string[]>(['進行中']);
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('hibi');
+  const [showModelSelect, setShowModelSelect] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const router = useRouter()
-  const supabase = createClientComponentClient<Database>()
+  const router = useRouter();
+  const supabase = createClientComponentClient<Database>();
 
   // 取得任務列表
   const fetchTasks = useCallback(async () => {
     try {
-      setIsLoading(true)
-      let query = supabase.from('ai_tasks').select('*')
+      setIsLoading(true);
+      let query = supabase.from('ai_tasks').select('*');
 
       // 根據 statusFilter 過濾任務狀態
-      let statusValues: string[] = []
+      const statusValues: string[] = [];
       for (const status of statusFilter) {
-        if (status === '進行中') statusValues.push('processing')
-        if (status === '已完成') statusValues.push('done')
-        if (status === '出現錯誤') statusValues.push('error')
+        if (status === '進行中') statusValues.push('processing');
+        if (status === '已完成') statusValues.push('done');
+        if (status === '出現錯誤') statusValues.push('error');
       }
       if (statusValues.length > 0) {
-        query = query.in('status', statusValues)
+        query = query.in('status', statusValues);
       }
 
-      const { data, error } = await query
+      const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching tasks:', error)
-        setTasks([])
+        console.error('Error fetching tasks:', error);
+        setTasks([]);
       } else {
         const mappedTasks = (data || []).map((item) => ({
           id: item.id,
@@ -112,20 +114,20 @@ export default function AIControlPanel({
           error_message: item.error_message || '',
           assigned_model: item.assigned_model || '',
           memory_id: item.memory_id || '',
-        }))
-        setTasks(mappedTasks)
+        }));
+        setTasks(mappedTasks);
       }
     } catch (error) {
-      console.error('Error in fetchTasks:', error)
-      setTasks([])
+      console.error('Error in fetchTasks:', error);
+      setTasks([]);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [supabase, statusFilter])
+  }, [supabase, statusFilter]);
 
   useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
+    fetchTasks();
+  }, [fetchTasks]);
 
   // 新增任務送出
   const handleSubmitTask = async () => {
@@ -140,38 +142,38 @@ export default function AIControlPanel({
         finished_at: null,
         error_message: undefined,
         assigned_model: undefined,
-        memory_id: `${selectedModel}-${Date.now()}`
-      }
+        memory_id: `${selectedModel}-${Date.now()}`,
+      };
 
-      console.log('送出任務', newTask)
+      console.log('送出任務', newTask);
 
-      const { error } = await supabase.from('ai_tasks').insert([newTask])
+      const { error } = await supabase.from('ai_tasks').insert([newTask]);
 
       if (error) {
-        console.error('任務送出失敗:', error)
-        alert('任務送出失敗: ' + error.message)
-        await fetchTasks()
+        console.error('任務送出失敗:', error);
+        alert(`任務送出失敗: ${error.message}`);
+        await fetchTasks();
       } else {
-        setShowCreateForm(false)
-        setTaskTitle('')
-        setTaskDescription('')
-        await fetchTasks()
+        setShowCreateForm(false);
+        setTaskTitle('');
+        setTaskDescription('');
+        await fetchTasks();
       }
     } catch (err) {
-      console.error('發生錯誤:', err)
-      alert('發生錯誤，請稍後再試')
+      console.error('發生錯誤:', err);
+      alert('發生錯誤，請稍後再試');
     }
-  }
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FCD58B] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FCD58B] mx-auto" />
           <p className="mt-4 text-[#2B3A3B]">載入中...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -183,41 +185,41 @@ export default function AIControlPanel({
             <div className="md:col-span-2">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
-                  <Image src="/owlui.png" alt="Owl UI" width={32} height={32} />
+                  <Image alt="Owl UI" height={32} src="/owlui.png" width={32} />
                   <div className="flex flex-col">
                     <h2 className="text-xl font-semibold">AI 任務列表</h2>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowCreateForm(true)}
                     className="px-3 py-1 rounded-full bg-[#FFF8E6] border border-[#DDD2BA] text-[#2B3A3B] text-sm font-semibold flex items-center gap-2"
+                    onClick={() => setShowCreateForm(true)}
                   >
                     ＋ 新增任務
                   </button>
                   {selectedTasks.length > 0 && (
                     <>
                       <button
-                        onClick={() => setSelectedTasks(tasks.map(t => t.id))}
                         className="px-2 py-1 text-sm rounded-full border border-[#DDD2BA] bg-[#FDF6E8] hover:bg-[#F5EAD4]"
+                        onClick={() => setSelectedTasks(tasks.map(t => t.id))}
                       >
                         全選
                       </button>
                       <button
-                        onClick={() => setSelectedTasks([])}
                         className="px-2 py-1 text-sm rounded-full border border-[#DDD2BA] bg-[#FDF6E8] hover:bg-[#F5EAD4]"
+                        onClick={() => setSelectedTasks([])}
                       >
                         取消選取
                       </button>
                       <button
-                        onClick={onCancelTask}
                         className="px-3 py-1 rounded-full bg-[#FFF8E6] border border-[#DDD2BA] text-[#2B3A3B] text-sm font-semibold flex items-center gap-2"
+                        onClick={onCancelTask}
                       >
                         ✕ 取消任務
                       </button>
                     </>
                   )}
-                  <button onClick={() => setShowPopup(true)} className="hanami-btn-soft px-3 py-1 text-[#2B3A3B] text-sm font-semibold">篩選：{statusFilter.join(', ')}</button>
+                  <button className="hanami-btn-soft px-3 py-1 text-[#2B3A3B] text-sm font-semibold" onClick={() => setShowPopup(true)}>篩選：{statusFilter.join(', ')}</button>
                 </div>
               </div>
               <div className="space-y-4">
@@ -231,7 +233,7 @@ export default function AIControlPanel({
                       setSelectedTasks((prev) =>
                         prev.includes(task.id)
                           ? prev.filter((id) => id !== task.id)
-                          : [...prev, task.id]
+                          : [...prev, task.id],
                       );
                     }}
                   >
@@ -243,10 +245,12 @@ export default function AIControlPanel({
                         </span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className={`w-2 h-2 rounded-full ${
-                          task.status === 'processing' ? 'bg-yellow-500' :
-                          task.status === 'done' ? 'bg-green-500' : 'bg-red-500'
-                        }`}></span>
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            task.status === 'processing' ? 'bg-yellow-500' :
+                              task.status === 'done' ? 'bg-green-500' : 'bg-red-500'
+                          }`}
+                        />
                         <span className="text-sm">
                           {task.status === 'processing' ? '處理中' : task.status === 'done' ? '已完成' : '錯誤'}
                         </span>
@@ -272,8 +276,8 @@ export default function AIControlPanel({
                                a 15.9155 15.9155 0 0 1 0 -31.831"
                             fill="none"
                             stroke="#FCD58B"
-                            strokeWidth="3"
                             strokeDasharray="100, 100"
+                            strokeWidth="3"
                           />
                         </svg>
                         <span className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs font-bold text-[#2B3A3B]">
@@ -300,25 +304,25 @@ export default function AIControlPanel({
                 {models.map((model) => (
                   <div key={model.name} className="flex items-center justify-between p-3 rounded-2xl border border-[#E8E3D5] bg-[#FFFCF2] shadow-sm">
                     <div className="flex items-center space-x-2">
-                      <Image src={getModelImage(model.name)} alt={model.name} width={24} height={24} />
+                      <Image alt={model.name} height={24} src={getModelImage(model.name)} width={24} />
                       <span>{getModelDisplayName(model.name)} {model.name}</span>
                     </div>
                     <span className="text-sm text-gray-500">
                       {model.status === 'idle'
                         ? '閒置中'
                         : model.status === 'busy'
-                        ? '暫停處理中'
-                        : '忙碌中'}
+                          ? '暫停處理中'
+                          : '忙碌中'}
                     </span>
                     <span
                       className={`w-3 h-3 rounded-full ${
                         model.status === 'idle'
                           ? 'bg-green-500'
                           : model.status === 'busy'
-                          ? 'bg-yellow-400'
-                          : 'bg-red-500'
+                            ? 'bg-yellow-400'
+                            : 'bg-red-500'
                       }`}
-                    ></span>
+                    />
                   </div>
                 ))}
               </div>
@@ -329,7 +333,7 @@ export default function AIControlPanel({
 
       {showPopup && (
         <PopupSelect
-          title="選擇任務狀態"
+          mode="multi"
           options={[
             { label: '未開始', value: '未開始' },
             { label: '排程中', value: '排程中' },
@@ -339,14 +343,14 @@ export default function AIControlPanel({
             { label: '出現錯誤', value: '出現錯誤' },
           ]}
           selected={statusFilter}
-          mode="multi"
+          title="選擇任務狀態"
+          onCancel={() => setShowPopup(false)}
           onChange={(value) => {
             const selected = value as string[];
             setStatusFilter(selected);
             onFilterChange(selected);
           }}
           onConfirm={() => setShowPopup(false)}
-          onCancel={() => setShowPopup(false)}
         />
       )}
 
@@ -356,18 +360,18 @@ export default function AIControlPanel({
             <h2 className="text-xl font-bold text-center mb-4">新增任務</h2>
             <div className="space-y-3">
               <input
-                type="text"
+                className="w-full border border-[#D8CDBF] rounded-xl px-4 py-2 text-sm"
                 placeholder="任務名稱"
+                type="text"
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
-                className="w-full border border-[#D8CDBF] rounded-xl px-4 py-2 text-sm"
               />
               <textarea
+                className="w-full border border-[#D8CDBF] rounded-xl px-4 py-2 text-sm"
                 placeholder="任務說明..."
+                rows={3}
                 value={taskDescription}
                 onChange={(e) => setTaskDescription(e.target.value)}
-                className="w-full border border-[#D8CDBF] rounded-xl px-4 py-2 text-sm"
-                rows={3}
               />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">上載圖片</label>
@@ -375,40 +379,40 @@ export default function AIControlPanel({
                   <label className="flex-1">
                     <span className="block text-sm mb-1">相機</span>
                     <input
-                      type="file"
                       accept="image/*"
                       capture="environment"
                       className="w-full border border-[#D8CDBF] rounded-xl px-4 py-2 text-sm bg-white"
+                      type="file"
                     />
                   </label>
                   <label className="flex-1">
                     <span className="block text-sm mb-1">相簿</span>
                     <input
-                      type="file"
                       accept="image/*"
                       className="w-full border border-[#D8CDBF] rounded-xl px-4 py-2 text-sm bg-white"
+                      type="file"
                     />
                   </label>
                 </div>
                 <label className="text-xs text-gray-500 mt-1 block">建議使用手機裝置拍照或選取圖片</label>
               </div>
               <button
-                onClick={() => setShowModelSelect(true)}
                 className="w-full border border-[#D8CDBF] rounded-xl px-4 py-2 text-sm text-left bg-white"
+                onClick={() => setShowModelSelect(true)}
               >
                 選擇模型：{getModelDisplayName(selectedModel)} ({selectedModel})
               </button>
             </div>
             <div className="flex justify-around mt-6">
               <button
-                onClick={() => setShowCreateForm(false)}
                 className="px-4 py-2 border border-[#D8CDBF] rounded-xl hover:bg-[#F3F0E5]"
+                onClick={() => setShowCreateForm(false)}
               >
                 取消
               </button>
               <button
-                onClick={handleSubmitTask}
                 className="px-6 py-2 bg-[#A68A64] text-white font-semibold rounded-xl hover:bg-[#937654]"
+                onClick={handleSubmitTask}
               >
                 送出
               </button>
@@ -419,7 +423,7 @@ export default function AIControlPanel({
 
       {showModelSelect && (
         <PopupSelect
-          title="選擇 AI 助理"
+          mode="single"
           options={[
             { label: '希希 Hibi', value: 'hibi' },
             { label: '語語 Lulu', value: 'lulu' },
@@ -427,12 +431,12 @@ export default function AIControlPanel({
             { label: '米米 Mimi', value: 'mimi' },
           ]}
           selected={selectedModel}
-          mode="single"
+          title="選擇 AI 助理"
+          onCancel={() => setShowModelSelect(false)}
           onChange={(val) => setSelectedModel(val as string)}
           onConfirm={() => setShowModelSelect(false)}
-          onCancel={() => setShowModelSelect(false)}
         />
       )}
     </>
-  )
+  );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+
 import { getSupabaseClient, supabase } from '@/lib/supabase';
 
 export type LessonPlan = {
@@ -42,7 +43,7 @@ export const useLessonPlans = () => {
       const plansWithNames = (data || []).map(plan => ({
         ...plan,
         teacher_names: (plan.teacher_ids || []).map(
-          (id: string) => teachers?.find(t => t.id === id)?.teacher_nickname || '未知老師'
+          (id: string) => teachers?.find(t => t.id === id)?.teacher_nickname || '未知老師',
         ),
       }));
 
@@ -70,7 +71,7 @@ export const useLessonPlans = () => {
           teacher_ids_1: plan.teacher_ids_1,
           teacher_ids_2: plan.teacher_ids_2,
           theme: plan.theme,
-          notes: plan.notes
+          notes: plan.notes,
         })
         .select();
 
@@ -105,7 +106,7 @@ export const useLessonPlans = () => {
           teacher_ids_1: plan.teacher_ids_1,
           teacher_ids_2: plan.teacher_ids_2,
           theme: plan.theme,
-          notes: plan.notes
+          notes: plan.notes,
         })
         .eq('id', plan.id);
 
@@ -158,7 +159,7 @@ export const useTeachers = () => {
       if (!error && data) {
         setTeachers(data.map(t => ({
           id: t.id,
-          name: t.teacher_nickname || '未命名'
+          name: t.teacher_nickname || '未命名',
         })));
       }
       setLoading(false);

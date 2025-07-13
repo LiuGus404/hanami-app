@@ -1,50 +1,51 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { getUserSession } from '@/lib/authUtils'
+import { useEffect, useState } from 'react';
+
+import { getUserSession } from '@/lib/authUtils';
 
 export function useUser() {
-  const [user, setUser] = useState<any>(null)
-  const [role, setRole] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true
+    let mounted = true;
 
     const fetchUser = async () => {
       try {
-        const userSession = getUserSession()
+        const userSession = getUserSession();
         
         if (!userSession) {
           if (mounted) {
-            setUser(null)
-            setRole(null)
-            setLoading(false)
+            setUser(null);
+            setRole(null);
+            setLoading(false);
           }
-          return
+          return;
         }
 
         if (mounted) {
-          setUser(userSession)
-          setRole(userSession.role)
-          setLoading(false)
+          setUser(userSession);
+          setRole(userSession.role);
+          setLoading(false);
         }
       } catch (error) {
-        console.error('Error fetching user:', error)
+        console.error('Error fetching user:', error);
         if (mounted) {
-          setUser(null)
-          setRole(null)
-          setLoading(false)
+          setUser(null);
+          setRole(null);
+          setLoading(false);
         }
       }
-    }
+    };
 
-    fetchUser()
+    fetchUser();
 
     return () => {
-      mounted = false
-    }
-  }, [])
+      mounted = false;
+    };
+  }, []);
 
   return {
     user,
@@ -53,6 +54,6 @@ export function useUser() {
     isAdmin: role === 'admin',
     isTeacher: role === 'teacher',
     isParent: role === 'parent',
-    isStudent: role === 'student'
-  }
+    isStudent: role === 'student',
+  };
 } 

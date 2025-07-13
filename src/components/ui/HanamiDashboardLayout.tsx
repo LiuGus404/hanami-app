@@ -1,9 +1,12 @@
 'use client';
 
-import React from 'react';
 import { useRouter } from 'next/navigation';
-import { HanamiCard, HanamiButton } from './index';
+import React from 'react';
+
 import AccountIcon from './AccountIcon';
+
+import { HanamiCard, HanamiButton } from './index';
+
 
 interface Tab {
   id: string;
@@ -28,7 +31,7 @@ export default function HanamiDashboardLayout({
   onTabChange,
   onLogout,
   children,
-  extraHeaderContent
+  extraHeaderContent,
 }: HanamiDashboardLayoutProps) {
   const router = useRouter();
 
@@ -48,8 +51,8 @@ export default function HanamiDashboardLayout({
           <div className="flex items-center space-x-3">
             {extraHeaderContent}
             <HanamiButton
-              variant="secondary"
               size="sm"
+              variant="secondary"
               onClick={onLogout}
             >
               登出
@@ -64,12 +67,12 @@ export default function HanamiDashboardLayout({
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => onTabChange(tab.id)}
               className={`flex items-center px-4 py-2 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-[#FFD59A] text-brown-700'
                   : 'text-brown-500 hover:bg-[#F9F2EF]'
               }`}
+              onClick={() => onTabChange(tab.id)}
             >
               <span className="mr-2">{tab.icon}</span>
               {tab.name}

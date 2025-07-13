@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { getSupabaseClient } from '@/lib/supabase';
+
 import { PopupSelect } from '@/components/ui/PopupSelect';
-import { TrialLesson } from '@/types';
 import { Spinner } from '@/components/ui/spinner';
+import { getSupabaseClient } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
+import { TrialLesson } from '@/types';
 
 // 固定香港時區的 Date 產生器
 const getHongKongDate = (date = new Date()) => {
@@ -127,7 +128,7 @@ const HanamiCalendar = () => {
           .filter((h): h is Holiday => h.date !== null && h.title !== null)
           .map(h => ({
             date: h.date,
-            title: h.title
+            title: h.title,
           }));
         setHolidays(validHolidays);
       }
@@ -159,10 +160,10 @@ const HanamiCalendar = () => {
     // 如果 view 和 currentDate 沒有變化且已經載入過，不重複載入
     const dateStr = getDateString(currentDate);
     const viewKey = `${view}_${dateStr}`;
-    if (currentViewRef.current === viewKey && lessonsFetchedRef.current) return
+    if (currentViewRef.current === viewKey && lessonsFetchedRef.current) return;
     
     // 防止重複載入
-    if (loadingRef.current) return
+    if (loadingRef.current) return;
     
     // 設置 loading 狀態
     loadingRef.current = true;
@@ -538,16 +539,16 @@ const HanamiCalendar = () => {
 
     // 處理常規學生數據
     const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
-        id: lesson.id,
+      id: lesson.id,
       student_id: lesson.student_id ?? '',
-        lesson_date: lesson.lesson_date,
-        regular_timeslot: lesson.regular_timeslot,
+      lesson_date: lesson.lesson_date,
+      regular_timeslot: lesson.regular_timeslot,
       course_type: lesson.course_type || '',
-        full_name: lesson.Hanami_Students?.full_name || '未命名學生',
-        student_age: lesson.Hanami_Students?.student_age || null,
-        lesson_status: lesson.lesson_status,
-        remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
-        is_trial: false
+      full_name: lesson.Hanami_Students?.full_name || '未命名學生',
+      student_age: lesson.Hanami_Students?.student_age || null,
+      lesson_status: lesson.lesson_status,
+      remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
+      is_trial: false,
     }));
 
     // 處理試堂學生數據
@@ -573,7 +574,7 @@ const HanamiCalendar = () => {
         lesson_status: null,
         remaining_lessons: null,
         is_trial: true,
-        health_note: trial.health_note ?? null
+        health_note: trial.health_note ?? null,
       } as Lesson;
     });
 
@@ -583,7 +584,7 @@ const HanamiCalendar = () => {
     // 如果有指定課程和時間，進行過濾
     if (course && time) {
       allLessons = allLessons.filter(
-        l => l.course_type === course && l.regular_timeslot === time
+        l => l.course_type === course && l.regular_timeslot === time,
       );
     }
 
@@ -594,15 +595,15 @@ const HanamiCalendar = () => {
         acc[key] = {
           time: l.regular_timeslot,
           course: l.course_type,
-          lessons: []
+          lessons: [],
         };
       }
       acc[key].lessons.push(l);
       return acc;
     }, {});
 
-    const groupedArray: GroupedLesson[] = Object.values(grouped) as GroupedLesson[];
-    groupedArray.sort((a, b) => a.time.localeCompare(b.time));
+    const groupedArray: GroupedLesson[] = Object.values(grouped);
+    groupedArray.sort((a, b) => (a as { time: string }).time.localeCompare((b as { time: string }).time));
     
     // 設置選中的詳細資訊
     setSelectedDetail({
@@ -615,9 +616,9 @@ const HanamiCalendar = () => {
           student_id: lesson.student_id,
           age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
           is_trial: lesson.is_trial,
-          remaining_lessons: lesson.remaining_lessons
-        }))
-      }))
+          remaining_lessons: lesson.remaining_lessons,
+        })),
+      })),
     });
   };
 
@@ -625,18 +626,18 @@ const HanamiCalendar = () => {
     try {
       // 1. 使用 PATCH 只更新狀態欄位
       const { error: updateError } = await supabase
-      .from('hanami_student_lesson')
+        .from('hanami_student_lesson')
         .update({
           lesson_status: status,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-      .eq('id', lessonId);
+        .eq('id', lessonId);
 
       if (updateError) {
         console.error('Update error:', updateError);
-        alert('更新失敗：' + updateError.message);
+        alert(`更新失敗：${updateError.message}`);
         return false;
-    }
+      }
 
       // 2. 查詢更新後的資料
       const { data: updatedLesson, error: fetchError } = await supabase
@@ -662,12 +663,12 @@ const HanamiCalendar = () => {
           prevLessons.map(lesson => 
             lesson.id === lessonId 
               ? { ...lesson, ...updatedLesson }
-              : lesson
-          )
+              : lesson,
+          ),
         );
 
         // 4. 重新獲取當前視圖的課堂
-    if (view === 'day') {
+        if (view === 'day') {
           const dateStr = getDateString(currentDate);
           const { data: refreshedLessons } = await supabase
             .from('hanami_student_lesson')
@@ -698,8 +699,8 @@ const HanamiCalendar = () => {
   const isPastOrToday = (dateStr: string) => {
     const date = getHongKongDate(new Date(dateStr));
     const today = getHongKongDate();
-    date.setHours(0,0,0,0);
-    today.setHours(0,0,0,0);
+    date.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
     return date <= today;
   };
 
@@ -718,19 +719,19 @@ const HanamiCalendar = () => {
     }
 
     // 動畫 class
-    const baseBtnClass = `inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs transition-all duration-200 flex items-center shadow-sm hover:scale-105 hover:shadow-lg active:scale-95 focus:outline-none`;
-    const statusBtnClass = `ml-2 px-2 py-0.5 rounded text-xs transition-all duration-200 shadow-sm hover:scale-105 hover:shadow-lg active:scale-95 focus:outline-none`;
-    const unsetBtnClass = `ml-2 px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-600 border border-gray-300 transition-all duration-200 shadow-sm hover:scale-105 hover:bg-yellow-100 hover:shadow-lg active:scale-95 focus:outline-none`;
+    const baseBtnClass = 'inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs transition-all duration-200 flex items-center shadow-sm hover:scale-105 hover:shadow-lg active:scale-95 focus:outline-none';
+    const statusBtnClass = 'ml-2 px-2 py-0.5 rounded text-xs transition-all duration-200 shadow-sm hover:scale-105 hover:shadow-lg active:scale-95 focus:outline-none';
+    const unsetBtnClass = 'ml-2 px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-600 border border-gray-300 transition-all duration-200 shadow-sm hover:scale-105 hover:bg-yellow-100 hover:shadow-lg active:scale-95 focus:outline-none';
 
     return (
       <div className="flex items-center">
         <button
-          onClick={() => window.location.href = `/admin/students/${nameObj.student_id}`}
           className={baseBtnClass}
           style={{ 
             minWidth: '60px',
-            backgroundColor: bgColor
+            backgroundColor: bgColor,
           }}
+          onClick={() => window.location.href = `/admin/students/${nameObj.student_id}`}
         >
           {nameObj.name}
           {nameObj.age ? (
@@ -738,32 +739,31 @@ const HanamiCalendar = () => {
           ) : null}
           {nameObj.is_trial && (
             <img
-              src="/trial.png"
               alt="Trial"
               className="ml-1 w-4 h-4"
+              src="/trial.png"
             />
           )}
         </button>
         {(lessonIsTodayOrPast && lesson?.lesson_status) ? (
           <button
-            onClick={() => setPopupInfo({ lessonId: lesson.id })}
             className={
-              statusBtnClass + ' ' + (
+              `${statusBtnClass} ${  
                 lesson.lesson_status === '出席' ? 'bg-[#DFFFD6] text-green-800' :
-                lesson.lesson_status === '缺席' ? 'bg-[#FFC1C1] text-red-700' :
-                (lesson.lesson_status === '病假' || lesson.lesson_status === '事假') ? 'bg-[#FFE5B4] text-yellow-700' :
-                'bg-gray-200 text-gray-600'
-              )
+                  lesson.lesson_status === '缺席' ? 'bg-[#FFC1C1] text-red-700' :
+                    (lesson.lesson_status === '病假' || lesson.lesson_status === '事假') ? 'bg-[#FFE5B4] text-yellow-700' :
+                      'bg-gray-200 text-gray-600'}`
             }
+            onClick={() => setPopupInfo({ lessonId: lesson.id })}
           >
             {lesson.lesson_status}
           </button>
         ) : (
           lessonIsTodayOrPast && !nameObj.is_trial && lesson && (
             <button
-              onClick={() => setPopupInfo({ lessonId: lesson.id })}
               className={unsetBtnClass}
               title="設定出席狀態"
+              onClick={() => setPopupInfo({ lessonId: lesson.id })}
             >
               未設定
             </button>
@@ -788,11 +788,11 @@ const HanamiCalendar = () => {
               student_id: lesson.student_id,
               age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
               is_trial: lesson.is_trial,
-              remaining_lessons: lesson.remaining_lessons
-            }
-          ]
-        }
-      ]
+              remaining_lessons: lesson.remaining_lessons,
+            },
+          ],
+        },
+      ],
     });
   };
 
@@ -818,7 +818,7 @@ const HanamiCalendar = () => {
       if (!error && data) {
         const list: {name: string, start: string, end: string}[] = [];
         data.forEach((row: any) => {
-          if (row.hanami_employee && row.hanami_employee.teacher_nickname && row.start_time && row.end_time) {
+          if (row.hanami_employee?.teacher_nickname && row.start_time && row.end_time) {
             list.push({ name: row.hanami_employee.teacher_nickname, start: row.start_time, end: row.end_time });
           }
         });
@@ -832,11 +832,14 @@ const HanamiCalendar = () => {
     <div className="bg-[#FFFDF8] p-4 rounded-xl shadow-md">
       <div className="flex flex-wrap gap-2 items-center mb-4 overflow-x-auto">
         <button
-          onClick={handlePrev}
           className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
-        >{'◀'}</button>
+          onClick={handlePrev}
+        >{'◀'}
+        </button>
         {view === 'day' ? (
           <input
+            className="border-2 border-[#EAC29D] px-3 py-2 rounded-full w-[120px] bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200"
+            style={{ minWidth: '100px' }}
             type="date"
             value={getDateString(currentDate)}
             onChange={(e) => {
@@ -844,20 +847,22 @@ const HanamiCalendar = () => {
               const newDate = getHongKongDate(new Date(year, month - 1, day));
               setCurrentDate(newDate);
             }}
-            className="border-2 border-[#EAC29D] px-3 py-2 rounded-full w-[120px] bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200"
-            style={{ minWidth: '100px' }}
           />
         ) : (
           <span className="font-semibold w-fit min-w-0 max-w-[120px] truncate text-[#4B4036]">{formatDate(currentDate)}</span>
         )}
         <button
-          onClick={handleNext}
           className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
-        >{'▶'}</button>
-        <button onClick={() => setView('day')} className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'day' ? 'hanami-btn' : 'hanami-btn-soft'}`}>日</button>
-        <button onClick={() => setView('week')} className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'week' ? 'hanami-btn' : 'hanami-btn-soft'}`}>週</button>
-        <button onClick={() => setView('month')} className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'month' ? 'hanami-btn' : 'hanami-btn-soft'}`}>月</button>
+          onClick={handleNext}
+        >{'▶'}
+        </button>
+        <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'day' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('day')}>日</button>
+        <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'week' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('week')}>週</button>
+        <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'month' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('month')}>月</button>
         <button
+          className="hanami-btn-soft w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ml-2"
+          id="refresh-btn"
+          title="刷新資料"
           onClick={async () => {
             lessonsFetchedRef.current = false;
             loadingRef.current = false;
@@ -870,11 +875,8 @@ const HanamiCalendar = () => {
               setTimeout(() => btn.classList.remove('animate-spin'), 1000);
             }
           }}
-          id="refresh-btn"
-          className="hanami-btn-soft w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ml-2"
-          title="刷新資料"
         >
-          <img src="/refresh.png" alt="Refresh" className="w-4 h-4" />
+          <img alt="Refresh" className="w-4 h-4" src="/refresh.png" />
         </button>
       </div>
       {/* 選擇日期上班老師圓角按鈕區塊 */}
@@ -888,7 +890,7 @@ const HanamiCalendar = () => {
                 window.location.href = `/admin/teachers/teacher-schedule?teacher_name=${encodeURIComponent(item.name)}`;
               }}
             >
-              {item.name}（{item.start.slice(0,5)}~{item.end.slice(0,5)}）
+              {item.name}（{item.start.slice(0, 5)}~{item.end.slice(0, 5)}）
             </button>
           ))
         ) : (
@@ -911,15 +913,15 @@ const HanamiCalendar = () => {
                 className="relative space-y-2"
                 style={{
                   backgroundColor: holiday ? '#FFF0F0' : undefined,
-                  border: holiday ? '1px solid #FFB3B3' : undefined
+                  border: holiday ? '1px solid #FFB3B3' : undefined,
                 }}
               >
                 {/* 印章圖示 */}
                 {holiday && (
                   <img
-                    src="/closed.png"
                     alt="休息日"
                     className="absolute top-1 right-1 w-4 h-4"
+                    src="/closed.png"
                   />
                 )}
                 {(() => {
@@ -942,15 +944,15 @@ const HanamiCalendar = () => {
                       acc[key] = {
                         time: l.regular_timeslot,
                         course: l.course_type,
-                        lessons: []
+                        lessons: [],
                       };
                     }
                     acc[key].lessons.push(l);
                     return acc;
                   }, {});
                   // 以課堂時間排序
-                  const groupedArray: GroupedLesson[] = Object.values(grouped) as GroupedLesson[];
-                  groupedArray.sort((a, b) => a.time.localeCompare(b.time));
+                  const groupedArray: GroupedLesson[] = Object.values(grouped);
+                  groupedArray.sort((a, b) => (a as { time: string }).time.localeCompare((b as { time: string }).time));
                   return groupedArray.map((g, i) => {
                     const endTime = (() => {
                       const [h, m] = g.time.split(':').map(Number);
@@ -963,27 +965,27 @@ const HanamiCalendar = () => {
                     return (
                       <div key={`${g.time}-${g.course}-${i}`} className="border-l-2 pl-4">
                         <div className="text-[#4B4036] font-bold">
-                          {g.time.slice(0,5)}-{endTime} {g.course} ({g.lessons.length})
+                          {g.time.slice(0, 5)}-{endTime} {g.course} ({g.lessons.length})
                         </div>
                         <div className="ml-4 text-sm text-[#4B4036]">
                           {g.lessons.map((lesson: Lesson, j: number) => {
-                          let age = '';
-                          if (lesson.is_trial) {
-                            age = lesson.age_display ? String(parseInt(lesson.age_display)) : '';
-                          } else {
-                            age = getStudentAge(lesson.student_id);
-                          }
-                          const nameObj = {
-                            name: lesson.full_name,
-                            student_id: lesson.student_id,
-                            age,
-                            is_trial: lesson.is_trial
-                          };
-                          return (
-                            <div key={`${lesson.id}-${j}`}>
-                              {renderStudentButton(nameObj, lesson)}
-                            </div>
-                          );
+                            let age = '';
+                            if (lesson.is_trial) {
+                              age = lesson.age_display ? String(parseInt(lesson.age_display)) : '';
+                            } else {
+                              age = getStudentAge(lesson.student_id);
+                            }
+                            const nameObj = {
+                              name: lesson.full_name,
+                              student_id: lesson.student_id,
+                              age,
+                              is_trial: lesson.is_trial,
+                            };
+                            return (
+                              <div key={`${lesson.id}-${j}`}>
+                                {renderStudentButton(nameObj, lesson)}
+                              </div>
+                            );
                           })}
                         </div>
                       </div>
@@ -1018,43 +1020,43 @@ const HanamiCalendar = () => {
                     acc[key] = {
                       time: l.regular_timeslot,
                       course: l.course_type,
-                      lessons: []
+                      lessons: [],
                     };
                   }
                   acc[key].lessons.push(l);
                   return acc;
                 }, {});
-                const groupedArray = Object.values(grouped) as GroupedLesson[];
-                groupedArray.sort((a, b) => a.time.localeCompare(b.time));
+                const groupedArray = Object.values(grouped);
+                groupedArray.sort((a, b) => (a as { time: string }).time.localeCompare((b as { time: string }).time));
                 return (
                   <div
                     key={i}
                     className="relative p-2 rounded-xl text-center text-[#4B4036] text-sm"
                     style={{
                       backgroundColor: holiday ? '#FFF0F0' : undefined,
-                      border: holiday ? '1px solid #FFB3B3' : undefined
+                      border: holiday ? '1px solid #FFB3B3' : undefined,
                     }}
                   >
                     {/* 印章圖示 */}
                     {holiday && (
                       <img
-                        src="/closed.png"
                         alt="休息日"
                         className="absolute top-1 right-1 w-4 h-4"
+                        src="/closed.png"
                       />
                     )}
-                    <div>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]}</div>
+                    <div>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i]}</div>
                     {groupedArray.map((g, j) => (
-                        <div
-                          key={j}
+                      <div
+                        key={j}
                         className="text-xs mt-1 rounded-xl p-1 cursor-pointer hover:bg-[#FFE5B4]"
                         style={{
                           backgroundColor:
-                            g.course === '音樂專注力'
+                            (g as { course: string }).course === '音樂專注力'
                               ? '#D1E7DD'
-                              : g.course === '鋼琴'
-                              ? '#CCE5FF'
-                              : '#F3EAD9'
+                              : (g as { course: string }).course === '鋼琴'
+                                ? '#CCE5FF'
+                                : '#F3EAD9',
                         }}
                         onClick={() => {
                           // 點擊時 setSelectedDetail，彈窗顯示學生
@@ -1062,22 +1064,22 @@ const HanamiCalendar = () => {
                             date,
                             groups: [
                               {
-                                time: g.time,
-                                course: g.course,
-                                names: g.lessons.map(lesson => ({
+                                time: (g as { time: string; course: string; lessons: any[] }).time,
+                                course: (g as { time: string; course: string; lessons: any[] }).course,
+                                names: (g as { time: string; course: string; lessons: any[] }).lessons.map(lesson => ({
                                   name: lesson.full_name,
                                   student_id: lesson.student_id,
                                   age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
                                   is_trial: lesson.is_trial,
-                                  remaining_lessons: lesson.remaining_lessons
-                                }))
-                              }
-                            ]
+                                  remaining_lessons: lesson.remaining_lessons,
+                                })),
+                              },
+                            ],
                           });
                         }}
-                        >
-                        <div className="font-bold">{g.time.slice(0, 5)} {g.course} ({g.lessons.length})</div>
-                        </div>
+                      >
+                        <div className="font-bold">{(g as { time: string; course: string; lessons: any[] }).time.slice(0, 5)} {(g as { time: string; course: string; lessons: any[] }).course} ({(g as { time: string; course: string; lessons: any[] }).lessons.length})</div>
+                      </div>
                     ))}
                   </div>
                 );
@@ -1089,7 +1091,7 @@ const HanamiCalendar = () => {
         {!isLoading && view === 'month' && (
           <>
             <div className="grid grid-cols-7 gap-2 mb-2">
-              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                 <div key={d} className="font-bold text-center">{d}</div>
               ))}
             </div>
@@ -1119,14 +1121,14 @@ const HanamiCalendar = () => {
                       acc[key] = {
                         time: l.regular_timeslot,
                         course: l.course_type,
-                        lessons: []
+                        lessons: [],
                       };
-                  }
+                    }
                     acc[key].lessons.push(l);
                     return acc;
                   }, {});
-                  const groupedArray = Object.values(grouped) as GroupedLesson[];
-                  groupedArray.sort((a, b) => a.time.localeCompare(b.time));
+                  const groupedArray = Object.values(grouped);
+                  groupedArray.sort((a, b) => (a as { time: string }).time.localeCompare((b as { time: string }).time));
                   // 統一休息日底色與邊框
                   let bgColor;
                   if (holiday) {
@@ -1140,45 +1142,49 @@ const HanamiCalendar = () => {
                       className="relative p-2 rounded-xl text-center text-[#4B4036] text-sm cursor-pointer"
                       style={{
                         backgroundColor: bgColor,
-                        border: holiday ? '1px solid #FFB3B3' : undefined
+                        border: holiday ? '1px solid #FFB3B3' : undefined,
                       }}
                       onClick={() => {
                         // 點擊格子時 setSelectedDetail，彈窗顯示該天所有班別與學生
                         setSelectedDetail({
                           date,
-                          groups: groupedArray.map(g => ({
-                            time: g.time,
-                            course: g.course,
-                            names: g.lessons.map(lesson => ({
-                              name: lesson.full_name,
-                              student_id: lesson.student_id,
-                              age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
-                              is_trial: lesson.is_trial,
-                              remaining_lessons: lesson.remaining_lessons
-                            }))
-                          }))
+                          groups: groupedArray.map(g => {
+                            const group = g as { time: string; course: string; lessons: any[] };
+                            return {
+                              time: group.time,
+                              course: group.course,
+                              names: group.lessons.map(lesson => ({
+                                name: lesson.full_name,
+                                student_id: lesson.student_id,
+                                age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
+                                is_trial: lesson.is_trial,
+                                remaining_lessons: lesson.remaining_lessons,
+                              })),
+                            };
+                          }),
                         });
                       }}
                     >
                       {/* 印章圖示 */}
                       {holiday && (
                         <img
-                          src="/closed.png"
                           alt="休息日"
                           className="absolute top-1 right-1 w-4 h-4"
+                          src="/closed.png"
                         />
                       )}
                       <div>{dayNum}</div>
                       {groupedArray.length > 0 && (
                         <div className="mt-1 flex flex-col gap-1">
                           {groupedArray.map((g, gi) => {
+                            const group = g as { lessons: any[]; time: string; course: string };
                             // 計算該 group 的剩餘堂數總和
-                            const totalRemaining = g.lessons
+                            const totalRemaining = group.lessons
                               .filter(l => !l.is_trial && typeof l.remaining_lessons === 'number')
                               .reduce((sum, l) => sum + (l.remaining_lessons ?? 0), 0);
                             return (
                               <div key={gi} className="flex items-center justify-center gap-1 text-xs">
-                                <span>{g.time?.slice(0,5) || ''} {g.course || ''}</span>
+                                <span>{group.time?.slice(0, 5) || ''} {group.course || ''}</span>
                                 <span
                                   style={totalRemaining === 0 ? { color: '#FF5A5A', fontWeight: 'bold' } : { color: '#A68A64' }}
                                 >
@@ -1199,15 +1205,20 @@ const HanamiCalendar = () => {
       </div>
       {popupInfo && (
         <PopupSelect
-          title="選擇出席狀態"
+          mode="single"
           options={[
             { label: '出席', value: '出席' },
             { label: '缺席', value: '缺席' },
             { label: '病假', value: '病假' },
             { label: '事假', value: '事假' },
-            { label: '未設定', value: '未設定' }
+            { label: '未設定', value: '未設定' },
           ]}
           selected={popupSelected}
+          title="選擇出席狀態"
+          onCancel={() => {
+            setPopupInfo(null);
+            setPopupSelected('');
+          }}
           onChange={(value) => setPopupSelected(value as string)}
           onConfirm={async () => {
             if (popupInfo.lessonId && popupSelected) {
@@ -1219,11 +1230,6 @@ const HanamiCalendar = () => {
             setPopupInfo(null);
             setPopupSelected('');
           }}
-          onCancel={() => {
-            setPopupInfo(null);
-            setPopupSelected('');
-          }}
-          mode="single"
         />
       )}
       {selectedDetail && (
@@ -1257,7 +1263,7 @@ const HanamiCalendar = () => {
                               l.student_id === nameObj.student_id &&
                               l.regular_timeslot === group.time &&
                               l.course_type === group.course &&
-                              getHongKongDate(new Date(l.lesson_date)).toDateString() === getHongKongDate(selectedDetail.date).toDateString()
+                              getHongKongDate(new Date(l.lesson_date)).toDateString() === getHongKongDate(selectedDetail.date).toDateString(),
                           );
                           return (
                             <div key={j} className="flex items-center">
@@ -1271,8 +1277,8 @@ const HanamiCalendar = () => {
                 })}
             </div>
             <button
-              onClick={() => setSelectedDetail(null)}
               className="mt-4 px-4 py-2 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036]"
+              onClick={() => setSelectedDetail(null)}
             >
               關閉
             </button>

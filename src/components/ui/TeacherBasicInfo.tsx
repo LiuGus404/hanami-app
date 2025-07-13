@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
-import { PopupSelect } from '@/components/ui/PopupSelect'
-import { createClient } from '@supabase/supabase-js'
-import { Teacher } from '@/types'
+import { createClient } from '@supabase/supabase-js';
+import React, { useState, useEffect } from 'react';
+
+import { PopupSelect } from '@/components/ui/PopupSelect';
+import { Teacher } from '@/types';
 
 interface TeacherFormData {
   id: string;
@@ -44,16 +45,16 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
     teacher_background: teacher.teacher_background,
     teacher_bankid: teacher.teacher_bankid,
     created_at: teacher.created_at,
-    updated_at: teacher.updated_at
+    updated_at: teacher.updated_at,
   });
 
   const requiredFields: (keyof TeacherFormData)[] = ['teacher_fullname', 'teacher_nickname'];
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
   const handleChange = (field: keyof TeacherFormData, value: string | number | null) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -94,8 +95,8 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
     console.log('updateData', updateData);
 
     try {
-    const { error } = await supabase
-      .from('hanami_employee')
+      const { error } = await supabase
+        .from('hanami_employee')
         .update(updateData)
         .eq('id', teacher.id);
 
@@ -107,20 +108,20 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
     }
   };
 
-  console.log('SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL)
-  console.log('SUPABASE_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  console.log('SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log('SUPABASE_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
   return (
     <div className="p-6 bg-white rounded-lg shadow">
       <div className="flex items-center gap-4 mb-6">
         <img
-          src={'/teacher.png'}
           alt="頭像"
           className="w-24 h-24 rounded-full border border-[#EADBC8]"
+          src={'/teacher.png'}
         />
         <div>
           <h2 className="text-xl font-semibold">
-          {formData.teacher_fullname || '未命名'}
+            {formData.teacher_fullname || '未命名'}
           </h2>
           <p className="text-gray-600">{formData.teacher_nickname}</p>
         </div>
@@ -129,89 +130,89 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">老師身份</label>
-                <PopupSelect
-            title="老師身份"
-                  options={[
+          <PopupSelect
+            options={[
               { label: '全職', value: 'full-time' },
-              { label: '兼職', value: 'part-time' }
-                  ]}
-                  selected={formData.teacher_role || ''}
+              { label: '兼職', value: 'part-time' },
+            ]}
+            selected={formData.teacher_role || ''}
+            title="老師身份"
             onChange={(value) => handleChange('teacher_role', value as string)}
-                />
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">在職狀態</label>
-                <PopupSelect
-            title="在職狀態"
-                  options={[
+          <PopupSelect
+            options={[
               { label: '在職', value: 'active' },
-              { label: '離職', value: 'inactive' }
-                  ]}
-                  selected={formData.teacher_status || ''}
+              { label: '離職', value: 'inactive' },
+            ]}
+            selected={formData.teacher_status || ''}
+            title="在職狀態"
             onChange={(value) => handleChange('teacher_status', value as string)}
-                />
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">電子郵件</label>
-            <input
+          <input
+            className="w-full px-3 py-2 border rounded-lg"
             type="email"
             value={formData.teacher_email || ''}
             onChange={(e) => handleChange('teacher_email', e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg"
-            />
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">電話</label>
           <input
+            className="w-full px-3 py-2 border rounded-lg"
             type="tel"
             value={formData.teacher_phone || ''}
             onChange={(e) => handleChange('teacher_phone', e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg"
           />
         </div>
 
         <div className="col-span-2">
           <label className="block text-sm font-medium text-gray-700">地址</label>
-            <input
+          <input
+            className="w-full px-3 py-2 border rounded-lg"
             type="text"
             value={formData.teacher_address || ''}
             onChange={(e) => handleChange('teacher_address', e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg"
-            />
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">時薪</label>
-            <input
-              type="number"
+          <input
+            className="w-full px-3 py-2 border rounded-lg"
+            type="number"
             value={formData.teacher_hsalary || ''}
             onChange={(e) => handleChange('teacher_hsalary', e.target.value ? Number(e.target.value) : null)}
-            className="w-full px-3 py-2 border rounded-lg"
-            />
+          />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">月薪</label>
-            <input
-              type="number"
+          <input
+            className="w-full px-3 py-2 border rounded-lg"
+            type="number"
             value={formData.teacher_msalary || ''}
             onChange={(e) => handleChange('teacher_msalary', e.target.value ? Number(e.target.value) : null)}
-            className="w-full px-3 py-2 border rounded-lg"
-            />
+          />
         </div>
       </div>
 
       <div className="flex justify-end mt-6">
-          <button
-          onClick={handleSubmit}
+        <button
           className="px-4 py-2 text-white bg-blue-500 rounded-lg hover:bg-blue-600"
-          >
-            儲存
-          </button>
-        </div>
+          onClick={handleSubmit}
+        >
+          儲存
+        </button>
+      </div>
     </div>
-  )
+  );
 }

@@ -1,24 +1,25 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { PopupSelect } from '@/components/ui/PopupSelect'
-import { Teacher } from '@/types'
-import BackButton from '@/components/ui/BackButton'
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+import BackButton from '@/components/ui/BackButton';
+import { PopupSelect } from '@/components/ui/PopupSelect';
+import { supabase } from '@/lib/supabase';
+import { Teacher } from '@/types';
 
 function translateRole(role: string): string {
   switch (role) {
     case 'full_time':
-      return '全職'
+      return '全職';
     case 'part_time':
-      return '兼職'
+      return '兼職';
     case 'admin':
-      return '行政'
+      return '行政';
     case 'teacher':
-      return '導師'
+      return '導師';
     default:
-      return role
+      return role;
   }
 }
 
@@ -44,74 +45,74 @@ function normalizeTeacher(data: any): Teacher {
 }
 
 export default function TeacherDetailPage() {
-  const { id } = useParams()
-  const router = useRouter()
-  const [teacher, setTeacher] = useState<Teacher | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [editData, setEditData] = useState<Teacher | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [editMode, setEditMode] = useState(false)
-  const [showRoleSelect, setShowRoleSelect] = useState(false)
-  const [showStatusSelect, setShowStatusSelect] = useState(false)
-  const [roleOptions, setRoleOptions] = useState<{ label: string; value: string }[]>([])
-  const [tempRole, setTempRole] = useState('')
-  const [tempStatus, setTempStatus] = useState('')
+  const { id } = useParams();
+  const router = useRouter();
+  const [teacher, setTeacher] = useState<Teacher | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editData, setEditData] = useState<Teacher | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [showRoleSelect, setShowRoleSelect] = useState(false);
+  const [showStatusSelect, setShowStatusSelect] = useState(false);
+  const [roleOptions, setRoleOptions] = useState<{ label: string; value: string }[]>([]);
+  const [tempRole, setTempRole] = useState('');
+  const [tempStatus, setTempStatus] = useState('');
 
   useEffect(() => {
     const fetchRoles = async () => {
       const { data, error } = await supabase
         .from('hanami_employee')
-        .select('teacher_role')
+        .select('teacher_role');
       if (!error && data) {
         const uniqueRoles = Array.from(new Set(
           data.map((r) => r.teacher_role?.trim())
-              .filter((r): r is string => !!r && !['', 'undefined'].includes(r))
-        ))
-        setRoleOptions(uniqueRoles.map((r) => ({ label: translateRole(r), value: r })))
+            .filter((r): r is string => !!r && !['', 'undefined'].includes(r)),
+        ));
+        setRoleOptions(uniqueRoles.map((r) => ({ label: translateRole(r), value: r })));
       }
-    }
-    fetchRoles()
-  }, [])
+    };
+    fetchRoles();
+  }, []);
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     const fetchTeacher = async () => {
       const { data, error } = await supabase
         .from('hanami_employee')
         .select('*')
         .eq('id', id as string)
-        .single()
+        .single();
       if (error) {
-        setError('找不到老師資料')
-        setLoading(false)
-        return
+        setError('找不到老師資料');
+        setLoading(false);
+        return;
       }
       const normalized = normalizeTeacher(data);
       setTeacher(normalized);
       setEditData(normalized);
-      setLoading(false)
-    }
-    fetchTeacher()
-  }, [id])
+      setLoading(false);
+    };
+    fetchTeacher();
+  }, [id]);
 
   useEffect(() => {
     if (editMode) {
-      setTempRole(editData?.teacher_role || '')
-      setTempStatus(editData?.teacher_status || '')
+      setTempRole(editData?.teacher_role || '');
+      setTempStatus(editData?.teacher_status || '');
     }
-  }, [editMode])
+  }, [editMode]);
 
   const handleChange = (field: keyof Teacher, value: string | number | null) => {
     if (!editData) return;
     const newData = { ...editData };
     (newData as any)[field] = value;
     setEditData(newData);
-  }
+  };
 
   const handleSave = async () => {
-    setSaving(true)
+    setSaving(true);
     if (!editData) return;
     const allowedFields = [
       'teacher_fullname',
@@ -142,24 +143,24 @@ export default function TeacherDetailPage() {
     const { error } = await supabase
       .from('hanami_employee')
       .update(updateData)
-      .eq('id', id as string)
-    setSaving(false)
+      .eq('id', id as string);
+    setSaving(false);
     if (error) {
-      alert('儲存失敗')
+      alert('儲存失敗');
     } else {
-      alert('已儲存')
-      setTeacher(editData)
+      alert('已儲存');
+      setTeacher(editData);
     }
-  }
+  };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">載入中...</div>
+    return <div className="flex items-center justify-center min-h-screen">載入中...</div>;
   }
   if (error) {
-    return <div className="flex items-center justify-center min-h-screen text-red-500">{error}</div>
+    return <div className="flex items-center justify-center min-h-screen text-red-500">{error}</div>;
   }
   if (!teacher || !editData) {
-    return <div className="flex items-center justify-center min-h-screen">找不到老師資料</div>
+    return <div className="flex items-center justify-center min-h-screen">找不到老師資料</div>;
   }
 
   return (
@@ -167,9 +168,9 @@ export default function TeacherDetailPage() {
       <div className="max-w-2xl mx-auto bg-white rounded-xl border border-[#EADBC8] p-8 shadow">
         <div className="flex flex-col items-center gap-2 mb-6">
           <img
-            src={editData.teacher_gender === 'female' ? '/girl.png' : '/teacher.png'}
             alt="頭像"
             className="w-24 h-24 rounded-full border border-[#EADBC8]"
+            src={editData.teacher_gender === 'female' ? '/girl.png' : '/teacher.png'}
           />
           <div className="text-xl font-semibold">{editData.teacher_fullname || '未命名'}</div>
           <div className="text-[#A68A64]">{editData.teacher_nickname || '—'}</div>
@@ -178,10 +179,10 @@ export default function TeacherDetailPage() {
           <h2 className="text-lg font-bold">基本資料</h2>
           {!editMode && (
             <button
-              onClick={() => setEditMode(true)}
               className="text-sm text-[#A68A64] hover:underline flex items-center gap-1"
+              onClick={() => setEditMode(true)}
             >
-              <img src="/icons/edit-pencil.png" alt="編輯" className="w-4 h-4" /> 編輯
+              <img alt="編輯" className="w-4 h-4" src="/icons/edit-pencil.png" /> 編輯
             </button>
           )}
         </div>
@@ -207,26 +208,26 @@ export default function TeacherDetailPage() {
             {editMode ? (
               <>
                 <button
-                  onClick={() => setShowRoleSelect(true)}
                   className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  onClick={() => setShowRoleSelect(true)}
                 >
                   {editData.teacher_role || '請選擇'}
                 </button>
                 {showRoleSelect && (
                   <PopupSelect
-                    title="選擇職位"
+                    mode="single"
                     options={roleOptions}
                     selected={tempRole}
+                    title="選擇職位"
+                    onCancel={() => {
+                      setTempRole(editData.teacher_role || '');
+                      setTimeout(() => setShowRoleSelect(false), 0);
+                    }}
                     onChange={(value) => setTempRole(value as string)}
                     onConfirm={() => {
                       handleChange('teacher_role', tempRole);
                       setTimeout(() => setShowRoleSelect(false), 0);
                     }}
-                    onCancel={() => {
-                      setTempRole(editData.teacher_role || '');
-                      setTimeout(() => setShowRoleSelect(false), 0);
-                    }}
-                    mode="single"
                   />
                 )}
               </>
@@ -235,8 +236,8 @@ export default function TeacherDetailPage() {
                 {editData.teacher_role === 'full_time'
                   ? '全職'
                   : editData.teacher_role === 'part_time'
-                  ? '兼職'
-                  : translateRole(editData.teacher_role || '—')}
+                    ? '兼職'
+                    : translateRole(editData.teacher_role || '—')}
               </div>
             )}
           </label>
@@ -245,29 +246,29 @@ export default function TeacherDetailPage() {
             {editMode ? (
               <>
                 <button
-                  onClick={() => setShowStatusSelect(true)}
                   className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  onClick={() => setShowStatusSelect(true)}
                 >
                   {editData.teacher_status || '請選擇'}
                 </button>
                 {showStatusSelect && (
                   <PopupSelect
-                    title="選擇狀態"
+                    mode="single"
                     options={[
                       { label: '全職', value: 'full_time' },
                       { label: '兼職', value: 'part_time' },
                     ]}
                     selected={tempStatus}
+                    title="選擇狀態"
+                    onCancel={() => {
+                      setTempStatus(editData.teacher_status || '');
+                      setTimeout(() => setShowStatusSelect(false), 0);
+                    }}
                     onChange={(value) => setTempStatus(value as string)}
                     onConfirm={() => {
                       handleChange('teacher_status', tempStatus);
                       setTimeout(() => setShowStatusSelect(false), 0);
                     }}
-                    onCancel={() => {
-                      setTempStatus(editData.teacher_status || '');
-                      setTimeout(() => setShowStatusSelect(false), 0);
-                    }}
-                    mode="single"
                   />
                 )}
               </>
@@ -275,8 +276,9 @@ export default function TeacherDetailPage() {
               <div className="px-3 py-2">{editData.teacher_status === 'full_time'
                 ? '全職'
                 : editData.teacher_status === 'part_time'
-                ? '兼職'
-                : '—'}</div>
+                  ? '兼職'
+                  : '—'}
+              </div>
             )}
           </label>
           <label className="flex flex-col gap-1">
@@ -317,14 +319,14 @@ export default function TeacherDetailPage() {
             <>
               <button
                 className="bg-[#FCD58B] text-[#2B3A3B] px-6 py-2 rounded-full font-bold hover:bg-[#ffe6a7]"
-                onClick={handleSave}
                 disabled={saving}
+                onClick={handleSave}
               >
                 {saving ? '儲存中...' : '儲存'}
               </button>
               <button
                 className="bg-gray-200 text-[#2B3A3B] px-6 py-2 rounded-full font-bold hover:bg-gray-300"
-                onClick={() => { setEditMode(false); setEditData(teacher) }}
+                onClick={() => { setEditMode(false); setEditData(teacher); }}
               >
                 取消
               </button>
@@ -340,5 +342,5 @@ export default function TeacherDetailPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

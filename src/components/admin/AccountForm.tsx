@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/lib/database.types';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { useState, useEffect } from 'react';
+
+import AccountIcon from '@/components/ui/AccountIcon';
 import HanamiButton from '@/components/ui/HanamiButton';
+import HanamiCard from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiSelect from '@/components/ui/HanamiSelect';
-import AccountIcon from '@/components/ui/AccountIcon';
+import { Database } from '@/lib/database.types';
 
 interface AccountFormProps {
   userType: 'teacher' | 'student' | 'admin';
@@ -30,7 +31,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
       setFormData({
         teacher_status: 'active',
         student_type: 'active',
-        role: 'admin'
+        role: 'admin',
       });
     }
   }, [editingUser]);
@@ -38,7 +39,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev: any) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -61,7 +62,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
             teacher_phone: formData.teacher_phone,
             teacher_role: formData.teacher_role,
             teacher_status: formData.teacher_status,
-            teacher_password: formData.teacher_password || '123456' // 預設密碼
+            teacher_password: formData.teacher_password || '123456', // 預設密碼
           };
           break;
         case 'student':
@@ -75,7 +76,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
             student_age: formData.student_age ? parseInt(formData.student_age) : null,
             course_type: formData.course_type,
             student_type: formData.student_type,
-            student_password: formData.student_password || '123456' // 預設密碼
+            student_password: formData.student_password || '123456', // 預設密碼
           };
           break;
         case 'admin':
@@ -84,7 +85,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
             admin_name: formData.admin_name,
             admin_email: formData.admin_email,
             role: formData.role,
-            admin_password: formData.admin_password || '123456' // 預設密碼
+            admin_password: formData.admin_password || '123456', // 預設密碼
           };
           break;
       }
@@ -97,7 +98,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
           .eq('id', editingUser.id);
 
         if (updateError) {
-          setError('更新失敗：' + updateError.message);
+          setError(`更新失敗：${updateError.message}`);
         } else {
           alert('帳戶更新成功');
           onSuccess();
@@ -110,7 +111,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
           .insert(data);
 
         if (insertError) {
-          setError('新增失敗：' + insertError.message);
+          setError(`新增失敗：${insertError.message}`);
         } else {
           alert('帳戶新增成功');
           onSuccess();
@@ -136,9 +137,9 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
           { name: 'teacher_role', label: '職位', type: 'text' },
           { name: 'teacher_status', label: '狀態', type: 'select', options: [
             { value: 'active', label: '在職' },
-            { value: 'inactive', label: '離職' }
-          ]},
-          { name: 'teacher_password', label: '密碼', type: 'password' }
+            { value: 'inactive', label: '離職' },
+          ] },
+          { name: 'teacher_password', label: '密碼', type: 'password' },
         ];
       case 'student':
         return [
@@ -151,9 +152,9 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
           { name: 'course_type', label: '課程類型', type: 'text' },
           { name: 'student_type', label: '狀態', type: 'select', options: [
             { value: 'active', label: '在學' },
-            { value: 'inactive', label: '休學' }
-          ]},
-          { name: 'student_password', label: '密碼', type: 'password' }
+            { value: 'inactive', label: '休學' },
+          ] },
+          { name: 'student_password', label: '密碼', type: 'password' },
         ];
       case 'admin':
         return [
@@ -161,9 +162,9 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
           { name: 'admin_email', label: '電子郵件', type: 'email', required: true },
           { name: 'role', label: '角色', type: 'select', options: [
             { value: 'admin', label: '管理員' },
-            { value: 'super_admin', label: '超級管理員' }
-          ]},
-          { name: 'admin_password', label: '密碼', type: 'password' }
+            { value: 'super_admin', label: '超級管理員' },
+          ] },
+          { name: 'admin_password', label: '密碼', type: 'password' },
         ];
       default:
         return [];
@@ -174,7 +175,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
     <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
       <HanamiCard className="w-full max-w-md mx-auto">
         <div className="flex items-center mb-6">
-          <AccountIcon type={userType} size="lg" className="mr-3" />
+          <AccountIcon className="mr-3" size="lg" type={userType} />
           <h3 className="text-lg font-bold text-[#2B3A3B]">
             {editingUser ? '編輯' : '新增'}{userType === 'teacher' ? '老師' : userType === 'student' ? '學生' : '管理員'}帳戶
           </h3>
@@ -186,25 +187,25 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit}>
           {getFormFields().map((field) => (
             <div key={field.name}>
               {field.type === 'select' ? (
                 <HanamiSelect
+                  label={field.label}
                   options={field.options || []}
+                  required={field.required}
                   value={formData[field.name] || ''}
                   onChange={(e) => handleInputChange(field.name, e.target.value)}
-                  required={field.required}
-                  label={field.label}
                 />
               ) : (
                 <HanamiInput
+                  label={field.label}
+                  placeholder={`請輸入${field.label}`}
+                  required={field.required}
                   type={field.type as 'text' | 'email' | 'password' | 'tel' | 'number'}
                   value={formData[field.name] || ''}
                   onChange={(e) => handleInputChange(field.name, e.target.value)}
-                  required={field.required}
-                  label={field.label}
-                  placeholder={`請輸入${field.label}`}
                 />
               )}
             </div>
@@ -212,16 +213,16 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
 
           <div className="flex justify-end space-x-3 pt-4">
             <HanamiButton
+              type="button"
               variant="secondary"
               onClick={onClose}
-              type="button"
             >
               取消
             </HanamiButton>
             <HanamiButton
-              variant="primary"
-              type="submit"
               disabled={loading}
+              type="submit"
+              variant="primary"
             >
               {loading ? '處理中...' : (editingUser ? '更新' : '新增')}
             </HanamiButton>

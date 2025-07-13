@@ -1,12 +1,13 @@
-'use client'
+'use client';
 
-import { useEffect, useState, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { getUserSession, clearUserSession } from '@/lib/authUtils'
-import { Spinner } from '@/components/ui/spinner'
-import AdminSidebar from '@/components/admin/AdminSidebar'
-import Breadcrumb from '@/components/ui/Breadcrumb'
-import '../globals.css'
+import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
+
+import AdminSidebar from '@/components/admin/AdminSidebar';
+import Breadcrumb from '@/components/ui/Breadcrumb';
+import { Spinner } from '@/components/ui/spinner';
+import { getUserSession, clearUserSession } from '@/lib/authUtils';
+import '../globals.css';
 
 // 動態設定頁面標題
 const setPageTitle = (pathname: string) => {
@@ -18,31 +19,31 @@ const setPageTitle = (pathname: string) => {
     '/admin/hanami-tc': '課堂管理 - Hanami 教育管理系統',
     '/admin/ai-select': 'AI 助理 - Hanami 教育管理系統',
     '/admin/lesson-availability': '課堂空缺 - Hanami 教育管理系統',
-  }
+  };
   
-  const title = titleMap[pathname] || '管理面板 - Hanami 教育管理系統'
+  const title = titleMap[pathname] || '管理面板 - Hanami 教育管理系統';
   if (typeof document !== 'undefined') {
-    document.title = title
+    document.title = title;
   }
-}
+};
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const [isLoading, setIsLoading] = useState(true)
-  const mounted = useRef(false)
-  const sessionChecked = useRef(false)
-  const isLoginPage = pathname === '/admin/login'
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(true);
+  const mounted = useRef(false);
+  const sessionChecked = useRef(false);
+  const isLoginPage = pathname === '/admin/login';
 
   useEffect(() => {
-    mounted.current = true
+    mounted.current = true;
 
     // 設定頁面標題
-    setPageTitle(pathname)
+    setPageTitle(pathname);
 
     const checkAuth = async () => {
       // 防止重複檢查
@@ -51,50 +52,50 @@ export default function AdminLayout({
 
       try {
         // 檢查用戶會話
-        const userSession = getUserSession()
+        const userSession = getUserSession();
         
         if (!userSession || userSession.role !== 'admin') {
           // 清除無效會話
           if (userSession) {
-            clearUserSession()
+            clearUserSession();
           }
           
           if (!isLoginPage && mounted.current) {
-            router.replace('/admin/login')
+            router.replace('/admin/login');
           }
         } else if (isLoginPage && mounted.current) {
           // 如果已登入且當前在登入頁面，重定向到管理面板
-          router.replace('/admin')
+          router.replace('/admin');
         }
       } catch (error) {
-        console.error('Auth check error:', error)
-        clearUserSession()
+        console.error('Auth check error:', error);
+        clearUserSession();
         if (!isLoginPage && mounted.current) {
-          router.replace('/admin/login')
+          router.replace('/admin/login');
         }
       } finally {
         if (mounted.current) {
-          setIsLoading(false)
+          setIsLoading(false);
         }
       }
-    }
+    };
 
-    checkAuth()
+    checkAuth();
 
     return () => {
-      mounted.current = false
-    }
-  }, []) // 移除 router 和 isLoginPage 依賴
+      mounted.current = false;
+    };
+  }, []); // 移除 router 和 isLoginPage 依賴
 
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#FFF9F2]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto" />
           <p className="mt-4 text-[#2B3A3B]">載入中...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // 如果是登入頁面，直接顯示內容
@@ -103,13 +104,13 @@ export default function AdminLayout({
       <div className="min-h-screen bg-[#FFF9F2]">
         {children}
       </div>
-    )
+    );
   }
 
   // 檢查是否有有效的管理員會話
-  const userSession = getUserSession()
+  const userSession = getUserSession();
   if (!userSession || userSession.role !== 'admin') {
-    return null
+    return null;
   }
 
   // 顯示管理員頁面內容
@@ -127,5 +128,5 @@ export default function AdminLayout({
       
       <AdminSidebar isLoggedIn={true} />
     </div>
-  )
+  );
 }

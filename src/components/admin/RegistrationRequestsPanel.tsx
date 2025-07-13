@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+
+import HanamiBadge from '@/components/ui/HanamiBadge';
+import HanamiButton from '@/components/ui/HanamiButton';
+import HanamiCard from '@/components/ui/HanamiCard';
 import { supabase } from '@/lib/supabase';
 import { RegistrationRequest, RegistrationStatus, UserRole } from '@/types/auth';
-import HanamiCard from '@/components/ui/HanamiCard';
-import HanamiButton from '@/components/ui/HanamiButton';
-import HanamiBadge from '@/components/ui/HanamiBadge';
 
 interface RegistrationRequestsPanelProps {}
 
@@ -114,7 +115,7 @@ export default function RegistrationRequestsPanel({}: RegistrationRequestsPanelP
       if (!request) return;
 
       // 生成隨機密碼
-      const password = Math.random().toString(36).slice(-8) + Math.random().toString(36).toUpperCase().slice(-4) + '!1';
+      const password = `${Math.random().toString(36).slice(-8) + Math.random().toString(36).toUpperCase().slice(-4)}!1`;
 
       // 調用 API 創建 Auth 用戶和資料表記錄
       const response = await fetch('/api/auth/create-account', {
@@ -206,7 +207,7 @@ export default function RegistrationRequestsPanel({}: RegistrationRequestsPanelP
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A64B2A]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A64B2A]" />
       </div>
     );
   }
@@ -236,9 +237,9 @@ export default function RegistrationRequestsPanel({}: RegistrationRequestsPanelP
               狀態篩選
             </label>
             <select
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as RegistrationStatus | 'all')}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
             >
               <option value="all">全部狀態</option>
               <option value="pending">待審核</option>
@@ -252,9 +253,9 @@ export default function RegistrationRequestsPanel({}: RegistrationRequestsPanelP
               角色篩選
             </label>
             <select
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as UserRole | 'all')}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
             >
               <option value="all">全部角色</option>
               <option value="admin">管理員</option>
@@ -325,24 +326,24 @@ export default function RegistrationRequestsPanel({}: RegistrationRequestsPanelP
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleViewDetails(request)}
                         className="text-indigo-600 hover:text-indigo-900"
+                        onClick={() => handleViewDetails(request)}
                       >
                         查看詳情
                       </button>
                       {request.status === 'pending' && (
                         <>
                           <button
-                            onClick={() => reviewRequest(request.id, 'approved')}
-                            disabled={processingRequest === request.id}
                             className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                            disabled={processingRequest === request.id}
+                            onClick={() => reviewRequest(request.id, 'approved')}
                           >
                             {processingRequest === request.id ? '處理中...' : '通過'}
                           </button>
                           <button
-                            onClick={() => handleReject(request)}
-                            disabled={processingRequest === request.id}
                             className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                            disabled={processingRequest === request.id}
+                            onClick={() => handleReject(request)}
                           >
                             拒絕
                           </button>
@@ -440,29 +441,29 @@ export default function RegistrationRequestsPanel({}: RegistrationRequestsPanelP
                 {selectedRequest.status === 'pending' && (
                   <>
                     <HanamiButton
-                      onClick={() => reviewRequest(selectedRequest.id, 'approved')}
                       disabled={processingRequest === selectedRequest.id}
+                      onClick={() => reviewRequest(selectedRequest.id, 'approved')}
                     >
                       {processingRequest === selectedRequest.id ? '處理中...' : '通過申請'}
                     </HanamiButton>
                     <button
+                      className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50"
+                      disabled={processingRequest === selectedRequest.id}
                       onClick={() => {
                         setShowDetailModal(false);
                         handleReject(selectedRequest);
                       }}
-                      disabled={processingRequest === selectedRequest.id}
-                      className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50"
                     >
                       拒絕申請
                     </button>
                   </>
                 )}
                 <button
+                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
                   onClick={() => {
                     setShowDetailModal(false);
                     setSelectedRequest(null);
                   }}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
                 >
                   關閉
                 </button>
@@ -486,28 +487,28 @@ export default function RegistrationRequestsPanel({}: RegistrationRequestsPanelP
                   拒絕原因 *
                 </label>
                 <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  rows={4}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                   placeholder="請填寫拒絕原因..."
+                  rows={4}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
                 />
               </div>
 
               <div className="mt-6 flex justify-end space-x-3">
                 <HanamiButton
-                  onClick={handleRejectSubmit}
                   disabled={!rejectionReason.trim() || processingRequest === selectedRequest.id}
+                  onClick={handleRejectSubmit}
                 >
                   {processingRequest === selectedRequest.id ? '處理中...' : '確認拒絕'}
                 </HanamiButton>
                 <button
+                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
                   onClick={() => {
                     setShowRejectionModal(false);
                     setRejectionReason('');
                     setSelectedRequest(null);
                   }}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
                 >
                   取消
                 </button>

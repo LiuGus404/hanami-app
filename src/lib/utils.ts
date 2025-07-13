@@ -1,9 +1,10 @@
-import { type ClassValue, clsx } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-import { getSupabaseClient } from '@/lib/supabase'
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+import { getSupabaseClient } from '@/lib/supabase';
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -27,7 +28,7 @@ const getHongKongDate = (date = new Date()) => {
  */
 export async function calculateRemainingLessons(
   studentId: string,
-  today?: Date
+  today?: Date,
 ): Promise<number> {
   const supabase = getSupabaseClient();
   const now = today ? new Date(today) : getHongKongDate();
@@ -85,7 +86,7 @@ export async function calculateRemainingLessons(
  */
 export async function calculateRemainingLessonsBatch(
   studentIds: string[],
-  today?: Date
+  today?: Date,
 ): Promise<Record<string, number>> {
   const supabase = getSupabaseClient();
   const now = today ? new Date(today) : getHongKongDate();

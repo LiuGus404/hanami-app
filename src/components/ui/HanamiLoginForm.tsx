@@ -1,9 +1,11 @@
 'use client';
 
-import React from 'react';
-import { HanamiCard, HanamiButton, HanamiInput } from './index';
-import AccountIcon from './AccountIcon';
 import Link from 'next/link';
+import React from 'react';
+
+import AccountIcon from './AccountIcon';
+
+import { HanamiCard, HanamiButton, HanamiInput } from './index';
 
 interface HanamiLoginFormProps {
   userType: 'admin' | 'teacher' | 'parent';
@@ -22,7 +24,7 @@ export default function HanamiLoginForm({
   error = '',
   title,
   subtitle,
-  onBackToHome
+  onBackToHome,
 }: HanamiLoginFormProps) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -65,9 +67,9 @@ export default function HanamiLoginForm({
           {/* Logo 和標題 */}
           <div className="mb-6">
             <AccountIcon 
-              type={userType} 
-              size="lg" 
               className="mx-auto mb-4" 
+              size="lg" 
+              type={userType} 
             />
             <h1 className="text-xl font-bold text-brown-700 mb-2">
               {title || getDefaultTitle()}
@@ -78,7 +80,7 @@ export default function HanamiLoginForm({
           </div>
 
           {/* 登入表單 */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             {error && (
               <div className="bg-[#FFE0E0] border border-[#FF6B6B] text-[#A64B2A] px-4 py-3 rounded-xl text-sm">
                 {error}
@@ -90,12 +92,12 @@ export default function HanamiLoginForm({
                 {userType === 'admin' ? '管理員帳號' : '電子郵件地址'}
               </label>
               <input
-                type="email"
-                placeholder={userType === 'admin' ? '請輸入管理員帳號' : '請輸入您的電子郵件'}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFD59A] bg-white text-brown-700 placeholder-brown-400"
+                placeholder={userType === 'admin' ? '請輸入管理員帳號' : '請輸入您的電子郵件'}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
@@ -104,20 +106,20 @@ export default function HanamiLoginForm({
                 密碼
               </label>
               <input
-                type="password"
-                placeholder="請輸入您的密碼"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFD59A] bg-white text-brown-700 placeholder-brown-400"
+                placeholder="請輸入您的密碼"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 
             <HanamiButton
+              className="w-full"
+              disabled={loading}
               type="submit"
               variant="primary"
-              disabled={loading}
-              className="w-full"
             >
               {loading ? '登入中...' : '登入'}
             </HanamiButton>
@@ -128,7 +130,7 @@ export default function HanamiLoginForm({
             <div className="text-center">
               <p className="text-sm text-brown-600 mb-3">
                 還沒有帳號？{' '}
-                <Link href="/register" className="font-medium text-brown-700 hover:text-brown-800 underline">
+                <Link className="font-medium text-brown-700 hover:text-brown-800 underline" href="/register">
                   立即註冊
                 </Link>
               </p>
@@ -139,8 +141,8 @@ export default function HanamiLoginForm({
           {onBackToHome && (
             <div className="mt-4">
               <button
-                onClick={onBackToHome}
                 className="text-brown-600 hover:text-brown-700 text-sm transition-colors"
+                onClick={onBackToHome}
               >
                 ← 返回首頁
               </button>

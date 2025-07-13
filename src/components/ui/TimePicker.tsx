@@ -1,7 +1,7 @@
-import React from 'react'
-import dynamic from 'next/dynamic'
-import 'react-time-picker/dist/TimePicker.css'
-import 'react-clock/dist/Clock.css'
+import dynamic from 'next/dynamic';
+import React from 'react';
+import 'react-time-picker/dist/TimePicker.css';
+import 'react-clock/dist/Clock.css';
 
 // 動態導入以避免 SSR 問題
 const TimePickerLib = dynamic(() => import('react-time-picker'), {
@@ -10,8 +10,8 @@ const TimePickerLib = dynamic(() => import('react-time-picker'), {
     <div className="w-full p-2 border border-[#EADBC8] rounded bg-white text-[#4B4036] animate-pulse">
       載入中...
     </div>
-  )
-})
+  ),
+});
 
 interface TimePickerProps {
   label?: string;
@@ -19,23 +19,23 @@ interface TimePickerProps {
   onChange: (val: string) => void;
 }
 
-export default function TimePicker({ label = "選擇時間", value, onChange }: TimePickerProps) {
+export default function TimePicker({ label = '選擇時間', value, onChange }: TimePickerProps) {
   return (
     <div className="flex flex-col gap-1">
       {label && <label className="text-sm text-[#4B4036] mb-1">{label}</label>}
       <div className="hanami-timepicker-wrapper">
         <TimePickerLib
-          value={value}
-          onChange={(val) => { if (typeof val === 'string') onChange(val) }}
-          disableClock={true}
-          format="HH:mm"
+          className="hanami-timepicker-input"
           clearIcon={null}
           clockIcon={null}
+          disableClock={true}
+          format="HH:mm"
           locale="zh-TW"
-          className="hanami-timepicker-input"
+          value={value}
+          onChange={(val) => { if (typeof val === 'string') onChange(val); }}
         />
       </div>
-      <style jsx global>{`
+      <style global jsx>{`
         .hanami-timepicker-wrapper .react-time-picker {
           width: 200px;
           background: #FFFDF8;
@@ -67,7 +67,8 @@ export default function TimePicker({ label = "選擇時間", value, onChange }: 
         .hanami-timepicker-input .react-time-picker__clock-button {
           display: none;
         }
-      `}</style>
+      `}
+      </style>
     </div>
-  )
+  );
 }

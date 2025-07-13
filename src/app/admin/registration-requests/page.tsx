@@ -2,8 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
-import { getUserSession, clearUserSession } from '@/lib/authUtils';
+
 import RegistrationRequestsPanel from '@/components/admin/RegistrationRequestsPanel';
+import { getUserSession, clearUserSession } from '@/lib/authUtils';
 
 export default function RegistrationRequestsPage() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function RegistrationRequestsPage() {
       console.log('Registration Requests Page - Invalid session, redirecting to login');
       clearUserSession();
       router.replace('/admin/login');
-      return;
+      
     }
   }, []);
 
@@ -38,8 +39,8 @@ export default function RegistrationRequestsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={handleBackToDashboard}
                 className="bg-[#FDE6B8] text-[#A64B2A] font-semibold px-4 py-2 rounded-full border border-[#EAC29D] shadow hover:bg-[#fce2c8] transition"
+                onClick={handleBackToDashboard}
               >
                 ← 返回儀表板
               </button>

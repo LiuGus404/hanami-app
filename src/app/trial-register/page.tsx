@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
+
+import { supabase } from '@/lib/supabase';
 import { ScheduleOption, PreferTime } from '@/types/schedule';
 
 export default function TrialRegisterPage() {
@@ -111,7 +112,7 @@ export default function TrialRegisterPage() {
       const fixedTimeSlots = [
         '09:00-12:30',
         '13:00-16:00', 
-        '16:00-19:30'
+        '16:00-19:30',
       ];
       
       const weekdays = ['星期日', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -124,7 +125,7 @@ export default function TrialRegisterPage() {
             label: `${day} ${timeslot}`,
             value: `${weekdayIndex}_${timeslot}`,
             weekday: weekdayIndex,
-            timeslot: timeslot
+            timeslot,
           });
         });
       });
@@ -156,7 +157,7 @@ export default function TrialRegisterPage() {
   const handleChange = (field: string, value: any) => {
     setForm(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -216,7 +217,7 @@ export default function TrialRegisterPage() {
         selectedWeeks.add(weekday);
         // 找到對應的 schedule 選項
         const option = scheduleOptions.find(opt => 
-          opt.label === `${dayText} ${timeText}`
+          opt.label === `${dayText} ${timeText}`,
         );
         if (option) {
           selectedRanges.push(option.value);
@@ -227,7 +228,7 @@ export default function TrialRegisterPage() {
     // 轉換為 JSON 格式
     const preferTimeJson: PreferTime = {
       week: Array.from(selectedWeeks).sort(),
-      range: selectedRanges
+      range: selectedRanges,
     };
     
     const id = form.id || crypto.randomUUID();
@@ -281,8 +282,8 @@ export default function TrialRegisterPage() {
               course_types: form.course_types,
               prefer_time: form.prefer_time,
               notes: form.notes,
-              registration_time: now
-            }
+              registration_time: now,
+            },
           };
           
           // 使用no-cors模式避免CORS問題
@@ -292,7 +293,7 @@ export default function TrialRegisterPage() {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(webhookData)
+            body: JSON.stringify(webhookData),
           });
           
           console.log('✅ Webhook發送成功');
@@ -304,7 +305,7 @@ export default function TrialRegisterPage() {
         setSubmitted(true);
       } else {
         console.error('❌ 插入錯誤:', error);
-        alert('提交失敗：' + error.message);
+        alert(`提交失敗：${error.message}`);
       }
     } catch (err) {
       console.error('❌ 提交異常:', err);
@@ -326,7 +327,7 @@ export default function TrialRegisterPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFF9F2]">
         <div className="p-6 max-w-md mx-auto text-center bg-[#FFFAF2] rounded-xl border border-[#EADBC8]">
-          <Image src="/rabbit.png" alt="success" width={48} height={48} className="mx-auto mb-3" />
+          <Image alt="success" className="mx-auto mb-3" height={48} src="/rabbit.png" width={48} />
           <h2 className="text-[#4B4036] font-semibold text-lg">已成功提交！</h2>
           <p className="text-sm text-[#87704e] mt-1">
             我們會儘快聯絡你安排試堂
@@ -349,11 +350,11 @@ export default function TrialRegisterPage() {
             <div>
               <label className="block text-sm text-[#4B4036] mb-1">小朋友姓名 *</label>
               <input
+                className="w-full border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFFCF5] text-[#4B4036]"
+                placeholder="請輸入小朋友全名"
                 type="text"
                 value={form.full_name}
                 onChange={(e) => handleChange('full_name', e.target.value)}
-                placeholder="請輸入小朋友全名"
-                className="w-full border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFFCF5] text-[#4B4036]"
               />
             </div>
 
@@ -362,12 +363,13 @@ export default function TrialRegisterPage() {
               <label className="block text-sm text-[#4B4036] mb-1">出生日期 *</label>
               <div className="flex gap-2">
                 <input
+                  className="flex-1 border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFFCF5] text-[#4B4036]"
                   type="date"
                   value={form.student_dob}
                   onChange={(e) => handleChange('student_dob', e.target.value)}
-                  className="flex-1 border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFFCF5] text-[#4B4036]"
                 />
                 <button
+                  className="px-3 py-2 bg-[#EADBC8] text-[#4B4036] rounded-lg text-sm"
                   type="button"
                   onClick={() => {
                     if (form.student_dob) {
@@ -390,7 +392,6 @@ export default function TrialRegisterPage() {
                       alert('請先輸入出生日期');
                     }
                   }}
-                  className="px-3 py-2 bg-[#EADBC8] text-[#4B4036] rounded-lg text-sm"
                 >
                   點我計算年齡
                 </button>
@@ -401,11 +402,11 @@ export default function TrialRegisterPage() {
             <div>
               <label className="block text-sm text-[#4B4036] mb-1">小朋友年齡</label>
               <input
+                disabled
+                className="w-full border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFF8EE] text-[#4B4036] opacity-80 cursor-not-allowed"
+                placeholder="請輸入出生日期後按計算"
                 type="text"
                 value={form.student_age}
-                disabled
-                placeholder="請輸入出生日期後按計算"
-                className="w-full border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFF8EE] text-[#4B4036] opacity-80 cursor-not-allowed"
               />
             </div>
 
@@ -413,11 +414,11 @@ export default function TrialRegisterPage() {
             <div>
               <label className="block text-sm text-[#4B4036] mb-1">聯絡電話 *</label>
               <input
+                className="w-full border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFFCF5] text-[#4B4036]"
+                placeholder="請輸入家長電話"
                 type="text"
                 value={form.phone_no}
                 onChange={(e) => handleChange('phone_no', e.target.value)}
-                placeholder="請輸入家長電話"
-                className="w-full border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFFCF5] text-[#4B4036]"
               />
             </div>
 
@@ -428,6 +429,11 @@ export default function TrialRegisterPage() {
                 {courseTypes.map((type) => (
                   <button
                     key={type}
+                    className={`px-3 py-1 rounded-full text-sm border ${
+                      (form.course_types).includes(type)
+                        ? 'bg-[#FDE6C2] border-[#E4B888] text-[#4B4036]'
+                        : 'bg-white border-[#D8CDBF] text-[#87704e]'
+                    }`}
                     type="button"
                     onClick={() => {
                       const arr = Array.isArray(form.course_types) ? form.course_types : [];
@@ -436,11 +442,6 @@ export default function TrialRegisterPage() {
                         : [...arr, type];
                       handleChange('course_types', updated);
                     }}
-                    className={`px-3 py-1 rounded-full text-sm border ${
-                      (form.course_types as string[]).includes(type)
-                        ? 'bg-[#FDE6C2] border-[#E4B888] text-[#4B4036]'
-                        : 'bg-white border-[#D8CDBF] text-[#87704e]'
-                    }`}
                   >
                     {type}
                   </button>
@@ -468,25 +469,25 @@ export default function TrialRegisterPage() {
                           <div className="font-medium text-[#4B4036] min-w-[60px]">{dayText}</div>
                           <div className="space-x-2 text-sm flex-shrink-0">
                             <button
+                              className="px-1.5 py-0.5 text-xs bg-white text-[#4B4036] border border-[#D8CDBF] rounded-md hover:bg-[#f5f5f5] transition"
                               type="button"
                               onClick={() => {
                                 const updated = [
                                   ...form.prefer_time,
                                   ...dayOptions.map((opt) => opt.label),
                                 ].filter((v, i, arr) => arr.indexOf(v) === i); // 去重
-                                handleChange('prefer_time', updated as string[]);
+                                handleChange('prefer_time', updated);
                               }}
-                              className="px-1.5 py-0.5 text-xs bg-white text-[#4B4036] border border-[#D8CDBF] rounded-md hover:bg-[#f5f5f5] transition"
                             >
                               全選
                             </button>
                             <button
+                              className="px-1.5 py-0.5 text-xs bg-white text-[#87704e] border border-[#D8CDBF] rounded-md hover:bg-[#f5f5f5] transition"
                               type="button"
                               onClick={() => {
                                 const updated = form.prefer_time.filter((v) => !dayOptions.map((opt) => opt.label).includes(v));
                                 handleChange('prefer_time', updated as string[]);
                               }}
-                              className="px-1.5 py-0.5 text-xs bg-white text-[#87704e] border border-[#D8CDBF] rounded-md hover:bg-[#f5f5f5] transition"
                             >
                               取消
                             </button>
@@ -498,18 +499,18 @@ export default function TrialRegisterPage() {
                             return (
                               <button
                                 key={label}
-                                onClick={() => {
-                                  const current = form.prefer_time;
-                                  const updated = (current as string[]).includes(label)
-                                    ? (current as string[]).filter((v) => v !== label)
-                                    : [...(current as string[]), label];
-                                  handleChange('prefer_time', updated as string[]);
-                                }}
                                 className={`px-3 py-1 rounded-full text-sm border ${
                                   (form.prefer_time as string[]).includes(label)
                                     ? 'bg-[#FDE6C2] border-[#E4B888] text-[#4B4036]'
                                     : 'bg-white border-[#D8CDBF] text-[#87704e]'
                                 }`}
+                                onClick={() => {
+                                  const current = form.prefer_time;
+                                  const updated = (current as string[]).includes(label)
+                                    ? (current as string[]).filter((v) => v !== label)
+                                    : [...(current as string[]), label];
+                                  handleChange('prefer_time', updated);
+                                }}
                               >
                                 {option.timeslot || ''}
                               </button>
@@ -527,11 +528,11 @@ export default function TrialRegisterPage() {
             <div>
               <label className="block text-sm text-[#4B4036] mb-1">學習目標或其他備註</label>
               <textarea
+                className="w-full border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFFCF5] text-[#4B4036]"
+                placeholder="例如：小朋友午睡時間是1300-1500，所以1500後都ok;屯門放學出來最快要1730才能到達；小朋友目標是培養興趣"
+                rows={3}
                 value={form.notes}
                 onChange={(e) => handleChange('notes', e.target.value)}
-                placeholder="例如：小朋友午睡時間是1300-1500，所以1500後都ok;屯門放學出來最快要1730才能到達；小朋友目標是培養興趣"
-                className="w-full border border-[#EADBC8] rounded-lg px-4 py-2 bg-[#FFFCF5] text-[#4B4036]"
-                rows={3}
               />
             </div>
 
@@ -544,9 +545,9 @@ export default function TrialRegisterPage() {
                 <div className="relative">
                   {captchaImage ? (
                     <img 
-                      src={captchaImage} 
                       alt="驗證碼" 
-                      className="border border-[#EADBC8] rounded bg-white"
+                      className="border border-[#EADBC8] rounded bg-white" 
+                      src={captchaImage}
                       style={{ width: '120px', height: '40px' }}
                     />
                   ) : (
@@ -558,21 +559,21 @@ export default function TrialRegisterPage() {
                     </div>
                   )}
                   <button
-                    type="button"
-                    onClick={generateCaptcha}
                     className="absolute -top-1 -right-1 w-6 h-6 bg-[#FFB84C] text-white rounded-full text-xs flex items-center justify-center hover:bg-[#FFA726] transition-colors"
                     title="重新生成驗證碼"
+                    type="button"
+                    onClick={generateCaptcha}
                   >
                     ↻
                   </button>
                 </div>
                 <input
+                  className="flex-1 border border-[#EADBC8] rounded-lg px-4 py-2 bg-white text-[#4B4036] uppercase"
+                  maxLength={4}
+                  placeholder="請輸入驗證碼"
                   type="text"
                   value={captchaAnswer}
                   onChange={(e) => setCaptchaAnswer(e.target.value)}
-                  placeholder="請輸入驗證碼"
-                  className="flex-1 border border-[#EADBC8] rounded-lg px-4 py-2 bg-white text-[#4B4036] uppercase"
-                  maxLength={4}
                 />
               </div>
               <p className="text-xs text-[#87704e] mt-2">
@@ -581,8 +582,8 @@ export default function TrialRegisterPage() {
             </div>
 
             <button
-              onClick={handleSubmit}
               className="w-full bg-[#A68A64] text-white py-2 rounded-full font-semibold hover:bg-[#8f7350] transition"
+              onClick={handleSubmit}
             >
               提交登記
             </button>

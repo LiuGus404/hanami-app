@@ -1,50 +1,54 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { motion } from 'framer-motion'
-import { Checkbox } from '@/components/ui/checkbox'
-import { PopupSelect } from '@/components/ui/PopupSelect'
-import { supabase } from '@/lib/supabase'
-import { useRouter, useSearchParams } from 'next/navigation'
-import StudentCard from '@/components/ui/StudentCard'
-import { calculateRemainingLessonsBatch } from '@/lib/utils'
-import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw } from 'lucide-react'
-import { useUser } from '@/hooks/useUser'
-import { useParams } from 'next/navigation'
-import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel'
-import BackButton from '@/components/ui/BackButton'
+import { motion } from 'framer-motion';
+import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { useState, useEffect, useRef, useMemo } from 'react';
+
+import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel';
+import BackButton from '@/components/ui/BackButton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { PopupSelect } from '@/components/ui/PopupSelect';
+import StudentCard from '@/components/ui/StudentCard';
+import { useUser } from '@/hooks/useUser';
+import { supabase } from '@/lib/supabase';
+import { calculateRemainingLessonsBatch } from '@/lib/utils';
+
+
+
+
 
 export default function StudentManagementPage() {
-  const searchParams = useSearchParams()
-  const filterParam = searchParams.get('filter')
+  const searchParams = useSearchParams();
+  const filterParam = searchParams.get('filter');
   
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([])
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [selectedCourses, setSelectedCourses] = useState<string[]>(() => {
-    if (filterParam === 'regular') return ['常規']
-    if (filterParam === 'trial') return ['試堂']
-    if (filterParam === 'inactive') return ['停用學生']
-    return []
-  })
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [students, setStudents] = useState<any[]>([])
-  const [inactiveStudents, setInactiveStudents] = useState<any[]>([])
-  const [selectedWeekdays, setSelectedWeekdays] = useState<string[]>([])
-  const [weekdayDropdownOpen, setWeekdayDropdownOpen] = useState(false)
+    if (filterParam === 'regular') return ['常規'];
+    if (filterParam === 'trial') return ['試堂'];
+    if (filterParam === 'inactive') return ['停用學生'];
+    return [];
+  });
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [students, setStudents] = useState<any[]>([]);
+  const [inactiveStudents, setInactiveStudents] = useState<any[]>([]);
+  const [selectedWeekdays, setSelectedWeekdays] = useState<string[]>([]);
+  const [weekdayDropdownOpen, setWeekdayDropdownOpen] = useState(false);
   const [selectedLessonFilter, setSelectedLessonFilter] = useState<'all' | 'gt2' | 'lte2' | 'custom'>(() => {
-    if (filterParam === 'lastLesson') return 'custom'
-    return 'all'
-  })
+    if (filterParam === 'lastLesson') return 'custom';
+    return 'all';
+  });
   const [customLessonCount, setCustomLessonCount] = useState<number | ''>(() => {
-    if (filterParam === 'lastLesson') return 1
-    return ''
-  })
-  const [lessonDropdownOpen, setLessonDropdownOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid')
-  const [pageSize, setPageSize] = useState(20)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false)
-  const [columnSelectorOpen, setColumnSelectorOpen] = useState(false)
+    if (filterParam === 'lastLesson') return 1;
+    return '';
+  });
+  const [lessonDropdownOpen, setLessonDropdownOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false);
+  const [columnSelectorOpen, setColumnSelectorOpen] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'student_oid',
     'full_name',
@@ -55,21 +59,21 @@ export default function StudentManagementPage() {
     'regular_timeslot',
     'remaining_lessons',
     'contact_number',
-    'health_notes'
-  ])
-  const [isLoading, setIsLoading] = useState(false)
+    'health_notes',
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // 排序相關狀態
-  const [sortField, setSortField] = useState<string>('')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  const router = useRouter()
-  const { user, loading: userLoading } = useUser()
-  const { id } = useParams()
+  const router = useRouter();
+  const { user, loading: userLoading } = useUser();
+  const { id } = useParams();
 
   // 添加防抖機制
-  const dataFetchedRef = useRef(false)
-  const loadingRef = useRef(false)
+  const dataFetchedRef = useRef(false);
+  const loadingRef = useRef(false);
 
   // 基本欄位（強制顯示，但不在選單中）
   // { label: '學生編號', value: 'student_oid' },
@@ -94,8 +98,8 @@ export default function StudentManagementPage() {
     { label: '健康備註', value: 'health_notes' },
     { label: '試堂日期', value: 'lesson_date' },
     { label: '試堂時間', value: 'actual_timeslot' },
-    { label: '停用日期', value: 'inactive_date' }
-  ]
+    { label: '停用日期', value: 'inactive_date' },
+  ];
 
   const [remainingLessonsMap, setRemainingLessonsMap] = useState<Record<string, number>>({});
   const [remainingLoading, setRemainingLoading] = useState(false);
@@ -105,91 +109,91 @@ export default function StudentManagementPage() {
 
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
-    if (userLoading || !user) return
+    if (userLoading || !user) return;
     
     // 如果用戶沒有權限，重定向
     if (!['admin', 'manager'].includes(user.role)) {
-      router.push('/')
-      return
+      router.push('/');
+      return;
     }
 
     // 如果已經載入過數據，不重複載入
-    if (dataFetchedRef.current) return
+    if (dataFetchedRef.current) return;
     
     // 防止重複載入
-    if (loadingRef.current) return
-    loadingRef.current = true
+    if (loadingRef.current) return;
+    loadingRef.current = true;
 
     const checkAndFetch = async () => {
       try {
         // 獲取常規學生數據
         const { data: studentData, error: studentError } = await supabase
           .from('Hanami_Students')
-          .select('id, full_name, student_age, student_preference, course_type, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes')
+          .select('id, full_name, student_age, student_preference, course_type, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes');
 
         // 獲取試堂學生數據
         const { data: trialStudentData, error: trialStudentError } = await supabase
           .from('hanami_trial_students')
-          .select('*')
+          .select('*');
 
         // 獲取停用學生數據
         const { data: inactiveStudentData, error: inactiveStudentError } = await supabase
           .from('inactive_student_list')
-          .select('*')
+          .select('*');
 
         if (studentError) {
-          console.error('Error fetching regular students:', studentError)
-          loadingRef.current = false
-          return
+          console.error('Error fetching regular students:', studentError);
+          loadingRef.current = false;
+          return;
         }
 
         if (trialStudentError) {
-          console.error('Error fetching trial students:', trialStudentError)
-          loadingRef.current = false
-          return
+          console.error('Error fetching trial students:', trialStudentError);
+          loadingRef.current = false;
+          return;
         }
 
         if (inactiveStudentError) {
-          console.error('Error fetching inactive students:', inactiveStudentError)
-          loadingRef.current = false
-          return
+          console.error('Error fetching inactive students:', inactiveStudentError);
+          loadingRef.current = false;
+          return;
         }
 
         // 處理常規學生數據
-        const regularStudents = studentData || []
+        const regularStudents = studentData || [];
         
         // 計算常規學生的剩餘堂數
-        const regularStudentIds = regularStudents.map(student => student.id)
-        const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date())
+        const regularStudentIds = regularStudents.map(student => student.id);
+        const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
         
         // 為常規學生添加剩餘堂數
         const regularStudentsWithRemaining = regularStudents.map(student => ({
           ...student,
-          remaining_lessons: remainingLessonsMap[student.id] || 0
-        }))
+          remaining_lessons: remainingLessonsMap[student.id] || 0,
+        }));
 
         // 處理試堂學生數據
         const trialStudents = (trialStudentData || []).map((trial) => {
           // 計算學生年齡
-          let student_age = 0
+          let student_age = 0;
           if (trial.student_dob) {
-            const dob = new Date(trial.student_dob)
-            const now = new Date()
-            let years = now.getFullYear() - dob.getFullYear()
-            let months = now.getMonth() - dob.getMonth()
+            const dob = new Date(trial.student_dob);
+            const now = new Date();
+            let years = now.getFullYear() - dob.getFullYear();
+            let months = now.getMonth() - dob.getMonth();
             if (months < 0) {
-              years -= 1
-              months += 12
+              years -= 1;
+              months += 12;
             }
-            student_age = years * 12 + months
+            student_age = years * 12 + months;
           }
 
           // 計算星期 - 修復試堂學生的星期計算邏輯
-          let weekday = null
+          let weekday = null;
           if (trial.lesson_date) {
-            const trialDate = new Date(trial.lesson_date)
+            const trialDate = new Date(trial.lesson_date);
             // 不需要加8小時，直接使用本地時間
-            weekday = trialDate.getDay().toString()
+            weekday = trialDate.getDay().toString();
           }
 
           return {
@@ -200,7 +204,7 @@ export default function StudentManagementPage() {
             course_type: trial.course_type || null,
             remaining_lessons: null, // 試堂學生沒有剩餘堂數概念，設為 null
             regular_weekday: weekday !== null ? [weekday] : [],
-            weekday: weekday,
+            weekday,
             gender: trial.gender || null,
             student_type: '試堂',
             lesson_date: trial.lesson_date,
@@ -216,9 +220,9 @@ export default function StudentManagementPage() {
             parent_email: trial.parent_email || null,
             student_dob: trial.student_dob || null,
             started_date: trial.lesson_date || null, // 試堂學生的入學日期就是試堂日期
-            duration_months: trial.duration_months || null
-          }
-        })
+            duration_months: trial.duration_months || null,
+          };
+        });
 
         // 處理停用學生數據
         const inactiveStudents = (inactiveStudentData || []).map((inactive) => {
@@ -239,71 +243,71 @@ export default function StudentManagementPage() {
             health_notes: inactive.health_notes || null,
             inactive_date: inactive.inactive_date,
             inactive_reason: inactive.inactive_reason,
-            is_inactive: true
-          }
-        })
+            is_inactive: true,
+          };
+        });
 
         // 合併所有學生數據
-        const allStudents = [...regularStudentsWithRemaining, ...trialStudents, ...inactiveStudents]
-        setStudents(allStudents)
-        setInactiveStudents(inactiveStudents)
-        dataFetchedRef.current = true
-        loadingRef.current = false
+        const allStudents = [...regularStudentsWithRemaining, ...trialStudents, ...inactiveStudents];
+        setStudents(allStudents);
+        setInactiveStudents(inactiveStudents);
+        dataFetchedRef.current = true;
+        loadingRef.current = false;
       } catch (error) {
-        console.error('Error in checkAndFetch:', error)
-        loadingRef.current = false
+        console.error('Error in checkAndFetch:', error);
+        loadingRef.current = false;
       }
-    }
+    };
 
-    checkAndFetch()
-  }, [user, userLoading, router])
+    checkAndFetch();
+  }, [user, userLoading, router]);
 
   // 當用戶變化時重置防抖狀態
   useEffect(() => {
     if (user) {
-      dataFetchedRef.current = false
-      loadingRef.current = false
+      dataFetchedRef.current = false;
+      loadingRef.current = false;
     }
-  }, [user])
+  }, [user]);
 
   // 刪除學生功能
   const handleDeleteStudents = async () => {
-    if (!selectedStudents.length) return
+    if (!selectedStudents.length) return;
     
     if (!confirm(`確定要刪除選中的 ${selectedStudents.length} 位學生嗎？此操作無法復原。`)) {
-      return
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       // 獲取選中學生的完整資料
-      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id))
-      console.log('選中要刪除的學生資料:', selectedStudentData)
+      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id));
+      console.log('選中要刪除的學生資料:', selectedStudentData);
       
       // 分離常規學生和試堂學生
-      const regularStudents = selectedStudentData.filter(s => s.student_type !== '試堂')
-      const trialStudents = selectedStudentData.filter(s => s.student_type === '試堂')
+      const regularStudents = selectedStudentData.filter(s => s.student_type !== '試堂');
+      const trialStudents = selectedStudentData.filter(s => s.student_type === '試堂');
       
-      console.log('常規學生:', regularStudents)
-      console.log('試堂學生:', trialStudents)
+      console.log('常規學生:', regularStudents);
+      console.log('試堂學生:', trialStudents);
 
       // 處理常規學生的外鍵依賴
       if (regularStudents.length > 0) {
-        const regularIds = regularStudents.map(s => s.id)
+        const regularIds = regularStudents.map(s => s.id);
         
         // 處理常規學生的外鍵依賴
-        console.log('處理常規學生外鍵依賴...')
+        console.log('處理常規學生外鍵依賴...');
         
         // 1. 刪除相關的課堂記錄 (hanami_student_lesson)
         const { error: lessonError } = await supabase
           .from('hanami_student_lesson')
           .delete()
-          .in('student_id', regularIds)
+          .in('student_id', regularIds);
         
         if (lessonError) {
-          console.error('Error deleting lesson records:', lessonError)
-          alert(`刪除課堂記錄時發生錯誤: ${lessonError.message}`)
-          return
+          console.error('Error deleting lesson records:', lessonError);
+          alert(`刪除課堂記錄時發生錯誤: ${lessonError.message}`);
+          return;
         }
 
         // 2. 進度記錄存在於 hanami_student_lesson 表的 progress_notes 欄位中，會隨課程記錄一起刪除
@@ -322,12 +326,12 @@ export default function StudentManagementPage() {
         const { error: packageError } = await supabase
           .from('Hanami_Student_Package')
           .delete()
-          .in('student_id', regularIds)
+          .in('student_id', regularIds);
         
         if (packageError) {
-          console.error('Error deleting package records:', packageError)
-          alert(`刪除課程包時發生錯誤: ${packageError.message}`)
-          return
+          console.error('Error deleting package records:', packageError);
+          alert(`刪除課程包時發生錯誤: ${packageError.message}`);
+          return;
         }
 
         // 4. 刪除試堂隊列記錄 (hanami_trial_queue)
@@ -345,66 +349,66 @@ export default function StudentManagementPage() {
         const { error: regularError } = await supabase
           .from('Hanami_Students')
           .delete()
-          .in('id', regularIds)
+          .in('id', regularIds);
         
         if (regularError) {
-          console.error('Error deleting regular students:', regularError)
-          alert(`刪除常規學生時發生錯誤: ${regularError.message}`)
-          return
+          console.error('Error deleting regular students:', regularError);
+          alert(`刪除常規學生時發生錯誤: ${regularError.message}`);
+          return;
         }
       }
 
       // 處理試堂學生
       if (trialStudents.length > 0) {
-        const trialIds = trialStudents.map(s => s.id)
+        const trialIds = trialStudents.map(s => s.id);
         
         // 試堂學生通常沒有複雜的外鍵依賴，直接刪除
         const { error: trialError } = await supabase
           .from('hanami_trial_students')
           .delete()
-          .in('id', trialIds)
+          .in('id', trialIds);
         
         if (trialError) {
-          console.error('Error deleting trial students:', trialError)
-          alert(`刪除試堂學生時發生錯誤: ${trialError.message}`)
-          return
+          console.error('Error deleting trial students:', trialError);
+          alert(`刪除試堂學生時發生錯誤: ${trialError.message}`);
+          return;
         }
       }
 
       // 更新本地狀態
-      setStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)))
-      setSelectedStudents([])
-      alert(`成功刪除 ${selectedStudents.length} 位學生`)
+      setStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)));
+      setSelectedStudents([]);
+      alert(`成功刪除 ${selectedStudents.length} 位學生`);
     } catch (error) {
-      console.error('Error deleting students:', error)
-      alert(`刪除學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`)
+      console.error('Error deleting students:', error);
+      alert(`刪除學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // 停用學生功能
   const handleInactiveStudents = async () => {
-    if (!selectedStudents.length) return
+    if (!selectedStudents.length) return;
     
     if (!confirm(`確定要停用選中的 ${selectedStudents.length} 位學生嗎？`)) {
-      return
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       // 獲取選中學生的完整資料
-      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id))
+      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id));
       
       // 分離常規學生和試堂學生
-      const regularStudents = selectedStudentData.filter(s => s.student_type !== '試堂')
-      const trialStudents = selectedStudentData.filter(s => s.student_type === '試堂')
+      const regularStudents = selectedStudentData.filter(s => s.student_type !== '試堂');
+      const trialStudents = selectedStudentData.filter(s => s.student_type === '試堂');
 
       // 如果有試堂學生，提示用戶試堂學生只能刪除不能停用
       if (trialStudents.length > 0) {
-        alert(`試堂學生只能刪除不能停用。請先取消選擇試堂學生，或使用刪除功能。`)
-        setIsLoading(false)
-        return
+        alert('試堂學生只能刪除不能停用。請先取消選擇試堂學生，或使用刪除功能。');
+        setIsLoading(false);
+        return;
       }
 
       // 將學生資料插入 inactive_student_list 表
@@ -442,37 +446,37 @@ export default function StudentManagementPage() {
         nick_name: s.nick_name,
         student_remarks: s.student_remarks,
         inactive_date: new Date().toISOString(),
-        inactive_reason: '管理員停用'
-      }))
+        inactive_reason: '管理員停用',
+      }));
 
       // 插入 inactive_student_list 表
       const { error: insertError } = await supabase
         .from('inactive_student_list')
-        .insert(inactiveStudentsData)
+        .insert(inactiveStudentsData);
 
       if (insertError) {
-        console.error('Error inserting inactive students:', insertError)
-        alert('停用學生時發生錯誤')
-        return
+        console.error('Error inserting inactive students:', insertError);
+        alert('停用學生時發生錯誤');
+        return;
       }
 
       // 刪除原表中的學生資料
       if (regularStudents.length > 0) {
-        const regularIds = regularStudents.map(s => s.id)
+        const regularIds = regularStudents.map(s => s.id);
         
         // 處理常規學生的外鍵依賴
-        console.log('處理常規學生外鍵依賴...')
+        console.log('處理常規學生外鍵依賴...');
         
         // 1. 刪除相關的課堂記錄 (hanami_student_lesson)
         const { error: lessonError } = await supabase
           .from('hanami_student_lesson')
           .delete()
-          .in('student_id', regularIds)
+          .in('student_id', regularIds);
         
         if (lessonError) {
-          console.error('Error deleting lesson records:', lessonError)
-          alert(`刪除課堂記錄時發生錯誤: ${lessonError.message}`)
-          return
+          console.error('Error deleting lesson records:', lessonError);
+          alert(`刪除課堂記錄時發生錯誤: ${lessonError.message}`);
+          return;
         }
 
         // 2. 進度記錄存在於 hanami_student_lesson 表的 progress_notes 欄位中，會隨課程記錄一起刪除
@@ -491,12 +495,12 @@ export default function StudentManagementPage() {
         const { error: packageError } = await supabase
           .from('Hanami_Student_Package')
           .delete()
-          .in('student_id', regularIds)
+          .in('student_id', regularIds);
         
         if (packageError) {
-          console.error('Error deleting package records:', packageError)
-          alert(`刪除課程包時發生錯誤: ${packageError.message}`)
-          return
+          console.error('Error deleting package records:', packageError);
+          alert(`刪除課程包時發生錯誤: ${packageError.message}`);
+          return;
         }
 
         // 4. 刪除試堂隊列記錄 (hanami_trial_queue)
@@ -514,24 +518,24 @@ export default function StudentManagementPage() {
         const { error: regularError } = await supabase
           .from('Hanami_Students')
           .delete()
-          .in('id', regularIds)
+          .in('id', regularIds);
         
         if (regularError) {
-          console.error('Error deleting regular students:', regularError)
-          alert(`刪除常規學生時發生錯誤: ${regularError.message}`)
-          return
+          console.error('Error deleting regular students:', regularError);
+          alert(`刪除常規學生時發生錯誤: ${regularError.message}`);
+          return;
         }
       }
 
       // 更新本地狀態
-      setStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)))
-      setSelectedStudents([])
-      alert(`成功停用 ${regularStudents.length} 位常規學生`)
+      setStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)));
+      setSelectedStudents([]);
+      alert(`成功停用 ${regularStudents.length} 位常規學生`);
       
       // 重新獲取停用學生數據
       const { data: inactiveStudentData } = await supabase
         .from('inactive_student_list')
-        .select('*')
+        .select('*');
       
       if (inactiveStudentData) {
         const updatedInactiveStudents = inactiveStudentData.map((inactive) => ({
@@ -553,34 +557,34 @@ export default function StudentManagementPage() {
           health_notes: inactive.health_notes,
           inactive_date: inactive.inactive_date,
           inactive_reason: inactive.inactive_reason,
-          is_inactive: true
-        }))
-        setInactiveStudents(updatedInactiveStudents)
+          is_inactive: true,
+        }));
+        setInactiveStudents(updatedInactiveStudents);
       }
     } catch (error) {
-      console.error('Error inactivating students:', error)
-      alert('停用學生時發生錯誤')
+      console.error('Error inactivating students:', error);
+      alert('停用學生時發生錯誤');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // 回復學生功能
   const handleRestoreStudents = async () => {
-    if (!selectedStudents.length) return
+    if (!selectedStudents.length) return;
     
     if (!confirm(`確定要回復選中的 ${selectedStudents.length} 位學生嗎？`)) {
-      return
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       // 獲取選中停用學生的完整資料
-      const selectedInactiveData = inactiveStudents.filter(s => selectedStudents.includes(s.id))
+      const selectedInactiveData = inactiveStudents.filter(s => selectedStudents.includes(s.id));
       
       // 分離常規學生和試堂學生
-      const regularStudents = selectedInactiveData.filter(s => s.student_type === '常規')
-      const trialStudents = selectedInactiveData.filter(s => s.student_type === '試堂')
+      const regularStudents = selectedInactiveData.filter(s => s.student_type === '常規');
+      const trialStudents = selectedInactiveData.filter(s => s.student_type === '試堂');
 
       // 將學生資料移回原表
       if (regularStudents.length > 0) {
@@ -615,21 +619,21 @@ export default function StudentManagementPage() {
           upcoming_lessons: s.upcoming_lessons,
           student_teacher: s.student_teacher,
           nick_name: s.nick_name,
-          student_remarks: s.student_remarks
-        }))
+          student_remarks: s.student_remarks,
+        }));
 
         // 使用 upsert 而不是 insert，這樣如果 ID 已存在會更新而不是報錯
         const { error: regularError } = await supabase
           .from('Hanami_Students')
           .upsert(regularData, { 
             onConflict: 'id',
-            ignoreDuplicates: false 
-          })
+            ignoreDuplicates: false, 
+          });
         
         if (regularError) {
-          console.error('Error restoring regular students:', regularError)
-          alert(`回復常規學生時發生錯誤: ${regularError.message}`)
-          return
+          console.error('Error restoring regular students:', regularError);
+          alert(`回復常規學生時發生錯誤: ${regularError.message}`);
+          return;
         }
       }
 
@@ -662,84 +666,84 @@ export default function StudentManagementPage() {
           upcoming_lessons: s.upcoming_lessons,
           student_teacher: s.student_teacher,
           nick_name: s.nick_name,
-          student_remarks: s.student_remarks
-        }))
+          student_remarks: s.student_remarks,
+        }));
 
         // 使用 upsert 而不是 insert
         const { error: trialError } = await supabase
           .from('hanami_trial_students')
           .upsert(trialData, { 
             onConflict: 'id',
-            ignoreDuplicates: false 
-          })
+            ignoreDuplicates: false, 
+          });
         
         if (trialError) {
-          console.error('Error restoring trial students:', trialError)
-          alert(`回復試堂學生時發生錯誤: ${trialError.message}`)
-          return
+          console.error('Error restoring trial students:', trialError);
+          alert(`回復試堂學生時發生錯誤: ${trialError.message}`);
+          return;
         }
       }
 
       // 從 inactive_student_list 表中刪除
       // 使用停用學生列表中的 ID（不是原始學生表的 ID）
-      const inactiveIdsToDelete = selectedInactiveData.map(s => s.id)
+      const inactiveIdsToDelete = selectedInactiveData.map(s => s.id);
       const { error: deleteError } = await supabase
         .from('inactive_student_list')
         .delete()
-        .in('id', inactiveIdsToDelete)
+        .in('id', inactiveIdsToDelete);
 
       if (deleteError) {
-        console.error('Error deleting from inactive list:', deleteError)
-        alert(`從停用列表刪除時發生錯誤: ${deleteError.message}`)
-        return
+        console.error('Error deleting from inactive list:', deleteError);
+        alert(`從停用列表刪除時發生錯誤: ${deleteError.message}`);
+        return;
       }
 
       // 更新本地狀態
-      setInactiveStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)))
-      setSelectedStudents([])
-      alert(`成功回復 ${selectedStudents.length} 位學生`)
+      setInactiveStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)));
+      setSelectedStudents([]);
+      alert(`成功回復 ${selectedStudents.length} 位學生`);
       
       // 重新獲取學生數據
       const { data: studentData } = await supabase
         .from('Hanami_Students')
-        .select('id, full_name, student_age, student_preference, course_type, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes')
+        .select('id, full_name, student_age, student_preference, course_type, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes');
 
       const { data: trialStudentData } = await supabase
         .from('hanami_trial_students')
-        .select('*')
+        .select('*');
 
       if (studentData) {
-        const regularStudents = studentData || []
+        const regularStudents = studentData || [];
         
         // 計算常規學生的剩餘堂數
-        const regularStudentIds = regularStudents.map(student => student.id)
-        const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date())
+        const regularStudentIds = regularStudents.map(student => student.id);
+        const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
         
         // 為常規學生添加剩餘堂數
         const regularStudentsWithRemaining = regularStudents.map(student => ({
           ...student,
-          remaining_lessons: remainingLessonsMap[student.id] || 0
-        }))
+          remaining_lessons: remainingLessonsMap[student.id] || 0,
+        }));
         
         const trialStudents = (trialStudentData || []).map((trial) => {
-          let student_age = 0
+          let student_age = 0;
           if (trial.student_dob) {
-            const dob = new Date(trial.student_dob)
-            const now = new Date()
-            let years = now.getFullYear() - dob.getFullYear()
-            let months = now.getMonth() - dob.getMonth()
+            const dob = new Date(trial.student_dob);
+            const now = new Date();
+            let years = now.getFullYear() - dob.getFullYear();
+            let months = now.getMonth() - dob.getMonth();
             if (months < 0) {
-              years -= 1
-              months += 12
+              years -= 1;
+              months += 12;
             }
-            student_age = years * 12 + months
+            student_age = years * 12 + months;
           }
 
-          let weekday = null
+          let weekday = null;
           if (trial.lesson_date) {
-            const trialDate = new Date(trial.lesson_date)
+            const trialDate = new Date(trial.lesson_date);
             // 不需要加8小時，直接使用本地時間
-            weekday = trialDate.getDay().toString()
+            weekday = trialDate.getDay().toString();
           }
 
           return {
@@ -750,7 +754,7 @@ export default function StudentManagementPage() {
             course_type: trial.course_type || null,
             remaining_lessons: null, // 試堂學生沒有剩餘堂數概念，設為 null
             regular_weekday: weekday !== null ? [weekday] : [],
-            weekday: weekday,
+            weekday,
             gender: trial.gender || null,
             student_type: '試堂',
             lesson_date: trial.lesson_date,
@@ -766,68 +770,68 @@ export default function StudentManagementPage() {
             parent_email: trial.parent_email || null,
             student_dob: trial.student_dob || null,
             started_date: trial.lesson_date || null, // 試堂學生的入學日期就是試堂日期
-            duration_months: trial.duration_months || null
-          }
-        })
+            duration_months: trial.duration_months || null,
+          };
+        });
 
-        const allStudents = [...regularStudentsWithRemaining, ...trialStudents]
-        setStudents(allStudents)
+        const allStudents = [...regularStudentsWithRemaining, ...trialStudents];
+        setStudents(allStudents);
       }
     } catch (error) {
-      console.error('Error restoring students:', error)
-      alert(`回復學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`)
+      console.error('Error restoring students:', error);
+      alert(`回復學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // 刪除停用學生功能
   const handleDeleteInactiveStudents = async () => {
-    if (!selectedStudents.length) return
+    if (!selectedStudents.length) return;
     
     if (!confirm(`確定要永久刪除選中的 ${selectedStudents.length} 位停用學生嗎？此操作無法復原。`)) {
-      return
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       // 獲取選中停用學生的完整資料
-      const selectedInactiveStudentData = inactiveStudents.filter(s => selectedStudents.includes(s.id))
-      console.log('選中要刪除的停用學生資料:', selectedInactiveStudentData)
+      const selectedInactiveStudentData = inactiveStudents.filter(s => selectedStudents.includes(s.id));
+      console.log('選中要刪除的停用學生資料:', selectedInactiveStudentData);
       
       // 分離常規學生和試堂學生
-      const regularInactiveStudents = selectedInactiveStudentData.filter(s => s.student_type === '常規')
-      const trialInactiveStudents = selectedInactiveStudentData.filter(s => s.student_type === '試堂')
+      const regularInactiveStudents = selectedInactiveStudentData.filter(s => s.student_type === '常規');
+      const trialInactiveStudents = selectedInactiveStudentData.filter(s => s.student_type === '試堂');
       
-      console.log('停用常規學生:', regularInactiveStudents)
-      console.log('停用試堂學生:', trialInactiveStudents)
+      console.log('停用常規學生:', regularInactiveStudents);
+      console.log('停用試堂學生:', trialInactiveStudents);
 
       // 處理停用常規學生的外鍵依賴（如果原始學生記錄還存在）
       if (regularInactiveStudents.length > 0) {
-        const originalIds = regularInactiveStudents.map(s => s.original_id).filter(id => id)
-        console.log('要檢查的原始學生ID:', originalIds)
+        const originalIds = regularInactiveStudents.map(s => s.original_id).filter(id => id);
+        console.log('要檢查的原始學生ID:', originalIds);
         
         if (originalIds.length > 0) {
           // 檢查原始學生記錄是否還存在，如果存在則處理外鍵依賴
           const { data: existingStudents } = await supabase
             .from('Hanami_Students')
             .select('id')
-            .in('id', originalIds)
+            .in('id', originalIds);
           
           if (existingStudents && existingStudents.length > 0) {
-            const existingIds = existingStudents.map(s => s.id)
-            console.log('存在的原始學生ID:', existingIds)
+            const existingIds = existingStudents.map(s => s.id);
+            console.log('存在的原始學生ID:', existingIds);
             
             // 1. 刪除相關的課堂記錄
             const { error: lessonError } = await supabase
               .from('hanami_student_lesson')
               .delete()
-              .in('student_id', existingIds)
+              .in('student_id', existingIds);
             
             if (lessonError) {
-              console.error('Error deleting lesson records:', lessonError)
-              alert(`刪除課堂記錄時發生錯誤: ${lessonError.message}`)
-              return
+              console.error('Error deleting lesson records:', lessonError);
+              alert(`刪除課堂記錄時發生錯誤: ${lessonError.message}`);
+              return;
             }
 
             // 2. 進度記錄存在於 hanami_student_lesson 表的 progress_notes 欄位中，會隨課程記錄一起刪除
@@ -846,12 +850,12 @@ export default function StudentManagementPage() {
             const { error: packageError } = await supabase
               .from('Hanami_Student_Package')
               .delete()
-              .in('student_id', existingIds)
+              .in('student_id', existingIds);
             
             if (packageError) {
-              console.error('Error deleting package records:', packageError)
-              alert(`刪除課程包時發生錯誤: ${packageError.message}`)
-              return
+              console.error('Error deleting package records:', packageError);
+              alert(`刪除課程包時發生錯誤: ${packageError.message}`);
+              return;
             }
 
             // 4. 刪除試堂隊列記錄
@@ -869,12 +873,12 @@ export default function StudentManagementPage() {
             const { error: regularError } = await supabase
               .from('Hanami_Students')
               .delete()
-              .in('id', existingIds)
+              .in('id', existingIds);
             
             if (regularError) {
-              console.error('Error deleting original students:', regularError)
-              alert(`刪除原始學生記錄時發生錯誤: ${regularError.message}`)
-              return
+              console.error('Error deleting original students:', regularError);
+              alert(`刪除原始學生記錄時發生錯誤: ${regularError.message}`);
+              return;
             }
           }
         }
@@ -882,75 +886,75 @@ export default function StudentManagementPage() {
 
       // 處理停用試堂學生（如果原始試堂記錄還存在）
       if (trialInactiveStudents.length > 0) {
-        const originalIds = trialInactiveStudents.map(s => s.original_id).filter(id => id)
-        console.log('要檢查的原始試堂學生ID:', originalIds)
+        const originalIds = trialInactiveStudents.map(s => s.original_id).filter(id => id);
+        console.log('要檢查的原始試堂學生ID:', originalIds);
         
         if (originalIds.length > 0) {
           // 檢查原始試堂記錄是否還存在
           const { data: existingTrialStudents } = await supabase
             .from('hanami_trial_students')
             .select('id')
-            .in('id', originalIds)
+            .in('id', originalIds);
           
           if (existingTrialStudents && existingTrialStudents.length > 0) {
-            const existingIds = existingTrialStudents.map(s => s.id)
-            console.log('存在的原始試堂學生ID:', existingIds)
+            const existingIds = existingTrialStudents.map(s => s.id);
+            console.log('存在的原始試堂學生ID:', existingIds);
             
             // 刪除原始試堂記錄
             const { error: trialError } = await supabase
               .from('hanami_trial_students')
               .delete()
-              .in('id', existingIds)
+              .in('id', existingIds);
             
             if (trialError) {
-              console.error('Error deleting original trial students:', trialError)
-              alert(`刪除原始試堂記錄時發生錯誤: ${trialError.message}`)
-              return
+              console.error('Error deleting original trial students:', trialError);
+              alert(`刪除原始試堂記錄時發生錯誤: ${trialError.message}`);
+              return;
             }
           }
         }
       }
 
       // 最後刪除停用學生記錄
-      const inactiveIds = selectedInactiveStudentData.map(s => s.id)
-      console.log('要刪除的停用學生記錄ID:', inactiveIds)
+      const inactiveIds = selectedInactiveStudentData.map(s => s.id);
+      console.log('要刪除的停用學生記錄ID:', inactiveIds);
       
       const { error: inactiveError } = await supabase
         .from('inactive_student_list')
         .delete()
-        .in('id', inactiveIds)
+        .in('id', inactiveIds);
       
       if (inactiveError) {
-        console.error('Error deleting inactive students:', inactiveError)
-        alert(`刪除停用學生記錄時發生錯誤: ${inactiveError.message}`)
-        return
+        console.error('Error deleting inactive students:', inactiveError);
+        alert(`刪除停用學生記錄時發生錯誤: ${inactiveError.message}`);
+        return;
       }
 
       // 更新本地狀態
-      setInactiveStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)))
-      setSelectedStudents([])
-      alert(`成功永久刪除 ${selectedStudents.length} 位停用學生`)
+      setInactiveStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)));
+      setSelectedStudents([]);
+      alert(`成功永久刪除 ${selectedStudents.length} 位停用學生`);
     } catch (error) {
-      console.error('Error deleting inactive students:', error)
-      alert(`刪除停用學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`)
+      console.error('Error deleting inactive students:', error);
+      alert(`刪除停用學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // 根據篩選條件決定顯示哪些學生
-  const isShowingInactiveStudents = selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('停用學生')
-  const currentStudents = isShowingInactiveStudents ? inactiveStudents : students.filter(s => !s.is_inactive)
+  const isShowingInactiveStudents = selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('停用學生');
+  const currentStudents = isShowingInactiveStudents ? inactiveStudents : students.filter(s => !s.is_inactive);
 
   // 計算顯示學生數（不包括停用學生）
-  const activeStudentsCount = students.filter(s => !s.is_inactive).length
+  const activeStudentsCount = students.filter(s => !s.is_inactive).length;
 
   const filteredStudents = useMemo(() => {
     if (!searchQuery.trim()) return students;
     const q = searchQuery.trim().toLowerCase();
     return students.filter(s =>
-      (s.full_name && s.full_name.toLowerCase().includes(q)) ||
-      (s.contact_number && s.contact_number.toLowerCase().includes(q))
+      (s.full_name?.toLowerCase().includes(q)) ||
+      (s.contact_number?.toLowerCase().includes(q)),
     );
   }, [students, searchQuery]);
 
@@ -961,64 +965,64 @@ export default function StudentManagementPage() {
       return [...students].sort((a, b) => {
         // 檢查是否選中了試堂課程
         if (selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('試堂')) {
-          const dateA = a.lesson_date ? new Date(a.lesson_date).getTime() : 0
-          const dateB = b.lesson_date ? new Date(b.lesson_date).getTime() : 0
-          return dateB - dateA // 從新到舊排序
+          const dateA = a.lesson_date ? new Date(a.lesson_date).getTime() : 0;
+          const dateB = b.lesson_date ? new Date(b.lesson_date).getTime() : 0;
+          return dateB - dateA; // 從新到舊排序
         }
-        return 0
-      })
+        return 0;
+      });
     }
 
     return [...students].sort((a, b) => {
-      let aValue = a[sortField]
-      let bValue = b[sortField]
+      let aValue = a[sortField];
+      let bValue = b[sortField];
 
       // 處理特殊欄位的排序
       switch (sortField) {
         case 'student_age':
           // 年齡按數字排序
-          aValue = Number(aValue) || 0
-          bValue = Number(bValue) || 0
-          break
+          aValue = Number(aValue) || 0;
+          bValue = Number(bValue) || 0;
+          break;
         case 'remaining_lessons':
           // 剩餘堂數按數字排序
-          aValue = Number(aValue) || 0
-          bValue = Number(bValue) || 0
-          break
+          aValue = Number(aValue) || 0;
+          bValue = Number(bValue) || 0;
+          break;
         case 'regular_weekday':
           // 上課日按數字排序
-          aValue = Array.isArray(aValue) ? Math.min(...aValue.map(Number)) : Number(aValue) || 0
-          bValue = Array.isArray(bValue) ? Math.min(...bValue.map(Number)) : Number(bValue) || 0
-          break
+          aValue = Array.isArray(aValue) ? Math.min(...aValue.map(Number)) : Number(aValue) || 0;
+          bValue = Array.isArray(bValue) ? Math.min(...bValue.map(Number)) : Number(bValue) || 0;
+          break;
         case 'student_dob':
         case 'started_date':
         case 'lesson_date':
         case 'inactive_date':
           // 日期按日期排序
-          aValue = aValue ? new Date(aValue).getTime() : 0
-          bValue = bValue ? new Date(bValue).getTime() : 0
-          break
+          aValue = aValue ? new Date(aValue).getTime() : 0;
+          bValue = bValue ? new Date(bValue).getTime() : 0;
+          break;
         case 'regular_timeslot':
         case 'actual_timeslot':
           // 時間按時間排序
-          aValue = aValue ? aValue.replace(':', '') : ''
-          bValue = bValue ? bValue.replace(':', '') : ''
-          break
+          aValue = aValue ? aValue.replace(':', '') : '';
+          bValue = bValue ? bValue.replace(':', '') : '';
+          break;
         default:
           // 其他欄位按字符串排序
-          aValue = String(aValue || '').toLowerCase()
-          bValue = String(bValue || '').toLowerCase()
+          aValue = String(aValue || '').toLowerCase();
+          bValue = String(bValue || '').toLowerCase();
       }
 
       if (aValue < bValue) {
-        return sortDirection === 'asc' ? -1 : 1
+        return sortDirection === 'asc' ? -1 : 1;
       }
       if (aValue > bValue) {
-        return sortDirection === 'asc' ? 1 : -1
+        return sortDirection === 'asc' ? 1 : -1;
       }
-      return 0
-    })
-  }
+      return 0;
+    });
+  };
 
   // 對試堂學生進行排序
   const sortedStudents = useMemo(() => {
@@ -1033,12 +1037,12 @@ export default function StudentManagementPage() {
       result = [...result].sort((a, b) => {
         // 檢查是否選中了試堂課程
         if (selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('試堂')) {
-          const dateA = a.lesson_date ? new Date(a.lesson_date).getTime() : 0
-          const dateB = b.lesson_date ? new Date(b.lesson_date).getTime() : 0
-          return dateB - dateA // 從新到舊排序
+          const dateA = a.lesson_date ? new Date(a.lesson_date).getTime() : 0;
+          const dateB = b.lesson_date ? new Date(b.lesson_date).getTime() : 0;
+          return dateB - dateA; // 從新到舊排序
         }
-        return 0
-      })
+        return 0;
+      });
     }
     
     return result;
@@ -1048,13 +1052,13 @@ export default function StudentManagementPage() {
   const handleSort = (field: string) => {
     if (sortField === field) {
       // 如果點擊的是同一個欄位，切換排序方向
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       // 如果點擊的是新欄位，設置為升序
-      setSortField(field)
-      setSortDirection('asc')
+      setSortField(field);
+      setSortDirection('asc');
     }
-  }
+  };
 
   // 獲取排序圖標
   const getSortIcon = (field: string) => {
@@ -1068,7 +1072,7 @@ export default function StudentManagementPage() {
             <path d="M10 17L3 10h14L10 17z" />
           </svg>
         </div>
-      )
+      );
     }
     return sortDirection === 'asc' ? 
       <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
@@ -1076,24 +1080,24 @@ export default function StudentManagementPage() {
       </svg> : 
       <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
         <path d="M10 17L3 10h14L10 17z" />
-      </svg>
-  }
+      </svg>;
+  };
 
   const toggleStudent = (id: string) => {
     setSelectedStudents((prev) =>
-      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
-    )
-  }
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id],
+    );
+  };
 
   // 計算總頁數
-  const totalPages = pageSize === Infinity || pageSize === 0 ? 1 : Math.max(1, Math.ceil(sortedStudents.length / pageSize))
+  const totalPages = pageSize === Infinity || pageSize === 0 ? 1 : Math.max(1, Math.ceil(sortedStudents.length / pageSize));
   
   // 確保當前頁數不超過總頁數
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1)
+      setCurrentPage(1);
     }
-  }, [totalPages, currentPage])
+  }, [totalPages, currentPage]);
 
   useEffect(() => {
     if (displayMode !== 'grid') return;
@@ -1116,7 +1120,46 @@ export default function StudentManagementPage() {
       <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold text-[#2B3A3B] mb-2">學生資料管理</h1>
 
-
+        {/* 學生進度管理按鈕區域 */}
+        <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => router.push('/admin/student-progress/dashboard')}
+            >
+              <BarChart3 className="w-4 h-4" />
+              進度儀表板
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => router.push('/admin/student-progress/growth-trees')}
+            >
+              <TreePine className="w-4 h-4" />
+              成長樹管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => router.push('/admin/student-progress/abilities')}
+            >
+              <TrendingUp className="w-4 h-4" />
+              發展能力圖卡
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => router.push('/admin/student-progress/activities')}
+            >
+              <Gamepad2 className="w-4 h-4" />
+              教學活動管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => router.push('/admin/student-progress')}
+            >
+              <FileText className="w-4 h-4" />
+              進度記錄管理
+            </button>
+          </div>
+        </div>
 
         {/* 操作按鈕區域 */}
         {selectedStudents.length > 0 && (
@@ -1127,8 +1170,8 @@ export default function StudentManagementPage() {
                   已選中 {selectedStudents.length} 位學生
                 </span>
                 <button
-                  onClick={() => setSelectedStudents([])}
                   className="text-xs text-[#A68A64] hover:text-[#8B7355] underline"
+                  onClick={() => setSelectedStudents([])}
                 >
                   取消選擇
                 </button>
@@ -1137,17 +1180,17 @@ export default function StudentManagementPage() {
                 {isShowingInactiveStudents ? (
                   <div className="flex gap-2">
                     <button
-                      onClick={handleRestoreStudents}
-                      disabled={isLoading}
                       className="hanami-btn-success flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isLoading}
+                      onClick={handleRestoreStudents}
                     >
                       <RotateCcw className="w-4 h-4" />
                       <span>回復學生</span>
                     </button>
                     <button
-                      onClick={handleDeleteInactiveStudents}
-                      disabled={isLoading}
                       className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isLoading}
+                      onClick={handleDeleteInactiveStudents}
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>刪除學生</span>
@@ -1157,33 +1200,33 @@ export default function StudentManagementPage() {
                   <>
                     {/* 檢查選中的學生中是否包含試堂學生 */}
                     {(() => {
-                      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id))
-                      const hasTrialStudents = selectedStudentData.some(s => s.student_type === '試堂')
-                      const hasRegularStudents = selectedStudentData.some(s => s.student_type !== '試堂')
+                      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id));
+                      const hasTrialStudents = selectedStudentData.some(s => s.student_type === '試堂');
+                      const hasRegularStudents = selectedStudentData.some(s => s.student_type !== '試堂');
                       
                       return (
                         <>
                           {/* 只有當選中的學生包含常規學生時才顯示停用按鈕 */}
                           {hasRegularStudents && (
                             <button
-                              onClick={handleInactiveStudents}
-                              disabled={isLoading}
                               className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={isLoading}
+                              onClick={handleInactiveStudents}
                             >
                               <UserX className="w-4 h-4" />
                               <span>停用學生</span>
                             </button>
                           )}
                           <button
-                            onClick={handleDeleteStudents}
-                            disabled={isLoading}
                             className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isLoading}
+                            onClick={handleDeleteStudents}
                           >
                             <Trash2 className="w-4 h-4" />
                             <span>刪除學生</span>
                           </button>
                         </>
-                      )
+                      );
                     })()}
                   </>
                 )}
@@ -1199,7 +1242,7 @@ export default function StudentManagementPage() {
               <div className="flex items-center gap-3">
                 {/* 搜尋圖標 */}
                 <div className="relative group">
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full blur-sm opacity-40 animate-pulse"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full blur-sm opacity-40 animate-pulse" />
                   <div className="relative w-8 h-8 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full flex items-center justify-center shadow-sm transition-all duration-300 group-hover:scale-110">
                     <svg 
                       className="w-4 h-4 text-[#A64B2A] transition-all duration-300 group-hover:scale-110 group-hover:rotate-6" 
@@ -1207,17 +1250,17 @@ export default function StudentManagementPage() {
                       stroke="currentColor" 
                       viewBox="0 0 24 24"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                     </svg>
                   </div>
                 </div>
                 {/* 搜尋輸入框 */}
                 <div className="flex-1 relative group">
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#FDE6B8] to-[#FCE2C8] rounded-lg blur-sm opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#FDE6B8] to-[#FCE2C8] rounded-lg blur-sm opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
                   <input
-                    type="text"
                     className="relative w-full px-4 py-2 bg-white border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-300 text-[#2B3A3B] placeholder-[#999] text-sm shadow-sm group-hover:shadow-md focus:shadow-lg"
                     placeholder="搜尋學生姓名或電話..."
+                    type="text"
                     value={searchInput}
                     onChange={e => setSearchInput(e.target.value)}
                     onKeyDown={e => {
@@ -1233,7 +1276,7 @@ export default function StudentManagementPage() {
                     }}
                   />
                   {/* 輸入框底部的動畫線 */}
-                  <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-[#FDE6B8] to-[#EAC29D] transition-all duration-300 group-hover:w-full group-focus-within:w-full"></div>
+                  <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-[#FDE6B8] to-[#EAC29D] transition-all duration-300 group-hover:w-full group-focus-within:w-full" />
                 </div>
                 {/* 搜尋按鈕 */}
                 <button
@@ -1250,7 +1293,7 @@ export default function StudentManagementPage() {
                     }
                   }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full blur-sm opacity-0 group-hover:opacity-40 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full blur-sm opacity-0 group-hover:opacity-40 transition-opacity duration-300" />
                   <div className="relative search-btn bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] hover:from-[#fce2c8] hover:to-[#fad8b8] text-[#A64B2A] border border-[#EAC29D] rounded-full px-4 py-2 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105 active:scale-95 font-medium text-sm hover:animate-search-glow">
                     <div className="flex items-center gap-1">
                       <svg 
@@ -1259,7 +1302,7 @@ export default function StudentManagementPage() {
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                       </svg>
                       <span>搜尋</span>
                     </div>
@@ -1282,7 +1325,7 @@ export default function StudentManagementPage() {
                       }
                     }}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] rounded-full blur-sm opacity-0 group-hover:opacity-40 transition-opacity duration-300"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] rounded-full blur-sm opacity-0 group-hover:opacity-40 transition-opacity duration-300" />
                     <div className="relative clear-btn bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] hover:from-[#ffd4d4] hover:to-[#ffc8c8] text-[#A64B2A] border border-[#EAC29D] rounded-full p-2 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105 active:scale-95">
                       <svg 
                         className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" 
@@ -1290,7 +1333,7 @@ export default function StudentManagementPage() {
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                       </svg>
                     </div>
                   </button>
@@ -1301,7 +1344,7 @@ export default function StudentManagementPage() {
                 <div className="mt-2 p-2 bg-gradient-to-r from-[#E0F2E0] to-[#D4F2D4] rounded-lg border border-[#C8EAC8] animate-fade-in">
                   <div className="flex items-center gap-2 text-[#2B3A3B] text-sm">
                     <svg className="w-4 h-4 text-[#4CAF50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                     </svg>
                     <span className="font-medium">找到 <span className="font-bold text-[#4CAF50]">{filteredStudents.length}</span> 位學生</span>
                     {searchQuery && (
@@ -1320,14 +1363,13 @@ export default function StudentManagementPage() {
           <div className="flex overflow-x-auto gap-2 pb-3">
             <div className="mb-4">
               <button
-                onClick={() => setDropdownOpen(true)}
                 className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
+                onClick={() => setDropdownOpen(true)}
               >
                 篩選課程
               </button>
               {dropdownOpen && (
                 <PopupSelect
-                  title="篩選課程"
                   options={[
                     { label: '鋼琴', value: '鋼琴' },
                     { label: '音樂專注力', value: '音樂專注力' },
@@ -1337,6 +1379,8 @@ export default function StudentManagementPage() {
                     { label: '停用學生', value: '停用學生' },
                   ]}
                   selected={selectedCourses}
+                  title="篩選課程"
+                  onCancel={() => { console.log('父層 cancel'); setDropdownOpen(false); }}
                   onChange={(value) => {
                     if (Array.isArray(value)) {
                       setSelectedCourses(value);
@@ -1344,8 +1388,7 @@ export default function StudentManagementPage() {
                       setSelectedCourses([value]);
                     }
                   }}
-                  onConfirm={() => { console.log('父層 confirm'); setDropdownOpen(false) }}
-                  onCancel={() => { console.log('父層 cancel'); setDropdownOpen(false) }}
+                  onConfirm={() => { console.log('父層 confirm'); setDropdownOpen(false); }}
                 />
               )}
             </div>
@@ -1354,14 +1397,13 @@ export default function StudentManagementPage() {
 
             <div className="mb-4">
               <button
-                onClick={() => setWeekdayDropdownOpen(true)}
                 className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
+                onClick={() => setWeekdayDropdownOpen(true)}
               >
                 篩選星期
               </button>
               {weekdayDropdownOpen && (
                 <PopupSelect
-                  title="篩選星期"
                   options={[
                     { label: '星期一', value: '1' },
                     { label: '星期二', value: '2' },
@@ -1372,23 +1414,24 @@ export default function StudentManagementPage() {
                     { label: '星期日', value: '0' },
                   ]}
                   selected={selectedWeekdays}
+                  title="篩選星期"
+                  onCancel={() => { console.log('父層 cancel'); setWeekdayDropdownOpen(false); }}
                   onChange={value => setSelectedWeekdays(Array.isArray(value) ? value : [value])}
-                  onConfirm={() => { console.log('父層 confirm'); setWeekdayDropdownOpen(false) }}
-                  onCancel={() => { console.log('父層 cancel'); setWeekdayDropdownOpen(false) }}
+                  onConfirm={() => { console.log('父層 confirm'); setWeekdayDropdownOpen(false); }}
                 />
               )}
             </div>
 
             <div className="mb-4">
               <button
-                onClick={() => setLessonDropdownOpen(true)}
                 className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
+                onClick={() => setLessonDropdownOpen(true)}
               >
                 篩選堂數
               </button>
               {lessonDropdownOpen && (
                 <PopupSelect
-                  title="篩選剩餘堂數"
+                  mode="single"
                   options={[
                     { label: '全部', value: 'all' },
                     { label: '> 2', value: 'gt2' },
@@ -1396,27 +1439,27 @@ export default function StudentManagementPage() {
                     { label: '自訂數字', value: 'custom' },
                   ]}
                   selected={selectedLessonFilter}
+                  title="篩選剩餘堂數"
+                  onCancel={() => { console.log('父層 cancel'); setLessonDropdownOpen(false); }}
                   onChange={(value) => setSelectedLessonFilter(value as any)}
-                  onConfirm={() => { console.log('父層 confirm'); setLessonDropdownOpen(false) }}
-                  onCancel={() => { console.log('父層 cancel'); setLessonDropdownOpen(false) }}
-                  mode="single"
+                  onConfirm={() => { console.log('父層 confirm'); setLessonDropdownOpen(false); }}
                 />
               )}
               {selectedLessonFilter === 'custom' && (
                 <input
+                  className="ml-2 border border-[#EADBC8] rounded px-2 py-1 text-sm w-20 mt-2"
+                  placeholder="數字"
                   type="number"
                   value={customLessonCount}
                   onChange={(e) => setCustomLessonCount(Number(e.target.value))}
-                  className="ml-2 border border-[#EADBC8] rounded px-2 py-1 text-sm w-20 mt-2"
-                  placeholder="數字"
                 />
               )}
             </div>
 
             <div className="mb-4">
               <button
-                onClick={() => setDisplayMode(displayMode === 'grid' ? 'list' : 'grid')}
                 className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2"
+                onClick={() => setDisplayMode(displayMode === 'grid' ? 'list' : 'grid')}
               >
                 {displayMode === 'grid' ? (
                   <>
@@ -1438,13 +1481,13 @@ export default function StudentManagementPage() {
               isCustomLessonFilterActive(selectedLessonFilter, customLessonCount)) && (
               <div className="mb-4">
                 <button
-                  onClick={() => {
-                    setSelectedCourses([])
-                    setSelectedWeekdays([])
-                    setSelectedLessonFilter('all')
-                    setCustomLessonCount('')
-                  }}
                   className="hanami-btn-danger text-sm px-4 py-2 text-[#A64B2A]"
+                  onClick={() => {
+                    setSelectedCourses([]);
+                    setSelectedWeekdays([]);
+                    setSelectedLessonFilter('all');
+                    setCustomLessonCount('');
+                  }}
                 >
                   清除條件
                 </button>
@@ -1464,10 +1507,10 @@ export default function StudentManagementPage() {
             selectedLessonFilter === 'custom' && typeof customLessonCount === 'number'
               ? `剩餘堂數 = ${customLessonCount}`
               : selectedLessonFilter === 'gt2'
-              ? '剩餘堂數 > 2'
-              : selectedLessonFilter === 'lte2'
-              ? '剩餘堂數 ≤ 2'
-              : null,
+                ? '剩餘堂數 > 2'
+                : selectedLessonFilter === 'lte2'
+                  ? '剩餘堂數 ≤ 2'
+                  : null,
           ]
             .filter(Boolean)
             .join('；') || '全部條件'}
@@ -1478,14 +1521,14 @@ export default function StudentManagementPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-[#2B3A3B]">每頁顯示：</span>
             <button
-              onClick={() => setPageSizeDropdownOpen(true)}
               className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
+              onClick={() => setPageSizeDropdownOpen(true)}
             >
               {pageSize === Infinity ? '全部' : pageSize}
             </button>
             {pageSizeDropdownOpen && (
               <PopupSelect
-                title="選擇顯示數量"
+                mode="single"
                 options={[
                   { label: '20', value: '20' },
                   { label: '50', value: '50' },
@@ -1493,52 +1536,52 @@ export default function StudentManagementPage() {
                   { label: '全部', value: 'all' },
                 ]}
                 selected={pageSize.toString()}
+                title="選擇顯示數量"
+                onCancel={() => { console.log('父層 cancel'); setPageSizeDropdownOpen(false); }}
                 onChange={(value) => {
-                  setPageSize(value === 'all' ? Infinity : Number(value))
-                  setCurrentPage(1)
+                  setPageSize(value === 'all' ? Infinity : Number(value));
+                  setCurrentPage(1);
                 }}
-                onConfirm={() => { console.log('父層 confirm'); setPageSizeDropdownOpen(false) }}
-                onCancel={() => { console.log('父層 cancel'); setPageSizeDropdownOpen(false) }}
-                mode="single"
+                onConfirm={() => { console.log('父層 confirm'); setPageSizeDropdownOpen(false); }}
               />
             )}
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setColumnSelectorOpen(true)}
               className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2"
+              onClick={() => setColumnSelectorOpen(true)}
             >
               <Settings2 className="w-4 h-4" />
               <span>顯示欄位</span>
             </button>
             {columnSelectorOpen && (
               <PopupSelect
-                title="選擇顯示欄位"
+                mode="multi"
                 options={columnOptions}
                 selected={selectedColumns}
+                title="選擇顯示欄位"
+                onCancel={() => { console.log('父層 cancel'); setColumnSelectorOpen(false); }}
                 onChange={(value) => {
                   // 確保基本欄位始終被選中
-                  const newSelected = Array.isArray(value) ? value : [value]
-                  if (!newSelected.includes('student_oid')) newSelected.push('student_oid')
-                  if (!newSelected.includes('full_name')) newSelected.push('full_name')
-                  if (!newSelected.includes('student_age')) newSelected.push('student_age')
-                  setSelectedColumns(newSelected)
+                  const newSelected = Array.isArray(value) ? value : [value];
+                  if (!newSelected.includes('student_oid')) newSelected.push('student_oid');
+                  if (!newSelected.includes('full_name')) newSelected.push('full_name');
+                  if (!newSelected.includes('student_age')) newSelected.push('student_age');
+                  setSelectedColumns(newSelected);
                 }}
-                onConfirm={() => { console.log('父層 confirm'); setColumnSelectorOpen(false) }}
-                onCancel={() => { console.log('父層 cancel'); setColumnSelectorOpen(false) }}
-                mode="multi"
+                onConfirm={() => { console.log('父層 confirm'); setColumnSelectorOpen(false); }}
               />
             )}
             {sortedStudents.length > 0 && (
               <>
                 <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
                   className={`p-2 rounded-full ${
                     currentPage === 1
                       ? 'text-gray-300 cursor-not-allowed'
                       : 'text-[#2B3A3B] hover:bg-[#FFF9F2]'
                   }`}
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
@@ -1546,13 +1589,13 @@ export default function StudentManagementPage() {
                   第 {currentPage} 頁，共 {totalPages} 頁
                 </span>
                 <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
                   className={`p-2 rounded-full ${
                     currentPage === totalPages
                       ? 'text-gray-300 cursor-not-allowed'
                       : 'text-[#2B3A3B] hover:bg-[#FFF9F2]'
                   }`}
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
@@ -1575,9 +1618,9 @@ export default function StudentManagementPage() {
               sortedStudents
                 .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                 .map((student) => {
-                  const ageInMonths = Number(student.student_age) || 0
-                  const years = Math.floor(ageInMonths / 12)
-                  const months = ageInMonths % 12
+                  const ageInMonths = Number(student.student_age) || 0;
+                  const years = Math.floor(ageInMonths / 12);
+                  const months = ageInMonths % 12;
 
                   // 移除頻繁的警告日誌，改為只在開發環境下顯示一次
                   if (!student.gender && process.env.NODE_ENV === 'development') {
@@ -1592,45 +1635,45 @@ export default function StudentManagementPage() {
                     }
                   }
 
-                  const isTrialStudent = student.student_type === '試堂'
-                  const isInactiveStudent = student.is_inactive === true
+                  const isTrialStudent = student.student_type === '試堂';
+                  const isInactiveStudent = student.is_inactive === true;
                   const cardFields = isTrialStudent
                     ? [
-                        {
-                          icon: CalendarClock,
-                          label: '年齡',
-                          value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
-                        },
-                        {
-                          icon: BookOpen,
-                          label: '課程',
-                          value: student.course_type || '未分班',
-                        },
-                        {
-                          icon: CalendarClock,
-                          label: '試堂時間',
-                          value: student.lesson_date && student.actual_timeslot
-                            ? `${new Date(student.lesson_date).toLocaleDateString('zh-HK')} ${student.actual_timeslot}`
-                            : '—',
-                        },
-                      ]
+                      {
+                        icon: CalendarClock,
+                        label: '年齡',
+                        value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
+                      },
+                      {
+                        icon: BookOpen,
+                        label: '課程',
+                        value: student.course_type || '未分班',
+                      },
+                      {
+                        icon: CalendarClock,
+                        label: '試堂時間',
+                        value: student.lesson_date && student.actual_timeslot
+                          ? `${new Date(student.lesson_date).toLocaleDateString('zh-HK')} ${student.actual_timeslot}`
+                          : '—',
+                      },
+                    ]
                     : [
-                        {
-                          icon: CalendarClock,
-                          label: '年齡',
-                          value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
-                        },
-                        {
-                          icon: BookOpen,
-                          label: '課程',
-                          value: student.course_type || '未分班',
-                        },
-                        {
-                          icon: Star,
-                          label: '剩餘堂數',
-                          value: remainingLessonsMap[student.id] !== undefined ? `${remainingLessonsMap[student.id]} 堂` : '—',
-                        },
-                      ]
+                      {
+                        icon: CalendarClock,
+                        label: '年齡',
+                        value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
+                      },
+                      {
+                        icon: BookOpen,
+                        label: '課程',
+                        value: student.course_type || '未分班',
+                      },
+                      {
+                        icon: Star,
+                        label: '剩餘堂數',
+                        value: remainingLessonsMap[student.id] !== undefined ? `${remainingLessonsMap[student.id]} 堂` : '—',
+                      },
+                    ];
 
                   // 如果是停用學生，添加停用日期信息
                   if (isInactiveStudent && student.inactive_date) {
@@ -1638,54 +1681,52 @@ export default function StudentManagementPage() {
                       icon: CalendarClock,
                       label: '停用日期',
                       value: new Date(student.inactive_date).toLocaleDateString('zh-HK'),
-                    })
+                    });
                   }
 
                   return (
                     <motion.div
                       key={student.id}
-                      initial={false}
                       animate={{
                         scale: selectedStudents.includes(student.id) ? 1.03 : 1,
                         boxShadow: selectedStudents.includes(student.id)
                           ? '0 4px 20px rgba(252, 213, 139, 0.4)'
                           : 'none',
                       }}
-                      whileTap={{ scale: 0.98 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                       className="cursor-pointer relative"
+                      initial={false}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => toggleStudent(student.id)}
                     >
                       {!isInactiveStudent && (
                         <div
                           className="absolute top-2 left-2 z-10"
                           onClick={(e) => {
-                            e.stopPropagation()
+                            e.stopPropagation();
                             // 對於停用學生，使用 inactive_student_list 的 ID
-                            const studentId = isInactiveStudent ? student.id : student.id
-                            router.push(`/admin/students/${studentId}`)
+                            const studentId = isInactiveStudent ? student.id : student.id;
+                            router.push(`/admin/students/${studentId}`);
                           }}
                         >
                           <img
-                            src="/icons/edit-pencil.png"
                             alt="編輯"
                             className="w-7 h-7 cursor-pointer hover:scale-110 transition-transform"
+                            src="/icons/edit-pencil.png"
                           />
                         </div>
                       )}
                       {selectedStudents.includes(student.id) && !isInactiveStudent && (
                         <motion.div
-                          initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
                           className="absolute top-2 right-2"
+                          exit={{ opacity: 0, y: -10 }}
+                          initial={{ opacity: 0, y: -10 }}
                         >
-                          <img src="/leaf-sprout.png" alt="選取" className="w-12 h-12" />
+                          <img alt="選取" className="w-12 h-12" src="/leaf-sprout.png" />
                         </motion.div>
                       )}
                       <StudentCard
-                        name={student.full_name || '未命名學生'}
-                        selected={selectedStudents.includes(student.id)}
                         avatar={
                           student.gender === 'male'
                             ? '/boy.png'
@@ -1694,12 +1735,14 @@ export default function StudentManagementPage() {
                               : '/boy.png'
                         }
                         fields={cardFields}
-                        studentType={student.student_type}
-                        isTrialStudent={isTrialStudent}
                         isInactive={isInactiveStudent}
+                        isTrialStudent={isTrialStudent}
+                        name={student.full_name || '未命名學生'}
+                        selected={selectedStudents.includes(student.id)}
+                        studentType={student.student_type}
                       />
                     </motion.div>
-                  )
+                  );
                 })
             )}
           </div>
@@ -1713,9 +1756,9 @@ export default function StudentManagementPage() {
                       checked={selectedStudents.length === sortedStudents.length}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedStudents(sortedStudents.map(s => s.id))
+                          setSelectedStudents(sortedStudents.map(s => s.id));
                         } else {
-                          setSelectedStudents([])
+                          setSelectedStudents([]);
                         }
                       }}
                     />
@@ -1848,7 +1891,7 @@ export default function StudentManagementPage() {
                       onClick={() => handleSort('regular_weekday')}
                     >
                       <div className="flex items-center gap-1">
-                      星期
+                        星期
                         {getSortIcon('regular_weekday')}
                       </div>
                     </th>
@@ -1969,15 +2012,15 @@ export default function StudentManagementPage() {
                 {sortedStudents
                   .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                   .map((student, index) => {
-                    const ageInMonths = Number(student.student_age) || 0
-                    const years = Math.floor(ageInMonths / 12)
-                    const months = ageInMonths % 12
-                    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+                    const ageInMonths = Number(student.student_age) || 0;
+                    const years = Math.floor(ageInMonths / 12);
+                    const months = ageInMonths % 12;
+                    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
                     const regularWeekdays = Array.isArray(student.regular_weekday)
                       ? student.regular_weekday.map((d: string | number) => `星期${weekdays[Number(d)]}`).join('、')
                       : typeof student.regular_weekday === 'string'
                         ? `星期${weekdays[Number(student.regular_weekday)]}`
-                        : '—'
+                        : '—';
 
                     return (
                       <tr
@@ -1992,9 +2035,9 @@ export default function StudentManagementPage() {
                             checked={selectedStudents.includes(student.id)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedStudents([...selectedStudents, student.id])
+                                setSelectedStudents([...selectedStudents, student.id]);
                               } else {
-                                setSelectedStudents(selectedStudents.filter(id => id !== student.id))
+                                setSelectedStudents(selectedStudents.filter(id => id !== student.id));
                               }
                             }}
                           />
@@ -2009,18 +2052,18 @@ export default function StudentManagementPage() {
                               <span>{student.full_name || '未命名學生'}</span>
                               {!student.is_inactive && (
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    // 對於停用學生，使用 inactive_student_list 的 ID
-                                    const studentId = student.is_inactive ? student.id : student.id
-                                    router.push(`/admin/students/${studentId}`)
-                                  }}
                                   className="hanami-btn-soft p-1 transition-all duration-200 hover:scale-110"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // 對於停用學生，使用 inactive_student_list 的 ID
+                                    const studentId = student.is_inactive ? student.id : student.id;
+                                    router.push(`/admin/students/${studentId}`);
+                                  }}
                                 >
                                   <img
-                                    src="/icons/edit-pencil.png"
                                     alt="編輯"
                                     className="w-4 h-4"
+                                    src="/icons/edit-pencil.png"
                                   />
                                 </button>
                               )}
@@ -2132,7 +2175,7 @@ export default function StudentManagementPage() {
                           </td>
                         )}
                       </tr>
-                    )
+                    );
                   })}
               </tbody>
             </table>
@@ -2140,7 +2183,7 @@ export default function StudentManagementPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function isCustomLessonFilterActive(filter: 'all' | 'gt2' | 'lte2' | 'custom', count: number | ''): boolean {

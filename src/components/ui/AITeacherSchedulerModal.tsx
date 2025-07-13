@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Teacher } from '@/types';
-import { getSupabaseClient } from '@/lib/supabase';
+
 import Calendarui from './Calendarui';
+
+import { getSupabaseClient } from '@/lib/supabase';
+import { Teacher } from '@/types';
 
 interface AITeacherSchedulerModalProps {
   open: boolean;
@@ -52,7 +54,7 @@ const getMonthDays = (year: number, month: number) => {
 const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
   open,
   onClose,
-  teachers
+  teachers,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
   const [daySchedule, setDaySchedule] = useState<DaySchedule | null>(null);
@@ -92,20 +94,20 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
               found = data.find((d: any) => d.id === t.teacherId);
             }
             let courses = t.courses;
-            if (found && found.course_roles) {
+            if (found?.course_roles) {
               // course_roles: { [courseId]: { main: boolean, assist: boolean } }
               courses = courses.map(c =>
                 found.course_roles[c.courseId]
                   ? { ...c, ...found.course_roles[c.courseId] }
-                  : c
+                  : c,
               );
             }
             return {
               ...t,
               courses,
-              requirement: found?.course_roles_note || ''
+              requirement: found?.course_roles_note || '',
             };
-          })
+          }),
         } : null);
       }
     };
@@ -157,9 +159,9 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
         requirement: '',
         startTime: row.start_time,
         endTime: row.end_time,
-        courses: courseTypes.map(c => ({ courseId: c.id, main: false, assist: false }))
+        courses: courseTypes.map(c => ({ courseId: c.id, main: false, assist: false })),
       })),
-      hasSchedule
+      hasSchedule,
     });
     setSelectedDate(date);
   };
@@ -171,9 +173,9 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
         teachers: prev.teachers.map(teacher =>
           teacher.teacherId === teacherId
             ? { ...teacher, requirement }
-            : teacher
-        )
-      } : null
+            : teacher,
+        ),
+      } : null,
     );
   };
 
@@ -183,15 +185,15 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
       teachers: prev.teachers.map(t =>
         t.teacherId === teacherId
           ? {
-              ...t,
-              courses: t.courses.map(c =>
-                c.courseId === courseId
-                  ? { ...c, [type]: checked }
-                  : c
-              )
-            }
-          : t
-      )
+            ...t,
+            courses: t.courses.map(c =>
+              c.courseId === courseId
+                ? { ...c, [type]: checked }
+                : c,
+            ),
+          }
+          : t,
+      ),
     } : null);
   };
 
@@ -201,15 +203,15 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
       teachers: prev.teachers.map(t =>
         t.teacherId === teacherId
           ? {
-              ...t,
-              courses: t.courses.map(c =>
-                c.courseId === courseId
-                  ? { ...c, [type]: !c[type] }
-                  : c
-              )
-            }
-          : t
-      )
+            ...t,
+            courses: t.courses.map(c =>
+              c.courseId === courseId
+                ? { ...c, [type]: !c[type] }
+                : c,
+            ),
+          }
+          : t,
+      ),
     } : null);
   };
 
@@ -219,11 +221,11 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
       teachers: prev.teachers.map(t =>
         t.teacherId === teacherId
           ? {
-              ...t,
-              courses: t.courses.map(c => ({ ...c, main: true, assist: true }))
-            }
-          : t
-      )
+            ...t,
+            courses: t.courses.map(c => ({ ...c, main: true, assist: true })),
+          }
+          : t,
+      ),
     } : null);
   };
   const handleClearAll = (teacherId: string) => {
@@ -232,11 +234,11 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
       teachers: prev.teachers.map(t =>
         t.teacherId === teacherId
           ? {
-              ...t,
-              courses: t.courses.map(c => ({ ...c, main: false, assist: false }))
-            }
-          : t
-      )
+            ...t,
+            courses: t.courses.map(c => ({ ...c, main: false, assist: false })),
+          }
+          : t,
+      ),
     } : null);
   };
 
@@ -253,13 +255,13 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
       const payload = {
         dates: daySchedule
           ? [
-              {
-                date: daySchedule.date,
-                formattedDate: formatDate(daySchedule.date),
-                teachers: daySchedule.teachers.filter(t => t.requirement.trim() !== '')
-              }
-            ]
-          : []
+            {
+              date: daySchedule.date,
+              formattedDate: formatDate(daySchedule.date),
+              teachers: daySchedule.teachers.filter(t => t.requirement.trim() !== ''),
+            },
+          ]
+          : [],
       };
       const response = await fetch('https://webhook.lingumiai.com/webhook/b1987633-4ffb-4bcd-8c64-59e06f518e4c', {
         method: 'POST',
@@ -317,12 +319,12 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
       <div className="bg-white rounded-2xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-[#EADBC8] shadow-xl">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-[#2B3A3B] flex items-center gap-2">
-            <img src="/icons/edit-pencil.png" alt="AI" className="w-6 h-6" />
+            <img alt="AI" className="w-6 h-6" src="/icons/edit-pencil.png" />
             AI 安排老師
           </h2>
           <button
-            onClick={onClose}
             className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-all"
+            onClick={onClose}
           >
             ×
           </button>
@@ -330,7 +332,7 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
         {/* 日曆區域 */}
         <div className="mb-6 flex flex-col items-center">
           <h3 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
-            <img src="/calendar.png" alt="日曆" className="w-5 h-5" />
+            <img alt="日曆" className="w-5 h-5" src="/calendar.png" />
             選擇需要安排老師的日期：
           </h3>
           <Calendarui value={selectedDate} onSelect={handleDateSelect} />
@@ -339,12 +341,12 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
         {daySchedule && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-[#4B4036] flex items-center gap-2">
-              <img src="/teacher.png" alt="老師" className="w-5 h-5" />
+              <img alt="老師" className="w-5 h-5" src="/teacher.png" />
               輸入老師安排需求：
             </h3>
             <div className="border border-[#EADBC8] rounded-xl p-4 bg-[#FFF9F2]">
               <h4 className="font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
-                <img src="/calendar.png" alt="日期" className="w-4 h-4" />
+                <img alt="日期" className="w-4 h-4" src="/calendar.png" />
                 {formatDate(daySchedule.date)}
               </h4>
               {!daySchedule.hasSchedule ? (
@@ -355,38 +357,41 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
                     <div key={teacher.teacherId} className="flex flex-col gap-2 p-2 bg-white rounded-lg border border-[#EADBC8]">
                       <div className="flex-shrink-0 w-full">
                         <span className="text-sm font-medium text-[#4B4036] flex items-center gap-1">
-                          <img src="/teacher.png" alt="老師" className="w-3 h-3" />
+                          <img alt="老師" className="w-3 h-3" src="/teacher.png" />
                           {teacher.teacherName}（{teacher.startTime}~{teacher.endTime}）
                         </span>
                       </div>
                       <input
-                        type="text"
-                        placeholder="輸入老師安排需求/備註..."
-                        value={teacher.requirement}
-                        onChange={(e) => handleRequirementChange(daySchedule.date, teacher.teacherId, e.target.value)}
                         className="flex-1 px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all bg-white"
                         disabled={!daySchedule.hasSchedule}
+                        placeholder="輸入老師安排需求/備註..."
+                        type="text"
+                        value={teacher.requirement}
+                        onChange={(e) => handleRequirementChange(daySchedule.date, teacher.teacherId, e.target.value)}
                       />
                       {/* 儲存/全選/消除按鈕同行 */}
                       <div className="flex gap-2 mb-1 items-center">
                         <button
-                          type="button"
                           className="px-3 py-1 rounded-full bg-[#FFD59A] text-[#4B4036] text-xs font-bold hover:bg-[#EAC29D] transition-all disabled:opacity-50"
-                          onClick={() => handleSaveTeacher(teacher)}
                           disabled={savingTeacherId === teacher.teacherId || !daySchedule.hasSchedule}
-                        >{savingTeacherId === teacher.teacherId ? '儲存中...' : '儲存'}</button>
-                        <button
                           type="button"
+                          onClick={() => handleSaveTeacher(teacher)}
+                        >{savingTeacherId === teacher.teacherId ? '儲存中...' : '儲存'}
+                        </button>
+                        <button
                           className="px-3 py-1 rounded-full bg-[#EAC29D] text-white text-xs font-bold hover:bg-[#D4B08A] transition-all"
-                          onClick={() => handleSelectAll(teacher.teacherId)}
                           disabled={!daySchedule.hasSchedule}
-                        >全選</button>
-                        <button
                           type="button"
+                          onClick={() => handleSelectAll(teacher.teacherId)}
+                        >全選
+                        </button>
+                        <button
                           className="px-3 py-1 rounded-full bg-gray-200 text-[#4B4036] text-xs font-bold hover:bg-gray-300 transition-all"
-                          onClick={() => handleClearAll(teacher.teacherId)}
                           disabled={!daySchedule.hasSchedule}
-                        >消除</button>
+                          type="button"
+                          onClick={() => handleClearAll(teacher.teacherId)}
+                        >消除
+                        </button>
                         {saveMessage[teacher.teacherId] && (
                           <span className={`text-xs transition-opacity duration-700 ${fadeOutTeacherId === teacher.teacherId ? 'opacity-100 animate-fade-in-out' : 'opacity-100'}`}>{saveMessage[teacher.teacherId]}</span>
                         )}
@@ -399,17 +404,19 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
                             <div key={course.id} className="flex items-center gap-3">
                               <span className="text-xs text-[#4B4036] w-20">{course.name}</span>
                               <button
-                                type="button"
                                 className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-150 focus:outline-none ${courseState?.main ? 'bg-[#FFD59A] text-[#4B4036] shadow-md scale-105' : 'bg-gray-100 text-gray-500 hover:bg-[#FDE6B8]'}`}
-                                onClick={() => handleCoursePillClick(teacher.teacherId, course.id, 'main')}
                                 disabled={!daySchedule.hasSchedule}
-                              >主教</button>
-                              <button
                                 type="button"
+                                onClick={() => handleCoursePillClick(teacher.teacherId, course.id, 'main')}
+                              >主教
+                              </button>
+                              <button
                                 className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-150 focus:outline-none ${courseState?.assist ? 'bg-[#EBC9A4] text-[#4B4036] shadow-md scale-105' : 'bg-gray-100 text-gray-500 hover:bg-[#FDE6B8]'}`}
-                                onClick={() => handleCoursePillClick(teacher.teacherId, course.id, 'assist')}
                                 disabled={!daySchedule.hasSchedule}
-                              >助教</button>
+                                type="button"
+                                onClick={() => handleCoursePillClick(teacher.teacherId, course.id, 'assist')}
+                              >助教
+                              </button>
                             </div>
                           );
                         })}
@@ -429,15 +436,15 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
             </span>
           )}
           <button
-            onClick={onClose}
             className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded-lg hover:bg-[#F5E7D4] transition-all font-medium"
+            onClick={onClose}
           >
             取消
           </button>
           <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !daySchedule || !daySchedule.hasSchedule}
             className="hanami-btn disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSubmitting || !daySchedule?.hasSchedule}
+            onClick={handleSubmit}
           >
             {isSubmitting ? '發送中...' : '發送需求'}
           </button>
@@ -454,7 +461,8 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
         .animate-fade-in-out {
           animation: fadeInOut 2s;
         }
-      `}</style>
+      `}
+      </style>
     </div>
   );
 };

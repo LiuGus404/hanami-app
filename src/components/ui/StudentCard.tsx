@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { LucideIcon } from 'lucide-react'
+import { LucideIcon } from 'lucide-react';
 
 type FieldItem = {
   icon: LucideIcon
@@ -52,26 +52,26 @@ export default function StudentCard({
 
   return (
     <div
-      onClick={onToggle}
-      className={`relative border rounded-[24px] p-5 shadow flex flex-col items-center text-[#4B4B4B] cursor-pointer transition-all`}
+      className={'relative border rounded-[24px] p-5 shadow flex flex-col items-center text-[#4B4B4B] cursor-pointer transition-all'}
       style={{
         backgroundColor: cardColor.bg,
-        borderColor: cardColor.border
+        borderColor: cardColor.border,
       }}
+      onClick={onToggle}
     >
       {selected && !isInactive && (
         <img
-          src="/leaf-sprout.png"
           alt="Selected"
           className="absolute top-3 right-3 w-8 h-8"
+          src="/leaf-sprout.png"
         />
       )}
 
       {isTrialStudent && !isInactive && (
         <img
-          src="/trial.png"
           alt="Trial"
           className="absolute top-3 right-3 w-10 h-10 rotate-12"
+          src="/trial.png"
         />
       )}
 
@@ -83,7 +83,6 @@ export default function StudentCard({
 
       {avatar && (
         <img
-          src={avatar}
           alt="avatar"
           className={`w-20 h-20 rounded-full border mb-2 ${
             isInactive
@@ -92,6 +91,7 @@ export default function StudentCard({
                 ? 'border-[#EADBC8]' 
                 : 'border-[#D8CDBF]'
           }`}
+          src={avatar}
         />
       )}
 
@@ -106,7 +106,7 @@ export default function StudentCard({
             ? '#9CA3AF' 
             : isTrialStudent 
               ? '#C4B5A0' 
-              : '#A68A64'
+              : '#A68A64';
           
           return (
             <div key={idx} className="flex items-center gap-2 text-sm">
@@ -118,9 +118,9 @@ export default function StudentCard({
                 {label}：{value}
               </span>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

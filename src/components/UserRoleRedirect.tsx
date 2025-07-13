@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
+
 import { getUserSession, getDashboardPath } from '@/lib/authUtils';
 
 export default function UserRoleRedirect() {
@@ -45,7 +46,7 @@ export default function UserRoleRedirect() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">檢查用戶身份中...</p>
         </div>
       </div>
@@ -60,8 +61,8 @@ export default function UserRoleRedirect() {
             <p className="text-red-700">{error}</p>
           </div>
           <button
-            onClick={() => router.push('/')}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => router.push('/')}
           >
             返回首頁
           </button>
@@ -115,7 +116,7 @@ export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) 
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">載入中...</p>
         </div>
       </div>

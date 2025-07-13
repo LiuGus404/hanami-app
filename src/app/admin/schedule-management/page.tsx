@@ -1,7 +1,8 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import ScheduleManagementPanel from '@/components/ui/ScheduleManagementPanel'
+import { useState } from 'react';
+
+import ScheduleManagementPanel from '@/components/ui/ScheduleManagementPanel';
 
 export default function ScheduleManagementPage() {
   return (
@@ -20,5 +21,5 @@ export default function ScheduleManagementPage() {
         </div>
       </div>
     </div>
-  )
+  );
 } 

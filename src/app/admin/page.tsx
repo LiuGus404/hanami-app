@@ -1,13 +1,14 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getUserSession, clearUserSession } from '@/lib/authUtils'
-import HanamiCalendar from '@/components/ui/HanamiCalendar'
+import { useRouter } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
+
+import HanamiCalendar from '@/components/ui/HanamiCalendar';
+import { getUserSession, clearUserSession } from '@/lib/authUtils';
+import { supabase } from '@/lib/supabase';
 
 export default function AdminPage() {
-  const router = useRouter()
+  const router = useRouter();
   const [studentCount, setStudentCount] = useState(0);
   const [trialStudentCount, setTrialStudentCount] = useState(0);
   const [lastLessonCount, setLastLessonCount] = useState(0);
@@ -22,18 +23,18 @@ export default function AdminPage() {
     sessionChecked.current = true;
 
     // 檢查用戶會話
-    const userSession = getUserSession()
+    const userSession = getUserSession();
     console.log('Admin Page - User Session:', userSession);
     
     if (!userSession || userSession.role !== 'admin') {
       console.log('Admin Page - Invalid session, redirecting to login');
-      clearUserSession()
-      router.replace('/admin/login')
-      return
+      clearUserSession();
+      router.replace('/admin/login');
+      return;
     }
 
     // 設置管理員名稱
-    setAdminName(userSession.name || '管理員')
+    setAdminName(userSession.name || '管理員');
     setIsLoading(false);
   }, []); // 移除 router 依賴
 
@@ -122,11 +123,11 @@ export default function AdminPage() {
     return (
       <div className="flex h-screen items-center justify-center bg-[#FFF9F2]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto" />
           <p className="mt-4 text-[#2B3A3B]">載入管理面板...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -138,7 +139,7 @@ export default function AdminPage() {
             <div>
               <h1 className="text-xl font-bold text-[#2B3A3B]">Hi {adminName}，歡迎回來！</h1>
             </div>
-           <div
+            <div
               style={{
                 width: '60px',
                 height: '60px',
@@ -149,8 +150,8 @@ export default function AdminPage() {
               }}
             >
               <img
-                src="/owlui.png"
                 alt="管理員"
+                src="/owlui.png"
                 style={{
                   width: '100%',
                   height: '100%',
@@ -188,8 +189,8 @@ export default function AdminPage() {
                   }}
                 >
                   <img
-                    src="/icons/bear-face.PNG"
                     alt="學生"
+                    src="/icons/bear-face.PNG"
                     style={{
                       width: '100%',
                       height: '100%',
@@ -201,7 +202,7 @@ export default function AdminPage() {
                 <p className="text-2xl font-bold text-[#2B3A3B]">{studentCount}</p>
                 <p className="text-sm text-[#555]">常規學生人數</p>
               </div>
-              <div className="bg-white border border-[#EADBC8] p-3 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer" style={{paddingBottom: '1rem'}} onClick={() => router.push('/admin/students?filter=trial')}>
+              <div className="bg-white border border-[#EADBC8] p-3 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer" style={{ paddingBottom: '1rem' }} onClick={() => router.push('/admin/students?filter=trial')}>
                 <div
                   style={{
                     width: '40px',
@@ -213,8 +214,8 @@ export default function AdminPage() {
                   }}
                 >
                   <img
-                    src="/icons/penguin-face.PNG"
                     alt="試堂"
+                    src="/icons/penguin-face.PNG"
                     style={{
                       width: '100%',
                       height: '100%',
@@ -226,7 +227,7 @@ export default function AdminPage() {
                 <p className="text-2xl font-bold text-[#2B3A3B]">{trialStudentCount}</p>
                 <p className="text-sm text-[#555]">試堂學生人數</p>
               </div>
-              <div className="bg-white border border-[#EADBC8] p-3 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer" style={{paddingBottom: '1rem'}} onClick={() => router.push('/admin/students?filter=lastLesson')}>
+              <div className="bg-white border border-[#EADBC8] p-3 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer" style={{ paddingBottom: '1rem' }} onClick={() => router.push('/admin/students?filter=lastLesson')}>
                 <div
                   style={{
                     width: '40px',
@@ -238,8 +239,8 @@ export default function AdminPage() {
                   }}
                 >
                   <img
-                    src="/icons/clock.PNG"
                     alt="最後一堂"
+                    src="/icons/clock.PNG"
                     style={{
                       width: '100%',
                       height: '100%',
@@ -265,7 +266,7 @@ export default function AdminPage() {
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/students')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
-                  <img src="/girl.png" alt="學生管理" className="w-full h-full object-contain" />
+                  <img alt="學生管理" className="w-full h-full object-contain" src="/girl.png" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">學生管理</h3>
               </div>
@@ -281,7 +282,7 @@ export default function AdminPage() {
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/hanami-tc')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
-                  <img src="/foxcat.png" alt="課堂管理" className="w-full h-full object-contain" />
+                  <img alt="課堂管理" className="w-full h-full object-contain" src="/foxcat.png" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">課堂管理</h3>
               </div>
@@ -289,7 +290,7 @@ export default function AdminPage() {
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/teachers')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
-                  <img src="/teacher.png" alt="老師管理" className="w-full h-full object-contain" />
+                  <img alt="老師管理" className="w-full h-full object-contain" src="/teacher.png" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">老師管理</h3>
               </div>
@@ -298,7 +299,7 @@ export default function AdminPage() {
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/ai-select')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
-                  <img src="/polarbear.png" alt="AI 助理" className="w-full h-full object-contain" />
+                  <img alt="AI 助理" className="w-full h-full object-contain" src="/polarbear.png" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">AI 助理</h3>
               </div>
@@ -307,7 +308,7 @@ export default function AdminPage() {
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/lesson-availability')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
-                  <img src="/details.png" alt="課堂空缺" className="w-full h-full object-contain" />
+                  <img alt="課堂空缺" className="w-full h-full object-contain" src="/details.png" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">課堂空缺</h3>
               </div>
@@ -316,7 +317,7 @@ export default function AdminPage() {
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/student-progress')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
-                  <img src="/icons/book-elephant.PNG" alt="學生進度" className="w-full h-full object-contain" />
+                  <img alt="學生進度" className="w-full h-full object-contain" src="/icons/book-elephant.PNG" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">學生進度</h3>
               </div>
@@ -325,7 +326,7 @@ export default function AdminPage() {
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/schedule-management')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
-                  <img src="/icons/clock.PNG" alt="管理課堂" className="w-full h-full object-contain" />
+                  <img alt="管理課堂" className="w-full h-full object-contain" src="/icons/clock.PNG" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">管理課堂</h3>
               </div>
@@ -334,5 +335,5 @@ export default function AdminPage() {
         </div>
       </div>
     </div>
-  )
+  );
 } 

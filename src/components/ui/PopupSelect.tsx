@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import React, { useState } from 'react'
-import { Sprout } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { Sprout } from 'lucide-react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export type PopupSelectProps = {
   title: string
@@ -11,7 +11,7 @@ export type PopupSelectProps = {
   onChange: (newSelected: string[] | string) => void
   onConfirm?: () => void
   onCancel?: () => void
-  mode?: 'multi' | 'single'
+  mode?: 'multi' | 'single' | 'multiple' // 支援 'multiple' 作為 'multi' 的別名
   errorMsg?: string
 }
 
@@ -25,26 +25,55 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
   mode = 'multi',
   errorMsg,
 }) => {
-  const isSelected = (value: string) =>
-    Array.isArray(selected) ? selected.includes(value) : selected === value
+  // 統一 mode 值，支援 'multiple' 作為 'multi' 的別名
+  const actualMode = mode === 'multiple' ? 'multi' : mode;
+
+  const isSelected = (value: string) => {
+    if (actualMode === 'multi') {
+      return Array.isArray(selected) ? selected.includes(value) : false;
+    } else {
+      return Array.isArray(selected) ? false : selected === value;
+    }
+  };
 
   const toggleOption = (value: string) => {
-    if (mode === 'multi') {
-      const current = Array.isArray(selected) ? selected : []
-      let updated: string[]
-      if (value === 'all') {
-        updated = ['all']
+    if (actualMode === 'multi') {
+      const current = Array.isArray(selected) ? selected : [];
+      let updated: string[];
+      
+      if (current.includes(value)) {
+        // 如果已選中，則移除
+        updated = current.filter((v) => v !== value);
       } else {
-        updated = current.includes(value)
-        ? current.filter((v) => v !== value)
-          : [...current.filter((v) => v !== 'all'), value]
-        if (updated.length === 0) updated = ['all']
+        // 如果未選中，則添加
+        updated = [...current, value];
       }
-      onChange(updated)
+      
+      onChange(updated);
     } else {
-      onChange(value)
+      // 單選模式
+      onChange(value);
     }
-  }
+  };
+
+  const getSelectedDisplay = () => {
+    if (actualMode === 'multi') {
+      if (!Array.isArray(selected) || selected.length === 0) {
+        return '請選擇';
+      }
+      if (selected.length === 1) {
+        const option = options.find(opt => opt.value === selected[0]);
+        return option ? option.label : '請選擇';
+      }
+      return `已選擇 ${selected.length} 項`;
+    } else {
+      if (!selected || selected === '') {
+        return '請選擇';
+      }
+      const option = options.find(opt => opt.value === selected);
+      return option ? option.label : '請選擇';
+    }
+  };
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-sm flex items-center justify-center">
@@ -53,6 +82,24 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
         {errorMsg && (
           <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">{errorMsg}</div>
         )}
+        
+        {/* 顯示已選擇的項目 */}
+        {actualMode === 'multi' && Array.isArray(selected) && selected.length > 0 && (
+          <div className="mb-4 p-3 bg-[#F3F0E5] rounded-lg">
+            <div className="text-sm font-medium mb-2">已選擇：</div>
+            <div className="flex flex-wrap gap-2">
+              {selected.map((value) => {
+                const option = options.find(opt => opt.value === value);
+                return option ? (
+                  <span key={value} className="text-xs bg-[#E8E3D5] px-2 py-1 rounded">
+                    {option.label}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          </div>
+        )}
+        
         <div className="space-y-3 overflow-y-auto flex-1 pr-2">
           {options.map(({ label, value }) => (
             <div
@@ -66,25 +113,31 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
                 <Sprout className={`w-5 h-5 ${isSelected(value) ? 'text-green-600' : 'text-[#D8CDBF]'}`} />
                 <span className="text-base font-medium">{label}</span>
               </div>
+              {actualMode === 'multi' && isSelected(value) && (
+                <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs">✓</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
+        
         <div className="flex justify-around mt-6 pt-4 border-t border-[#D8CDBF]">
           <button
-            onClick={onCancel}
             className="px-4 py-2 border border-[#D8CDBF] rounded-xl hover:bg-[#F3F0E5]"
+            onClick={onCancel}
           >
             取消
           </button>
           <button
-            onClick={onConfirm}
             className="px-6 py-2 bg-[#A68A64] text-white font-semibold rounded-xl hover:bg-[#937654]"
+            onClick={onConfirm}
           >
             確定
           </button>
         </div>
       </div>
     </div>,
-    typeof window !== 'undefined' ? document.body : (null as any)
-  )
-}
+    typeof window !== 'undefined' ? document.body : (null as any),
+  );
+};

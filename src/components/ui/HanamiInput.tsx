@@ -3,7 +3,7 @@
 import React from 'react';
 
 interface HanamiInputProps {
-  type?: 'text' | 'email' | 'password' | 'tel' | 'number';
+  type?: 'text' | 'email' | 'password' | 'tel' | 'number' | 'date' | 'time' | 'url';
   placeholder?: string;
   value?: string | number;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -12,6 +12,8 @@ interface HanamiInputProps {
   className?: string;
   label?: string;
   error?: string;
+  min?: number;
+  max?: number;
 }
 
 export default function HanamiInput({
@@ -23,7 +25,9 @@ export default function HanamiInput({
   disabled = false,
   className = '',
   label,
-  error
+  error,
+  min,
+  max,
 }: HanamiInputProps) {
   const baseClasses = 'w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200 bg-white text-[#2B3A3B] placeholder-[#999]';
   const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed bg-[#F5F5F5]' : '';
@@ -40,13 +44,15 @@ export default function HanamiInput({
         </label>
       )}
       <input
-        type={type}
+        className={classes}
+        disabled={disabled}
+        max={max}
+        min={min}
         placeholder={placeholder}
+        required={required}
+        type={type}
         value={value}
         onChange={onChange}
-        required={required}
-        disabled={disabled}
-        className={classes}
       />
       {error && (
         <p className="mt-1 text-sm text-[#FF6B6B]">{error}</p>

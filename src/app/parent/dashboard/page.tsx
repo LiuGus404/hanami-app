@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { Database } from '@/lib/database.types';
-import HanamiDashboardLayout from '@/components/ui/HanamiDashboardLayout';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { useState, useEffect, useRef } from 'react';
+
 import HanamiBadge from '@/components/ui/HanamiBadge';
 import HanamiButton from '@/components/ui/HanamiButton';
-import { supabase } from '@/lib/supabase';
-import { getUserSession, clearUserSession } from '@/lib/authUtils';
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
+import HanamiCard from '@/components/ui/HanamiCard';
+import HanamiDashboardLayout from '@/components/ui/HanamiDashboardLayout';
+import { getUserSession, clearUserSession } from '@/lib/authUtils';
+import { Database } from '@/lib/database.types';
+import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
 
 interface Student {
@@ -96,7 +97,7 @@ export default function ParentDashboard() {
         // 為孩子添加剩餘堂數
         const childrenWithRemaining = childrenData.map(child => ({
           ...child,
-          remaining_lessons: remainingLessonsMap[child.id] || 0
+          remaining_lessons: remainingLessonsMap[child.id] || 0,
         }));
         
         setChildren(childrenWithRemaining);
@@ -180,12 +181,12 @@ export default function ParentDashboard() {
           {children.map((child) => (
             <button
               key={child.id}
-              onClick={() => setSelectedChild(child)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 selectedChild?.id === child.id
                   ? 'bg-brown-600 text-white'
                   : 'bg-gray-100 text-brown-700 hover:bg-gray-200'
               }`}
+              onClick={() => setSelectedChild(child)}
             >
               {child.full_name}
             </button>
@@ -346,7 +347,7 @@ export default function ParentDashboard() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">載入中...</p>
         </div>
       </div>
@@ -355,18 +356,18 @@ export default function ParentDashboard() {
 
   return (
     <HanamiDashboardLayout
-      title={`${parentName}的儀表板`}
-      onLogout={handleLogout}
       activeTab={activeTab}
-      onTabChange={setActiveTab}
       tabs={[
         { id: 'overview', name: '概覽', icon: '📊' },
         { id: 'progress', name: '學習進度', icon: '📈' },
         { id: 'videos', name: '課堂影片', icon: '🎥' },
         { id: 'certificates', name: '證書', icon: '🏆' },
         { id: 'comments', name: '評語', icon: '💬' },
-        { id: 'packages', name: '課程包', icon: '📦' }
+        { id: 'packages', name: '課程包', icon: '📦' },
       ]}
+      title={`${parentName}的儀表板`}
+      onLogout={handleLogout}
+      onTabChange={setActiveTab}
     >
       {renderContent()}
     </HanamiDashboardLayout>

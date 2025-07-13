@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import AddTrialStudents from '@/components/ui/AddTrialStudents'
+import AddTrialStudents from '@/components/ui/AddTrialStudents';
 
 export default function AddTrialStudentsPage() {
   return (
@@ -9,5 +9,5 @@ export default function AddTrialStudentsPage() {
         <AddTrialStudents />
       </div>
     </div>
-  )
+  );
 } 

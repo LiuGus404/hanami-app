@@ -1,4 +1,4 @@
-import { MetadataRoute } from 'next'
+import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -17,5 +17,5 @@ export default function robots(): MetadataRoute.Robots {
       ],
     },
     sitemap: 'https://hanami-music.com/sitemap.xml',
-  }
+  };
 } 

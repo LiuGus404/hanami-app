@@ -1,17 +1,19 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef } from 'react'
-import { getUserSession } from '@/lib/authUtils'
 import Image from 'next/image';
-import FeatureMenu from '@/components/FeatureMenu';
-import CourseCard from '@/components/CourseCard';
-import TestimonialCard from '@/components/TestimonialCard';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+
+import CourseCard from '@/components/CourseCard';
+import FeatureMenu from '@/components/FeatureMenu';
+import TestimonialCard from '@/components/TestimonialCard';
+import { getUserSession } from '@/lib/authUtils';
+
 
 export default function Home() {
-  const router = useRouter()
-  const sessionChecked = useRef(false)
+  const router = useRouter();
+  const sessionChecked = useRef(false);
 
   useEffect(() => {
     // 防止重複檢查
@@ -19,47 +21,47 @@ export default function Home() {
     sessionChecked.current = true;
 
     // 檢查是否已有登入會話，但不自動重定向
-    const userSession = getUserSession()
+    const userSession = getUserSession();
     if (userSession) {
       console.log('用戶已登入:', userSession.role);
       // 不再自動重定向，讓用戶自己選擇
     }
-  }, []) // 移除 router 依賴
+  }, []); // 移除 router 依賴
 
   const handleLoginClick = (userType: 'admin' | 'teacher' | 'parent') => {
     // 檢查用戶是否已登入
-    const userSession = getUserSession()
+    const userSession = getUserSession();
     
     if (userSession) {
       // 如果已登入，直接跳轉到對應的儀表板
       switch (userType) {
         case 'admin':
           if (userSession.role === 'admin') {
-            router.push('/admin')
+            router.push('/admin');
           } else {
-            alert('您沒有管理員權限')
+            alert('您沒有管理員權限');
           }
-          break
+          break;
         case 'teacher':
           if (userSession.role === 'teacher') {
-            router.push('/teacher/dashboard')
+            router.push('/teacher/dashboard');
           } else {
-            alert('您沒有教師權限')
+            alert('您沒有教師權限');
           }
-          break
+          break;
         case 'parent':
           if (userSession.role === 'parent') {
-            router.push('/parent/dashboard')
+            router.push('/parent/dashboard');
           } else {
-            alert('您沒有家長權限')
+            alert('您沒有家長權限');
           }
-          break
+          break;
       }
     } else {
       // 如果未登入，跳轉到統一的登入頁面
-      router.push('/login')
+      router.push('/login');
     }
-  }
+  };
 
   return (
     <div className="bg-[#FFF9F2] min-h-screen pb-20 flex flex-col">
@@ -85,9 +87,9 @@ export default function Home() {
       <div className="flex justify-center mt-6 px-4">
         <div className="relative w-full max-w-md">
           <input
-            type="text"
-            placeholder="Search"
             className="w-full rounded-full border border-[#E0E0E0] py-2 pl-5 pr-10 text-brown-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FFD59A]"
+            placeholder="Search"
+            type="text"
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2">
             <span className="text-[#4B4036] opacity-60">🔍</span>
@@ -113,16 +115,16 @@ export default function Home() {
         <h2 className="text-xl md:text-2xl font-semibold text-brown-700 mb-4">課程與商品</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <CourseCard
+            bgColor="#FFD59A"
+            description="適合3-6歲，啟發音樂潛能，快樂學習。"
             icon="⭐"
             title="Pre-K Class"
-            description="適合3-6歲，啟發音樂潛能，快樂學習。"
-            bgColor="#FFD59A"
           />
           <CourseCard
+            bgColor="#BFE3FF"
+            description="精選錄音教材，隨時隨地快樂唱。"
             icon="🎸"
             title="Recorded Songs"
-            description="精選錄音教材，隨時隨地快樂唱。"
-            bgColor="#BFE3FF"
           />
         </div>
       </section>
@@ -142,19 +144,19 @@ export default function Home() {
         <h2 className="text-xl md:text-2xl font-semibold text-brown-700 mb-4">🌟 家長真心推薦</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <TestimonialCard
-            name="小彤媽媽"
+            avatar="👩"
             comment="第一次見到女兒咁投入唱歌，真係感動～"
-            avatar="👩"
+            name="小彤媽媽"
           />
           <TestimonialCard
-            name="浩浩爸爸"
-            comment="老師好有愛心，小朋友學得開心又專心。"
             avatar="👨"
+            comment="老師好有愛心，小朋友學得開心又專心。"
+            name="浩浩爸爸"
           />
           <TestimonialCard
-            name="思樂媽媽"
-            comment="本來怕分離，依家返學都笑笑口！"
             avatar="👩"
+            comment="本來怕分離，依家返學都笑笑口！"
+            name="思樂媽媽"
           />
         </div>
       </section>
@@ -165,13 +167,13 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
           {/* 管理員登入 */}
           <div
-            onClick={() => handleLoginClick('admin')}
             className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8] hover:shadow-xl transition-shadow cursor-pointer"
+            onClick={() => handleLoginClick('admin')}
           >
             <div className="text-center">
               <div className="w-16 h-16 bg-[#FDE6B8] rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-[#A64B2A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-brown-700 mb-2">管理員</h3>
@@ -181,13 +183,13 @@ export default function Home() {
 
           {/* 老師登入 */}
           <div
-            onClick={() => handleLoginClick('teacher')}
             className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8] hover:shadow-xl transition-shadow cursor-pointer"
+            onClick={() => handleLoginClick('teacher')}
           >
             <div className="text-center">
               <div className="w-16 h-16 bg-[#FDE6B8] rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-[#A64B2A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-brown-700 mb-2">合作老師</h3>
@@ -197,13 +199,13 @@ export default function Home() {
 
           {/* 家長登入 */}
           <div
-            onClick={() => handleLoginClick('parent')}
             className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8] hover:shadow-xl transition-shadow cursor-pointer"
+            onClick={() => handleLoginClick('parent')}
           >
             <div className="text-center">
               <div className="w-16 h-16 bg-[#FDE6B8] rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-[#A64B2A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-brown-700 mb-2">家長</h3>
@@ -218,5 +220,5 @@ export default function Home() {
         <p>© 2024 Hanami 音樂. All rights reserved.</p>
       </footer>
     </div>
-  )
+  );
 } 

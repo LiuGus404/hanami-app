@@ -13,7 +13,7 @@ export default function CourseCard({ icon, title, description, bgColor = '#FFD59
       {isEmoji ? (
         <div className="text-4xl mb-2">{icon}</div>
       ) : (
-        <img src={icon} alt={title} className="w-14 h-14 mb-2" />
+        <img alt={title} className="w-14 h-14 mb-2" src={icon} />
       )}
       <div className="text-lg font-bold text-brown-700 mb-1">{title}</div>
       <div className="text-brown-500 text-sm text-center">{description}</div>

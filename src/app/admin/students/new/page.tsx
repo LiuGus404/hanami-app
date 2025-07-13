@@ -1,6 +1,6 @@
 // /app/admin/students/add/page.tsx
-import AddRegularStudentForm from '@/components/AddRegularStudentForm'
-import BackButton from '@/components/ui/BackButton'
+import AddRegularStudentForm from '@/components/AddRegularStudentForm';
+import BackButton from '@/components/ui/BackButton';
 
 export default function AddStudentPage() {
   return (
@@ -12,5 +12,5 @@ export default function AddStudentPage() {
       
       <AddRegularStudentForm />
     </div>
-  )
+  );
 }

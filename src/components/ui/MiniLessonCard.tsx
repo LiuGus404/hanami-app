@@ -79,7 +79,7 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
           onEdit();
         }}
       >
-        <img src="/icons/edit-pencil.png" alt="Edit" className="w-4 h-4" />
+        <img alt="Edit" className="w-4 h-4" src="/icons/edit-pencil.png" />
       </button>
 
       <div className="mb-0.5">
@@ -92,14 +92,14 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
       </div>
       <div className="text-xs text-[#6B5C4D] mb-1">{course.name}</div>
       <div className="flex items-center gap-0 text-[11px] text-[#7A6654]">
-        <img src="/teacher.png" alt="teacher" className="w-4 h-4" />
+        <img alt="teacher" className="w-4 h-4" src="/teacher.png" />
         <span>老師</span>
         <button
+          className="ml-1 text-[9px] underline text-[#4B4036]"
           onClick={(e) => {
             e.stopPropagation();
             setShowTeachers(!showTeachers);
           }}
-          className="ml-1 text-[9px] underline text-[#4B4036]"
         >
           {showTeachers ? '收起' : '展開'}
         </button>
@@ -113,15 +113,15 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
         </div>
       )}
       <div className="flex items-center gap-0 text-[11px] text-[#7A6654]">
-                        <img src="/icons/penguin-face.PNG" alt="students" className="w-4 h-4" />
+        <img alt="students" className="w-4 h-4" src="/icons/penguin-face.PNG" />
         <span>學生</span>
         <span className="flex items-center gap-0 text-[10px] text-[#4B4036] font-semibold">（{students.length}）</span>
         <button
+          className="ml-1 text-[9px] underline text-[#4B4036]"
           onClick={(e) => {
             e.stopPropagation();
             setShowStudents(!showStudents);
           }}
-          className="ml-1 text-[9px] underline text-[#4B4036]"
         >
           {showStudents ? '收起' : '展開'}
         </button>
@@ -144,25 +144,25 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
                       const years = Math.floor(months / 12);
                       const remainingMonths = months % 12;
                       if (years === 0) return `${remainingMonths}M`;
-                      return `${years}Y${remainingMonths ? remainingMonths + 'M' : ''}`;
+                      return `${years}Y${remainingMonths ? `${remainingMonths}M` : ''}`;
                     })()}
                   </span>
                 )}
-                {stu.isTrial && <img src="/trial.png" alt="Trial" className="ml-1 w-3 h-3" />}
+                {stu.isTrial && <img alt="Trial" className="ml-1 w-3 h-3" src="/trial.png" />}
               </div>
             </div>
           ))}
         </div>
       )}
       <div className="flex items-center gap-1 text-[11px] text-[#7A6654] mt-1">
-        <img src="/details.png" alt="details" className="w-4 h-4" />
+        <img alt="details" className="w-4 h-4" src="/details.png" />
         <span>課堂活動</span>
         <button
+          className="ml-1 text-[9px] underline text-[#4B4036]"
           onClick={(e) => {
             e.stopPropagation();
             setShowPlan((prev) => !prev);
           }}
-          className="ml-1 text-[9px] underline text-[#4B4036]"
         >
           {showPlan ? '收起' : '展開'}
         </button>

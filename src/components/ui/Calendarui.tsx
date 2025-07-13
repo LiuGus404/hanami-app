@@ -63,19 +63,19 @@ const Calendarui: React.FC<CalendaruiProps> = ({ value, onSelect, className }) =
     return [
       'w-12 h-12 flex items-center justify-center rounded-2xl cursor-pointer select-none font-semibold transition-all duration-150 text-base',
       isToday ? 'border-2 border-[#EAC29D] text-[#EAC29D]' : 'text-[#4B4036]',
-      isSelected ? 'bg-[#EAC29D] text-white shadow-lg scale-110' : 'bg-white hover:bg-[#FDE6B8]'
+      isSelected ? 'bg-[#EAC29D] text-white shadow-lg scale-110' : 'bg-white hover:bg-[#FDE6B8]',
     ].join(' ');
   };
 
   return (
     <div className={className || ''}>
       <div className="flex items-center justify-between mb-2 w-full max-w-md mx-auto">
-        <button onClick={handlePrevMonth} className="px-2 py-1 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#EAC29D] font-bold text-lg hover:bg-[#FDE6B8]">◀</button>
+        <button className="px-2 py-1 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#EAC29D] font-bold text-lg hover:bg-[#FDE6B8]" onClick={handlePrevMonth}>◀</button>
         <span className="font-bold text-[#4B4036]">{calendarMonth.year} 年 {calendarMonth.month + 1} 月</span>
-        <button onClick={handleNextMonth} className="px-2 py-1 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#EAC29D] font-bold text-lg hover:bg-[#FDE6B8]">▶</button>
+        <button className="px-2 py-1 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#EAC29D] font-bold text-lg hover:bg-[#FDE6B8]" onClick={handleNextMonth}>▶</button>
       </div>
       <div className="grid grid-cols-7 gap-2 mb-1 w-full max-w-md mx-auto">
-        {["日", "一", "二", "三", "四", "五", "六"].map((w, i) => (
+        {['日', '一', '二', '三', '四', '五', '六'].map((w, i) => (
           <div key={i} className="text-center text-xs text-[#A68A64] font-bold w-12 h-8 flex items-center justify-center">{w}</div>
         ))}
       </div>

@@ -1,148 +1,149 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useState } from 'react';
+
+import { supabase } from '@/lib/supabase';
 
 type ScanMode = 'simple'
 
 export default function SchemaScannerPage() {
-  const [isScanning, setIsScanning] = useState(false)
-  const [scanMode, setScanMode] = useState<ScanMode>('simple')
-  const [report, setReport] = useState<string>('')
-  const [error, setError] = useState<string>('')
-  const [scanResult, setScanResult] = useState<string>('')
-  const [loading, setLoading] = useState(false)
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanMode, setScanMode] = useState<ScanMode>('simple');
+  const [report, setReport] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [scanResult, setScanResult] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
   const handleScan = async () => {
-    setIsScanning(true)
-    setError('')
+    setIsScanning(true);
+    setError('');
 
     try {
       // 簡化掃描功能，直接使用 scanDatabase
-      await scanDatabase()
-      setReport('資料庫掃描完成，請查看掃描結果。')
+      await scanDatabase();
+      setReport('資料庫掃描完成，請查看掃描結果。');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '掃描失敗')
+      setError(err instanceof Error ? err.message : '掃描失敗');
     } finally {
-      setIsScanning(false)
+      setIsScanning(false);
     }
-  }
+  };
 
   const downloadReport = () => {
-    if (!report) return
+    if (!report) return;
     
-    const blob = new Blob([report], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `supabase-schema-report-${scanMode}-${new Date().toISOString().split('T')[0]}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
+    const blob = new Blob([report], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `supabase-schema-report-${scanMode}-${new Date().toISOString().split('T')[0]}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const scanDatabase = async () => {
-    setLoading(true)
-    setScanResult('開始掃描資料庫...\n')
+    setLoading(true);
+    setScanResult('開始掃描資料庫...\n');
 
     try {
       // 檢查 hanami_student_lesson 表
-      setScanResult(prev => prev + '\n🔍 檢查 hanami_student_lesson 表...\n')
+      setScanResult(prev => `${prev}\n🔍 檢查 hanami_student_lesson 表...\n`);
       
       const { data: lessonData, error: lessonError } = await supabase
         .from('hanami_student_lesson')
         .select('*')
-        .limit(10)
+        .limit(10);
       
       if (lessonError) {
-        setScanResult(prev => prev + `❌ 錯誤: ${lessonError.message}\n`)
+        setScanResult(prev => `${prev}❌ 錯誤: ${lessonError.message}\n`);
         if (lessonError.code === 'PGRST116') {
-          setScanResult(prev => prev + `💡 提示: 這可能是RLS權限問題，請執行 fix_hanami_student_lesson_rls.sql 腳本\n`)
+          setScanResult(prev => `${prev}💡 提示: 這可能是RLS權限問題，請執行 fix_hanami_student_lesson_rls.sql 腳本\n`);
         }
       } else {
-        setScanResult(prev => prev + `✅ 找到 ${lessonData?.length || 0} 筆課堂記錄\n`)
+        setScanResult(prev => `${prev}✅ 找到 ${lessonData?.length || 0} 筆課堂記錄\n`);
         if (lessonData && lessonData.length > 0) {
-          setScanResult(prev => prev + `📋 範例資料:\n${JSON.stringify(lessonData[0], null, 2)}\n`)
+          setScanResult(prev => `${prev}📋 範例資料:\n${JSON.stringify(lessonData[0], null, 2)}\n`);
         }
       }
 
       // 檢查 Hanami_Students 表
-      setScanResult(prev => prev + '\n🔍 檢查 Hanami_Students 表...\n')
+      setScanResult(prev => `${prev}\n🔍 檢查 Hanami_Students 表...\n`);
       
       const { data: studentData, error: studentError } = await supabase
         .from('Hanami_Students')
         .select('id, full_name, student_type')
-        .limit(5)
+        .limit(5);
       
       if (studentError) {
-        setScanResult(prev => prev + `❌ 錯誤: ${studentError.message}\n`)
+        setScanResult(prev => `${prev}❌ 錯誤: ${studentError.message}\n`);
       } else {
-        setScanResult(prev => prev + `✅ 找到 ${studentData?.length || 0} 筆學生記錄\n`)
+        setScanResult(prev => `${prev}✅ 找到 ${studentData?.length || 0} 筆學生記錄\n`);
         if (studentData && studentData.length > 0) {
-          setScanResult(prev => prev + `📋 學生列表:\n${studentData.map(s => `${s.id}: ${s.full_name} (${s.student_type})`).join('\n')}\n`)
+          setScanResult(prev => `${prev}📋 學生列表:\n${studentData.map(s => `${s.id}: ${s.full_name} (${s.student_type})`).join('\n')}\n`);
         }
       }
 
       // 檢查特定學生的課堂資料
       if (studentData && studentData.length > 0) {
-        const testStudent = studentData[0]
-        setScanResult(prev => prev + `\n🔍 檢查學生 ${testStudent.full_name} (${testStudent.student_type}) 的課堂資料...\n`)
+        const testStudent = studentData[0];
+        setScanResult(prev => `${prev}\n🔍 檢查學生 ${testStudent.full_name} (${testStudent.student_type}) 的課堂資料...\n`);
         
         if (testStudent.student_type === '試堂' || testStudent.student_type === 'trial') {
           // 檢查試堂學生課堂資料
           const { data: trialLessons, error: trialLessonError } = await supabase
             .from('hanami_trial_students')
             .select('*')
-            .eq('id', testStudent.id)
+            .eq('id', testStudent.id);
           
           if (trialLessonError) {
-            setScanResult(prev => prev + `❌ 錯誤: ${trialLessonError.message}\n`)
+            setScanResult(prev => `${prev}❌ 錯誤: ${trialLessonError.message}\n`);
           } else {
-            setScanResult(prev => prev + `✅ 試堂學生課堂資料: ${JSON.stringify(trialLessons?.[0] || {}, null, 2)}\n`)
+            setScanResult(prev => `${prev}✅ 試堂學生課堂資料: ${JSON.stringify(trialLessons?.[0] || {}, null, 2)}\n`);
           }
         } else {
           // 檢查常規學生課堂資料
           const { data: studentLessons, error: studentLessonError } = await supabase
             .from('hanami_student_lesson')
             .select('*')
-            .eq('student_id', testStudent.id)
+            .eq('student_id', testStudent.id);
           
           if (studentLessonError) {
-            setScanResult(prev => prev + `❌ 錯誤: ${studentLessonError.message}\n`)
+            setScanResult(prev => `${prev}❌ 錯誤: ${studentLessonError.message}\n`);
           } else {
-            setScanResult(prev => prev + `✅ 該學生有 ${studentLessons?.length || 0} 筆課堂記錄\n`)
+            setScanResult(prev => `${prev}✅ 該學生有 ${studentLessons?.length || 0} 筆課堂記錄\n`);
           }
         }
       }
 
     } catch (error) {
-      setScanResult(prev => prev + `❌ 掃描失敗: ${error}\n`)
+      setScanResult(prev => `${prev}❌ 掃描失敗: ${error}\n`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const createTestData = async () => {
-    setLoading(true)
-    setScanResult('開始創建測試資料...\n')
+    setLoading(true);
+    setScanResult('開始創建測試資料...\n');
 
     try {
       // 先獲取一個學生
       const { data: students, error: studentError } = await supabase
         .from('Hanami_Students')
         .select('id, full_name, student_type')
-        .limit(5)
+        .limit(5);
       
       if (studentError || !students || students.length === 0) {
-        setScanResult(prev => prev + '❌ 無法獲取學生資料\n')
-        return
+        setScanResult(prev => `${prev}❌ 無法獲取學生資料\n`);
+        return;
       }
 
-      setScanResult(prev => prev + `📝 找到 ${students.length} 個學生，開始創建測試課堂資料...\n`)
+      setScanResult(prev => `${prev}📝 找到 ${students.length} 個學生，開始創建測試課堂資料...\n`);
 
       for (const student of students) {
-        setScanResult(prev => prev + `\n🎯 為學生 ${student.full_name} (${student.id}) 創建課堂資料...\n`)
+        setScanResult(prev => `${prev}\n🎯 為學生 ${student.full_name} (${student.id}) 創建課堂資料...\n`);
         
         if (student.student_type === '試堂' || student.student_type === 'trial') {
           // 試堂學生：更新 hanami_trial_students 表
@@ -153,14 +154,14 @@ export default function SchemaScannerPage() {
               course_type: '鋼琴',
               actual_timeslot: '14:00-15:00',
               student_teacher: '張老師',
-              lesson_duration: '00:45:00'
+              lesson_duration: '00:45:00',
             })
-            .eq('id', student.id)
+            .eq('id', student.id);
           
           if (updateError) {
-            setScanResult(prev => prev + `❌ 更新試堂學生課堂資料失敗: ${updateError.message}\n`)
+            setScanResult(prev => `${prev}❌ 更新試堂學生課堂資料失敗: ${updateError.message}\n`);
           } else {
-            setScanResult(prev => prev + `✅ 成功更新試堂學生課堂資料\n`)
+            setScanResult(prev => `${prev}✅ 成功更新試堂學生課堂資料\n`);
           }
         } else {
           // 常規學生：在 hanami_student_lesson 表中創建記錄
@@ -172,7 +173,7 @@ export default function SchemaScannerPage() {
               actual_timeslot: '14:00-15:00',
               lesson_teacher: '張老師',
               lesson_status: '出席',
-              full_name: student.full_name
+              full_name: student.full_name,
             },
             {
               student_id: student.id,
@@ -181,7 +182,7 @@ export default function SchemaScannerPage() {
               actual_timeslot: '14:00-15:00',
               lesson_teacher: '張老師',
               lesson_status: '出席',
-              full_name: student.full_name
+              full_name: student.full_name,
             },
             {
               student_id: student.id,
@@ -190,87 +191,87 @@ export default function SchemaScannerPage() {
               actual_timeslot: '14:00-15:00',
               lesson_teacher: '張老師',
               lesson_status: null,
-              full_name: student.full_name
-            }
-          ]
+              full_name: student.full_name,
+            },
+          ];
 
           for (const lesson of testLessons) {
             const { error: insertError } = await supabase
               .from('hanami_student_lesson')
-              .insert(lesson)
+              .insert(lesson);
             
             if (insertError) {
-              setScanResult(prev => prev + `❌ 創建課堂資料失敗: ${insertError.message}\n`)
+              setScanResult(prev => `${prev}❌ 創建課堂資料失敗: ${insertError.message}\n`);
             } else {
-              setScanResult(prev => prev + `✅ 成功創建課堂資料: ${lesson.lesson_date}\n`)
+              setScanResult(prev => `${prev}✅ 成功創建課堂資料: ${lesson.lesson_date}\n`);
             }
           }
         }
       }
 
-      setScanResult(prev => prev + '\n🎉 測試資料創建完成！\n')
+      setScanResult(prev => `${prev}\n🎉 測試資料創建完成！\n`);
 
     } catch (error) {
-      setScanResult(prev => prev + `❌ 創建測試資料失敗: ${error}\n`)
+      setScanResult(prev => `${prev}❌ 創建測試資料失敗: ${error}\n`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const checkSpecificStudent = async () => {
-    setLoading(true)
-    setScanResult('開始檢查特定學生課堂資料...\n')
+    setLoading(true);
+    setScanResult('開始檢查特定學生課堂資料...\n');
 
     try {
       // 獲取第一個學生
       const { data: students, error: studentError } = await supabase
         .from('Hanami_Students')
         .select('id, full_name, student_type')
-        .limit(1)
+        .limit(1);
       
       if (studentError || !students || students.length === 0) {
-        setScanResult(prev => prev + '❌ 無法獲取學生資料\n')
-        return
+        setScanResult(prev => `${prev}❌ 無法獲取學生資料\n`);
+        return;
       }
 
-      const student = students[0]
-      setScanResult(prev => prev + `🎯 檢查學生 ${student.full_name} (${student.id}) 的課堂資料...\n`)
+      const student = students[0];
+      setScanResult(prev => `${prev}🎯 檢查學生 ${student.full_name} (${student.id}) 的課堂資料...\n`);
 
       if (student.student_type === '試堂' || student.student_type === 'trial') {
         // 檢查試堂學生
         const { data: trialData, error: trialError } = await supabase
           .from('hanami_trial_students')
           .select('*')
-          .eq('id', student.id)
+          .eq('id', student.id);
         
         if (trialError) {
-          setScanResult(prev => prev + `❌ 查詢試堂學生資料失敗: ${trialError.message}\n`)
+          setScanResult(prev => `${prev}❌ 查詢試堂學生資料失敗: ${trialError.message}\n`);
         } else {
-          setScanResult(prev => prev + `✅ 試堂學生資料: ${JSON.stringify(trialData, null, 2)}\n`)
+          setScanResult(prev => `${prev}✅ 試堂學生資料: ${JSON.stringify(trialData, null, 2)}\n`);
         }
       } else {
         // 檢查常規學生的課堂資料
         const { data: lessonData, error: lessonError } = await supabase
           .from('hanami_student_lesson')
           .select('*')
-          .eq('student_id', student.id)
+          .eq('student_id', student.id);
         
         if (lessonError) {
-          setScanResult(prev => prev + `❌ 查詢課堂資料失敗: ${lessonError.message}\n`)
+          setScanResult(prev => `${prev}❌ 查詢課堂資料失敗: ${lessonError.message}\n`);
         } else {
-          setScanResult(prev => prev + `✅ 課堂資料數量: ${lessonData?.length || 0}\n`)
+          setScanResult(prev => `${prev}✅ 課堂資料數量: ${lessonData?.length || 0}\n`);
           if (lessonData && lessonData.length > 0) {
-            setScanResult(prev => prev + `📋 課堂資料: ${JSON.stringify(lessonData[0], null, 2)}\n`)
+            setScanResult(prev => `${prev}📋 課堂資料: ${JSON.stringify(lessonData[0], null, 2)}\n`);
           }
         }
       }
 
     } catch (error) {
-      setScanResult(prev => prev + `❌ 檢查失敗: ${error}\n`)
+      setScanResult(prev => `${prev}❌ 檢查失敗: ${error}\n`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -286,11 +287,11 @@ export default function SchemaScannerPage() {
           <div className="flex gap-4">
             <label className="flex items-center">
               <input
+                checked={scanMode === 'simple'}
+                className="mr-2"
                 type="radio"
                 value="simple"
-                checked={scanMode === 'simple'}
                 onChange={(e) => setScanMode(e.target.value as ScanMode)}
-                className="mr-2"
               />
               <span>簡單掃描 (基本資訊)</span>
             </label>
@@ -300,17 +301,17 @@ export default function SchemaScannerPage() {
         
         <div className="flex gap-4 mb-6">
           <button
-            onClick={handleScan}
-            disabled={isScanning}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isScanning}
+            onClick={handleScan}
           >
             {isScanning ? '掃描中...' : '開始簡單掃描'}
           </button>
           
           {report && (
             <button
-              onClick={downloadReport}
               className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              onClick={downloadReport}
             >
               下載報告
             </button>
@@ -338,9 +339,9 @@ export default function SchemaScannerPage() {
       <div className="mt-8">
         <h2 className="text-2xl font-bold mb-4">資料庫資料檢查</h2>
         <button
-          onClick={scanDatabase}
-          disabled={loading}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={loading}
+          onClick={scanDatabase}
         >
           {loading ? '掃描中...' : '開始掃描資料庫'}
         </button>
@@ -358,9 +359,9 @@ export default function SchemaScannerPage() {
       <div className="mt-8">
         <h2 className="text-2xl font-bold mb-4">創建測試資料</h2>
         <button
-          onClick={createTestData}
-          disabled={loading}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={loading}
+          onClick={createTestData}
         >
           {loading ? '創建中...' : '開始創建測試資料'}
         </button>
@@ -369,13 +370,13 @@ export default function SchemaScannerPage() {
       <div className="mt-8">
         <h2 className="text-2xl font-bold mb-4">檢查特定學生課堂資料</h2>
         <button
-          onClick={checkSpecificStudent}
-          disabled={loading}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={loading}
+          onClick={checkSpecificStudent}
         >
           {loading ? '檢查中...' : '開始檢查特定學生課堂資料'}
         </button>
       </div>
     </div>
-  )
+  );
 } 

@@ -180,25 +180,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "hanami_student_lesson_package_id_fkey"
-            columns: ["package_id"]
+            foreignKeyName: 'hanami_student_lesson_package_id_fkey'
+            columns: ['package_id']
             isOneToOne: false
-            referencedRelation: "Hanami_Student_Package"
-            referencedColumns: ["id"]
+            referencedRelation: 'Hanami_Student_Package'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "hanami_student_lesson_student_id_fkey"
-            columns: ["student_id"]
+            foreignKeyName: 'hanami_student_lesson_student_id_fkey'
+            columns: ['student_id']
             isOneToOne: false
-            referencedRelation: "Hanami_Students"
-            referencedColumns: ["id"]
+            referencedRelation: 'Hanami_Students'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "hanami_student_lesson_student_oid_fkey"
-            columns: ["student_oid"]
+            foreignKeyName: 'hanami_student_lesson_student_oid_fkey'
+            columns: ['student_oid']
             isOneToOne: false
-            referencedRelation: "Hanami_Students"
-            referencedColumns: ["student_oid"]
+            referencedRelation: 'Hanami_Students'
+            referencedColumns: ['student_oid']
           },
         ]
       }
@@ -259,11 +259,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "Hanami_Student_Package_student_id_fkey"
-            columns: ["student_id"]
+            foreignKeyName: 'Hanami_Student_Package_student_id_fkey'
+            columns: ['student_id']
             isOneToOne: false
-            referencedRelation: "Hanami_Students"
-            referencedColumns: ["id"]
+            referencedRelation: 'Hanami_Students'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -434,27 +434,27 @@ export type Database = {
       }
       Hanami_CourseTypes: {
         Row: {
-          created_at: string
-          id: string
-          name: string | null
-          status: boolean | null
-          trial_limit: number | null
-        }
+          created_at: string;
+          id: string;
+          name: string | null;
+          status: boolean | null;
+          trial_limit: number | null;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          name?: string | null
-          status?: boolean | null
-          trial_limit?: number | null
-        }
+          created_at?: string;
+          id?: string;
+          name?: string | null;
+          status?: boolean | null;
+          trial_limit?: number | null;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          name?: string | null
-          status?: boolean | null
-          trial_limit?: number | null
-        }
-        Relationships: []
+          created_at?: string;
+          id?: string;
+          name?: string | null;
+          status?: boolean | null;
+          trial_limit?: number | null;
+        };
+        Relationships: [];
       }
       hanami_holidays: {
         Row: {
@@ -668,48 +668,48 @@ export type Database = {
       }
       hanami_trial_queue: {
         Row: {
-          id: string
-          student_id: string
-          status: string | null
-          created_at: string | null
-          updated_at: string | null
-          prefer_time: string | null
-          student_age: number | null
-          full_name: string | null
-          student_dob: string | null
-          notes: string | null
-          phone_no: string | null
-          course_types: string | null
-        }
+          id: string;
+          student_id: string;
+          status: string | null;
+          prefer_time: string | null;
+          course_types: string | null;
+          notes: string | null;
+          student_age: number | null;
+          full_name: string | null;
+          student_dob: string | null;
+          phone_no: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
         Insert: {
-          id?: string
-          student_id: string
-          status?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-          prefer_time?: string | null
-          student_age?: number | null
-          full_name?: string | null
-          student_dob?: string | null
-          notes?: string | null
-          phone_no?: string | null
-          course_types?: string | null
-        }
+          id?: string;
+          student_id: string;
+          status?: string | null;
+          prefer_time?: string | null;
+          course_types?: string | null;
+          notes?: string | null;
+          student_age?: number | null;
+          full_name?: string | null;
+          student_dob?: string | null;
+          phone_no?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
         Update: {
-          id?: string
-          student_id?: string
-          status?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-          prefer_time?: string | null
-          student_age?: number | null
-          full_name?: string | null
-          student_dob?: string | null
-          notes?: string | null
-          phone_no?: string | null
-          course_types?: string | null
-        }
-        Relationships: []
+          id?: string;
+          student_id?: string;
+          status?: string | null;
+          prefer_time?: string | null;
+          course_types?: string | null;
+          notes?: string | null;
+          student_age?: number | null;
+          full_name?: string | null;
+          student_dob?: string | null;
+          phone_no?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
       }
       hanami_admin: {
         Row: {
@@ -786,6 +786,378 @@ export type Database = {
         }
         Relationships: []
       }
+      hanami_teaching_activities: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          activity_type: string
+          difficulty_level: number
+          duration: number
+          materials: string[]
+          objectives: string[]
+          instructions: string
+          notes: string
+          created_at: string
+          updated_at: string
+          template_id: string | null
+          custom_fields: any
+          status: string
+          tags: string[]
+          category: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description: string
+          activity_type: string
+          difficulty_level: number
+          duration: number
+          materials: string[]
+          objectives: string[]
+          instructions: string
+          notes: string
+          created_at?: string
+          updated_at?: string
+          template_id?: string | null
+          custom_fields?: any
+          status?: string
+          tags?: string[]
+          category?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string
+          activity_type?: string
+          difficulty_level?: number
+          duration?: number
+          materials?: string[]
+          objectives?: string[]
+          instructions?: string
+          notes?: string
+          created_at?: string
+          updated_at?: string
+          template_id?: string | null
+          custom_fields?: any
+          status?: string
+          tags?: string[]
+          category?: string
+        }
+        Relationships: []
+      }
+      hanami_resource_templates: {
+        Row: {
+          id: string
+          template_name: string
+          template_type: string
+          template_description: string | null
+          template_schema: any
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          template_name: string
+          template_type: string
+          template_description?: string | null
+          template_schema: any
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          template_name?: string
+          template_type?: string
+          template_description?: string | null
+          template_schema?: any
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hanami_resource_categories: {
+        Row: {
+          id: string
+          category_name: string
+          category_description: string | null
+          parent_category_id: string | null
+          sort_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          category_name: string
+          category_description?: string | null
+          parent_category_id?: string | null
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          category_name?: string
+          category_description?: string | null
+          parent_category_id?: string | null
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hanami_resource_tags: {
+        Row: {
+          id: string
+          tag_name: string
+          tag_description: string | null
+          tag_color: string
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tag_name: string
+          tag_description?: string | null
+          tag_color?: string
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tag_name?: string
+          tag_description?: string | null
+          tag_color?: string
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      hanami_custom_options: {
+        Row: {
+          id: string
+          option_type: string
+          option_name: string
+          option_value: string
+          sort_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          option_type: string
+          option_name: string
+          option_value: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          option_type?: string
+          option_name?: string
+          option_value?: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hanami_development_abilities: {
+        Row: {
+          id: string;
+          ability_name: string;
+          ability_description: string | null;
+          ability_icon: string | null;
+          ability_color: string | null;
+          max_level: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          ability_name: string;
+          ability_description?: string | null;
+          ability_icon?: string | null;
+          ability_color?: string | null;
+          max_level: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          ability_name?: string;
+          ability_description?: string | null;
+          ability_icon?: string | null;
+          ability_color?: string | null;
+          max_level?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      }
+      hanami_student_abilities: {
+        Row: {
+          id: string;
+          student_id: string;
+          ability_id: string;
+          current_level: number;
+          progress_percentage: number;
+          last_updated: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          ability_id: string;
+          current_level: number;
+          progress_percentage: number;
+          last_updated: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          ability_id?: string;
+          current_level?: number;
+          progress_percentage?: number;
+          last_updated?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      }
+      hanami_growth_trees: {
+        Row: {
+          id: string;
+          tree_name: string;
+          tree_description: string | null;
+          tree_icon: string | null;
+          course_type: string;
+          tree_level: number | null;
+          difficulty_level: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tree_name: string;
+          tree_description?: string | null;
+          tree_icon?: string | null;
+          course_type: string;
+          tree_level?: number | null;
+          difficulty_level: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tree_name?: string;
+          tree_description?: string | null;
+          tree_icon?: string | null;
+          course_type?: string;
+          tree_level?: number | null;
+          difficulty_level?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      }
+      hanami_student_progress: {
+        Row: {
+          id: string;
+          student_id: string;
+          lesson_date: string;
+          activity_id: string | null;
+          goal_id: string | null;
+          performance_rating: number;
+          notes: string | null;
+          next_target: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          lesson_date: string;
+          activity_id?: string | null;
+          goal_id?: string | null;
+          performance_rating: number;
+          notes?: string | null;
+          next_target?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          lesson_date?: string;
+          activity_id?: string | null;
+          goal_id?: string | null;
+          performance_rating?: number;
+          notes?: string | null;
+          next_target?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      }
+      hanami_growth_goals: {
+        Row: {
+          id: string;
+          tree_id: string;
+          goal_name: string;
+          goal_description: string | null;
+          goal_icon: string | null;
+          goal_order: number;
+          is_completed: boolean;
+          is_achievable: boolean;
+          progress_max: number;
+          required_abilities: string[];
+          related_activities: string[];
+          progress_contents: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tree_id: string;
+          goal_name: string;
+          goal_description?: string | null;
+          goal_icon?: string | null;
+          goal_order: number;
+          is_completed?: boolean;
+          is_achievable?: boolean;
+          progress_max: number;
+          required_abilities?: string[];
+          related_activities?: string[];
+          progress_contents?: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tree_id?: string;
+          goal_name?: string;
+          goal_description?: string | null;
+          goal_icon?: string | null;
+          goal_order?: number;
+          is_completed?: boolean;
+          is_achievable?: boolean;
+          progress_max?: number;
+          required_abilities?: string[];
+          related_activities?: string[];
+          progress_contents?: string[];
+          created_at?: string;
+        };
+        Relationships: [];
+      }
     }
     Views: {
       [_ in never]: never
@@ -806,20 +1178,20 @@ export type Database = {
     }
     Enums: {
       lesson_status_type:
-        | "attended"
-        | "absent"
-        | "makeup"
-        | "cancelled"
-        | "sick_leave"
-        | "personal_leave"
+        | 'attended'
+        | 'absent'
+        | 'makeup'
+        | 'cancelled'
+        | 'sick_leave'
+        | 'personal_leave'
       lesson_type_enum:
-        | "正常課"
-        | "補課"
-        | "評估課"
-        | "考試課"
-        | "比賽課"
-        | "拍片課"
-      package_status_type: "active" | "paused" | "completed" | "cancelled"
+        | '正常課'
+        | '補課'
+        | '評估課'
+        | '考試課'
+        | '比賽課'
+        | '拍片課'
+      package_status_type: 'active' | 'paused' | 'completed' | 'cancelled'
     }
     CompositeTypes: {
       [_ in never]: never

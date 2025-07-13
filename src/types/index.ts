@@ -186,4 +186,4 @@ export interface StudentProgress {
     actual_timeslot: string | null
     lesson_teacher: string | null
   }
-} 
+}

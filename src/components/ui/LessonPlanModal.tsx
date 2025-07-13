@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { useTeachers } from '@/hooks/useLessonPlans';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -45,14 +46,14 @@ const LessonPlanModal = ({
           ? existingPlan.objectives
           : existingPlan.objectives
             ? JSON.parse(existingPlan.objectives)
-            : ['']
+            : [''],
       );
       setMaterials(
         Array.isArray(existingPlan.materials)
           ? existingPlan.materials
           : existingPlan.materials
             ? JSON.parse(existingPlan.materials)
-            : ['']
+            : [''],
       );
       setRemarks(existingPlan.remarks || '');
       setSelectedTeacher1(existingPlan.teacher_ids_1 || []);
@@ -61,7 +62,7 @@ const LessonPlanModal = ({
           ? existingPlan.teacher_ids_2
           : existingPlan.teacher_ids_2
             ? JSON.parse(existingPlan.teacher_ids_2)
-            : []
+            : [],
       );
     } else {
       setTopic('');
@@ -82,16 +83,16 @@ const LessonPlanModal = ({
       const lessonDateStr = hkDate.toISOString().split('T')[0];
       const planData = {
         lesson_date: lessonDateStr,
-        timeslot: timeslot,
+        timeslot,
         course_type: courseType,
-        topic: topic,
+        topic,
         objectives: objectives.filter(obj => obj.trim() !== ''),
         materials: materials.filter(mat => mat.trim() !== ''),
         notes: remarks,
         teacher_ids: selectedTeacher1,
         teacher_names: (selectedTeacher1 || []).map(id => teachers.find(t => t.id === id)?.name || ''),
         theme: '',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       };
 
       console.log('handleSubmit timeslot:', timeslot);
@@ -105,7 +106,7 @@ const LessonPlanModal = ({
             ...planData,
             teacher_ids_1: selectedTeacher1,
             teacher_ids_2: selectedTeacher2,
-            remarks: remarks
+            remarks,
           })
           .eq('id', existingPlan.id);
 
@@ -118,7 +119,7 @@ const LessonPlanModal = ({
             ...planData,
             teacher_ids_1: selectedTeacher1,
             teacher_ids_2: selectedTeacher2,
-            remarks: remarks
+            remarks,
           }]);
 
         if (error) throw error;
@@ -178,7 +179,7 @@ const LessonPlanModal = ({
   // 將老師資料轉換為 PopupSelect 需要的格式
   const teacherOptions = teachers.map(t => ({
     value: t.id,
-    label: t.name
+    label: t.name,
   }));
 
   console.log('open modal with timeslot:', timeslot);
@@ -193,14 +194,16 @@ const LessonPlanModal = ({
           <h2 className="text-xl font-bold text-[#4B4036]">編輯教案</h2>
           <div className="flex gap-2">
             <button
-              type="button"
-              onClick={handleTestFill}
               className="px-3 py-1 rounded-full border border-[#EBC9A4] bg-white text-[#4B4036] hover:bg-[#f5e7d4] transition"
               disabled={saving}
+              type="button"
+              onClick={handleTestFill}
             >
               測試填入
             </button>
             <button
+              className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EBC9A4] text-[#4B4036] hover:bg-[#f7f3ec]"
+              title="刷新老師資料"
               type="button"
               onClick={(e) => {
                 const btn = e.currentTarget.querySelector('img');
@@ -210,184 +213,187 @@ const LessonPlanModal = ({
                 }
                 window.location.reload();
               }}
-              className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EBC9A4] text-[#4B4036] hover:bg-[#f7f3ec]"
-              title="刷新老師資料"
             >
-              <img src="/refresh.png" alt="Refresh" className="w-4 h-4" />
+              <img alt="Refresh" className="w-4 h-4" src="/refresh.png" />
             </button>
           </div>
         </div>
         {loading ? (
           <div className="text-center text-[#4B4036] py-8">老師資料載入中...</div>
         ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1 text-[#4B4036]">教學主題</label>
-            <input
-              type="text"
-              value={topic}
-              onChange={e => setTopic(e.target.value)}
-              className="w-full p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-[#4B4036]">教學目標</label>
-            {objectives.map((value, index) => (
-              <div key={index} className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={value}
-                  onChange={e => {
-                    const updated = [...objectives];
-                    updated[index] = e.target.value;
-                    setObjectives(updated);
-                  }}
-                  className="flex-1 p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeField('objectives', index)}
-                  className="px-2 py-1 text-red-500 hover:text-red-700 rounded"
-                  disabled={objectives.length === 1}
-                >✕</button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => addField('objectives')}
-              className="text-sm text-[#4B4036] underline"
-            >➕ 新增一欄</button>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-[#4B4036]">教學活動</label>
-            {materials.map((value, index) => (
-              <div key={index} className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={value}
-                  onChange={e => {
-                    const updated = [...materials];
-                    updated[index] = e.target.value;
-                    setMaterials(updated);
-                  }}
-                  className="flex-1 p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeField('materials', index)}
-                  className="px-2 py-1 text-red-500 hover:text-red-700 rounded"
-                  disabled={materials.length === 1}
-                >✕</button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => addField('materials')}
-              className="text-sm text-[#4B4036] underline"
-            >➕ 新增一欄</button>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-[#4B4036]">老師</label>
-            <div className="space-y-2">
-              <div className="flex items-center gap-4">
-                <div>
-                  <span className="mr-2">主老師：</span>
-                  <button
-                    type="button"
-                    className="px-2 py-1 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
-                    onClick={() => {
-                      setTempSelectedTeacher1(selectedTeacher1);
-                      setShowPopup('main');
-                    }}
-                  >
-                    {selectedTeacher1.length > 0
-                      ? teacherNames1.join('、')
-                      : '請選擇'}
-                  </button>
-                </div>
-                <div>
-                  <span className="mr-2">副老師：</span>
-                  <button
-                    type="button"
-                    className="px-2 py-1 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
-                    onClick={() => {
-                      setTempSelectedTeacher2(selectedTeacher2);
-                      setShowPopup('assist');
-                    }}
-                  >
-                    {selectedTeacher2.length > 0
-                      ? teacherNames2.join('、')
-                      : '請選擇'}
-                  </button>
-                </div>
-              </div>
-              {teachers.length === 0 && (
-                <div className="text-sm text-red-500 mt-1">無法載入老師資料，請稍後再試</div>
-              )}
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-[#4B4036]">教學主題</label>
+              <input
+                className="w-full p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
+                type="text"
+                value={topic}
+                onChange={e => setTopic(e.target.value)}
+              />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-[#4B4036]">備註</label>
-            <textarea
-              value={remarks}
-              onChange={e => setRemarks(e.target.value)}
-              className="w-full p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036] h-24"
-            />
-          </div>
-          <div className="flex justify-end gap-2 mt-4">
-            {existingPlan?.id && (
+            <div>
+              <label className="block text-sm font-medium mb-1 text-[#4B4036]">教學目標</label>
+              {objectives.map((value, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <input
+                    className="flex-1 p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
+                    type="text"
+                    value={value}
+                    onChange={e => {
+                      const updated = [...objectives];
+                      updated[index] = e.target.value;
+                      setObjectives(updated);
+                    }}
+                  />
+                  <button
+                    className="px-2 py-1 text-red-500 hover:text-red-700 rounded"
+                    disabled={objectives.length === 1}
+                    type="button"
+                    onClick={() => removeField('objectives', index)}
+                  >✕
+                  </button>
+                </div>
+              ))}
               <button
+                className="text-sm text-[#4B4036] underline"
                 type="button"
-                onClick={handleDelete}
+                onClick={() => addField('objectives')}
+              >➕ 新增一欄
+              </button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-[#4B4036]">教學活動</label>
+              {materials.map((value, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <input
+                    className="flex-1 p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
+                    type="text"
+                    value={value}
+                    onChange={e => {
+                      const updated = [...materials];
+                      updated[index] = e.target.value;
+                      setMaterials(updated);
+                    }}
+                  />
+                  <button
+                    className="px-2 py-1 text-red-500 hover:text-red-700 rounded"
+                    disabled={materials.length === 1}
+                    type="button"
+                    onClick={() => removeField('materials', index)}
+                  >✕
+                  </button>
+                </div>
+              ))}
+              <button
+                className="text-sm text-[#4B4036] underline"
+                type="button"
+                onClick={() => addField('materials')}
+              >➕ 新增一欄
+              </button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-[#4B4036]">老師</label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <span className="mr-2">主老師：</span>
+                    <button
+                      className="px-2 py-1 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
+                      type="button"
+                      onClick={() => {
+                        setTempSelectedTeacher1(selectedTeacher1);
+                        setShowPopup('main');
+                      }}
+                    >
+                      {selectedTeacher1.length > 0
+                        ? teacherNames1.join('、')
+                        : '請選擇'}
+                    </button>
+                  </div>
+                  <div>
+                    <span className="mr-2">副老師：</span>
+                    <button
+                      className="px-2 py-1 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
+                      type="button"
+                      onClick={() => {
+                        setTempSelectedTeacher2(selectedTeacher2);
+                        setShowPopup('assist');
+                      }}
+                    >
+                      {selectedTeacher2.length > 0
+                        ? teacherNames2.join('、')
+                        : '請選擇'}
+                    </button>
+                  </div>
+                </div>
+                {teachers.length === 0 && (
+                <div className="text-sm text-red-500 mt-1">無法載入老師資料，請稍後再試</div>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-[#4B4036]">備註</label>
+              <textarea
+                className="w-full p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036] h-24"
+                value={remarks}
+                onChange={e => setRemarks(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              {existingPlan?.id && (
+              <button
                 className="px-4 py-2 rounded-full border border-red-300 bg-white text-red-600 hover:bg-red-100 transition"
                 disabled={saving}
+                type="button"
+                onClick={handleDelete}
               >
                 刪除
               </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-full border border-[#EBC9A4] bg-white text-[#4B4036] hover:bg-[#f5e7d4] transition"
-              disabled={saving}
-            >取消</button>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-full bg-[#EBC9A4] text-[#4B4036] hover:bg-[#d0ab7d] transition font-semibold"
-              disabled={saving}
-            >
-              {saving ? '儲存中...' : '儲存'}
-            </button>
-          </div>
-        </form>
+              )}
+              <button
+                className="px-4 py-2 rounded-full border border-[#EBC9A4] bg-white text-[#4B4036] hover:bg-[#f5e7d4] transition"
+                disabled={saving}
+                type="button"
+                onClick={onClose}
+              >取消
+              </button>
+              <button
+                className="px-4 py-2 rounded-full bg-[#EBC9A4] text-[#4B4036] hover:bg-[#d0ab7d] transition font-semibold"
+                disabled={saving}
+                type="submit"
+              >
+                {saving ? '儲存中...' : '儲存'}
+              </button>
+            </div>
+          </form>
         )}
         {/* PopupSelect 彈窗 */}
         {showPopup === 'main' && (
           <PopupSelect
-            title="選擇主老師"
+            mode="multi"
             options={teacherOptions}
             selected={tempSelectedTeacher1}
+            title="選擇主老師"
+            onCancel={() => setShowPopup(null)}
             onChange={val => setTempSelectedTeacher1(Array.isArray(val) ? val : [val])}
             onConfirm={() => {
               setSelectedTeacher1(tempSelectedTeacher1);
               setShowPopup(null);
             }}
-            onCancel={() => setShowPopup(null)}
-            mode="multi"
           />
         )}
         {showPopup === 'assist' && (
           <PopupSelect
-            title="選擇副老師"
+            mode="multi"
             options={teacherOptions}
             selected={tempSelectedTeacher2}
+            title="選擇副老師"
+            onCancel={() => setShowPopup(null)}
             onChange={val => setTempSelectedTeacher2(Array.isArray(val) ? val : [val])}
             onConfirm={() => {
               setSelectedTeacher2(tempSelectedTeacher2);
               setShowPopup(null);
             }}
-            onCancel={() => setShowPopup(null)}
-            mode="multi"
           />
         )}
       </div>

@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import HanamiCard from '@/components/ui/HanamiCard';
+
+import AccountForm from '@/components/admin/AccountForm';
+import AccountIcon from '@/components/ui/AccountIcon';
+import HanamiBadge from '@/components/ui/HanamiBadge';
 import HanamiButton from '@/components/ui/HanamiButton';
+import HanamiCard from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiSelect from '@/components/ui/HanamiSelect';
-import HanamiBadge from '@/components/ui/HanamiBadge';
-import AccountIcon from '@/components/ui/AccountIcon';
-import AccountForm from '@/components/admin/AccountForm';
+import { supabase } from '@/lib/supabase';
 
 interface UserPermission {
   id: string;
@@ -153,7 +154,7 @@ export default function PermissionManagementPanel() {
           can_manage_lessons: true,
           can_view_financial_data: true,
           can_export_data: true,
-          is_active: true
+          is_active: true,
         },
         ...(teachersData?.map((teacher, index) => ({
           id: `teacher-${index + 1}`,
@@ -167,8 +168,8 @@ export default function PermissionManagementPanel() {
           can_manage_lessons: true,
           can_view_financial_data: false,
           can_export_data: false,
-          is_active: teacher.teacher_status === 'active'
-        })) || [])
+          is_active: teacher.teacher_status === 'active',
+        })) || []),
       ];
 
       console.log('權限資料創建成功:', mockPermissions.length, '筆');
@@ -187,7 +188,7 @@ export default function PermissionManagementPanel() {
     try {
       // 模擬更新操作
       setUserPermissions(prev => 
-        prev.map(up => up.id === id ? { ...up, ...updates } : up)
+        prev.map(up => up.id === id ? { ...up, ...updates } : up),
       );
       
       alert('權限更新成功！');
@@ -201,7 +202,7 @@ export default function PermissionManagementPanel() {
   const batchUpdatePermissions = async (userType: string, updates: Partial<UserPermission>) => {
     try {
       setUserPermissions(prev => 
-        prev.map(up => up.user_type === userType ? { ...up, ...updates } : up)
+        prev.map(up => up.user_type === userType ? { ...up, ...updates } : up),
       );
 
       alert('批量更新成功！');
@@ -268,11 +269,11 @@ export default function PermissionManagementPanel() {
         const searchFields = [
           item.teacher_fullname || item.full_name || item.admin_name,
           item.teacher_email || item.student_email || item.admin_email,
-          item.teacher_nickname || item.nick_name
+          item.teacher_nickname || item.nick_name,
         ].filter(Boolean);
         
         return searchFields.some(field => 
-          field.toLowerCase().includes(searchTerm.toLowerCase())
+          field.toLowerCase().includes(searchTerm.toLowerCase()),
         );
       });
     }
@@ -313,7 +314,7 @@ export default function PermissionManagementPanel() {
         .eq('id', userId);
 
       if (error) {
-        alert('刪除失敗：' + error.message);
+        alert(`刪除失敗：${error.message}`);
       } else {
         alert('刪除成功');
         loadData();
@@ -350,7 +351,7 @@ export default function PermissionManagementPanel() {
         .eq('id', userId);
 
       if (error) {
-        alert('狀態更新失敗：' + error.message);
+        alert(`狀態更新失敗：${error.message}`);
       } else {
         alert('狀態更新成功');
         loadData();
@@ -399,7 +400,7 @@ export default function PermissionManagementPanel() {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto" />
           <p className="mt-4 text-lg text-[#2B3A3B]">載入權限管理系統...</p>
         </div>
       </div>
@@ -427,42 +428,42 @@ export default function PermissionManagementPanel() {
       {/* 標籤頁導航 */}
       <div className="flex space-x-4 border-b border-gray-200">
         <button
-          onClick={() => setActiveTab('permissions')}
           className={`px-4 py-2 font-medium rounded-t-lg ${
             activeTab === 'permissions'
               ? 'bg-[#FDE6B8] text-[#A64B2A] border-b-2 border-[#A64B2A]'
               : 'text-gray-500 hover:text-gray-700'
           }`}
+          onClick={() => setActiveTab('permissions')}
         >
           用戶權限 ({userPermissions.length})
         </button>
         <button
-          onClick={() => setActiveTab('teachers')}
           className={`px-4 py-2 font-medium rounded-t-lg ${
             activeTab === 'teachers'
               ? 'bg-[#FDE6B8] text-[#A64B2A] border-b-2 border-[#A64B2A]'
               : 'text-gray-500 hover:text-gray-700'
           }`}
+          onClick={() => setActiveTab('teachers')}
         >
           老師管理 ({teachers.length})
         </button>
         <button
-          onClick={() => setActiveTab('students')}
           className={`px-4 py-2 font-medium rounded-t-lg ${
             activeTab === 'students'
               ? 'bg-[#FDE6B8] text-[#A64B2A] border-b-2 border-[#A64B2A]'
               : 'text-gray-500 hover:text-gray-700'
           }`}
+          onClick={() => setActiveTab('students')}
         >
           學生管理 ({students.length})
         </button>
         <button
-          onClick={() => setActiveTab('accounts')}
           className={`px-4 py-2 font-medium rounded-t-lg ${
             activeTab === 'accounts'
               ? 'bg-[#FDE6B8] text-[#A64B2A] border-b-2 border-[#A64B2A]'
               : 'text-gray-500 hover:text-gray-700'
           }`}
+          onClick={() => setActiveTab('accounts')}
         >
           帳戶管理
         </button>
@@ -487,15 +488,15 @@ export default function PermissionManagementPanel() {
                   <label className="block text-sm font-medium text-[#555] mb-2">老師權限</label>
                   <div className="space-y-2">
                     <HanamiButton
-                      variant="secondary"
                       size="sm"
+                      variant="secondary"
                       onClick={() => batchUpdatePermissions('teacher', { can_view_all_students: true })}
                     >
                       允許查看所有學生
                     </HanamiButton>
                     <HanamiButton
-                      variant="secondary"
                       size="sm"
+                      variant="secondary"
                       onClick={() => batchUpdatePermissions('teacher', { can_view_all_students: false })}
                     >
                       限制學生查看
@@ -506,15 +507,15 @@ export default function PermissionManagementPanel() {
                   <label className="block text-sm font-medium text-[#555] mb-2">家長權限</label>
                   <div className="space-y-2">
                     <HanamiButton
-                      variant="secondary"
                       size="sm"
+                      variant="secondary"
                       onClick={() => batchUpdatePermissions('parent', { can_view_all_students: true })}
                     >
                       允許查看進度
                     </HanamiButton>
                     <HanamiButton
-                      variant="secondary"
                       size="sm"
+                      variant="secondary"
                       onClick={() => batchUpdatePermissions('parent', { can_view_all_students: false })}
                     >
                       限制進度查看
@@ -525,15 +526,15 @@ export default function PermissionManagementPanel() {
                   <label className="block text-sm font-medium text-[#555] mb-2">管理員權限</label>
                   <div className="space-y-2">
                     <HanamiButton
-                      variant="secondary"
                       size="sm"
+                      variant="secondary"
                       onClick={() => batchUpdatePermissions('admin', { can_view_financial_data: true })}
                     >
                       允許查看財務
                     </HanamiButton>
                     <HanamiButton
-                      variant="secondary"
                       size="sm"
+                      variant="secondary"
                       onClick={() => batchUpdatePermissions('admin', { can_view_financial_data: false })}
                     >
                       限制財務查看
@@ -564,16 +565,18 @@ export default function PermissionManagementPanel() {
                       <p className="text-xs text-[#777]">類型: {user.user_type}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        user.is_active 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs ${
+                          user.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
                         {user.is_active ? '啟用' : '停用'}
                       </span>
                       <HanamiButton
-                        variant="secondary"
                         size="sm"
+                        variant="secondary"
                         onClick={() => handleEditUser(user)}
                       >
                         編輯
@@ -658,18 +661,18 @@ export default function PermissionManagementPanel() {
               {[
                 { id: 'teacher', name: '老師帳戶', type: 'teacher' as const, count: teachers.length },
                 { id: 'student', name: '學生帳戶', type: 'student' as const, count: students.length },
-                { id: 'admin', name: '管理員帳戶', type: 'admin' as const, count: admins.length }
+                { id: 'admin', name: '管理員帳戶', type: 'admin' as const, count: admins.length },
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setAccountActiveTab(tab.id as UserType)}
                   className={`flex items-center px-3 py-2 rounded-xl font-medium text-sm transition-all ${
                     accountActiveTab === tab.id
                       ? 'bg-[#FDE6B8] text-[#A64B2A]'
                       : 'text-[#666] hover:bg-[#FFF3E0]'
                   }`}
+                  onClick={() => setAccountActiveTab(tab.id as UserType)}
                 >
-                  <AccountIcon type={tab.type} size="sm" className="mr-2" />
+                  <AccountIcon className="mr-2" size="sm" type={tab.type} />
                   {tab.name}
                   <span className="ml-2 bg-white text-[#666] px-2 py-1 rounded-full text-xs">
                     {tab.count}
@@ -683,25 +686,25 @@ export default function PermissionManagementPanel() {
           <HanamiCard>
             <div className="space-y-4">
               <HanamiInput
-                type="text"
                 placeholder="搜尋姓名、電子郵件..."
+                type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
               <div className="flex gap-3">
                 <HanamiSelect
+                  className="flex-1"
                   options={[
                     { value: 'all', label: '所有狀態' },
                     { value: 'active', label: '啟用' },
-                    { value: 'inactive', label: '停用' }
+                    { value: 'inactive', label: '停用' },
                   ]}
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as AccountStatus)}
-                  className="flex-1"
                 />
                 <HanamiButton
-                  onClick={handleAddAccount}
                   className="whitespace-nowrap"
+                  onClick={handleAddAccount}
                 >
                   新增帳戶
                 </HanamiButton>
@@ -717,8 +720,8 @@ export default function PermissionManagementPanel() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <AccountIcon 
-                        type={accountActiveTab} 
                         size="md" 
+                        type={accountActiveTab} 
                       />
                       <div>
                         <h3 className="font-semibold text-[#2B3A3B]">
@@ -736,26 +739,26 @@ export default function PermissionManagementPanel() {
                       {getStatusBadge(user.teacher_status || user.student_type || user.role)}
                       <div className="flex space-x-1">
                         <HanamiButton
-                          variant="secondary"
                           size="sm"
+                          variant="secondary"
                           onClick={() => handleEditAccount(user)}
                         >
                           編輯
                         </HanamiButton>
                         <HanamiButton
-                          variant="secondary"
                           size="sm"
+                          variant="secondary"
                           onClick={() => handleStatusChange(
                             user.id, 
                             accountActiveTab, 
-                            (user.teacher_status || user.student_type || user.role) === 'active' ? 'inactive' : 'active'
+                            (user.teacher_status || user.student_type || user.role) === 'active' ? 'inactive' : 'active',
                           )}
                         >
                           {(user.teacher_status || user.student_type || user.role) === 'active' ? '停用' : '啟用'}
                         </HanamiButton>
                         <HanamiButton
-                          variant="danger"
                           size="sm"
+                          variant="danger"
                           onClick={() => handleDeleteUser(user.id, accountActiveTab)}
                         >
                           刪除
@@ -771,7 +774,7 @@ export default function PermissionManagementPanel() {
               
               {getFilteredData().length === 0 && (
                 <div className="text-center py-8">
-                  <AccountIcon type="all" size="lg" className="mx-auto mb-3 opacity-50" />
+                  <AccountIcon className="mx-auto mb-3 opacity-50" size="lg" type="all" />
                   <p className="text-[#666]">沒有找到符合條件的帳戶</p>
                 </div>
               )}
@@ -789,64 +792,64 @@ export default function PermissionManagementPanel() {
               <div>
                 <label className="block text-sm font-medium text-[#555] mb-2">用戶郵箱</label>
                 <input
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   type="email"
                   value={selectedUser.user_email}
-                  onChange={(e) => setSelectedUser({...selectedUser, user_email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  onChange={(e) => setSelectedUser({ ...selectedUser, user_email: e.target.value })}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <label className="flex items-center">
                   <input
-                    type="checkbox"
                     checked={selectedUser.can_view_all_students}
-                    onChange={(e) => setSelectedUser({...selectedUser, can_view_all_students: e.target.checked})}
                     className="mr-2"
+                    type="checkbox"
+                    onChange={(e) => setSelectedUser({ ...selectedUser, can_view_all_students: e.target.checked })}
                   />
                   <span className="text-sm">查看所有學生</span>
                 </label>
                 <label className="flex items-center">
                   <input
-                    type="checkbox"
                     checked={selectedUser.can_view_all_lessons}
-                    onChange={(e) => setSelectedUser({...selectedUser, can_view_all_lessons: e.target.checked})}
                     className="mr-2"
+                    type="checkbox"
+                    onChange={(e) => setSelectedUser({ ...selectedUser, can_view_all_lessons: e.target.checked })}
                   />
                   <span className="text-sm">查看所有課程</span>
                 </label>
                 <label className="flex items-center">
                   <input
-                    type="checkbox"
                     checked={selectedUser.can_manage_teachers}
-                    onChange={(e) => setSelectedUser({...selectedUser, can_manage_teachers: e.target.checked})}
                     className="mr-2"
+                    type="checkbox"
+                    onChange={(e) => setSelectedUser({ ...selectedUser, can_manage_teachers: e.target.checked })}
                   />
                   <span className="text-sm">管理老師</span>
                 </label>
                 <label className="flex items-center">
                   <input
-                    type="checkbox"
                     checked={selectedUser.can_manage_students}
-                    onChange={(e) => setSelectedUser({...selectedUser, can_manage_students: e.target.checked})}
                     className="mr-2"
+                    type="checkbox"
+                    onChange={(e) => setSelectedUser({ ...selectedUser, can_manage_students: e.target.checked })}
                   />
                   <span className="text-sm">管理學生</span>
                 </label>
                 <label className="flex items-center">
                   <input
-                    type="checkbox"
                     checked={selectedUser.can_view_financial_data}
-                    onChange={(e) => setSelectedUser({...selectedUser, can_view_financial_data: e.target.checked})}
                     className="mr-2"
+                    type="checkbox"
+                    onChange={(e) => setSelectedUser({ ...selectedUser, can_view_financial_data: e.target.checked })}
                   />
                   <span className="text-sm">查看財務資料</span>
                 </label>
                 <label className="flex items-center">
                   <input
-                    type="checkbox"
                     checked={selectedUser.is_active}
-                    onChange={(e) => setSelectedUser({...selectedUser, is_active: e.target.checked})}
                     className="mr-2"
+                    type="checkbox"
+                    onChange={(e) => setSelectedUser({ ...selectedUser, is_active: e.target.checked })}
                   />
                   <span className="text-sm">啟用帳戶</span>
                 </label>
@@ -873,8 +876,8 @@ export default function PermissionManagementPanel() {
       {/* 新增/編輯帳戶表單 */}
       {showAddModal && (
         <AccountForm
-          userType={accountActiveTab}
           editingUser={editingUser}
+          userType={accountActiveTab}
           onClose={handleFormClose}
           onSuccess={handleFormSuccess}
         />

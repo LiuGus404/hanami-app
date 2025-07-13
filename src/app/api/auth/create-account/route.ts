@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // 創建 Supabase Auth 用戶
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: registrationRequest.email,
-      password: password,
+      password,
       email_confirm: true,
     });
 
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       message: '用戶帳號創建成功',
-      userId: authData.user.id 
+      userId: authData.user.id, 
     });
 
   } catch (error) {

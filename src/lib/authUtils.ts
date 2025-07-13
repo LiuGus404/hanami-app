@@ -1,4 +1,5 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
 import { Database } from './database.types';
 
 export type UserRole = 'admin' | 'teacher' | 'parent';
@@ -38,8 +39,8 @@ export async function validateUserCredentials(email: string, password: string): 
           id: admin.id,
           email: admin.admin_email || email,
           role: 'admin',
-          name: admin.admin_name || '管理員'
-        }
+          name: admin.admin_name || '管理員',
+        },
       };
     }
 
@@ -65,8 +66,8 @@ export async function validateUserCredentials(email: string, password: string): 
           email: teacherData.teacher_email || email,
           role: 'teacher',
           name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
-          relatedIds: students?.map(s => s.id) || []
-        }
+          relatedIds: students?.map(s => s.id) || [],
+        },
       };
     }
 
@@ -86,8 +87,8 @@ export async function validateUserCredentials(email: string, password: string): 
           email: studentData.student_email || email,
           role: 'parent',
           name: `${studentData.full_name}的家長`,
-          relatedIds: [studentData.id]
-        }
+          relatedIds: [studentData.id],
+        },
       };
     }
 
@@ -108,21 +109,21 @@ export async function validateUserCredentials(email: string, password: string): 
           email: parentData.parent_email || email,
           role: 'parent',
           name: `${parentData.full_name}的家長`,
-          relatedIds: [parentData.id]
-        }
+          relatedIds: [parentData.id],
+        },
       };
     }
 
     return {
       success: false,
-      error: '帳號或密碼錯誤'
+      error: '帳號或密碼錯誤',
     };
 
   } catch (error) {
     console.error('Error validating credentials:', error);
     return {
       success: false,
-      error: '登入驗證失敗'
+      error: '登入驗證失敗',
     };
   }
 }
@@ -132,7 +133,7 @@ export async function getUserRole(): Promise<UserRole | null> {
   
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !user.email) return null;
+    if (!user?.email) return null;
 
     // 檢查是否為管理員
     const { data: adminData } = await supabase
@@ -173,7 +174,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
   
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !user.email) return null;
+    if (!user?.email) return null;
 
     const role = await getUserRole();
     if (!role) return null;
@@ -191,7 +192,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
             id: adminData.id,
             email: adminData.admin_email || user.email,
             role: 'admin',
-            name: adminData.admin_name || '管理員'
+            name: adminData.admin_name || '管理員',
           };
         }
         break;
@@ -215,7 +216,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
             email: teacherData.teacher_email || user.email,
             role: 'teacher',
             name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
-            relatedIds: students?.map(s => s.id) || []
+            relatedIds: students?.map(s => s.id) || [],
           };
         }
         break;
@@ -233,7 +234,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
             email: user.email,
             role: 'parent',
             name: `${students[0].full_name}的家長`,
-            relatedIds: students.map(s => s.id)
+            relatedIds: students.map(s => s.id),
           };
         }
         break;
@@ -277,7 +278,7 @@ export function setUserSession(user: UserProfile) {
   if (typeof window !== 'undefined') {
     const sessionData = {
       user,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     
     // 設置 localStorage

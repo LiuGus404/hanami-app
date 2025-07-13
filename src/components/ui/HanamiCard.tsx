@@ -13,14 +13,14 @@ export default function HanamiCard({
   children, 
   className = '', 
   onClick, 
-  variant = 'default' 
+  variant = 'default', 
 }: HanamiCardProps) {
   const baseClasses = 'bg-white rounded-2xl border border-[#EADBC8] p-4';
   
   const variantClasses = {
     default: 'shadow-sm',
     hover: 'shadow-sm hover:shadow-md transition-shadow',
-    interactive: 'shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-[1.02]'
+    interactive: 'shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-[1.02]',
   };
 
   const classes = `${baseClasses} ${variantClasses[variant]} ${className}`;

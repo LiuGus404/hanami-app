@@ -1,10 +1,11 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import Image from 'next/image'
-import { PopupSelect } from '@/components/ui/PopupSelect'
-import TimePicker from '@/components/ui/TimePicker'
+import Image from 'next/image';
+import React, { useState, useEffect } from 'react';
+
+import { PopupSelect } from '@/components/ui/PopupSelect';
+import TimePicker from '@/components/ui/TimePicker';
+import { supabase } from '@/lib/supabase';
 
 interface ClassType {
   id: string
@@ -26,80 +27,80 @@ interface ScheduleSlot {
 }
 
 export default function ClassManagementPanel() {
-  const [classTypes, setClassTypes] = useState<ClassType[]>([])
-  const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([])
+  const [classTypes, setClassTypes] = useState<ClassType[]>([]);
+  const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]);
 
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // 排序相關狀態
-  const [sortField, setSortField] = useState<string>('')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // 新增班別狀態
-  const [showAddClass, setShowAddClass] = useState(false)
-  const [newClassName, setNewClassName] = useState('')
+  const [showAddClass, setShowAddClass] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
   
   // 編輯班別狀態
-  const [showEditClass, setShowEditClass] = useState(false)
-  const [editingClass, setEditingClass] = useState<ClassType | null>(null)
-  const [editClassName, setEditClassName] = useState('')
+  const [showEditClass, setShowEditClass] = useState(false);
+  const [editingClass, setEditingClass] = useState<ClassType | null>(null);
+  const [editClassName, setEditClassName] = useState('');
   
-  const [courseTypes, setCourseTypes] = useState<{id: string, name: string}[]>([])
+  const [courseTypes, setCourseTypes] = useState<{id: string, name: string}[]>([]);
 
   // 新增課堂空缺狀態
-  const [showAddSlot, setShowAddSlot] = useState(false)
+  const [showAddSlot, setShowAddSlot] = useState(false);
   const [newSlot, setNewSlot] = useState<Partial<ScheduleSlot>>({
     weekday: 1,
     timeslot: '09:00:00',
     max_students: 10,
     assigned_teachers: '',
     course_type: '',
-    duration: '01:00:00'
-  })
+    duration: '01:00:00',
+  });
 
-  const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null)
+  const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null);
 
-  const [editSlot, setEditSlot] = useState<Partial<ScheduleSlot>>({})
+  const [editSlot, setEditSlot] = useState<Partial<ScheduleSlot>>({});
 
-  const [showEditSlot, setShowEditSlot] = useState(false)
+  const [showEditSlot, setShowEditSlot] = useState(false);
 
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([])
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
 
-  const [selectAll, setSelectAll] = useState(false)
+  const [selectAll, setSelectAll] = useState(false);
 
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
 
-  const [teachers, setTeachers] = useState<any[]>([])
+  const [teachers, setTeachers] = useState<any[]>([]);
 
-  const [showWeekdaySelect, setShowWeekdaySelect] = useState(false)
+  const [showWeekdaySelect, setShowWeekdaySelect] = useState(false);
 
-  const [showTeacherSelect, setShowTeacherSelect] = useState(false)
+  const [showTeacherSelect, setShowTeacherSelect] = useState(false);
 
-  const [showCourseTypeSelect, setShowCourseTypeSelect] = useState(false)
+  const [showCourseTypeSelect, setShowCourseTypeSelect] = useState(false);
 
-  const [showEditWeekdaySelect, setShowEditWeekdaySelect] = useState(false)
+  const [showEditWeekdaySelect, setShowEditWeekdaySelect] = useState(false);
 
-  const [showEditTeacherSelect, setShowEditTeacherSelect] = useState(false)
+  const [showEditTeacherSelect, setShowEditTeacherSelect] = useState(false);
 
-  const [showEditCourseTypeSelect, setShowEditCourseTypeSelect] = useState(false)
+  const [showEditCourseTypeSelect, setShowEditCourseTypeSelect] = useState(false);
 
   useEffect(() => {
-    fetchData()
-    fetchCourseTypes()
-  }, [])
+    fetchData();
+    fetchCourseTypes();
+  }, []);
 
   // 排序功能
   const handleSort = (field: string) => {
     if (sortField === field) {
       // 如果點擊的是同一個欄位，切換排序方向
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       // 如果點擊的是新欄位，設置為升序
-      setSortField(field)
-      setSortDirection('asc')
+      setSortField(field);
+      setSortDirection('asc');
     }
-  }
+  };
 
   // 獲取排序圖標
   const getSortIcon = (field: string) => {
@@ -113,7 +114,7 @@ export default function ClassManagementPanel() {
             <path d="M10 17L3 10h14L10 17z" />
           </svg>
         </div>
-      )
+      );
     }
     return sortDirection === 'asc' ? 
       <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
@@ -121,42 +122,42 @@ export default function ClassManagementPanel() {
       </svg> : 
       <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
         <path d="M10 17L3 10h14L10 17z" />
-      </svg>
-  }
+      </svg>;
+  };
 
 
 
   const fetchData = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
       // 取得班別資料
       const { data: classData, error: classError } = await supabase
         .from('Hanami_CourseTypes')
         .select('*')
-        .order('name')
+        .order('name');
       
-      console.log('🔍 班別資料查詢結果:', { classData, classError })
+      console.log('🔍 班別資料查詢結果:', { classData, classError });
       
-      if (classError) throw classError
+      if (classError) throw classError;
       
-      setClassTypes(classData || [])
+      setClassTypes(classData || []);
       
       console.log('✅ 資料載入完成:', {
-        班別數量: classData?.length || 0
-      })
+        班別數量: classData?.length || 0,
+      });
     } catch (err: any) {
-      console.error('❌ 資料載入失敗:', err)
-      setError(err.message)
+      console.error('❌ 資料載入失敗:', err);
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleAddClass = async () => {
     if (!newClassName.trim()) {
-      alert('請輸入班別名稱')
-      return
+      alert('請輸入班別名稱');
+      return;
     }
     
     try {
@@ -164,24 +165,24 @@ export default function ClassManagementPanel() {
         .from('Hanami_CourseTypes')
         .insert({
           name: newClassName.trim(),
-          status: true
-        })
+          status: true,
+        });
       
-      if (error) throw error
+      if (error) throw error;
       
-      setNewClassName('')
-      setShowAddClass(false)
-      await fetchData()
-      alert('班別新增成功！')
+      setNewClassName('');
+      setShowAddClass(false);
+      await fetchData();
+      alert('班別新增成功！');
     } catch (err: any) {
-      alert('新增失敗：' + err.message)
+      alert(`新增失敗：${err.message}`);
     }
-  }
+  };
 
   const handleAddSlot = async () => {
     if (!newSlot.weekday || !newSlot.timeslot) {
-      alert('請填寫完整資訊')
-      return
+      alert('請填寫完整資訊');
+      return;
     }
     
     try {
@@ -193,10 +194,10 @@ export default function ClassManagementPanel() {
           max_students: newSlot.max_students ?? 10,
           assigned_teachers: newSlot.assigned_teachers || null,
           course_type: newSlot.course_type || null,
-          duration: newSlot.duration || null
-        })
+          duration: newSlot.duration || null,
+        });
       
-      if (error) throw error
+      if (error) throw error;
       
       setNewSlot({
         weekday: 1,
@@ -204,146 +205,146 @@ export default function ClassManagementPanel() {
         max_students: 10,
         assigned_teachers: '',
         course_type: '',
-        duration: '01:00:00'
-      })
-      setShowAddSlot(false)
-      await fetchData()
-      alert('課堂空缺情況新增成功！')
+        duration: '01:00:00',
+      });
+      setShowAddSlot(false);
+      await fetchData();
+      alert('課堂空缺情況新增成功！');
     } catch (err: any) {
-      alert('新增失敗：' + err.message)
+      alert(`新增失敗：${err.message}`);
     }
-  }
+  };
 
   const handleDeleteClass = async (id: string) => {
-    if (!confirm('確定要刪除此班別嗎？')) return
+    if (!confirm('確定要刪除此班別嗎？')) return;
     
     try {
       const { error } = await supabase
         .from('Hanami_CourseTypes')
         .delete()
-        .eq('id', id)
+        .eq('id', id);
       
-      if (error) throw error
+      if (error) throw error;
       
-      await fetchData()
-      alert('班別刪除成功！')
+      await fetchData();
+      alert('班別刪除成功！');
     } catch (err: any) {
-      alert('刪除失敗：' + err.message)
+      alert(`刪除失敗：${err.message}`);
     }
-  }
+  };
 
   const handleEditClass = (classType: ClassType) => {
-    setEditingClass(classType)
-    setEditClassName(classType.name || '')
-    setShowEditClass(true)
-  }
+    setEditingClass(classType);
+    setEditClassName(classType.name || '');
+    setShowEditClass(true);
+  };
 
   const handleUpdateClass = async () => {
-    console.log('🔍 準備更新班別:', { editingClass, editClassName })
+    console.log('🔍 準備更新班別:', { editingClass, editClassName });
     
     if (!editingClass) {
-      alert('編輯班別資料遺失，請重新選擇')
-      return
+      alert('編輯班別資料遺失，請重新選擇');
+      return;
     }
     
     if (!editClassName.trim()) {
-      alert('請輸入班別名稱')
-      return
+      alert('請輸入班別名稱');
+      return;
     }
     
     try {
-      const updateData = { name: editClassName.trim() }
-      console.log('🔍 更新資料:', updateData)
+      const updateData = { name: editClassName.trim() };
+      console.log('🔍 更新資料:', updateData);
       
       const { data, error } = await supabase
         .from('Hanami_CourseTypes')
         .update(updateData)
         .eq('id', editingClass.id)
-        .select()
+        .select();
       
-      console.log('🔍 更新結果:', { data, error })
+      console.log('🔍 更新結果:', { data, error });
       
       if (error) {
-        console.error('❌ 更新失敗:', error)
-        throw error
+        console.error('❌ 更新失敗:', error);
+        throw error;
       }
       
-      console.log('✅ 更新成功:', data)
+      console.log('✅ 更新成功:', data);
       
-      setEditClassName('')
-      setEditingClass(null)
-      setShowEditClass(false)
-      await fetchData()
-      alert('班別更新成功！')
+      setEditClassName('');
+      setEditingClass(null);
+      setShowEditClass(false);
+      await fetchData();
+      alert('班別更新成功！');
     } catch (err: any) {
-      console.error('❌ 更新時發生錯誤:', err)
-      alert('更新失敗：' + (err.message || '未知錯誤'))
+      console.error('❌ 更新時發生錯誤:', err);
+      alert(`更新失敗：${err.message || '未知錯誤'}`);
     }
-  }
+  };
 
   const handleToggleClassStatus = async (classType: ClassType) => {
     try {
       const { error } = await supabase
         .from('Hanami_CourseTypes')
         .update({ status: !classType.status })
-        .eq('id', classType.id)
+        .eq('id', classType.id);
       
-      if (error) throw error
+      if (error) throw error;
       
-      await fetchData()
-      alert(`班別已${!classType.status ? '啟用' : '停用'}！`)
+      await fetchData();
+      alert(`班別已${!classType.status ? '啟用' : '停用'}！`);
     } catch (err: any) {
-      alert('狀態更新失敗：' + err.message)
+      alert(`狀態更新失敗：${err.message}`);
     }
-  }
+  };
 
   const handleDeleteSlot = async (id: string) => {
-    if (!confirm('確定要刪除此課堂空缺情況嗎？')) return
+    if (!confirm('確定要刪除此課堂空缺情況嗎？')) return;
     
     try {
       const { error } = await supabase
         .from('hanami_schedule')
         .delete()
-        .eq('id', id)
+        .eq('id', id);
       
-      if (error) throw error
+      if (error) throw error;
       
-      await fetchData()
-      alert('課堂空缺情況刪除成功！')
+      await fetchData();
+      alert('課堂空缺情況刪除成功！');
     } catch (err: any) {
-      alert('刪除失敗：' + err.message)
+      alert(`刪除失敗：${err.message}`);
     }
-  }
+  };
 
   const handleEditSlot = (slot: ScheduleSlot) => {
-    setEditingSlot(slot)
+    setEditingSlot(slot);
     setEditSlot({
       weekday: slot.weekday !== null ? slot.weekday : 1,
       timeslot: slot.timeslot || '09:00:00',
       max_students: slot.max_students ?? 10,
       assigned_teachers: slot.assigned_teachers || '',
       course_type: slot.course_type || '',
-      duration: slot.duration || '01:00:00'
-    })
-    setShowEditSlot(true)
-  }
+      duration: slot.duration || '01:00:00',
+    });
+    setShowEditSlot(true);
+  };
 
   const handleCloseEditClass = () => {
-    setShowEditClass(false)
-    setEditingClass(null)
-    setEditClassName('')
-  }
+    setShowEditClass(false);
+    setEditingClass(null);
+    setEditClassName('');
+  };
 
   const handleCloseEditSlot = () => {
-    setShowEditSlot(false)
-    setEditingSlot(null)
-    setEditSlot({})
-  }
+    setShowEditSlot(false);
+    setEditingSlot(null);
+    setEditSlot({});
+  };
 
   const handleUpdateSlot = async () => {
     if (!editingSlot || !editSlot.weekday || !editSlot.timeslot) {
-      alert('請填寫完整資訊')
-      return
+      alert('請填寫完整資訊');
+      return;
     }
     
     try {
@@ -355,21 +356,21 @@ export default function ClassManagementPanel() {
           max_students: editSlot.max_students ?? 10,
           assigned_teachers: editSlot.assigned_teachers || null,
           course_type: editSlot.course_type || null,
-          duration: editSlot.duration || null
+          duration: editSlot.duration || null,
         })
-        .eq('id', editingSlot.id)
+        .eq('id', editingSlot.id);
       
-      if (error) throw error
+      if (error) throw error;
       
-      setShowEditSlot(false)
-      setEditingSlot(null)
-      setEditSlot({})
-      await fetchData()
-      alert('課堂空缺情況更新成功！')
+      setShowEditSlot(false);
+      setEditingSlot(null);
+      setEditSlot({});
+      await fetchData();
+      alert('課堂空缺情況更新成功！');
     } catch (err: any) {
-      alert('更新失敗：' + err.message)
+      alert(`更新失敗：${err.message}`);
     }
-  }
+  };
 
   const handleCopySlot = (slot: ScheduleSlot) => {
     setNewSlot({
@@ -378,53 +379,53 @@ export default function ClassManagementPanel() {
       max_students: slot.max_students ?? 10,
       assigned_teachers: slot.assigned_teachers || '',
       course_type: slot.course_type || '',
-      duration: slot.duration || '01:00:00'
-    })
-    setShowAddSlot(true)
-  }
+      duration: slot.duration || '01:00:00',
+    });
+    setShowAddSlot(true);
+  };
 
   const handleSelectSlot = (id: string) => {
     setSelectedSlots(prev => 
       prev.includes(id) 
         ? prev.filter(slotId => slotId !== id)
-        : [...prev, id]
-    )
-  }
+        : [...prev, id],
+    );
+  };
 
   const handleSelectAll = () => {
     if (selectAll) {
-      setSelectedSlots([])
-      setSelectAll(false)
+      setSelectedSlots([]);
+      setSelectAll(false);
     } else {
-      setSelectedSlots(scheduleSlots.map(slot => slot.id))
-      setSelectAll(true)
+      setSelectedSlots(scheduleSlots.map(slot => slot.id));
+      setSelectAll(true);
     }
-  }
+  };
 
   const handleBatchDelete = async () => {
     if (selectedSlots.length === 0) {
-      alert('請選擇要刪除的課堂空缺情況')
-      return
+      alert('請選擇要刪除的課堂空缺情況');
+      return;
     }
     
-    if (!confirm(`確定要刪除選中的 ${selectedSlots.length} 個課堂空缺情況嗎？`)) return
+    if (!confirm(`確定要刪除選中的 ${selectedSlots.length} 個課堂空缺情況嗎？`)) return;
     
     try {
       const { error } = await supabase
         .from('hanami_schedule')
         .delete()
-        .in('id', selectedSlots)
+        .in('id', selectedSlots);
       
-      if (error) throw error
+      if (error) throw error;
       
-      setSelectedSlots([])
-      setSelectAll(false)
-      await fetchData()
-      alert('批量刪除課堂空缺情況成功！')
+      setSelectedSlots([]);
+      setSelectAll(false);
+      await fetchData();
+      alert('批量刪除課堂空缺情況成功！');
     } catch (err: any) {
-      alert('批量刪除課堂空缺情況失敗：' + err.message)
+      alert(`批量刪除課堂空缺情況失敗：${err.message}`);
     }
-  }
+  };
 
   const fetchCourseTypes = async () => {
     try {
@@ -432,18 +433,18 @@ export default function ClassManagementPanel() {
         .from('Hanami_CourseTypes')
         .select('id, name')
         .eq('status', true)
-        .order('name')
+        .order('name');
 
       if (error) {
-        console.error('Error fetching course types:', error)
-        return
+        console.error('Error fetching course types:', error);
+        return;
       }
 
-      setCourseTypes((data || []).map(item => ({ ...item, name: item.name || '' })))
+      setCourseTypes((data || []).map(item => ({ ...item, name: item.name || '' })));
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error:', error);
     }
-  }
+  };
 
   const fetchTeachers = async () => {
     try {
@@ -451,25 +452,25 @@ export default function ClassManagementPanel() {
         .from('hanami_employee')
         .select('id, teacher_nickname')
         .eq('teacher_status', 'active')
-        .order('teacher_nickname')
+        .order('teacher_nickname');
 
       if (error) {
-        console.error('Error fetching teachers:', error)
-        return
+        console.error('Error fetching teachers:', error);
+        return;
       }
 
-      setTeachers(data || [])
+      setTeachers(data || []);
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error:', error);
     }
-  }
+  };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
         <div className="text-[#4B4036]">載入中...</div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -477,7 +478,7 @@ export default function ClassManagementPanel() {
       <div className="text-red-500 text-center p-4">
         ⚠️ {error}
       </div>
-    )
+    );
   }
 
   return (
@@ -486,12 +487,12 @@ export default function ClassManagementPanel() {
       <div className="bg-[#FFFDF7] border border-[#EADBC8] rounded-xl p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-[#4B4036] flex items-center gap-2">
-            <Image src="/icons/book-elephant.PNG" alt="class" width={24} height={24} />
+            <Image alt="class" height={24} src="/icons/book-elephant.PNG" width={24} />
             班別管理
           </h3>
           <button
-            onClick={() => setShowAddClass(true)}
             className="bg-[#4B4036] hover:bg-[#3A3329] text-white px-4 py-2 rounded-full text-sm transition-colors"
+            onClick={() => setShowAddClass(true)}
           >
             新增班別
           </button>
@@ -508,24 +509,24 @@ export default function ClassManagementPanel() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handleToggleClassStatus(classType)}
                   className={`px-2 py-1 text-xs rounded ${
                     classType.status 
                       ? 'bg-green-100 text-green-700 hover:bg-green-200' 
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
+                  onClick={() => handleToggleClassStatus(classType)}
                 >
                   {classType.status ? '停用' : '啟用'}
                 </button>
                 <button
-                  onClick={() => handleEditClass(classType)}
                   className="text-blue-500 hover:text-blue-700 text-sm"
+                  onClick={() => handleEditClass(classType)}
                 >
                   編輯
                 </button>
                 <button
-                  onClick={() => handleDeleteClass(classType.id)}
                   className="text-red-500 hover:text-red-700 text-sm"
+                  onClick={() => handleDeleteClass(classType.id)}
                 >
                   刪除
                 </button>
@@ -539,26 +540,26 @@ export default function ClassManagementPanel() {
 
       {/* 新增班別彈窗 */}
       {showAddClass && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{background: 'rgba(255,255,255,0.7)'}}>
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(255,255,255,0.7)' }}>
           <div className="bg-white p-6 rounded-xl w-96">
             <h3 className="text-lg font-bold mb-4">新增班別</h3>
             <input
+              className="w-full p-2 border border-[#EADBC8] rounded mb-4"
+              placeholder="請輸入班別名稱"
               type="text"
               value={newClassName}
               onChange={(e) => setNewClassName(e.target.value)}
-              placeholder="請輸入班別名稱"
-              className="w-full p-2 border border-[#EADBC8] rounded mb-4"
             />
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => setShowAddClass(false)}
                 className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded"
+                onClick={() => setShowAddClass(false)}
               >
                 取消
               </button>
               <button
-                onClick={handleAddClass}
                 className="px-4 py-2 bg-[#4B4036] text-white rounded"
+                onClick={handleAddClass}
               >
                 新增
               </button>
@@ -573,22 +574,22 @@ export default function ClassManagementPanel() {
           <div className="bg-white p-6 rounded-xl w-96">
             <h3 className="text-lg font-bold mb-4">編輯班別</h3>
             <input
+              className="w-full p-2 border border-[#EADBC8] rounded mb-4"
+              placeholder="請輸入班別名稱"
               type="text"
               value={editClassName}
               onChange={(e) => setEditClassName(e.target.value)}
-              placeholder="請輸入班別名稱"
-              className="w-full p-2 border border-[#EADBC8] rounded mb-4"
             />
             <div className="flex gap-2 justify-end">
               <button
-                onClick={handleCloseEditClass}
                 className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded"
+                onClick={handleCloseEditClass}
               >
                 取消
               </button>
               <button
-                onClick={handleUpdateClass}
                 className="px-4 py-2 bg-[#4B4036] text-white rounded"
+                onClick={handleUpdateClass}
               >
                 更新
               </button>
@@ -599,27 +600,27 @@ export default function ClassManagementPanel() {
 
       {/* 新增課堂空缺情況彈窗 */}
       {showAddSlot && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{background: 'rgba(255,255,255,0.7)'}}>
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(255,255,255,0.7)' }}>
           <div className="bg-white p-6 rounded-xl w-96 max-h-[80vh] overflow-y-auto shadow-xl border border-[#EADBC8]">
             <h3 className="text-lg font-bold mb-4">新增課堂空缺情況</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">星期</label>
                 <button
-                  onClick={() => setShowWeekdaySelect(true)}
                   className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  onClick={() => setShowWeekdaySelect(true)}
                 >
                   {newSlot.weekday === 1 ? '星期一' :
-                   newSlot.weekday === 2 ? '星期二' :
-                   newSlot.weekday === 3 ? '星期三' :
-                   newSlot.weekday === 4 ? '星期四' :
-                   newSlot.weekday === 5 ? '星期五' :
-                   newSlot.weekday === 6 ? '星期六' :
-                   newSlot.weekday === 0 ? '星期日' : '請選擇星期'}
+                    newSlot.weekday === 2 ? '星期二' :
+                      newSlot.weekday === 3 ? '星期三' :
+                        newSlot.weekday === 4 ? '星期四' :
+                          newSlot.weekday === 5 ? '星期五' :
+                            newSlot.weekday === 6 ? '星期六' :
+                              newSlot.weekday === 0 ? '星期日' : '請選擇星期'}
                 </button>
                 {showWeekdaySelect && (
                   <PopupSelect
-                    title="選擇星期"
+                    mode="single"
                     options={[
                       { label: '星期一', value: '1' },
                       { label: '星期二', value: '2' },
@@ -627,13 +628,13 @@ export default function ClassManagementPanel() {
                       { label: '星期四', value: '4' },
                       { label: '星期五', value: '5' },
                       { label: '星期六', value: '6' },
-                      { label: '星期日', value: '0' }
+                      { label: '星期日', value: '0' },
                     ]}
                     selected={(newSlot.weekday ?? 1).toString()}
-                    onChange={(value) => setNewSlot({...newSlot, weekday: parseInt(value as string)})}
-                    onConfirm={() => setShowWeekdaySelect(false)}
+                    title="選擇星期"
                     onCancel={() => setShowWeekdaySelect(false)}
-                    mode="single"
+                    onChange={(value) => setNewSlot({ ...newSlot, weekday: parseInt(value as string) })}
+                    onConfirm={() => setShowWeekdaySelect(false)}
                   />
                 )}
               </div>
@@ -641,55 +642,55 @@ export default function ClassManagementPanel() {
                 <label className="block text-sm font-medium mb-1">課堂空缺情況</label>
                 <TimePicker
                   value={newSlot.timeslot?.slice(0, 5) || '09:00'}
-                  onChange={(time) => setNewSlot({...newSlot, timeslot: time + ':00'})}
+                  onChange={(time) => setNewSlot({ ...newSlot, timeslot: `${time}:00` })}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">最大學生數</label>
                 <input 
+                  className="w-full p-2 border border-[#EADBC8] rounded bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]" 
                   type="number" 
                   value={newSlot.max_students ?? 10} 
-                  onChange={e => setNewSlot({...newSlot, max_students: parseInt(e.target.value)})} 
-                  className="w-full p-2 border border-[#EADBC8] rounded bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]" 
+                  onChange={e => setNewSlot({ ...newSlot, max_students: parseInt(e.target.value) })} 
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">指派老師</label>
                 <button
-                  onClick={() => setShowTeacherSelect(true)}
                   className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  onClick={() => setShowTeacherSelect(true)}
                 >
                   {newSlot.assigned_teachers || '請選擇老師'}
                 </button>
                 {showTeacherSelect && (
                   <PopupSelect
-                    title="選擇老師"
+                    mode="single"
                     options={teachers.map(teacher => ({ label: teacher.teacher_nickname, value: teacher.teacher_nickname }))}
                     selected={newSlot.assigned_teachers || ''}
-                    onChange={(value) => setNewSlot({...newSlot, assigned_teachers: value as string})}
-                    onConfirm={() => setShowTeacherSelect(false)}
+                    title="選擇老師"
                     onCancel={() => setShowTeacherSelect(false)}
-                    mode="single"
+                    onChange={(value) => setNewSlot({ ...newSlot, assigned_teachers: value as string })}
+                    onConfirm={() => setShowTeacherSelect(false)}
                   />
                 )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">課程類型</label>
                 <button
-                  onClick={() => setShowCourseTypeSelect(true)}
                   className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  onClick={() => setShowCourseTypeSelect(true)}
                 >
                   {courseTypes.find(type => type.id === newSlot.course_type)?.name || '請選擇課程類型'}
                 </button>
                 {showCourseTypeSelect && (
                   <PopupSelect
-                    title="選擇課程類型"
+                    mode="single"
                     options={courseTypes.map(type => ({ label: type.name || '', value: type.id }))}
                     selected={newSlot.course_type || ''}
-                    onChange={(value) => setNewSlot({...newSlot, course_type: value as string})}
-                    onConfirm={() => setShowCourseTypeSelect(false)}
+                    title="選擇課程類型"
                     onCancel={() => setShowCourseTypeSelect(false)}
-                    mode="single"
+                    onChange={(value) => setNewSlot({ ...newSlot, course_type: value as string })}
+                    onConfirm={() => setShowCourseTypeSelect(false)}
                   />
                 )}
               </div>
@@ -697,13 +698,13 @@ export default function ClassManagementPanel() {
                 <label className="block text-sm font-medium mb-1">時長</label>
                 <TimePicker
                   value={newSlot.duration?.slice(0, 5) || '01:00'}
-                  onChange={(time) => setNewSlot({...newSlot, duration: time + ':00'})}
+                  onChange={(time) => setNewSlot({ ...newSlot, duration: `${time}:00` })}
                 />
               </div>
             </div>
             <div className="flex gap-2 justify-end mt-6">
-              <button onClick={() => setShowAddSlot(false)} className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded">取消</button>
-              <button onClick={handleAddSlot} className="px-4 py-2 bg-[#4B4036] text-white rounded">新增</button>
+              <button className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded" onClick={() => setShowAddSlot(false)}>取消</button>
+              <button className="px-4 py-2 bg-[#4B4036] text-white rounded" onClick={handleAddSlot}>新增</button>
             </div>
           </div>
         </div>
@@ -711,27 +712,27 @@ export default function ClassManagementPanel() {
 
       {/* 編輯課堂空缺情況彈窗 */}
       {showEditSlot && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{background: 'rgba(255,255,255,0.7)'}}>
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(255,255,255,0.7)' }}>
           <div className="bg-white p-6 rounded-xl w-96 max-h-[80vh] overflow-y-auto shadow-xl border border-[#EADBC8]">
             <h3 className="text-lg font-bold mb-4">編輯課堂空缺情況</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">星期</label>
                 <button
-                  onClick={() => setShowEditWeekdaySelect(true)}
                   className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  onClick={() => setShowEditWeekdaySelect(true)}
                 >
                   {editSlot.weekday === 1 ? '星期一' :
-                   editSlot.weekday === 2 ? '星期二' :
-                   editSlot.weekday === 3 ? '星期三' :
-                   editSlot.weekday === 4 ? '星期四' :
-                   editSlot.weekday === 5 ? '星期五' :
-                   editSlot.weekday === 6 ? '星期六' :
-                   editSlot.weekday === 0 ? '星期日' : '請選擇星期'}
+                    editSlot.weekday === 2 ? '星期二' :
+                      editSlot.weekday === 3 ? '星期三' :
+                        editSlot.weekday === 4 ? '星期四' :
+                          editSlot.weekday === 5 ? '星期五' :
+                            editSlot.weekday === 6 ? '星期六' :
+                              editSlot.weekday === 0 ? '星期日' : '請選擇星期'}
                 </button>
                 {showEditWeekdaySelect && (
                   <PopupSelect
-                    title="選擇星期"
+                    mode="single"
                     options={[
                       { label: '星期一', value: '1' },
                       { label: '星期二', value: '2' },
@@ -739,13 +740,13 @@ export default function ClassManagementPanel() {
                       { label: '星期四', value: '4' },
                       { label: '星期五', value: '5' },
                       { label: '星期六', value: '6' },
-                      { label: '星期日', value: '0' }
+                      { label: '星期日', value: '0' },
                     ]}
                     selected={editSlot.weekday?.toString() || '1'}
-                    onChange={(value) => setEditSlot({...editSlot, weekday: parseInt(value as string)})}
-                    onConfirm={() => setShowEditWeekdaySelect(false)}
+                    title="選擇星期"
                     onCancel={() => setShowEditWeekdaySelect(false)}
-                    mode="single"
+                    onChange={(value) => setEditSlot({ ...editSlot, weekday: parseInt(value as string) })}
+                    onConfirm={() => setShowEditWeekdaySelect(false)}
                   />
                 )}
               </div>
@@ -753,55 +754,55 @@ export default function ClassManagementPanel() {
                 <label className="block text-sm font-medium mb-1">課堂空缺情況</label>
                 <TimePicker
                   value={editSlot.timeslot?.slice(0, 5) || '09:00'}
-                  onChange={(time) => setEditSlot({...editSlot, timeslot: time + ':00'})}
+                  onChange={(time) => setEditSlot({ ...editSlot, timeslot: `${time}:00` })}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">最大學生數</label>
                 <input 
+                  className="w-full p-2 border border-[#EADBC8] rounded bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]" 
                   type="number" 
                   value={editSlot.max_students ?? 10} 
-                  onChange={e => setEditSlot({...editSlot, max_students: parseInt(e.target.value)})} 
-                  className="w-full p-2 border border-[#EADBC8] rounded bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]" 
+                  onChange={e => setEditSlot({ ...editSlot, max_students: parseInt(e.target.value) })} 
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">指派老師</label>
                 <button
-                  onClick={() => setShowEditTeacherSelect(true)}
                   className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  onClick={() => setShowEditTeacherSelect(true)}
                 >
                   {editSlot.assigned_teachers || '請選擇老師'}
                 </button>
                 {showEditTeacherSelect && (
                   <PopupSelect
-                    title="選擇老師"
+                    mode="single"
                     options={teachers.map(teacher => ({ label: teacher.teacher_nickname, value: teacher.teacher_nickname }))}
                     selected={editSlot.assigned_teachers || ''}
-                    onChange={(value) => setEditSlot({...editSlot, assigned_teachers: value as string})}
-                    onConfirm={() => setShowEditTeacherSelect(false)}
+                    title="選擇老師"
                     onCancel={() => setShowEditTeacherSelect(false)}
-                    mode="single"
+                    onChange={(value) => setEditSlot({ ...editSlot, assigned_teachers: value as string })}
+                    onConfirm={() => setShowEditTeacherSelect(false)}
                   />
                 )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">課程類型</label>
                 <button
-                  onClick={() => setShowEditCourseTypeSelect(true)}
                   className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  onClick={() => setShowEditCourseTypeSelect(true)}
                 >
                   {courseTypes.find(type => type.id === editSlot.course_type)?.name || '請選擇課程類型'}
                 </button>
                 {showEditCourseTypeSelect && (
                   <PopupSelect
-                    title="選擇課程類型"
+                    mode="single"
                     options={courseTypes.map(type => ({ label: type.name || '', value: type.id }))}
                     selected={editSlot.course_type || ''}
-                    onChange={(value) => setEditSlot({...editSlot, course_type: value as string})}
-                    onConfirm={() => setShowEditCourseTypeSelect(false)}
+                    title="選擇課程類型"
                     onCancel={() => setShowEditCourseTypeSelect(false)}
-                    mode="single"
+                    onChange={(value) => setEditSlot({ ...editSlot, course_type: value as string })}
+                    onConfirm={() => setShowEditCourseTypeSelect(false)}
                   />
                 )}
               </div>
@@ -809,17 +810,17 @@ export default function ClassManagementPanel() {
                 <label className="block text-sm font-medium mb-1">時長</label>
                 <TimePicker
                   value={editSlot.duration?.slice(0, 5) || '01:00'}
-                  onChange={(time) => setEditSlot({...editSlot, duration: time + ':00'})}
+                  onChange={(time) => setEditSlot({ ...editSlot, duration: `${time}:00` })}
                 />
               </div>
             </div>
             <div className="flex gap-2 justify-end mt-6">
-              <button onClick={handleCloseEditSlot} className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded">取消</button>
-              <button onClick={handleUpdateSlot} className="px-4 py-2 bg-[#4B4036] text-white rounded">更新</button>
+              <button className="px-4 py-2 text-[#4B4036] border border-[#EADBC8] rounded" onClick={handleCloseEditSlot}>取消</button>
+              <button className="px-4 py-2 bg-[#4B4036] text-white rounded" onClick={handleUpdateSlot}>更新</button>
             </div>
           </div>
         </div>
       )}
     </div>
-  )
+  );
 } 

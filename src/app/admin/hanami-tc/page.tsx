@@ -1,11 +1,12 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import HanamiTC from '@/components/ui/HanamiTC'
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+import AITeacherSchedulerModal from '@/components/ui/AITeacherSchedulerModal';
+import HanamiTC from '@/components/ui/HanamiTC';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Teacher } from '@/types';
-import AITeacherSchedulerModal from '@/components/ui/AITeacherSchedulerModal';
 
 export default function HanamiTCPage() {
   const router = useRouter();
@@ -24,8 +25,8 @@ export default function HanamiTCPage() {
         setTeachers(
           data.map((t: any) => ({
             ...t,
-            teacher_gender: t.teacher_gender ?? null
-          }))
+            teacher_gender: t.teacher_gender ?? null,
+          })),
         );
       }
     };
@@ -36,18 +37,18 @@ export default function HanamiTCPage() {
     <div className="min-h-screen bg-[#FFF9F2] font-['Quicksand',_sans-serif] px-6 py-8">
       <AITeacherSchedulerModal
         open={isAISchedulerOpen}
-        onClose={() => setIsAISchedulerOpen(false)}
         teachers={teachers}
+        onClose={() => setIsAISchedulerOpen(false)}
       />
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-2xl p-6 mb-6 border border-[#EADBC8]">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold text-[#2B3A3B]">課堂管理</h1>
             <button
-              onClick={() => setIsAISchedulerOpen(true)}
               className="flex items-center gap-2 hanami-btn px-4 py-2"
+              onClick={() => setIsAISchedulerOpen(true)}
             >
-              <img src="/icons/edit-pencil.png" alt="AI" className="w-5 h-5" />
+              <img alt="AI" className="w-5 h-5" src="/icons/edit-pencil.png" />
               <span className="text-base font-bold">AI 安排老師</span>
             </button>
           </div>
@@ -55,5 +56,5 @@ export default function HanamiTCPage() {
         </div>
       </div>
     </div>
-  )
+  );
 } 

@@ -1,10 +1,11 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useRef } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import Image from 'next/image'
-import AIControlPanel from '@/components/AIControlPanel'
-import { PopupSelect } from '@/components/ui/PopupSelect'
+import Image from 'next/image';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+
+import AIControlPanel from '@/components/AIControlPanel';
+import { PopupSelect } from '@/components/ui/PopupSelect';
 
 type MessageType = {
   sender: 'user' | 'ai';
@@ -51,7 +52,7 @@ export default function AIHubPage() {
     { value: 'llama3-custom', label: '希希 Hibi', image: '/owlui.png' },
     { value: 'gemma-2b', label: '語語 Lulu', image: '/foxcat.png' },
     { value: 'deepseek-r1-8b', label: '策策 Taku', image: '/polarbear.png' },
-    { value: 'llava-v1.6-7b', label: '米米 Mimi', image: '/rabbit.png' }
+    { value: 'llava-v1.6-7b', label: '米米 Mimi', image: '/rabbit.png' },
   ];
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function AIHubPage() {
         'deepseek-r1-8b': '你好，我是策策，專長是數據分析與邏輯規劃，有什麼資料要幫你解讀？',
         'llava-v1.6-7b': '你好，我是米米，擅長圖片理解與多模態分析，請給我圖片或任務吧！',
       };
-      setMessages([{ sender: 'ai' as 'ai', text: greetingMap[model] || '你好，有什麼可以幫你？', model }]);
+      setMessages([{ sender: 'ai' as const, text: greetingMap[model] || '你好，有什麼可以幫你？', model }]);
       setHasGreeted(true);
     }
   }, [model, hasGreeted, assistantOptions]);
@@ -87,12 +88,17 @@ export default function AIHubPage() {
             </button>
             {popupOpen && (
               <PopupSelect
-                title="選擇 AI 助理"
+                mode="single"
                 options={assistantOptions.map(opt => ({
                   label: opt.label,
-                  value: opt.value
+                  value: opt.value,
                 }))}
                 selected={pendingModel}
+                title="選擇 AI 助理"
+                onCancel={() => {
+                  setPendingModel(model);
+                  setPopupOpen(false);
+                }}
                 onChange={(val) => setPendingModel(val as string)}
                 onConfirm={() => {
                   setModel(pendingModel);
@@ -104,26 +110,21 @@ export default function AIHubPage() {
                   };
                   setMessages(prev => [
                     ...prev,
-                    { sender: 'ai' as 'ai', text: greetingMap[pendingModel] || '你好，有什麼可以幫你？', model: pendingModel }
+                    { sender: 'ai' as const, text: greetingMap[pendingModel] || '你好，有什麼可以幫你？', model: pendingModel },
                   ]);
                   setPopupOpen(false);
                 }}
-                onCancel={() => {
-                  setPendingModel(model);
-                  setPopupOpen(false);
-                }}
-                mode="single"
               />
             )}
           </div>
           <div className="mb-4 flex justify-between items-center">
             <h2 className="text-xl font-bold text-[#2B3A3B] flex items-center gap-2">
               <Image
-                src={assistantOptions.find(opt => opt.value === model)?.image || '/owlui.png'}
                 alt="avatar"
-                width={32}
-                height={32}
                 className="rounded-full"
+                height={32}
+                src={assistantOptions.find(opt => opt.value === model)?.image || '/owlui.png'}
+                width={32}
               />
               {assistantOptions.find(opt => opt.value === model)?.label || '希希 Hibi'}
             </h2>
@@ -131,7 +132,7 @@ export default function AIHubPage() {
               className="px-3 py-1 rounded-full bg-[#FFF8E6] border border-[#DDD2BA] text-[#2B3A3B] text-sm font-semibold flex items-center gap-2"
               onClick={() => window.location.assign('/admin/control')}
             >
-              <Image src="/owlui.png" alt="任務列表" width={20} height={20} />
+              <Image alt="任務列表" height={20} src="/owlui.png" width={20} />
               任務列表
             </button>
           </div>
@@ -149,11 +150,11 @@ export default function AIHubPage() {
               >
                 {msg.sender === 'ai' && (
                   <Image
-                    src={senderImage}
                     alt="assistant"
-                    width={28}
-                    height={28}
                     className="rounded-full mt-1"
+                    height={28}
+                    src={senderImage}
+                    width={28}
                   />
                 )}
                 {/* 訊息氣泡與複製按鈕包裹 */}
@@ -166,13 +167,13 @@ export default function AIHubPage() {
                     {msg.text}
                   </div>
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(msg.text).then(() =>
-                        console.log('已複製訊息：', msg.text)
-                      );
-                    }}
                     className="absolute top-1 right-1 text-xs text-gray-500 hover:text-black"
                     title="複製"
+                    onClick={() => {
+                      navigator.clipboard.writeText(msg.text).then(() =>
+                        console.log('已複製訊息：', msg.text),
+                      );
+                    }}
                   >
                     ⧉
                   </button>
@@ -187,12 +188,12 @@ export default function AIHubPage() {
         {model === 'deepseek-r1-8b' && (
           <div className="flex mt-4 items-center bg-[#FFFDF5] rounded-lg border border-[#DDD2BA] px-2 py-1">
             {/* 上傳文字檔案按鈕 */}
-            <label htmlFor="upload-text" className="text-3xl text-[#2B3A3B] cursor-pointer select-none mr-2">＋</label>
+            <label className="text-3xl text-[#2B3A3B] cursor-pointer select-none mr-2" htmlFor="upload-text">＋</label>
             <input
-              id="upload-text"
-              type="file"
               accept=".txt,.md,.csv"
               className="hidden"
+              id="upload-text"
+              type="file"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -202,9 +203,9 @@ export default function AIHubPage() {
             />
             {/* 輸入框 */}
             <input
-              type="text"
-              placeholder="輸入訊息..."
               className="flex-1 px-2 py-2 bg-transparent outline-none text-sm"
+              placeholder="輸入訊息..."
+              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
@@ -212,11 +213,11 @@ export default function AIHubPage() {
               className="px-4 py-2 bg-[#EBC9A4] text-[#2B3A3B] font-semibold rounded-lg ml-2"
               onClick={() => {
                 if (!input.trim()) return;
-                const newMessages = [...messages, { sender: 'user' as 'user', text: input, model }];
+                const newMessages = [...messages, { sender: 'user' as const, text: input, model }];
                 setMessages(newMessages);
                 setInput('');
                 const assistantLabel = assistantOptions.find(opt => opt.value === model)?.label || '';
-                setMessages(prev => [...prev, { sender: 'ai' as 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
+                setMessages(prev => [...prev, { sender: 'ai' as const, text: `${assistantLabel} 正在思考中...`, model }]);
                 const webhookMap: Record<string, string> = {
                   'llama3-custom': 'http://10.147.19.122:5678/webhook/d5c7aec9-194c-4f70-812e-d62ae4984e95',
                   'deepseek-r1-8b': 'http://10.147.19.122:5678/webhook/895a02fe-e4e3-4b95-b362-778ab66a82b3',
@@ -228,42 +229,42 @@ export default function AIHubPage() {
                   fetch(webhookURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: input })
+                    body: JSON.stringify({ message: input }),
                   })
-                  .then(res => res.json())
-                  .then(data => {
-                    const replyText = data.reply || data.output || data.message || JSON.stringify(data);
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (
-                        lastIndex >= 0 &&
+                    .then(res => res.json())
+                    .then(data => {
+                      const replyText = data.reply || data.output || data.message || JSON.stringify(data);
+                      setMessages(prev => {
+                        const updated = [...prev];
+                        const lastIndex = updated.length - 1;
+                        if (
+                          lastIndex >= 0 &&
                         updated[lastIndex].sender === 'ai' &&
                         updated[lastIndex].text.includes('正在思考中')
-                      ) {
-                        updated[lastIndex] = { ...updated[lastIndex], text: replyText };
-                      } else {
-                        updated.push({ sender: 'ai' as 'ai', text: replyText, model });
-                      }
-                      return updated;
-                    });
-                  })
-                  .catch(() => {
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (
-                        lastIndex >= 0 &&
+                        ) {
+                          updated[lastIndex] = { ...updated[lastIndex], text: replyText };
+                        } else {
+                          updated.push({ sender: 'ai' as const, text: replyText, model });
+                        }
+                        return updated;
+                      });
+                    })
+                    .catch(() => {
+                      setMessages(prev => {
+                        const updated = [...prev];
+                        const lastIndex = updated.length - 1;
+                        if (
+                          lastIndex >= 0 &&
                         updated[lastIndex].sender === 'ai' &&
                         updated[lastIndex].text.includes('正在思考中')
-                      ) {
-                        updated[lastIndex] = { ...updated[lastIndex], text: '出現錯誤，請稍後再試' };
-                      } else {
-                        updated.push({ sender: 'ai' as 'ai', text: '出現錯誤，請稍後再試', model });
-                      }
-                      return updated;
+                        ) {
+                          updated[lastIndex] = { ...updated[lastIndex], text: '出現錯誤，請稍後再試' };
+                        } else {
+                          updated.push({ sender: 'ai' as const, text: '出現錯誤，請稍後再試', model });
+                        }
+                        return updated;
+                      });
                     });
-                  });
                 }
               }}
             >
@@ -275,9 +276,9 @@ export default function AIHubPage() {
         {model !== 'llava-v1.6-7b' && model !== 'deepseek-r1-8b' && (
           <div className="flex mt-4">
             <input
-              type="text"
-              placeholder="Message"
               className="flex-1 px-4 py-2 rounded-l-lg border-t border-l border-b border-[#DDD2BA] bg-[#FFFDF5] text-sm"
+              placeholder="Message"
+              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
@@ -285,12 +286,12 @@ export default function AIHubPage() {
               className="px-4 py-2 bg-[#EBC9A4] text-[#2B3A3B] font-semibold rounded-r-lg"
               onClick={() => {
                 if (!input.trim()) return;
-                const newMessages = [...messages, { sender: 'user' as 'user', text: input, model }];
+                const newMessages = [...messages, { sender: 'user' as const, text: input, model }];
                 setMessages(newMessages);
                 setInput('');
 
                 const assistantLabel = assistantOptions.find(opt => opt.value === model)?.label || '';
-                setMessages(prev => [...prev, { sender: 'ai' as 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
+                setMessages(prev => [...prev, { sender: 'ai' as const, text: `${assistantLabel} 正在思考中...`, model }]);
 
                 const webhookMap: Record<string, string> = {
                   'llama3-custom': 'http://10.147.19.122:5678/webhook/d5c7aec9-194c-4f70-812e-d62ae4984e95',
@@ -305,71 +306,71 @@ export default function AIHubPage() {
                   fetch(webhookURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: input })
+                    body: JSON.stringify({ message: input }),
                   })
-                  .then(res => {
-                    const ct = res.headers.get('content-type') || '';
-                    return ct.includes('application/json') ? res.json() : res.text().then(text => ({ response: text }));
-                  })
-                  .then(data => {
-                    const raw = data as any;
-                    console.log('Webhook actual reply:', raw);
-                    let replyText = '';
-                    if (raw && raw.code === 0) {
-                      replyText = `抱歉，${assistantLabel}的大腦當機了，請稍後再試`;
-                    } else if (typeof raw === 'string') {
-                      replyText = raw;
-                    } else if (raw.output) {
-                      replyText = raw.output;
-                    } else if (raw.response) {
-                      replyText = raw.response;
-                    } else if (raw.message) {
-                      replyText = raw.message;
-                    } else if (raw.text) {
-                      replyText = raw.text;
-                    } else {
-                      replyText = JSON.stringify(raw);
-                    }
-                    // Remove <|end_of_text|> string if present
-                    replyText = replyText.replace(/<\|end_of_text\|>/g, '');
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (
-                        lastIndex >= 0 &&
+                    .then(res => {
+                      const ct = res.headers.get('content-type') || '';
+                      return ct.includes('application/json') ? res.json() : res.text().then(text => ({ response: text }));
+                    })
+                    .then(data => {
+                      const raw = data;
+                      console.log('Webhook actual reply:', raw);
+                      let replyText = '';
+                      if (raw && raw.code === 0) {
+                        replyText = `抱歉，${assistantLabel}的大腦當機了，請稍後再試`;
+                      } else if (typeof raw === 'string') {
+                        replyText = raw;
+                      } else if (raw.output) {
+                        replyText = raw.output;
+                      } else if (raw.response) {
+                        replyText = raw.response;
+                      } else if (raw.message) {
+                        replyText = raw.message;
+                      } else if (raw.text) {
+                        replyText = raw.text;
+                      } else {
+                        replyText = JSON.stringify(raw);
+                      }
+                      // Remove <|end_of_text|> string if present
+                      replyText = replyText.replace(/<\|end_of_text\|>/g, '');
+                      setMessages(prev => {
+                        const updated = [...prev];
+                        const lastIndex = updated.length - 1;
+                        if (
+                          lastIndex >= 0 &&
                         updated[lastIndex].sender === 'ai' &&
                         updated[lastIndex].text.includes('正在思考中')
-                      ) {
-                        updated[lastIndex] = { ...updated[lastIndex], text: replyText };
-                      } else {
-                        updated.push({ sender: 'ai' as 'ai', text: replyText, model });
-                      }
-                      return updated;
-                    });
-                  })
-                  .catch(err => {
-                    console.error('Webhook error:', err);
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (
-                        lastIndex >= 0 &&
+                        ) {
+                          updated[lastIndex] = { ...updated[lastIndex], text: replyText };
+                        } else {
+                          updated.push({ sender: 'ai' as const, text: replyText, model });
+                        }
+                        return updated;
+                      });
+                    })
+                    .catch(err => {
+                      console.error('Webhook error:', err);
+                      setMessages(prev => {
+                        const updated = [...prev];
+                        const lastIndex = updated.length - 1;
+                        if (
+                          lastIndex >= 0 &&
                         updated[lastIndex].sender === 'ai' &&
                         updated[lastIndex].text.includes('正在思考中')
-                      ) {
-                        updated[lastIndex] = { ...updated[lastIndex], text: '抱歉，他的大腦當機了，請稍後再試' };
-                      } else {
-                        updated.push({ sender: 'ai' as 'ai', text: '抱歉，他的大腦當機了，請稍後再試', model });
-                      }
-                      return updated;
+                        ) {
+                          updated[lastIndex] = { ...updated[lastIndex], text: '抱歉，他的大腦當機了，請稍後再試' };
+                        } else {
+                          updated.push({ sender: 'ai' as const, text: '抱歉，他的大腦當機了，請稍後再試', model });
+                        }
+                        return updated;
+                      });
                     });
-                  });
                 } else {
                   // simulate AI response for other models
                   setTimeout(() => {
                     setMessages((msgs) => [
                       ...msgs,
-                      { sender: 'ai' as 'ai', text: '抱歉，他正在忙碌中...，請稍後再試', model }
+                      { sender: 'ai' as const, text: '抱歉，他正在忙碌中...，請稍後再試', model },
                     ]);
                   }, 1000);
                 }
@@ -384,16 +385,16 @@ export default function AIHubPage() {
         {model === 'llava-v1.6-7b' && (
           <div className="flex mt-4 items-center bg-[#FFFDF5] rounded-lg border border-[#DDD2BA] px-2 py-1">
             {/* 上傳圖示 */}
-            <label htmlFor="upload-photo" className="text-3xl text-[#2B3A3B] cursor-pointer select-none mr-2">＋</label>
-            <input id="upload-photo" type="file" accept="image/*" className="hidden" onChange={() => alert('🖼️ 圖片上傳尚未實作')} />
+            <label className="text-3xl text-[#2B3A3B] cursor-pointer select-none mr-2" htmlFor="upload-photo">＋</label>
+            <input accept="image/*" className="hidden" id="upload-photo" type="file" onChange={() => alert('🖼️ 圖片上傳尚未實作')} />
             {/* 拍照圖示 */}
-            <button onClick={() => setShowCamera(true)} className="w-6 h-6 mr-2 flex items-center justify-center">
-              <Image src="/camera.png" alt="camera" width={24} height={24} />
+            <button className="w-6 h-6 mr-2 flex items-center justify-center" onClick={() => setShowCamera(true)}>
+              <Image alt="camera" height={24} src="/camera.png" width={24} />
             </button>
             <input
-              type="text"
-              placeholder="Message"
               className="flex-1 px-2 py-2 bg-transparent outline-none text-sm"
+              placeholder="Message"
+              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
@@ -401,12 +402,12 @@ export default function AIHubPage() {
               className="px-4 py-2 bg-[#EBC9A4] text-[#2B3A3B] font-semibold rounded-lg ml-2"
               onClick={() => {
                 if (!input.trim()) return;
-                const newMessages = [...messages, { sender: 'user' as 'user', text: input, model }];
+                const newMessages = [...messages, { sender: 'user' as const, text: input, model }];
                 setMessages(newMessages);
                 setInput('');
 
                 const assistantLabel = assistantOptions.find(opt => opt.value === model)?.label || '';
-                setMessages(prev => [...prev, { sender: 'ai' as 'ai', text: `${assistantLabel} 正在思考中...`, model }]);
+                setMessages(prev => [...prev, { sender: 'ai' as const, text: `${assistantLabel} 正在思考中...`, model }]);
 
                 const webhookMap: Record<string, string> = {
                   'llama3-custom': 'http://10.147.19.122:5678/webhook/d5c7aec9-194c-4f70-812e-d62ae4984e95',
@@ -421,71 +422,71 @@ export default function AIHubPage() {
                   fetch(webhookURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: input })
+                    body: JSON.stringify({ message: input }),
                   })
-                  .then(res => {
-                    const ct = res.headers.get('content-type') || '';
-                    return ct.includes('application/json') ? res.json() : res.text().then(text => ({ response: text }));
-                  })
-                  .then(data => {
-                    const raw = data as any;
-                    console.log('Webhook actual reply:', raw);
-                    let replyText = '';
-                    if (raw && raw.code === 0) {
-                      replyText = `抱歉，${assistantLabel}的大腦當機了，請稍後再試`;
-                    } else if (typeof raw === 'string') {
-                      replyText = raw;
-                    } else if (raw.output) {
-                      replyText = raw.output;
-                    } else if (raw.response) {
-                      replyText = raw.response;
-                    } else if (raw.message) {
-                      replyText = raw.message;
-                    } else if (raw.text) {
-                      replyText = raw.text;
-                    } else {
-                      replyText = JSON.stringify(raw);
-                    }
-                    // Remove <|end_of_text|> string if present
-                    replyText = replyText.replace(/<\|end_of_text\|>/g, '');
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (
-                        lastIndex >= 0 &&
+                    .then(res => {
+                      const ct = res.headers.get('content-type') || '';
+                      return ct.includes('application/json') ? res.json() : res.text().then(text => ({ response: text }));
+                    })
+                    .then(data => {
+                      const raw = data;
+                      console.log('Webhook actual reply:', raw);
+                      let replyText = '';
+                      if (raw && raw.code === 0) {
+                        replyText = `抱歉，${assistantLabel}的大腦當機了，請稍後再試`;
+                      } else if (typeof raw === 'string') {
+                        replyText = raw;
+                      } else if (raw.output) {
+                        replyText = raw.output;
+                      } else if (raw.response) {
+                        replyText = raw.response;
+                      } else if (raw.message) {
+                        replyText = raw.message;
+                      } else if (raw.text) {
+                        replyText = raw.text;
+                      } else {
+                        replyText = JSON.stringify(raw);
+                      }
+                      // Remove <|end_of_text|> string if present
+                      replyText = replyText.replace(/<\|end_of_text\|>/g, '');
+                      setMessages(prev => {
+                        const updated = [...prev];
+                        const lastIndex = updated.length - 1;
+                        if (
+                          lastIndex >= 0 &&
                         updated[lastIndex].sender === 'ai' &&
                         updated[lastIndex].text.includes('正在思考中')
-                      ) {
-                        updated[lastIndex] = { ...updated[lastIndex], text: replyText };
-                      } else {
-                        updated.push({ sender: 'ai' as 'ai', text: replyText, model });
-                      }
-                      return updated;
-                    });
-                  })
-                  .catch(err => {
-                    console.error('Webhook error:', err);
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (
-                        lastIndex >= 0 &&
+                        ) {
+                          updated[lastIndex] = { ...updated[lastIndex], text: replyText };
+                        } else {
+                          updated.push({ sender: 'ai' as const, text: replyText, model });
+                        }
+                        return updated;
+                      });
+                    })
+                    .catch(err => {
+                      console.error('Webhook error:', err);
+                      setMessages(prev => {
+                        const updated = [...prev];
+                        const lastIndex = updated.length - 1;
+                        if (
+                          lastIndex >= 0 &&
                         updated[lastIndex].sender === 'ai' &&
                         updated[lastIndex].text.includes('正在思考中')
-                      ) {
-                        updated[lastIndex] = { ...updated[lastIndex], text: '抱歉，他的大腦當機了，請稍後再試' };
-                      } else {
-                        updated.push({ sender: 'ai' as 'ai', text: '抱歉，他的大腦當機了，請稍後再試', model });
-                      }
-                      return updated;
+                        ) {
+                          updated[lastIndex] = { ...updated[lastIndex], text: '抱歉，他的大腦當機了，請稍後再試' };
+                        } else {
+                          updated.push({ sender: 'ai' as const, text: '抱歉，他的大腦當機了，請稍後再試', model });
+                        }
+                        return updated;
+                      });
                     });
-                  });
                 } else {
                   // simulate AI response for other models
                   setTimeout(() => {
                     setMessages((msgs) => [
                       ...msgs,
-                      { sender: 'ai' as 'ai', text: '抱歉，他正在忙碌中...，請稍後再試', model }
+                      { sender: 'ai' as const, text: '抱歉，他正在忙碌中...，請稍後再試', model },
                     ]);
                   }, 1000);
                 }
@@ -503,10 +504,11 @@ export default function AIHubPage() {
             {showCamera && (
               <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-white/10">
                 <div className="bg-white p-4 rounded-lg shadow-lg w-[350px] max-w-full">
-                  <video ref={videoRef} width={320} height={240} className="rounded border mb-2" />
-                  <canvas ref={canvasRef} width={320} height={240} className="hidden" />
+                  <video ref={videoRef} className="rounded border mb-2" height={240} width={320} />
+                  <canvas ref={canvasRef} className="hidden" height={240} width={320} />
                   <div className="flex justify-end gap-2">
                     <button
+                      className="px-3 py-1 text-sm bg-[#EBC9A4] rounded-md"
                       onClick={() => {
                         if (!canvasRef.current || !videoRef.current) return;
                         const ctx = canvasRef.current.getContext('2d');
@@ -516,13 +518,12 @@ export default function AIHubPage() {
                         setPhotoPreview(data);
                         setShowCamera(false);
                       }}
-                      className="px-3 py-1 text-sm bg-[#EBC9A4] rounded-md"
                     >
                       拍照
                     </button>
                     <button
-                      onClick={() => setShowCamera(false)}
                       className="px-3 py-1 text-sm bg-gray-300 rounded-md"
+                      onClick={() => setShowCamera(false)}
                     >
                       取消
                     </button>
@@ -533,55 +534,55 @@ export default function AIHubPage() {
             {/* 拍照預覽與送出 */}
             {photoPreview && (
               <div className="mt-2 flex flex-col items-end">
-                <img src={photoPreview} alt="preview" className="w-40 rounded border mb-2" />
+                <img alt="preview" className="w-40 rounded border mb-2" src={photoPreview} />
                 <button
+                  className="px-3 py-1 text-sm bg-[#EBC9A4] rounded-md"
                   onClick={async () => {
-                    setMessages(prev => [...prev, { sender: 'user' as 'user', text: '已上傳相片，等待回應...', model }]);
+                    setMessages(prev => [...prev, { sender: 'user' as const, text: '已上傳相片，等待回應...', model }]);
                     const webhookURL = 'http://10.147.19.122:5678/webhook/a94f62fe-81df-4139-bde9-4538a8dcc5ed';
                     const payload = new FormData();
                     const blob = await (await fetch(photoPreview)).blob();
                     payload.append('image', blob, 'photo.png');
                     fetch(webhookURL, {
                       method: 'POST',
-                      body: payload
+                      body: payload,
                     })
-                    .then(r => r.json())
-                    .then(d => {
-                      const replyText = d.reply || d.output || d.message || JSON.stringify(d);
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (
-                        lastIndex >= 0 &&
+                      .then(r => r.json())
+                      .then(d => {
+                        const replyText = d.reply || d.output || d.message || JSON.stringify(d);
+                        setMessages(prev => {
+                          const updated = [...prev];
+                          const lastIndex = updated.length - 1;
+                          if (
+                            lastIndex >= 0 &&
                         updated[lastIndex].sender === 'ai' &&
                         updated[lastIndex].text.includes('正在思考中')
-                      ) {
-                        updated[lastIndex] = { ...updated[lastIndex], text: replyText };
-                      } else {
-                        updated.push({ sender: 'ai' as 'ai', text: replyText, model });
-                      }
-                      return updated;
-                    });
-                    })
-                    .catch(() => {
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (
-                        lastIndex >= 0 &&
+                          ) {
+                            updated[lastIndex] = { ...updated[lastIndex], text: replyText };
+                          } else {
+                            updated.push({ sender: 'ai' as const, text: replyText, model });
+                          }
+                          return updated;
+                        });
+                      })
+                      .catch(() => {
+                        setMessages(prev => {
+                          const updated = [...prev];
+                          const lastIndex = updated.length - 1;
+                          if (
+                            lastIndex >= 0 &&
                         updated[lastIndex].sender === 'ai' &&
                         updated[lastIndex].text.includes('正在思考中')
-                      ) {
-                        updated[lastIndex] = { ...updated[lastIndex], text: '圖片處理時發生錯誤' };
-                      } else {
-                        updated.push({ sender: 'ai' as 'ai', text: '圖片處理時發生錯誤', model });
-                      }
-                      return updated;
-                    });
-                    });
+                          ) {
+                            updated[lastIndex] = { ...updated[lastIndex], text: '圖片處理時發生錯誤' };
+                          } else {
+                            updated.push({ sender: 'ai' as const, text: '圖片處理時發生錯誤', model });
+                          }
+                          return updated;
+                        });
+                      });
                     setPhotoPreview(null);
                   }}
-                  className="px-3 py-1 text-sm bg-[#EBC9A4] rounded-md"
                 >
                   送出圖片
                 </button>
@@ -592,5 +593,5 @@ export default function AIHubPage() {
       </div>
 
     </div>
-  )
+  );
 }

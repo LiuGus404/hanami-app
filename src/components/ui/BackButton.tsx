@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import { ArrowLeftIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
 
 interface BackButtonProps {
   href?: string
@@ -12,21 +12,21 @@ interface BackButtonProps {
 export default function BackButton({ 
   href, 
   label = '返回', 
-  className = '' 
+  className = '', 
 }: BackButtonProps) {
-  const router = useRouter()
+  const router = useRouter();
 
   const handleClick = () => {
     if (href) {
-      router.push(href)
+      router.push(href);
     } else {
-      router.back()
+      router.back();
     }
-  }
+  };
 
   return (
     <button
-      onClick={handleClick}
+      aria-label={label}
       className={`
         inline-flex items-center gap-2 px-4 py-2 
         bg-white border border-[#EADBC8] rounded-lg
@@ -36,10 +36,10 @@ export default function BackButton({
         focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2
         ${className}
       `}
-      aria-label={label}
+      onClick={handleClick}
     >
       <ArrowLeftIcon className="w-4 h-4" />
       <span className="font-medium">{label}</span>
     </button>
-  )
+  );
 } 

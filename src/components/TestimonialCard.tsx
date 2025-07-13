@@ -14,7 +14,7 @@ export default function TestimonialCard({ name, comment, avatar }: Props) {
           {avatar}
         </div>
       ) : (
-        <img src={avatar} alt={name} className="w-12 h-12 rounded-full object-cover" />
+        <img alt={name} className="w-12 h-12 rounded-full object-cover" src={avatar} />
       )}
       <div>
         <div className="font-semibold text-brown-700">{name}</div>

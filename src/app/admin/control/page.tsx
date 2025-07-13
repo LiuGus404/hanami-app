@@ -1,8 +1,9 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react';
-import AIControlPanel from '@/components/AIControlPanel';
 import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+
+import AIControlPanel from '@/components/AIControlPanel';
 import { Spinner } from '@/components/ui/spinner';
 import { getUserSession } from '@/lib/authUtils';
 
@@ -73,8 +74,8 @@ const ControlPage = () => {
     };
   }, [router]);
 
-  const handleCreateTask = () => console.log("Create Task");
-  const handleCancelTask = () => console.log("Cancel Task");
+  const handleCreateTask = () => console.log('Create Task');
+  const handleCancelTask = () => console.log('Cancel Task');
   const handleFilterChange = (status: string[]) => console.log(`Filter: ${status}`);
 
   if (isLoading) {
@@ -150,8 +151,8 @@ const ControlPage = () => {
       <div className="max-w-5xl mx-auto p-6">
         <AIControlPanel
           models={mockModels}
-          onCreateTask={handleCreateTask}
           onCancelTask={handleCancelTask}
+          onCreateTask={handleCreateTask}
           onFilterChange={handleFilterChange}
         />
       </div>

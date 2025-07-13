@@ -1,30 +1,32 @@
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import SessionProviderWrapper from "@/components/SessionProviderWrapper";
-import { cookies } from "next/headers";
-import { Toaster } from "react-hot-toast";
+import type { Metadata, Viewport } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+
+import './globals.css';
+import { cookies } from 'next/headers';
+import { Toaster } from 'react-hot-toast';
+
+import SessionProviderWrapper from '@/components/SessionProviderWrapper';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Hanami 音樂教育 | 專業兒童音樂課程",
-    template: "%s | Hanami 音樂教育"
+    default: 'Hanami 音樂教育 | 專業兒童音樂課程',
+    template: '%s | Hanami 音樂教育',
   },
-  description: "Hanami 音樂教育提供專業的兒童音樂課程，包括Pre-K音樂啟蒙、錄音教材等。讓孩子在快樂中學習音樂，培養藝術天賦。",
-  keywords: ["兒童音樂課程", "音樂教育", "Pre-K音樂", "音樂啟蒙", "兒童音樂班", "音樂錄音教材"],
-  authors: [{ name: "Hanami 音樂教育" }],
-  creator: "Hanami 音樂教育",
-  publisher: "Hanami 音樂教育",
+  description: 'Hanami 音樂教育提供專業的兒童音樂課程，包括Pre-K音樂啟蒙、錄音教材等。讓孩子在快樂中學習音樂，培養藝術天賦。',
+  keywords: ['兒童音樂課程', '音樂教育', 'Pre-K音樂', '音樂啟蒙', '兒童音樂班', '音樂錄音教材'],
+  authors: [{ name: 'Hanami 音樂教育' }],
+  creator: 'Hanami 音樂教育',
+  publisher: 'Hanami 音樂教育',
   formatDetection: {
     email: false,
     address: false,
@@ -67,19 +69,19 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  manifest: "/manifest.json",
+  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "Hanami 音樂教育",
+    statusBarStyle: 'default',
+    title: 'Hanami 音樂教育',
   },
 };
 
 export const viewport: Viewport = {
-  width: "device-width",
+  width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#FFF9F2",
+  themeColor: '#FFF9F2',
 };
 
 export default async function RootLayout({
@@ -104,39 +106,39 @@ export default async function RootLayout({
     }
   }
 
-  console.log("[RootLayout] 包裹 children:", children);
+  console.log('[RootLayout] 包裹 children:', children);
 
   return (
     <html lang="zh-TW">
       <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#FFF9F2" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192x192.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-192x192.png" />
+        <link href="/manifest.json" rel="manifest" />
+        <meta content="#FFF9F2" name="theme-color" />
+        <link href="/icons/icon-192x192.png" rel="apple-touch-icon" />
+        <link href="/icons/icon-192x192.png" rel="icon" sizes="32x32" type="image/png" />
+        <link href="/icons/icon-192x192.png" rel="icon" sizes="16x16" type="image/png" />
         
         {/* 結構化資料 */}
         <script
-          type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "EducationalOrganization",
-              "name": "Hanami 音樂教育",
-              "description": "專業的兒童音樂教育機構，提供Pre-K音樂啟蒙課程",
-              "url": "https://hanami-music.com",
-              "logo": "https://hanami-music.com/icons/icon-512x512.png",
-              "address": {
-                "@type": "PostalAddress",
-                "addressCountry": "TW"
+              '@context': 'https://schema.org',
+              '@type': 'EducationalOrganization',
+              'name': 'Hanami 音樂教育',
+              'description': '專業的兒童音樂教育機構，提供Pre-K音樂啟蒙課程',
+              'url': 'https://hanami-music.com',
+              'logo': 'https://hanami-music.com/icons/icon-512x512.png',
+              'address': {
+                '@type': 'PostalAddress',
+                'addressCountry': 'TW',
               },
-              "contactPoint": {
-                "@type": "ContactPoint",
-                "contactType": "customer service"
+              'contactPoint': {
+                '@type': 'ContactPoint',
+                'contactType': 'customer service',
               },
-              "sameAs": []
-            })
+              'sameAs': [],
+            }),
           }}
+          type="application/ld+json"
         />
       </head>
       <body

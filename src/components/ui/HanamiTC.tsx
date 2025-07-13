@@ -1,13 +1,15 @@
 import * as React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { getSupabaseClient } from '@/lib/supabase';
-import { PopupSelect } from '@/components/ui/PopupSelect';
-import LessonPlanModal from '@/components/ui/LessonPlanModal';
-import AITeacherSchedulerModal from '@/components/ui/AITeacherSchedulerModal';
-import { Lesson, Teacher, CourseType, Student } from '@/types';
+
 import LessonCard from './LessonCard';
 import MiniLessonCard from './MiniLessonCard';
+
+import AITeacherSchedulerModal from '@/components/ui/AITeacherSchedulerModal';
+import LessonPlanModal from '@/components/ui/LessonPlanModal';
+import { PopupSelect } from '@/components/ui/PopupSelect';
+import { getSupabaseClient } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
+import { Lesson, Teacher, CourseType, Student } from '@/types';
 
 interface ProcessedLesson {
   id: string;
@@ -103,7 +105,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
       materials: string[];
     };
     onEdit: () => void;
-  } | null>(null);
+      } | null>(null);
   const [selectedTeacher1, setSelectedTeacher1] = useState<string[]>([]);
   const [selectedTeacher2, setSelectedTeacher2] = useState<string[]>([]);
   const [showPopup, setShowPopup] = useState<'main' | 'assist' | null>(null);
@@ -279,7 +281,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     if (!error && data) {
       const list: {name: string, start: string, end: string}[] = [];
       data.forEach((row: any) => {
-        if (row.hanami_employee && row.hanami_employee.teacher_nickname && row.start_time && row.end_time) {
+        if (row.hanami_employee?.teacher_nickname && row.start_time && row.end_time) {
           list.push({ name: row.hanami_employee.teacher_nickname, start: row.start_time, end: row.end_time });
         }
       });
@@ -317,18 +319,18 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
           <div key={idx} className="flex flex-col items-center">
             <button
               className="rounded-full bg-[#FFF7D6] text-[#4B4036] px-2 py-1 shadow-sm font-semibold text-xs hover:bg-[#FFE5B4] transition-all duration-150 truncate max-w-full"
+              title={teacher.name}
               onClick={() => {
                 window.location.href = `/admin/teachers/teacher-schedule?teacher_name=${encodeURIComponent(teacher.name)}`;
               }}
-              title={teacher.name}
             >
               {teacher.name}
             </button>
             <span
               className="rounded-full bg-[#EADBC8] text-[#7A6654] px-2 py-0.5 font-mono text-xs min-w-[60px] text-center mt-1"
-              title={`${teacher.start.slice(0,5)}~${teacher.end.slice(0,5)}`}
+              title={`${teacher.start.slice(0, 5)}~${teacher.end.slice(0, 5)}`}
             >
-              {teacher.start.slice(0,5)}~{teacher.end.slice(0,5)}
+              {teacher.start.slice(0, 5)}~{teacher.end.slice(0, 5)}
             </span>
           </div>
         ))}
@@ -360,7 +362,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
 
           await Promise.all([
             fetchLessons(startOfWeek, endOfWeek),
-            fetchPlans(startOfWeek, endOfWeek)
+            fetchPlans(startOfWeek, endOfWeek),
           ]);
         } else if (view === 'day') {
           const startOfDay = new Date(currentDate);
@@ -368,7 +370,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
 
           await Promise.all([
             fetchLessons(startOfDay, endOfDay),
-            fetchPlans(startOfDay, endOfDay)
+            fetchPlans(startOfDay, endOfDay),
           ]);
         }
 
@@ -444,12 +446,12 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     return (
       <div className="flex items-center">
         <button
-          onClick={() => window.location.href = `/admin/students/${nameObj.student_id}`}
-          className={`inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs hover:bg-[#d0ab7d] transition flex items-center`}
+          className={'inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs hover:bg-[#d0ab7d] transition flex items-center'}
           style={{ 
             minWidth: '60px',
-            backgroundColor: bgColor
+            backgroundColor: bgColor,
           }}
+          onClick={() => window.location.href = `/admin/students/${nameObj.student_id}`}
         >
           {nameObj.name}
           {nameObj.age && <span className="ml-1 text-[10px]">({nameObj.age}歲)</span>}
@@ -503,7 +505,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
         acc[key] = {
           time: l.regular_timeslot,
           course: l.course_type,
-          students: []
+          students: [],
         };
       }
       let age = '';
@@ -515,7 +517,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
         student_id: l.student_id,
         age,
         is_trial: l.is_trial,
-        remaining_lessons: l.remaining_lessons ?? undefined
+        remaining_lessons: l.remaining_lessons ?? undefined,
       });
       return acc;
     }, {});
@@ -534,7 +536,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
         acc[key] = {
           time: l.regular_timeslot,
           course: l.course_type,
-          students: []
+          students: [],
         };
       }
       let age = '';
@@ -550,7 +552,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
       });
       return acc;
     }, {});
-    const groupedArray = Object.values(grouped) as Group[];
+    const groupedArray = Object.values(grouped);
     dailyViewContent = (
       <div className="flex flex-col items-center w-full">
         <div className="font-semibold text-[#4B4036] text-lg mb-1">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]}</div>
@@ -560,8 +562,15 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
           {groupedArray.map((group, j) => (
             <MiniLessonCard
               key={j}
-              time={group.time?.slice(0, 5) || ''}
+              allShowPlan={allShowPlan}
+              allShowStudents={allShowStudents}
+              allShowTeachers={allShowTeachers}
               course={{ name: group.course }}
+              duration={lessons.find(l =>
+                l.regular_timeslot === group.time &&
+                l.course_type === group.course &&
+                getDateString(new Date(l.lesson_date)) === getDateString(date),
+              )?.lesson_duration || undefined}
               students={group.students.map(student => ({
                 id: student.student_id,
                 name: student.name,
@@ -569,21 +578,12 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
                 isTrial: student.is_trial,
                 remainingLessons: student.remaining_lessons ?? undefined,
               }))}
-              onEdit={() => {
-                const matchedPlan = (plans || []).find(
-                  p =>
-                    p.lesson_date === getDateString(date) &&
-                    p.timeslot === group.time &&
-                    p.course_type === group.course
-                );
-                setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
-                setIsModalOpen(true);
-              }}
+              time={group.time?.slice(0, 5) || ''}
               onClick={() => {
                 setSelectedLesson({
                   time: group.time?.slice(0, 5) || '',
                   course: { name: group.course },
-                  teachers: teachers,
+                  teachers,
                   students: group.students.map(student => ({
                     id: student.student_id,
                     name: student.name,
@@ -594,17 +594,19 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
                   onEdit: () => {
                     setModalInfo({ date, time: group.time, course: group.course });
                     setIsModalOpen(true);
-                  }
+                  },
                 });
               }}
-              duration={lessons.find(l =>
-                l.regular_timeslot === group.time &&
-                l.course_type === group.course &&
-                getDateString(new Date(l.lesson_date)) === getDateString(date)
-              )?.lesson_duration || undefined}
-              allShowTeachers={allShowTeachers}
-              allShowStudents={allShowStudents}
-              allShowPlan={allShowPlan}
+              onEdit={() => {
+                const matchedPlan = (plans || []).find(
+                  p =>
+                    p.lesson_date === getDateString(date) &&
+                    p.timeslot === group.time &&
+                    p.course_type === group.course,
+                );
+                setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
+                setIsModalOpen(true);
+              }}
             />
           ))}
         </div>
@@ -625,195 +627,195 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
   return (
     <div className="bg-white min-h-screen flex flex-col items-center py-0">
       <div className="bg-[#FFFDF8] rounded-xl shadow p-4 w-full max-w-5xl">
-      <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex gap-2 items-center">
-            <button onClick={handlePrev} className="hanami-btn-cute px-2 py-1 text-[#4B4036]">◀</button>
-          {view === 'day' ? (
-            <input
-              type="date"
-              value={getDateString(currentDate)}
+            <button className="hanami-btn-cute px-2 py-1 text-[#4B4036]" onClick={handlePrev}>◀</button>
+            {view === 'day' ? (
+              <input
+                className="border-2 border-[#EAC29D] px-3 py-2 rounded-full bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200"
+                style={{ width: '120px' }}
+                type="date"
+                value={getDateString(currentDate)}
                 onChange={e => {
-                const [year, month, day] = e.target.value.split('-').map(Number);
+                  const [year, month, day] = e.target.value.split('-').map(Number);
                   setCurrentDate(new Date(year, month - 1, day));
-              }}
-              className="border-2 border-[#EAC29D] px-3 py-2 rounded-full bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200"
-              style={{ width: '120px' }}
-            />
-          ) : (
+                }}
+              />
+            ) : (
               <span className="font-semibold text-[#4B4036]">{formatDate(currentDate)}</span>
-          )}
-            <button onClick={handleNext} className="hanami-btn-cute px-2 py-1 text-[#4B4036]">▶</button>
-            {view === 'day' && (
-              <span className="ml-2 text-[#4B4036] text-sm font-semibold">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][currentDate.getDay()]}
-              </span>
             )}
-        </div>
-        <div className="flex items-center gap-2">
+            <button className="hanami-btn-cute px-2 py-1 text-[#4B4036]" onClick={handleNext}>▶</button>
+            {view === 'day' && (
+            <span className="ml-2 text-[#4B4036] text-sm font-semibold">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][currentDate.getDay()]}
+            </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
             <button className={`px-3 py-1 ${view === 'day' ? 'hanami-btn' : 'hanami-btn-soft'} text-[#4B4036]`} onClick={() => setView('day')}>日</button>
             <button className={`px-3 py-1 ${view === 'week' ? 'hanami-btn' : 'hanami-btn-soft'} text-[#4B4036]`} onClick={() => setView('week')}>週</button>
             <button className="flex items-center gap-1 px-2 py-1 hanami-btn-soft text-[#4B4036]" onClick={() => setAllShowTeachers((prev) => !prev)}>
-            <img src="/teacher.png" alt="老師" className="w-4 h-4" />
-            <span className="text-xs">{allShowTeachers ? '收起老師' : '展示老師'}</span>
-          </button>
+              <img alt="老師" className="w-4 h-4" src="/teacher.png" />
+              <span className="text-xs">{allShowTeachers ? '收起老師' : '展示老師'}</span>
+            </button>
             <button className="flex items-center gap-1 px-2 py-1 hanami-btn-soft text-[#4B4036]" onClick={() => setAllShowStudents((prev) => !prev)}>
-            <img src="/icons/penguin-face.PNG" alt="學生" className="w-4 h-4" />
-            <span className="text-xs">{allShowStudents ? '收起學生' : '展示學生'}</span>
-          </button>
+              <img alt="學生" className="w-4 h-4" src="/icons/penguin-face.PNG" />
+              <span className="text-xs">{allShowStudents ? '收起學生' : '展示學生'}</span>
+            </button>
             <button className="flex items-center gap-1 px-2 py-1 hanami-btn-soft text-[#4B4036]" onClick={() => setAllShowPlan((prev) => !prev)}>
-            <img src="/details.png" alt="課堂活動" className="w-4 h-4" />
-            <span className="text-xs">{allShowPlan ? '收起活動' : '展示活動'}</span>
-          </button>
-          <button
-            onClick={async (e) => {
+              <img alt="課堂活動" className="w-4 h-4" src="/details.png" />
+              <span className="text-xs">{allShowPlan ? '收起活動' : '展示活動'}</span>
+            </button>
+            <button
+              className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EBC9A4] text-[#4B4036] hover:bg-[#f7f3ec]"
+              title="刷新資料"
+              onClick={async (e) => {
                 const btn = e.currentTarget.querySelector('img');
-              if (btn) {
+                if (btn) {
                   btn.classList.add('animate-spin');
                   setTimeout(() => btn.classList.remove('animate-spin'), 1000);
-              }
+                }
                 const weekStart = getHongKongDate(currentDate);
                 weekStart.setDate(weekStart.getDate() - weekStart.getDay());
                 const weekEnd = getHongKongDate(weekStart);
                 weekEnd.setDate(weekEnd.getDate() + 6);
                 await fetchLessons(weekStart, weekEnd);
                 await fetchPlans(weekStart, weekEnd);
-            }}
-              className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EBC9A4] text-[#4B4036] hover:bg-[#f7f3ec]"
-              title="刷新資料"
-          >
-              <img src="/refresh.png" alt="Refresh" className="w-4 h-4" />
-          </button>
+              }}
+            >
+              <img alt="Refresh" className="w-4 h-4" src="/refresh.png" />
+            </button>
+          </div>
         </div>
-      </div>
         {/* 日曆內容 */}
         <div className="w-full overflow-x-auto">
           {view === 'week' ? (
-          <div className="grid grid-cols-7 gap-2 min-w-[700px] sm:min-w-0">
-            {Array.from({ length: 7 }, (_, i) => {
-              const weekStart = getHongKongDate(currentDate);
-              weekStart.setDate(currentDate.getDate() - currentDate.getDay());
-              const date = getHongKongDate(weekStart);
-              date.setDate(date.getDate() + i);
-              const groupedArray = renderDayLessons(date);
+            <div className="grid grid-cols-7 gap-2 min-w-[700px] sm:min-w-0">
+              {Array.from({ length: 7 }, (_, i) => {
+                const weekStart = getHongKongDate(currentDate);
+                weekStart.setDate(currentDate.getDate() - currentDate.getDay());
+                const date = getHongKongDate(weekStart);
+                date.setDate(date.getDate() + i);
+                const groupedArray = renderDayLessons(date);
               
-              return (
-                <div key={i} className="p-2 rounded-xl text-center text-[#4B4036] text-sm bg-[#FFFDF8] flex flex-col items-center h-full">
-                  <div className="font-semibold">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i]}</div>
-                  <div className="text-xs text-gray-500">{date.getDate()}</div>
-                  <TodayTeachersSection date={date} />
-                  <div className="flex flex-row flex-wrap gap-2 justify-center mt-1 w-full">
-                    {groupedArray.map((group, j) => {
-                      const matchedPlan = (plans || []).find(
-                        p =>
-                          p.lesson_date === getDateString(date) &&
+                return (
+                  <div key={i} className="p-2 rounded-xl text-center text-[#4B4036] text-sm bg-[#FFFDF8] flex flex-col items-center h-full">
+                    <div className="font-semibold">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i]}</div>
+                    <div className="text-xs text-gray-500">{date.getDate()}</div>
+                    <TodayTeachersSection date={date} />
+                    <div className="flex flex-row flex-wrap gap-2 justify-center mt-1 w-full">
+                      {groupedArray.map((group, j) => {
+                        const matchedPlan = (plans || []).find(
+                          p =>
+                            p.lesson_date === getDateString(date) &&
                           p.timeslot === group.time &&
-                          p.course_type === group.course
-                      );
+                          p.course_type === group.course,
+                        );
                       
-                      const teacherNames1 = (matchedPlan?.teacher_names_1 || []) as string[];
-                      const teacherNames2 = (matchedPlan?.teacher_names_2 || []) as string[];
+                        const teacherNames1 = (matchedPlan?.teacher_names_1 || []) as string[];
+                        const teacherNames2 = (matchedPlan?.teacher_names_2 || []) as string[];
                       
-                      const plan = matchedPlan
-                        ? {
+                        const plan = matchedPlan
+                          ? {
                             teacherNames1,
                             teacherNames2,
                             objectives: matchedPlan.objectives || [],
                             materials: matchedPlan.materials || [],
                           }
-                        : undefined;
+                          : undefined;
                       
-                      return (
-                        <MiniLessonCard
-                          key={j}
-                          time={group.time?.slice(0, 5) || ''}
-                          course={{ name: group.course }}
-                                                      students={group.students.map(student => ({
+                        return (
+                          <MiniLessonCard
+                            key={j}
+                            allShowPlan={allShowPlan}
+                            allShowStudents={allShowStudents}
+                            allShowTeachers={allShowTeachers}
+                            course={{ name: group.course }}
+                            duration={lessons.find(l =>
+                              l.regular_timeslot === group.time &&
+                            l.course_type === group.course &&
+                            getDateString(new Date(l.lesson_date)) === getDateString(date),
+                            )?.lesson_duration || undefined}
+                            plan={plan}
+                            students={group.students.map(student => ({
                               id: student.student_id,
                               name: student.name,
                               age: student.age,
                               isTrial: student.is_trial,
                               remainingLessons: student.remaining_lessons ?? undefined,
                             }))}
-                          plan={plan}
-                          onEdit={() => {
-                            const matchedPlan = (plans || []).find(
-                              p =>
-                                p.lesson_date === getDateString(date) &&
+                            time={group.time?.slice(0, 5) || ''}
+                            onClick={() => {
+                              setSelectedLesson({
+                                time: group.time?.slice(0, 5) || '',
+                                course: { name: group.course },
+                                teachers,
+                                students: group.students.map(student => ({
+                                  id: student.student_id,
+                                  name: student.name,
+                                  age: student.age,
+                                  isTrial: student.is_trial,
+                                  remainingLessons: student.remaining_lessons ?? undefined,
+                                })),
+                                plan,
+                                onEdit: () => {
+                                  setModalInfo({ date, time: group.time, course: group.course });
+                                  setIsModalOpen(true);
+                                },
+                              });
+                            }}
+                            onEdit={() => {
+                              const matchedPlan = (plans || []).find(
+                                p =>
+                                  p.lesson_date === getDateString(date) &&
                                 p.timeslot === group.time &&
-                                p.course_type === group.course
-                            );
-                            setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
-                            setIsModalOpen(true);
-                          }}
-                          onClick={() => {
-                            setSelectedLesson({
-                              time: group.time?.slice(0, 5) || '',
-                              course: { name: group.course },
-                              teachers: teachers,
-                              students: group.students.map(student => ({
-                                id: student.student_id,
-                                name: student.name,
-                                age: student.age,
-                                isTrial: student.is_trial,
-                                remainingLessons: student.remaining_lessons ?? undefined,
-                              })),
-                              plan,
-                              onEdit: () => {
-                                setModalInfo({ date, time: group.time, course: group.course });
-                                setIsModalOpen(true);
-                              }
-                            });
-                          }}
-                          duration={lessons.find(l =>
-                            l.regular_timeslot === group.time &&
-                            l.course_type === group.course &&
-                            getDateString(new Date(l.lesson_date)) === getDateString(date)
-                          )?.lesson_duration || undefined}
-                          allShowTeachers={allShowTeachers}
-                          allShowStudents={allShowStudents}
-                          allShowPlan={allShowPlan}
-                        />
-                      );
-                    })}
+                                p.course_type === group.course,
+                              );
+                              setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
+                              setIsModalOpen(true);
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-        </div>
-      ) : (
+                );
+              })}
+            </div>
+          ) : (
             dailyViewContent
           )}
-            </div>
+        </div>
         {/* LessonCard 彈窗 */}
         {selectedLesson && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={() => setSelectedLesson(null)}>
             <div className="max-w-md w-full relative" onClick={e => e.stopPropagation()}>
               <LessonCard 
-                time={selectedLesson.time}
                 course={selectedLesson.course}
-                teachers={selectedLesson.teachers.map(t => ({
-                  name: t.teacher_fullname,
-                }))}
-                students={selectedLesson.students}
                 plan={selectedLesson.plan ? {
                   teacherNames: [...selectedLesson.plan.teacherNames1, ...selectedLesson.plan.teacherNames2],
                   objectives: selectedLesson.plan.objectives,
-                  materials: selectedLesson.plan.materials
+                  materials: selectedLesson.plan.materials,
                 } : undefined}
-                onEdit={selectedLesson.onEdit}
+                students={selectedLesson.students}
+                teachers={selectedLesson.teachers.map(t => ({
+                  name: t.teacher_fullname,
+                }))}
+                time={selectedLesson.time}
                 onClose={() => setSelectedLesson(null)}
+                onEdit={selectedLesson.onEdit}
               />
             </div>
           </div>
         )}
         {modalInfo && (
           <LessonPlanModal
-            open={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            lessonDate={modalInfo.date}
-            timeslot={modalInfo.time}
             courseType={modalInfo.course}
             existingPlan={modalInfo.plan}
+            lessonDate={modalInfo.date}
+            open={isModalOpen}
+            timeslot={modalInfo.time}
+            onClose={() => setIsModalOpen(false)}
             onSaved={async () => {
               const weekStart = getHongKongDate(currentDate);
               weekStart.setDate(weekStart.getDate() - weekStart.getDay());
@@ -827,11 +829,11 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
         {/* AI 安排老師模態框 */}
         <AITeacherSchedulerModal
           open={isAISchedulerOpen}
-          onClose={() => setIsAISchedulerOpen(false)}
           teachers={teachers}
+          onClose={() => setIsAISchedulerOpen(false)}
         />
 
-        </div>
+      </div>
     </div>
   );
 };

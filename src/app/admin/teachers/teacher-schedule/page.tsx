@@ -1,32 +1,33 @@
 // /admin/teacher-schedule/page.tsx
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel'
-import { PopupSelect } from '@/components/ui/PopupSelect'
+import { useState, useEffect } from 'react';
+
+import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel';
+import { PopupSelect } from '@/components/ui/PopupSelect';
+import { supabase } from '@/lib/supabase';
 
 export default function TeacherSchedulePage() {
-  const [teachers, setTeachers] = useState<any[]>([])
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('*')
-  const [showTeacherSelect, setShowTeacherSelect] = useState(false)
-  const [tempTeacherId, setTempTeacherId] = useState<string>('*')
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('*');
+  const [showTeacherSelect, setShowTeacherSelect] = useState(false);
+  const [tempTeacherId, setTempTeacherId] = useState<string>('*');
 
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
-        const { data, error } = await supabase.from('hanami_employee').select('id, teacher_nickname')
+        const { data, error } = await supabase.from('hanami_employee').select('id, teacher_nickname');
         if (error) {
-          console.warn('Warning fetching teachers:', error.message)
+          console.warn('Warning fetching teachers:', error.message);
         } else if (data) {
-          setTeachers(data)
+          setTeachers(data);
         }
       } catch (error) {
-        console.warn('Unexpected error fetching teachers:', error)
+        console.warn('Unexpected error fetching teachers:', error);
       }
-    }
-    fetchTeachers()
-  }, [])
+    };
+    fetchTeachers();
+  }, []);
 
   return (
     <div className="p-6 bg-[#FFF9F2] min-h-screen">
@@ -35,29 +36,29 @@ export default function TeacherSchedulePage() {
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">選擇老師：</label>
           <button
-            onClick={() => setShowTeacherSelect(true)}
             className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+            onClick={() => setShowTeacherSelect(true)}
           >
             {selectedTeacherId === '*' ? '全部老師' : teachers.find(t => t.id === selectedTeacherId)?.teacher_nickname || '請選擇'}
           </button>
           {showTeacherSelect && (
             <PopupSelect
-              title="選擇老師"
+              mode="single"
               options={[
                 { label: '全部老師', value: '*' },
-                ...teachers.map(t => ({ label: t.teacher_nickname, value: t.id }))
+                ...teachers.map(t => ({ label: t.teacher_nickname, value: t.id })),
               ]}
               selected={tempTeacherId}
+              title="選擇老師"
+              onCancel={() => {
+                setTempTeacherId(selectedTeacherId);
+                setShowTeacherSelect(false);
+              }}
               onChange={(value) => setTempTeacherId(value as string)}
               onConfirm={() => {
-                setSelectedTeacherId(tempTeacherId)
-                setShowTeacherSelect(false)
+                setSelectedTeacherId(tempTeacherId);
+                setShowTeacherSelect(false);
               }}
-              onCancel={() => {
-                setTempTeacherId(selectedTeacherId)
-                setShowTeacherSelect(false)
-              }}
-              mode="single"
             />
           )}
         </div>
@@ -73,5 +74,5 @@ export default function TeacherSchedulePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

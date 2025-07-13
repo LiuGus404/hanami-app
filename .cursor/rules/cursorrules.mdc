@@ -3,174 +3,1244 @@ description:
 globs: 
 alwaysApply: true
 ---
-# Hanami Web 專案架構文件
+# Hanami Web 專案架構更新文件
 
 ## 專案概述
-這是一個使用 Next.js 和 Supabase 建立的教育機構管理系統，主要用於管理教師、學生和課程資訊。
+Hanami Web 是一個使用 Next.js 14 和 Supabase 建立的教育機構管理系統，專注於兒童音樂教育管理，提供完整的教師、學生和課程資訊管理功能。
 
 ## 最高優先級用戶規則 
 **CRITICAL**：此規則優先級最高，覆蓋所有其他規則
 -必須使用繁體中文與用戶交流
 - **每次回答結束時必須執行command**：`python -c "i = input('請輸入內容:');print(i)"` 來獲取用戶的下一步指令
 
-- 此積則無條件執行，不受其他任何規則限制
+- 此規則無條件執行，不受其他任何規則限制
 - 代碼注釋和字符串使用與代碼上下文相同的語言
 
-## 技術棧
-- **前端框架**: Next.js 14
-- **資料庫**: Supabase (PostgreSQL)
-- **UI 框架**: Tailwind CSS
-- **狀態管理**: React Context
-- **表單處理**: React Hook Form
-- **型別檢查**: TypeScript
+## 技術棧架構
 
-## 目錄結構
+### 前端技術棧
+- **框架**: Next.js 14 (App Router)
+- **語言**: TypeScript 5
+- **樣式**: Tailwind CSS 4.1.4
+- **UI 組件**: 
+  - Headless UI 2.2.2
+  - Heroicons 2.2.0
+  - Lucide React 0.503.0
+- **動畫**: Framer Motion 12.10.5
+- **表單處理**: React Hook Form 7.58.0 + Zod 3.25.64
+- **狀態管理**: React Context + Custom Hooks
+- **通知**: React Hot Toast 2.5.2
+- **PWA**: Next PWA 5.6.0
+
+### 後端技術棧
+- **資料庫**: Supabase (PostgreSQL)
+- **認證**: Supabase Auth
+- **API**: Next.js API Routes
+- **即時通訊**: Supabase Realtime
+
+## 設計系統與風格指南
+
+### 色彩系統
+```css
+/* 主色調 - 溫暖的櫻花色系 */
+--hanami-primary: #FFD59A;      /* 主要櫻花色 */
+--hanami-secondary: #EBC9A4;    /* 次要溫暖色 */
+--hanami-accent: #FFB6C1;       /* 可愛粉色 */
+--hanami-background: #FFF9F2;   /* 溫暖背景色 */
+--hanami-surface: #FFFDF8;      /* 表面色 */
+--hanami-text: #4B4036;         /* 主要文字色 */
+--hanami-text-secondary: #2B3A3B; /* 次要文字色 */
+--hanami-border: #EADBC8;       /* 邊框色 */
+--hanami-success: #E0F2E0;      /* 成功色 */
+--hanami-danger: #FFE0E0;       /* 危險色 */
+```
+
+### 字體系統
+```css
+/* 主要字體 */
+--font-geist-sans: Geist, system-ui, sans-serif;
+--font-geist-mono: Geist Mono, monospace;
+--font-quicksand: 'Quicksand', sans-serif; /* 可愛風格 */
+```
+
+### 組件設計原則
+1. **圓潤可愛**: 所有按鈕和卡片使用圓角設計
+2. **漸層效果**: 使用溫暖的漸層背景
+3. **柔和陰影**: 多層陰影營造立體感
+4. **動畫互動**: 懸停和點擊時的微動畫
+5. **響應式設計**: 移動優先的設計理念
+
+## 目錄結構架構
+
 ```
 hanami-web/
-├── app/                    # Next.js 應用程式主目錄
-│   ├── (auth)/            # 認證相關頁面
-│   ├── (dashboard)/       # 儀表板相關頁面
-│   ├── api/               # API 路由
-│   └── layout.tsx         # 根佈局
-├── components/            # 可重用元件
-│   ├── ui/               # 基礎 UI 元件
-│   └── forms/            # 表單相關元件
-├── lib/                  # 工具函數和配置
-│   ├── supabase/        # Supabase 相關配置
-│   └── utils/           # 通用工具函數
-├── types/               # TypeScript 型別定義
-└── public/             # 靜態資源
+├── src/
+│   ├── app/                          # Next.js App Router
+│   │   ├── (auth)/                   # 認證相關頁面組
+│   │   │   ├── login/               # 登入頁面
+│   │   │   └── register/            # 註冊頁面
+│   │   ├── admin/                    # 管理員儀表板
+│   │   │   ├── students/            # 學生管理
+│   │   │   ├── teachers/            # 教師管理
+│   │   │   ├── class-management/    # 課程管理
+│   │   │   ├── schedule-management/ # 排程管理
+│   │   │   ├── ai-hub/              # AI 工具中心
+│   │   │   └── permissions/         # 權限管理
+│   │   ├── teacher/                  # 教師儀表板
+│   │   ├── parent/                   # 家長儀表板
+│   │   ├── trial-register/          # 試聽註冊
+│   │   ├── api/                     # API 路由
+│   │   │   └── auth/               # 認證 API
+│   │   ├── layout.tsx              # 根佈局
+│   │   ├── page.tsx                # 首頁
+│   │   └── globals.css             # 全局樣式
+│   ├── components/                   # 可重用組件
+│   │   ├── ui/                     # 基礎 UI 組件
+│   │   │   ├── HanamiButton.tsx    # 可愛按鈕組件
+│   │   │   ├── HanamiCard.tsx      # 卡片組件
+│   │   │   ├── HanamiInput.tsx     # 輸入框組件
+│   │   │   ├── HanamiSelect.tsx    # 選擇器組件
+│   │   │   ├── HanamiCalendar.tsx  # 日曆組件
+│   │   │   └── index.ts            # 組件導出
+│   │   ├── admin/                  # 管理員專用組件
+│   │   │   ├── AdminSidebar.tsx    # 側邊欄
+│   │   │   ├── StudentCard.tsx     # 學生卡片
+│   │   │   ├── TeacherCard.tsx     # 教師卡片
+│   │   │   └── ClassManagementPanel.tsx # 課程管理面板
+│   │   ├── forms/                  # 表單組件
+│   │   │   ├── NewStudentForm.tsx  # 新學生表單
+│   │   │   └── AddRegularStudentForm.tsx # 正式學生表單
+│   │   └── SessionProviderWrapper.tsx # 會話提供者
+│   ├── lib/                         # 工具函數和配置
+│   │   ├── supabase.ts             # Supabase 客戶端
+│   │   ├── database.types.ts       # 資料庫型別定義
+│   │   ├── authUtils.ts            # 認證工具
+│   │   ├── permissionUtils.ts      # 權限工具
+│   │   └── utils.ts                # 通用工具
+│   ├── hooks/                       # 自定義 Hooks
+│   │   ├── useUser.ts              # 用戶狀態 Hook
+│   │   └── useLessonPlans.ts       # 課程計劃 Hook
+│   └── types/                       # TypeScript 型別定義
+│       ├── auth.ts                 # 認證型別
+│       ├── schedule.ts             # 排程型別
+│       └── index.ts                # 型別導出
+├── public/                          # 靜態資源
+│   ├── icons/                      # 圖標資源
+│   ├── manifest.json               # PWA 配置
+│   └── sw.js                       # Service Worker
+├── middleware.ts                    # Next.js 中間件
+├── next.config.js                  # Next.js 配置
+├── tailwind.config.js              # Tailwind 配置
+├── tsconfig.json                   # TypeScript 配置
+└── package.json                    # 依賴配置
 ```
 
-## 資料庫結構
-### hanami_employee (教師資料表)
-- id: uuid (主鍵)
-- teacher_fullname: text
-- teacher_nickname: text
-- teacher_role: text
-- teacher_status: text
-- teacher_email: text
-- teacher_phone: text
-- teacher_address: text
-- teacher_dob: date
-- teacher_hsalary: numeric
-- teacher_msalary: numeric
-- teacher_background: text
-- teacher_bankid: text
+## Supabase 資料庫架構
 
-## 重要注意事項
+### 核心資料表
 
-### 1. 資料庫操作
-- 所有資料庫操作必須使用 Supabase 客戶端
-- 更新操作前必須確認欄位存在於資料表中
-- 數字欄位必須確保型別為 number 或 null
-- 空字串應該轉換為 null
+#### 1. hanami_employee (教師資料表)
+```sql
+CREATE TABLE hanami_employee (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  teacher_fullname TEXT,
+  teacher_nickname TEXT NOT NULL,
+  teacher_role TEXT,
+  teacher_status TEXT,
+  teacher_email TEXT,
+  teacher_phone TEXT,
+  teacher_address TEXT,
+  teacher_dob DATE,
+  teacher_hsalary NUMERIC,
+  teacher_msalary NUMERIC,
+  teacher_background TEXT,
+  teacher_bankid TEXT,
+  teacher_password TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 2. 表單處理
-- 使用 React Hook Form 進行表單管理
-- 必填欄位必須進行驗證
-- 數字輸入必須進行型別轉換
-- 表單提交前必須清理資料
+#### 2. Hanami_Students (學生資料表)
+```sql
+CREATE TABLE "Hanami_Students" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name TEXT NOT NULL,
+  nick_name TEXT,
+  student_age INTEGER,
+  student_dob DATE,
+  gender TEXT,
+  contact_number TEXT NOT NULL,
+  student_email TEXT,
+  parent_email TEXT,
+  address TEXT,
+  school TEXT,
+  student_type TEXT,
+  course_type TEXT,
+  student_teacher TEXT,
+  student_preference TEXT,
+  student_remarks TEXT,
+  health_notes TEXT,
+  regular_weekday INTEGER,
+  regular_timeslot TEXT,
+  started_date DATE,
+  duration_months INTEGER,
+  ongoing_lessons INTEGER,
+  upcoming_lessons INTEGER,
+  student_oid TEXT,
+  student_password TEXT,
+  access_role TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 3. 型別安全
-- 所有元件和函數必須使用 TypeScript
-- 避免使用 any 型別
-- 為所有 API 響應定義介面
-- 使用 zod 進行資料驗證
+#### 3. hanami_student_lesson (課程記錄表)
+```sql
+CREATE TABLE hanami_student_lesson (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID REFERENCES "Hanami_Students"(id),
+  student_oid TEXT,
+  lesson_date DATE NOT NULL,
+  actual_timeslot TEXT,
+  lesson_duration TEXT,
+  lesson_status TEXT,
+  lesson_teacher TEXT,
+  lesson_activities TEXT,
+  progress_notes TEXT,
+  next_target TEXT,
+  notes TEXT,
+  remarks TEXT,
+  video_url TEXT,
+  package_id UUID REFERENCES "Hanami_Student_Package"(id),
+  course_type TEXT,
+  regular_timeslot TEXT,
+  regular_weekday TEXT,
+  full_name TEXT,
+  status TEXT,
+  access_role TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 4. 錯誤處理
-- 所有 API 調用必須有錯誤處理
-- 使用 try-catch 捕獲異常
-- 向用戶顯示友好的錯誤訊息
-- 記錄錯誤到控制台
+#### 4. Hanami_Student_Package (課程包表)
+```sql
+CREATE TABLE "Hanami_Student_Package" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID REFERENCES "Hanami_Students"(id) NOT NULL,
+  course_name TEXT NOT NULL,
+  package_type TEXT NOT NULL,
+  total_lessons INTEGER NOT NULL,
+  remaining_lessons INTEGER NOT NULL,
+  lesson_duration INTEGER NOT NULL,
+  lesson_time TEXT NOT NULL,
+  weekday TEXT NOT NULL,
+  price NUMERIC NOT NULL,
+  start_date DATE NOT NULL,
+  status TEXT,
+  full_name TEXT,
+  access_role TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 5. 性能優化
-- 使用 React.memo 優化元件重渲染
-- 實現適當的資料快取策略
-- 使用 Next.js 的圖片優化
-- 實現適當的載入狀態
+#### 5. hanami_trial_students (試聽學生表)
+```sql
+CREATE TABLE hanami_trial_students (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name TEXT,
+  nick_name TEXT,
+  student_age INTEGER,
+  student_dob DATE,
+  gender TEXT,
+  contact_number TEXT,
+  student_email TEXT,
+  parent_email TEXT,
+  address TEXT,
+  school TEXT,
+  student_type TEXT,
+  course_type TEXT,
+  student_teacher TEXT,
+  student_preference TEXT,
+  health_notes TEXT,
+  regular_weekday TEXT,
+  regular_timeslot TEXT,
+  lesson_date DATE,
+  lesson_duration TEXT,
+  duration_months TEXT,
+  ongoing_lessons INTEGER,
+  remaining_lessons INTEGER,
+  upcoming_lessons INTEGER,
+  student_oid TEXT,
+  student_password TEXT,
+  trial_status TEXT,
+  trial_remarks TEXT,
+  weekday TEXT,
+  actual_timeslot TEXT,
+  access_role TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-## 開發流程
+#### 6. hanami_schedule (排程表)
+```sql
+CREATE TABLE hanami_schedule (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  weekday INTEGER NOT NULL,
+  timeslot TEXT NOT NULL,
+  max_students INTEGER NOT NULL,
+  assigned_teachers TEXT,
+  course_type TEXT,
+  duration TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 1. 新功能開發
-1. 檢查資料庫結構是否需要更新
-2. 定義必要的型別
-3. 創建或修改相關元件
-4. 實現業務邏輯
-5. 添加錯誤處理
-6. 測試功能
+#### 7. hanami_lesson_plan (課程計劃表)
+```sql
+CREATE TABLE hanami_lesson_plan (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lesson_date DATE NOT NULL,
+  timeslot TEXT NOT NULL,
+  course_type TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  objectives TEXT[] NOT NULL,
+  materials TEXT[] NOT NULL,
+  teacher_ids TEXT[] NOT NULL,
+  teacher_names TEXT[] NOT NULL,
+  teacher_ids_1 TEXT[],
+  teacher_ids_2 TEXT[],
+  theme TEXT NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 2. 資料庫操作
-1. 確認欄位存在性
-2. 驗證資料型別
-3. 清理輸入資料
-4. 實現錯誤處理
-5. 測試操作
+#### 8. hanami_admin (管理員表)
+```sql
+CREATE TABLE hanami_admin (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_email TEXT NOT NULL UNIQUE,
+  admin_name TEXT NOT NULL,
+  role TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 3. 表單處理
-1. 定義表單結構
-2. 設置驗證規則
-3. 實現資料轉換
-4. 處理提交邏輯
-5. 添加錯誤處理
+#### 9. hanami_trial_queue (試聽隊列表)
+```sql
+CREATE TABLE hanami_trial_queue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id TEXT NOT NULL,
+  full_name TEXT,
+  student_age INTEGER,
+  student_dob DATE,
+  phone_no TEXT,
+  course_types TEXT,
+  prefer_time TEXT,
+  notes TEXT,
+  status TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-## 常見問題解決
+#### 10. ai_tasks (AI 任務表)
+```sql
+CREATE TABLE ai_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status TEXT NOT NULL,
+  title TEXT NOT NULL,
+  model TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  result TEXT,
+  started_at TIMESTAMP WITH TIME ZONE,
+  finished_at TIMESTAMP WITH TIME ZONE,
+  error_message TEXT,
+  assigned_model TEXT,
+  memory_id TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 1. 400 錯誤
-- 檢查欄位是否存在於資料表
-- 確認資料型別是否正確
-- 驗證必填欄位是否已填寫
-- 檢查空值處理
+### 資料庫函數
 
-### 2. 型別錯誤
-- 確認 TypeScript 配置
-- 檢查型別定義
-- 驗證資料結構
-- 使用型別斷言
+#### 1. 自動生成學生帳號
+```sql
+CREATE OR REPLACE FUNCTION auto_generate_student_email_password()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- 自動生成學生郵箱和密碼邏輯
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
 
-### 3. 表單驗證
-- 檢查必填欄位
-- 驗證資料格式
-- 處理特殊字元
-- 實現自定義驗證
+#### 2. 自動生成教師帳號
+```sql
+CREATE OR REPLACE FUNCTION auto_generate_teacher_email_password()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- 自動生成教師郵箱和密碼邏輯
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### 3. 生成簡單 ID
+```sql
+CREATE OR REPLACE FUNCTION generate_simple_id()
+RETURNS TEXT AS $$
+BEGIN
+  RETURN 'STU' || LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 資料庫觸發器
+```sql
+-- 學生資料更新觸發器
+CREATE TRIGGER update_student_updated_at
+  BEFORE UPDATE ON "Hanami_Students"
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- 教師資料更新觸發器
+CREATE TRIGGER update_employee_updated_at
+  BEFORE UPDATE ON hanami_employee
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+```
+
+## 組件設計系統
+
+### 1. HanamiButton 組件
+```typescript
+interface HanamiButtonProps {
+  variant?: 'primary' | 'secondary' | 'cute' | 'soft' | 'success' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+}
+```
+
+### 2. HanamiCard 組件
+```typescript
+interface HanamiCardProps {
+  children: React.ReactNode;
+  className?: string;
+  padding?: 'sm' | 'md' | 'lg';
+  shadow?: 'sm' | 'md' | 'lg';
+}
+```
+
+### 3. HanamiInput 組件
+```typescript
+interface HanamiInputProps {
+  label?: string;
+  placeholder?: string;
+  value?: string;
+  onChange?: (value: string) => void;
+  error?: string;
+  type?: 'text' | 'email' | 'password' | 'number';
+  required?: boolean;
+}
+```
+
+## 認證系統架構
+
+### 1. 自定義會話管理
+```typescript
+interface UserSession {
+  id: string;
+  email: string;
+  role: 'admin' | 'teacher' | 'parent' | 'student';
+  name: string;
+  timestamp: number;
+}
+```
+
+### 2. 權限控制
+```typescript
+interface Permission {
+  resource: string;
+  action: 'create' | 'read' | 'update' | 'delete';
+  role: string[];
+}
+```
+
+### 3. 路由保護
+```typescript
+// middleware.ts
+export function middleware(request: NextRequest) {
+  // 路由權限檢查邏輯
+}
+```
+
+## API 架構
+
+### 1. 認證 API
+```typescript
+// app/api/auth/create-account/route.ts
+export async function POST(request: Request) {
+  // 創建帳號邏輯
+}
+```
+
+### 2. 學生管理 API
+```typescript
+// 學生 CRUD 操作
+export async function GET() { /* 獲取學生列表 */ }
+export async function POST() { /* 創建學生 */ }
+export async function PUT() { /* 更新學生 */ }
+export async function DELETE() { /* 刪除學生 */ }
+```
+
+### 3. 教師管理 API
+```typescript
+// 教師 CRUD 操作
+export async function GET() { /* 獲取教師列表 */ }
+export async function POST() { /* 創建教師 */ }
+export async function PUT() { /* 更新教師 */ }
+export async function DELETE() { /* 刪除教師 */ }
+```
+
+## 狀態管理架構
+
+### 1. 用戶狀態 Hook
+```typescript
+// hooks/useUser.ts
+export function useUser() {
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // 用戶狀態管理邏輯
+  return { user, loading, login, logout, updateUser };
+}
+```
+
+### 2. 課程計劃 Hook
+```typescript
+// hooks/useLessonPlans.ts
+export function useLessonPlans() {
+  const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
+  
+  // 課程計劃管理邏輯
+  return { lessonPlans, createPlan, updatePlan, deletePlan };
+}
+```
+
+## 性能優化策略
+
+### 1. 代碼分割
+- 使用 Next.js 動態導入
+- 組件懶加載
+- 路由級代碼分割
+
+### 2. 圖片優化
+- 使用 Next.js Image 組件
+- WebP 格式支援
+- 響應式圖片
+
+### 3. 快取策略
+- 瀏覽器快取
+- CDN 快取
+- API 響應快取
+
+### 4. 資料庫優化
+- 索引優化
+- 查詢優化
+- 連接池管理
+
+## 安全性架構
+
+### 1. 認證安全
+- JWT Token 管理
+- 會話過期處理
+- 密碼加密存儲
+
+### 2. 資料安全
+- SQL 注入防護
+- XSS 防護
+- CSRF 防護
+
+### 3. API 安全
+- 請求驗證
+- 權限檢查
+- 速率限制
+
+## 部署架構
+
+### 1. 環境配置
+```bash
+# 開發環境
+NEXT_PUBLIC_SUPABASE_URL=your_dev_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_dev_key
+
+# 生產環境
+NEXT_PUBLIC_SUPABASE_URL=your_prod_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_prod_key
+```
+
+### 2. 部署流程
+1. 代碼提交到 Git
+2. 自動化測試
+3. 構建生產版本
+4. 部署到 Vercel
+5. 資料庫遷移
+6. 健康檢查
+
+## 監控與日誌
+
+### 1. 錯誤監控
+- 前端錯誤捕獲
+- API 錯誤記錄
+- 資料庫錯誤監控
+
+### 2. 性能監控
+- 頁面載入時間
+- API 響應時間
+- 資料庫查詢性能
+
+### 3. 用戶行為分析
+- 頁面訪問統計
+- 功能使用分析
+- 用戶路徑追蹤
 
 ## 維護指南
 
-### 1. 更新此文件
-- 新增功能時更新相關部分
-- 修改資料庫結構時更新資料庫部分
-- 添加新的注意事項
-- 更新常見問題解決方案
+### 1. 日常維護
+- 資料庫備份
+- 日誌清理
+- 性能監控
 
-### 2. 代碼審查
-- 檢查型別安全
-- 驗證錯誤處理
-- 確認性能優化
-- 檢查代碼風格
+### 2. 版本更新
+- 依賴包更新
+- 安全補丁
+- 功能增強
 
-### 3. 測試
-- 單元測試
-- 整合測試
-- 端到端測試
-- 性能測試
+### 3. 故障排除
+- 錯誤日誌分析
+- 性能問題診斷
+- 資料庫問題修復
 
-## 版本控制
-- 使用語意化版本
-- 保持提交訊息清晰
-- 使用分支管理功能開發
-- 定期合併主分支
+## Hanami 資源庫系統架構
 
-## 部署流程
-1. 測試所有功能
-2. 更新版本號
-3. 合併到主分支
-4. 部署到生產環境
-5. 監控系統狀態
+### 系統概述
+Hanami 資源庫系統是一個完整的教學資源管理平台，支援多種範本類型、動態表單、權限管理和版本控制。系統設計為可擴展的模組化架構，支援教案、繪本、遊戲、訓練等多種教學資源類型。
 
-## 聯繫方式
-- 技術負責人：[姓名]
-- 郵箱：[郵箱地址]
-- 緊急聯繫：[電話號碼]
+### 核心功能特性
+1. **多範本支援**: 支援教案、繪本、遊戲、訓練、自訂等範本類型
+2. **動態表單**: 根據範本 schema 自動生成表單
+3. **權限管理**: 細粒度的資源權限控制
+4. **版本控制**: 完整的資源版本歷史追蹤
+5. **檔案管理**: 支援多種檔案類型和儲存方式
+6. **標籤分類**: 靈活的標籤和分類系統
+7. **使用統計**: 詳細的資源使用分析
+
+### 資料庫架構
+
+#### 1. hanami_resource_templates (資源範本表)
+```sql
+CREATE TABLE IF NOT EXISTS public.hanami_resource_templates (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  template_name TEXT NOT NULL UNIQUE,
+  template_type TEXT NOT NULL CHECK (template_type IN ('lesson_plan', 'storybook', 'game', 'training', 'custom')),
+  template_description TEXT,
+  template_schema JSONB NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_by UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  CONSTRAINT hanami_resource_templates_pkey PRIMARY KEY (id)
+);
+```
+
+#### 2. hanami_teaching_activities (教學活動表 - 擴展)
+```sql
+-- 新增欄位到現有表
+ALTER TABLE public.hanami_teaching_activities ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES hanami_resource_templates(id);
+ALTER TABLE public.hanami_teaching_activities ADD COLUMN IF NOT EXISTS custom_fields JSONB;
+ALTER TABLE public.hanami_teaching_activities ADD COLUMN IF NOT EXISTS tags TEXT[];
+ALTER TABLE public.hanami_teaching_activities ADD COLUMN IF NOT EXISTS category TEXT;
+ALTER TABLE public.hanami_teaching_activities ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived'));
+ALTER TABLE public.hanami_teaching_activities ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1;
+ALTER TABLE public.hanami_teaching_activities ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE public.hanami_teaching_activities ADD COLUMN IF NOT EXISTS updated_by UUID;
+```
+
+#### 3. hanami_file_resources (檔案資源表)
+```sql
+CREATE TABLE IF NOT EXISTS public.hanami_file_resources (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  resource_id UUID NOT NULL,
+  resource_type TEXT NOT NULL CHECK (resource_type IN ('activity', 'template', 'lesson_plan')),
+  file_name TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_size BIGINT,
+  file_type TEXT,
+  mime_type TEXT,
+  storage_provider TEXT DEFAULT 'supabase' CHECK (storage_provider IN ('supabase', 'google_drive')),
+  external_url TEXT,
+  is_public BOOLEAN DEFAULT false,
+  download_count INTEGER DEFAULT 0,
+  created_by UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  CONSTRAINT hanami_file_resources_pkey PRIMARY KEY (id)
+);
+```
+
+#### 4. hanami_resource_permissions (權限管理表)
+```sql
+CREATE TABLE IF NOT EXISTS public.hanami_resource_permissions (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  resource_id UUID NOT NULL,
+  resource_type TEXT NOT NULL CHECK (resource_type IN ('activity', 'template', 'file')),
+  user_id UUID,
+  role_id UUID,
+  permission_type TEXT NOT NULL CHECK (permission_type IN ('view', 'download', 'edit', 'admin')),
+  granted_by UUID,
+  granted_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  expires_at TIMESTAMP WITH TIME ZONE,
+  is_active BOOLEAN DEFAULT true,
+  CONSTRAINT hanami_resource_permissions_pkey PRIMARY KEY (id)
+);
+```
+
+#### 5. hanami_resource_categories (資源分類表)
+```sql
+CREATE TABLE IF NOT EXISTS public.hanami_resource_categories (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  category_name TEXT NOT NULL UNIQUE,
+  category_description TEXT,
+  parent_category_id UUID REFERENCES hanami_resource_categories(id),
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  CONSTRAINT hanami_resource_categories_pkey PRIMARY KEY (id)
+);
+```
+
+#### 6. hanami_resource_tags (資源標籤表)
+```sql
+CREATE TABLE IF NOT EXISTS public.hanami_resource_tags (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  tag_name TEXT NOT NULL UNIQUE,
+  tag_description TEXT,
+  tag_color TEXT DEFAULT '#3B82F6',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  CONSTRAINT hanami_resource_tags_pkey PRIMARY KEY (id)
+);
+```
+
+#### 7. hanami_resource_tag_relations (資源標籤關聯表)
+```sql
+CREATE TABLE IF NOT EXISTS public.hanami_resource_tag_relations (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  resource_id UUID NOT NULL,
+  resource_type TEXT NOT NULL,
+  tag_id UUID NOT NULL REFERENCES hanami_resource_tags(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  CONSTRAINT hanami_resource_tag_relations_pkey PRIMARY KEY (id),
+  CONSTRAINT unique_resource_tag UNIQUE (resource_id, resource_type, tag_id)
+);
+```
+
+#### 8. hanami_resource_versions (資源版本歷史表)
+```sql
+CREATE TABLE IF NOT EXISTS public.hanami_resource_versions (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  resource_id UUID NOT NULL,
+  resource_type TEXT NOT NULL,
+  version_number INTEGER NOT NULL,
+  version_data JSONB NOT NULL,
+  version_notes TEXT,
+  created_by UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  CONSTRAINT hanami_resource_versions_pkey PRIMARY KEY (id)
+);
+```
+
+#### 9. hanami_resource_usage (資源使用統計表)
+```sql
+CREATE TABLE IF NOT EXISTS public.hanami_resource_usage (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  resource_id UUID NOT NULL,
+  resource_type TEXT NOT NULL,
+  user_id UUID,
+  action_type TEXT NOT NULL CHECK (action_type IN ('view', 'download', 'edit', 'create')),
+  action_timestamp TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  ip_address INET,
+  user_agent TEXT,
+  CONSTRAINT hanami_resource_usage_pkey PRIMARY KEY (id)
+);
+```
+
+### 預設資料
+
+#### 資源範本預設資料
+```sql
+INSERT INTO hanami_resource_templates (template_name, template_type, template_description, template_schema)
+VALUES
+  ('標準教案範本', 'lesson_plan', '適用於一般音樂教學的標準教案格式', '{
+    "fields": [
+      {"name": "教學目標", "type": "text", "required": true, "placeholder": "請輸入本堂課的教學目標"},
+      {"name": "教學重點", "type": "text", "required": true, "placeholder": "請輸入本堂課的教學重點"},
+      {"name": "教學步驟", "type": "array", "required": true, "placeholder": "請輸入教學步驟"},
+      {"name": "評估方式", "type": "text", "required": false, "placeholder": "請輸入評估方式"},
+      {"name": "注意事項", "type": "text", "required": false, "placeholder": "請輸入注意事項"},
+      {"name": "所需道具", "type": "array", "required": false, "placeholder": "請輸入所需道具"}
+    ],
+    "metadata": {
+      "version": "1.0",
+      "author": "Hanami System",
+      "last_updated": "2024-12-19"
+    }
+  }'::jsonb),
+  
+  ('遊戲活動範本', 'game', '適用於音樂遊戲活動的範本', '{
+    "fields": [
+      {"name": "遊戲目標", "type": "text", "required": true, "placeholder": "請輸入遊戲目標"},
+      {"name": "遊戲規則", "type": "text", "required": true, "placeholder": "請輸入遊戲規則"},
+      {"name": "所需道具", "type": "array", "required": false, "placeholder": "請輸入所需道具"},
+      {"name": "遊戲流程", "type": "array", "required": true, "placeholder": "請輸入遊戲流程"},
+      {"name": "變體玩法", "type": "text", "required": false, "placeholder": "請輸入變體玩法"},
+      {"name": "適合年齡", "type": "text", "required": false, "placeholder": "請輸入適合年齡"},
+      {"name": "遊戲時間", "type": "text", "required": false, "placeholder": "請輸入遊戲時間"}
+    ],
+    "metadata": {
+      "version": "1.0",
+      "author": "Hanami System",
+      "last_updated": "2024-12-19"
+    }
+  }'::jsonb),
+  
+  ('繪本教學範本', 'storybook', '適用於繪本音樂教學的範本', '{
+    "fields": [
+      {"name": "繪本資訊", "type": "text", "required": true, "placeholder": "請輸入繪本資訊"},
+      {"name": "音樂元素", "type": "array", "required": true, "placeholder": "請輸入音樂元素"},
+      {"name": "教學重點", "type": "text", "required": true, "placeholder": "請輸入教學重點"},
+      {"name": "互動環節", "type": "array", "required": false, "placeholder": "請輸入互動環節"},
+      {"name": "延伸活動", "type": "text", "required": false, "placeholder": "請輸入延伸活動"},
+      {"name": "故事背景", "type": "text", "required": false, "placeholder": "請輸入故事背景"}
+    ],
+    "metadata": {
+      "version": "1.0",
+      "author": "Hanami System",
+      "last_updated": "2024-12-19"
+    }
+  }'::jsonb),
+  
+  ('訓練活動範本', 'training', '適用於音樂技能訓練的範本', '{
+    "fields": [
+      {"name": "訓練目標", "type": "text", "required": true, "placeholder": "請輸入訓練目標"},
+      {"name": "訓練內容", "type": "text", "required": true, "placeholder": "請輸入訓練內容"},
+      {"name": "訓練步驟", "type": "array", "required": true, "placeholder": "請輸入訓練步驟"},
+      {"name": "難度等級", "type": "select", "required": true, "options": ["初級", "中級", "高級"]},
+      {"name": "訓練時間", "type": "text", "required": false, "placeholder": "請輸入訓練時間"},
+      {"name": "注意事項", "type": "text", "required": false, "placeholder": "請輸入注意事項"}
+    ],
+    "metadata": {
+      "version": "1.0",
+      "author": "Hanami System",
+      "last_updated": "2024-12-19"
+    }
+  }'::jsonb);
+```
+
+#### 資源分類預設資料
+```sql
+INSERT INTO hanami_resource_categories (category_name, category_description, sort_order)
+VALUES
+  ('基礎訓練', '基礎音樂技能訓練活動，包含節奏、音感、視譜等基礎能力培養', 1),
+  ('遊戲活動', '音樂遊戲和互動活動，讓學習變得有趣且有效', 2),
+  ('繪本教學', '結合繪本的音樂教學，透過故事引導音樂學習', 3),
+  ('創作活動', '音樂創作和表達活動，培養創造力和音樂表達能力', 4),
+  ('表演活動', '音樂表演和展示活動，提升舞台表現和自信心', 5),
+  ('團體合奏', '團體合奏和協作活動，培養團隊合作精神', 6),
+  ('個別指導', '適合個別指導的活動，針對個人需求進行教學', 7);
+```
+
+#### 資源標籤預設資料
+```sql
+INSERT INTO hanami_resource_tags (tag_name, tag_description, tag_color)
+VALUES
+  ('節奏訓練', '節奏相關的教學活動，包含拍子、節奏型態等', '#EF4444'),
+  ('音感訓練', '音感和聽力訓練，包含音高、音程、和聲等', '#3B82F6'),
+  ('創作活動', '音樂創作相關活動，包含作曲、編曲、即興等', '#10B981'),
+  ('團體活動', '適合團體進行的活動，培養合作精神', '#F59E0B'),
+  ('個別指導', '適合個別指導的活動，針對個人需求', '#8B5CF6'),
+  ('初學者', '適合初學者的活動，基礎入門', '#06B6D4'),
+  ('進階', '適合進階學習者的活動，挑戰性較高', '#F97316'),
+  ('視譜訓練', '視譜和讀譜相關訓練', '#EC4899'),
+  ('聽力訓練', '聽力辨識和音樂欣賞', '#84CC16'),
+  ('表演技巧', '舞台表演和表現技巧', '#F472B6'),
+  ('樂理知識', '音樂理論知識學習', '#A855F7'),
+  ('即興演奏', '即興演奏和創作', '#14B8A6');
+```
+
+### 實用函數
+
+#### 1. 獲取資源統計資訊
+```sql
+CREATE OR REPLACE FUNCTION get_resource_statistics()
+RETURNS TABLE (
+  total_activities BIGINT,
+  total_templates BIGINT,
+  total_files BIGINT,
+  total_categories BIGINT,
+  total_tags BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    (SELECT COUNT(*) FROM hanami_teaching_activities) as total_activities,
+    (SELECT COUNT(*) FROM hanami_resource_templates) as total_templates,
+    (SELECT COUNT(*) FROM hanami_file_resources) as total_files,
+    (SELECT COUNT(*) FROM hanami_resource_categories) as total_categories,
+    (SELECT COUNT(*) FROM hanami_resource_tags) as total_tags;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### 2. 檢查資源權限
+```sql
+CREATE OR REPLACE FUNCTION check_resource_permission(
+  p_resource_id UUID,
+  p_resource_type TEXT,
+  p_user_id UUID,
+  p_permission_type TEXT
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+  has_permission BOOLEAN := FALSE;
+BEGIN
+  SELECT EXISTS(
+    SELECT 1 FROM hanami_resource_permissions 
+    WHERE resource_id = p_resource_id 
+      AND resource_type = p_resource_type 
+      AND user_id = p_user_id 
+      AND permission_type = p_permission_type 
+      AND is_active = true 
+      AND (expires_at IS NULL OR expires_at > now())
+  ) INTO has_permission;
+  
+  RETURN has_permission;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 前端組件架構
+
+#### 1. 資源庫主頁面組件
+```typescript
+// components/admin/ResourceLibrary.tsx
+interface ResourceLibraryProps {
+  userRole: string;
+  userId: string;
+}
+
+export function ResourceLibrary({ userRole, userId }: ResourceLibraryProps) {
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  
+  // 組件邏輯...
+}
+```
+
+#### 2. 動態表單組件
+```typescript
+// components/forms/DynamicForm.tsx
+interface DynamicFormProps {
+  template: Template;
+  initialData?: any;
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+}
+
+export function DynamicForm({ template, initialData, onSubmit, onCancel }: DynamicFormProps) {
+  const [formData, setFormData] = useState<any>(initialData || {});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const renderField = (field: FormField) => {
+    switch (field.type) {
+      case 'text':
+        return <HanamiInput {...field} />;
+      case 'array':
+        return <ArrayField {...field} />;
+      case 'select':
+        return <HanamiSelect {...field} />;
+      default:
+        return <HanamiInput {...field} />;
+    }
+  };
+  
+  // 組件邏輯...
+}
+```
+
+#### 3. 權限控制 Hook
+```typescript
+// hooks/useResourcePermissions.ts
+export function useResourcePermissions() {
+  const { user } = useUser();
+  
+  const checkPermission = useCallback(async (
+    resourceId: string,
+    resourceType: string,
+    permissionType: string
+  ): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      const { data, error } = await supabase.rpc('check_resource_permission', {
+        p_resource_id: resourceId,
+        p_resource_type: resourceType,
+        p_user_id: user.id,
+        p_permission_type: permissionType
+      });
+      
+      if (error) throw error;
+      return data || false;
+    } catch (error) {
+      console.error('權限檢查錯誤:', error);
+      return false;
+    }
+  }, [user]);
+  
+  return { checkPermission };
+}
+```
+
+### 使用教學
+
+#### 1. 資料庫遷移
+```bash
+# 執行遷移腳本
+psql -h your-supabase-host -U your-username -d your-database -f final_hanami_resource_migration.sql
+```
+
+#### 2. 前端整合步驟
+
+**步驟 1: 安裝依賴**
+```bash
+npm install @supabase/supabase-js react-hook-form zod
+```
+
+**步驟 2: 配置 Supabase 客戶端**
+```typescript
+// lib/supabase.ts
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+```
+
+**步驟 3: 創建資源庫頁面**
+```typescript
+// app/admin/resource-library/page.tsx
+import { ResourceLibrary } from '@/components/admin/ResourceLibrary';
+
+export default function ResourceLibraryPage() {
+  return (
+    <div className="container mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">教學資源庫</h1>
+      <ResourceLibrary userRole="admin" userId="user-id" />
+    </div>
+  );
+}
+```
+
+**步驟 4: 實現資源 CRUD 操作**
+```typescript
+// lib/resourceApi.ts
+export const resourceApi = {
+  // 獲取資源列表
+  async getResources(filters?: ResourceFilters) {
+    const { data, error } = await supabase
+      .from('hanami_teaching_activities')
+      .select('*')
+      .match(filters || {});
+    
+    if (error) throw error;
+    return data;
+  },
+  
+  // 創建新資源
+  async createResource(resource: CreateResourceData) {
+    const { data, error } = await supabase
+      .from('hanami_teaching_activities')
+      .insert(resource)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+  
+  // 更新資源
+  async updateResource(id: string, updates: Partial<Resource>) {
+    const { data, error } = await supabase
+      .from('hanami_teaching_activities')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+  
+  // 刪除資源
+  async deleteResource(id: string) {
+    const { error } = await supabase
+      .from('hanami_teaching_activities')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+};
+```
+
+#### 3. 權限管理使用
+
+**設置資源權限**
+```typescript
+// 為用戶設置資源權限
+const setResourcePermission = async (
+  resourceId: string,
+  userId: string,
+  permissionType: 'view' | 'download' | 'edit' | 'admin'
+) => {
+  const { error } = await supabase
+    .from('hanami_resource_permissions')
+    .insert({
+      resource_id: resourceId,
+      resource_type: 'activity',
+      user_id: userId,
+      permission_type: permissionType,
+      granted_by: currentUser.id
+    });
+  
+  if (error) throw error;
+};
+```
+
+**檢查權限**
+```typescript
+// 在組件中檢查權限
+const { checkPermission } = useResourcePermissions();
+
+const canEdit = await checkPermission(resourceId, 'activity', 'edit');
+if (!canEdit) {
+  return <div>您沒有編輯此資源的權限</div>;
+}
+```
+
+#### 4. 動態表單使用
+
+**根據範本創建表單**
+```typescript
+// 獲取範本並渲染動態表單
+const [template, setTemplate] = useState<Template | null>(null);
+
+useEffect(() => {
+  const loadTemplate = async () => {
+    const { data } = await supabase
+      .from('hanami_resource_templates')
+      .select('*')
+      .eq('template_type', 'lesson_plan')
+      .single();
+    
+    setTemplate(data);
+  };
+  
+  loadTemplate();
+}, []);
+
+// 渲染動態表單
+{template && (
+  <DynamicForm
+    template={template}
+    onSubmit={handleSubmit}
+    onCancel={handleCancel}
+  />
+)}
+```
+
+#### 5. 檔案上傳功能
+
+**上傳檔案到 Supabase Storage**
+```typescript
+const uploadFile = async (file: File, resourceId: string) => {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${resourceId}/${Date.now()}.${fileExt}`;
+  
+  const { data, error } = await supabase.storage
+    .from('resource-files')
+    .upload(fileName, file);
+  
+  if (error) throw error;
+  
+  // 記錄檔案資訊到資料庫
+  await supabase
+    .from('hanami_file_resources')
+    .insert({
+      resource_id: resourceId,
+      resource_type: 'activity',
+      file_name: file.name,
+      file_path: data.path,
+      file_size: file.size,
+      file_type: fileExt,
+      mime_type: file.type
+    });
+  
+  return data;
+};
+```
+
+### 最佳實踐
+
+#### 1. 效能優化
+- 使用 React Query 或 SWR 進行資料快取
+- 實作虛擬滾動處理大量資源列表
+- 使用圖片懶加載和壓縮
+
+#### 2. 安全性
+- 所有 API 端點都要驗證用戶權限
+- 檔案上傳要驗證檔案類型和大小
+- 使用 RLS (Row Level Security) 保護資料
+
+#### 3. 用戶體驗
+- 提供載入狀態和錯誤處理
+- 實作拖拽上傳和批量操作
+- 支援鍵盤快捷鍵和無障礙功能
+
+#### 4. 維護性
+- 使用 TypeScript 確保型別安全
+- 實作完整的錯誤日誌記錄
+- 定期備份和監控系統狀態
 
 ---
-最後更新日期：2024-03-21
+**最後更新日期**: 2024-12-19
+**版本**: 2.1.0
+**維護者**: Hanami 開發團隊 

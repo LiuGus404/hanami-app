@@ -1,5 +1,6 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Database } from '@/lib/database.types'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+import { Database } from '@/lib/database.types';
 
 let supabaseClientSingleton: ReturnType<typeof createClientComponentClient<Database>> | null = null;
 

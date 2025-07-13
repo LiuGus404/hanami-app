@@ -1,8 +1,9 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import Image from 'next/image'
+import Image from 'next/image';
+import React, { useState, useEffect } from 'react';
+
+import { supabase } from '@/lib/supabase';
 
 interface AvailableTimeSlot {
   weekday: number
@@ -27,16 +28,16 @@ interface CopyAvailableTimesModalProps {
 }
 
 export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailableTimesModalProps) {
-  const [availableSlots, setAvailableSlots] = useState<AvailableTimeSlot[]>([])
-  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([])
-  const [selectedCourses, setSelectedCourses] = useState<string[]>([])
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([])
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([])
-  const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showTimes, setShowTimes] = useState(false)
-  const [showTrialDates, setShowTrialDates] = useState(false)
+  const [availableSlots, setAvailableSlots] = useState<AvailableTimeSlot[]>([]);
+  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([]);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [courseTypes, setCourseTypes] = useState<CourseType[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showTimes, setShowTimes] = useState(false);
+  const [showTrialDates, setShowTrialDates] = useState(false);
 
   const weekdays = [
     { value: 0, name: '星期日', icon: '/icons/bear-face.PNG' },
@@ -45,20 +46,20 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
     { value: 3, name: '星期三', icon: '/icons/book-elephant.PNG' },
     { value: 4, name: '星期四', icon: '/icons/music.PNG' },
     { value: 5, name: '星期五', icon: '/icons/owlui.png' },
-    { value: 6, name: '星期六', icon: '/icons/bunnysmall-v2.PNG' }
-  ]
+    { value: 6, name: '星期六', icon: '/icons/bunnysmall-v2.PNG' },
+  ];
 
   useEffect(() => {
     if (isOpen) {
-      fetchCourseTypes()
+      fetchCourseTypes();
     }
-  }, [isOpen])
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && courseTypes.length > 0) {
-      fetchAvailableSlots()
+      fetchAvailableSlots();
     }
-  }, [isOpen, courseTypes])
+  }, [isOpen, courseTypes]);
 
   const fetchCourseTypes = async () => {
     try {
@@ -66,22 +67,22 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         .from('Hanami_CourseTypes')
         .select('*')
         .eq('status', true)
-        .order('name')
+        .order('name');
 
       if (error) {
-        console.error('載入課程類型失敗:', error)
-        return
+        console.error('載入課程類型失敗:', error);
+        return;
       }
 
-      setCourseTypes(data || [])
+      setCourseTypes(data || []);
     } catch (err) {
-      console.error('載入課程類型時發生錯誤:', err)
+      console.error('載入課程類型時發生錯誤:', err);
     }
-  }
+  };
 
   const fetchAvailableSlots = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     
     try {
       // 1. 獲取所有課程時段設定
@@ -89,11 +90,11 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         .from('hanami_schedule')
         .select('*')
         .order('weekday', { ascending: true })
-        .order('timeslot', { ascending: true })
+        .order('timeslot', { ascending: true });
 
       if (scheduleError) {
-        setError('無法載入課程時段設定：' + scheduleError.message)
-        return
+        setError(`無法載入課程時段設定：${scheduleError.message}`);
+        return;
       }
 
       // 2. 獲取所有常規學生
@@ -102,90 +103,90 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
         .in('student_type', ['常規', '試堂'])
         .not('regular_weekday', 'is', null)
-        .not('regular_timeslot', 'is', null)
+        .not('regular_timeslot', 'is', null);
 
       if (regularError) {
-        setError('無法載入常規學生：' + regularError.message)
-        return
+        setError(`無法載入常規學生：${regularError.message}`);
+        return;
       }
 
       // 3. 計算每個時段的學生數量
-      const studentCountMap: { [key: string]: number } = {}
+      const studentCountMap: { [key: string]: number } = {};
       
       // 調試信息：檢查學生資料
-      console.log('模態框學生資料總數：', regularData?.length || 0)
+      console.log('模態框學生資料總數：', regularData?.length || 0);
       
       for (const student of regularData || []) {
-        if (!student.regular_timeslot || student.regular_weekday === null || student.regular_weekday === undefined) continue
+        if (!student.regular_timeslot || student.regular_weekday === null || student.regular_weekday === undefined) continue;
         
-        let weekdayNum: number
+        let weekdayNum: number;
         if (typeof student.regular_weekday === 'string') {
-          weekdayNum = parseInt(student.regular_weekday)
-          if (isNaN(weekdayNum)) continue
+          weekdayNum = parseInt(student.regular_weekday);
+          if (isNaN(weekdayNum)) continue;
         } else {
-          weekdayNum = student.regular_weekday
+          weekdayNum = student.regular_weekday;
         }
         
-        const studentCourseName = student.course_type || ''
+        const studentCourseName = student.course_type || '';
         
         // 為每個課程類型建立key，支援課程名稱和課程ID兩種格式
-        const courseKeys = []
+        const courseKeys = [];
         
         // 方法1：使用課程名稱建立key
-        courseKeys.push(`${weekdayNum}_${student.regular_timeslot}_${studentCourseName}`)
+        courseKeys.push(`${weekdayNum}_${student.regular_timeslot}_${studentCourseName}`);
         
         // 方法2：使用課程ID建立key（如果courseTypes中有對應的ID）
         for (const courseType of courseTypes) {
           if (courseType.name === studentCourseName) {
-            courseKeys.push(`${weekdayNum}_${student.regular_timeslot}_${courseType.id}`)
-            break
+            courseKeys.push(`${weekdayNum}_${student.regular_timeslot}_${courseType.id}`);
+            break;
           }
         }
         
         // 為每個可能的key增加學生數量
         for (const key of courseKeys) {
           if (!studentCountMap[key]) {
-            studentCountMap[key] = 0
+            studentCountMap[key] = 0;
           }
-          studentCountMap[key]++
+          studentCountMap[key]++;
         }
         
         // 調試信息：檢查學生分配
-        console.log(`模態框學生分配 - 學生: ${student.full_name}, 時段: ${student.regular_timeslot}, 星期: ${weekdayNum}, 課程: ${studentCourseName}`)
-        console.log(`  建立的keys: ${courseKeys.join(', ')}`)
+        console.log(`模態框學生分配 - 學生: ${student.full_name}, 時段: ${student.regular_timeslot}, 星期: ${weekdayNum}, 課程: ${studentCourseName}`);
+        console.log(`  建立的keys: ${courseKeys.join(', ')}`);
       }
       
       // 調試信息：檢查學生數量映射表
-      console.log('模態框學生數量映射表：', studentCountMap)
+      console.log('模態框學生數量映射表：', studentCountMap);
 
       // 4. 生成有位時間列表
-      const availableSlotsList: AvailableTimeSlot[] = []
+      const availableSlotsList: AvailableTimeSlot[] = [];
       
       // 調試信息：檢查課程類型資料
-      console.log('模態框課程類型資料：', courseTypes)
+      console.log('模態框課程類型資料：', courseTypes);
       
       for (const schedule of scheduleData || []) {
-        const courseType = schedule.course_type || ''
-        const key = `${schedule.weekday}_${schedule.timeslot}_${courseType}`
-        const currentStudents = studentCountMap[key] || 0
-        const availableSlots = Math.max(0, schedule.max_students - currentStudents)
+        const courseType = schedule.course_type || '';
+        const key = `${schedule.weekday}_${schedule.timeslot}_${courseType}`;
+        const currentStudents = studentCountMap[key] || 0;
+        const availableSlots = Math.max(0, schedule.max_students - currentStudents);
         
         // 調試信息：檢查每個時段的學生數量
-        console.log(`模態框時段檢查 - 時段: ${schedule.timeslot}, 星期: ${schedule.weekday}, 課程: ${courseType}`)
-        console.log(`  Key: ${key}`)
-        console.log(`  最大人數: ${schedule.max_students}`)
-        console.log(`  目前人數: ${currentStudents}`)
-        console.log(`  剩餘名額: ${availableSlots}`)
+        console.log(`模態框時段檢查 - 時段: ${schedule.timeslot}, 星期: ${schedule.weekday}, 課程: ${courseType}`);
+        console.log(`  Key: ${key}`);
+        console.log(`  最大人數: ${schedule.max_students}`);
+        console.log(`  目前人數: ${currentStudents}`);
+        console.log(`  剩餘名額: ${availableSlots}`);
         
         if (availableSlots > 0) {
           // 獲取課程名稱 - 使用 courseTypes 狀態中的資料
-          const courseName = courseTypes.find(c => c.id === courseType)?.name || courseType
+          const courseName = courseTypes.find(c => c.id === courseType)?.name || courseType;
           
           // 調試信息：檢查課程名稱映射
-          console.log(`模態框課程ID: ${courseType}, 課程名稱: ${courseName}`)
-          console.log(`模態框課程類型資料:`, courseTypes)
-          console.log(`模態框課程ID類型: ${typeof courseType}, 值: ${courseType}`)
-          console.log(`模態框映射結果: ${courseName}`)
+          console.log(`模態框課程ID: ${courseType}, 課程名稱: ${courseName}`);
+          console.log('模態框課程類型資料:', courseTypes);
+          console.log(`模態框課程ID類型: ${typeof courseType}, 值: ${courseType}`);
+          console.log(`模態框映射結果: ${courseName}`);
           
           availableSlotsList.push({
             weekday: schedule.weekday,
@@ -195,258 +196,258 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
             course_name: courseName,
             max_students: schedule.max_students,
             current_students: currentStudents,
-            available_slots: availableSlots
-          })
+            available_slots: availableSlots,
+          });
         }
       }
 
-      setAvailableSlots(availableSlotsList)
+      setAvailableSlots(availableSlotsList);
     } catch (err) {
-      setError('載入資料時發生錯誤：' + (err as Error).message)
+      setError(`載入資料時發生錯誤：${(err as Error).message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleWeekdayToggle = (weekday: number) => {
     setSelectedWeekdays(prev => {
       const newSelectedWeekdays = prev.includes(weekday) 
         ? prev.filter(w => w !== weekday)
-        : [...prev, weekday]
+        : [...prev, weekday];
       
       // 根據選中的星期自動選擇對應的有位時間
-      const newSelectedSlots: string[] = []
+      const newSelectedSlots: string[] = [];
       
       availableSlots.forEach(slot => {
-        const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
+        const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`;
         
         // 如果該時段屬於選中的星期，則自動選中
         if (newSelectedWeekdays.includes(slot.weekday)) {
-          newSelectedSlots.push(slotKey)
+          newSelectedSlots.push(slotKey);
         }
-      })
+      });
       
-      setSelectedSlots(newSelectedSlots)
-      return newSelectedWeekdays
-    })
-  }
+      setSelectedSlots(newSelectedSlots);
+      return newSelectedWeekdays;
+    });
+  };
 
   const handleCourseToggle = (courseId: string) => {
     setSelectedCourses(prev => {
       const newSelectedCourses = prev.includes(courseId) 
         ? prev.filter(c => c !== courseId)
-        : [...prev, courseId]
+        : [...prev, courseId];
       
       // 根據選中的課程和星期自動選擇對應的有位時間
-      const newSelectedSlots: string[] = []
+      const newSelectedSlots: string[] = [];
       
       availableSlots.forEach(slot => {
-        const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
+        const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`;
         
         // 如果該時段屬於選中的課程，則自動選中
         if (newSelectedCourses.includes(slot.course_type || '')) {
           // 如果同時選中了星期，必須也符合星期條件
           if (selectedWeekdays.length === 0 || selectedWeekdays.includes(slot.weekday)) {
-            newSelectedSlots.push(slotKey)
+            newSelectedSlots.push(slotKey);
           }
         }
-      })
+      });
       
-      setSelectedSlots(newSelectedSlots)
-      return newSelectedCourses
-    })
-  }
+      setSelectedSlots(newSelectedSlots);
+      return newSelectedCourses;
+    });
+  };
 
   const handleTimeSlotToggle = (timeSlot: string) => {
     setSelectedTimeSlots(prev => 
       prev.includes(timeSlot) 
         ? prev.filter(t => t !== timeSlot)
-        : [...prev, timeSlot]
-    )
-  }
+        : [...prev, timeSlot],
+    );
+  };
 
   const handleSlotToggle = (slot: AvailableTimeSlot) => {
     // 創建一個唯一的識別符，包含星期、時間和課程類型
-    const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
+    const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`;
     
     // 切換這個特定組合的選中狀態
     setSelectedSlots(prev => 
       prev.includes(slotKey) 
         ? prev.filter(key => key !== slotKey)
-        : [...prev, slotKey]
-    )
-  }
+        : [...prev, slotKey],
+    );
+  };
 
   const isSlotSelected = (slot: AvailableTimeSlot) => {
-    const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
-    return selectedSlots.includes(slotKey)
-  }
+    const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`;
+    return selectedSlots.includes(slotKey);
+  };
 
   const handleSelectAll = () => {
     // 根據當前顯示的時段進行全選
     const visibleSlots = availableSlots.filter(slot => {
       // 如果沒有選中任何星期或課程，顯示全部
       if (selectedWeekdays.length === 0 && selectedCourses.length === 0) {
-        return true
+        return true;
       }
       
       // 如果有選中星期，必須匹配星期
-      const matchesWeekday = selectedWeekdays.length === 0 || selectedWeekdays.includes(slot.weekday)
+      const matchesWeekday = selectedWeekdays.length === 0 || selectedWeekdays.includes(slot.weekday);
       
       // 如果有選中課程，必須匹配課程
-      const matchesCourse = selectedCourses.length === 0 || selectedCourses.includes(slot.course_type || '')
+      const matchesCourse = selectedCourses.length === 0 || selectedCourses.includes(slot.course_type || '');
       
-      return matchesWeekday && matchesCourse
-    })
+      return matchesWeekday && matchesCourse;
+    });
     
     const allSlotKeys = visibleSlots.map(slot => 
-      `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
-    )
-    setSelectedSlots(allSlotKeys)
-  }
+      `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`,
+    );
+    setSelectedSlots(allSlotKeys);
+  };
 
   const handleClearAll = () => {
-    setSelectedSlots([])
-    setSelectedWeekdays([])
-    setSelectedCourses([])
-    setShowTrialDates(false)
-  }
+    setSelectedSlots([]);
+    setSelectedWeekdays([]);
+    setSelectedCourses([]);
+    setShowTrialDates(false);
+  };
 
   // 計算未來2個最快可試堂的日期
-  const getNextTrialDates = (weekday: number, count: number = 2): string[] => {
-    const today = new Date()
-    const currentWeekday = today.getDay()
-    const dates: string[] = []
+  const getNextTrialDates = (weekday: number, count = 2): string[] => {
+    const today = new Date();
+    const currentWeekday = today.getDay();
+    const dates: string[] = [];
     
     // 計算到下一個該星期的天數
-    let daysToAdd = weekday - currentWeekday
+    let daysToAdd = weekday - currentWeekday;
     if (daysToAdd <= 0) {
-      daysToAdd += 7 // 如果今天就是該星期或已經過了，加7天到下週
+      daysToAdd += 7; // 如果今天就是該星期或已經過了，加7天到下週
     }
     
     // 生成未來2個該星期的日期
     for (let i = 0; i < count; i++) {
-      const nextDate = new Date(today)
-      nextDate.setDate(today.getDate() + daysToAdd + (i * 7))
+      const nextDate = new Date(today);
+      nextDate.setDate(today.getDate() + daysToAdd + (i * 7));
       
-      const year = nextDate.getFullYear()
-      const month = String(nextDate.getMonth() + 1).padStart(2, '0')
-      const day = String(nextDate.getDate()).padStart(2, '0')
+      const year = nextDate.getFullYear();
+      const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+      const day = String(nextDate.getDate()).padStart(2, '0');
       
-      dates.push(`${year}-${month}-${day}`)
+      dates.push(`${year}-${month}-${day}`);
     }
     
-    return dates
-  }
+    return dates;
+  };
 
   const getVisibleSelectedSlots = () => {
     // 只取目前顯示（符合星期和課程條件）的已選時段
     return availableSlots.filter(slot => {
       // 過濾條件
-      if (selectedWeekdays.length > 0 && !selectedWeekdays.includes(slot.weekday)) return false
-      if (selectedCourses.length > 0 && !selectedCourses.includes(slot.course_type || '')) return false
+      if (selectedWeekdays.length > 0 && !selectedWeekdays.includes(slot.weekday)) return false;
+      if (selectedCourses.length > 0 && !selectedCourses.includes(slot.course_type || '')) return false;
       // 必須已選中
-      const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`
-      return selectedSlots.includes(slotKey)
-    })
-  }
+      const slotKey = `${slot.weekday}_${slot.timeslot}_${slot.course_type || 'default'}`;
+      return selectedSlots.includes(slotKey);
+    });
+  };
 
   const copyToClipboard = () => {
-    const selectedSlotData = getVisibleSelectedSlots()
+    const selectedSlotData = getVisibleSelectedSlots();
     if (selectedSlotData.length === 0) {
-      alert('請選擇要複製的項目')
-      return
+      alert('請選擇要複製的項目');
+      return;
     }
 
     // 按課程分組
-    const groupedByCourse: { [courseName: string]: { [weekday: string]: Array<{ timeslot: string, available_slots: number, weekday: number }> } } = {}
+    const groupedByCourse: { [courseName: string]: { [weekday: string]: Array<{ timeslot: string, available_slots: number, weekday: number }> } } = {};
     
     selectedSlotData.forEach(slot => {
-      const courseName = slot.course_name || '未指定課程'
-      const weekdayName = slot.weekdayName
+      const courseName = slot.course_name || '未指定課程';
+      const weekdayName = slot.weekdayName;
       
       if (!groupedByCourse[courseName]) {
-        groupedByCourse[courseName] = {}
+        groupedByCourse[courseName] = {};
       }
       
       if (!groupedByCourse[courseName][weekdayName]) {
-        groupedByCourse[courseName][weekdayName] = []
+        groupedByCourse[courseName][weekdayName] = [];
       }
       
       groupedByCourse[courseName][weekdayName].push({
         timeslot: slot.timeslot,
         available_slots: slot.available_slots,
-        weekday: slot.weekday
-      })
-    })
+        weekday: slot.weekday,
+      });
+    });
 
     // 生成美觀的文本格式
-    let textContent = '📚 有位時間列表\n\n'
+    let textContent = '📚 有位時間列表\n\n';
     
     // 添加開頭文字
-    const courseNames = Object.keys(groupedByCourse)
+    const courseNames = Object.keys(groupedByCourse);
     if (courseNames.length > 0) {
-      textContent += `暫時${courseNames.join('、')}班時間都比較full，暫時以下時間仲有少量位🥰：\n\n`
+      textContent += `暫時${courseNames.join('、')}班時間都比較full，暫時以下時間仲有少量位🥰：\n\n`;
     }
     
     Object.entries(groupedByCourse).forEach(([courseName, weekdays], courseIndex) => {
-      textContent += `🥳 課程：${courseName}\n`
+      textContent += `🥳 課程：${courseName}\n`;
       
       Object.entries(weekdays).forEach(([weekdayName, timeSlots], weekdayIndex) => {
-        textContent += `  📅 星期：${weekdayName}\n`
+        textContent += `  📅 星期：${weekdayName}\n`;
         
         timeSlots.forEach((timeSlot, timeIndex) => {
-          textContent += `    ⏰ 時間：${timeSlot.timeslot} (剩餘 ${timeSlot.available_slots} 位)`
+          textContent += `    ⏰ 時間：${timeSlot.timeslot} (剩餘 ${timeSlot.available_slots} 位)`;
           
           // 如果啟用試堂日期顯示，添加試堂日期
           if (showTrialDates) {
-            const trialDates = getNextTrialDates(timeSlot.weekday)
-            textContent += `\n      🗓️ 試堂日期：${trialDates.join('、')}`
+            const trialDates = getNextTrialDates(timeSlot.weekday);
+            textContent += `\n      🗓️ 試堂日期：${trialDates.join('、')}`;
           }
           
-          textContent += '\n'
-        })
+          textContent += '\n';
+        });
         
         if (weekdayIndex < Object.keys(weekdays).length - 1) {
-          textContent += '\n'
+          textContent += '\n';
         }
-      })
+      });
       
       if (courseIndex < Object.keys(groupedByCourse).length - 1) {
-        textContent += '\n'
+        textContent += '\n';
       }
-    })
+    });
     
     // 添加結尾文字
-    textContent += '\n可以睇下邊段時間方便試堂🤤'
+    textContent += '\n可以睇下邊段時間方便試堂🤤';
 
     navigator.clipboard.writeText(textContent).then(() => {
-      alert('已複製到剪貼簿')
+      alert('已複製到剪貼簿');
     }).catch(() => {
-      alert('複製失敗，請手動複製')
-    })
-  }
+      alert('複製失敗，請手動複製');
+    });
+  };
 
   const exportToCSV = () => {
-    const selectedSlotData = getVisibleSelectedSlots()
+    const selectedSlotData = getVisibleSelectedSlots();
     if (selectedSlotData.length === 0) {
-      alert('請選擇要匯出的項目')
-      return
+      alert('請選擇要匯出的項目');
+      return;
     }
 
     // 按課程分組
-    const groupedByCourse: { [courseName: string]: { [weekday: string]: Array<{ timeslot: string, available_slots: number, max_students: number, current_students: number, weekday: number }> } } = {}
+    const groupedByCourse: { [courseName: string]: { [weekday: string]: Array<{ timeslot: string, available_slots: number, max_students: number, current_students: number, weekday: number }> } } = {};
     
     selectedSlotData.forEach(slot => {
-      const courseName = slot.course_name || '未指定課程'
-      const weekdayName = slot.weekdayName
+      const courseName = slot.course_name || '未指定課程';
+      const weekdayName = slot.weekdayName;
       
       if (!groupedByCourse[courseName]) {
-        groupedByCourse[courseName] = {}
+        groupedByCourse[courseName] = {};
       }
       
       if (!groupedByCourse[courseName][weekdayName]) {
-        groupedByCourse[courseName][weekdayName] = []
+        groupedByCourse[courseName][weekdayName] = [];
       }
       
       groupedByCourse[courseName][weekdayName].push({
@@ -454,16 +455,16 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         available_slots: slot.available_slots,
         max_students: slot.max_students,
         current_students: slot.current_students,
-        weekday: slot.weekday
-      })
-    })
+        weekday: slot.weekday,
+      });
+    });
 
     // 生成CSV內容
     const csvRows = [
       showTrialDates 
         ? ['課程', '星期', '時間', '最大人數', '目前人數', '剩餘名額', '試堂日期']
-        : ['課程', '星期', '時間', '最大人數', '目前人數', '剩餘名額']
-    ]
+        : ['課程', '星期', '時間', '最大人數', '目前人數', '剩餘名額'],
+    ];
     
     Object.entries(groupedByCourse).forEach(([courseName, weekdays]) => {
       Object.entries(weekdays).forEach(([weekdayName, timeSlots]) => {
@@ -474,45 +475,45 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
             timeSlot.timeslot,
             timeSlot.max_students.toString(),
             timeSlot.current_students.toString(),
-            timeSlot.available_slots.toString()
-          ]
+            timeSlot.available_slots.toString(),
+          ];
           
           // 如果啟用試堂日期顯示，添加試堂日期
           if (showTrialDates) {
-            const trialDates = getNextTrialDates(timeSlot.weekday)
-            row.push(trialDates.join('、'))
+            const trialDates = getNextTrialDates(timeSlot.weekday);
+            row.push(trialDates.join('、'));
           }
           
-          csvRows.push(row)
-        })
-      })
-    })
+          csvRows.push(row);
+        });
+      });
+    });
 
-    const csvContent = csvRows.map(row => row.join(',')).join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `有位時間_${new Date().toISOString().slice(0, 10)}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
+    const csvContent = csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `有位時間_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // 禁止背景滾動
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden'
+      document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = ''
+      document.body.style.overflow = '';
     }
     return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isOpen])
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -528,23 +529,23 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Image
-                src="/icons/clock.PNG"
                 alt="時間"
-                width={24}
-                height={24}
                 className="animate-pulse"
+                height={24}
+                src="/icons/clock.PNG"
+                width={24}
               />
               <h2 className="text-lg font-semibold text-[#4B4036]">複製有位時間</h2>
             </div>
             <button
-              onClick={onClose}
               className="p-2 hover:bg-[#EADBC8] rounded-full transition-all duration-200 hover:scale-110"
+              onClick={onClose}
             >
               <Image
-                src="/close.png"
                 alt="關閉"
-                width={20}
                 height={20}
+                src="/close.png"
+                width={20}
               />
             </button>
           </div>
@@ -561,17 +562,17 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           {/* 全選/清除按鈕 */}
           <div className="flex gap-2">
             <button
-              onClick={handleSelectAll}
               className="flex-1 hanami-btn-cute text-sm py-2 flex items-center justify-center gap-2"
+              onClick={handleSelectAll}
             >
-              <Image src="/icons/leaf-sprout.png" alt="全選" width={16} height={16} />
+              <Image alt="全選" height={16} src="/icons/leaf-sprout.png" width={16} />
               全選
             </button>
             <button
-              onClick={handleClearAll}
               className="flex-1 hanami-btn-soft text-sm py-2 flex items-center justify-center gap-2"
+              onClick={handleClearAll}
             >
-              <Image src="/icons/close.png" alt="清除" width={16} height={16} />
+              <Image alt="清除" height={16} src="/icons/close.png" width={16} />
               清除
             </button>
           </div>
@@ -579,27 +580,27 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           {/* 顯示試堂日期切換 */}
           <div>
             <h4 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
-              <Image src="/icons/calendar.png" alt="試堂日期" width={20} height={20} />
+              <Image alt="試堂日期" height={20} src="/icons/calendar.png" width={20} />
               試堂日期設定
             </h4>
             <div className="flex items-center justify-center">
               <button
-                onClick={() => setShowTrialDates(v => !v)}
                 className={`group relative flex items-center gap-3 px-6 py-3 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] active:scale-98 overflow-hidden ${
                   showTrialDates
                     ? 'bg-gradient-to-r from-[#E0F2E0] to-[#D4F2D4] border-[#C8EAC8] shadow-md'
                     : 'bg-white border-[#EADBC8] hover:border-[#C8EAC8] hover:shadow-sm'
                 }`}
+                onClick={() => setShowTrialDates(v => !v)}
               >
                 {/* 懸停波紋效果 */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 group-hover:opacity-20 group-hover:animate-pulse transition-opacity duration-300" />
                 
                 <Image 
-                  src="/icons/calendar.png" 
                   alt="試堂日期" 
-                  width={20} 
-                  height={20}
-                  className={`transition-all duration-300 ${showTrialDates ? 'animate-pulse' : 'group-hover:scale-110 group-hover:rotate-12'}`}
+                  className={`transition-all duration-300 ${showTrialDates ? 'animate-pulse' : 'group-hover:scale-110 group-hover:rotate-12'}`} 
+                  height={20} 
+                  src="/icons/calendar.png"
+                  width={20}
                 />
                 <span className="font-medium text-[#4B4036] relative z-10">
                   {showTrialDates ? '已啟用試堂日期' : '顯示試堂日期'}
@@ -629,28 +630,28 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           {/* 星期選擇 */}
           <div>
             <h4 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
-              <Image src="/calendar.png" alt="星期" width={20} height={20} />
+              <Image alt="星期" height={20} src="/calendar.png" width={20} />
               選擇星期
             </h4>
             <div className="grid grid-cols-7 gap-2">
               {weekdays.map(weekday => (
                 <button
                   key={weekday.value}
-                  onClick={() => handleWeekdayToggle(weekday.value)}
                   className={`relative p-3 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 active:scale-95 ${
                     selectedWeekdays.includes(weekday.value)
                       ? 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] border-[#EAC29D] shadow-lg animate-bounce-subtle'
                       : 'bg-white border-[#EADBC8] hover:border-[#EAC29D] hover:shadow-md'
                   }`}
+                  onClick={() => handleWeekdayToggle(weekday.value)}
                 >
                   <Image 
-                    src={weekday.icon} 
                     alt={weekday.name} 
-                    width={24} 
-                    height={24}
                     className={`transition-all duration-300 ${
                       selectedWeekdays.includes(weekday.value) ? 'animate-pulse' : ''
-                    }`}
+                    }`} 
+                    height={24} 
+                    src={weekday.icon}
+                    width={24}
                   />
                   <div className="text-xs mt-1 font-medium text-[#4B4036]">
                     {weekday.name.slice(-1)}
@@ -669,19 +670,19 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           {courseTypes.length > 0 && (
             <div>
               <h4 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
-                <Image src="/icons/music.PNG" alt="課程" width={20} height={20} />
+                <Image alt="課程" height={20} src="/icons/music.PNG" width={20} />
                 選擇課程
               </h4>
               <div className="space-y-2">
                 {courseTypes.map(course => (
                   <button
                     key={course.id}
-                    onClick={() => handleCourseToggle(course.id)}
                     className={`w-full p-3 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] active:scale-98 ${
                       selectedCourses.includes(course.id)
                         ? 'bg-gradient-to-r from-[#E0F2E0] to-[#D4F2D4] border-[#C8EAC8] shadow-md'
                         : 'bg-white border-[#EADBC8] hover:border-[#C8EAC8]'
                     }`}
+                    onClick={() => handleCourseToggle(course.id)}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-[#4B4036]">{course.name}</span>
@@ -700,9 +701,9 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           {/* 時間選擇展開/收起按鈕 */}
           <div className="px-6 pt-4">
             <button
+              aria-expanded={showTimes}
               className="flex items-center gap-2 text-[#4B4036] font-semibold py-2 px-4 rounded-full border border-[#EADBC8] bg-[#FFFDF8] shadow-sm transition-all duration-200 hover:bg-[#F3EFE3] focus:outline-none focus:ring-2 focus:ring-[#EADBC8] w-full justify-between"
               onClick={() => setShowTimes(v => !v)}
-              aria-expanded={showTimes}
             >
               <span>選擇時間</span>
               <div className={`w-4 h-4 border-r-2 border-b-2 border-[#4B4036] transform transition-transform duration-300 ${showTimes ? 'rotate-45' : '-rotate-45'}`} />
@@ -713,19 +714,19 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
               {/* 這裡放原本的時間選擇區塊內容 */}
               <div>
                 <h4 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
-                  <Image src="/icons/clock.PNG" alt="時間" width={20} height={20} />
+                  <Image alt="時間" height={20} src="/icons/clock.PNG" width={20} />
                   選擇時間
                 </h4>
                 <div className="grid grid-cols-2 gap-2">
                   {[...new Set(availableSlots.map(s => s.timeslot))].map(timeSlot => (
                     <button
                       key={timeSlot}
-                      onClick={() => handleTimeSlotToggle(timeSlot)}
                       className={`p-3 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] active:scale-98 ${
                         selectedTimeSlots.includes(timeSlot)
                           ? 'bg-gradient-to-r from-[#BFE3FF] to-[#ABD7FB] border-[#8BC4F7] shadow-md'
                           : 'bg-white border-[#EADBC8] hover:border-[#8BC4F7]'
                       }`}
+                      onClick={() => handleTimeSlotToggle(timeSlot)}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-[#4B4036]">{timeSlot}</span>
@@ -745,7 +746,7 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           {/* 有位時間列表 */}
           <div>
             <h4 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center gap-2">
-              <Image src="/icons/teacher.png" alt="有位時間" width={20} height={20} />
+              <Image alt="有位時間" height={20} src="/icons/teacher.png" width={20} />
               {selectedWeekdays.length === 0 && selectedCourses.length === 0 ? (
                 '所有有位時間'
               ) : (
@@ -769,7 +770,7 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
             
             {loading ? (
               <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#4B4036]"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#4B4036]" />
                 <p className="mt-2 text-[#4B4036]">載入中...</p>
               </div>
             ) : (
@@ -778,50 +779,50 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
                   .filter(slot => {
                     // 如果沒有選中任何星期或課程，顯示全部
                     if (selectedWeekdays.length === 0 && selectedCourses.length === 0) {
-                      return true
+                      return true;
                     }
                     
                     // 如果有選中星期，必須匹配星期
-                    const matchesWeekday = selectedWeekdays.length === 0 || selectedWeekdays.includes(slot.weekday)
+                    const matchesWeekday = selectedWeekdays.length === 0 || selectedWeekdays.includes(slot.weekday);
                     
                     // 如果有選中課程，必須匹配課程
-                    const matchesCourse = selectedCourses.length === 0 || selectedCourses.includes(slot.course_type || '')
+                    const matchesCourse = selectedCourses.length === 0 || selectedCourses.includes(slot.course_type || '');
                     
-                    return matchesWeekday && matchesCourse
+                    return matchesWeekday && matchesCourse;
                   })
                   .map((slot, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSlotToggle(slot)}
-                    className={`w-full text-left border border-[#EADBC8] p-3 rounded-xl transition-all duration-200 transform hover:scale-[1.01] active:scale-98 ${
-                      isSlotSelected(slot)
-                        ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] border-[#EAC29D] shadow-md'
-                        : 'bg-[#FFF9F2] hover:bg-[#F3EFE3]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="font-semibold text-[#4B4036]">
-                        {slot.weekdayName} {slot.timeslot}
-                      </div>
-                      {isSlotSelected(slot) && (
+                    <button
+                      key={index}
+                      className={`w-full text-left border border-[#EADBC8] p-3 rounded-xl transition-all duration-200 transform hover:scale-[1.01] active:scale-98 ${
+                        isSlotSelected(slot)
+                          ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] border-[#EAC29D] shadow-md'
+                          : 'bg-[#FFF9F2] hover:bg-[#F3EFE3]'
+                      }`}
+                      onClick={() => handleSlotToggle(slot)}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="font-semibold text-[#4B4036]">
+                          {slot.weekdayName} {slot.timeslot}
+                        </div>
+                        {isSlotSelected(slot) && (
                         <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
                           <span className="text-white text-xs">✓</span>
                         </div>
-                      )}
-                    </div>
-                    <div className="text-sm text-[#87704e] mb-2">
-                      課程：{slot.course_name || '未指定'}
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[#4B4036]">
-                        {slot.current_students}/{slot.max_students}
-                      </span>
-                      <span className="font-semibold text-green-600">
-                        剩餘 {slot.available_slots} 位
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                        )}
+                      </div>
+                      <div className="text-sm text-[#87704e] mb-2">
+                        課程：{slot.course_name || '未指定'}
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#4B4036]">
+                          {slot.current_students}/{slot.max_students}
+                        </span>
+                        <span className="font-semibold text-green-600">
+                          剩餘 {slot.available_slots} 位
+                        </span>
+                      </div>
+                    </button>
+                  ))}
               </div>
             )}
           </div>
@@ -831,31 +832,31 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         <div className="p-6 border-t border-[#EADBC8] bg-[#FFFDF8] space-y-3">
           <div className="flex gap-3">
             <button
-              onClick={copyToClipboard}
-              disabled={selectedSlots.length === 0}
               className="flex-1 hanami-btn-cute py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={selectedSlots.length === 0}
+              onClick={copyToClipboard}
             >
-              <Image src="/icons/edit-pencil.png" alt="複製" width={16} height={16} />
+              <Image alt="複製" height={16} src="/icons/edit-pencil.png" width={16} />
               複製
             </button>
             <button
-              onClick={exportToCSV}
-              disabled={selectedSlots.length === 0}
               className="flex-1 hanami-btn-success py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={selectedSlots.length === 0}
+              onClick={exportToCSV}
             >
-              <Image src="/icons/file.svg" alt="匯出" width={16} height={16} />
+              <Image alt="匯出" height={16} src="/icons/file.svg" width={16} />
               匯出 CSV
             </button>
           </div>
           <button
-            onClick={onClose}
             className="w-full hanami-btn-soft py-3 flex items-center justify-center gap-2"
+            onClick={onClose}
           >
-            <Image src="/icons/close.png" alt="返回" width={16} height={16} />
+            <Image alt="返回" height={16} src="/icons/close.png" width={16} />
             返回
           </button>
         </div>
       </div>
     </div>
-  )
+  );
 } 

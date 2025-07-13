@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline'
+import { ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 interface BreadcrumbItem {
   label: string
@@ -16,17 +16,17 @@ interface BreadcrumbProps {
 }
 
 export default function Breadcrumb({ items, showHome = true }: BreadcrumbProps) {
-  const pathname = usePathname()
+  const pathname = usePathname();
   
   // 如果沒有提供items，則根據pathname自動生成
-  const breadcrumbItems = items || generateBreadcrumbItems(pathname, showHome)
+  const breadcrumbItems = items || generateBreadcrumbItems(pathname, showHome);
   
   if (breadcrumbItems.length <= 1) {
-    return null
+    return null;
   }
 
   return (
-    <nav className="flex items-center space-x-1 text-sm text-gray-600 mb-4 px-4" aria-label="麵包屑導航">
+    <nav aria-label="麵包屑導航" className="flex items-center space-x-1 text-sm text-gray-600 mb-4 px-4">
       {breadcrumbItems.map((item, index) => (
         <div key={item.href} className="flex items-center">
           {index > 0 && (
@@ -35,15 +35,15 @@ export default function Breadcrumb({ items, showHome = true }: BreadcrumbProps) 
           
           {item.isCurrent ? (
             <span 
-              className="text-[#A64B2A] font-medium"
               aria-current="page"
+              className="text-[#A64B2A] font-medium"
             >
               {item.label}
             </span>
           ) : (
             <Link
-              href={item.href}
               className="text-[#2B3A3B] hover:text-[#A64B2A] transition-colors duration-200 flex items-center"
+              href={item.href}
             >
               {item.href === '/' && showHome ? (
                 <HomeIcon className="w-4 h-4 mr-1" />
@@ -54,20 +54,20 @@ export default function Breadcrumb({ items, showHome = true }: BreadcrumbProps) 
         </div>
       ))}
     </nav>
-  )
+  );
 }
 
 function generateBreadcrumbItems(pathname: string, showHome: boolean): BreadcrumbItem[] {
-  const segments = pathname.split('/').filter(Boolean)
-  const items: BreadcrumbItem[] = []
+  const segments = pathname.split('/').filter(Boolean);
+  const items: BreadcrumbItem[] = [];
   
   // 添加首頁
   if (showHome) {
     items.push({
       label: '首頁',
       href: '/?skipRedirect=true',
-      isCurrent: pathname === '/'
-    })
+      isCurrent: pathname === '/',
+    });
   }
   
   // 特殊處理 trial-queue 路徑
@@ -75,19 +75,19 @@ function generateBreadcrumbItems(pathname: string, showHome: boolean): Breadcrum
     items.push({
       label: '管理面板',
       href: '/admin',
-      isCurrent: false
-    })
+      isCurrent: false,
+    });
     items.push({
       label: '課堂空缺情況',
       href: '/admin/lesson-availability',
-      isCurrent: false
-    })
+      isCurrent: false,
+    });
     items.push({
       label: '輪候學生列表',
       href: '/admin/trial-queue',
-      isCurrent: true
-    })
-    return items
+      isCurrent: true,
+    });
+    return items;
   }
 
   // 特殊處理 add-trial-students 路徑
@@ -95,37 +95,37 @@ function generateBreadcrumbItems(pathname: string, showHome: boolean): Breadcrum
     items.push({
       label: '管理面板',
       href: '/admin',
-      isCurrent: false
-    })
+      isCurrent: false,
+    });
     items.push({
       label: '課堂空缺情況',
       href: '/admin/lesson-availability',
-      isCurrent: false
-    })
+      isCurrent: false,
+    });
     items.push({
       label: '新增/編輯輪候學生',
       href: '/admin/add-trial-students',
-      isCurrent: true
-    })
-    return items
+      isCurrent: true,
+    });
+    return items;
   }
   
   // 生成路徑項目
-  let currentPath = ''
+  let currentPath = '';
   segments.forEach((segment, index) => {
-    currentPath += `/${segment}`
+    currentPath += `/${segment}`;
     
     // 將路徑轉換為中文標籤
-    const label = getBreadcrumbLabel(segment, segments, index)
+    const label = getBreadcrumbLabel(segment, segments, index);
     
     items.push({
       label,
       href: currentPath,
-      isCurrent: index === segments.length - 1
-    })
-  })
+      isCurrent: index === segments.length - 1,
+    });
+  });
   
-  return items
+  return items;
 }
 
 function getBreadcrumbLabel(segment: string, allSegments: string[], index: number): string {
@@ -151,16 +151,16 @@ function getBreadcrumbLabel(segment: string, allSegments: string[], index: numbe
     'schema-scanner': '資料庫掃描',
     'tools': '工具',
     'removebg': '背景移除',
-    'teacher-schedule': '老師課表'
-  }
+    'teacher-schedule': '老師課表',
+  };
   
   // 如果是動態路由（如 [id]），嘗試從上下文推斷
   if (segment.startsWith('[') && segment.endsWith(']')) {
-    const context = allSegments[index - 1]
-    if (context === 'students') return '學生詳情'
-    if (context === 'teachers') return '老師詳情'
-    return '詳情'
+    const context = allSegments[index - 1];
+    if (context === 'students') return '學生詳情';
+    if (context === 'teachers') return '老師詳情';
+    return '詳情';
   }
   
-  return labelMap[segment] || segment
+  return labelMap[segment] || segment;
 } 

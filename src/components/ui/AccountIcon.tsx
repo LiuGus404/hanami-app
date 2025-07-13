@@ -12,7 +12,7 @@ export default function AccountIcon({ type, size = 'md', className = '' }: Accou
   const sizeClasses = {
     sm: 'w-6 h-6',
     md: 'w-8 h-8',
-    lg: 'w-12 h-12'
+    lg: 'w-12 h-12',
   };
 
   const getIcon = () => {
@@ -20,7 +20,7 @@ export default function AccountIcon({ type, size = 'md', className = '' }: Accou
       case 'teacher':
         return (
           <div className={`${sizeClasses[size]} bg-[#FFF3E0] rounded-full flex items-center justify-center ${className}`}>
-            <img src="/teacher.png" alt="teacher" className="w-6 h-6" />
+            <img alt="teacher" className="w-6 h-6" src="/teacher.png" />
           </div>
         );
       case 'student':

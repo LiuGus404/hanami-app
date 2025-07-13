@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { Database } from '@/lib/database.types';
-import HanamiDashboardLayout from '@/components/ui/HanamiDashboardLayout';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { useState, useEffect, useRef } from 'react';
+
 import HanamiBadge from '@/components/ui/HanamiBadge';
-import { supabase } from '@/lib/supabase';
-import { getUserSession, clearUserSession } from '@/lib/authUtils';
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
+import HanamiCard from '@/components/ui/HanamiCard';
+import HanamiDashboardLayout from '@/components/ui/HanamiDashboardLayout';
+import { getUserSession, clearUserSession } from '@/lib/authUtils';
+import { Database } from '@/lib/database.types';
+import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
 
 interface Student {
@@ -102,7 +103,7 @@ export default function TeacherDashboard() {
         // 為學生添加剩餘堂數
         const studentsWithRemaining = studentsData.map(student => ({
           ...student,
-          remaining_lessons: remainingLessonsMap[student.id] || 0
+          remaining_lessons: remainingLessonsMap[student.id] || 0,
         }));
         
         setStudents(studentsWithRemaining);
@@ -120,7 +121,7 @@ export default function TeacherDashboard() {
       if (lessonsData) {
         setRecentLessons(lessonsData.map(lesson => ({
           ...lesson,
-          full_name: (lesson as any).Hanami_Students?.full_name || null
+          full_name: (lesson as any).Hanami_Students?.full_name || null,
         })));
       }
 
@@ -258,7 +259,7 @@ export default function TeacherDashboard() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">載入中...</p>
         </div>
       </div>
@@ -267,16 +268,16 @@ export default function TeacherDashboard() {
 
   return (
     <HanamiDashboardLayout
-      title={`${teacherName}的儀表板`}
-      onLogout={handleLogout}
       activeTab={activeTab}
-      onTabChange={setActiveTab}
       tabs={[
         { id: 'overview', name: '概覽', icon: '📊' },
         { id: 'students', name: '學生管理', icon: '👥' },
         { id: 'schedule', name: '課程安排', icon: 'calendar' },
-        { id: 'reports', name: '報告', icon: '📈' }
+        { id: 'reports', name: '報告', icon: '📈' },
       ]}
+      title={`${teacherName}的儀表板`}
+      onLogout={handleLogout}
+      onTabChange={setActiveTab}
     >
       {renderContent()}
     </HanamiDashboardLayout>

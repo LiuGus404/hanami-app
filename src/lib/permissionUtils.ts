@@ -304,7 +304,7 @@ export const permissionUtils = {
           can_manage_lessons: true,
           can_view_financial_data: true,
           can_export_data: true,
-          is_active: true
+          is_active: true,
         };
       }
 
@@ -317,7 +317,7 @@ export const permissionUtils = {
           can_manage_lessons: true,
           can_view_financial_data: false,
           can_export_data: false,
-          is_active: true
+          is_active: true,
         };
       }
 
@@ -330,7 +330,7 @@ export const permissionUtils = {
           can_manage_lessons: false,
           can_view_financial_data: false,
           can_export_data: false,
-          is_active: true
+          is_active: true,
         };
       }
 
@@ -342,7 +342,7 @@ export const permissionUtils = {
         can_manage_lessons: false,
         can_view_financial_data: false,
         can_export_data: false,
-        is_active: false
+        is_active: false,
       };
     } catch (error) {
       console.error('獲取用戶權限時發生錯誤:', error);
@@ -354,7 +354,7 @@ export const permissionUtils = {
         can_manage_lessons: false,
         can_view_financial_data: false,
         can_export_data: false,
-        is_active: false
+        is_active: false,
       };
     }
   },
@@ -431,5 +431,5 @@ export const permissionUtils = {
       console.error('獲取家長課程列表時發生錯誤:', error);
       return [];
     }
-  }
+  },
 }; 

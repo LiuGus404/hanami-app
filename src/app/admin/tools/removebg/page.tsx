@@ -1,12 +1,12 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
+import { useState } from 'react';
 
 export default function RemoveBgToolPage() {
-  const [originalImage, setOriginalImage] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [resultUrl, setResultUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [originalImage, setOriginalImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +49,7 @@ export default function RemoveBgToolPage() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('回傳錯誤：', errorText);
-        setErrorMessage('去背失敗：' + errorText);
+        setErrorMessage(`去背失敗：${errorText}`);
         setLoading(false);
         return;
       }
@@ -59,7 +59,7 @@ export default function RemoveBgToolPage() {
       setResultUrl(resultObjectUrl);
     } catch (error) {
       console.error('發生例外錯誤：', error);
-      setErrorMessage('發生錯誤：' + error);
+      setErrorMessage(`發生錯誤：${error}`);
     } finally {
       setLoading(false);
     }
@@ -71,37 +71,37 @@ export default function RemoveBgToolPage() {
         <h2 className="text-xl font-bold text-[#2B3A3B] mb-4">圖片去背景工具</h2>
 
         <div className="mb-6 text-center">
-  <input
-    id="fileInput"
-    type="file"
-    accept="image/*"
-    onChange={handleFileChange}
-    className="hidden"
-  />
+          <input
+            accept="image/*"
+            className="hidden"
+            id="fileInput"
+            type="file"
+            onChange={handleFileChange}
+          />
 
-  <label htmlFor="fileInput">
-    <div className="cursor-pointer bg-[#F78CA2] text-white px-6 py-2 rounded-full font-semibold hover:bg-[#f96d8c] transition inline-block">
-      上載圖片
-    </div>
-  </label>
-</div>
+          <label htmlFor="fileInput">
+            <div className="cursor-pointer bg-[#F78CA2] text-white px-6 py-2 rounded-full font-semibold hover:bg-[#f96d8c] transition inline-block">
+              上載圖片
+            </div>
+          </label>
+        </div>
 
         {previewUrl && (
           <div className="mb-4">
             <p className="text-sm text-[#555] mb-1">原始圖片預覽：</p>
-            <img src={previewUrl} alt="預覽" className="rounded-xl max-w-full" />
+            <img alt="預覽" className="rounded-xl max-w-full" src={previewUrl} />
           </div>
         )}
 
-{previewUrl && (
-  <button
-    onClick={handleRemoveBackground}
-    disabled={loading}
-    className="mt-4 bg-[#F78CA2] text-white font-semibold px-6 py-2 rounded-full hover:bg-[#f96d8c] transition"
-  >
-    {loading ? '處理中...' : '去除背景'}
-  </button>
-)}
+        {previewUrl && (
+        <button
+          className="mt-4 bg-[#F78CA2] text-white font-semibold px-6 py-2 rounded-full hover:bg-[#f96d8c] transition"
+          disabled={loading}
+          onClick={handleRemoveBackground}
+        >
+          {loading ? '處理中...' : '去除背景'}
+        </button>
+        )}
 
         {errorMessage && (
           <p className="mt-2 text-red-500 text-sm">{errorMessage}</p>
@@ -110,10 +110,10 @@ export default function RemoveBgToolPage() {
         {resultUrl && (
           <div className="mt-6">
             <p className="text-sm text-[#555] mb-1">去背結果：</p>
-            <img src={resultUrl} alt="去背後" className="rounded-xl max-w-full" />
+            <img alt="去背後" className="rounded-xl max-w-full" src={resultUrl} />
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

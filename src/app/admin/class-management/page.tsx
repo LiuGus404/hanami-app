@@ -1,7 +1,8 @@
-'use client'
+'use client';
 
-import ClassManagementPanel from '@/components/ui/ClassManagementPanel'
-import Link from 'next/link'
+import Link from 'next/link';
+
+import ClassManagementPanel from '@/components/ui/ClassManagementPanel';
 
 export default function ClassManagementPage() {
   return (
@@ -11,8 +12,8 @@ export default function ClassManagementPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-[#4B4036]">班別管理</h1>
             <Link 
-              href="/admin/lesson-availability"
               className="bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] font-semibold py-2 px-4 rounded-full border border-[#EADBC8] shadow-sm transition-colors duration-200"
+              href="/admin/lesson-availability"
             >
               返回課堂空缺
             </Link>
@@ -25,5 +26,5 @@ export default function ClassManagementPage() {
         <ClassManagementPanel />
       </div>
     </div>
-  )
+  );
 } 

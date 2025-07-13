@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { LucideIcon, User, Briefcase, Phone, Mail, DollarSign, BadgeCheck } from 'lucide-react'
+import { LucideIcon, User, Briefcase, Phone, Mail, DollarSign, BadgeCheck } from 'lucide-react';
 
 type FieldItem = {
   icon: LucideIcon
@@ -40,23 +40,23 @@ export default function TeacherCard({
     { icon: Phone, label: '電話', value: phone || '—' },
     { icon: Mail, label: 'Email', value: email || '—' },
     { icon: DollarSign, label: '月薪', value: msalary != null ? msalary : '—' },
-  ]
+  ];
   return (
     <div
+      className={'relative border rounded-[24px] p-5 shadow flex flex-col items-center text-[#4B4B4B] cursor-pointer bg-[#FFFDF8] border-[#D8CDBF] hover:shadow-lg transition'}
       onClick={onToggle}
-      className={`relative border rounded-[24px] p-5 shadow flex flex-col items-center text-[#4B4B4B] cursor-pointer bg-[#FFFDF8] border-[#D8CDBF] hover:shadow-lg transition`}
     >
       {selected && (
         <img
-          src="/leaf-sprout.png"
           alt="Selected"
           className="absolute top-3 right-3 w-8 h-8"
+          src="/leaf-sprout.png"
         />
       )}
       <img
-        src={avatar || '/teacher.png'}
         alt="avatar"
         className="w-20 h-20 rounded-full border mb-2 border-[#D8CDBF]"
+        src={avatar || '/teacher.png'}
       />
       <h3 className="text-lg font-bold mb-1">{name}</h3>
       <div className="text-sm text-[#A68A64] mb-2">{nickname || '—'}</div>
@@ -69,5 +69,5 @@ export default function TeacherCard({
         ))}
       </div>
     </div>
-  )
+  );
 } 

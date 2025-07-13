@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import React, { useState } from 'react';
 
 /**
  * Props:
@@ -91,7 +91,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
             if (onClose) onClose(); // 點擊編輯時同時關閉卡片
           }}
         >
-          <img src="/icons/edit-pencil.png" alt="Edit" className="w-5 h-5" />
+          <img alt="Edit" className="w-5 h-5" src="/icons/edit-pencil.png" />
         </button>
         <button
           className="hover:bg-[#F5E7D4] text-[#A33] text-sm font-bold flex items-center justify-center transition-colors"
@@ -101,7 +101,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
             if (onClose) onClose();
           }}
         >
-          <img src="/close.png" alt="Close" className="w-5 h-5" />
+          <img alt="Close" className="w-5 h-5" src="/close.png" />
         </button>
       </div>
       <div className="flex flex-col w-full mb-1">
@@ -109,9 +109,9 @@ const LessonCard: React.FC<LessonCardProps> = ({
         <div className="flex items-center justify-between gap-2 mt-1">
           <div className="flex items-center gap-1">
             {course.icon ? (
-              <img src={course.icon} alt={course.name} className="w-5 h-5" />
+              <img alt={course.name} className="w-5 h-5" src={course.icon} />
             ) : (
-              <span className="text-xl"></span>
+              <span className="text-xl" />
             )}
             <span className="text-sm font-semibold text-[#4B4036]">{course.name}</span>
           </div>
@@ -119,14 +119,14 @@ const LessonCard: React.FC<LessonCardProps> = ({
       </div>
 
       <div className="flex items-center gap-1 text-[11px] text-[#7A6654]">
-        <img src="/teacher.png" alt="teacher" className="w-4 h-4" />
+        <img alt="teacher" className="w-4 h-4" src="/teacher.png" />
         <span>老師</span>
         <button
+          className="ml-1 text-[9px] underline text-[#4B4036]"
           onClick={(e) => {
             e.stopPropagation();
             setShowTeachers(!showTeachers);
           }}
-          className="ml-1 text-[9px] underline text-[#4B4036]"
         >
           {showTeachers ? '收起' : '展開'}
         </button>
@@ -141,15 +141,15 @@ const LessonCard: React.FC<LessonCardProps> = ({
       )}
 
       <div className="flex items-center gap-0 text-[11px] text-[#7A6654]">
-                        <img src="/icons/penguin-face.PNG" alt="students" className="w-4 h-4" />
+        <img alt="students" className="w-4 h-4" src="/icons/penguin-face.PNG" />
         <span>學生</span>
         <span className="flex items-center gap-0 text-[10px] text-[#4B4036] font-semibold">（{students.length}）</span>
         <button
+          className="ml-1 text-[9px] underline text-[#4B4036]"
           onClick={(e) => {
             e.stopPropagation();
             setShowStudents(!showStudents);
           }}
-          className="ml-1 text-[9px] underline text-[#4B4036]"
         >
           {showStudents ? '收起' : '展開'}
         </button>
@@ -167,16 +167,16 @@ const LessonCard: React.FC<LessonCardProps> = ({
               {stu.age && (
                 <span className="ml-1 text-[10px] text-[#87704e]">
                   ({(() => {
-                    const months = typeof stu.age === 'string' ? parseInt(stu.age) : stu.age;
-                    if (isNaN(months)) return '';
-                    const years = Math.floor(months / 12);
-                    const remainingMonths = months % 12;
-                    if (years === 0) return `${remainingMonths}M`;
-                    return `${years}Y${remainingMonths ? remainingMonths + 'M' : ''}`;
-                  })()})
+                  const months = typeof stu.age === 'string' ? parseInt(stu.age) : stu.age;
+                  if (isNaN(months)) return '';
+                  const years = Math.floor(months / 12);
+                  const remainingMonths = months % 12;
+                  if (years === 0) return `${remainingMonths}M`;
+                  return `${years}Y${remainingMonths ? `${remainingMonths}M` : ''}`;
+                })()})
                 </span>
               )}
-              {stu.isTrial && <img src="/trial.png" alt="Trial" className="ml-1 w-3 h-3" />}
+              {stu.isTrial && <img alt="Trial" className="ml-1 w-3 h-3" src="/trial.png" />}
               {stu.teacher && (
                 <span className="ml-1 text-[10px] text-[#4B4036] bg-[#F0ECE6] px-1 rounded">
                   {stu.teacher}
@@ -188,14 +188,14 @@ const LessonCard: React.FC<LessonCardProps> = ({
       )}
 
       <div className="flex items-center gap-1 text-[11px] text-[#7A6654] mt-1">
-        <img src="/details.png" alt="details" className="w-4 h-4" />
+        <img alt="details" className="w-4 h-4" src="/details.png" />
         <span>課堂活動</span>
         <button
+          className="ml-1 text-[9px] underline text-[#4B4036]"
           onClick={(e) => {
             e.stopPropagation();
             setShowPlan(!showPlan);
           }}
-          className="ml-1 text-[9px] underline text-[#4B4036]"
         >
           {showPlan ? '收起' : '展開'}
         </button>
