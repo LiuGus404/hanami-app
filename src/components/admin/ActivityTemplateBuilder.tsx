@@ -142,7 +142,7 @@ export function ActivityTemplateBuilder({
       template_schema: {
         fields: template.fields,
       },
-      template_type: template.category || 'custom',
+      template_category: template.category || 'custom',
       is_active: true,
     };
 

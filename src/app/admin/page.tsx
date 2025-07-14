@@ -79,11 +79,11 @@ export default function AdminPage() {
         if (regularStudentsError) {
           console.error('Error fetching regular students for lesson count:', regularStudentsError);
         } else if (Array.isArray(regularStudentsForLesson)) {
-          // 獲取每個常規學生的課堂記錄
+          // 獲取每個常規學生的課堂記錄（包含時間和時長資訊）
           const studentIds = regularStudentsForLesson.map(s => s.id);
           const { data: lessonRecords, error: lessonError } = await supabase
             .from('hanami_student_lesson')
-            .select('student_id, lesson_date, status')
+            .select('student_id, lesson_date, actual_timeslot, lesson_duration')
             .in('student_id', studentIds)
             .gte('lesson_date', today)
             .order('lesson_date');
@@ -91,23 +91,56 @@ export default function AdminPage() {
           if (lessonError) {
             console.error('Error fetching lesson records:', lessonError);
           } else if (Array.isArray(lessonRecords)) {
-            // 計算每個學生的剩餘堂數
+            // 使用統一的時間計算邏輯：課堂開始時間+課程時長
+            const now = new Date();
+            const todayStr = now.toISOString().slice(0, 10);
             const studentLessonCounts = new Map();
+            
+            // 初始化所有常規學生的計數為0
+            studentIds.forEach(id => {
+              studentLessonCounts.set(id, 0);
+            });
             
             lessonRecords.forEach(lesson => {
               const studentId = lesson.student_id;
-              if (!studentLessonCounts.has(studentId)) {
-                studentLessonCounts.set(studentId, 0);
+              if (!studentId) return;
+              
+              let shouldCount = false;
+              
+              if (lesson.lesson_date > todayStr) {
+                // 大於今天的都算
+                shouldCount = true;
+              } else if (lesson.lesson_date === todayStr) {
+                // 等於今天的要判斷結束時間
+                if (!lesson.actual_timeslot || !lesson.lesson_duration) {
+                  // 沒有時間資訊，保守算進剩餘堂數
+                  shouldCount = true;
+                } else {
+                  // 解析時間：課堂開始時間+課程時長
+                  const [h, m] = lesson.actual_timeslot.split(':').map(Number);
+                  const durationParts = lesson.lesson_duration.split(':').map(Number);
+                  const dh = durationParts[0] || 0; // 小時
+                  const dm = durationParts[1] || 0; // 分鐘
+                  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+                  const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
+                  if (end >= now) {
+                    shouldCount = true;
+                  }
+                }
               }
-              studentLessonCounts.set(studentId, studentLessonCounts.get(studentId) + 1);
+              
+              if (shouldCount) {
+                const currentCount = studentLessonCounts.get(studentId) || 0;
+                studentLessonCounts.set(studentId, currentCount + 1);
+              }
             });
             
-            // 計算剩餘堂數為1的學生數量
-            const studentsWithOneLessonLeft = Array.from(studentLessonCounts.entries())
-              .filter(([studentId, count]) => count === 1)
+            // 計算剩餘堂數為1或0的學生數量（包含剩餘堂數=0的學生）
+            const studentsWithLastLesson = Array.from(studentLessonCounts.entries())
+              .filter(([studentId, count]) => count === 1 || count === 0)
               .length;
             
-            setLastLessonCount(studentsWithOneLessonLeft);
+            setLastLessonCount(studentsWithLastLesson);
           }
         }
       } catch (error) {

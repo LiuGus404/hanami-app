@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
+import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare } from 'lucide-react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useState, useEffect, useRef, useMemo } from 'react';
 
@@ -10,13 +10,35 @@ import BackButton from '@/components/ui/BackButton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import StudentCard from '@/components/ui/StudentCard';
+import AIMessageModal from '@/components/ui/AIMessageModal';
 import { useUser } from '@/hooks/useUser';
 import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
+import HanamiInput from '@/components/ui/HanamiInput';
 
-
-
-
+// 新增一個 hook：useStudentRemainingLessons
+function useStudentRemainingLessons(studentId: string | undefined) {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!studentId) {
+      setCount(null);
+      return;
+    }
+    let cancelled = false;
+    async function fetchCount() {
+      if (!studentId) return;
+      const { count, error } = await supabase
+        .from('hanami_student_lesson')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .gte('lesson_date', new Date().toISOString().slice(0, 10));
+      if (!cancelled) setCount(error ? null : count ?? 0);
+    }
+    fetchCount();
+    return () => { cancelled = true; };
+  }, [studentId]);
+  return count;
+}
 
 export default function StudentManagementPage() {
   const searchParams = useSearchParams();
@@ -106,6 +128,10 @@ export default function StudentManagementPage() {
 
   const [searchInput, setSearchInput] = useState(''); // 用於輸入框
   const [searchQuery, setSearchQuery] = useState(''); // 真正觸發搜尋的值
+  
+  // AI 訊息相關狀態
+  const [showAIMessageModal, setShowAIMessageModal] = useState(false);
+  const [selectedStudentsForAI, setSelectedStudentsForAI] = useState<any[]>([]);
 
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
@@ -942,6 +968,8 @@ export default function StudentManagementPage() {
     }
   };
 
+  // 移除這個 useEffect，避免無窮迴圈
+
   // 根據篩選條件決定顯示哪些學生
   const isShowingInactiveStudents = selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('停用學生');
   const currentStudents = isShowingInactiveStudents ? inactiveStudents : students.filter(s => !s.is_inactive);
@@ -950,13 +978,120 @@ export default function StudentManagementPage() {
   const activeStudentsCount = students.filter(s => !s.is_inactive).length;
 
   const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) return students;
-    const q = searchQuery.trim().toLowerCase();
-    return students.filter(s =>
-      (s.full_name?.toLowerCase().includes(q)) ||
-      (s.contact_number?.toLowerCase().includes(q)),
-    );
-  }, [students, searchQuery]);
+    try {
+      // 根據是否選擇停用學生來決定基礎資料來源
+      const baseStudents = isShowingInactiveStudents 
+        ? [...students, ...inactiveStudents] 
+        : students.filter(s => !s.is_inactive);
+      
+      // 先合成一份帶最新 remaining_lessons 的 students
+      const studentsWithLatestLessons = (baseStudents || []).map(s => {
+        if (s.student_type !== '試堂' && !s.is_inactive && s.id && remainingLessonsMap[s.id] !== undefined) {
+          return { ...s, remaining_lessons: remainingLessonsMap[s.id] };
+        }
+        return s;
+      });
+
+      let result = studentsWithLatestLessons;
+
+      // 1. 搜尋篩選
+      if (searchQuery && searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        result = result.filter(s => {
+          if (!s) return false;
+          try {
+            return (
+              (s.full_name && typeof s.full_name === 'string' && s.full_name.toLowerCase().includes(q)) ||
+              (s.contact_number && typeof s.contact_number === 'string' && s.contact_number.toLowerCase().includes(q)) ||
+              (s.student_oid && typeof s.student_oid === 'string' && s.student_oid.toLowerCase().includes(q))
+            );
+          } catch (error) {
+            console.error('搜尋篩選錯誤:', error);
+            return false;
+          }
+        });
+      }
+
+      // 2. 課程篩選
+      if (selectedCourses && selectedCourses.length > 0) {
+        result = result.filter(s => {
+          if (!s) return false;
+          try {
+            // 處理特殊課程類型
+            if (selectedCourses.includes('常規') && s.student_type !== '試堂' && !s.is_inactive) {
+              return true;
+            }
+            if (selectedCourses.includes('試堂') && s.student_type === '試堂') {
+              return true;
+            }
+            if (selectedCourses.includes('停用學生') && s.is_inactive) {
+              return true;
+            }
+            // 處理具體課程類型
+            if (s.course_type && selectedCourses.includes(s.course_type)) {
+              return true;
+            }
+            return false;
+          } catch (error) {
+            console.error('課程篩選錯誤:', error);
+            return false;
+          }
+        });
+      }
+
+      // 3. 星期篩選
+      if (selectedWeekdays && selectedWeekdays.length > 0) {
+        result = result.filter(s => {
+          if (!s) return false;
+          // 處理常規學生與試堂學生
+          let weekdays: string[] = [];
+          if (Array.isArray(s.regular_weekday)) {
+            weekdays = s.regular_weekday.map(String);
+          } else if (s.regular_weekday !== undefined && s.regular_weekday !== null) {
+            weekdays = [String(s.regular_weekday)];
+          }
+          return weekdays.some(weekday => selectedWeekdays.includes(weekday));
+        });
+      }
+
+      // 4. 堂數篩選（只對常規學生生效）
+      if (selectedLessonFilter && selectedLessonFilter !== 'all') {
+        result = result.filter(s => {
+          if (!s) return false;
+          try {
+            // 只有常規學生才有剩餘堂數概念
+            if (s.student_type !== '常規') {
+              return false;
+            }
+            const remainingLessons = s.remaining_lessons;
+            if (remainingLessons === null || remainingLessons === undefined) return false;
+
+            switch (selectedLessonFilter) {
+              case 'gt2':
+                return Number(remainingLessons) > 2;
+              case 'lte2':
+                return Number(remainingLessons) <= 2;
+              case 'custom':
+                if (customLessonCount !== '' && customLessonCount !== null && customLessonCount !== undefined) {
+                  return Number(remainingLessons) === Number(customLessonCount);
+                }
+                return false; // 如果沒有設定自訂數字，不顯示任何學生
+              default:
+                return true;
+            }
+          } catch (error) {
+            console.error('堂數篩選錯誤:', error);
+            return false;
+          }
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error('filteredStudents 計算錯誤:', error);
+      return students || [];
+    }
+  }, [students, searchQuery, selectedCourses, selectedWeekdays, selectedLessonFilter, customLessonCount, remainingLessonsMap]);
 
   // 排序學生數據
   const sortStudents = (students: any[]) => {
@@ -990,9 +1125,17 @@ export default function StudentManagementPage() {
           bValue = Number(bValue) || 0;
           break;
         case 'regular_weekday':
-          // 上課日按數字排序
-          aValue = Array.isArray(aValue) ? Math.min(...aValue.map(Number)) : Number(aValue) || 0;
-          bValue = Array.isArray(bValue) ? Math.min(...bValue.map(Number)) : Number(bValue) || 0;
+          // 取最小的星期數字（如 [1,2] 取 1），若為字串或數字則直接轉數字
+          aValue = Array.isArray(aValue)
+            ? Math.min(...aValue.map(Number))
+            : aValue !== undefined && aValue !== null
+              ? Number(aValue)
+              : 0;
+          bValue = Array.isArray(bValue)
+            ? Math.min(...bValue.map(Number))
+            : bValue !== undefined && bValue !== null
+              ? Number(bValue)
+              : 0;
           break;
         case 'student_dob':
         case 'started_date':
@@ -1102,18 +1245,90 @@ export default function StudentManagementPage() {
   useEffect(() => {
     if (displayMode !== 'grid') return;
     setRemainingLoading(true);
-    const currentStudents = sortedStudents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-    const regularStudentIds = currentStudents.filter(s => s.student_type !== '試堂').map(s => s.id);
+    
+    // 只計算常規學生的剩餘堂數，與學校狀況一覽保持一致
+    const regularStudentIds = students
+      .filter(s => s.student_type === '常規')
+      .map(s => s.id);
+    
     if (regularStudentIds.length === 0) {
       setRemainingLessonsMap({});
       setRemainingLoading(false);
       return;
     }
-    calculateRemainingLessonsBatch(regularStudentIds, new Date()).then(map => {
-      setRemainingLessonsMap(map);
-      setRemainingLoading(false);
-    });
-  }, [displayMode, currentPage, pageSize, sortedStudents]);
+    
+    // 使用與學校狀況一覽相同的邏輯：只查詢今天及之後的課堂記錄
+    const today = new Date().toISOString().split('T')[0];
+    
+    supabase
+      .from('hanami_student_lesson')
+      .select('student_id, lesson_date, actual_timeslot, lesson_duration')
+      .in('student_id', regularStudentIds)
+      .gte('lesson_date', today)
+      .order('lesson_date')
+      .then(({ data: lessonRecords, error }) => {
+        if (error) {
+          console.error('Error fetching lesson records:', error);
+          setRemainingLessonsMap({});
+          setRemainingLoading(false);
+          return;
+        }
+        
+        // 計算每個學生的剩餘堂數（與學校狀況一覽完全相同的邏輯）
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        const studentLessonCounts = new Map<string, number>();
+        
+        // 初始化所有常規學生的計數為0
+        regularStudentIds.forEach(id => {
+          studentLessonCounts.set(id, 0);
+        });
+        
+        // 計算每個學生的剩餘堂數
+        lessonRecords?.forEach(lesson => {
+          const studentId = lesson.student_id;
+          if (!studentId) return;
+          
+          let shouldCount = false;
+          
+          if (lesson.lesson_date > todayStr) {
+            // 大於今天的都算
+            shouldCount = true;
+          } else if (lesson.lesson_date === todayStr) {
+            // 等於今天的要判斷結束時間
+            if (!lesson.actual_timeslot || !lesson.lesson_duration) {
+              // 沒有時間資訊，保守算進剩餘堂數
+              shouldCount = true;
+            } else {
+              // 解析時間：課堂開始時間+課程時長
+              const [h, m] = lesson.actual_timeslot.split(':').map(Number);
+              const durationParts = lesson.lesson_duration.split(':').map(Number);
+              const dh = durationParts[0] || 0; // 小時
+              const dm = durationParts[1] || 0; // 分鐘
+              const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+              const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
+              if (end >= now) {
+                shouldCount = true;
+              }
+            }
+          }
+          
+          if (shouldCount) {
+            const currentCount = studentLessonCounts.get(studentId) || 0;
+            studentLessonCounts.set(studentId, currentCount + 1);
+          }
+        });
+        
+        // 轉換為 Map 格式
+        const remainingMap: Record<string, number> = {};
+        studentLessonCounts.forEach((count, studentId) => {
+          remainingMap[studentId] = count;
+        });
+        
+        setRemainingLessonsMap(remainingMap);
+        setRemainingLoading(false);
+      });
+  }, [students, displayMode]);
 
   return (
     <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
@@ -1225,6 +1440,23 @@ export default function StudentManagementPage() {
                             <Trash2 className="w-4 h-4" />
                             <span>刪除學生</span>
                           </button>
+                          {/* AI 訊息按鈕 - 允許多選 */}
+                          {selectedStudents.length > 0 && (
+                            <button
+                              className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={isLoading}
+                              onClick={() => {
+                                const selected = students.filter(s => selectedStudents.includes(s.id));
+                                if (selected.length > 0) {
+                                  setSelectedStudentsForAI(selected);
+                                  setShowAIMessageModal(true);
+                                }
+                              }}
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              <span>AI 訊息</span>
+                            </button>
+                          )}
                         </>
                       );
                     })()}
@@ -1238,123 +1470,31 @@ export default function StudentManagementPage() {
         {/* 美觀的搜尋區域 - 靠左版 */}
         <div className="mb-4 flex justify-start">
           <div className="w-full max-w-xl" style={{ minWidth: 240, width: '50%' }}>
-            <div className="p-3 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
-              <div className="flex items-center gap-3">
-                {/* 搜尋圖標 */}
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full blur-sm opacity-40 animate-pulse" />
-                  <div className="relative w-8 h-8 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full flex items-center justify-center shadow-sm transition-all duration-300 group-hover:scale-110">
-                    <svg 
-                      className="w-4 h-4 text-[#A64B2A] transition-all duration-300 group-hover:scale-110 group-hover:rotate-6" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-                    </svg>
-                  </div>
-                </div>
-                {/* 搜尋輸入框 */}
-                <div className="flex-1 relative group">
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#FDE6B8] to-[#FCE2C8] rounded-lg blur-sm opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
-                  <input
-                    className="relative w-full px-4 py-2 bg-white border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-300 text-[#2B3A3B] placeholder-[#999] text-sm shadow-sm group-hover:shadow-md focus:shadow-lg"
-                    placeholder="搜尋學生姓名或電話..."
-                    type="text"
-                    value={searchInput}
-                    onChange={e => setSearchInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        setSearchQuery(searchInput);
-                        // 添加按鍵動畫效果
-                        const input = e.target as HTMLInputElement;
-                        input.style.transform = 'scale(0.98)';
-                        setTimeout(() => {
-                          input.style.transform = 'scale(1)';
-                        }, 150);
-                      }
-                    }}
-                  />
-                  {/* 輸入框底部的動畫線 */}
-                  <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-[#FDE6B8] to-[#EAC29D] transition-all duration-300 group-hover:w-full group-focus-within:w-full" />
-                </div>
-                {/* 搜尋按鈕 */}
-                <button
-                  className="relative group"
-                  onClick={() => {
-                    setSearchQuery(searchInput);
-                    // 添加按鈕動畫效果
-                    const button = document.querySelector('.search-btn') as HTMLButtonElement;
-                    if (button) {
-                      button.style.transform = 'scale(0.95) rotate(3deg)';
-                      setTimeout(() => {
-                        button.style.transform = 'scale(1) rotate(0deg)';
-                      }, 200);
-                    }
-                  }}
+            <div className="relative">
+              <button
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                onClick={() => setSearchQuery(searchInput)}
+              >
+                <svg
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] rounded-full blur-sm opacity-0 group-hover:opacity-40 transition-opacity duration-300" />
-                  <div className="relative search-btn bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] hover:from-[#fce2c8] hover:to-[#fad8b8] text-[#A64B2A] border border-[#EAC29D] rounded-full px-4 py-2 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105 active:scale-95 font-medium text-sm hover:animate-search-glow">
-                    <div className="flex items-center gap-1">
-                      <svg 
-                        className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-                      </svg>
-                      <span>搜尋</span>
-                    </div>
-                  </div>
-                </button>
-                {/* 清除搜尋按鈕（當有搜尋內容時顯示） */}
-                {searchInput && (
-                  <button
-                    className="relative group"
-                    onClick={() => {
-                      setSearchInput('');
-                      setSearchQuery('');
-                      // 添加清除動畫效果
-                      const button = document.querySelector('.clear-btn') as HTMLButtonElement;
-                      if (button) {
-                        button.style.transform = 'scale(0.9) rotate(-8deg)';
-                        setTimeout(() => {
-                          button.style.transform = 'scale(1) rotate(0deg)';
-                        }, 200);
-                      }
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] rounded-full blur-sm opacity-0 group-hover:opacity-40 transition-opacity duration-300" />
-                    <div className="relative clear-btn bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] hover:from-[#ffd4d4] hover:to-[#ffc8c8] text-[#A64B2A] border border-[#EAC29D] rounded-full p-2 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105 active:scale-95">
-                      <svg 
-                        className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-                      </svg>
-                    </div>
-                  </button>
-                )}
-              </div>
-              {/* 搜尋結果反饋 - 緊湊版 */}
-              {searchQuery && (
-                <div className="mt-2 p-2 bg-gradient-to-r from-[#E0F2E0] to-[#D4F2D4] rounded-lg border border-[#C8EAC8] animate-fade-in">
-                  <div className="flex items-center gap-2 text-[#2B3A3B] text-sm">
-                    <svg className="w-4 h-4 text-[#4CAF50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-                    </svg>
-                    <span className="font-medium">找到 <span className="font-bold text-[#4CAF50]">{filteredStudents.length}</span> 位學生</span>
-                    {searchQuery && (
-                      <span className="text-xs text-[#A68A64]">
-                        （「{searchQuery}」）
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                </svg>
+              </button>
+              <HanamiInput
+                className="pl-10"
+                placeholder="搜尋學生..."
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
+                    setSearchQuery(searchInput);
+                    if (e.preventDefault) e.preventDefault();
+                  }
+                }}
+              />
             </div>
           </div>
         </div>
@@ -1363,10 +1503,15 @@ export default function StudentManagementPage() {
           <div className="flex overflow-x-auto gap-2 pb-3">
             <div className="mb-4">
               <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
                 onClick={() => setDropdownOpen(true)}
               >
-                篩選課程
+                <span>篩選課程</span>
+                {selectedCourses.length > 0 && (
+                  <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full min-w-[20px] flex items-center justify-center">
+                    {selectedCourses.length}
+                  </span>
+                )}
               </button>
               {dropdownOpen && (
                 <PopupSelect
@@ -1397,10 +1542,15 @@ export default function StudentManagementPage() {
 
             <div className="mb-4">
               <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
                 onClick={() => setWeekdayDropdownOpen(true)}
               >
-                篩選星期
+                <span>篩選星期</span>
+                {selectedWeekdays.length > 0 && (
+                  <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full min-w-[20px] flex items-center justify-center">
+                    {selectedWeekdays.length}
+                  </span>
+                )}
               </button>
               {weekdayDropdownOpen && (
                 <PopupSelect
@@ -1424,10 +1574,15 @@ export default function StudentManagementPage() {
 
             <div className="mb-4">
               <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
                 onClick={() => setLessonDropdownOpen(true)}
               >
-                篩選堂數
+                <span>篩選堂數</span>
+                {(selectedLessonFilter !== 'all' || isCustomLessonFilterActive(selectedLessonFilter, customLessonCount)) && (
+                  <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full min-w-[20px] flex items-center justify-center">
+                    {selectedLessonFilter === 'custom' && customLessonCount !== '' ? customLessonCount : '✓'}
+                  </span>
+                )}
               </button>
               {lessonDropdownOpen && (
                 <PopupSelect
@@ -1458,7 +1613,7 @@ export default function StudentManagementPage() {
 
             <div className="mb-4">
               <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2"
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
                 onClick={() => setDisplayMode(displayMode === 'grid' ? 'list' : 'grid')}
               >
                 {displayMode === 'grid' ? (
@@ -1478,23 +1633,63 @@ export default function StudentManagementPage() {
             {(selectedCourses.length > 0 ||
               selectedWeekdays.length > 0 ||
               selectedLessonFilter !== 'all' ||
-              isCustomLessonFilterActive(selectedLessonFilter, customLessonCount)) && (
+              isCustomLessonFilterActive(selectedLessonFilter, customLessonCount) ||
+              searchQuery) && (
               <div className="mb-4">
                 <button
-                  className="hanami-btn-danger text-sm px-4 py-2 text-[#A64B2A]"
+                  className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
                   onClick={() => {
                     setSelectedCourses([]);
                     setSelectedWeekdays([]);
                     setSelectedLessonFilter('all');
                     setCustomLessonCount('');
+                    setSearchInput('');
+                    setSearchQuery('');
                   }}
                 >
-                  清除條件
+                  <span>清除所有條件</span>
                 </button>
               </div>
             )}
           </div>
         </div>
+
+        {/* 篩選條件顯示區域 */}
+        {(selectedCourses.length > 0 || selectedWeekdays.length > 0 || selectedLessonFilter !== 'all' || isCustomLessonFilterActive(selectedLessonFilter, customLessonCount) || searchQuery) && (
+          <div className="mb-4 p-3 bg-gradient-to-r from-[#E0F2E0] to-[#D4F2D4] rounded-lg border border-[#C8EAC8]">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-4 h-4 text-[#4CAF50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+              </svg>
+              <span className="font-medium text-[#2B3A3B]">當前篩選條件：</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {searchQuery && (
+                <span className="bg-[#4CAF50] text-white text-xs px-2 py-1 rounded-full">
+                  搜尋：{searchQuery}
+                </span>
+              )}
+              {selectedCourses.map(course => (
+                <span key={course} className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full">
+                  課程：{course}
+                </span>
+              ))}
+              {selectedWeekdays.map(weekday => {
+                const weekdayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                return (
+                  <span key={weekday} className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full">
+                    星期：{weekdayNames[parseInt(weekday)]}
+                  </span>
+                );
+              })}
+              {selectedLessonFilter !== 'all' && (
+                <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full">
+                  堂數：{selectedLessonFilter === 'gt2' ? '> 2' : selectedLessonFilter === 'lte2' ? '≤ 2' : selectedLessonFilter === 'custom' ? `= ${customLessonCount}` : selectedLessonFilter}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="text-sm text-gray-600 mb-2">
           顯示學生數：{sortedStudents.length}（
@@ -1521,10 +1716,10 @@ export default function StudentManagementPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-[#2B3A3B]">每頁顯示：</span>
             <button
-              className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B]"
+              className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
               onClick={() => setPageSizeDropdownOpen(true)}
             >
-              {pageSize === Infinity ? '全部' : pageSize}
+              <span>{pageSize === Infinity ? '全部' : pageSize}</span>
             </button>
             {pageSizeDropdownOpen && (
               <PopupSelect
@@ -1548,7 +1743,7 @@ export default function StudentManagementPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2"
+              className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
               onClick={() => setColumnSelectorOpen(true)}
             >
               <Settings2 className="w-4 h-4" />
@@ -1671,7 +1866,7 @@ export default function StudentManagementPage() {
                       {
                         icon: Star,
                         label: '剩餘堂數',
-                        value: remainingLessonsMap[student.id] !== undefined ? `${remainingLessonsMap[student.id]} 堂` : '—',
+                        value: student.student_type === '常規' ? (remainingLessonsMap[student.id] !== undefined ? `${remainingLessonsMap[student.id]} 堂` : '—') : '—',
                       },
                     ];
 
@@ -2134,7 +2329,7 @@ export default function StudentManagementPage() {
                         )}
                         {selectedColumns.includes('remaining_lessons') && (
                           <td className={`p-3 text-sm ${student.is_inactive ? 'text-gray-500' : 'text-[#2B3A3B]'}`}>
-                            {student.student_type === '試堂' ? '試堂' : (student.remaining_lessons ?? '—')}
+                            {student.student_type === '常規' ? (remainingLessonsMap[student.id] !== undefined ? remainingLessonsMap[student.id] : '—') : '—'}
                           </td>
                         )}
                         {selectedColumns.includes('started_date') && (
@@ -2181,11 +2376,23 @@ export default function StudentManagementPage() {
             </table>
           </div>
         )}
+
+        {/* AI 訊息模態框 */}
+        {showAIMessageModal && selectedStudentsForAI.length > 0 && (
+          <AIMessageModal
+            isOpen={showAIMessageModal}
+            onClose={() => {
+              setShowAIMessageModal(false);
+              setSelectedStudentsForAI([]);
+            }}
+            students={selectedStudentsForAI}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 function isCustomLessonFilterActive(filter: 'all' | 'gt2' | 'lte2' | 'custom', count: number | ''): boolean {
-  return filter === 'custom' && count !== '' && count !== null && count !== undefined;
+  return filter === 'custom' && count !== '' && count !== null && count !== undefined && !isNaN(Number(count));
 }

@@ -7,6 +7,7 @@ interface HanamiInputProps {
   placeholder?: string;
   value?: string | number;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   required?: boolean;
   disabled?: boolean;
   className?: string;
@@ -21,6 +22,7 @@ export default function HanamiInput({
   placeholder,
   value,
   onChange,
+  onKeyDown,
   required = false,
   disabled = false,
   className = '',
@@ -53,6 +55,7 @@ export default function HanamiInput({
         type={type}
         value={value}
         onChange={onChange}
+        onKeyDown={onKeyDown}
       />
       {error && (
         <p className="mt-1 text-sm text-[#FF6B6B]">{error}</p>

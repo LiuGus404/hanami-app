@@ -1158,6 +1158,92 @@ export type Database = {
         };
         Relationships: [];
       }
+      hanami_ai_message_templates: {
+        Row: {
+          id: string;
+          template_name: string;
+          template_content: string;
+          template_type: string;
+          variables: string[] | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_name: string;
+          template_content: string;
+          template_type?: string;
+          variables?: string[] | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          template_name?: string;
+          template_content?: string;
+          template_type?: string;
+          variables?: string[] | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      }
+      hanami_ai_message_logs: {
+        Row: {
+          id: string;
+          student_id: string;
+          student_name: string;
+          student_phone: string | null;
+          template_id: string | null;
+          template_name: string;
+          message_content: string;
+          status: string;
+          error_message: string | null;
+          sent_at: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          student_name: string;
+          student_phone?: string | null;
+          template_id?: string | null;
+          template_name: string;
+          message_content: string;
+          status?: string;
+          error_message?: string | null;
+          sent_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          student_name?: string;
+          student_phone?: string | null;
+          template_id?: string | null;
+          template_name?: string;
+          message_content?: string;
+          status?: string;
+          error_message?: string | null;
+          sent_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'hanami_ai_message_logs_template_id_fkey'
+            columns: ['template_id']
+            isOneToOne: false
+            referencedRelation: 'hanami_ai_message_templates'
+            referencedColumns: ['id']
+          }
+        ];
+      }
     }
     Views: {
       [_ in never]: never

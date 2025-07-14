@@ -132,6 +132,14 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
 
           <button
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+            onClick={() => router.push('/admin/ai-message-history')}
+          >
+            <span className="mr-2 text-lg">💬</span>
+            AI 訊息記錄
+          </button>
+
+          <button
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
             onClick={() => {
               router.back();
               setTimeout(() => window.location.reload(), 500);

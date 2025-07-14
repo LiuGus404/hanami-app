@@ -99,7 +99,7 @@ export interface ActivityTemplate {
   template_name: string;
   template_description: string;
   template_schema?: any;
-  template_type: string;
+  template_category: string;
   is_active: boolean;
 }
 

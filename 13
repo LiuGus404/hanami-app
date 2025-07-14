@@ -1,0 +1,12 @@
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  14 | import { useUser } from '@/hooks/useUser';
+  15 | import { supabase } from '@/lib/supabase';
+  16 | import { calculateRemainingLessonsBatch } from '@/lib/utils';
+
+Import map: aliased to relative './src/components/ui/AIMessageModal' inside of [project]/
+
+https://nextjs.org/docs/messages/module-not-found
+	nextJsHandleConsoleError ([root-of-the-server]__ec07ee34._.js:11308)
+	handleErrors ([root-of-the-server]__ec07ee34._.js:12219)
+	processMessage ([root-of-the-server]__ec07ee34._.js:12283)
+	(anonymous function) ([root-of-the-server]__ec07ee34._.js:12123)

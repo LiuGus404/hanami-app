@@ -27,7 +27,7 @@ import { TeachingActivity } from '@/types/progress';
 interface Template {
   id: string;
   template_name: string;
-  template_type: string;
+  template_category: string;
   template_description: string | null;
   template_schema: any;
 }
@@ -112,7 +112,7 @@ export default function ResourceActivitiesPage() {
         .from('hanami_teaching_activities')
         .select(`
           *,
-          hanami_resource_templates!inner(template_name, template_type)
+          hanami_resource_templates!inner(template_name, template_category)
         `)
         .order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -164,7 +164,15 @@ export default function ResourceActivitiesPage() {
         .order('template_name');
 
       if (error) throw error;
-      setTemplates(data || []);
+      setTemplates(
+        (data || []).map((item: any) => ({
+          id: item.id,
+          template_name: item.template_name,
+          template_category: item.template_category || '',
+          template_description: item.template_description,
+          template_schema: item.template_schema,
+        }))
+      );
     } catch (error) {
       console.error('載入範本失敗:', error);
     }
