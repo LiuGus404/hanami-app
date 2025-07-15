@@ -348,6 +348,16 @@ export default function AIMessageModal({ isOpen, onClose, students }: AIMessageM
             </div>
             <button onClick={onClose} className="p-2 hover:rotate-12"><X className="w-5 h-5 text-[#4B4036]" /></button>
           </div>
+          {/* 手機版標題欄（含關閉） */}
+          <div className="sm:hidden flex items-center justify-between p-4 border-b-2 border-[#EADBC8]/30 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8]">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center shadow-lg">
+                <MessageSquare className="w-4 h-4 text-[#4B4036]" />
+              </div>
+              <h2 className="text-lg font-bold text-[#2B3A3B]">AI 訊息發送</h2>
+            </div>
+            <button onClick={onClose} className="p-2 hover:rotate-12"><X className="w-5 h-5 text-[#4B4036]" /></button>
+          </div>
           {/* 內容區域 */}
           <div className="flex-1 flex flex-col sm:flex-row overflow-y-auto">
             {/* 學生區塊 */}
@@ -451,11 +461,11 @@ export default function AIMessageModal({ isOpen, onClose, students }: AIMessageM
                 </div>
                 {/* 發送按鈕 */}
                 <div className="flex items-center gap-2 w-full">
-                  <button onClick={handleSend} disabled={!selectedTemplate || selectedStudentIds.length===0 || isSending} className="flex-1 py-3 px-6 rounded-full font-bold text-base transition-all duration-300 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3">
-                    {isSending ? (<><span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#4B4036]"></span>發送中...</>) : (<><Send className="w-5 h-5" />發送訊息給 {selectedStudentIds.length} 位學生</>)}
-                  </button>
                   <button onClick={handleCopyMessage} className="p-3 rounded-full bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md hover:scale-110 transition-all duration-300" title="複製目前學生訊息">
                     <Copy className="w-5 h-5" />
+                  </button>
+                  <button onClick={handleSend} disabled={!selectedTemplate || selectedStudentIds.length===0 || isSending} className="flex-1 py-3 px-6 rounded-full font-bold text-base transition-all duration-300 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3">
+                    {isSending ? (<><span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#4B4036]"></span>發送中...</>) : (<><Send className="w-5 h-5" />發送訊息給 {selectedStudentIds.length} 位學生</>)}
                   </button>
                 </div>
                 {isSending && <div className="text-xs text-[#4B4036] mt-2">發送進度：{sendProgress}/{selectedStudentIds.length}</div>}

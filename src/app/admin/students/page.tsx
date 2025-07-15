@@ -1,9 +1,10 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare } from 'lucide-react';
+import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare, X } from 'lucide-react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useState, useEffect, useRef, useMemo } from 'react';
+import useSWR from 'swr';
 
 import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel';
 import BackButton from '@/components/ui/BackButton';
@@ -15,6 +16,7 @@ import { useUser } from '@/hooks/useUser';
 import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
 import HanamiInput from '@/components/ui/HanamiInput';
+import Calendarui from '@/components/ui/Calendarui';
 
 // 新增一個 hook：useStudentRemainingLessons
 function useStudentRemainingLessons(studentId: string | undefined) {
@@ -40,11 +42,22 @@ function useStudentRemainingLessons(studentId: string | undefined) {
   return count;
 }
 
+const fetchStudentsWithLessons = async (body: any) => {
+  const res = await fetch('/api/students-with-lessons', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('API 請求失敗');
+  return res.json();
+};
+
 export default function StudentManagementPage() {
   const searchParams = useSearchParams();
   const filterParam = searchParams.get('filter');
   
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
   const [selectedCourses, setSelectedCourses] = useState<string[]>(() => {
     if (filterParam === 'regular') return ['常規'];
     if (filterParam === 'trial') return ['試堂'];
@@ -52,7 +65,6 @@ export default function StudentManagementPage() {
     return [];
   });
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [students, setStudents] = useState<any[]>([]);
   const [inactiveStudents, setInactiveStudents] = useState<any[]>([]);
   const [selectedWeekdays, setSelectedWeekdays] = useState<string[]>([]);
   const [weekdayDropdownOpen, setWeekdayDropdownOpen] = useState(false);
@@ -83,7 +95,6 @@ export default function StudentManagementPage() {
     'contact_number',
     'health_notes',
   ]);
-  const [isLoading, setIsLoading] = useState(false);
 
   // 排序相關狀態
   const [sortField, setSortField] = useState<string>('');
@@ -133,6 +144,83 @@ export default function StudentManagementPage() {
   const [showAIMessageModal, setShowAIMessageModal] = useState(false);
   const [selectedStudentsForAI, setSelectedStudentsForAI] = useState<any[]>([]);
 
+  const [showDateFilter, setShowDateFilter] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]); // 支援多選
+
+  // 新增：用於API查詢的狀態
+  type ApiFilter = {
+    selectedDates: string[];
+    selectedCourses: string[];
+    selectedWeekdays: string[];
+    searchTerm: string;
+  };
+  const [apiFilter, setApiFilter] = useState<ApiFilter>(() => {
+    const initialCourses = (() => {
+      if (filterParam === 'regular') return ['常規'];
+      if (filterParam === 'trial') return ['試堂'];
+      if (filterParam === 'inactive') return ['停用學生'];
+      return [];
+    })();
+    return {
+      selectedDates: [],
+      selectedCourses: initialCourses,
+      selectedWeekdays: [],
+      searchTerm: '',
+    };
+  });
+
+  // 監控篩選條件變化，自動查詢API
+  // useEffect(() => {
+  //   setApiFilter({
+  //     selectedDates: selectedDates.map(d => d.toLocaleDateString('sv-SE')),
+  //     selectedCourses,
+  //     selectedWeekdays,
+  //     searchTerm,
+  //   });
+  // }, [selectedDates, selectedCourses, selectedWeekdays, searchTerm]);
+
+  // 改為每次 filter 變動時直接 setApiFilter
+  const handleSelectedCoursesChange = (courses: string[]) => {
+    // 允許同時選擇常規和試堂學生
+    setSelectedCourses(courses);
+    setApiFilter(prev => ({
+      ...prev,
+      selectedCourses: courses
+    }));
+  };
+  const handleSelectedWeekdaysChange = (weekdays: string[]) => {
+    setSelectedWeekdays(weekdays);
+    setApiFilter(prev => ({
+      ...prev,
+      selectedWeekdays: weekdays
+    }));
+  };
+  const handleSelectedDatesChange = (dates: Date[]) => {
+    setSelectedDates(dates);
+    setApiFilter(prev => ({
+      ...prev,
+      selectedDates: dates.map(d => d.toLocaleDateString('sv-SE'))
+    }));
+  };
+  const handleSearchTermChange = (term: string) => {
+    setSearchTerm(term);
+    setApiFilter(prev => ({
+      ...prev,
+      searchTerm: term
+    }));
+  };
+
+  // 使用 SWR 進行資料獲取
+  const { data: apiData, error: apiError, isValidating } = useSWR(
+    ['students-with-lessons', apiFilter],
+    () => fetchStudentsWithLessons(apiFilter),
+    { revalidateOnFocus: false }
+  );
+
+  // 取回的學生資料
+  const students = apiData?.students || [];
+  const isLoading = isValidating;
+
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
     if (userLoading || !user) return;
@@ -157,10 +245,104 @@ export default function StudentManagementPage() {
           .from('Hanami_Students')
           .select('id, full_name, student_age, student_preference, course_type, regular_weekday, gender, student_type, student_oid, contact_number, regular_timeslot, health_notes');
 
+        // 獲取常規學生的課堂記錄（用於日期篩選）
+        // 移除所有日期限制，確保載入所有課堂記錄
+        const { data: lessonData, error: lessonError } = await supabase
+          .from('hanami_student_lesson')
+          .select(`
+            student_id, 
+            lesson_date, 
+            full_name, 
+            course_type,
+            Hanami_Students!hanami_student_lesson_student_id_fkey (
+              id,
+              full_name
+            )
+          `)
+          .not('student_id', 'is', null) // 確保只獲取有 student_id 的記錄
+          .limit(1000); // 設定較大的限制，確保能載入所有記錄
+        
+        // 手動測試：專門查詢7月的課堂記錄
+        const { data: julyTestData, error: julyTestError } = await supabase
+          .from('hanami_student_lesson')
+          .select('*')
+          .gte('lesson_date', '2025-07-01')
+          .lt('lesson_date', '2025-08-01')
+          .limit(10);
+        
+        console.log('手動測試7月課堂記錄:', {
+          count: julyTestData?.length || 0,
+          error: julyTestError?.message || '無錯誤',
+          data: julyTestData?.slice(0, 3) || []
+        });
+        
+        // 手動測試：查詢所有課堂記錄（不分日期）
+        const { data: allTestData, error: allTestError } = await supabase
+          .from('hanami_student_lesson')
+          .select('lesson_date, student_id')
+          .limit(20);
+        
+        console.log('手動測試所有課堂記錄:', {
+          count: allTestData?.length || 0,
+          error: allTestError?.message || '無錯誤',
+          dates: allTestData?.map(l => l.lesson_date).sort() || []
+        });
+        
+        // 除錯：檢查課堂記錄的資料結構
+        if (lessonData && lessonData.length > 0) {
+          console.log('課堂記錄總數:', lessonData.length);
+          console.log('課堂記錄範例:', lessonData.slice(0, 2));
+          
+          // 檢查日期範圍
+          const dates = lessonData.map(l => l.lesson_date).sort();
+          console.log('課堂記錄日期範圍:', {
+            earliest: dates[0],
+            latest: dates[dates.length - 1],
+            julyCount: dates.filter(d => d.startsWith('2025-07')).length,
+            augustCount: dates.filter(d => d.startsWith('2025-08')).length,
+            septemberCount: dates.filter(d => d.startsWith('2025-09')).length,
+            octoberCount: dates.filter(d => d.startsWith('2025-10')).length,
+          });
+          
+          // 詳細檢查7月的課堂記錄
+          const julyLessons = lessonData.filter(l => l.lesson_date && l.lesson_date.startsWith('2025-07'));
+          console.log('7月課堂記錄詳細資訊:', {
+            count: julyLessons.length,
+            lessons: julyLessons.map(l => ({
+              student_id: l.student_id,
+              lesson_date: l.lesson_date,
+              full_name: l.full_name,
+              course_type: l.course_type
+            }))
+          });
+          
+          // 檢查所有月份的分佈
+          const monthDistribution: Record<string, number> = {};
+          dates.forEach(date => {
+            const month = date.substring(0, 7); // YYYY-MM
+            monthDistribution[month] = (monthDistribution[month] || 0) + 1;
+          });
+          console.log('月份分佈:', monthDistribution);
+        }
+
         // 獲取試堂學生數據
         const { data: trialStudentData, error: trialStudentError } = await supabase
           .from('hanami_trial_students')
           .select('*');
+
+        // 手動測試：檢查試堂學生表中的7月記錄
+        const { data: trialJulyTestData, error: trialJulyTestError } = await supabase
+          .from('hanami_trial_students')
+          .select('*')
+          .gte('lesson_date', '2025-07-01')
+          .lt('lesson_date', '2025-08-01')
+          .limit(10);
+        
+        console.log('手動測試試堂學生7月記錄:', {
+          count: trialJulyTestData?.length || 0,
+          error: trialJulyTestError?.message || '無錯誤',
+          data: trialJulyTestData?.slice(0, 3) || []
+        });
 
         // 獲取停用學生數據
         const { data: inactiveStudentData, error: inactiveStudentError } = await supabase
@@ -185,18 +367,55 @@ export default function StudentManagementPage() {
           return;
         }
 
+        if (lessonError) {
+          console.error('Error fetching lesson data:', lessonError);
+          loadingRef.current = false;
+          return;
+        }
+
         // 處理常規學生數據
         const regularStudents = studentData || [];
+        
+        // 除錯：檢查常規學生的ID
+        console.log('常規學生總數:', regularStudents.length);
+        console.log('常規學生ID範例:', regularStudents.slice(0, 3).map(s => ({ id: s.id, name: s.full_name })));
         
         // 計算常規學生的剩餘堂數
         const regularStudentIds = regularStudents.map(student => student.id);
         const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
         
-        // 為常規學生添加剩餘堂數
-        const regularStudentsWithRemaining = regularStudents.map(student => ({
-          ...student,
-          remaining_lessons: remainingLessonsMap[student.id] || 0,
-        }));
+        // 建立學生課堂日期映射
+        const studentLessonDates = new Map<string, string[]>();
+        if (lessonData) {
+          console.log('載入的課堂記錄總數:', lessonData.length);
+          lessonData.forEach(lesson => {
+            if (lesson.student_id && lesson.lesson_date) {
+              // 確保日期格式為 YYYY-MM-DD
+              const dateStr = lesson.lesson_date;
+              const existing = studentLessonDates.get(lesson.student_id) || [];
+              if (!existing.includes(dateStr)) {
+                existing.push(dateStr);
+              }
+              studentLessonDates.set(lesson.student_id, existing);
+            }
+          });
+          console.log('學生課堂日期映射總數:', studentLessonDates.size);
+          
+          // 檢查映射中的一些範例
+          const mappingEntries = Array.from(studentLessonDates.entries()).slice(0, 3);
+          console.log('課堂日期映射範例:', mappingEntries);
+        }
+        
+        // 為常規學生添加剩餘堂數和課堂日期
+        const regularStudentsWithRemaining = regularStudents.map(student => {
+          const lessonDates = studentLessonDates.get(student.id) || [];
+          return {
+            ...student,
+            remaining_lessons: remainingLessonsMap[student.id] || 0,
+            lesson_dates: lessonDates, // 添加所有課堂日期
+            lesson_date: lessonDates[0] || null, // 添加最近的課堂日期（用於向後兼容）
+          };
+        });
 
         // 處理試堂學生數據
         const trialStudents = (trialStudentData || []).map((trial) => {
@@ -220,6 +439,11 @@ export default function StudentManagementPage() {
             const trialDate = new Date(trial.lesson_date);
             // 不需要加8小時，直接使用本地時間
             weekday = trialDate.getDay().toString();
+          }
+
+          // 除錯：檢查試堂學生的日期資料
+          if (trial.lesson_date) {
+            console.log(`試堂學生 ${trial.full_name} 的原始 lesson_date:`, trial.lesson_date);
           }
 
           return {
@@ -275,7 +499,6 @@ export default function StudentManagementPage() {
 
         // 合併所有學生數據
         const allStudents = [...regularStudentsWithRemaining, ...trialStudents, ...inactiveStudents];
-        setStudents(allStudents);
         setInactiveStudents(inactiveStudents);
         dataFetchedRef.current = true;
         loadingRef.current = false;
@@ -304,22 +527,22 @@ export default function StudentManagementPage() {
       return;
     }
 
-    setIsLoading(true);
+    setActionLoading(true);
     try {
       // 獲取選中學生的完整資料
-      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id));
+      const selectedStudentData = students.filter((s: any) => selectedStudents.includes(s.id));
       console.log('選中要刪除的學生資料:', selectedStudentData);
       
       // 分離常規學生和試堂學生
-      const regularStudents = selectedStudentData.filter(s => s.student_type !== '試堂');
-      const trialStudents = selectedStudentData.filter(s => s.student_type === '試堂');
+      const regularStudents = selectedStudentData.filter((s: any) => s.student_type !== '試堂');
+      const trialStudents = selectedStudentData.filter((s: any) => s.student_type === '試堂');
       
       console.log('常規學生:', regularStudents);
       console.log('試堂學生:', trialStudents);
 
       // 處理常規學生的外鍵依賴
       if (regularStudents.length > 0) {
-        const regularIds = regularStudents.map(s => s.id);
+        const regularIds = regularStudents.map((s: any) => s.id);
         
         // 處理常規學生的外鍵依賴
         console.log('處理常規學生外鍵依賴...');
@@ -386,7 +609,7 @@ export default function StudentManagementPage() {
 
       // 處理試堂學生
       if (trialStudents.length > 0) {
-        const trialIds = trialStudents.map(s => s.id);
+        const trialIds = trialStudents.map((s: any) => s.id);
         
         // 試堂學生通常沒有複雜的外鍵依賴，直接刪除
         const { error: trialError } = await supabase
@@ -402,14 +625,13 @@ export default function StudentManagementPage() {
       }
 
       // 更新本地狀態
-      setStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)));
       setSelectedStudents([]);
       alert(`成功刪除 ${selectedStudents.length} 位學生`);
     } catch (error) {
       console.error('Error deleting students:', error);
       alert(`刪除學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
-      setIsLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -421,24 +643,24 @@ export default function StudentManagementPage() {
       return;
     }
 
-    setIsLoading(true);
+    setActionLoading(true);
     try {
       // 獲取選中學生的完整資料
-      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id));
+      const selectedStudentData = students.filter((s: any) => selectedStudents.includes(s.id));
       
       // 分離常規學生和試堂學生
-      const regularStudents = selectedStudentData.filter(s => s.student_type !== '試堂');
-      const trialStudents = selectedStudentData.filter(s => s.student_type === '試堂');
+      const regularStudents = selectedStudentData.filter((s: any) => s.student_type !== '試堂');
+      const trialStudents = selectedStudentData.filter((s: any) => s.student_type === '試堂');
 
       // 如果有試堂學生，提示用戶試堂學生只能刪除不能停用
       if (trialStudents.length > 0) {
         alert('試堂學生只能刪除不能停用。請先取消選擇試堂學生，或使用刪除功能。');
-        setIsLoading(false);
+        setActionLoading(false);
         return;
       }
 
       // 將學生資料插入 inactive_student_list 表
-      const inactiveStudentsData = regularStudents.map(s => ({
+      const inactiveStudentsData = regularStudents.map((s: any) => ({
         original_id: s.id,
         student_type: 'regular',
         full_name: s.full_name,
@@ -488,7 +710,7 @@ export default function StudentManagementPage() {
 
       // 刪除原表中的學生資料
       if (regularStudents.length > 0) {
-        const regularIds = regularStudents.map(s => s.id);
+        const regularIds = regularStudents.map((s: any) => s.id);
         
         // 處理常規學生的外鍵依賴
         console.log('處理常規學生外鍵依賴...');
@@ -554,7 +776,6 @@ export default function StudentManagementPage() {
       }
 
       // 更新本地狀態
-      setStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)));
       setSelectedStudents([]);
       alert(`成功停用 ${regularStudents.length} 位常規學生`);
       
@@ -591,7 +812,7 @@ export default function StudentManagementPage() {
       console.error('Error inactivating students:', error);
       alert('停用學生時發生錯誤');
     } finally {
-      setIsLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -603,7 +824,7 @@ export default function StudentManagementPage() {
       return;
     }
 
-    setIsLoading(true);
+    setActionLoading(true);
     try {
       // 獲取選中停用學生的完整資料
       const selectedInactiveData = inactiveStudents.filter(s => selectedStudents.includes(s.id));
@@ -725,7 +946,6 @@ export default function StudentManagementPage() {
       }
 
       // 更新本地狀態
-      setInactiveStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)));
       setSelectedStudents([]);
       alert(`成功回復 ${selectedStudents.length} 位學生`);
       
@@ -801,13 +1021,13 @@ export default function StudentManagementPage() {
         });
 
         const allStudents = [...regularStudentsWithRemaining, ...trialStudents];
-        setStudents(allStudents);
+        setInactiveStudents(allStudents);
       }
     } catch (error) {
       console.error('Error restoring students:', error);
       alert(`回復學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
-      setIsLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -819,15 +1039,15 @@ export default function StudentManagementPage() {
       return;
     }
 
-    setIsLoading(true);
+    setActionLoading(true);
     try {
       // 獲取選中停用學生的完整資料
-      const selectedInactiveStudentData = inactiveStudents.filter(s => selectedStudents.includes(s.id));
+      const selectedInactiveStudentData = inactiveStudents.filter((s: any) => selectedStudents.includes(s.id));
       console.log('選中要刪除的停用學生資料:', selectedInactiveStudentData);
       
       // 分離常規學生和試堂學生
-      const regularInactiveStudents = selectedInactiveStudentData.filter(s => s.student_type === '常規');
-      const trialInactiveStudents = selectedInactiveStudentData.filter(s => s.student_type === '試堂');
+      const regularInactiveStudents = selectedInactiveStudentData.filter((s: any) => s.student_type === '常規');
+      const trialInactiveStudents = selectedInactiveStudentData.filter((s: any) => s.student_type === '試堂');
       
       console.log('停用常規學生:', regularInactiveStudents);
       console.log('停用試堂學生:', trialInactiveStudents);
@@ -957,35 +1177,32 @@ export default function StudentManagementPage() {
       }
 
       // 更新本地狀態
-      setInactiveStudents(prev => prev.filter(s => !selectedStudents.includes(s.id)));
       setSelectedStudents([]);
       alert(`成功永久刪除 ${selectedStudents.length} 位停用學生`);
     } catch (error) {
       console.error('Error deleting inactive students:', error);
       alert(`刪除停用學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
-      setIsLoading(false);
+      setActionLoading(false);
     }
   };
 
-  // 移除這個 useEffect，避免無窮迴圈
-
   // 根據篩選條件決定顯示哪些學生
   const isShowingInactiveStudents = selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('停用學生');
-  const currentStudents = isShowingInactiveStudents ? inactiveStudents : students.filter(s => !s.is_inactive);
+  const currentStudents = isShowingInactiveStudents ? inactiveStudents : students.filter((s: any) => !s.is_inactive);
 
   // 計算顯示學生數（不包括停用學生）
-  const activeStudentsCount = students.filter(s => !s.is_inactive).length;
+  const activeStudentsCount = students.filter((s: any) => !s.is_inactive).length;
 
   const filteredStudents = useMemo(() => {
     try {
       // 根據是否選擇停用學生來決定基礎資料來源
       const baseStudents = isShowingInactiveStudents 
         ? [...students, ...inactiveStudents] 
-        : students.filter(s => !s.is_inactive);
+        : students.filter((s: any) => !s.is_inactive);
       
       // 先合成一份帶最新 remaining_lessons 的 students
-      const studentsWithLatestLessons = (baseStudents || []).map(s => {
+      const studentsWithLatestLessons = (baseStudents || []).map((s: any) => {
         if (s.student_type !== '試堂' && !s.is_inactive && s.id && remainingLessonsMap[s.id] !== undefined) {
           return { ...s, remaining_lessons: remainingLessonsMap[s.id] };
         }
@@ -997,7 +1214,7 @@ export default function StudentManagementPage() {
       // 1. 搜尋篩選
       if (searchQuery && searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
-        result = result.filter(s => {
+        result = result.filter((s: any) => {
           if (!s) return false;
           try {
             return (
@@ -1014,7 +1231,7 @@ export default function StudentManagementPage() {
 
       // 2. 課程篩選
       if (selectedCourses && selectedCourses.length > 0) {
-        result = result.filter(s => {
+        result = result.filter((s: any) => {
           if (!s) return false;
           try {
             // 處理特殊課程類型
@@ -1027,7 +1244,7 @@ export default function StudentManagementPage() {
             if (selectedCourses.includes('停用學生') && s.is_inactive) {
               return true;
             }
-            // 處理具體課程類型
+            // 處理具體課程類型（如鋼琴、音樂專注力等）
             if (s.course_type && selectedCourses.includes(s.course_type)) {
               return true;
             }
@@ -1041,7 +1258,7 @@ export default function StudentManagementPage() {
 
       // 3. 星期篩選
       if (selectedWeekdays && selectedWeekdays.length > 0) {
-        result = result.filter(s => {
+        result = result.filter((s: any) => {
           if (!s) return false;
           // 處理常規學生與試堂學生
           let weekdays: string[] = [];
@@ -1050,13 +1267,13 @@ export default function StudentManagementPage() {
           } else if (s.regular_weekday !== undefined && s.regular_weekday !== null) {
             weekdays = [String(s.regular_weekday)];
           }
-          return weekdays.some(weekday => selectedWeekdays.includes(weekday));
+          return weekdays.some((weekday: string) => selectedWeekdays.includes(weekday));
         });
       }
 
       // 4. 堂數篩選（只對常規學生生效）
       if (selectedLessonFilter && selectedLessonFilter !== 'all') {
-        result = result.filter(s => {
+        result = result.filter((s: any) => {
           if (!s) return false;
           try {
             // 只有常規學生才有剩餘堂數概念
@@ -1086,12 +1303,73 @@ export default function StudentManagementPage() {
         });
       }
 
+      // 5. 日期篩選
+      if (selectedDates && selectedDates.length > 0) {
+        // 使用與 HanamiCalendar 相同的日期格式處理
+        const getDateString = (date: Date) => {
+          return date.toLocaleDateString('sv-SE'); // 產生 'YYYY-MM-DD' 格式
+        };
+        
+        const selectedDateStrings = selectedDates.map(d => getDateString(d));
+        console.log('開始日期篩選，選中日期:', selectedDateStrings);
+        console.log('篩選前的學生總數:', result.length);
+        
+        result = result.filter((s: any) => {
+          if (!s) return false;
+          try {
+            // 檢查學生是否有符合選中日期的課堂
+            const studentDates: string[] = [];
+            
+            // 常規學生：檢查 hanami_student_lesson 表中的課堂日期
+            if (s.student_type === '常規') {
+              if (s.lesson_dates && Array.isArray(s.lesson_dates)) {
+                studentDates.push(...s.lesson_dates);
+              }
+            }
+            
+            // 試堂學生：檢查 lesson_date（直接存在試堂學生記錄中）
+            if (s.student_type === '試堂' && s.lesson_date) {
+              studentDates.push(s.lesson_date);
+            }
+            
+            // 檢查是否有任何選中的日期與學生的課堂日期匹配
+            const hasMatch = selectedDateStrings.some((selectedDateStr: string) => {
+              const match = studentDates.includes(selectedDateStr);
+              if (match) {
+                console.log(`找到匹配: ${s.full_name} 的日期 ${selectedDateStr} 與選中日期匹配`);
+              }
+              return match;
+            });
+            
+            // 顯示所有學生的篩選結果
+            console.log(`學生 ${s.full_name} (${s.student_type}) - 匹配: ${hasMatch}, 日期: [${studentDates.join(', ')}]`);
+            
+            // 除錯：顯示日期比較的詳細資訊
+            if (studentDates.length > 0) {
+              console.log(`  選中日期: [${selectedDateStrings.join(', ')}]`);
+              console.log(`  學生日期: [${studentDates.join(', ')}]`);
+            }
+            
+            // 特別顯示試堂學生的資訊
+            if (s.student_type === '試堂') {
+              console.log(`試堂學生 ${s.full_name} 的 lesson_date:`, s.lesson_date);
+            }
+            
+            return hasMatch;
+          } catch (error) {
+            console.error('日期篩選錯誤:', error);
+            return false;
+          }
+        });
+        console.log('日期篩選後的學生數量:', result.length);
+      }
+
       return result;
     } catch (error) {
       console.error('filteredStudents 計算錯誤:', error);
       return students || [];
     }
-  }, [students, searchQuery, selectedCourses, selectedWeekdays, selectedLessonFilter, customLessonCount, remainingLessonsMap]);
+  }, [students, searchQuery, selectedCourses, selectedWeekdays, selectedLessonFilter, customLessonCount, selectedDates, remainingLessonsMap]);
 
   // 排序學生數據
   const sortStudents = (students: any[]) => {
@@ -1240,95 +1518,292 @@ export default function StudentManagementPage() {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [totalPages, currentPage]);
+  }, [totalPages]); // 移除 currentPage 依賴，避免無窮迴圈
 
+  // 移除這個會造成無窮迴圈的 useEffect
+  // useEffect(() => {
+  //   if (displayMode !== 'grid') return;
+  //   setRemainingLoading(true);
+    
+  //   // 只計算常規學生的剩餘堂數，與學校狀況一覽保持一致
+  //   const regularStudentIds = students
+  //     .filter(s => s.student_type === '常規')
+  //     .map(s => s.id);
+    
+  //   if (regularStudentIds.length === 0) {
+  //     setRemainingLessonsMap({});
+  //     setRemainingLoading(false);
+  //     return;
+  //   }
+    
+  //   // 使用與學校狀況一覽相同的邏輯：只查詢今天及之後的課堂記錄
+  //   const today = new Date().toISOString().split('T')[0];
+    
+  //   supabase
+  //     .from('hanami_student_lesson')
+  //     .select('student_id, lesson_date, actual_timeslot, lesson_duration')
+  //     .in('student_id', regularStudentIds)
+  //     .gte('lesson_date', today)
+  //     .order('lesson_date')
+  //     .then(({ data: lessonRecords, error }) => {
+  //       if (error) {
+  //         console.error('Error fetching lesson records:', error);
+  //         setRemainingLessonsMap({});
+  //         setRemainingLoading(false);
+  //         return;
+  //       }
+        
+  //       // 計算每個學生的剩餘堂數（與學校狀況一覽完全相同的邏輯）
+  //       const now = new Date();
+  //       const todayStr = now.toISOString().slice(0, 10);
+  //       const studentLessonCounts = new Map<string, number>();
+        
+  //       // 初始化所有常規學生的計數為0
+  //       regularStudentIds.forEach(id => {
+  //         studentLessonCounts.set(id, 0);
+  //       });
+        
+  //       // 計算每個學生的剩餘堂數
+  //       lessonRecords?.forEach(lesson => {
+  //         const studentId = lesson.student_id;
+  //         if (!studentId) return;
+          
+  //         let shouldCount = false;
+          
+  //         if (lesson.lesson_date > todayStr) {
+  //           // 大於今天的都算
+  //           shouldCount = true;
+  //         } else if (lesson.lesson_date === todayStr) {
+  //           // 等於今天的要判斷結束時間
+  //           if (!lesson.actual_timeslot || !lesson.lesson_duration) {
+  //             // 沒有時間資訊，保守算進剩餘堂數
+  //             shouldCount = true;
+  //           } else {
+  //             // 解析時間：課堂開始時間+課程時長
+  //             const [h, m] = lesson.actual_timeslot.split(':').map(Number);
+  //             const durationParts = lesson.lesson_duration.split(':').map(Number);
+  //             const dh = durationParts[0] || 0; // 小時
+  //             const dm = durationParts[1] || 0; // 分鐘
+  //             const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+  //             const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
+  //             if (end >= now) {
+  //               shouldCount = true;
+  //             }
+  //           }
+  //         }
+        
+  //         if (shouldCount) {
+  //           const currentCount = studentLessonCounts.get(studentId) || 0;
+  //           studentLessonCounts.set(studentId, currentCount + 1);
+  //         }
+  //       });
+        
+  //       // 轉換為 Map 格式
+  //       const remainingMap: Record<string, number> = {};
+  //       studentLessonCounts.forEach((count, studentId) => {
+  //         remainingMap[studentId] = count;
+  //       });
+        
+  //       setRemainingLessonsMap(remainingMap);
+  //       setRemainingLoading(false);
+  //     });
+  // }, [students, displayMode]);
+
+  // 改為在 displayMode 變動時才計算剩餘堂數
   useEffect(() => {
-    if (displayMode !== 'grid') return;
-    setRemainingLoading(true);
-    
-    // 只計算常規學生的剩餘堂數，與學校狀況一覽保持一致
-    const regularStudentIds = students
-      .filter(s => s.student_type === '常規')
-      .map(s => s.id);
-    
-    if (regularStudentIds.length === 0) {
+    if (displayMode !== 'grid') {
       setRemainingLessonsMap({});
       setRemainingLoading(false);
       return;
     }
     
-    // 使用與學校狀況一覽相同的邏輯：只查詢今天及之後的課堂記錄
-    const today = new Date().toISOString().split('T')[0];
+    // 延遲計算，避免在每次 render 時都計算
+    const timer = setTimeout(() => {
+      setRemainingLoading(true);
+      
+      // 只計算常規學生的剩餘堂數，與學校狀況一覽保持一致
+      const regularStudentIds = students
+        .filter((s: any) => s.student_type === '常規')
+        .map((s: any) => s.id);
+      
+      if (regularStudentIds.length === 0) {
+        setRemainingLessonsMap({});
+        setRemainingLoading(false);
+        return;
+      }
+      
+      // 使用與學校狀況一覽相同的邏輯：只查詢今天及之後的課堂記錄
+      const today = new Date().toISOString().split('T')[0];
+      
+      supabase
+        .from('hanami_student_lesson')
+        .select('student_id, lesson_date, actual_timeslot, lesson_duration')
+        .in('student_id', regularStudentIds)
+        .gte('lesson_date', today)
+        .order('lesson_date')
+        .then(({ data: lessonRecords, error }) => {
+          if (error) {
+            console.error('Error fetching lesson records:', error);
+            setRemainingLessonsMap({});
+            setRemainingLoading(false);
+            return;
+          }
+          
+          // 計算每個學生的剩餘堂數（與學校狀況一覽完全相同的邏輯）
+          const now = new Date();
+          const todayStr = now.toISOString().slice(0, 10);
+          const studentLessonCounts = new Map<string, number>();
+          
+          // 初始化所有常規學生的計數為0
+          regularStudentIds.forEach((id: any) => {
+            studentLessonCounts.set(id, 0);
+          });
+          
+          // 計算每個學生的剩餘堂數
+          lessonRecords?.forEach(lesson => {
+            const studentId = lesson.student_id;
+            if (!studentId) return;
+            
+            let shouldCount = false;
+            
+            if (lesson.lesson_date > todayStr) {
+              // 大於今天的都算
+              shouldCount = true;
+            } else if (lesson.lesson_date === todayStr) {
+              // 等於今天的要判斷結束時間
+              if (!lesson.actual_timeslot || !lesson.lesson_duration) {
+                // 沒有時間資訊，保守算進剩餘堂數
+                shouldCount = true;
+              } else {
+                // 解析時間：課堂開始時間+課程時長
+                const [h, m] = lesson.actual_timeslot.split(':').map(Number);
+                const durationParts = lesson.lesson_duration.split(':').map(Number);
+                const dh = durationParts[0] || 0; // 小時
+                const dm = durationParts[1] || 0; // 分鐘
+                const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+                const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
+                if (end >= now) {
+                  shouldCount = true;
+                }
+              }
+            }
+            
+            if (shouldCount) {
+              const currentCount = studentLessonCounts.get(studentId) || 0;
+              studentLessonCounts.set(studentId, currentCount + 1);
+            }
+          });
+          
+          // 轉換為 Map 格式
+          const remainingMap: Record<string, number> = {};
+          studentLessonCounts.forEach((count, studentId) => {
+            remainingMap[studentId] = count;
+          });
+          
+          setRemainingLessonsMap(remainingMap);
+          setRemainingLoading(false);
+        });
+    }, 100); // 延遲 100ms 執行
     
-    supabase
-      .from('hanami_student_lesson')
-      .select('student_id, lesson_date, actual_timeslot, lesson_duration')
-      .in('student_id', regularStudentIds)
-      .gte('lesson_date', today)
-      .order('lesson_date')
-      .then(({ data: lessonRecords, error }) => {
-        if (error) {
-          console.error('Error fetching lesson records:', error);
+    return () => clearTimeout(timer);
+  }, [displayMode, students.length]); // 監控 displayMode 和 students 數量變化
+
+  // 新增：當 SWR 資料更新時，重新計算剩餘堂數
+  useEffect(() => {
+    if (displayMode === 'grid' && students.length > 0 && !isLoading) {
+      // 延遲計算，避免頻繁更新
+      const timer = setTimeout(() => {
+        setRemainingLoading(true);
+        
+        // 只計算常規學生的剩餘堂數
+        const regularStudentIds = students
+          .filter((s: any) => s.student_type === '常規')
+          .map((s: any) => s.id);
+        
+        if (regularStudentIds.length === 0) {
           setRemainingLessonsMap({});
           setRemainingLoading(false);
           return;
         }
         
-        // 計算每個學生的剩餘堂數（與學校狀況一覽完全相同的邏輯）
-        const now = new Date();
-        const todayStr = now.toISOString().slice(0, 10);
-        const studentLessonCounts = new Map<string, number>();
+        // 使用與學校狀況一覽相同的邏輯：只查詢今天及之後的課堂記錄
+        const today = new Date().toISOString().split('T')[0];
         
-        // 初始化所有常規學生的計數為0
-        regularStudentIds.forEach(id => {
-          studentLessonCounts.set(id, 0);
-        });
-        
-        // 計算每個學生的剩餘堂數
-        lessonRecords?.forEach(lesson => {
-          const studentId = lesson.student_id;
-          if (!studentId) return;
-          
-          let shouldCount = false;
-          
-          if (lesson.lesson_date > todayStr) {
-            // 大於今天的都算
-            shouldCount = true;
-          } else if (lesson.lesson_date === todayStr) {
-            // 等於今天的要判斷結束時間
-            if (!lesson.actual_timeslot || !lesson.lesson_duration) {
-              // 沒有時間資訊，保守算進剩餘堂數
-              shouldCount = true;
-            } else {
-              // 解析時間：課堂開始時間+課程時長
-              const [h, m] = lesson.actual_timeslot.split(':').map(Number);
-              const durationParts = lesson.lesson_duration.split(':').map(Number);
-              const dh = durationParts[0] || 0; // 小時
-              const dm = durationParts[1] || 0; // 分鐘
-              const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
-              const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
-              if (end >= now) {
-                shouldCount = true;
-              }
+        supabase
+          .from('hanami_student_lesson')
+          .select('student_id, lesson_date, actual_timeslot, lesson_duration')
+          .in('student_id', regularStudentIds)
+          .gte('lesson_date', today)
+          .order('lesson_date')
+          .then(({ data: lessonRecords, error }) => {
+            if (error) {
+              console.error('Error fetching lesson records:', error);
+              setRemainingLessonsMap({});
+              setRemainingLoading(false);
+              return;
             }
-          }
-          
-          if (shouldCount) {
-            const currentCount = studentLessonCounts.get(studentId) || 0;
-            studentLessonCounts.set(studentId, currentCount + 1);
-          }
-        });
-        
-        // 轉換為 Map 格式
-        const remainingMap: Record<string, number> = {};
-        studentLessonCounts.forEach((count, studentId) => {
-          remainingMap[studentId] = count;
-        });
-        
-        setRemainingLessonsMap(remainingMap);
-        setRemainingLoading(false);
-      });
-  }, [students, displayMode]);
+            
+            // 計算每個學生的剩餘堂數
+            const now = new Date();
+            const todayStr = now.toISOString().slice(0, 10);
+            const studentLessonCounts = new Map<string, number>();
+            
+            // 初始化所有常規學生的計數為0
+            regularStudentIds.forEach((id: any) => {
+              studentLessonCounts.set(id, 0);
+            });
+            
+            // 計算每個學生的剩餘堂數
+            lessonRecords?.forEach(lesson => {
+              const studentId = lesson.student_id;
+              if (!studentId) return;
+              
+              let shouldCount = false;
+              
+              if (lesson.lesson_date > todayStr) {
+                // 大於今天的都算
+                shouldCount = true;
+              } else if (lesson.lesson_date === todayStr) {
+                // 等於今天的要判斷結束時間
+                if (!lesson.actual_timeslot || !lesson.lesson_duration) {
+                  // 沒有時間資訊，保守算進剩餘堂數
+                  shouldCount = true;
+                } else {
+                  // 解析時間：課堂開始時間+課程時長
+                  const [h, m] = lesson.actual_timeslot.split(':').map(Number);
+                  const durationParts = lesson.lesson_duration.split(':').map(Number);
+                  const dh = durationParts[0] || 0; // 小時
+                  const dm = durationParts[1] || 0; // 分鐘
+                  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+                  const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
+                  if (end >= now) {
+                    shouldCount = true;
+                  }
+                }
+              }
+              
+              if (shouldCount) {
+                const currentCount = studentLessonCounts.get(studentId) || 0;
+                studentLessonCounts.set(studentId, currentCount + 1);
+              }
+            });
+            
+            // 轉換為 Map 格式
+            const remainingMap: Record<string, number> = {};
+            studentLessonCounts.forEach((count, studentId) => {
+              remainingMap[studentId] = count;
+            });
+            
+            setRemainingLessonsMap(remainingMap);
+            setRemainingLoading(false);
+          });
+      }, 200); // 延遲 200ms 執行
+      
+      return () => clearTimeout(timer);
+    }
+    // 其他情況 return undefined
+    return undefined;
+  }, [students, displayMode, isLoading]); // 監控 students 資料變化
 
   return (
     <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
@@ -1396,7 +1871,7 @@ export default function StudentManagementPage() {
                   <div className="flex gap-2">
                     <button
                       className="hanami-btn-success flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isLoading}
+                      disabled={actionLoading}
                       onClick={handleRestoreStudents}
                     >
                       <RotateCcw className="w-4 h-4" />
@@ -1404,7 +1879,7 @@ export default function StudentManagementPage() {
                     </button>
                     <button
                       className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isLoading}
+                      disabled={actionLoading}
                       onClick={handleDeleteInactiveStudents}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1415,9 +1890,9 @@ export default function StudentManagementPage() {
                   <>
                     {/* 檢查選中的學生中是否包含試堂學生 */}
                     {(() => {
-                      const selectedStudentData = students.filter(s => selectedStudents.includes(s.id));
-                      const hasTrialStudents = selectedStudentData.some(s => s.student_type === '試堂');
-                      const hasRegularStudents = selectedStudentData.some(s => s.student_type !== '試堂');
+                      const selectedStudentData = students.filter((s: any) => selectedStudents.includes(s.id));
+                      const hasTrialStudents = selectedStudentData.some((s: any) => s.student_type === '試堂');
+                      const hasRegularStudents = selectedStudentData.some((s: any) => s.student_type !== '試堂');
                       
                       return (
                         <>
@@ -1425,7 +1900,7 @@ export default function StudentManagementPage() {
                           {hasRegularStudents && (
                             <button
                               className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={isLoading}
+                              disabled={actionLoading}
                               onClick={handleInactiveStudents}
                             >
                               <UserX className="w-4 h-4" />
@@ -1434,7 +1909,7 @@ export default function StudentManagementPage() {
                           )}
                           <button
                             className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={isLoading}
+                            disabled={actionLoading}
                             onClick={handleDeleteStudents}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1444,9 +1919,9 @@ export default function StudentManagementPage() {
                           {selectedStudents.length > 0 && (
                             <button
                               className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={isLoading}
+                              disabled={actionLoading}
                               onClick={() => {
-                                const selected = students.filter(s => selectedStudents.includes(s.id));
+                                const selected = students.filter((s: any) => selectedStudents.includes(s.id));
                                 if (selected.length > 0) {
                                   setSelectedStudentsForAI(selected);
                                   setShowAIMessageModal(true);
@@ -1473,7 +1948,10 @@ export default function StudentManagementPage() {
             <div className="relative">
               <button
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                onClick={() => setSearchQuery(searchInput)}
+                onClick={() => {
+                  setSearchQuery(searchInput);
+                  handleSearchTermChange(searchInput);
+                }}
               >
                 <svg
                   fill="none"
@@ -1487,10 +1965,14 @@ export default function StudentManagementPage() {
                 className="pl-10"
                 placeholder="搜尋學生..."
                 value={searchInput}
-                onChange={e => setSearchInput(e.target.value)}
+                onChange={e => {
+                  setSearchInput(e.target.value);
+                  handleSearchTermChange(e.target.value);
+                }}
                 onKeyDown={e => {
                   if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
                     setSearchQuery(searchInput);
+                    handleSearchTermChange(searchInput);
                     if (e.preventDefault) e.preventDefault();
                   }
                 }}
@@ -1515,6 +1997,7 @@ export default function StudentManagementPage() {
               </button>
               {dropdownOpen && (
                 <PopupSelect
+                  mode="multi"
                   options={[
                     { label: '鋼琴', value: '鋼琴' },
                     { label: '音樂專注力', value: '音樂專注力' },
@@ -1527,10 +2010,11 @@ export default function StudentManagementPage() {
                   title="篩選課程"
                   onCancel={() => { console.log('父層 cancel'); setDropdownOpen(false); }}
                   onChange={(value) => {
+                    console.log('課程篩選 onChange:', value);
                     if (Array.isArray(value)) {
-                      setSelectedCourses(value);
+                      handleSelectedCoursesChange(value);
                     } else if (typeof value === 'string') {
-                      setSelectedCourses([value]);
+                      handleSelectedCoursesChange([value]);
                     }
                   }}
                   onConfirm={() => { console.log('父層 confirm'); setDropdownOpen(false); }}
@@ -1554,6 +2038,7 @@ export default function StudentManagementPage() {
               </button>
               {weekdayDropdownOpen && (
                 <PopupSelect
+                  mode="multi"
                   options={[
                     { label: '星期一', value: '1' },
                     { label: '星期二', value: '2' },
@@ -1566,7 +2051,7 @@ export default function StudentManagementPage() {
                   selected={selectedWeekdays}
                   title="篩選星期"
                   onCancel={() => { console.log('父層 cancel'); setWeekdayDropdownOpen(false); }}
-                  onChange={value => setSelectedWeekdays(Array.isArray(value) ? value : [value])}
+                  onChange={value => handleSelectedWeekdaysChange(Array.isArray(value) ? value : [value])}
                   onConfirm={() => { console.log('父層 confirm'); setWeekdayDropdownOpen(false); }}
                 />
               )}
@@ -1614,6 +2099,30 @@ export default function StudentManagementPage() {
             <div className="mb-4">
               <button
                 className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
+                onClick={() => setShowDateFilter(true)}
+              >
+                <CalendarClock className="w-4 h-4" />
+                <span>篩選日期</span>
+                {selectedDates.length > 0 && (
+                  <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full min-w-[20px] flex items-center justify-center">
+                    {selectedDates.length}
+                  </span>
+                )}
+              </button>
+              {/* 日曆彈窗 */}
+              {showDateFilter && (
+                <Calendarui
+                  value={selectedDates}
+                  onChange={handleSelectedDatesChange}
+                  onClose={() => setShowDateFilter(false)}
+                  multiple
+                />
+              )}
+            </div>
+
+            <div className="mb-4">
+              <button
+                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
                 onClick={() => setDisplayMode(displayMode === 'grid' ? 'list' : 'grid')}
               >
                 {displayMode === 'grid' ? (
@@ -1634,6 +2143,7 @@ export default function StudentManagementPage() {
               selectedWeekdays.length > 0 ||
               selectedLessonFilter !== 'all' ||
               isCustomLessonFilterActive(selectedLessonFilter, customLessonCount) ||
+              selectedDates.length > 0 ||
               searchQuery) && (
               <div className="mb-4">
                 <button
@@ -1643,8 +2153,16 @@ export default function StudentManagementPage() {
                     setSelectedWeekdays([]);
                     setSelectedLessonFilter('all');
                     setCustomLessonCount('');
+                    setSelectedDates([]);
                     setSearchInput('');
                     setSearchQuery('');
+                    // 同時清除 API 篩選狀態
+                    setApiFilter({
+                      selectedDates: [],
+                      selectedCourses: [],
+                      selectedWeekdays: [],
+                      searchTerm: '',
+                    });
                   }}
                 >
                   <span>清除所有條件</span>
@@ -1655,7 +2173,7 @@ export default function StudentManagementPage() {
         </div>
 
         {/* 篩選條件顯示區域 */}
-        {(selectedCourses.length > 0 || selectedWeekdays.length > 0 || selectedLessonFilter !== 'all' || isCustomLessonFilterActive(selectedLessonFilter, customLessonCount) || searchQuery) && (
+        {(selectedCourses.length > 0 || selectedWeekdays.length > 0 || selectedLessonFilter !== 'all' || isCustomLessonFilterActive(selectedLessonFilter, customLessonCount) || selectedDates.length > 0 || searchQuery) && (
           <div className="mb-4 p-3 bg-gradient-to-r from-[#E0F2E0] to-[#D4F2D4] rounded-lg border border-[#C8EAC8]">
             <div className="flex items-center gap-2 mb-2">
               <svg className="w-4 h-4 text-[#4CAF50]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1687,6 +2205,11 @@ export default function StudentManagementPage() {
                   堂數：{selectedLessonFilter === 'gt2' ? '> 2' : selectedLessonFilter === 'lte2' ? '≤ 2' : selectedLessonFilter === 'custom' ? `= ${customLessonCount}` : selectedLessonFilter}
                 </span>
               )}
+              {selectedDates.length > 0 && (
+                <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full">
+                  日期：{selectedDates.map(date => date.toLocaleDateString('zh-TW')).join('、')}
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -1706,6 +2229,7 @@ export default function StudentManagementPage() {
                 : selectedLessonFilter === 'lte2'
                   ? '剩餘堂數 ≤ 2'
                   : null,
+            selectedDates.length > 0 && `日期：${selectedDates.map(date => date.toLocaleDateString('zh-TW')).join('、')}`,
           ]
             .filter(Boolean)
             .join('；') || '全部條件'}
@@ -1812,7 +2336,7 @@ export default function StudentManagementPage() {
             ) : (
               sortedStudents
                 .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                .map((student) => {
+                .map((student: any, index: number) => {
                   const ageInMonths = Number(student.student_age) || 0;
                   const years = Math.floor(ageInMonths / 12);
                   const months = ageInMonths % 12;
@@ -1951,7 +2475,7 @@ export default function StudentManagementPage() {
                       checked={selectedStudents.length === sortedStudents.length}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedStudents(sortedStudents.map(s => s.id));
+                          setSelectedStudents(sortedStudents.map((s: any) => s.id));
                         } else {
                           setSelectedStudents([]);
                         }
@@ -2206,7 +2730,7 @@ export default function StudentManagementPage() {
               <tbody>
                 {sortedStudents
                   .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                  .map((student, index) => {
+                  .map((student: any, index: number) => {
                     const ageInMonths = Number(student.student_age) || 0;
                     const years = Math.floor(ageInMonths / 12);
                     const months = ageInMonths % 12;
