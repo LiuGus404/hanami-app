@@ -817,7 +817,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
         {/* 課堂資料表格 */}
         {!loading && !error && lessons.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="w-full text-[#4B4036]">
+                          <table className="w-full min-w-max text-[#4B4036]">
             <thead>
               <tr className="border-b border-[#E9E2D6]">
                 <th>

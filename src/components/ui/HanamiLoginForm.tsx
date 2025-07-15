@@ -61,7 +61,7 @@ export default function HanamiLoginForm({
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF9F2] font-['Quicksand',_sans-serif] flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-[#FFF9F2] font-quicksand flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-sm">
         <HanamiCard className="text-center">
           {/* Logo 和標題 */}

@@ -692,7 +692,7 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                     >複製 Markdown
                     </button>
                   </div>
-                  <table className="min-w-full border border-[#EADBC8] rounded-xl">
+                  <table className="w-full min-w-max border border-[#EADBC8] rounded-xl">
                     <thead className="bg-[#FFF9F2]">
                       <tr>
                         <th className="p-2 border-b border-[#EADBC8] text-left">日期</th>

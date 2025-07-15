@@ -64,8 +64,8 @@ const Calendarui: React.FC<CalendaruiProps> = ({
         const d = value[0];
         return { year: d.getFullYear(), month: d.getMonth() };
       } else if (typeof value === 'string') {
-        const d = new Date(value);
-        return { year: d.getFullYear(), month: d.getMonth() };
+      const d = new Date(value);
+      return { year: d.getFullYear(), month: d.getMonth() };
       }
     }
     return { year: today.getFullYear(), month: today.getMonth() };
@@ -179,7 +179,7 @@ const Calendarui: React.FC<CalendaruiProps> = ({
         
         {/* 日曆區域 */}
         <div className="px-6 pb-4 flex-1 overflow-y-auto">
-          <div className={className || ''}>
+    <div className={className || ''}>
             {/* 月份導航 */}
             <div className="flex items-center justify-between mb-4">
               <button 
@@ -197,33 +197,33 @@ const Calendarui: React.FC<CalendaruiProps> = ({
               >
                 ▶
               </button>
-            </div>
+      </div>
             
             {/* 星期標題 */}
             <div className="grid grid-cols-7 gap-2 mb-3">
-              {['日', '一', '二', '三', '四', '五', '六'].map((w, i) => (
+        {['日', '一', '二', '三', '四', '五', '六'].map((w, i) => (
                 <div key={i} className="text-center text-sm text-[#A68A64] font-bold h-8 flex items-center justify-center">
                   {w}
                 </div>
-              ))}
-            </div>
+        ))}
+      </div>
             
             {/* 日期網格 */}
             <div className="grid grid-cols-7 gap-2">
               {Array(Math.max(0, firstDayOfWeek)).fill(null).map((_, i) => (
-                <div key={i} className="w-12 h-12" />
-              ))}
-              {monthDays.map((date, i) => {
-                return (
-                  <div
+          <div key={i} className="w-12 h-12" />
+        ))}
+        {monthDays.map((date, i) => {
+          return (
+            <div
                     key={formatDateLocal(date)}
-                    className={getCellClass(date)}
+              className={getCellClass(date)}
                     onClick={() => handleDateClick(date)}
-                  >
-                    {date.getDate()}
-                  </div>
-                );
-              })}
+            >
+              {date.getDate()}
+            </div>
+          );
+        })}
             </div>
           </div>
         </div>

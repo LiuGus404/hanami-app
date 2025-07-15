@@ -1710,9 +1710,11 @@ export default function StudentManagementPage() {
 
   // 新增：當 SWR 資料更新時，重新計算剩餘堂數
   useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
     if (displayMode === 'grid' && students.length > 0 && !isLoading) {
       // 延遲計算，避免頻繁更新
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         setRemainingLoading(true);
         
         // 只計算常規學生的剩餘堂數
@@ -1798,11 +1800,13 @@ export default function StudentManagementPage() {
             setRemainingLoading(false);
           });
       }, 200); // 延遲 200ms 執行
-      
-      return () => clearTimeout(timer);
     }
-    // 其他情況 return undefined
-    return undefined;
+    
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
   }, [students, displayMode, isLoading]); // 監控 students 資料變化
 
   return (
@@ -2467,7 +2471,7 @@ export default function StudentManagementPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-[#EADBC8] overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto table-scroll-container">
               <table className="w-full min-w-max">
               <thead>
                 <tr className="bg-[#FFF9F2] border-b border-[#EADBC8]">
@@ -2483,12 +2487,12 @@ export default function StudentManagementPage() {
                       }}
                     />
                   </th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">#</th>
-                  {selectedColumns.includes('student_oid') && (
-                    <th 
-                      className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                      onClick={() => handleSort('student_oid')}
-                    >
+                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B] min-w-[60px]">#</th>
+                                      {selectedColumns.includes('student_oid') && (
+                      <th 
+                        className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition-colors min-w-[100px]"
+                        onClick={() => handleSort('student_oid')}
+                      >
                       <div className="flex items-center gap-1">
                         學生編號
                         {getSortIcon('student_oid')}
@@ -2497,7 +2501,7 @@ export default function StudentManagementPage() {
                   )}
                   {selectedColumns.includes('full_name') && (
                     <th 
-                      className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                      className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition-colors min-w-[120px]"
                       onClick={() => handleSort('full_name')}
                     >
                       <div className="flex items-center gap-1">
@@ -2662,7 +2666,7 @@ export default function StudentManagementPage() {
                   )}
                   {selectedColumns.includes('contact_number') && (
                     <th 
-                      className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                      className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition-colors min-w-[120px]"
                       onClick={() => handleSort('contact_number')}
                     >
                       <div className="flex items-center gap-1">
@@ -2899,7 +2903,6 @@ export default function StudentManagementPage() {
                   })}
               </tbody>
             </table>
-            </div>
           </div>
         )}
 

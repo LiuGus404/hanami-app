@@ -247,7 +247,7 @@ export default function AIMessageHistoryPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-max">
                 <thead className="bg-[#FFF9F2]">
                   <tr>
                     <th className="px-6 py-4 text-left text-sm font-medium text-[#2B3A3B]">學生</th>

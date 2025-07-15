@@ -98,14 +98,19 @@ export async function POST(request: Request) {
 
     // 應用搜尋篩選
     if (searchTerm && searchTerm.trim()) {
+      console.log('應用搜尋篩選，搜尋詞:', searchTerm);
+      
       if (shouldQueryRegular) {
-        regularStudentQuery = regularStudentQuery.or(`full_name.ilike.%${searchTerm}%,student_oid.ilike.%${searchTerm}%,contact_number.ilike.%${searchTerm}%`);
+        regularStudentQuery = regularStudentQuery.or(`full_name.ilike.%${searchTerm}%,contact_number.ilike.%${searchTerm}%,student_oid.ilike.%${searchTerm}%`);
+        console.log('常規學生搜尋條件: full_name, contact_number, student_oid');
       }
       if (shouldQueryTrial) {
         trialStudentQuery = trialStudentQuery.or(`full_name.ilike.%${searchTerm}%,contact_number.ilike.%${searchTerm}%`);
+        console.log('試堂學生搜尋條件: full_name, contact_number');
       }
       if (shouldQueryInactive) {
         inactiveStudentQuery = inactiveStudentQuery.or(`full_name.ilike.%${searchTerm}%,contact_number.ilike.%${searchTerm}%`);
+        console.log('停用學生搜尋條件: full_name, contact_number');
       }
     }
 

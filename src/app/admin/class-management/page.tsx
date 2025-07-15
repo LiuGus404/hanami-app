@@ -6,7 +6,7 @@ import ClassManagementPanel from '@/components/ui/ClassManagementPanel';
 
 export default function ClassManagementPage() {
   return (
-    <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
+    <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-quicksand">
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
           <div className="flex items-center justify-between">

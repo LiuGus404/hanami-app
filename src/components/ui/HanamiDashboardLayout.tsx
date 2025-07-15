@@ -36,7 +36,7 @@ export default function HanamiDashboardLayout({
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-[#FFF9F2] font-['Quicksand',_sans-serif]">
+    <div className="min-h-screen bg-[#FFF9F2] font-quicksand">
       {/* 頂部導航欄 */}
       <HanamiCard className="mb-4 mx-4 mt-4">
         <div className="flex justify-between items-center">

@@ -643,7 +643,7 @@ export default function TrialQueueListPage() {
           <div className="text-red-500 text-center py-10">⚠️ {error}</div>
         ) : (
           <div className="mt-6 overflow-x-auto w-full">
-            <table className="min-w-[800px] w-full border-collapse bg-white rounded-lg shadow-md text-sm md:text-base">
+            <table className="w-full min-w-max border-collapse bg-white rounded-lg shadow-md text-sm md:text-base">
               <thead>
                 <tr className="bg-[#FFF9F2] border-b border-[#EADBC8]">
                   <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">#</th>

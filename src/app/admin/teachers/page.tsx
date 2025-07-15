@@ -231,7 +231,8 @@ export default function TeacherManagementPage() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-[#EADBC8] overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max">
               <thead>
                 <tr className="bg-[#FFF9F2] border-b border-[#EADBC8]">
                   <th className="w-12 p-3 text-left text-sm font-medium text-[#2B3A3B]">
@@ -296,6 +297,7 @@ export default function TeacherManagementPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

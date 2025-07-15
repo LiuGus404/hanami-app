@@ -437,7 +437,7 @@ export default function ScheduleManagementPanel() {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+                          <table className="w-full min-w-max text-sm">
             <thead>
               <tr className="border-b border-[#EADBC8]">
                 <th className="text-left p-2">
