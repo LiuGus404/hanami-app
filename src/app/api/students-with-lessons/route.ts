@@ -24,21 +24,38 @@ export async function POST(request: Request) {
       .select('*');
 
     // 決定要查詢哪些學生類型
-    let shouldQueryRegular = true;
-    let shouldQueryTrial = true;
-    let shouldQueryInactive = true;
+    let shouldQueryRegular = false;
+    let shouldQueryTrial = false;
+    let shouldQueryInactive = false;
 
     if (selectedCourses && selectedCourses.length > 0) {
       // 分離特殊類型和具體課程類型
       const specialTypes = selectedCourses.filter((course: string) => ['常規', '試堂', '停用學生'].includes(course));
       const specificCourses = selectedCourses.filter((course: string) => !['常規', '試堂', '停用學生'].includes(course));
       
-      // 如果有特殊類型篩選，只查詢對應的學生類型
+      console.log('篩選分析:', {
+        allSelectedCourses: selectedCourses,
+        specialTypes,
+        specificCourses
+      });
+      
+      // 如果有特殊類型篩選，只在明確選擇時才查詢對應的學生類型
       if (specialTypes.length > 0) {
         shouldQueryRegular = specialTypes.includes('常規');
         shouldQueryTrial = specialTypes.includes('試堂');
         shouldQueryInactive = specialTypes.includes('停用學生');
+      } else {
+        // 如果只選擇了具體課程類型（如鋼琴、音樂專注力），查詢常規和試堂學生（不包括停用學生）
+        shouldQueryRegular = true;
+        shouldQueryTrial = true;
+        shouldQueryInactive = false;
       }
+      
+      console.log('查詢決定:', {
+        shouldQueryRegular,
+        shouldQueryTrial,
+        shouldQueryInactive
+      });
       
       // 如果有具體課程類型篩選，應用 course_type 篩選
       if (specificCourses.length > 0) {
@@ -52,6 +69,17 @@ export async function POST(request: Request) {
           inactiveStudentQuery = inactiveStudentQuery.in('course_type', specificCourses);
         }
       }
+    } else {
+      // 如果沒有選擇任何課程類型，預設查詢常規和試堂學生（不包括停用學生）
+      shouldQueryRegular = true;
+      shouldQueryTrial = true;
+      shouldQueryInactive = false;
+      
+      console.log('預設查詢設定:', {
+        shouldQueryRegular,
+        shouldQueryTrial,
+        shouldQueryInactive
+      });
     }
 
     // 應用星期篩選
@@ -63,18 +91,21 @@ export async function POST(request: Request) {
         // 試堂學生可能使用 weekday 而不是 regular_weekday
         trialStudentQuery = trialStudentQuery.in('weekday', selectedWeekdays);
       }
+      if (shouldQueryInactive) {
+        inactiveStudentQuery = inactiveStudentQuery.in('weekday', selectedWeekdays);
+      }
     }
 
     // 應用搜尋篩選
     if (searchTerm && searchTerm.trim()) {
       if (shouldQueryRegular) {
-        regularStudentQuery = regularStudentQuery.or(`full_name.ilike.%${searchTerm}%,student_oid.ilike.%${searchTerm}%`);
+        regularStudentQuery = regularStudentQuery.or(`full_name.ilike.%${searchTerm}%,student_oid.ilike.%${searchTerm}%,contact_number.ilike.%${searchTerm}%`);
       }
       if (shouldQueryTrial) {
-        trialStudentQuery = trialStudentQuery.or(`full_name.ilike.%${searchTerm}%`);
+        trialStudentQuery = trialStudentQuery.or(`full_name.ilike.%${searchTerm}%,contact_number.ilike.%${searchTerm}%`);
       }
       if (shouldQueryInactive) {
-        inactiveStudentQuery = inactiveStudentQuery.or(`full_name.ilike.%${searchTerm}%`);
+        inactiveStudentQuery = inactiveStudentQuery.or(`full_name.ilike.%${searchTerm}%,contact_number.ilike.%${searchTerm}%`);
       }
     }
 
@@ -96,6 +127,11 @@ export async function POST(request: Request) {
       queries.push(inactiveStudentQuery);
       queryNames.push('inactive');
     }
+
+    console.log('準備執行的查詢:', {
+      queryCount: queries.length,
+      queryNames
+    });
 
     // 並行查詢
     const results = await Promise.all(queries);

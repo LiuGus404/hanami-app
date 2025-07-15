@@ -1963,7 +1963,7 @@ export default function StudentManagementPage() {
               </button>
               <HanamiInput
                 className="pl-10"
-                placeholder="搜尋學生..."
+                placeholder="搜尋學生姓名、電話或編號..."
                 value={searchInput}
                 onChange={e => {
                   setSearchInput(e.target.value);
