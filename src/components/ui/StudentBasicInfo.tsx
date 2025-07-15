@@ -50,6 +50,7 @@ interface StudentFormData {
   student_type: string | null;
   lesson_date: string | null;
   actual_timeslot: string | null;
+  weekday: string | null;
 }
 
 interface FormField {
@@ -231,10 +232,28 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   };
 
   const handleChange = (field: keyof StudentFormData, value: string | number | null) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [field]: value,
+      };
+      
+      // 試堂學生：當 actual_timeslot 改變時，同步到 regular_timeslot
+      if (field === 'actual_timeslot' && prev.student_type === '試堂' && value) {
+        newData.regular_timeslot = value as string;
+      }
+      
+      // 試堂學生：當 lesson_date 改變時，自動計算並更新星期
+      if (field === 'lesson_date' && prev.student_type === '試堂' && value) {
+        const date = new Date(value as string);
+        const weekday = date.getDay().toString(); // 0-6 (日-六)
+        newData.regular_weekday = weekday;
+        // 同時更新 weekday 欄位以保持資料一致性
+        newData.weekday = weekday;
+      }
+      
+      return newData;
+    });
   };
 
   function studentToFormData(student: Student): StudentFormData {
@@ -266,6 +285,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       student_type: student.student_type ?? null,
       lesson_date: student.lesson_date ?? null,
       actual_timeslot: student.actual_timeslot ?? null,
+      weekday: (student as any).weekday ?? null,
     };
   }
 
@@ -341,6 +361,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       student_type: '類別',
       lesson_date: '試堂日期',
       actual_timeslot: '試堂時間',
+      weekday: '星期',
     };
     if (missingFields.length > 0) {
       alert(`請填寫以下欄位：${missingFields.map(f => fieldLabels[f] || f).join(', ')}`);
@@ -360,12 +381,25 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
     let error;
     if (formData.student_type === '試堂') {
+      // 試堂學生：同步 actual_timeslot 到 regular_timeslot
+      if (formData.actual_timeslot) {
+        formData.regular_timeslot = formData.actual_timeslot;
+      }
+      
+      // 試堂學生：根據 lesson_date 計算星期
+      if (formData.lesson_date) {
+        const date = new Date(formData.lesson_date);
+        const weekday = date.getDay().toString();
+        formData.regular_weekday = weekday;
+        formData.weekday = weekday;
+      }
+      
       // 只傳 hanami_trial_students 有的欄位
       const trialStudentFields: (keyof StudentFormData)[] = [
         'id', 'student_oid', 'full_name', 'nick_name', 'gender', 'contact_number', 'student_dob', 'student_age',
         'parent_email', 'health_notes', 'created_at', 'updated_at', 'address', 'course_type',
         'duration_months', 'regular_timeslot', 'regular_weekday', 'school', 'student_email',
-        'student_password', 'student_preference', 'student_teacher', 'student_type', 'lesson_date', 'actual_timeslot',
+        'student_password', 'student_preference', 'student_teacher', 'student_type', 'lesson_date', 'actual_timeslot', 'weekday',
       ];
       const trialPayload: Record<string, any> = {};
       trialStudentFields.forEach((key) => {
@@ -629,12 +663,17 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
             <div className="font-medium">試堂時間：</div>
             <div>
               {editMode && isEditable('actual_timeslot') ? (
-                <input
-                  className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
-                  type="time"
-                  value={formData.actual_timeslot || ''}
-                  onChange={(e) => handleChange('actual_timeslot', e.target.value)}
-                />
+                <div>
+                  <input
+                    className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                    type="time"
+                    value={formData.actual_timeslot || ''}
+                    onChange={(e) => handleChange('actual_timeslot', e.target.value)}
+                  />
+                  <div className="text-xs text-[#A68A64] mt-1">
+                    💡 試堂時間會自動同步到課堂情況中
+                  </div>
+                </div>
               ) : (
                 formData.actual_timeslot || '—'
               )}
