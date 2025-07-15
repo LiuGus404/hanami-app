@@ -7,8 +7,11 @@ import { PopupSelect } from '@/components/ui/PopupSelect';
 import TimePicker from '@/components/ui/TimePicker';
 import { supabase } from '@/lib/supabase';
 import { CourseType, Teacher } from '@/types';
+import { useSearchParams } from 'next/navigation';
 
 export default function AddRegularStudentForm() {
+  const searchParams = useSearchParams();
+  const typeParam = searchParams.get('type');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     id: uuidv4(),
@@ -40,6 +43,14 @@ export default function AddRegularStudentForm() {
     trial_remarks: '',
     // 可選: 可加入 duration_months, remaining_lessons 若有需要
   });
+
+  useEffect(() => {
+    if (typeParam === 'trial') {
+      setFormData(prev => ({ ...prev, student_type: '試堂' }));
+    } else if (typeParam === 'regular') {
+      setFormData(prev => ({ ...prev, student_type: '常規' }));
+    }
+  }, [typeParam]);
 
   const [showPopup, setShowPopup] = useState<{ field: string, open: boolean }>({ field: '', open: false });
   const [popupSelected, setPopupSelected] = useState('');
@@ -295,7 +306,9 @@ export default function AddRegularStudentForm() {
         />
       )}
       <form className="bg-[#FFFDF8] p-6 rounded-2xl shadow-xl space-y-6 max-w-lg mx-auto" onSubmit={handleSubmit}>
-        <h2 className="text-2xl font-bold text-center text-[#4B4036]">新增常規學生</h2>
+        <h2 className="text-2xl font-bold text-center text-[#4B4036]">
+          {formData.student_type === '試堂' ? '新增試堂學生' : '新增常規學生'}
+        </h2>
         {/* 一鍵填入測試資料按鈕 */}
         <div className="flex justify-center mb-2">
           <button

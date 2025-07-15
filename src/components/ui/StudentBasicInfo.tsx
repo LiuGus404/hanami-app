@@ -50,7 +50,7 @@ interface StudentFormData {
   student_type: string | null;
   lesson_date: string | null;
   actual_timeslot: string | null;
-  weekday: string | null;
+  weekday: number | null;
 }
 
 interface FormField {
@@ -94,9 +94,10 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     student_email: student?.student_email || null,
     student_password: student?.student_password || null,
     student_preference: student?.student_preference || null,
+    student_type: student?.student_type || null,
     lesson_date: student?.lesson_date || null,
     actual_timeslot: student?.actual_timeslot || null,
-    student_type: student?.student_type || null,
+    weekday: null,
   });
   const [originalData, setOriginalData] = useState<Student>(student);
   const [courseOptions, setCourseOptions] = useState<string[] | null>(null);
@@ -246,7 +247,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       // 試堂學生：當 lesson_date 改變時，自動計算並更新星期
       if (field === 'lesson_date' && prev.student_type === '試堂' && value) {
         const date = new Date(value as string);
-        const weekday = date.getDay().toString(); // 0-6 (日-六)
+        const weekday = date.getDay(); // 0-6 (日-六)
         newData.regular_weekday = weekday;
         // 同時更新 weekday 欄位以保持資料一致性
         newData.weekday = weekday;
@@ -389,7 +390,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       // 試堂學生：根據 lesson_date 計算星期
       if (formData.lesson_date) {
         const date = new Date(formData.lesson_date);
-        const weekday = date.getDay().toString();
+        const weekday = date.getDay();
         formData.regular_weekday = weekday;
         formData.weekday = weekday;
       }

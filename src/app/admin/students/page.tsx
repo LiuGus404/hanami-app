@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare, X } from 'lucide-react';
+import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare, X, Plus } from 'lucide-react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import useSWR from 'swr';
@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import StudentCard from '@/components/ui/StudentCard';
 import AIMessageModal from '@/components/ui/AIMessageModal';
+import StudentTypeSelector from '@/components/ui/StudentTypeSelector';
 import { useUser } from '@/hooks/useUser';
 import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
@@ -143,6 +144,9 @@ export default function StudentManagementPage() {
   // AI 訊息相關狀態
   const [showAIMessageModal, setShowAIMessageModal] = useState(false);
   const [selectedStudentsForAI, setSelectedStudentsForAI] = useState<any[]>([]);
+
+  // 新增學生類型選擇器狀態
+  const [showStudentTypeSelector, setShowStudentTypeSelector] = useState(false);
 
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]); // 支援多選
@@ -410,8 +414,8 @@ export default function StudentManagementPage() {
         const regularStudentsWithRemaining = regularStudents.map(student => {
           const lessonDates = studentLessonDates.get(student.id) || [];
           return {
-            ...student,
-            remaining_lessons: remainingLessonsMap[student.id] || 0,
+          ...student,
+          remaining_lessons: remainingLessonsMap[student.id] || 0,
             lesson_dates: lessonDates, // 添加所有課堂日期
             lesson_date: lessonDates[0] || null, // 添加最近的課堂日期（用於向後兼容）
           };
@@ -1619,90 +1623,90 @@ export default function StudentManagementPage() {
     
     // 延遲計算，避免在每次 render 時都計算
     const timer = setTimeout(() => {
-      setRemainingLoading(true);
-      
-      // 只計算常規學生的剩餘堂數，與學校狀況一覽保持一致
-      const regularStudentIds = students
+    setRemainingLoading(true);
+    
+    // 只計算常規學生的剩餘堂數，與學校狀況一覽保持一致
+    const regularStudentIds = students
         .filter((s: any) => s.student_type === '常規')
         .map((s: any) => s.id);
-      
-      if (regularStudentIds.length === 0) {
-        setRemainingLessonsMap({});
-        setRemainingLoading(false);
-        return;
-      }
-      
-      // 使用與學校狀況一覽相同的邏輯：只查詢今天及之後的課堂記錄
-      const today = new Date().toISOString().split('T')[0];
-      
-      supabase
-        .from('hanami_student_lesson')
-        .select('student_id, lesson_date, actual_timeslot, lesson_duration')
-        .in('student_id', regularStudentIds)
-        .gte('lesson_date', today)
-        .order('lesson_date')
-        .then(({ data: lessonRecords, error }) => {
-          if (error) {
-            console.error('Error fetching lesson records:', error);
-            setRemainingLessonsMap({});
-            setRemainingLoading(false);
-            return;
-          }
-          
-          // 計算每個學生的剩餘堂數（與學校狀況一覽完全相同的邏輯）
-          const now = new Date();
-          const todayStr = now.toISOString().slice(0, 10);
-          const studentLessonCounts = new Map<string, number>();
-          
-          // 初始化所有常規學生的計數為0
+    
+    if (regularStudentIds.length === 0) {
+      setRemainingLessonsMap({});
+      setRemainingLoading(false);
+      return;
+    }
+    
+    // 使用與學校狀況一覽相同的邏輯：只查詢今天及之後的課堂記錄
+    const today = new Date().toISOString().split('T')[0];
+    
+    supabase
+      .from('hanami_student_lesson')
+      .select('student_id, lesson_date, actual_timeslot, lesson_duration')
+      .in('student_id', regularStudentIds)
+      .gte('lesson_date', today)
+      .order('lesson_date')
+      .then(({ data: lessonRecords, error }) => {
+        if (error) {
+          console.error('Error fetching lesson records:', error);
+          setRemainingLessonsMap({});
+          setRemainingLoading(false);
+          return;
+        }
+        
+        // 計算每個學生的剩餘堂數（與學校狀況一覽完全相同的邏輯）
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        const studentLessonCounts = new Map<string, number>();
+        
+        // 初始化所有常規學生的計數為0
           regularStudentIds.forEach((id: any) => {
-            studentLessonCounts.set(id, 0);
-          });
+          studentLessonCounts.set(id, 0);
+        });
+        
+        // 計算每個學生的剩餘堂數
+        lessonRecords?.forEach(lesson => {
+          const studentId = lesson.student_id;
+          if (!studentId) return;
           
-          // 計算每個學生的剩餘堂數
-          lessonRecords?.forEach(lesson => {
-            const studentId = lesson.student_id;
-            if (!studentId) return;
-            
-            let shouldCount = false;
-            
-            if (lesson.lesson_date > todayStr) {
-              // 大於今天的都算
+          let shouldCount = false;
+          
+          if (lesson.lesson_date > todayStr) {
+            // 大於今天的都算
+            shouldCount = true;
+          } else if (lesson.lesson_date === todayStr) {
+            // 等於今天的要判斷結束時間
+            if (!lesson.actual_timeslot || !lesson.lesson_duration) {
+              // 沒有時間資訊，保守算進剩餘堂數
               shouldCount = true;
-            } else if (lesson.lesson_date === todayStr) {
-              // 等於今天的要判斷結束時間
-              if (!lesson.actual_timeslot || !lesson.lesson_duration) {
-                // 沒有時間資訊，保守算進剩餘堂數
+            } else {
+              // 解析時間：課堂開始時間+課程時長
+              const [h, m] = lesson.actual_timeslot.split(':').map(Number);
+              const durationParts = lesson.lesson_duration.split(':').map(Number);
+              const dh = durationParts[0] || 0; // 小時
+              const dm = durationParts[1] || 0; // 分鐘
+              const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
+              const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
+              if (end >= now) {
                 shouldCount = true;
-              } else {
-                // 解析時間：課堂開始時間+課程時長
-                const [h, m] = lesson.actual_timeslot.split(':').map(Number);
-                const durationParts = lesson.lesson_duration.split(':').map(Number);
-                const dh = durationParts[0] || 0; // 小時
-                const dm = durationParts[1] || 0; // 分鐘
-                const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
-                const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
-                if (end >= now) {
-                  shouldCount = true;
-                }
               }
             }
-            
-            if (shouldCount) {
-              const currentCount = studentLessonCounts.get(studentId) || 0;
-              studentLessonCounts.set(studentId, currentCount + 1);
-            }
-          });
+          }
           
-          // 轉換為 Map 格式
-          const remainingMap: Record<string, number> = {};
-          studentLessonCounts.forEach((count, studentId) => {
-            remainingMap[studentId] = count;
-          });
-          
-          setRemainingLessonsMap(remainingMap);
-          setRemainingLoading(false);
+          if (shouldCount) {
+            const currentCount = studentLessonCounts.get(studentId) || 0;
+            studentLessonCounts.set(studentId, currentCount + 1);
+          }
         });
+        
+        // 轉換為 Map 格式
+        const remainingMap: Record<string, number> = {};
+        studentLessonCounts.forEach((count, studentId) => {
+          remainingMap[studentId] = count;
+        });
+        
+        setRemainingLessonsMap(remainingMap);
+        setRemainingLoading(false);
+      });
     }, 100); // 延遲 100ms 執行
     
     return () => clearTimeout(timer);
@@ -2266,6 +2270,14 @@ export default function StudentManagementPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* 新增學生按鈕 */}
+            <button
+              className="hanami-btn flex items-center gap-2 px-4 py-2 text-white bg-gradient-to-r from-[#A64B2A] to-[#C17817] hover:from-[#8B3A1F] hover:to-[#A66514] transition-all duration-300 hover:shadow-md rounded-lg"
+              onClick={() => setShowStudentTypeSelector(true)}
+            >
+              <Plus className="w-4 h-4" />
+              <span>新增學生</span>
+            </button>
             <button
               className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
               onClick={() => setColumnSelectorOpen(true)}
@@ -2902,6 +2914,12 @@ export default function StudentManagementPage() {
             </div>
           </div>
         )}
+
+        {/* 學生類型選擇器 */}
+        <StudentTypeSelector
+          isOpen={showStudentTypeSelector}
+          onClose={() => setShowStudentTypeSelector(false)}
+        />
 
         {/* AI 訊息模態框 */}
         {showAIMessageModal && selectedStudentsForAI.length > 0 && (
