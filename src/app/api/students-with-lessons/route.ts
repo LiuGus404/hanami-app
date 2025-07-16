@@ -184,6 +184,7 @@ export async function POST(request: Request) {
         student_type: '停用學生', // 確保有 student_type 欄位
         regular_weekday: student.weekday || student.regular_weekday, // 統一欄位名稱
         regular_timeslot: student.actual_timeslot || student.regular_timeslot, // 統一欄位名稱
+        is_inactive: true, // 標記為停用學生
       }));
       allStudents.push(...normalizedInactiveStudents);
     }

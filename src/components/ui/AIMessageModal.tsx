@@ -226,6 +226,7 @@ export default function AIMessageModal({ isOpen, onClose, students }: AIMessageM
     setIsSending(true);
     setSendProgress(0);
     setErrorMessage('');
+    let hasError = false;
     
     if (!selectedTemplate) {
       setErrorMessage('請先選擇範本');
@@ -239,7 +240,7 @@ export default function AIMessageModal({ isOpen, onClose, students }: AIMessageM
       const studentMessage = customMessages[student.id] || selectedTemplate.template_content;
       const messageContent = generateMessage(studentMessage, student);
       try {
-        await fetch('/api/ai-message/send', {
+        const res = await fetch('/api/ai-message/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -251,12 +252,24 @@ export default function AIMessageModal({ isOpen, onClose, students }: AIMessageM
             messageContent,
           }),
         });
+        if (res.ok) {
+          toast.success(`已成功發送給 ${student.full_name}`);
+        } else {
+          hasError = true;
+          toast.error(`發送給 ${student.full_name} 失敗`);
+        }
       } catch (e) {
-        setErrorMessage('發送失敗');
+        hasError = true;
+        toast.error(`發送給 ${student.full_name} 失敗`);
       }
       setSendProgress(i + 1);
     }
     setIsSending(false);
+    if (hasError) {
+      toast.error('部分或全部訊息發送失敗，請檢查網路或稍後再試！');
+    } else {
+      toast.success('所有訊息已成功發送！');
+    }
   };
 
   // 在組件內部新增複製功能
@@ -625,7 +638,6 @@ export default function AIMessageModal({ isOpen, onClose, students }: AIMessageM
                       更多變數請參考系統變數列表
                     </div>
                   </div>
-                  
                   {/* 操作按鈕 */}
                   <div className="flex gap-3 pt-4">
                     <button
@@ -664,73 +676,73 @@ export default function AIMessageModal({ isOpen, onClose, students }: AIMessageM
             {/* 右上角熊臉圖 */}
             <img src="/icons/bear-face.PNG" alt="熊" className="absolute -top-7 -right-7 w-14 h-14 drop-shadow-lg select-none pointer-events-none z-10" />
             <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl w-full max-w-md border-2 border-[#EADBC8]/50 animate-in zoom-in-95 duration-200 overflow-hidden">
-            {/* 標題欄 */}
-            <div className="flex items-center justify-center p-6 border-b-2 border-[#EADBC8]/30 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center shadow-lg">
-                  <Send className="w-5 h-5 text-[#4B4036]" />
-                </div>
-                <h2 className="text-xl font-bold text-[#2B3A3B]">確認發送訊息</h2>
-              </div>
-            </div>
-            
-            {/* 內容區域 */}
-            <div className="p-6 space-y-4">
-              <div className="text-center">
-                <div className="text-lg font-bold text-[#2B3A3B] mb-2">
-                  確定要發送訊息嗎？🥰
-                </div>
-                <div className="text-sm text-[#4B4036] opacity-75">
-                  此操作無法撤銷，請確認後再發送
+              {/* 標題欄 */}
+              <div className="flex items-center justify-center p-6 border-b-2 border-[#EADBC8]/30 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center shadow-lg">
+                    <Send className="w-5 h-5 text-[#4B4036]" />
+                  </div>
+                  <h2 className="text-xl font-bold text-[#2B3A3B]">確認發送訊息</h2>
                 </div>
               </div>
               
-              {/* 發送資訊 */}
-              <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] p-4 rounded-2xl border-2 border-[#EADBC8]/30">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                      <span className="text-xs font-bold text-[#2B3A3B]">{selectedStudentIds.length}</span>
-                    </div>
-                    <span className="text-sm font-bold text-[#2B3A3B]">發送對象</span>
+              {/* 內容區域 */}
+              <div className="p-6 space-y-4">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-[#2B3A3B] mb-2">
+                    確定要發送訊息嗎？🥰
                   </div>
-                  <div className="text-sm text-[#4B4036] ml-8 max-h-32 overflow-y-auto pr-2">
-                    {students.filter(s => selectedStudentIds.includes(s.id)).map(s => s.full_name).join('、')}
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                      <FileText className="w-3 h-3 text-[#2B3A3B]" />
-                    </div>
-                    <span className="text-sm font-bold text-[#2B3A3B]">使用範本</span>
-                  </div>
-                  <div className="text-sm text-[#4B4036] ml-8">
-                    {selectedTemplate?.template_name}
+                  <div className="text-sm text-[#4B4036] opacity-75">
+                    此操作無法撤銷，請確認後再發送
                   </div>
                 </div>
+                
+                {/* 發送資訊 */}
+                <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] p-4 rounded-2xl border-2 border-[#EADBC8]/30">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-[#2B3A3B]">{selectedStudentIds.length}</span>
+                      </div>
+                      <span className="text-sm font-bold text-[#2B3A3B]">發送對象</span>
+                    </div>
+                    <div className="text-sm text-[#4B4036] ml-8 max-h-32 overflow-y-auto pr-2">
+                      {students.filter(s => selectedStudentIds.includes(s.id)).map(s => s.full_name).join('、')}
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <FileText className="w-3 h-3 text-[#2B3A3B]" />
+                      </div>
+                      <span className="text-sm font-bold text-[#2B3A3B]">使用範本</span>
+                    </div>
+                    <div className="text-sm text-[#4B4036] ml-8">
+                      {selectedTemplate?.template_name}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 按鈕區域 */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowConfirmDialog(false)}
+                    className="flex-1 py-3 px-6 rounded-full font-bold text-base transition-all duration-300 bg-white/80 text-[#4B4036] border-2 border-[#EADBC8]/50 hover:bg-[#EADBC8]/30 hover:scale-105"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleConfirmSend}
+                    className="flex-1 py-3 px-6 rounded-full font-bold text-base transition-all duration-300 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md hover:scale-105 flex items-center justify-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    確認發送
+                  </button>
+                </div>
               </div>
-              
-              {/* 按鈕區域 */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowConfirmDialog(false)}
-                  className="flex-1 py-3 px-6 rounded-full font-bold text-base transition-all duration-300 bg-white/80 text-[#4B4036] border-2 border-[#EADBC8]/50 hover:bg-[#EADBC8]/30 hover:scale-105"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleConfirmSend}
-                  className="flex-1 py-3 px-6 rounded-full font-bold text-base transition-all duration-300 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md hover:scale-105 flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  確認發送
-                </button>
-              </div>
-            </div>
             </div>
           </div>
         </div>
       )}
     </>
   );
-} 
+}
