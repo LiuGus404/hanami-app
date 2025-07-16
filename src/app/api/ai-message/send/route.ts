@@ -16,6 +16,11 @@ export async function OPTIONS(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 [AI訊息API] 開始處理請求...');
+    console.log('🌍 [AI訊息API] 環境檢查:', {
+      NODE_ENV: process.env.NODE_ENV,
+      N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL ? '已設定' : '未設定',
+      SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? '已設定' : '未設定',
+    });
     
     const body = await request.json();
     console.log('📦 [AI訊息API] 收到請求內容:', JSON.stringify(body, null, 2));
@@ -41,30 +46,70 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [AI訊息API] 欄位驗證通過');
 
-    // 記錄到資料庫
-    console.log('💾 [AI訊息API] 開始記錄到資料庫...');
-    const { data: logData, error: logError } = await supabase
-      .from('hanami_ai_message_logs')
-      .insert({
-        student_id: studentId,
-        student_name: studentName,
-        student_phone: studentPhone,
-        template_id: templateId,
-        template_name: templateName,
-        message_content: messageContent,
-        status: 'pending',
-        created_by: null, // 可以從session中獲取
-      });
-
-    if (logError) {
-      console.error('❌ [AI訊息API] 記錄訊息失敗:', logError);
+    // 檢查 Supabase 連接
+    console.log('🔌 [AI訊息API] 檢查 Supabase 連接...');
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('hanami_ai_message_logs')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ [AI訊息API] Supabase 連接測試失敗:', testError);
+        return NextResponse.json(
+          { error: '資料庫連接失敗' },
+          { status: 500 }
+        );
+      }
+      console.log('✅ [AI訊息API] Supabase 連接正常');
+    } catch (connectionError) {
+      console.error('❌ [AI訊息API] Supabase 連接異常:', connectionError);
       return NextResponse.json(
-        { error: '記錄訊息失敗' },
+        { error: '資料庫連接異常' },
         { status: 500 }
       );
     }
 
+    // 記錄到資料庫
+    console.log('💾 [AI訊息API] 開始記錄到資料庫...');
+    const insertData = {
+      student_id: studentId,
+      template_id: templateId,
+      message_content: messageContent,
+      student_data: {
+        studentName,
+        studentPhone,
+        templateName,
+        variables
+      },
+      status: 'pending',
+      created_by: null, // 可以從session中獲取
+    };
+    
+    console.log('📝 [AI訊息API] 準備插入資料:', insertData);
+    
+    const { data: logData, error: logError } = await supabase
+      .from('hanami_ai_message_logs')
+      .insert(insertData);
+
+    if (logError) {
+      console.error('❌ [AI訊息API] 記錄訊息失敗:', logError);
+      console.error('❌ [AI訊息API] 錯誤詳情:', {
+        code: logError.code,
+        message: logError.message,
+        details: logError.details,
+        hint: logError.hint,
+      });
+      return NextResponse.json(
+        { error: '記錄訊息失敗', details: logError.message },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ [AI訊息API] 資料庫插入成功');
+
     // 獲取插入的記錄ID
+    console.log('🔍 [AI訊息API] 獲取插入記錄ID...');
     const { data: insertedData, error: fetchError } = await supabase
       .from('hanami_ai_message_logs')
       .select('id')
@@ -78,7 +123,7 @@ export async function POST(request: NextRequest) {
     if (fetchError || !insertedData) {
       console.error('❌ [AI訊息API] 獲取插入記錄失敗:', fetchError);
       return NextResponse.json(
-        { error: '獲取記錄失敗' },
+        { error: '獲取記錄失敗', details: fetchError?.message },
         { status: 500 }
       );
     }
@@ -86,7 +131,7 @@ export async function POST(request: NextRequest) {
     const logId = insertedData.id;
     console.log('✅ [AI訊息API] 資料庫記錄成功, logId:', logId);
 
-    // 發送到Webhook (這裡需要配置您的n8n webhook URL)
+    // 發送到Webhook
     const webhookUrl = process.env.N8N_WEBHOOK_URL || 'http://webhook.lingumiai.com/webhook/f49613fa-6f0a-4fcf-bf77-b72074c8ae2c';
     console.log('📡 [AI訊息API] 準備發送到webhook:', webhookUrl);
     
@@ -199,8 +244,13 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('💥 [AI訊息API] 處理過程中發生錯誤:', error);
+    console.error('💥 [AI訊息API] 錯誤詳情:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
-      { error: '發送失敗' },
+      { error: '發送失敗', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

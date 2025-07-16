@@ -1195,44 +1195,38 @@ export type Database = {
         Row: {
           id: string;
           student_id: string;
-          student_name: string;
-          student_phone: string | null;
           template_id: string | null;
-          template_name: string;
           message_content: string;
-          status: string;
-          error_message: string | null;
+          student_data: any;
+          webhook_response: any | null;
+          status: string | null;
           sent_at: string | null;
           created_by: string | null;
-          created_at: string;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
           student_id: string;
-          student_name: string;
-          student_phone?: string | null;
           template_id?: string | null;
-          template_name: string;
           message_content: string;
-          status?: string;
-          error_message?: string | null;
+          student_data: any;
+          webhook_response?: any | null;
+          status?: string | null;
           sent_at?: string | null;
           created_by?: string | null;
-          created_at?: string;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
           student_id?: string;
-          student_name?: string;
-          student_phone?: string | null;
           template_id?: string | null;
-          template_name?: string;
           message_content?: string;
-          status?: string;
-          error_message?: string | null;
+          student_data?: any;
+          webhook_response?: any | null;
+          status?: string | null;
           sent_at?: string | null;
           created_by?: string | null;
-          created_at?: string;
+          created_at?: string | null;
         };
         Relationships: [
           {

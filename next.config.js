@@ -174,16 +174,6 @@ const withPWA = require('next-pwa')({
 });
 
 const nextConfig = {
-  // 啟用 Turbopack (開發模式)
-  turbopack: {
-    rules: {
-      '*.svg': {
-        loaders: ['@svgr/webpack'],
-        as: '*.js',
-      },
-    },
-  },
-  
   // 圖片優化配置
   images: {
     domains: [
