@@ -267,8 +267,15 @@ export default function StudentManagementPage() {
           return;
         }
         
-        // 使用統一的 calculateRemainingLessonsBatch 函數
-        const remainingMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+        // 使用統一的 calculateRemainingLessonsBatch 函數，傳遞篩選條件
+        const remainingMap = await calculateRemainingLessonsBatch(
+          regularStudentIds, 
+          new Date(),
+          {
+            selectedWeekdays: apiFilter.selectedWeekdays,
+            selectedCourses: apiFilter.selectedCourses
+          }
+        );
         
         console.log('計算剩餘堂數結果:', remainingMap);
         setRemainingLessonsMap(remainingMap);
@@ -284,7 +291,7 @@ export default function StudentManagementPage() {
     const timer = setTimeout(calculateRemainingLessons, 200);
     
     return () => clearTimeout(timer);
-  }, [students, isLoading]);
+  }, [students, isLoading, apiFilter.selectedWeekdays, apiFilter.selectedCourses]);
 
   // 刪除學生功能
   const handleDeleteStudents = async () => {
