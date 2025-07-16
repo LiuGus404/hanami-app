@@ -134,7 +134,6 @@ const HanamiCalendar = () => {
       }
     };
     fetchHolidays();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 判斷是否為節日

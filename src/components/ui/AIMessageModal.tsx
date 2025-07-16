@@ -188,8 +188,8 @@ export default function AIMessageModal({ isOpen, onClose, students }: AIMessageM
         value = rawValue ?? '';
       }
       // 支援 {key}、{{key}}，允許前後空白
-      const regex1 = new RegExp(`{{\s*${v.key}\s*}}`, 'gi');
-      const regex2 = new RegExp(`{\s*${v.key}\s*}`, 'gi');
+      const regex1 = new RegExp(`{{\\s*${v.key}\\s*}}`, 'gi');
+      const regex2 = new RegExp(`{\\s*${v.key}\\s*}`, 'gi');
       msg = msg.replace(regex1, value);
       msg = msg.replace(regex2, value);
       // 除錯輸出

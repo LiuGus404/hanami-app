@@ -381,7 +381,7 @@ export default function ResourceActivitiesPage() {
         case 'archive':
           updates = { status: 'archived' };
           break;
-        case 'delete':
+        case 'delete': {
           const { error: deleteError } = await supabase
             .from('hanami_teaching_activities')
             .delete()
@@ -390,6 +390,7 @@ export default function ResourceActivitiesPage() {
           if (deleteError) throw deleteError;
           toast.success('成功刪除選中的活動');
           break;
+        }
       }
 
       if (action !== 'delete') {

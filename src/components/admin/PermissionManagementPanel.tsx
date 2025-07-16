@@ -215,12 +215,14 @@ export default function PermissionManagementPanel() {
   // 獲取用戶名稱
   const getUserName = (userType: string, userId: string) => {
     switch (userType) {
-      case 'teacher':
+      case 'teacher': {
         const teacher = teachers.find(t => t.id === userId);
         return teacher ? teacher.teacher_nickname || teacher.teacher_fullname : '未知老師';
-      case 'parent':
+      }
+      case 'parent': {
         const student = students.find(s => s.id === userId);
         return student ? `${student.full_name}的家長` : '未知家長';
+      }
       case 'admin':
         return '管理員';
       default:

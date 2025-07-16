@@ -112,7 +112,6 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
       }
     };
     fetchTeacherRoles();
-    // eslint-disable-next-line
   }, [open, daySchedule?.teachers.map(t => t.teacherId).join(',')]);
 
   // 2. 儲存成功提示動畫

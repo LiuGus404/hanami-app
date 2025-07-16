@@ -498,7 +498,7 @@ export default function LessonAvailabilityDashboard() {
             try {
               courseTypes = JSON.parse(q.course_types);
             } catch (err) {
-  
+              // 解析失敗時使用空陣列
             }
           } else if (Array.isArray(q.course_types)) {
             courseTypes = q.course_types;
@@ -528,7 +528,7 @@ export default function LessonAvailabilityDashboard() {
             }
           }
         } else {
-
+          // 預留：未來可處理 preferTime 不存在時的情境
         }
       }
         

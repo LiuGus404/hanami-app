@@ -180,7 +180,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
     if (!role) return null;
 
     switch (role) {
-      case 'admin':
+      case 'admin': {
         const { data: adminData } = await supabase
           .from('hanami_admin')
           .select('id, admin_name, admin_email')
@@ -196,8 +196,9 @@ export async function getUserProfile(): Promise<UserProfile | null> {
           };
         }
         break;
+      }
 
-      case 'teacher':
+      case 'teacher': {
         const { data: teacherData } = await supabase
           .from('hanami_employee')
           .select('id, teacher_fullname, teacher_email, teacher_nickname')
@@ -205,7 +206,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
           .single();
         
         if (teacherData) {
-          // 獲取老師負責的學生ID列表
+          // 取得老師負責的學生ID列表
           const { data: students } = await supabase
             .from('Hanami_Students')
             .select('id')
@@ -220,9 +221,10 @@ export async function getUserProfile(): Promise<UserProfile | null> {
           };
         }
         break;
+      }
 
-      case 'parent':
-        // 獲取家長相關的學生資料
+      case 'parent': {
+        // 取得家長相關的學生資料
         const { data: students } = await supabase
           .from('Hanami_Students')
           .select('id, full_name, parent_email')
@@ -238,6 +240,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
           };
         }
         break;
+      }
     }
 
     return null;

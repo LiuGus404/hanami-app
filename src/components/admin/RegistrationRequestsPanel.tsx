@@ -10,7 +10,7 @@ import { RegistrationRequest, RegistrationStatus, UserRole } from '@/types/auth'
 
 interface RegistrationRequestsPanelProps {}
 
-export default function RegistrationRequestsPanel({}: RegistrationRequestsPanelProps) {
+export default function RegistrationRequestsPanel() {
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
