@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// 添加 CORS 支援
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 [AI訊息API] 開始處理請求...');
@@ -35,11 +47,13 @@ export async function POST(request: NextRequest) {
       .from('hanami_ai_message_logs')
       .insert({
         student_id: studentId,
-        student_name: studentName,
-        student_phone: studentPhone,
         template_id: templateId,
-        template_name: templateName,
         message_content: messageContent,
+        student_data: {
+          studentName,
+          studentPhone,
+          variables
+        },
         status: 'pending',
         created_by: null, // 可以從session中獲取
       })
@@ -74,58 +88,98 @@ export async function POST(request: NextRequest) {
     console.log('📦 [AI訊息API] Webhook payload:', JSON.stringify(webhookPayload, null, 2));
 
     console.log('🚀 [AI訊息API] 開始發送webhook請求...');
-    const webhookResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(webhookPayload),
-    });
+    
+    // 添加超時設定和更好的錯誤處理
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超時
+    
+    try {
+      const webhookResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Hanami-Web-App/1.0',
+        },
+        body: JSON.stringify(webhookPayload),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('📊 [AI訊息API] Webhook回應狀態:', webhookResponse.status, webhookResponse.statusText);
+      console.log('📋 [AI訊息API] Webhook回應標頭:', Object.fromEntries(webhookResponse.headers.entries()));
 
-    console.log('📊 [AI訊息API] Webhook回應狀態:', webhookResponse.status, webhookResponse.statusText);
-    console.log('📋 [AI訊息API] Webhook回應標頭:', Object.fromEntries(webhookResponse.headers.entries()));
+      const webhookResponseText = await webhookResponse.text();
+      console.log('📄 [AI訊息API] Webhook回應內容:', webhookResponseText);
 
-    const webhookResponseText = await webhookResponse.text();
-    console.log('📄 [AI訊息API] Webhook回應內容:', webhookResponseText);
+      // 更新發送狀態
+      const updateData = {
+        webhook_response: {
+          status: webhookResponse.status,
+          statusText: webhookResponse.statusText,
+          timestamp: new Date().toISOString(),
+          responseText: webhookResponseText,
+        },
+        status: webhookResponse.ok ? 'sent' : 'failed',
+      };
 
-    // 更新發送狀態
-    const updateData = {
-      webhook_response: {
-        status: webhookResponse.status,
-        statusText: webhookResponse.statusText,
-        timestamp: new Date().toISOString(),
-        responseText: webhookResponseText,
-      },
-      status: webhookResponse.ok ? 'sent' : 'failed',
-    };
+      console.log('💾 [AI訊息API] 更新資料庫狀態:', updateData);
 
-    console.log('💾 [AI訊息API] 更新資料庫狀態:', updateData);
+      const { error: updateError } = await supabase
+        .from('hanami_ai_message_logs')
+        .update(updateData)
+        .eq('id', logData.id);
 
-    const { error: updateError } = await supabase
-      .from('hanami_ai_message_logs')
-      .update(updateData)
-      .eq('id', logData.id);
+      if (updateError) {
+        console.error('❌ [AI訊息API] 更新發送狀態失敗:', updateError);
+      } else {
+        console.log('✅ [AI訊息API] 資料庫狀態更新成功');
+      }
 
-    if (updateError) {
-      console.error('❌ [AI訊息API] 更新發送狀態失敗:', updateError);
-    } else {
-      console.log('✅ [AI訊息API] 資料庫狀態更新成功');
-    }
+      if (!webhookResponse.ok) {
+        console.log('❌ [AI訊息API] Webhook發送失敗，回傳錯誤');
+        return NextResponse.json(
+          { error: `發送失敗: HTTP ${webhookResponse.status} - ${webhookResponse.statusText}` },
+          { status: 500 }
+        );
+      }
 
-    if (!webhookResponse.ok) {
-      console.log('❌ [AI訊息API] Webhook發送失敗，回傳錯誤');
+      console.log('✅ [AI訊息API] 所有處理完成，回傳成功');
+      return NextResponse.json({
+        success: true,
+        messageId: logData.id,
+        status: 'sent',
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      });
+      
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error('❌ [AI訊息API] Webhook請求失敗:', fetchError);
+      
+      // 更新資料庫狀態為失敗
+      const updateData = {
+        webhook_response: {
+          error: fetchError instanceof Error ? fetchError.message : 'Unknown error',
+          timestamp: new Date().toISOString(),
+        },
+        status: 'failed',
+      };
+
+      await supabase
+        .from('hanami_ai_message_logs')
+        .update(updateData)
+        .eq('id', logData.id);
+
       return NextResponse.json(
-        { error: `發送失敗: HTTP ${webhookResponse.status}` },
+        { error: `網路錯誤: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}` },
         { status: 500 }
       );
     }
-
-    console.log('✅ [AI訊息API] 所有處理完成，回傳成功');
-    return NextResponse.json({
-      success: true,
-      messageId: logData.id,
-      status: 'sent',
-    });
 
   } catch (error) {
     console.error('💥 [AI訊息API] 處理過程中發生錯誤:', error);
