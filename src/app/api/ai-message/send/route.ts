@@ -47,18 +47,14 @@ export async function POST(request: NextRequest) {
       .from('hanami_ai_message_logs')
       .insert({
         student_id: studentId,
+        student_name: studentName,
+        student_phone: studentPhone,
         template_id: templateId,
+        template_name: templateName,
         message_content: messageContent,
-        student_data: {
-          studentName,
-          studentPhone,
-          variables
-        },
         status: 'pending',
         created_by: null, // 可以從session中獲取
-      })
-      .select()
-      .single();
+      });
 
     if (logError) {
       console.error('❌ [AI訊息API] 記錄訊息失敗:', logError);
@@ -68,7 +64,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('✅ [AI訊息API] 資料庫記錄成功, logId:', logData.id);
+    // 獲取插入的記錄ID
+    const { data: insertedData, error: fetchError } = await supabase
+      .from('hanami_ai_message_logs')
+      .select('id')
+      .eq('student_id', studentId)
+      .eq('template_id', templateId)
+      .eq('message_content', messageContent)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (fetchError || !insertedData) {
+      console.error('❌ [AI訊息API] 獲取插入記錄失敗:', fetchError);
+      return NextResponse.json(
+        { error: '獲取記錄失敗' },
+        { status: 500 }
+      );
+    }
+
+    const logId = insertedData.id;
+    console.log('✅ [AI訊息API] 資料庫記錄成功, logId:', logId);
 
     // 發送到Webhook (這裡需要配置您的n8n webhook URL)
     const webhookUrl = process.env.N8N_WEBHOOK_URL || 'http://webhook.lingumiai.com/webhook/f49613fa-6f0a-4fcf-bf77-b72074c8ae2c';
@@ -128,7 +144,7 @@ export async function POST(request: NextRequest) {
       const { error: updateError } = await supabase
         .from('hanami_ai_message_logs')
         .update(updateData)
-        .eq('id', logData.id);
+        .eq('id', logId);
 
       if (updateError) {
         console.error('❌ [AI訊息API] 更新發送狀態失敗:', updateError);
@@ -147,7 +163,7 @@ export async function POST(request: NextRequest) {
       console.log('✅ [AI訊息API] 所有處理完成，回傳成功');
       return NextResponse.json({
         success: true,
-        messageId: logData.id,
+        messageId: logId,
         status: 'sent',
       }, {
         headers: {
@@ -173,7 +189,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('hanami_ai_message_logs')
         .update(updateData)
-        .eq('id', logData.id);
+        .eq('id', logId);
 
       return NextResponse.json(
         { error: `網路錯誤: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}` },
