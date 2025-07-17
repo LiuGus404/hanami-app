@@ -30,6 +30,7 @@ export default function StudentDetailPage() {
   const [categorySelectOpen, setCategorySelectOpen] = useState(false);
   const [isInactiveStudent, setIsInactiveStudent] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [courseUpdateTrigger, setCourseUpdateTrigger] = useState(0); // 課程更新觸發器
   
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -347,6 +348,10 @@ export default function StudentDetailPage() {
           student={student}
           onUpdate={(newData) => {
             setStudent(newData);
+            // 如果是試堂學生且課程有更新，觸發課堂資料重新載入
+            if (newData.student_type === '試堂' && newData.course_type !== student.course_type) {
+              setCourseUpdateTrigger(prev => prev + 1);
+            }
           }}
         />
         {student && (
@@ -366,6 +371,7 @@ export default function StudentDetailPage() {
                   studentId={lessonStudentId}
                   studentName={student.full_name}
                   studentType={student.student_type}
+                  onCourseUpdate={courseUpdateTrigger}
                 />
               );
             })()}

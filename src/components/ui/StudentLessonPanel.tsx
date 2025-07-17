@@ -31,6 +31,7 @@ interface StudentLessonPanelProps {
   studentType?: string; // 添加學生類型參數
   studentName?: string; // 添加學生姓名參數
   contactNumber?: string; // 添加聯絡電話參數
+  onCourseUpdate?: () => void; // 課程更新回調
 }
 
 interface LessonData {
@@ -61,7 +62,7 @@ interface LessonData {
   remarks: string | null;
 }
 
-export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber }: StudentLessonPanelProps) {
+export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
   
   // 添加動畫樣式到 head
@@ -126,6 +127,16 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
   useEffect(() => {
     setTempCategoryFilter(categoryFilter);
   }, [categoryFilter]);
+
+  // 監聽課程更新，重新載入課堂資料
+  useEffect(() => {
+    if (onCourseUpdate) {
+      // 重置防抖狀態，強制重新載入
+      lessonsFetchedRef.current = false;
+      loadingRef.current = false;
+      fetchLessons();
+    }
+  }, [onCourseUpdate]);
 
   // 排序功能
   const handleSort = (field: string) => {
