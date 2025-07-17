@@ -4,6 +4,20 @@ import { useEffect, useState, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 
+// 添加動畫樣式
+const animationStyles = `
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`;
+
 
 
 import LessonEditorModal from '@/components/ui/LessonEditorModal';
@@ -49,6 +63,17 @@ interface LessonData {
 
 export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
+  
+  // 添加動畫樣式到 head
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = animationStyles;
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
@@ -74,6 +99,10 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
+  // 動畫相關狀態
+  const [isCountButtonAnimating, setIsCountButtonAnimating] = useState(false);
+  const [showSuccessIndicator, setShowSuccessIndicator] = useState(false);
+  
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
   const currentStudentIdRef = useRef<string | null>(null);
@@ -92,6 +121,11 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
     
     fetchLessons();
   }, [studentId]);
+
+  // 同步 tempCategoryFilter 和 categoryFilter
+  useEffect(() => {
+    setTempCategoryFilter(categoryFilter);
+  }, [categoryFilter]);
 
   // 排序功能
   const handleSort = (field: string) => {
@@ -345,16 +379,45 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
 
   const handleVisibleCountConfirm = () => {
     let parsed: number;
+    let successMessage = '';
+    
     if (tempVisibleCount === 'all') {
       parsed = lessons.length;
+      successMessage = `已設定顯示全部 ${parsed} 筆課堂記錄（按日期舊到新排序）`;
+      // 當選擇顯示全部時，自動設置為按日期升序（舊到新）
+      setSortField('lesson_date');
+      setSortDirection('asc');
     } else {
       parsed = parseInt(tempVisibleCount);
       if (isNaN(parsed) || parsed < 1) {
         parsed = 5;
       }
+      successMessage = `已設定顯示 ${parsed} 筆課堂記錄`;
     }
+    
     setVisibleCount(parsed);
     setVisibleCountSelectOpen(false);
+    
+    // 添加成功提示動畫
+    setIsCountButtonAnimating(true);
+    setShowSuccessIndicator(true);
+    setTimeout(() => {
+      setIsCountButtonAnimating(false);
+      setShowSuccessIndicator(false);
+    }, 1000);
+    
+    // 顯示成功提示
+    toast.success(successMessage, {
+      duration: 2000,
+      style: {
+        background: '#FDE6B8',
+        color: '#4B4036',
+        border: '1px solid #FCD58B',
+        borderRadius: '12px',
+        fontSize: '14px',
+        fontWeight: '500',
+      },
+    });
   };
 
   const handleVisibleCountCancel = () => {
@@ -368,8 +431,11 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
     if (categoryFilter.includes('all')) return true;
 
     const lessonDateStr = format(new Date(lesson.lesson_date), 'yyyy-MM-dd');
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    
+    // 檢查日期和狀態類別
     const dateMatches =
-      (categoryFilter.includes('upcoming') && lessonDateStr >= todayStr) ||
+      (categoryFilter.includes('upcoming') && lessonDateStr > todayStr) ||
       (categoryFilter.includes('past') && lessonDateStr < todayStr) ||
       (categoryFilter.includes('today') && lessonDateStr === todayStr);
 
@@ -540,7 +606,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
     }
 
     // 只匯出選中的課堂
-    const selectedLessons = sortedLessons.filter(lesson => selected.includes(lesson.id));
+    const selectedLessons = filteredLessons.filter(lesson => selected.includes(lesson.id));
     
     const headers = ['日期', '課堂', '上課時間'];
     const csvData = selectedLessons.map(lesson => [
@@ -576,7 +642,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
     }
 
     // 只複製選中的課堂
-    const selectedLessons = sortedLessons.filter(lesson => selected.includes(lesson.id));
+    const selectedLessons = filteredLessons.filter(lesson => selected.includes(lesson.id));
 
     const studentInfo = `${studentName || '學生'} 課堂記錄\n`;
     const lessonRecords = selectedLessons.map(lesson => {
@@ -607,7 +673,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
   const sendToWhatsApp = () => {
     // 檢查是否有聯絡電話
     if (!contactNumber) {
-      toast.error('此學生沒有聯絡電話，無法發送WhatsApp');
+      toast.error('此學生沒有聯絡電話，請先複製課堂記錄，然後手動發送WhatsApp');
       return;
     }
 
@@ -618,7 +684,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
     }
 
     // 只發送選中的課堂
-    const selectedLessons = sortedLessons.filter(lesson => selected.includes(lesson.id));
+    const selectedLessons = filteredLessons.filter(lesson => selected.includes(lesson.id));
 
     const studentInfo = `${studentName || '學生'} 課堂記錄\n`;
     const lessonRecords = selectedLessons.map(lesson => {
@@ -650,119 +716,88 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
       <div className="bg-[#FFFDF8] p-6 rounded-xl shadow-inner max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-[#4B4036]">課堂情況</h2>
-          <div className="flex items-center gap-3">
-            {/* 匯出CSV按鈕 */}
+          <div className="flex gap-2 overflow-x-auto flex-nowrap py-2 px-1 scrollbar-hide">
             <button
-              className="border border-[#DDD2BA] rounded-md px-3 py-1 text-sm text-[#4B4036] bg-white hover:bg-[#F8F5EC] transition-colors flex items-center gap-1"
-              title="匯出選中的課堂記錄為CSV檔案"
               onClick={exportToCSV}
+              className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+              title="匯出CSV"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path clipRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" fillRule="evenodd" />
+              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 16v-8m0 8l-3-3m3 3l3-3" strokeLinecap="round" strokeLinejoin="round" />
+                <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
               </svg>
-              匯出CSV
+              <span className="text-[11px] text-[#4B4036]">匯出</span>
             </button>
-          
-            {/* 複製按鈕 */}
             <button
-              className="border border-[#DDD2BA] rounded-md px-3 py-1 text-sm text-[#4B4036] bg-white hover:bg-[#F8F5EC] transition-colors flex items-center gap-1"
-              title="複製選中的課堂記錄到剪貼簿"
               onClick={copyToWhatsApp}
+              className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+              title="複製課堂記錄"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
-              複製
+              <span className="text-[11px] text-[#4B4036]">複製</span>
             </button>
-          
-            {/* WhatsApp按鈕 */}
+            {contactNumber && (
+              <button
+                onClick={sendToWhatsApp}
+                className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+                title="發送WhatsApp訊息"
+              >
+                <svg className="w-6 h-6 mb-0.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.505 0 .105 5.4.105 12.045c0 2.205.9 4.305 2.505 5.85L.105 24l6.195-3.105c1.5.795 3.195 1.2 4.95 1.2 6.54 0 11.94-5.4 11.94-12.045C22.2 8.4 20.955 5.4 20.52 3.449zM12.045 21.75c-1.5 0-3-.405-4.305-1.2L3.6 20.25l1.5-4.305c-.795-1.305-1.2-2.805-1.2-4.5 0-5.4 4.395-9.795 9.795-9.795 2.595 0 5.1.9 7.05 2.55 1.95 1.65 3.15 3.9 3.15 6.45 0 5.4-4.395 9.795-9.795 9.795z"/>
+                </svg>
+                <span className="text-[11px] text-[#4B4036]">WhatsApp</span>
+              </button>
+            )}
             <button
-              className="border border-[#DDD2BA] rounded-md px-3 py-1 text-sm text-[#4B4036] bg-white hover:bg-[#F8F5EC] transition-colors flex items-center gap-1"
-              title="發送選中的課堂記錄到WhatsApp"
-              onClick={sendToWhatsApp}
+              onClick={fetchLessons}
+              className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+              title="刷新"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
+              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M4 4v5h.582M20 20v-5h-.581M5.635 19A9 9 0 1 1 19 5.635" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              WhatsApp
-            </button>
-          
-            <button
-              className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
-              onClick={() => {
-                fetchLessons();
-                alert('刷新成功');
-              }}
-            >
-              刷新
+              <span className="text-[11px] text-[#4B4036]">刷新</span>
             </button>
             <button
-              className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
               onClick={() => setCategorySelectOpen(true)}
+              className={`flex flex-col items-center min-w-[48px] px-2 py-1 rounded-xl shadow transition ${
+                categoryFilter.includes('all') 
+                  ? 'bg-[#F8F5EC] hover:bg-[#FDE6B8]' 
+                  : 'bg-[#FDE6B8] hover:bg-[#FCD58B] border-2 border-[#FCD58B]'
+              }`}
+              title={`類別${categoryFilter.includes('all') ? '' : ` (${categoryFilter.length} 項)`}`}
             >
-              類別
+              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12h8M12 8v8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[11px] text-[#4B4036]">
+                {categoryFilter.includes('all') ? '類別' : `${categoryFilter.length}項`}
+              </span>
             </button>
-            {categorySelectOpen && (
-            <PopupSelect
-              mode="multi"
-              options={[
-                { label: '全部', value: 'all' },
-                { label: '未上課堂', value: 'upcoming' },
-                { label: '過往課堂', value: 'past' },
-                { label: '今日課堂', value: 'today' },
-                { label: '請假', value: 'sick' },
-                { label: '補課', value: 'makeup' },
-                { label: '缺席', value: 'absent' },
-              ]}
-              selected={tempCategoryFilter}
-              title="類別"
-              onCancel={() => {
-                setTempCategoryFilter(categoryFilter);
-                setCategorySelectOpen(false);
-              }}
-              onChange={(selected) => {
-                if (selected.length === 0 || selected.includes('all')) {
-                  setTempCategoryFilter(['all']);
-                } else {
-                  setTempCategoryFilter(selected as string[]);
-                }
-              }}
-              onConfirm={() => {
-                setCategoryFilter(tempCategoryFilter);
-                setCategorySelectOpen(false);
-              }}
-            />
-            )}
             <button
-              className="border border-[#DDD2BA] rounded-md px-2 py-1 text-sm text-[#4B4036] bg-white"
               onClick={() => setVisibleCountSelectOpen(true)}
+              className={`flex flex-col items-center min-w-[48px] px-2 py-1 rounded-xl shadow transition relative ${
+                isCountButtonAnimating ? 'animate-pulse scale-105 bg-[#FDE6B8] border-[#FCD58B] shadow-lg' : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
+              } ${showSuccessIndicator ? 'bg-green-50 border-green-300' : ''}`}
+              title={`顯示筆數 (${visibleCount >= lessons.length ? '全部' : visibleCount} 筆)`}
             >
-              顯示筆數：{visibleCount === lessons.length ? '全部' : visibleCount}
+              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <rect x="4" y="4" width="16" height="16" rx="4" />
+                <path d="M8 12h8M12 8v8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[11px] text-[#4B4036]">
+                {visibleCount >= lessons.length ? '全部' : visibleCount}
+              </span>
+              {showSuccessIndicator && (
+                <svg className="w-4 h-4 text-green-500 animate-bounce absolute -top-2 -right-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              )}
             </button>
-            {visibleCountSelectOpen && (
-            <PopupSelect
-              mode="multi"
-              options={[
-                { label: '5 筆', value: '5' },
-                { label: '10 筆', value: '10' },
-                { label: '15 筆', value: '15' },
-                { label: '20 筆', value: '20' },
-                { label: '全部', value: 'all' },
-              ]}
-              selected={tempVisibleCount}
-              title="顯示筆數"
-              onCancel={handleVisibleCountCancel}
-              onChange={(selected) => {
-                if (typeof selected === 'string') {
-                  setTempVisibleCount(selected);
-                } else if (Array.isArray(selected) && selected.length > 0) {
-                  setTempVisibleCount(String(selected[0]));
-                }
-              }}
-              onConfirm={handleVisibleCountConfirm}
-            />
-            )}
           </div>
         </div>
       
@@ -814,6 +849,31 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
         </div>
         )}
       
+        {/* 過濾狀態顯示 */}
+        {!loading && !error && lessons.length > 0 && !categoryFilter.includes('all') && (
+          <div className="mb-4 p-3 bg-[#FDE6B8] rounded-lg border border-[#FCD58B]">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-[#4B4036]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
+              </svg>
+              <span className="text-[#4B4036] font-medium">已過濾：</span>
+              <div className="flex flex-wrap gap-2">
+                {categoryFilter.map((category) => (
+                  <span key={category} className="text-sm bg-[#FCD58B] px-2 py-1 rounded-full text-[#4B4036]">
+                    {category}
+                  </span>
+                ))}
+              </div>
+              <button
+                onClick={() => setCategoryFilter(['all'])}
+                className="text-sm text-[#4B4036] underline hover:text-[#7A6A52] ml-2"
+              >
+                清除過濾
+              </button>
+            </div>
+          </div>
+        )}
+        
         {/* 課堂資料表格 */}
         {!loading && !error && lessons.length > 0 && (
         <div className="overflow-x-auto">
@@ -825,7 +885,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                     className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
                     type="checkbox"
                     onChange={(e) => {
-                      if (e.target.checked) setSelected(sortedLessons.slice(0, visibleCount).map(l => l.id));
+                      if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id));
                       else setSelected([]);
                     }}
                   />
@@ -879,8 +939,15 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
               </tr>
             </thead>
             <tbody>
-              {sortedLessons.slice(0, visibleCount).map((lesson) => (
-                <tr key={lesson.id} className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6]">
+              {filteredLessons.slice(0, visibleCount).map((lesson, index) => (
+                <tr 
+                  key={lesson.id} 
+                  className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6] transition-all duration-300"
+                  style={{
+                    animationDelay: `${index * 50}ms`,
+                    animation: showSuccessIndicator ? 'fadeInUp 0.5s ease-out' : 'none'
+                  }}
+                >
                   <td className="px-2 py-2">
                     <input
                       checked={selected.includes(lesson.id)}
@@ -946,6 +1013,17 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
           </table>
         </div>
         )}
+        
+        {/* 記錄數量顯示 */}
+        {!loading && !error && lessons.length > 0 && (
+          <div className="mt-4 text-sm text-[#4B4036] text-center">
+            <span>
+              顯示 {Math.min(visibleCount, filteredLessons.length)} / {filteredLessons.length} 筆記錄
+              {!categoryFilter.includes('all') && ` (已過濾 ${lessons.length - filteredLessons.length} 筆)`}
+            </span>
+          </div>
+        )}
+        
         <div className="flex gap-3 mt-4">
           <button
             className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
@@ -1020,6 +1098,52 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
             </div>
           </div>
         </div>
+        )}
+        
+        {/* 類別選擇彈窗 */}
+        {categorySelectOpen && (
+          <PopupSelect
+            title="選擇課堂類別"
+            options={[
+              { label: '全部', value: 'all' },
+              { label: '未上課堂', value: 'upcoming' },
+              { label: '過往課堂', value: 'past' },
+              { label: '今日課堂', value: 'today' },
+              { label: '請假', value: 'sick' },
+              { label: '補課', value: 'makeup' },
+              { label: '缺席', value: 'absent' },
+            ]}
+            selected={tempCategoryFilter}
+            onChange={(value) => setTempCategoryFilter(Array.isArray(value) ? value : [value])}
+            onConfirm={() => {
+              setCategoryFilter(tempCategoryFilter);
+              setCategorySelectOpen(false);
+            }}
+            onCancel={() => {
+              setTempCategoryFilter(categoryFilter);
+              setCategorySelectOpen(false);
+            }}
+            mode="multi"
+          />
+        )}
+        
+        {/* 顯示筆數選擇彈窗 */}
+        {visibleCountSelectOpen && (
+          <PopupSelect
+            title="選擇顯示筆數"
+            options={[
+              { label: '5 筆', value: '5' },
+              { label: '10 筆', value: '10' },
+              { label: '20 筆', value: '20' },
+              { label: '50 筆', value: '50' },
+              { label: '全部', value: 'all' },
+            ]}
+            selected={tempVisibleCount}
+            onChange={(value) => setTempVisibleCount(Array.isArray(value) ? value[0] : value)}
+            onConfirm={handleVisibleCountConfirm}
+            onCancel={handleVisibleCountCancel}
+            mode="single"
+          />
         )}
       </div>
     </div>

@@ -314,3 +314,11 @@ body {
   @apply bg-gradient-to-br from-[#FFFDF8] to-[#F5E7D4] scale-95 shadow-lg;
   transform: translateY(0px) scale(0.95);
 }
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

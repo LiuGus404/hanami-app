@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare, X, Plus } from 'lucide-react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
 
 import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel';
@@ -174,6 +174,21 @@ export default function StudentManagementPage() {
     };
   });
 
+  // 當 filterParam 變化時更新 apiFilter
+  useEffect(() => {
+    const initialCourses = (() => {
+      if (filterParam === 'regular') return ['常規'];
+      if (filterParam === 'trial') return ['試堂'];
+      if (filterParam === 'inactive') return ['停用學生'];
+      return [];
+    })();
+    
+    setApiFilter(prev => ({
+      ...prev,
+      selectedCourses: initialCourses
+    }));
+  }, [filterParam]);
+
   // 監控篩選條件變化，自動查詢API
   // useEffect(() => {
   //   setApiFilter({
@@ -185,45 +200,48 @@ export default function StudentManagementPage() {
   // }, [selectedDates, selectedCourses, selectedWeekdays, searchTerm]);
 
   // 改為每次 filter 變動時直接 setApiFilter
-  const handleSelectedCoursesChange = (courses: string[]) => {
+  const handleSelectedCoursesChange = useCallback((courses: string[]) => {
     // 允許同時選擇常規和試堂學生
     setSelectedCourses(courses);
     setApiFilter(prev => ({
       ...prev,
       selectedCourses: courses
     }));
-  };
-  const handleSelectedWeekdaysChange = (weekdays: string[]) => {
+  }, []);
+  
+  const handleSelectedWeekdaysChange = useCallback((weekdays: string[]) => {
     setSelectedWeekdays(weekdays);
     setApiFilter(prev => ({
       ...prev,
       selectedWeekdays: weekdays
     }));
-  };
-  const handleSelectedDatesChange = (dates: Date[]) => {
+  }, []);
+  
+  const handleSelectedDatesChange = useCallback((dates: Date[]) => {
     setSelectedDates(dates);
     setApiFilter(prev => ({
       ...prev,
       selectedDates: dates.map(d => d.toLocaleDateString('sv-SE'))
     }));
-  };
-  const handleSearchTermChange = (term: string) => {
+  }, []);
+  
+  const handleSearchTermChange = useCallback((term: string) => {
     setSearchTerm(term);
     setApiFilter(prev => ({
       ...prev,
       searchTerm: term
     }));
-  };
+  }, []);
 
   // 使用 SWR 進行資料獲取
   const { data: apiData, error: apiError, isValidating } = useSWR(
-    ['students-with-lessons', apiFilter],
+    ['students-with-lessons', JSON.stringify(apiFilter)],
     () => fetchStudentsWithLessons(apiFilter),
     { revalidateOnFocus: false }
   );
 
   // 取回的學生資料
-  const students = apiData?.students || [];
+  const students = useMemo(() => apiData?.students || [], [apiData?.students]);
   const isLoading = isValidating;
 
   // 檢查用戶權限
@@ -291,7 +309,7 @@ export default function StudentManagementPage() {
     const timer = setTimeout(calculateRemainingLessons, 200);
     
     return () => clearTimeout(timer);
-  }, [students, isLoading, apiFilter.selectedWeekdays, apiFilter.selectedCourses]);
+  }, [students, isLoading, JSON.stringify(apiFilter.selectedWeekdays), JSON.stringify(apiFilter.selectedCourses)]);
 
   // 刪除學生功能
   const handleDeleteStudents = async () => {

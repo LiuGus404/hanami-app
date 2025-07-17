@@ -104,18 +104,20 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
           {options.map(({ label, value }) => (
             <div
               key={value}
-              className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition ${
-                isSelected(value) ? 'bg-[#E8E3D5]' : 'bg-white hover:bg-[#F3F0E5]'
+              className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${
+                isSelected(value) ? 'bg-green-50 border-2 border-green-200 shadow-md scale-[1.02]' : 'bg-white hover:bg-[#F3F0E5] hover:shadow-sm border-2 border-transparent'
               }`}
               onClick={() => toggleOption(value)}
             >
               <div className="flex items-center gap-3">
-                <Sprout className={`w-5 h-5 ${isSelected(value) ? 'text-green-600' : 'text-[#D8CDBF]'}`} />
-                <span className="text-base font-medium">{label}</span>
+                <Sprout className={`w-5 h-5 transition-all duration-200 ${isSelected(value) ? 'text-green-600 scale-110' : 'text-[#D8CDBF]'}`} />
+                <span className={`text-base font-medium transition-colors duration-200 ${
+                  isSelected(value) ? 'text-green-700 font-semibold' : 'text-[#4B4B4B]'
+                }`}>{label}</span>
               </div>
-              {actualMode === 'multi' && isSelected(value) && (
-                <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs">✓</span>
+              {isSelected(value) && (
+                <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center animate-bounce">
+                  <span className="text-white text-xs font-bold">✓</span>
                 </div>
               )}
             </div>
@@ -124,13 +126,13 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
         
         <div className="flex justify-around mt-6 pt-4 border-t border-[#D8CDBF]">
           <button
-            className="px-4 py-2 border border-[#D8CDBF] rounded-xl hover:bg-[#F3F0E5]"
+            className="px-4 py-2 border border-[#D8CDBF] rounded-xl hover:bg-[#F3F0E5] transition-all duration-200 hover:scale-105"
             onClick={onCancel}
           >
             取消
           </button>
           <button
-            className="px-6 py-2 bg-[#A68A64] text-white font-semibold rounded-xl hover:bg-[#937654]"
+            className="px-6 py-2 bg-[#A68A64] text-white font-semibold rounded-xl hover:bg-[#937654] transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
             onClick={onConfirm}
           >
             確定
