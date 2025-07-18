@@ -371,7 +371,11 @@ export default function StudentDetailPage() {
                   studentId={lessonStudentId}
                   studentName={student.full_name}
                   studentType={student.student_type}
-                  onCourseUpdate={courseUpdateTrigger}
+                  onCourseUpdate={() => {
+                    // 觸發課程更新
+                    setCourseUpdateTrigger(prev => prev + 1);
+                  }}
+                  studentData={student}
                 />
               );
             })()}
