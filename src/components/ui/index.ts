@@ -40,6 +40,9 @@ export { Spinner } from './spinner';
 export { default as GrowthTreeIllustration } from './GrowthTreeIllustration';
 export { default as CuteCard } from './CuteCard';
 export { default as StudentProfileHeader } from './StudentProfileHeader';
+export { default as AddGrowthTreeModal } from './AddGrowthTreeModal';
+export { GrowthTreeDetailModal } from './GrowthTreeDetailModal';
+export { default as GrowthTreeStudentsModal } from './GrowthTreeStudentsModal';
 
 // 類型定義
  

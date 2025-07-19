@@ -61,6 +61,11 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const [activitySearchText, setActivitySearchText] = useState('');
   const [activityTempSelected, setActivityTempSelected] = useState<string[]>([]);
 
+  // 2. 新增能力選擇器狀態
+  const [showAbilitySelector, setShowAbilitySelector] = useState<{open: boolean, goalIdx: number | null}>({ open: false, goalIdx: null });
+  const [abilitySearchText, setAbilitySearchText] = useState('');
+  const [abilityTempSelected, setAbilityTempSelected] = useState<string[]>([]);
+
   // 監控每個目標的 progress_max 變化
   useEffect(() => {
     setGoals(goals => goals.map(goal => {
@@ -149,6 +154,24 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
     closeActivitySelector();
   };
   const filteredActivities = props.activitiesOptions.filter(a => a.label.includes(activitySearchText));
+
+  // 3. 能力選擇器函數
+  const openAbilitySelector = (goalIdx: number) => {
+    setAbilityTempSelected(goals[goalIdx].required_abilities || []);
+    setAbilitySearchText('');
+    setShowAbilitySelector({ open: true, goalIdx });
+  };
+  const closeAbilitySelector = () => setShowAbilitySelector({ open: false, goalIdx: null });
+  const handleAbilityToggle = (id: string) => {
+    setAbilityTempSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+  const handleAbilityConfirm = () => {
+    if (showAbilitySelector.goalIdx !== null) {
+      handleGoalChange(showAbilitySelector.goalIdx, 'required_abilities', abilityTempSelected);
+    }
+    closeAbilitySelector();
+  };
+  const filteredAbilities = props.abilitiesOptions.filter(a => a.label.includes(abilitySearchText));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -359,17 +382,26 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-[#2B3A3B] mb-2">所需發展能力</label>
-                        <select
-                          multiple
-                          className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
-                          size={4}
-                          value={goal.required_abilities}
-                          onChange={e => handleGoalChange(idx, 'required_abilities', Array.from(e.target.selectedOptions, o => o.value))}
+                        <button
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white"
+                          type="button"
+                          onClick={() => openAbilitySelector(idx)}
                         >
-                          {props.abilitiesOptions.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
+                          {goal.required_abilities && goal.required_abilities.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {goal.required_abilities.map(id => {
+                                const ability = props.abilitiesOptions.find(a => a.value === id);
+                                return ability ? (
+                                  <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
+                                    {ability.label}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          ) : (
+                            '請選擇所需發展能力'
+                          )}
+                        </button>
                       </div>
                       {/* 相關活動選擇 */}
                       <div>
@@ -529,6 +561,53 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
             <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
               <HanamiButton variant="secondary" onClick={closeActivitySelector}>取消</HanamiButton>
               <HanamiButton className="bg-hanami-primary hover:bg-hanami-accent" onClick={handleActivityConfirm}>確認</HanamiButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 能力多選彈窗 */}
+      {showAbilitySelector.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <span className="font-bold text-lg">選擇所需發展能力</span>
+              <button className="text-gray-400 hover:text-gray-600" onClick={closeAbilitySelector}>✕</button>
+            </div>
+            <div className="p-4 flex flex-col gap-4 overflow-y-auto">
+              <input
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
+                placeholder="搜尋發展能力..."
+                type="text"
+                value={abilitySearchText}
+                onChange={e => setAbilitySearchText(e.target.value)}
+              />
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {filteredAbilities.length === 0 && <div className="text-gray-400 text-center py-4">查無發展能力</div>}
+                {filteredAbilities.map(ability => (
+                  <button
+                    key={ability.value}
+                    className={`w-full p-3 border rounded-lg text-left transition-colors ${
+                      abilityTempSelected.includes(ability.value)
+                        ? 'border-hanami-primary bg-hanami-primary/10 text-hanami-text'
+                        : 'border-gray-300 bg-white hover:bg-gray-50'
+                    }`}
+                    type="button"
+                    onClick={() => handleAbilityToggle(ability.value)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{ability.label}</span>
+                      {abilityTempSelected.includes(ability.value) && (
+                        <span className="text-hanami-primary">✓</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+              <HanamiButton variant="secondary" onClick={closeAbilitySelector}>取消</HanamiButton>
+              <HanamiButton className="bg-hanami-primary hover:bg-hanami-accent" onClick={handleAbilityConfirm}>確認</HanamiButton>
             </div>
           </div>
         </div>

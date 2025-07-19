@@ -22,6 +22,8 @@ export interface GrowthGoal {
   is_completed: boolean;
   created_at: string;
   progress_contents?: string[];
+  required_abilities?: string[];
+  related_activities?: string[];
 }
 
 export interface DevelopmentAbility {
@@ -31,6 +33,25 @@ export interface DevelopmentAbility {
   ability_icon?: string;
   ability_color?: string;
   max_level: number;
+  category?: string;
+  created_at: string;
+}
+
+export interface AbilityCategory {
+  id: string;
+  category_name: string;
+  category_description?: string;
+  category_color?: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface AbilityLevel {
+  id: string;
+  ability_id: string;
+  level: number;
+  level_title: string;
+  level_description: string;
   created_at: string;
 }
 
@@ -99,7 +120,7 @@ export interface StudentTree {
 }
 
 // 能力評估等級
-export type AbilityLevel = 1 | 2 | 3 | 4 | 5;
+export type AbilityLevelType = 1 | 2 | 3 | 4 | 5;
 
 // 進度狀態
 export type ProgressStatus = 'not_started' | 'in_progress' | 'completed' | 'exceeded';

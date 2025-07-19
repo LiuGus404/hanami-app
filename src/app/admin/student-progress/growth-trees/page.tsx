@@ -1,11 +1,13 @@
 'use client';
 
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-import { HanamiCard, HanamiButton } from '@/components/ui';
+import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
 import AddGrowthTreeModal from '@/components/ui/AddGrowthTreeModal';
+import { GrowthTreeDetailModal, GrowthTreeStudentsModal } from '@/components/ui';
+import { PopupSelect } from '@/components/ui/PopupSelect';
 import { supabase } from '@/lib/supabase';
 import { GrowthTree, GrowthGoal } from '@/types/progress';
 
@@ -19,6 +21,32 @@ export default function GrowthTreesPage() {
   const [activitiesOptions, setActivitiesOptions] = useState<{ value: string; label: string }[]>([]);
   const [teachersOptions, setTeachersOptions] = useState<{ value: string; label: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // 詳細視窗狀態
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedTree, setSelectedTree] = useState<GrowthTree | null>(null);
+  const [studentsInTree, setStudentsInTree] = useState<any[]>([]);
+
+  // 刪除確認狀態
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [treeToDelete, setTreeToDelete] = useState<GrowthTree | null>(null);
+
+  // 學生管理狀態
+  const [showStudentsModal, setShowStudentsModal] = useState(false);
+  const [selectedTreeForStudents, setSelectedTreeForStudents] = useState<GrowthTree | null>(null);
+
+  // 搜尋和篩選狀態
+  const [filters, setFilters] = useState({
+    search: '',
+    tree_levels: [] as number[],
+    statuses: [] as string[],
+    abilities: [] as string[],
+    activities: [] as string[],
+  });
+
+  // 彈出選擇相關狀態
+  const [showPopup, setShowPopup] = useState<{ field: string, open: boolean }>({ field: '', open: false });
+  const [popupSelected, setPopupSelected] = useState<string | string[]>([]);
 
   useEffect(() => {
     loadAllData();
@@ -413,6 +441,215 @@ export default function GrowthTreesPage() {
     }
   };
 
+  // 載入在此成長樹的學生資料
+  const loadStudentsInTree = async (treeId: string) => {
+    try {
+      console.log('載入在此成長樹的學生資料:', treeId);
+      
+      // 使用現有的關聯表查詢學生
+      const { data: studentsData, error } = await supabase
+        .from('hanami_student_trees')
+        .select(`
+          student_id,
+          enrollment_date,
+          completion_date,
+          tree_status,
+          teacher_notes,
+          start_date,
+          status,
+          completed_goals,
+          Hanami_Students!inner (
+            id,
+            full_name,
+            nick_name,
+            student_age,
+            course_type
+          )
+        `)
+        .eq('tree_id', treeId)
+        .or('status.eq.active,tree_status.eq.active');
+      
+      if (error) {
+        console.error('載入學生資料失敗:', error);
+        setStudentsInTree([]);
+        return;
+      }
+      
+      console.log('載入到的學生資料:', studentsData);
+      console.log('學生數量:', studentsData?.length || 0);
+      
+      // 轉換資料格式以符合現有介面
+      const formattedStudents = (studentsData || []).map(item => ({
+        id: item.Hanami_Students.id,
+        full_name: item.Hanami_Students.full_name,
+        nick_name: item.Hanami_Students.nick_name,
+        student_age: item.Hanami_Students.student_age,
+        course_type: item.Hanami_Students.course_type,
+        // 額外的關聯資訊
+        start_date: item.start_date || item.enrollment_date,
+        status: item.status || item.tree_status,
+        completed_goals: item.completed_goals || []
+      }));
+      
+      // 在客戶端排序
+      formattedStudents.sort((a, b) => a.full_name.localeCompare(b.full_name));
+      
+      console.log('格式化後的學生資料:', formattedStudents);
+      setStudentsInTree(formattedStudents);
+    } catch (error) {
+      console.error('載入學生資料失敗:', error);
+      setStudentsInTree([]);
+    }
+  };
+
+  // 打開詳細視窗
+  const openDetailModal = async (tree: GrowthTree) => {
+    setSelectedTree(tree);
+    await loadStudentsInTree(tree.id);
+    setShowDetailModal(true);
+  };
+
+  // 打開學生管理視窗
+  const openStudentsModal = (tree: GrowthTree) => {
+    setSelectedTreeForStudents(tree);
+    setShowStudentsModal(true);
+  };
+
+  // 關閉詳細視窗
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedTree(null);
+    setStudentsInTree([]);
+  };
+
+  // 顯示刪除確認視窗
+  const showDeleteConfirmation = (tree: GrowthTree) => {
+    setTreeToDelete(tree);
+    setShowDeleteConfirm(true);
+  };
+
+  // 確認刪除
+  const confirmDelete = async () => {
+    if (treeToDelete) {
+      await handleDeleteTree(treeToDelete.id);
+      setShowDeleteConfirm(false);
+      setTreeToDelete(null);
+    }
+  };
+
+  // 取消刪除
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setTreeToDelete(null);
+  };
+
+  // 篩選處理函數
+  const handleFilterChange = (key: keyof typeof filters, value: any) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // 彈出選擇處理函數
+  const handleFilterPopupOpen = (field: string) => {
+    setShowPopup({ field, open: true });
+    const currentValue = filters[field as keyof typeof filters] || [];
+    if (Array.isArray(currentValue) && typeof currentValue[0] === 'number') {
+      setPopupSelected(currentValue.map(String));
+    } else {
+      setPopupSelected(currentValue as string | string[]);
+    }
+  };
+
+  const handleFilterPopupConfirm = () => {
+    let convertedValue: any = popupSelected;
+    if (showPopup.field === 'tree_levels' && Array.isArray(popupSelected)) {
+      convertedValue = (popupSelected as string[]).map(Number);
+    }
+    setFilters(prev => ({
+      ...prev,
+      [showPopup.field]: convertedValue
+    }));
+    setShowPopup({ field: '', open: false });
+  };
+
+  const handleFilterPopupCancel = () => {
+    const currentValue = filters[showPopup.field as keyof typeof filters] || [];
+    if (Array.isArray(currentValue) && typeof currentValue[0] === 'number') {
+      setPopupSelected(currentValue.map(String));
+    } else {
+      setPopupSelected(currentValue as string | string[]);
+    }
+    setShowPopup({ field: '', open: false });
+  };
+
+  // 清除篩選
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      tree_levels: [],
+      statuses: [],
+      abilities: [],
+      activities: [],
+    });
+  };
+
+  // 獲取篩選後的成長樹
+  const getFilteredTrees = () => {
+    return trees.filter(tree => {
+      // 搜尋篩選
+      if (filters.search && !tree.tree_name.toLowerCase().includes(filters.search.toLowerCase()) &&
+          !(tree.tree_description && tree.tree_description.toLowerCase().includes(filters.search.toLowerCase()))) {
+        return false;
+      }
+
+      // 成長樹等級篩選
+      if (
+        filters.tree_levels.length > 0 &&
+        (tree.tree_level === undefined || !filters.tree_levels.includes(tree.tree_level))
+      ) {
+        return false;
+      }
+
+      // 狀態篩選
+      if (filters.statuses.length > 0) {
+        const isActive = tree.is_active ? 'active' : 'inactive';
+        if (!filters.statuses.includes(isActive)) {
+          return false;
+        }
+      }
+
+      // 能力篩選
+      if (filters.abilities.length > 0) {
+        const treeGoals = getGoalsForTree(tree.id);
+        const hasMatchingAbility = treeGoals.some(goal => 
+          goal.required_abilities && goal.required_abilities.some(abilityId => 
+            filters.abilities.includes(abilityId)
+          )
+        );
+        if (!hasMatchingAbility) {
+          return false;
+        }
+      }
+
+      // 活動篩選
+      if (filters.activities.length > 0) {
+        const treeGoals = getGoalsForTree(tree.id);
+        const hasMatchingActivity = treeGoals.some(goal => 
+          goal.related_activities && goal.related_activities.some(activityId => 
+            filters.activities.includes(activityId)
+          )
+        );
+        if (!hasMatchingActivity) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
@@ -492,6 +729,227 @@ export default function GrowthTreesPage() {
           </div>
         </div>
 
+        {/* 搜尋和篩選工具列 */}
+        <div className="bg-white rounded-xl p-6 mb-6 shadow-sm border border-hanami-border">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* 搜尋和篩選 */}
+            <div className="flex items-center gap-4 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <HanamiInput
+                  className="pl-10"
+                  placeholder="搜尋成長樹名稱或描述..."
+                  value={filters.search}
+                  onChange={(value) => handleFilterChange('search', value)}
+                />
+              </div>
+              
+              {/* 成長樹等級多選篩選 */}
+              <div className="relative">
+                <button
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[140px]"
+                  type="button"
+                  onClick={() => handleFilterPopupOpen('tree_levels')}
+                >
+                  <FunnelIcon className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-700">成長樹等級</span>
+                  {filters.tree_levels.length > 0 && (
+                    <span className="ml-auto bg-hanami-primary text-white text-xs rounded-full px-2 py-1">
+                      {filters.tree_levels.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* 狀態多選篩選 */}
+              <div className="relative">
+                <button
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
+                  type="button"
+                  onClick={() => handleFilterPopupOpen('statuses')}
+                >
+                  <FunnelIcon className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-700">狀態</span>
+                  {filters.statuses.length > 0 && (
+                    <span className="ml-auto bg-hanami-secondary text-white text-xs rounded-full px-2 py-1">
+                      {filters.statuses.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* 能力多選篩選 */}
+              <div className="relative">
+                <button
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
+                  type="button"
+                  onClick={() => handleFilterPopupOpen('abilities')}
+                >
+                  <FunnelIcon className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-700">能力</span>
+                  {filters.abilities.length > 0 && (
+                    <span className="ml-auto bg-hanami-accent text-white text-xs rounded-full px-2 py-1">
+                      {filters.abilities.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* 活動多選篩選 */}
+              <div className="relative">
+                <button
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
+                  type="button"
+                  onClick={() => handleFilterPopupOpen('activities')}
+                >
+                  <FunnelIcon className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-700">活動</span>
+                  {filters.activities.length > 0 && (
+                    <span className="ml-auto bg-hanami-success text-white text-xs rounded-full px-2 py-1">
+                      {filters.activities.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* 清除篩選按鈕 */}
+            <div className="flex items-center gap-2">
+              <HanamiButton
+                variant="secondary"
+                size="sm"
+                onClick={clearFilters}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                清除篩選
+              </HanamiButton>
+            </div>
+          </div>
+
+          {/* 已選擇的篩選條件顯示 */}
+          {(filters.tree_levels.length > 0 || filters.statuses.length > 0 || filters.abilities.length > 0 || filters.activities.length > 0) && (
+            <div className="mt-4 pt-4 border-t border-hanami-border">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-medium text-gray-700">已選擇的篩選條件：</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {filters.tree_levels.map(level => (
+                  <span key={level} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-primary text-white text-xs rounded-full">
+                    等級 {level}
+                    <button
+                      onClick={() => handleFilterChange('tree_levels', filters.tree_levels.filter(l => l !== level))}
+                      className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {filters.statuses.map(status => (
+                  <span key={status} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-secondary text-white text-xs rounded-full">
+                    {status === 'active' ? '啟用' : '停用'}
+                    <button
+                      onClick={() => handleFilterChange('statuses', filters.statuses.filter(s => s !== status))}
+                      className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {filters.abilities.map(abilityId => {
+                  const ability = abilitiesOptions.find(a => a.value === abilityId);
+                  return (
+                    <span key={abilityId} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-accent text-white text-xs rounded-full">
+                      {ability?.label || abilityId}
+                      <button
+                        onClick={() => handleFilterChange('abilities', filters.abilities.filter(a => a !== abilityId))}
+                        className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+                {filters.activities.map(activityId => {
+                  const activity = activitiesOptions.find(a => a.value === activityId);
+                  return (
+                    <span key={activityId} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-success text-white text-xs rounded-full">
+                      {activity?.label || activityId}
+                      <button
+                        onClick={() => handleFilterChange('activities', filters.activities.filter(a => a !== activityId))}
+                        className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 統計資訊 */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <HanamiCard className="p-6 text-center">
+            <div className="text-2xl font-bold text-hanami-text mb-2">
+              {getFilteredTrees().length}
+            </div>
+            <div className="text-sm text-hanami-text-secondary">總成長樹數</div>
+          </HanamiCard>
+          
+          <HanamiCard className="p-6 text-center">
+            <div className="text-2xl font-bold text-green-600 mb-2">
+              {getFilteredTrees().filter(t => t.is_active).length}
+            </div>
+            <div className="text-sm text-hanami-text-secondary">啟用中</div>
+          </HanamiCard>
+          
+          <HanamiCard className="p-6 text-center">
+            <div className="text-2xl font-bold text-blue-600 mb-2">
+              {goals.length}
+            </div>
+            <div className="text-sm text-hanami-text-secondary">總目標數</div>
+          </HanamiCard>
+          
+          <HanamiCard className="p-6 text-center">
+            <div className="text-2xl font-bold text-purple-600 mb-2">
+              {abilitiesOptions.length}
+            </div>
+            <div className="text-sm text-hanami-text-secondary">相關能力</div>
+          </HanamiCard>
+        </div>
+
+        {/* 彈出選擇組件 */}
+        {showPopup.open && (
+          <PopupSelect
+            mode="multiple"
+            options={
+              showPopup.field === 'tree_levels'
+                ? [1, 2, 3, 4, 5].map(level => ({ value: level.toString(), label: `等級 ${level}` }))
+                : showPopup.field === 'statuses'
+                ? [
+                    { value: 'active', label: '啟用' },
+                    { value: 'inactive', label: '停用' }
+                  ]
+                : showPopup.field === 'abilities'
+                ? abilitiesOptions
+                : showPopup.field === 'activities'
+                ? activitiesOptions
+                : []
+            }
+            selected={popupSelected}
+            title={
+              showPopup.field === 'tree_levels' ? '選擇成長樹等級' :
+              showPopup.field === 'statuses' ? '選擇狀態' :
+              showPopup.field === 'abilities' ? '選擇能力' :
+              showPopup.field === 'activities' ? '選擇活動' : '選擇'
+            }
+            onCancel={handleFilterPopupCancel}
+            onChange={(value: string | string[]) => setPopupSelected(value)}
+            onConfirm={handleFilterPopupConfirm}
+          />
+        )}
+
         {showAddModal && (
           <AddGrowthTreeModal
             abilitiesOptions={abilitiesOptions}
@@ -534,13 +992,109 @@ export default function GrowthTreesPage() {
           />
         )}
 
+        {/* 詳細視窗 */}
+        {showDetailModal && selectedTree && (
+          <GrowthTreeDetailModal
+            tree={selectedTree}
+            goals={getGoalsForTree(selectedTree.id)}
+            abilitiesOptions={abilitiesOptions}
+            activitiesOptions={activitiesOptions}
+            teachersOptions={teachersOptions}
+            studentsInTree={studentsInTree}
+            onClose={closeDetailModal}
+            onEdit={() => {
+              closeDetailModal();
+              setEditingTree(selectedTree);
+            }}
+            onManageStudents={() => {
+              closeDetailModal();
+              openStudentsModal(selectedTree);
+            }}
+          />
+        )}
+
+        {/* 學生管理視窗 */}
+        {showStudentsModal && selectedTreeForStudents && (
+          <GrowthTreeStudentsModal
+            treeId={selectedTreeForStudents.id}
+            treeName={selectedTreeForStudents.tree_name}
+            treeCourseType={selectedTreeForStudents.course_type}
+            requiredAbilities={getGoalsForTree(selectedTreeForStudents.id)
+              .flatMap((goal: any) => goal.required_abilities || [])
+              .filter((ability: string, index: number, arr: string[]) => arr.indexOf(ability) === index)}
+            relatedActivities={getGoalsForTree(selectedTreeForStudents.id)
+              .flatMap((goal: any) => goal.related_activities || [])
+              .filter((activity: string, index: number, arr: string[]) => arr.indexOf(activity) === index)}
+            abilitiesOptions={abilitiesOptions}
+            activitiesOptions={activitiesOptions}
+            onClose={() => {
+              setShowStudentsModal(false);
+              setSelectedTreeForStudents(null);
+            }}
+          />
+        )}
+
+        {/* 刪除確認視窗 */}
+        {showDeleteConfirm && treeToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+              <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 border-b border-red-200 rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">⚠️</span>
+                  <h2 className="text-xl font-bold text-white">確認刪除</h2>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-3xl">{treeToDelete.tree_icon || '🌳'}</span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-hanami-text">{treeToDelete.tree_name}</h3>
+                    <p className="text-sm text-hanami-text-secondary">成長樹</p>
+                  </div>
+                </div>
+                
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                  <p className="text-red-800 text-sm">
+                    <strong>警告：</strong>刪除此成長樹將會：
+                  </p>
+                  <ul className="text-red-700 text-sm mt-2 space-y-1">
+                    <li>• 永久刪除成長樹及其所有目標</li>
+                    <li>• 無法恢復已刪除的資料</li>
+                    <li>• 可能影響相關的學生進度記錄</li>
+                  </ul>
+                </div>
+                
+                <p className="text-hanami-text mb-6">
+                  您確定要刪除成長樹 <strong>"{treeToDelete.tree_name}"</strong> 嗎？
+                </p>
+                
+                <div className="flex gap-3 justify-end">
+                  <button
+                    className="px-4 py-2 text-sm font-medium text-hanami-text-secondary bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    onClick={cancelDelete}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                    onClick={confirmDelete}
+                  >
+                    確認刪除
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {trees.map((tree) => {
+          {getFilteredTrees().map((tree) => {
             const treeGoals = getGoalsForTree(tree.id);
             const completedGoals = treeGoals.filter(goal => goal.is_completed).length;
             
             return (
-              <HanamiCard key={tree.id} className="p-6 rounded-2xl shadow-lg bg-white hover:shadow-xl transition-shadow cursor-pointer border border-[#EADBC8] relative" onClick={() => setEditingTree(tree)}>
+              <HanamiCard key={tree.id} className="p-6 rounded-2xl shadow-lg bg-white hover:shadow-xl transition-shadow cursor-pointer border border-[#EADBC8] relative" onClick={() => openDetailModal(tree)}>
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-hanami-text mb-2 flex items-center gap-2">
@@ -551,7 +1105,7 @@ export default function GrowthTreesPage() {
                   </div>
                   <div className="flex space-x-2 absolute top-4 right-4 z-10">
                     <button
-                      className="p-2 rounded-full bg-hanami-primary hover:bg-hanami-accent shadow text-hanami-text"
+                      className="p-2 rounded-full bg-hanami-secondary hover:bg-hanami-accent shadow text-hanami-text"
                       title="編輯"
                       onClick={e => { e.stopPropagation(); setEditingTree(tree); }}
                     >
@@ -560,7 +1114,7 @@ export default function GrowthTreesPage() {
                     <button
                       className="p-2 rounded-full bg-hanami-danger hover:bg-red-400 shadow text-hanami-text"
                       title="刪除"
-                      onClick={e => { e.stopPropagation(); handleDeleteTree(tree.id); }}
+                      onClick={e => { e.stopPropagation(); showDeleteConfirmation(tree); }}
                     >
                       <svg fill="none" height="20" viewBox="0 0 24 24" width="20"><path d="M6 18 18 6M6 6l12 12" stroke="#A64B2A" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" /></svg>
                     </button>
@@ -616,9 +1170,11 @@ export default function GrowthTreesPage() {
           })}
         </div>
 
-        {trees.length === 0 && (
+        {getFilteredTrees().length === 0 && (
           <div className="text-center py-12">
-            <p className="text-hanami-text-secondary">尚無成長樹</p>
+            <p className="text-hanami-text-secondary">
+              {trees.length === 0 ? '尚無成長樹' : '沒有符合篩選條件的成長樹'}
+            </p>
           </div>
         )}
       </div>

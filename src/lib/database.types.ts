@@ -983,6 +983,7 @@ export type Database = {
           ability_icon: string | null;
           ability_color: string | null;
           max_level: number;
+          category: string | null;
           created_at: string;
         };
         Insert: {
@@ -992,6 +993,7 @@ export type Database = {
           ability_icon?: string | null;
           ability_color?: string | null;
           max_level: number;
+          category?: string | null;
           created_at?: string;
         };
         Update: {
@@ -1001,9 +1003,80 @@ export type Database = {
           ability_icon?: string | null;
           ability_color?: string | null;
           max_level?: number;
+          category?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "hanami_development_abilities_category_fkey";
+            columns: ["category"];
+            isOneToOne: false;
+            referencedRelation: "hanami_ability_categories";
+            referencedColumns: ["category_name"];
+          }
+        ];
+      }
+      hanami_ability_categories: {
+        Row: {
+          id: string;
+          category_name: string;
+          category_description: string | null;
+          category_color: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_name: string;
+          category_description?: string | null;
+          category_color?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          category_name?: string;
+          category_description?: string | null;
+          category_color?: string;
+          sort_order?: number;
           created_at?: string;
         };
         Relationships: [];
+      }
+      hanami_ability_levels: {
+        Row: {
+          id: string;
+          ability_id: string;
+          level: number;
+          level_title: string;
+          level_description: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          ability_id: string;
+          level: number;
+          level_title: string;
+          level_description: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          ability_id?: string;
+          level?: number;
+          level_title?: string;
+          level_description?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "hanami_ability_levels_ability_id_fkey";
+            columns: ["ability_id"];
+            isOneToOne: false;
+            referencedRelation: "hanami_development_abilities";
+            referencedColumns: ["id"];
+          }
+        ];
       }
       hanami_student_abilities: {
         Row: {
@@ -1234,6 +1307,82 @@ export type Database = {
             columns: ['template_id']
             isOneToOne: false
             referencedRelation: 'hanami_ai_message_templates'
+            referencedColumns: ['id']
+          }
+        ];
+      }
+      hanami_student_trees: {
+        Row: {
+          id: string;
+          student_id: string | null;
+          tree_id: string | null;
+          enrollment_date: string | null;
+          completion_date: string | null;
+          current_goal_id: string | null;
+          tree_status: string | null;
+          teacher_notes: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+          // 新增欄位（如果存在）
+          start_date?: string | null;
+          status?: string | null;
+          completed_goals?: string[] | null;
+          progress_notes?: string | null;
+        };
+        Insert: {
+          id?: string;
+          student_id?: string | null;
+          tree_id?: string | null;
+          enrollment_date?: string | null;
+          completion_date?: string | null;
+          current_goal_id?: string | null;
+          tree_status?: string | null;
+          teacher_notes?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+          // 新增欄位（如果存在）
+          start_date?: string | null;
+          status?: string | null;
+          completed_goals?: string[] | null;
+          progress_notes?: string | null;
+        };
+        Update: {
+          id?: string;
+          student_id?: string | null;
+          tree_id?: string | null;
+          enrollment_date?: string | null;
+          completion_date?: string | null;
+          current_goal_id?: string | null;
+          tree_status?: string | null;
+          teacher_notes?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+          // 新增欄位（如果存在）
+          start_date?: string | null;
+          status?: string | null;
+          completed_goals?: string[] | null;
+          progress_notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'hanami_student_trees_student_id_fkey'
+            columns: ['student_id']
+            isOneToOne: false
+            referencedRelation: 'Hanami_Students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hanami_student_trees_tree_id_fkey'
+            columns: ['tree_id']
+            isOneToOne: false
+            referencedRelation: 'hanami_growth_trees'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hanami_student_trees_current_goal_id_fkey'
+            columns: ['current_goal_id']
+            isOneToOne: false
+            referencedRelation: 'hanami_growth_goals'
             referencedColumns: ['id']
           }
         ];
