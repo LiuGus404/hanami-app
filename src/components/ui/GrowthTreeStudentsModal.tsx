@@ -715,7 +715,7 @@ export function GrowthTreeStudentsModal({
 
         {/* 學生選擇器 */}
         {showStudentSelector && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4">
+          <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
               <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
                 <div className="flex items-center justify-between">
@@ -818,7 +818,7 @@ export function GrowthTreeStudentsModal({
 
         {/* 刪除確認視窗 */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/50 p-4">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
               <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
                 <div className="flex items-center gap-3">
@@ -864,7 +864,7 @@ export function GrowthTreeStudentsModal({
                     取消
                   </button>
                   <button
-                    className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-hanami-primary to-hanami-secondary hover:from-hanami-secondary hover:to-hanami-accent rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-hanami-text-secondary bg-gray-100 from-hanami-primary to-hanami-secondary hover:from-hanami-secondary hover:to-hanami-accent rounded-lg transition-colors"
                     onClick={confirmDeleteStudent}
                   >
                     確認移除
