@@ -888,8 +888,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
               {formData.activity_types.map((id: string) => {
                 const option = customOptions.activity_types.find(t => t.id === id);
                 return option ? (
-                  <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
-                    {option.label}
+                  <span key={id} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
+                    {option.name}
                   </span>
                 ) : null;
               })}
@@ -926,7 +926,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
               {formData.categories.map((cid: string) => {
                 const category = categories.find(c => c.category_name === cid);
                 return category ? (
-                  <span key={cid} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-secondary/20 text-hanami-text border border-hanami-secondary/30">
+                  <span key={cid} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-secondary/20 text-hanami-text border border-hanami-secondary/30">
                     {category.category_name}
                   </span>
                 ) : null;
@@ -961,8 +961,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
               {formData.statuses.map((sid: string) => {
                 const status = customOptions.statuses.find(s => s.id === sid);
                 return status ? (
-                  <span key={sid} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-accent/20 text-hanami-text border border-hanami-accent/30">
-                    {status.label}
+                  <span key={sid} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-accent/20 text-hanami-text border border-hanami-accent/30">
+                    {status.name}
                   </span>
                 ) : null;
               })}

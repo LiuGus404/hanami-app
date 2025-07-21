@@ -10,38 +10,12 @@ export async function GET() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('獲取教學活動失敗:', error);
+      throw error;
+    }
 
-    // 轉換資料格式以向後兼容
-    const transformedData = data?.map(activity => ({
-      id: activity.id,
-      title: activity.title,
-      description: activity.description,
-      activity_type: activity.activity_type,
-      difficulty_level: activity.difficulty_level,
-      duration: activity.duration,
-      estimated_duration: activity.duration, // 向後兼容
-      materials: activity.materials,
-      // materials_needed: activity.materials, // 向後兼容（移除重複）
-      objectives: activity.objectives,
-      instructions: activity.instructions,
-      notes: activity.notes,
-      template_id: activity.template_id,
-      custom_fields: activity.custom_fields,
-      status: activity.status,
-      tags: activity.tags,
-      category: activity.category,
-      created_at: activity.created_at,
-      updated_at: activity.updated_at,
-      // 保留原始資料庫欄位
-      activity_name: activity.title,
-      activity_description: activity.description,
-      duration_minutes: activity.duration,
-      target_abilities: activity.objectives,
-      materials_needed: activity.materials,
-    })) || [];
-
-    return NextResponse.json(transformedData);
+    return NextResponse.json(data);
   } catch (error) {
     console.error('獲取教學活動失敗:', error);
     return NextResponse.json(
@@ -73,14 +47,39 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('收到的原始 body:', JSON.stringify(body, null, 2));
     
+    // 首先檢查表是否存在
+    try {
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('hanami_teaching_activities')
+        .select('id')
+        .limit(1);
+      
+      if (tableError) {
+        console.error('資料庫表檢查失敗:', tableError);
+        return NextResponse.json(
+          { error: '資料庫表不存在或無法訪問', details: tableError },
+          { status: 500 },
+        );
+      }
+      
+      console.log('資料庫表檢查成功');
+    } catch (checkError) {
+      console.error('資料庫連接檢查失敗:', checkError);
+      return NextResponse.json(
+        { error: '資料庫連接失敗', details: checkError },
+        { status: 500 },
+      );
+    }
+    
     // 準備插入資料，使用正確的資料庫欄位名稱
     const insertData: any = {};
     
     // 安全地設置每個欄位，並記錄類型
     try {
-      insertData.activity_name = String(body.title || body.activity_name || '');
-      insertData.activity_description = body.description || body.activity_description || null;
-      insertData.activity_type = String(body.activity_type || '');
+      // 必填欄位，確保有預設值
+      insertData.activity_name = String(body.activity_name || body.title || '未命名活動');
+      insertData.activity_description = String(body.activity_description || body.description || '');
+      insertData.activity_type = String(body.activity_type || 'general');
       
       // 數字欄位的安全轉換
       const difficultyLevel = body.difficulty_level;
@@ -91,30 +90,22 @@ export async function POST(request: NextRequest) {
       insertData.duration_minutes = Number.isInteger(duration) ? duration : 
         Number.isInteger(parseInt(duration)) ? parseInt(duration) : 30;
       
-      const estimatedDuration = body.estimated_duration || body.duration_minutes || body.duration;
-      insertData.estimated_duration = Number.isInteger(estimatedDuration) ? estimatedDuration : 
-        Number.isInteger(parseInt(estimatedDuration)) ? parseInt(estimatedDuration) : 30;
+      // 陣列欄位 - 確保是陣列且不為空
+      insertData.materials_needed = Array.isArray(body.materials_needed) ? body.materials_needed : 
+        Array.isArray(body.materials) ? body.materials : 
+        (body.materials_needed ? [body.materials_needed] : []);
       
-      const ageMin = body.age_range_min;
-      insertData.age_range_min = Number.isInteger(ageMin) ? ageMin : 
-        Number.isInteger(parseInt(ageMin)) ? parseInt(ageMin) : 3;
-      
-      const ageMax = body.age_range_max;
-      insertData.age_range_max = Number.isInteger(ageMax) ? ageMax : 
-        Number.isInteger(parseInt(ageMax)) ? parseInt(ageMax) : 12;
-      
-      // 陣列欄位
-      insertData.materials_needed = Array.isArray(body.materials) ? body.materials : 
-        Array.isArray(body.materials_needed) ? body.materials_needed : [];
       insertData.target_abilities = Array.isArray(body.target_abilities) ? body.target_abilities : 
-        Array.isArray(body.objectives) ? body.objectives : [];
+        Array.isArray(body.objectives) ? body.objectives : 
+        (body.target_abilities ? [body.target_abilities] : []);
+      
       insertData.tags = Array.isArray(body.tags) ? body.tags : [];
       
-      // 文字欄位
-      insertData.instructions = body.instructions || null;
-      insertData.notes = body.notes || null;
+      // 文字欄位 - 確保有預設值
+      insertData.instructions = String(body.instructions || '');
+      insertData.notes = String(body.notes || '');
       insertData.status = String(body.status || 'draft');
-      insertData.category = body.category || null;
+      insertData.category = String(body.category || '');
       
       // UUID 欄位
       insertData.template_id = (body.template_id && typeof body.template_id === 'string' && body.template_id.trim().length > 0) ? body.template_id : null;
@@ -122,8 +113,14 @@ export async function POST(request: NextRequest) {
       // JSONB 欄位
       insertData.custom_fields = body.custom_fields || null;
       
-      // 布林欄位
-      insertData.is_active = true;
+      // 其他欄位
+      insertData.is_active = body.is_active !== undefined ? Boolean(body.is_active) : true;
+      insertData.estimated_duration = Number.isInteger(body.estimated_duration) ? body.estimated_duration : 
+        Number.isInteger(parseInt(body.estimated_duration)) ? parseInt(body.estimated_duration) : 0;
+      
+      // 移除不需要的欄位
+      delete insertData.created_at;
+      delete insertData.updated_at;
       
     } catch (fieldError) {
       console.error('欄位處理錯誤:', fieldError);

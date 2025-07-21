@@ -21,7 +21,7 @@ export async function GET(
       id: data.id,
       name: data.template_name,
       description: data.template_description,
-      fields: data.template_schema?.fields || [],
+      fields: (data.template_schema as any)?.fields || [],
       category: data.template_type,
       tags: [],
       created_at: data.created_at,

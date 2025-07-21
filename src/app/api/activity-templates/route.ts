@@ -17,8 +17,8 @@ export async function GET() {
       let fields = [];
       if (Array.isArray(template.template_schema)) {
         fields = template.template_schema;
-      } else if (template.template_schema?.fields) {
-        fields = template.template_schema.fields;
+      } else if ((template.template_schema as any)?.fields) {
+        fields = (template.template_schema as any).fields;
       }
       return {
         id: template.id,
@@ -52,32 +52,111 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('收到的範本資料:', JSON.stringify(body, null, 2));
     
-    // 優先使用新的資料庫格式，如果沒有則使用舊格式
-    const templateName = body.template_name || body.name;
-    const templateDescription = body.template_description || body.description;
-    const templateSchema = body.template_schema || { fields: body.fields || [] };
-    const templateType = body.template_type || body.type || body.category || 'custom';
+    // 首先檢查表是否存在
+    try {
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('hanami_resource_templates')
+        .select('id')
+        .limit(1);
+      
+      if (tableError) {
+        console.error('資料庫表檢查失敗:', tableError);
+        return NextResponse.json(
+          { error: '資料庫表不存在或無法訪問', details: tableError },
+          { status: 500 },
+        );
+      }
+      
+      console.log('資料庫表檢查成功');
+    } catch (checkError) {
+      console.error('資料庫連接檢查失敗:', checkError);
+      return NextResponse.json(
+        { error: '資料庫連接失敗', details: checkError },
+        { status: 500 },
+      );
+    }
     
+    // 準備插入資料，使用正確的資料庫欄位名稱
+    const insertData: any = {};
+    
+    try {
+      // 必填欄位
+      insertData.template_name = String(body.template_name || body.name || '未命名範本');
+      insertData.template_type = String(body.template_type || body.template_category || body.type || body.category || 'custom');
+      insertData.template_description = String(body.template_description || body.description || '');
+      
+      // 處理 template_schema
+      if (body.template_schema) {
+        insertData.template_schema = body.template_schema;
+      } else if (body.fields) {
+        // 如果沒有 template_schema 但有 fields，創建 schema
+        insertData.template_schema = {
+          fields: Array.isArray(body.fields) ? body.fields : [],
+          metadata: {
+            version: "1.0",
+            author: "Hanami System",
+            last_updated: new Date().toISOString()
+          }
+        };
+      } else {
+        // 預設 schema
+        insertData.template_schema = {
+          fields: [],
+          metadata: {
+            version: "1.0",
+            author: "Hanami System",
+            last_updated: new Date().toISOString()
+          }
+        };
+      }
+      
+      // 可選欄位
+      insertData.template_icon = String(body.template_icon || '📄');
+      insertData.template_color = String(body.template_color || '#3B82F6');
+      insertData.is_active = body.is_active !== undefined ? Boolean(body.is_active) : true;
+      insertData.is_public = body.is_public !== undefined ? Boolean(body.is_public) : false;
+      insertData.created_by = (body.created_by && typeof body.created_by === 'string' && body.created_by.trim().length > 0) ? body.created_by : null;
+      
+      // 移除不需要的欄位
+      delete insertData.created_at;
+      delete insertData.updated_at;
+      
+    } catch (fieldError) {
+      console.error('欄位處理錯誤:', fieldError);
+      throw new Error(`欄位處理失敗: ${fieldError instanceof Error ? fieldError.message : String(fieldError)}`);
+    }
+
+    console.log('API 最終插入資料:', insertData);
+
+    // 驗證資料類型
+    console.log('資料類型檢查:');
+    Object.keys(insertData).forEach(key => {
+      console.log(`- ${key}: ${typeof insertData[key]} = ${JSON.stringify(insertData[key])}`);
+    });
+
     const { data, error } = await supabase
       .from('hanami_resource_templates')
-      .insert({
-        template_name: templateName,
-        template_description: templateDescription,
-        template_schema: templateSchema,
-        template_type: templateType,
-        is_active: true,
-      })
+      .insert(insertData)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase 錯誤詳細:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw error;
+    }
 
     return NextResponse.json(data);
   } catch (error) {
     console.error('創建範本失敗:', error);
     return NextResponse.json(
-      { error: '創建範本失敗' },
+      { error: '創建範本失敗', details: error },
       { status: 500 },
     );
   }

@@ -10,13 +10,13 @@ export async function POST(request: NextRequest) {
     
     // 步驟 1: 基本欄位（已知可用）
     const step1Data = {
-      title: String(body.title || body.activity_name || '測試活動'),
-      description: String(body.description || body.activity_description || '測試活動描述'),
+      activity_name: String(body.activity_name || body.title || '測試活動'),
+      activity_description: String(body.activity_description || body.description || '測試活動描述'),
       activity_type: String(body.activity_type || 'game'),
       difficulty_level: 1,
-      duration: 30,
-      materials: [],
-      objectives: [],
+      duration_minutes: 30,
+      materials_needed: [],
+      target_abilities: [],
       instructions: '測試指令',
       notes: '測試備註',
       status: 'draft',

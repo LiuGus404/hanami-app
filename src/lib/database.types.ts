@@ -789,62 +789,94 @@ export type Database = {
       hanami_teaching_activities: {
         Row: {
           id: string
-          title: string
-          description: string
+          activity_name: string
+          activity_description: string | null
           activity_type: string
-          difficulty_level: number
-          duration: number
-          materials: string[]
-          objectives: string[]
-          instructions: string
-          notes: string
-          created_at: string
-          updated_at: string
+          difficulty_level: number | null
+          target_abilities: string[] | null
+          materials_needed: string[] | null
+          duration_minutes: number | null
+          age_range_min: number | null
+          age_range_max: number | null
+          notion_id: string | null
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
           template_id: string | null
-          custom_fields: any
-          status: string
-          tags: string[]
-          category: string
+          custom_fields: Json | null
+          tags: string[] | null
+          category: string | null
+          status: string | null
+          version: number | null
+          created_by: string | null
+          updated_by: string | null
+          estimated_duration: number | null
+          instructions: string | null
+          notes: string | null
         }
         Insert: {
           id?: string
-          title: string
-          description: string
+          activity_name: string
+          activity_description?: string | null
           activity_type: string
-          difficulty_level: number
-          duration: number
-          materials: string[]
-          objectives: string[]
-          instructions: string
-          notes: string
-          created_at?: string
-          updated_at?: string
+          difficulty_level?: number | null
+          target_abilities?: string[] | null
+          materials_needed?: string[] | null
+          duration_minutes?: number | null
+          age_range_min?: number | null
+          age_range_max?: number | null
+          notion_id?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
           template_id?: string | null
-          custom_fields?: any
-          status?: string
-          tags?: string[]
-          category?: string
+          custom_fields?: Json | null
+          tags?: string[] | null
+          category?: string | null
+          status?: string | null
+          version?: number | null
+          created_by?: string | null
+          updated_by?: string | null
+          estimated_duration?: number | null
+          instructions?: string | null
+          notes?: string | null
         }
         Update: {
           id?: string
-          title?: string
-          description?: string
+          activity_name?: string
+          activity_description?: string | null
           activity_type?: string
-          difficulty_level?: number
-          duration?: number
-          materials?: string[]
-          objectives?: string[]
-          instructions?: string
-          notes?: string
-          created_at?: string
-          updated_at?: string
+          difficulty_level?: number | null
+          target_abilities?: string[] | null
+          materials_needed?: string[] | null
+          duration_minutes?: number | null
+          age_range_min?: number | null
+          age_range_max?: number | null
+          notion_id?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
           template_id?: string | null
-          custom_fields?: any
-          status?: string
-          tags?: string[]
-          category?: string
+          custom_fields?: Json | null
+          tags?: string[] | null
+          category?: string | null
+          status?: string | null
+          version?: number | null
+          created_by?: string | null
+          updated_by?: string | null
+          estimated_duration?: number | null
+          instructions?: string | null
+          notes?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hanami_teaching_activities_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_resource_templates"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       hanami_resource_templates: {
         Row: {
@@ -852,33 +884,42 @@ export type Database = {
           template_name: string
           template_type: string
           template_description: string | null
-          template_schema: any
-          is_active: boolean
+          template_schema: Json
+          template_icon: string | null
+          template_color: string | null
+          is_active: boolean | null
+          is_public: boolean | null
           created_by: string | null
-          created_at: string
-          updated_at: string
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
           template_name: string
           template_type: string
           template_description?: string | null
-          template_schema: any
-          is_active?: boolean
+          template_schema: Json
+          template_icon?: string | null
+          template_color?: string | null
+          is_active?: boolean | null
+          is_public?: boolean | null
           created_by?: string | null
-          created_at?: string
-          updated_at?: string
+          created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
           template_name?: string
           template_type?: string
           template_description?: string | null
-          template_schema?: any
-          is_active?: boolean
+          template_schema?: Json
+          template_icon?: string | null
+          template_color?: string | null
+          is_active?: boolean | null
+          is_public?: boolean | null
           created_by?: string | null
-          created_at?: string
-          updated_at?: string
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }

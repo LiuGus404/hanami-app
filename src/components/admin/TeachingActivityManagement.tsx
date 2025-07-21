@@ -29,22 +29,30 @@ import { ActivityTemplate } from '@/types/template';
 
 interface TeachingActivity {
   id: string;
-  title: string;
-  description: string;
+  activity_name: string;
+  activity_description: string | null;
   activity_type: string;
-  difficulty_level: number;
-  duration: number;
-  materials: string[];
-  objectives: string[];
-  instructions: string;
-  notes: string;
-  created_at: string;
-  updated_at: string;
+  difficulty_level: number | null;
+  target_abilities: string[] | null;
+  materials_needed: string[] | null;
+  duration_minutes: number | null;
+  age_range_min: number | null;
+  age_range_max: number | null;
+  notion_id: string | null;
+  is_active: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
   template_id?: string;
   custom_fields?: any;
   status?: string;
   tags?: string[];
   category?: string;
+  version?: number;
+  created_by?: string;
+  updated_by?: string;
+  estimated_duration?: number;
+  instructions?: string;
+  notes?: string;
 }
 
 interface TemplateField {
@@ -192,8 +200,8 @@ export function TeachingActivityManagement() {
 
     if (searchQuery) {
       filtered = filtered.filter(activity =>
-        activity.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        activity.description.toLowerCase().includes(searchQuery.toLowerCase()),
+        activity.activity_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        activity.activity_description?.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
 
@@ -217,8 +225,8 @@ export function TeachingActivityManagement() {
     // 排序：以最後更新時間（updated_at > created_at）倒序
     filtered.sort((a, b) => {
       if (filterSort === 'last_updated') {
-        const aTime = new Date(a.updated_at || a.created_at).getTime();
-        const bTime = new Date(b.updated_at || b.created_at).getTime();
+        const aTime = new Date(a.updated_at || a.created_at || '').getTime();
+        const bTime = new Date(b.updated_at || b.created_at || '').getTime();
         return bTime - aTime;
       }
       // 其他欄位排序
@@ -258,51 +266,32 @@ export function TeachingActivityManagement() {
   const handleAddActivity = async (formData: any) => {
     try {
       console.log('收到的表單資料:', formData);
-      // 準備提交資料，確保欄位名稱正確且不包含 estimated_duration
+      // 準備提交資料，使用正確的資料庫欄位名稱
       const newActivity = {
-        title: formData.activity_name || formData.title,
-        description: formData.activity_description || formData.description,
-        activity_type: formData.activity_types?.[0] || formData.activity_type,
-        difficulty_level: formData.difficulty_level,
-        duration: formData.duration || formData.estimated_duration || 0,
-        materials: formData.materials_needed || formData.materials || [],
-        objectives: formData.objectives || [],
-        instructions: formData.instructions,
-        notes: formData.notes,
-        template_id: selectedTemplate?.id,
+        activity_name: formData.activity_name || formData.title || '未命名活動',
+        activity_description: formData.activity_description || formData.description || '',
+        activity_type: formData.activity_types?.[0] || formData.activity_type || 'general',
+        difficulty_level: formData.difficulty_level || 1,
+        duration_minutes: formData.duration_minutes || formData.duration || formData.estimated_duration || 30,
+        materials_needed: formData.materials_needed || formData.materials || [],
+        target_abilities: formData.target_abilities || formData.objectives || [],
+        instructions: formData.instructions || '',
+        notes: formData.notes || '',
+        template_id: selectedTemplate?.id || null,
         custom_fields: formData.custom_fields || formData,
         status: formData.statuses?.[0] || formData.status || 'draft',
         tags: formData.tags || [],
-        category: formData.categories?.[0] || formData.category,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        category: formData.categories?.[0] || formData.category || '',
+        is_active: formData.is_active !== undefined ? formData.is_active : true,
+        estimated_duration: formData.estimated_duration || formData.duration || 30,
       };
-      // 準備提交資料，包含 estimated_duration
-      const cleanActivity = {
-        title: newActivity.title,
-        description: newActivity.description,
-        activity_type: newActivity.activity_type,
-        difficulty_level: newActivity.difficulty_level,
-        duration: newActivity.duration,
-        estimated_duration: newActivity.duration, // 同時設置 estimated_duration
-        materials: newActivity.materials,
-        objectives: newActivity.objectives,
-        instructions: newActivity.instructions,
-        notes: newActivity.notes,
-        template_id: newActivity.template_id,
-        custom_fields: newActivity.custom_fields,
-        status: newActivity.status,
-        tags: newActivity.tags,
-        category: newActivity.category,
-        created_at: newActivity.created_at,
-        updated_at: newActivity.updated_at,
-      };
-      console.log('準備提交的資料:', cleanActivity);
+      
+      console.log('準備提交的資料:', newActivity);
       // 調用 API
       const response = await fetch('/api/teaching-activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cleanActivity),
+        body: JSON.stringify(newActivity),
       });
       if (response.ok) {
         const result = await response.json();
@@ -381,7 +370,7 @@ export function TeachingActivityManagement() {
       const copiedActivity = {
         ...activity,
         id: undefined,
-        title: `${activity.title} (複製)`,
+        activity_name: `${activity.activity_name} (複製)`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -503,24 +492,24 @@ export function TeachingActivityManagement() {
 
       // 準備測試活動資料
       const testActivity = {
-        title: '測試音樂活動',
-        description: '這是一個測試用的音樂教學活動，用於驗證系統功能。',
+        activity_name: '測試音樂活動',
+        activity_description: '這是一個測試用的音樂教學活動，用於驗證系統功能。',
         activity_type: 'game',
         difficulty_level: 1,
-        duration: 30,
-        materials: ['樂器', '節奏棒', '音樂播放器'],
+        duration_minutes: 30,
+        materials_needed: ['樂器', '節奏棒', '音樂播放器'],
         objectives: ['培養節奏感', '提升音樂欣賞能力', '增進團體合作'],
         instructions: '1. 播放音樂\n2. 學生跟隨節奏拍手\n3. 分組進行節奏遊戲\n4. 總結活動心得',
         notes: '適合 3-6 歲兒童，注意音量控制',
         template_id: standardTemplate.id,
         custom_fields: {
-          title: '測試音樂活動',
-          description: '這是一個測試用的音樂教學活動，用於驗證系統功能。',
+          activity_name: '測試音樂活動',
+          activity_description: '這是一個測試用的音樂教學活動，用於驗證系統功能。',
           activity_type: '遊戲活動',
           difficulty_level: 1,
-          duration: 30,
+          duration_minutes: 30,
           objectives: ['培養節奏感', '提升音樂欣賞能力', '增進團體合作'],
-          materials: ['樂器', '節奏棒', '音樂播放器'],
+          materials_needed: ['樂器', '節奏棒', '音樂播放器'],
           instructions: '1. 播放音樂\n2. 學生跟隨節奏拍手\n3. 分組進行節奏遊戲\n4. 總結活動心得',
           notes: '適合 3-6 歲兒童，注意音量控制',
         },
@@ -557,7 +546,7 @@ export function TeachingActivityManagement() {
   // 活動卡片
   const renderActivityCard = (activity: TeachingActivity) => {
     // Debug: 檢查 activity 資料
-    console.log(`渲染活動卡片: ${activity.title}`);
+    console.log(`渲染活動卡片: ${activity.activity_name}`);
     console.log('activity.id:', activity.id, 'updated_at:', activity.updated_at, 'created_at:', activity.created_at, 'dayjs(updated_at):', dayjs(activity.updated_at).isValid(), 'dayjs(created_at):', dayjs(activity.created_at).isValid());
     
     const lastUpdated = dayjs(activity.updated_at || activity.created_at).format('YYYY-MM-DD HH:mm');
@@ -568,8 +557,8 @@ export function TeachingActivityManagement() {
         <div>
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">{activity.title}</h3>
-              <p className="text-gray-600 text-sm line-clamp-2">{activity.description}</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">{activity.activity_name}</h3>
+              <p className="text-gray-600 text-sm line-clamp-2">{activity.activity_description}</p>
             </div>
             <div className="flex gap-1 ml-4">
               <HanamiButton className="tooltip" data-tooltip="查看" size="sm" variant="soft" onClick={() => setViewingActivity(activity)}><EyeIcon className="h-4 w-4" /></HanamiButton>
@@ -581,7 +570,7 @@ export function TeachingActivityManagement() {
           <div className="flex flex-wrap gap-2 text-xs mb-2">
             <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{activity.activity_type}</span>
             <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full">{activity.difficulty_level === 1 ? '初級' : activity.difficulty_level === 2 ? '中級' : activity.difficulty_level === 3 ? '高級' : activity.difficulty_level}</span>
-            <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full">{activity.duration} 分鐘</span>
+            <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full">{activity.duration_minutes} 分鐘</span>
           </div>
           {/* 其他內容可加在這裡 */}
         </div>
@@ -681,7 +670,7 @@ export function TeachingActivityManagement() {
         </div>
         
         <HanamiCard className="p-6">
-          <h3 className="text-xl font-semibold mb-4">{viewingActivity.title}</h3>
+          <h3 className="text-xl font-semibold mb-4">{viewingActivity.activity_name}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h4 className="font-medium mb-2">活動類型</h4>
@@ -693,28 +682,18 @@ export function TeachingActivityManagement() {
             </div>
             <div>
               <h4 className="font-medium mb-2">時長</h4>
-              <p className="text-gray-600">{viewingActivity.duration} 分鐘</p>
+              <p className="text-gray-600">{viewingActivity.duration_minutes} 分鐘</p>
             </div>
             <div>
               <h4 className="font-medium mb-2">描述</h4>
-              <p className="text-gray-600">{viewingActivity.description}</p>
+              <p className="text-gray-600">{viewingActivity.activity_description}</p>
             </div>
-            {viewingActivity.materials && viewingActivity.materials.length > 0 && (
+            {viewingActivity.materials_needed && viewingActivity.materials_needed.length > 0 && (
               <div className="md:col-span-2">
                 <h4 className="font-medium mb-2">所需材料</h4>
                 <ul className="list-disc list-inside text-gray-600">
-                  {viewingActivity.materials.map((material, index) => (
+                  {viewingActivity.materials_needed.map((material, index) => (
                     <li key={index}>{material}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {viewingActivity.objectives && viewingActivity.objectives.length > 0 && (
-              <div className="md:col-span-2">
-                <h4 className="font-medium mb-2">學習目標</h4>
-                <ul className="list-disc list-inside text-gray-600">
-                  {viewingActivity.objectives.map((objective, index) => (
-                    <li key={index}>{objective}</li>
                   ))}
                 </ul>
               </div>

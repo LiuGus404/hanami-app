@@ -154,15 +154,14 @@ export const initializeTeachingActivities = async () => {
         .map(ability => ability.id);
 
       return {
-        title: activity.activity_name,
-        description: activity.activity_description,
+        activity_name: activity.activity_name,
+        activity_description: activity.activity_description,
         activity_type: activity.activity_type,
         difficulty_level: activity.difficulty_level,
-        duration: activity.duration_minutes,
-        materials: activity.materials_needed,
-        objectives: targetAbilities,
+        estimated_duration: activity.duration_minutes,
+        materials_needed: activity.materials_needed,
+        target_abilities: targetAbilities,
         instructions: '',
-        notes: '',
         status: 'draft',
         tags: [],
         category: '',

@@ -416,15 +416,13 @@ export default function ResourceActivitiesPage() {
     try {
       const { id, created_at, updated_at, ...activityData } = activity;
       const newActivity = {
-        title: `${activity.activity_name} (複製)`,
-        description: activity.activity_description || '',
+        activity_name: `${activity.activity_name} (複製)`,
+        activity_description: activity.activity_description || '',
         activity_type: activity.activity_type,
         difficulty_level: activity.difficulty_level,
-        duration: activity.estimated_duration,
-        materials: activity.materials_needed || [],
-        objectives: [], // 若有對應欄位請補上
+        estimated_duration: activity.estimated_duration,
+        materials_needed: activity.materials_needed || [],
         instructions: activity.instructions || '',
-        notes: '', // 若有對應欄位請補上
         template_id: activity.template_id || null,
         custom_fields: activity.custom_fields || {},
         tags: activity.tags || [],
