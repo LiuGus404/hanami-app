@@ -1117,9 +1117,8 @@ export type Database = {
           tree_name: string;
           tree_description: string | null;
           tree_icon: string | null;
-          course_type: string;
+          course_type_id: string | null;
           tree_level: number | null;
-          difficulty_level: number;
           is_active: boolean;
           created_at: string;
         };
@@ -1128,9 +1127,8 @@ export type Database = {
           tree_name: string;
           tree_description?: string | null;
           tree_icon?: string | null;
-          course_type: string;
+          course_type_id?: string | null;
           tree_level?: number | null;
-          difficulty_level: number;
           is_active?: boolean;
           created_at?: string;
         };
@@ -1139,9 +1137,8 @@ export type Database = {
           tree_name?: string;
           tree_description?: string | null;
           tree_icon?: string | null;
-          course_type?: string;
+          course_type_id?: string | null;
           tree_level?: number | null;
-          difficulty_level?: number;
           is_active?: boolean;
           created_at?: string;
         };

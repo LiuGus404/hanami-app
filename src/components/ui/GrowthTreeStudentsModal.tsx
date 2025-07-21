@@ -36,7 +36,7 @@ interface GrowthTreeStudentsModalProps {
   onClose: () => void;
 }
 
-export function GrowthTreeStudentsModal({
+export default function GrowthTreeStudentsModal({
   treeId,
   treeName,
   treeCourseType,
@@ -877,6 +877,4 @@ export function GrowthTreeStudentsModal({
       </div>
     </div>
   );
-}
-
-export default GrowthTreeStudentsModal; 
+} 

@@ -24,7 +24,7 @@ interface AddGrowthTreeModalProps {
   editingTree?: any;
 }
 
-export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
+export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const [treeName, setTreeName] = useState(props.editingTree?.tree_name || '');
   const [treeDescription, setTreeDescription] = useState(props.editingTree?.tree_description || '');
   const [treeColor, setTreeColor] = useState(props.editingTree?.tree_color || '#FFD59A');
@@ -675,5 +675,3 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
     </div>
   );
 } 
-
-export default AddGrowthTreeModal; 

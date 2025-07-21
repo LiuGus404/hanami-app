@@ -14,7 +14,7 @@ interface GrowthTreeDetailModalProps {
   onManageStudents?: () => void;
 }
 
-export function GrowthTreeDetailModal({
+export default function GrowthTreeDetailModal({
   tree,
   goals,
   abilitiesOptions,

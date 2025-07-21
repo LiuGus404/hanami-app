@@ -96,7 +96,7 @@ interface SimpleAbilityAssessmentModalProps {
   defaultAssessmentDate?: string; // 新增：預設評估日期
 }
 
-export function SimpleAbilityAssessmentModal({
+export default function SimpleAbilityAssessmentModal({
   onClose,
   onSubmit,
   initialData,

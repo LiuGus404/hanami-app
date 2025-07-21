@@ -48,7 +48,7 @@ interface AbilityAssessmentModalProps {
   onSubmit: (assessment: AbilityAssessment) => void;
 }
 
-export function AbilityAssessmentModal({
+export default function AbilityAssessmentModal({
   student,
   tree,
   onClose,
@@ -449,6 +449,4 @@ export function AbilityAssessmentModal({
       </div>
     </div>
   );
-}
-
-export default AbilityAssessmentModal; 
+} 

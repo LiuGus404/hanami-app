@@ -260,7 +260,6 @@ export const initializeGrowthTrees = async () => {
       tree_description: `${courseType.name}課程的基礎學習目標和進度追蹤`,
       course_type: courseType.id,
       tree_level: 1,
-      difficulty_level: 1,
       is_active: true,
     }));
 

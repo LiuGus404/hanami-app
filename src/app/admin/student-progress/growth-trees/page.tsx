@@ -67,7 +67,7 @@ export default function GrowthTreesPage() {
       if (treesError) throw treesError;
       const fixedTrees = (treesData || []).map((t: any) => ({
         ...t,
-        course_type: t.course_type ?? t.course_type_id ?? '',
+        course_type: t.course_type_id ?? t.course_type ?? '',
         tree_description: t.tree_description ?? undefined,
       }));
       setTrees(fixedTrees);

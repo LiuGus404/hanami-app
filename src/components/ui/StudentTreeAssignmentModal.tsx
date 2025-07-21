@@ -40,7 +40,7 @@ interface StudentTreeAssignmentModalProps {
   onSuccess?: () => void;
 }
 
-export function StudentTreeAssignmentModal({
+export default function StudentTreeAssignmentModal({
   isOpen,
   onClose,
   student,

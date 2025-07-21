@@ -41,11 +41,11 @@ export { default as GrowthTreeIllustration } from './GrowthTreeIllustration';
 export { default as CuteCard } from './CuteCard';
 export { default as StudentProfileHeader } from './StudentProfileHeader';
 export { default as AddGrowthTreeModal } from './AddGrowthTreeModal';
-export { GrowthTreeDetailModal } from './GrowthTreeDetailModal';
+export { default as GrowthTreeDetailModal } from './GrowthTreeDetailModal';
 export { default as GrowthTreeStudentsModal } from './GrowthTreeStudentsModal';
 export { default as AbilityAssessmentModal } from './AbilityAssessmentModal';
-export { SimpleAbilityAssessmentModal } from './SimpleAbilityAssessmentModal';
-export { StudentTreeAssignmentModal } from './StudentTreeAssignmentModal';
+export { default as SimpleAbilityAssessmentModal } from './SimpleAbilityAssessmentModal';
+export { default as StudentTreeAssignmentModal } from './StudentTreeAssignmentModal';
 
 // 類型定義
  

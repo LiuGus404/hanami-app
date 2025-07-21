@@ -25,7 +25,6 @@ export async function GET() {
       tree_icon: '🌳',
       course_type: 'test-course-id',
       tree_level: 1,
-      difficulty_level: 1,
       is_active: true,
     };
 

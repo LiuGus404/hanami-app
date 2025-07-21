@@ -34,7 +34,6 @@ export async function GET() {
       progress_contents: ['步驟1', '步驟2', '步驟3'],
       review_teachers: ['teacher1'],
       notes: '測試備註',
-      difficulty_level: 2,
       course_type: 'piano',
     };
 
