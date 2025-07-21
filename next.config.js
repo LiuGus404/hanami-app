@@ -33,64 +33,8 @@ const nextConfig = {
     ];
   },
   
-  // 標頭配置
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin',
-          },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
-          },
-        ],
-      },
-      {
-        source: '/api/(.*)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, max-age=0',
-          },
-        ],
-      },
-    ];
-  },
-  
   // Webpack 配置
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // 優化 bundle 大小
-    if (!dev && !isServer) {
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-          },
-          common: {
-            name: 'common',
-            minChunks: 2,
-            chunks: 'all',
-            enforce: true,
-          },
-        },
-      };
-    }
-    
     // 處理 SVG 文件
     config.module.rules.push({
       test: /\.svg$/,
@@ -104,9 +48,6 @@ const nextConfig = {
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
-  
-  // 輸出配置
-  output: 'standalone',
   
   // 壓縮配置
   compress: true,

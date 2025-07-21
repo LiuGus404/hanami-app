@@ -68,7 +68,6 @@ export default function GrowthTreesPage() {
       const fixedTrees = (treesData || []).map((t: any) => ({
         ...t,
         course_type: t.course_type ?? t.course_type_id ?? '',
-        difficulty_level: t.difficulty_level ?? t.tree_level ?? 1,
         tree_description: t.tree_description ?? undefined,
       }));
       setTrees(fixedTrees);
@@ -169,9 +168,8 @@ export default function GrowthTreesPage() {
           tree_name: treeData.tree_name,
           tree_description: treeData.tree_description,
           tree_icon: treeData.tree_icon,
-          course_type: treeData.course_type,
+          course_type_id: treeData.course_type,
           tree_level: treeData.tree_level,
-          difficulty_level: treeData.difficulty_level || 1,
           is_active: true,
         }])
         .select()

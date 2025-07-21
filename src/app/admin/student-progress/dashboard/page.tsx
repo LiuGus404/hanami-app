@@ -296,7 +296,6 @@ export default function StudentProgressDashboard() {
       const fixedTrees = (treesData || []).map((t: any) => ({
         ...t,
         course_type: t.course_type ?? t.course_type_id ?? '',
-        difficulty_level: t.difficulty_level ?? t.tree_level ?? 1,
         tree_description: t.tree_description ?? undefined,
       }));
       setTrees(fixedTrees);

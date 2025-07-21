@@ -242,7 +242,7 @@ export default function StudentManagementPage() {
 
   // 取回的學生資料
   const students = useMemo(() => apiData?.students || [], [apiData?.students]);
-  const isLoading = isValidating;
+  const isLoading = !apiData; // 只有在沒有資料時才認為是載入中
 
   // 檢查用戶權限
   useEffect(() => {
@@ -264,7 +264,10 @@ export default function StudentManagementPage() {
 
   // 計算剩餘堂數 - 使用統一的 PostgreSQL 查詢
   useEffect(() => {
+    console.log('剩餘堂數計算 useEffect 觸發:', { isLoading, studentsLength: students.length });
+    
     if (isLoading || students.length === 0) {
+      console.log('跳過剩餘堂數計算:', { isLoading, studentsLength: students.length });
       setRemainingLessonsMap({});
       setRemainingLoading(false);
       return;
@@ -279,20 +282,20 @@ export default function StudentManagementPage() {
           .filter((s: any) => s.student_type === '常規' && !s.is_inactive)
           .map((s: any) => s.id);
         
+        console.log(`總學生數: ${students.length}, 常規學生數: ${regularStudentIds.length}`);
+        console.log('常規學生ID:', regularStudentIds);
+        
         if (regularStudentIds.length === 0) {
           setRemainingLessonsMap({});
           setRemainingLoading(false);
           return;
         }
         
-        // 使用統一的 calculateRemainingLessonsBatch 函數，傳遞篩選條件
+        // 使用統一的 calculateRemainingLessonsBatch 函數，不傳遞篩選條件
+        // 剩餘堂數應該是所有未來課堂的總數，不應該受到篩選條件的影響
         const remainingMap = await calculateRemainingLessonsBatch(
           regularStudentIds, 
-          new Date(),
-          {
-            selectedWeekdays: apiFilter.selectedWeekdays,
-            selectedCourses: apiFilter.selectedCourses
-          }
+          new Date()
         );
         
         console.log('計算剩餘堂數結果:', remainingMap);
@@ -309,7 +312,7 @@ export default function StudentManagementPage() {
     const timer = setTimeout(calculateRemainingLessons, 200);
     
     return () => clearTimeout(timer);
-  }, [students, isLoading, JSON.stringify(apiFilter.selectedWeekdays), JSON.stringify(apiFilter.selectedCourses)]);
+  }, [students, isLoading]);
 
   // 刪除學生功能
   const handleDeleteStudents = async () => {
@@ -1062,34 +1065,47 @@ export default function StudentManagementPage() {
 
       // 4. 堂數篩選（只對常規學生生效）
       if (selectedLessonFilter && selectedLessonFilter !== 'all') {
-        result = result.filter((s: any) => {
-          if (!s) return false;
-          try {
-            // 只有常規學生才有剩餘堂數概念
-            if (s.student_type !== '常規') {
+        // 如果剩餘堂數還在計算中，暫時不進行篩選
+        if (remainingLoading) {
+          console.log('剩餘堂數計算中，暫時跳過堂數篩選');
+        } else {
+          result = result.filter((s: any) => {
+            if (!s) return false;
+            try {
+              // 只有常規學生才有剩餘堂數概念
+              if (s.student_type !== '常規') {
+                console.log(`學生 ${s.full_name} (ID: ${s.id}) 不是常規學生，類型: ${s.student_type}`);
+                return false;
+              }
+              
+              // 使用 remainingLessonsMap 中的最新計算結果
+              const remainingLessons = remainingLessonsMap[s.id];
+              if (remainingLessons === null || remainingLessons === undefined) {
+                console.log(`學生 ${s.full_name} (ID: ${s.id}) 的剩餘堂數未計算完成，跳過篩選`);
+                return false;
+              }
+
+              console.log(`學生 ${s.full_name} (ID: ${s.id}) 的剩餘堂數: ${remainingLessons}, 篩選條件: ${selectedLessonFilter}, 自訂數量: ${customLessonCount}`);
+
+              switch (selectedLessonFilter) {
+                case 'gt2':
+                  return Number(remainingLessons) > 2;
+                case 'lte2':
+                  return Number(remainingLessons) <= 2;
+                case 'custom':
+                  if (customLessonCount !== '' && customLessonCount !== null && customLessonCount !== undefined) {
+                    return Number(remainingLessons) === Number(customLessonCount);
+                  }
+                  return false; // 如果沒有設定自訂數字，不顯示任何學生
+                default:
+                  return true;
+              }
+            } catch (error) {
+              console.error('堂數篩選錯誤:', error);
               return false;
             }
-            const remainingLessons = s.remaining_lessons;
-            if (remainingLessons === null || remainingLessons === undefined) return false;
-
-            switch (selectedLessonFilter) {
-              case 'gt2':
-                return Number(remainingLessons) > 2;
-              case 'lte2':
-                return Number(remainingLessons) <= 2;
-              case 'custom':
-                if (customLessonCount !== '' && customLessonCount !== null && customLessonCount !== undefined) {
-                  return Number(remainingLessons) === Number(customLessonCount);
-                }
-                return false; // 如果沒有設定自訂數字，不顯示任何學生
-              default:
-                return true;
-            }
-          } catch (error) {
-            console.error('堂數篩選錯誤:', error);
-            return false;
-          }
-        });
+          });
+        }
       }
 
       // 5. 日期篩選
@@ -1158,7 +1174,7 @@ export default function StudentManagementPage() {
       console.error('filteredStudents 計算錯誤:', error);
       return students || [];
     }
-  }, [students, searchQuery, selectedCourses, selectedWeekdays, selectedLessonFilter, customLessonCount, selectedDates, remainingLessonsMap]);
+  }, [students, searchQuery, selectedCourses, selectedWeekdays, selectedLessonFilter, customLessonCount, selectedDates, remainingLessonsMap, remainingLoading]);
 
   // 排序學生數據
   const sortStudents = (students: any[]) => {

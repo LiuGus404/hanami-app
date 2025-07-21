@@ -109,16 +109,14 @@ export async function calculateRemainingLessons(
  */
 export async function calculateRemainingLessonsBatch(
   studentIds: string[],
-  today?: Date,
-  filters?: {
-    selectedWeekdays?: string[];
-    selectedCourses?: string[];
-  }
+  today?: Date
 ): Promise<Record<string, number>> {
   const supabase = getSupabaseClient();
   const now = today ? new Date(today) : getHongKongDate();
   const todayStr = now.toISOString().slice(0, 10);
   const results: Record<string, number> = {};
+
+  console.log(`開始計算 ${studentIds.length} 個學生的剩餘堂數，今天日期: ${todayStr}`);
 
   // 一次查詢所有學生今天及未來課堂
   let query = supabase
@@ -127,25 +125,6 @@ export async function calculateRemainingLessonsBatch(
     .gte('lesson_date', todayStr)
     .in('student_id', studentIds);
 
-  // 如果有星期篩選，需要額外查詢學生的 regular_weekday 資訊
-  let studentWeekdayMap: Record<string, string[]> = {};
-  if (filters?.selectedWeekdays && filters.selectedWeekdays.length > 0) {
-    // 查詢學生的 regular_weekday 資訊
-    const { data: studentData, error: studentError } = await supabase
-      .from('Hanami_Students')
-      .select('id, regular_weekday')
-      .in('id', studentIds);
-    
-    if (!studentError && studentData) {
-      studentData.forEach(student => {
-        const weekdays = Array.isArray(student.regular_weekday) 
-          ? student.regular_weekday.map(String)
-          : student.regular_weekday ? [String(student.regular_weekday)] : [];
-        studentWeekdayMap[student.id] = weekdays;
-      });
-    }
-  }
-
   const { data: lessonsData, error: lessonsError } = await query;
   if (lessonsError) {
     console.error('Error fetching future/today lessons batch:', lessonsError);
@@ -153,39 +132,23 @@ export async function calculateRemainingLessonsBatch(
     return results;
   }
 
+  console.log(`查詢到 ${lessonsData?.length || 0} 條課堂記錄`);
+
   // 依學生分組
   studentIds.forEach(id => {
     const lessons = (lessonsData || []).filter(l => l.student_id === id);
     let count = 0;
     
+    console.log(`學生 ${id} 有 ${lessons.length} 條課堂記錄`);
+    
     for (const lesson of lessons) {
-      // 檢查星期篩選
-      if (filters?.selectedWeekdays && filters.selectedWeekdays.length > 0) {
-        const studentWeekdays = studentWeekdayMap[id] || [];
-        // 如果學生沒有設定星期，或者學生的星期不在篩選範圍內，跳過這堂課
-        if (studentWeekdays.length === 0 || 
-            !studentWeekdays.some(weekday => filters.selectedWeekdays!.includes(weekday))) {
-          continue;
-        }
-      }
-
-      // 檢查課程類型篩選
-      if (filters?.selectedCourses && filters.selectedCourses.length > 0) {
-        // 過濾掉特殊類型（常規、試堂、停用學生），只檢查具體課程類型
-        const specificCourses = filters.selectedCourses.filter(course => 
-          !['常規', '試堂', '停用學生'].includes(course)
-        );
-        if (specificCourses.length > 0 && lesson.course_type && 
-            !specificCourses.includes(lesson.course_type)) {
-          continue;
-        }
-      }
-
       if (lesson.lesson_date > todayStr) {
         count++;
+        console.log(`學生 ${id} 的未來課堂 ${lesson.lesson_date} 計入剩餘堂數`);
       } else if (lesson.lesson_date === todayStr) {
         if (!lesson.actual_timeslot || !lesson.lesson_duration) {
           count++;
+          console.log(`學生 ${id} 的今天課堂 ${lesson.lesson_date} 沒有時間資訊，計入剩餘堂數`);
           continue;
         }
         const [h, m] = lesson.actual_timeslot.split(':').map(Number);
@@ -196,10 +159,16 @@ export async function calculateRemainingLessonsBatch(
         const end = new Date(start.getTime() + (dh * 60 + dm) * 60000);
         if (end >= now) {
           count++;
+          console.log(`學生 ${id} 的今天課堂 ${lesson.lesson_date} ${lesson.actual_timeslot} 尚未結束，計入剩餘堂數`);
+        } else {
+          console.log(`學生 ${id} 的今天課堂 ${lesson.lesson_date} ${lesson.actual_timeslot} 已結束，不計入剩餘堂數`);
         }
       }
     }
+    console.log(`學生 ${id} 的總剩餘堂數: ${count}`);
     results[id] = count;
   });
+  
+  console.log('剩餘堂數計算完成:', results);
   return results;
 } 
