@@ -1,73 +1,68 @@
 import { NextResponse } from 'next/server';
+
 import { supabase } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    console.log('開始測試資料庫查詢...');
-
-    // 1. 測試：查詢所有課堂記錄的日期範圍
-    const { data: allLessons, error: allError } = await supabase
-      .from('hanami_student_lesson')
-      .select('lesson_date, student_id, full_name')
-      .order('lesson_date', { ascending: false })
-      .limit(50);
-
-    if (allError) {
-      console.error('查詢所有課堂記錄失敗:', allError);
-      return NextResponse.json({ error: allError.message }, { status: 500 });
-    }
-
-    // 2. 測試：專門查詢7月的課堂記錄
-    const { data: julyLessons, error: julyError } = await supabase
-      .from('hanami_student_lesson')
+    // 嘗試獲取 hanami_growth_trees 資料表的所有資料
+    const { data: treesData, error: treesError } = await supabase
+      .from('hanami_growth_trees')
       .select('*')
-      .gte('lesson_date', '2025-07-01')
-      .lt('lesson_date', '2025-08-01');
+      .limit(1);
 
-    if (julyError) {
-      console.error('查詢7月課堂記錄失敗:', julyError);
-      return NextResponse.json({ error: julyError.message }, { status: 500 });
+    if (treesError) {
+      return NextResponse.json({ 
+        success: false, 
+        error: '無法獲取成長樹資料',
+        details: treesError,
+      });
     }
 
-    // 3. 測試：查詢試堂學生表中的7月記錄
-    const { data: trialJulyLessons, error: trialJulyError } = await supabase
-      .from('hanami_trial_students')
-      .select('*')
-      .gte('lesson_date', '2025-07-01')
-      .lt('lesson_date', '2025-08-01');
-
-    if (trialJulyError) {
-      console.error('查詢試堂學生7月記錄失敗:', trialJulyError);
-      return NextResponse.json({ error: trialJulyError.message }, { status: 500 });
-    }
-
-    // 4. 分析日期分佈
-    const dates: string[] = (allLessons?.map(l => l.lesson_date).sort() || []).filter(Boolean);
-    const monthDistribution: Record<string, number> = {};
-    dates.forEach(date => {
-      const month = typeof date === 'string' ? date.substring(0, 7) : '';
-      if (month) monthDistribution[month] = (monthDistribution[month] || 0) + 1;
-    });
-
-    const result = {
-      totalLessons: allLessons?.length || 0,
-      julyLessons: julyLessons?.length || 0,
-      trialJulyLessons: trialJulyLessons?.length || 0,
-      dateRange: {
-        earliest: dates[0] || '無記錄',
-        latest: dates[dates.length - 1] || '無記錄'
-      },
-      monthDistribution,
-      sampleLessons: allLessons?.slice(0, 5) || [],
-      julySample: julyLessons?.slice(0, 3) || [],
-      trialJulySample: trialJulyLessons?.slice(0, 3) || []
+    // 嘗試插入一個簡單的測試記錄
+    const testTreeData = {
+      tree_name: '測試成長樹',
+      tree_description: '這是一個測試成長樹',
+      tree_icon: '🌳',
+      course_type: 'test-course-id',
+      tree_level: 1,
+      difficulty_level: 1,
+      is_active: true,
     };
 
-    console.log('測試結果:', result);
-    return NextResponse.json(result);
+    const { data: insertData, error: insertError } = await supabase
+      .from('hanami_growth_trees')
+      .insert([testTreeData])
+      .select()
+      .single();
+
+    if (insertError) {
+      return NextResponse.json({ 
+        success: false, 
+        error: '插入測試資料失敗',
+        details: insertError,
+        testData: testTreeData,
+        existingData: treesData,
+      });
+    }
+
+    // 刪除測試資料
+    await supabase
+      .from('hanami_growth_trees')
+      .delete()
+      .eq('id', insertData.id);
+
+    return NextResponse.json({ 
+      success: true, 
+      message: '測試成功',
+      insertedData: insertData,
+      existingData: treesData,
+    });
 
   } catch (error) {
-    console.error('測試過程中發生錯誤:', error);
-    return NextResponse.json({ error: '測試失敗' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: '測試失敗',
+      details: error,
+    });
   }
 } 

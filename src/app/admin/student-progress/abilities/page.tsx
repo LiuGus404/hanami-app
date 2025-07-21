@@ -11,6 +11,7 @@ import {
   TagIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
+  AcademicCapIcon,
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -41,6 +42,10 @@ export default function AbilitiesPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedAbility, setSelectedAbility] = useState<DevelopmentAbility | null>(null);
   const [editingAbility, setEditingAbility] = useState<DevelopmentAbility | null>(null);
+  
+  // 刪除確認狀態
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [abilityToDelete, setAbilityToDelete] = useState<DevelopmentAbility | null>(null);
 
   // 新增能力表單狀態
   const [newAbility, setNewAbility] = useState({
@@ -658,6 +663,61 @@ export default function AbilitiesPage() {
     }
   };
 
+  // 刪除能力函數
+  const deleteAbility = async (ability: DevelopmentAbility) => {
+    try {
+      // 檢查是否有學生正在使用此能力
+      const { data: studentAbilitiesData, error: checkError } = await supabase
+        .from('hanami_student_abilities')
+        .select('id')
+        .eq('ability_id', ability.id)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (studentAbilitiesData && studentAbilitiesData.length > 0) {
+        toast.error('無法刪除：已有學生正在使用此能力');
+        return;
+      }
+
+      // 檢查是否有成長樹正在使用此能力
+      const { data: growthTreesData, error: treesError } = await supabase
+        .from('hanami_growth_goals')
+        .select('id, goal_name')
+        .contains('required_abilities', [ability.id]);
+
+      if (treesError) throw treesError;
+
+      if (growthTreesData && growthTreesData.length > 0) {
+        toast.error(`無法刪除：此能力正在被以下成長目標使用：${growthTreesData.map(g => g.goal_name).join(', ')}`);
+        return;
+      }
+
+      // 執行刪除
+      const { error: deleteError } = await supabase
+        .from('hanami_development_abilities')
+        .delete()
+        .eq('id', ability.id);
+
+      if (deleteError) throw deleteError;
+
+      // 從本地狀態中移除
+      setAbilities(abilities.filter(a => a.id !== ability.id));
+      setShowDeleteConfirm(false);
+      setAbilityToDelete(null);
+      toast.success('能力刪除成功！');
+    } catch (err) {
+      console.error('刪除能力失敗：', err);
+      toast.error('刪除失敗，請重試');
+    }
+  };
+
+  // 處理刪除確認
+  const handleDeleteClick = (ability: DevelopmentAbility) => {
+    setAbilityToDelete(ability);
+    setShowDeleteConfirm(true);
+  };
+
   const getStudentAbility = (studentId: string, abilityId: string) => {
     return studentAbilities.find(sa => 
       sa.student_id === studentId && sa.ability_id === abilityId,
@@ -775,13 +835,20 @@ export default function AbilitiesPage() {
             <Gamepad2 className="w-4 h-4" />
             教學活動管理
           </button>
-          <button
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-            onClick={() => window.location.href = '/admin/student-progress'}
-          >
-            <FileText className="w-4 h-4" />
-            進度記錄管理
-          </button>
+                      <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => window.location.href = '/admin/student-progress'}
+            >
+              <FileText className="w-4 h-4" />
+              進度記錄管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => window.location.href = '/admin/student-progress/ability-assessments'}
+            >
+              <AcademicCapIcon className="w-4 h-4" />
+              能力評估管理
+            </button>
           <button
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
             onClick={() => window.location.href = '/admin/students'}
@@ -959,85 +1026,98 @@ export default function AbilitiesPage() {
       </div>
 
       {/* 能力概覽 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {getFilteredAbilities().map((ability) => (
-          <HanamiCard key={ability.id} className="hover:shadow-lg transition-shadow">
+          <HanamiCard key={ability.id} className="hover:shadow-lg transition-all duration-300 hover:scale-[1.02] group">
             <div className="p-4 text-center">
+              {/* 能力圖標 */}
               <div 
-                className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center"
+                className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow"
                 style={{ backgroundColor: ability.ability_color || '#FFB6C1' }}
               >
                 <StarIcon className="h-8 w-8 text-white" />
               </div>
-              <h3 className="font-semibold text-hanami-text mb-1">
+              
+              {/* 能力名稱 */}
+              <h3 className="font-bold text-base text-hanami-text mb-2">
                 {ability.ability_name}
               </h3>
-              <p className="text-sm text-hanami-text-secondary mb-2">
+              
+              {/* 能力描述 */}
+              <p className="text-xs text-hanami-text-secondary mb-3 leading-relaxed line-clamp-2">
                 {ability.ability_description}
               </p>
+              
+              {/* 能力類別標籤 */}
               {ability.category && (
-                <div className="mb-2">
-                  <span className="inline-block px-2 py-1 text-xs bg-hanami-primary text-white rounded-full">
+                <div className="mb-3">
+                  <span className="inline-block px-2 py-1 text-xs bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30 rounded-full">
                     {ability.category}
                   </span>
                 </div>
               )}
               
-              {/* 等級管理按鈕 */}
-              <div className="mb-3 flex gap-2 justify-center">
-                <HanamiButton
-                  size="sm"
-                  variant="secondary"
+              {/* 操作按鈕 */}
+              <div className="mb-3 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <button
                   onClick={() => {
                     setSelectedAbility(ability);
                     setShowLevelManager(true);
                   }}
-                  className="flex items-center gap-1"
+                  className="p-1.5 text-[#A68A64] hover:bg-[#FFF9F2] rounded-full transition-colors"
+                  title="等級管理"
                 >
-                  <Cog6ToothIcon className="h-4 w-4" />
-                  等級管理
-                </HanamiButton>
-                <HanamiButton
-                  size="sm"
-                  variant="primary"
+                  <Cog6ToothIcon className="h-3.5 w-3.5" />
+                </button>
+                <button
                   onClick={() => {
                     setEditingAbility(ability);
                     setShowEditModal(true);
                   }}
-                  className="flex items-center gap-1"
+                  className="p-1.5 text-[#A64B2A] hover:bg-[#FFF9F2] rounded-full transition-colors"
+                  title="編輯能力"
                 >
-                  <PencilIcon className="h-4 w-4" />
-                  編輯
-                </HanamiButton>
+                  <PencilIcon className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDeleteClick(ability)}
+                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                  title="刪除能力"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                  </svg>
+                </button>
               </div>
               
               {/* 需要此能力的成長樹 */}
-              <div className="space-y-2">
+              <div className="space-y-1 pt-2 border-t border-[#EADBC8]/50">
+                <div className="text-xs text-hanami-text-secondary font-medium mb-1">相關成長樹</div>
                 {(() => {
                   const treesForAbility = getGrowthTreesForAbility(ability.id);
                   return (
                     <>
-                      {treesForAbility.slice(0, 3).map((tree) => {
+                      {treesForAbility.slice(0, 2).map((tree) => {
                         const requirementCount = getAbilityRequirementCount(tree.id, ability.id);
                         return (
                           <div key={tree.id} className="flex items-center justify-between text-xs">
-                            <span className="truncate">
+                            <span className="truncate text-[#87704e]">
                               {tree.tree_name}
                             </span>
-                            <span className="font-medium text-hanami-primary">
-                              {requirementCount} 個目標
+                            <span className="font-medium text-hanami-primary bg-hanami-primary/10 px-1.5 py-0.5 rounded-full text-xs">
+                              {requirementCount}
                             </span>
                           </div>
                         );
                       })}
-                      {treesForAbility.length > 3 && (
+                      {treesForAbility.length > 2 && (
                         <div className="text-xs text-hanami-text-secondary">
-                          +{treesForAbility.length - 3} 個成長樹
+                          +{treesForAbility.length - 2} 個
                         </div>
                       )}
                       {treesForAbility.length === 0 && (
                         <div className="text-xs text-hanami-text-secondary">
-                          暫無成長樹需要此能力
+                          暫無相關
                         </div>
                       )}
                     </>
@@ -1368,6 +1448,50 @@ export default function AbilitiesPage() {
             setEditingAbility(null);
           }}
         />
+      )}
+
+      {/* 刪除確認模態框 */}
+      {showDeleteConfirm && abilityToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-red-100">
+                <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                確認刪除能力
+              </h3>
+              <p className="text-gray-600 mb-6">
+                您確定要刪除能力「<span className="font-semibold text-red-600">{abilityToDelete.ability_name}</span>」嗎？
+                <br />
+                <span className="text-sm text-gray-500">
+                  此操作無法復原，請謹慎操作。
+                </span>
+              </p>
+              <div className="flex gap-3">
+                <HanamiButton
+                  variant="secondary"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setAbilityToDelete(null);
+                  }}
+                  className="flex-1"
+                >
+                  取消
+                </HanamiButton>
+                <HanamiButton
+                  variant="danger"
+                  onClick={() => deleteAbility(abilityToDelete)}
+                  className="flex-1"
+                >
+                  確認刪除
+                </HanamiButton>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

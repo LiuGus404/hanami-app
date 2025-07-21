@@ -420,10 +420,12 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     console.log('statuses 類型:', typeof formData.statuses, '值:', formData.statuses);
     
     const newErrors: Record<string, string> = {};
+    const missingFields: string[] = [];
     
     // 基本欄位驗證
     if (!formData.activity_name?.trim()) {
       newErrors.activity_name = '請輸入活動名稱';
+      missingFields.push('活動名稱');
       console.log('活動名稱驗證失敗');
     }
     
@@ -436,16 +438,19 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     
     if (activityTypes.length === 0) {
       newErrors.activity_types = '請選擇至少一個活動類型';
+      missingFields.push('活動類型');
       console.log('活動類型驗證失敗');
     }
 
     if (categories.length === 0) {
       newErrors.categories = '請選擇至少一個分類';
+      missingFields.push('分類');
       console.log('分類驗證失敗');
     }
 
     if (statuses.length === 0) {
       newErrors.statuses = '請選擇至少一個狀態';
+      missingFields.push('狀態');
       console.log('狀態驗證失敗');
     }
     
@@ -460,6 +465,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
           const value = formData[fieldName];
           if (!value || (Array.isArray(value) && value.length === 0) || (typeof value === 'string' && !value.trim())) {
             newErrors[fieldName] = `請填寫${fieldName}`;
+            missingFields.push(fieldName);
           }
         }
       });
@@ -469,6 +475,12 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     console.log('驗證錯誤:', newErrors);
     setErrors(newErrors);
     const isValid = Object.keys(newErrors).length === 0;
+    
+    // 如果驗證失敗，顯示具體的錯誤訊息
+    if (!isValid && missingFields.length > 0) {
+      toast.error(`請填寫以下必填欄位：${missingFields.join('、')}`);
+    }
+    
     console.log('=== validateForm 結束，結果:', isValid, '===');
     return isValid;
   };

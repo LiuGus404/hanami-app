@@ -1183,6 +1183,117 @@ export type Database = {
         };
         Relationships: [];
       }
+      hanami_ability_assessments: {
+        Row: {
+          id: string;
+          student_id: string;
+          tree_id: string;
+          assessment_date: string;
+          lesson_date: string;
+          teacher_id: string | null;
+          ability_assessments: any;
+          overall_performance_rating: number;
+          general_notes: string | null;
+          next_lesson_focus: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          tree_id: string;
+          assessment_date: string;
+          lesson_date: string;
+          teacher_id?: string | null;
+          ability_assessments: any;
+          overall_performance_rating: number;
+          general_notes?: string | null;
+          next_lesson_focus?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          tree_id?: string;
+          assessment_date?: string;
+          lesson_date?: string;
+          teacher_id?: string | null;
+          ability_assessments?: any;
+          overall_performance_rating?: number;
+          general_notes?: string | null;
+          next_lesson_focus?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'hanami_ability_assessments_student_id_fkey'
+            columns: ['student_id']
+            isOneToOne: false
+            referencedRelation: 'Hanami_Students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hanami_ability_assessments_tree_id_fkey'
+            columns: ['tree_id']
+            isOneToOne: false
+            referencedRelation: 'hanami_growth_trees'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hanami_ability_assessments_teacher_id_fkey'
+            columns: ['teacher_id']
+            isOneToOne: false
+            referencedRelation: 'hanami_employee'
+            referencedColumns: ['id']
+          }
+        ];
+      }
+      hanami_ability_assessment_history: {
+        Row: {
+          id: string;
+          assessment_id: string;
+          student_id: string;
+          ability_id: string;
+          previous_level: number | null;
+          new_level: number | null;
+          change_date: string;
+          change_reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          assessment_id: string;
+          student_id: string;
+          ability_id: string;
+          previous_level?: number | null;
+          new_level?: number | null;
+          change_date: string;
+          change_reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          assessment_id?: string;
+          student_id?: string;
+          ability_id?: string;
+          previous_level?: number | null;
+          new_level?: number | null;
+          change_date?: string;
+          change_reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'hanami_ability_assessment_history_assessment_id_fkey'
+            columns: ['assessment_id']
+            isOneToOne: false
+            referencedRelation: 'hanami_ability_assessments'
+            referencedColumns: ['id']
+          }
+        ];
+      }
       hanami_growth_goals: {
         Row: {
           id: string;

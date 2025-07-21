@@ -43,6 +43,9 @@ export { default as StudentProfileHeader } from './StudentProfileHeader';
 export { default as AddGrowthTreeModal } from './AddGrowthTreeModal';
 export { GrowthTreeDetailModal } from './GrowthTreeDetailModal';
 export { default as GrowthTreeStudentsModal } from './GrowthTreeStudentsModal';
+export { default as AbilityAssessmentModal } from './AbilityAssessmentModal';
+export { SimpleAbilityAssessmentModal } from './SimpleAbilityAssessmentModal';
+export { StudentTreeAssignmentModal } from './StudentTreeAssignmentModal';
 
 // 類型定義
  

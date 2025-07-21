@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import HanamiButton from './HanamiButton';
+import { PopupSelect } from './PopupSelect';
+import { FunnelIcon } from '@heroicons/react/24/outline';
 
 interface GoalInput {
   goal_name: string;
@@ -18,6 +20,7 @@ interface AddGrowthTreeModalProps {
   abilitiesOptions: { value: string; label: string }[];
   activitiesOptions: { value: string; label: string }[];
   teachersOptions: { value: string; label: string }[];
+  courseTypesOptions: { value: string; label: string }[];
   editingTree?: any;
 }
 
@@ -27,8 +30,31 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const [treeColor, setTreeColor] = useState(props.editingTree?.tree_color || '#FFD59A');
   const [treeIcon, setTreeIcon] = useState(props.editingTree?.tree_icon || '🌳');
   const [treeLevel, setTreeLevel] = useState(props.editingTree?.tree_level || 1);
+  const [courseType, setCourseType] = useState(props.editingTree?.course_type || '');
   const [reviewTeachers, setReviewTeachers] = useState<string[]>(props.editingTree?.review_teachers || []);
   const [notes, setNotes] = useState(props.editingTree?.notes || '');
+  
+  // 課程類型選擇器狀態
+  const [showCourseTypeSelect, setShowCourseTypeSelect] = useState(false);
+  const [tempSelectedCourseType, setTempSelectedCourseType] = useState<string>('');
+  
+  // 課程類型選擇器處理函數
+  const handleCourseTypeSelect = () => {
+    setTempSelectedCourseType(courseType);
+    setShowCourseTypeSelect(true);
+  };
+  
+  const handleCourseTypeConfirm = () => {
+    setCourseType(tempSelectedCourseType);
+    setShowCourseTypeSelect(false);
+  };
+  
+  const handleCourseTypeCancel = () => {
+    setTempSelectedCourseType(courseType);
+    setShowCourseTypeSelect(false);
+  };
+  
+  // 其他狀態保持不變...
   const [goals, setGoals] = useState<GoalInput[]>(() => {
     if (props.editingTree?.goals) {
       // 編輯模式：載入現有目標，確保進度內容正確
@@ -202,6 +228,7 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
         review_teachers: reviewTeachers,
         notes,
         tree_level: treeLevel,
+        course_type: courseType,
       }, fixedGoals);
     } finally {
       setLoading(false);
@@ -256,6 +283,38 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
             {/* 基本設定 */}
             <div className="grid grid-cols-3 gap-4">
               <div>
+                <label className="block text-sm font-medium text-[#2B3A3B] mb-2">課程類型</label>
+                <button
+                  type="button"
+                  className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white hover:bg-[#FFF9F2] transition-colors text-left flex items-center justify-between"
+                  onClick={handleCourseTypeSelect}
+                >
+                  <span>
+                    {courseType 
+                      ? props.courseTypesOptions.find(opt => opt.value === courseType)?.label || '請選擇課程類型'
+                      : '請選擇課程類型'
+                    }
+                  </span>
+                  <FunnelIcon className="h-4 w-4 text-[#A68A64]" />
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#2B3A3B] mb-2">等級</label>
+                <input
+                  className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
+                  max={10}
+                  min={1}
+                  placeholder="1-10"
+                  type="number"
+                  value={treeLevel}
+                  onChange={e => setTreeLevel(Number(e.target.value))}
+                />
+              </div>
+            </div>
+
+            {/* 外觀設定 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-medium text-[#2B3A3B] mb-2">主題色彩</label>
                 <input
                   className="w-full h-12 border border-[#EADBC8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
@@ -273,18 +332,6 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                   type="text"
                   value={treeIcon}
                   onChange={e => setTreeIcon(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#2B3A3B] mb-2">等級</label>
-                <input
-                  className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
-                  max={10}
-                  min={1}
-                  placeholder="1-10"
-                  type="number"
-                  value={treeLevel}
-                  onChange={e => setTreeLevel(Number(e.target.value))}
                 />
               </div>
             </div>
@@ -611,6 +658,19 @@ export function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 課程類型選擇彈窗 */}
+      {showCourseTypeSelect && (
+        <PopupSelect
+          mode="single"
+          options={props.courseTypesOptions}
+          selected={tempSelectedCourseType}
+          title="選擇課程類型"
+          onCancel={handleCourseTypeCancel}
+          onChange={(value) => setTempSelectedCourseType(Array.isArray(value) ? value[0] || '' : value)}
+          onConfirm={handleCourseTypeConfirm}
+        />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, MagnifyingGlassIcon, FunnelIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -20,6 +20,7 @@ export default function GrowthTreesPage() {
   const [abilitiesOptions, setAbilitiesOptions] = useState<{ value: string; label: string }[]>([]);
   const [activitiesOptions, setActivitiesOptions] = useState<{ value: string; label: string }[]>([]);
   const [teachersOptions, setTeachersOptions] = useState<{ value: string; label: string }[]>([]);
+  const [courseTypesOptions, setCourseTypesOptions] = useState<{ value: string; label: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // 詳細視窗狀態
@@ -135,6 +136,15 @@ export default function GrowthTreesPage() {
         ...((adminsData || []).map((a: any) => ({ value: a.id, label: `${a.admin_name}（管理員）` }))),
       ]);
       
+      // 課程類型
+      const { data: courseTypesData, error: courseTypesError } = await supabase
+        .from('Hanami_CourseTypes')
+        .select('id, name')
+        .eq('status', true)
+        .order('name');
+      if (courseTypesError) throw courseTypesError;
+      setCourseTypesOptions((courseTypesData || []).map((ct: any) => ({ value: ct.id, label: ct.name })));
+      
       console.log('資料載入完成');
     } catch (err: any) {
       console.error('資料載入失敗:', err);
@@ -161,7 +171,7 @@ export default function GrowthTreesPage() {
           tree_icon: treeData.tree_icon,
           course_type: treeData.course_type,
           tree_level: treeData.tree_level,
-          difficulty_level: treeData.difficulty_level,
+          difficulty_level: treeData.difficulty_level || 1,
           is_active: true,
         }])
         .select()
@@ -721,6 +731,13 @@ export default function GrowthTreesPage() {
             </button>
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => window.location.href = '/admin/student-progress/ability-assessments'}
+            >
+              <AcademicCapIcon className="w-4 h-4" />
+              能力評估管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
               onClick={() => window.location.href = '/admin/students'}
             >
               <Users className="w-4 h-4" />
@@ -956,6 +973,7 @@ export default function GrowthTreesPage() {
             activitiesOptions={activitiesOptions}
             editingTree={null}
             teachersOptions={teachersOptions}
+            courseTypesOptions={courseTypesOptions}
             onClose={() => setShowAddModal(false)}
             onSubmit={handleAddTree}
           />
@@ -987,6 +1005,7 @@ export default function GrowthTreesPage() {
               }),
             }}
             teachersOptions={teachersOptions}
+            courseTypesOptions={courseTypesOptions}
             onClose={() => setEditingTree(null)}
             onSubmit={handleUpdateTree}
           />

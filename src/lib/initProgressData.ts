@@ -186,9 +186,53 @@ export const initializeTeachingActivities = async () => {
   }
 };
 
+// 初始化課程類型
+export const initializeCourseTypes = async () => {
+  try {
+    // 檢查是否已存在課程類型
+    const { data: existingCourseTypes } = await supabase
+      .from('Hanami_CourseTypes')
+      .select('name');
+
+    if (existingCourseTypes && existingCourseTypes.length > 0) {
+      console.log('課程類型資料已存在，跳過初始化');
+      return;
+    }
+
+    // 插入基本課程類型
+    const courseTypes = [
+      { name: '鋼琴', status: true, trial_limit: 1 },
+      { name: '音樂專注力', status: true, trial_limit: 1 },
+      { name: '小提琴', status: true, trial_limit: 1 },
+      { name: '大提琴', status: true, trial_limit: 1 },
+      { name: '長笛', status: true, trial_limit: 1 },
+      { name: '吉他', status: true, trial_limit: 1 },
+      { name: '鼓組', status: true, trial_limit: 1 },
+      { name: '聲樂', status: true, trial_limit: 1 },
+    ];
+
+    const { data, error } = await supabase
+      .from('Hanami_CourseTypes')
+      .insert(courseTypes)
+      .select();
+
+    if (error) {
+      console.error('初始化課程類型失敗：', error);
+      throw error;
+    }
+
+    console.log('成功初始化課程類型資料：', data);
+  } catch (err) {
+    console.error('初始化課程類型時發生錯誤：', err);
+  }
+};
+
 // 初始化成長樹模板
 export const initializeGrowthTrees = async () => {
   try {
+    // 先初始化課程類型
+    await initializeCourseTypes();
+    
     // 獲取課程類型
     const { data: courseTypes } = await supabase
       .from('Hanami_CourseTypes')

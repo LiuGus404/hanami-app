@@ -7,6 +7,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// 獲取香港時間的日期字符串 (YYYY-MM-DD)
+export function getHKDateString(date?: Date): string {
+  const targetDate = date || new Date();
+  // 香港時間是 UTC+8
+  const hkTime = new Date(targetDate.getTime() + (8 * 60 * 60 * 1000));
+  return hkTime.toISOString().split('T')[0];
+}
+
+// 獲取香港時間的日期時間字符串 (YYYY-MM-DDTHH:mm:ss.sssZ)
+export function getHKDateTimeString(date?: Date): string {
+  const targetDate = date || new Date();
+  // 香港時間是 UTC+8
+  const hkTime = new Date(targetDate.getTime() + (8 * 60 * 60 * 1000));
+  return hkTime.toISOString();
+}
+
+// 檢查日期是否為今天（香港時間）
+export function isToday(dateString: string): boolean {
+  const today = getHKDateString();
+  return dateString === today;
+}
+
 /**
  * 計算學生基於 hanami_student_lesson 表的剩餘堂數
  * @param studentId 學生ID
