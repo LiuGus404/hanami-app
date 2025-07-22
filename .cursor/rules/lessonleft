@@ -55,3 +55,107 @@ BEGIN
   ORDER BY next_lesson_date, next_lesson_time;
 END;
 $$;
+
+-- 修復版本的計算剩餘堂數 RPC 函數
+-- 確保包含所有學生，包括剩餘堂數為 0 的學生
+
+CREATE OR REPLACE FUNCTION calculate_remaining_lessons_batch_fixed(
+  student_ids UUID[],
+  today_date DATE
+)
+RETURNS TABLE (
+  student_id UUID,
+  remaining_lessons BIGINT
+) 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    hs.id AS student_id,
+    COALESCE(lesson_counts.remaining_lessons, 0)::BIGINT AS remaining_lessons
+  FROM "Hanami_Students" hs
+  LEFT JOIN (
+    SELECT 
+      hsl.student_id,
+      COUNT(*)::BIGINT AS remaining_lessons
+    FROM hanami_student_lesson hsl
+    WHERE hsl.student_id = ANY(student_ids)
+      AND hsl.lesson_date >= today_date
+    GROUP BY hsl.student_id
+  ) lesson_counts ON hs.id = lesson_counts.student_id
+  WHERE hs.id = ANY(student_ids)
+    AND hs.student_type = '常規';
+END;
+$$;
+
+-- 修復版本的詳細查詢函數
+CREATE OR REPLACE FUNCTION calculate_remaining_lessons_detailed_fixed(
+  student_ids UUID[],
+  today_date DATE
+)
+RETURNS TABLE (
+  student_id UUID,
+  full_name TEXT,
+  remaining_lessons BIGINT,
+  next_lesson_date DATE,
+  next_lesson_time TIME,
+  course_type TEXT
+) 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    hs.id AS student_id,
+    hs.full_name,
+    COALESCE(lesson_counts.remaining_lessons, 0)::BIGINT AS remaining_lessons,
+    lesson_counts.next_lesson_date,
+    lesson_counts.next_lesson_time,
+    lesson_counts.course_type
+  FROM "Hanami_Students" hs
+  LEFT JOIN (
+    SELECT 
+      hsl.student_id,
+      COUNT(*)::BIGINT AS remaining_lessons,
+      MIN(hsl.lesson_date) AS next_lesson_date,
+      MIN(hsl.actual_timeslot) AS next_lesson_time,
+      MIN(hsl.course_type) AS course_type
+    FROM hanami_student_lesson hsl
+    WHERE hsl.student_id = ANY(student_ids)
+      AND hsl.lesson_date >= today_date
+    GROUP BY hsl.student_id
+  ) lesson_counts ON hs.id = lesson_counts.student_id
+  WHERE hs.id = ANY(student_ids)
+    AND hs.student_type = '常規'
+  ORDER BY lesson_counts.next_lesson_date, lesson_counts.next_lesson_time;
+END;
+$$;
+
+-- 測試查詢：驗證修復後的函數
+-- 請在 Supabase SQL Editor 中執行以下查詢來測試
+
+-- 1. 測試修復後的批量計算函數
+-- SELECT * FROM calculate_remaining_lessons_batch_fixed(
+--   ARRAY['your-student-id-here']::UUID[],
+--   CURRENT_DATE
+-- );
+
+-- 2. 測試修復後的詳細查詢函數
+-- SELECT * FROM calculate_remaining_lessons_detailed_fixed(
+--   ARRAY['your-student-id-here']::UUID[],
+--   CURRENT_DATE
+-- );
+
+-- 3. 手動驗證：檢查是否有剩餘堂數為 0 的學生
+-- SELECT 
+--   hs.id,
+--   hs.full_name,
+--   hs.student_type,
+--   COALESCE(COUNT(hsl.id), 0) AS remaining_lessons
+-- FROM "Hanami_Students" hs
+-- LEFT JOIN hanami_student_lesson hsl ON hs.id = hsl.student_id 
+--   AND hsl.lesson_date >= CURRENT_DATE
+-- WHERE hs.student_type = '常規'
+-- GROUP BY hs.id, hs.full_name, hs.student_type
+-- ORDER BY remaining_lessons; 

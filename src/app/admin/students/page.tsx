@@ -70,8 +70,8 @@ export default function StudentManagementPage() {
   // const [inactiveStudents, setInactiveStudents] = useState<any[]>([]);
   const [selectedWeekdays, setSelectedWeekdays] = useState<string[]>([]);
   const [weekdayDropdownOpen, setWeekdayDropdownOpen] = useState(false);
-  const [selectedLessonFilter, setSelectedLessonFilter] = useState<'all' | 'gt2' | 'lte2' | 'custom'>(() => {
-    if (filterParam === 'lastLesson') return 'custom';
+  const [selectedLessonFilter, setSelectedLessonFilter] = useState<'all' | 'gt2' | 'lte2' | 'lte1' | 'custom'>(() => {
+    if (filterParam === 'lastLesson') return 'lte1';
     return 'all';
   });
   const [customLessonCount, setCustomLessonCount] = useState<number | ''>(() => {
@@ -1093,6 +1093,8 @@ export default function StudentManagementPage() {
                   return Number(remainingLessons) > 2;
                 case 'lte2':
                   return Number(remainingLessons) <= 2;
+                case 'lte1':
+                  return Number(remainingLessons) <= 1;
                 case 'custom':
                   if (customLessonCount !== '' && customLessonCount !== null && customLessonCount !== undefined) {
                     return Number(remainingLessons) === Number(customLessonCount);
@@ -1597,6 +1599,7 @@ export default function StudentManagementPage() {
                     { label: '全部', value: 'all' },
                     { label: '> 2', value: 'gt2' },
                     { label: '≤ 2', value: 'lte2' },
+                    { label: '≤ 1', value: 'lte1' },
                     { label: '自訂數字', value: 'custom' },
                   ]}
                   selected={selectedLessonFilter}
@@ -1723,7 +1726,7 @@ export default function StudentManagementPage() {
               })}
               {selectedLessonFilter !== 'all' && (
                 <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full">
-                  堂數：{selectedLessonFilter === 'gt2' ? '> 2' : selectedLessonFilter === 'lte2' ? '≤ 2' : selectedLessonFilter === 'custom' ? `= ${customLessonCount}` : selectedLessonFilter}
+                  堂數：{selectedLessonFilter === 'gt2' ? '> 2' : selectedLessonFilter === 'lte2' ? '≤ 2' : selectedLessonFilter === 'lte1' ? '≤ 1' : selectedLessonFilter === 'custom' ? `= ${customLessonCount}` : selectedLessonFilter}
                 </span>
               )}
               {selectedDates.length > 0 && (
@@ -1749,7 +1752,9 @@ export default function StudentManagementPage() {
                 ? '剩餘堂數 > 2'
                 : selectedLessonFilter === 'lte2'
                   ? '剩餘堂數 ≤ 2'
-                  : null,
+                  : selectedLessonFilter === 'lte1'
+                    ? '剩餘堂數 ≤ 1'
+                    : null,
             selectedDates.length > 0 && `日期：${selectedDates.map(date => date.toLocaleDateString('zh-TW')).join('、')}`,
           ]
             .filter(Boolean)
@@ -2454,6 +2459,6 @@ export default function StudentManagementPage() {
   );
 }
 
-function isCustomLessonFilterActive(filter: 'all' | 'gt2' | 'lte2' | 'custom', count: number | ''): boolean {
+function isCustomLessonFilterActive(filter: 'all' | 'gt2' | 'lte2' | 'lte1' | 'custom', count: number | ''): boolean {
   return filter === 'custom' && count !== '' && count !== null && count !== undefined && !isNaN(Number(count));
 }
