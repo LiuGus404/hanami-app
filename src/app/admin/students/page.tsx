@@ -262,7 +262,7 @@ export default function StudentManagementPage() {
     }
   }, [user]);
 
-  // 計算剩餘堂數 - 使用統一的 PostgreSQL 查詢
+  // 計算剩餘堂數 - 不受篩選條件影響，直接查詢所有常規學生
   useEffect(() => {
     console.log('剩餘堂數計算 useEffect 觸發:', { isLoading, studentsLength: students.length });
     
@@ -277,7 +277,7 @@ export default function StudentManagementPage() {
       setRemainingLoading(true);
       
       try {
-        // 只計算常規學生的剩餘堂數
+        // 從已載入的學生資料中提取常規學生ID，確保資料一致性
         const regularStudentIds = students
           .filter((s: any) => s.student_type === '常規' && !s.is_inactive)
           .map((s: any) => s.id);
@@ -291,8 +291,7 @@ export default function StudentManagementPage() {
           return;
         }
         
-        // 使用統一的 calculateRemainingLessonsBatch 函數，不傳遞篩選條件
-        // 剩餘堂數應該是所有未來課堂的總數，不應該受到篩選條件的影響
+        // 使用統一的 calculateRemainingLessonsBatch 函數計算所有常規學生的剩餘堂數
         const remainingMap = await calculateRemainingLessonsBatch(
           regularStudentIds, 
           new Date()
@@ -312,7 +311,7 @@ export default function StudentManagementPage() {
     const timer = setTimeout(calculateRemainingLessons, 200);
     
     return () => clearTimeout(timer);
-  }, [students, isLoading]);
+  }, [isLoading, students.length]); // 依賴 isLoading 和 students.length
 
   // 刪除學生功能
   const handleDeleteStudents = async () => {
@@ -996,7 +995,9 @@ export default function StudentManagementPage() {
       // 先合成一份帶最新 remaining_lessons 的 students
       const studentsWithLatestLessons = (baseStudents || []).map((s: any) => {
         if (s.student_type !== '試堂' && !s.is_inactive && s.id && remainingLessonsMap[s.id] !== undefined) {
-          return { ...s, remaining_lessons: remainingLessonsMap[s.id] };
+          const updatedStudent = { ...s, remaining_lessons: remainingLessonsMap[s.id] };
+          console.log(`學生 ${s.full_name} (ID: ${s.id}) 的剩餘堂數: ${remainingLessonsMap[s.id]}`);
+          return updatedStudent;
         }
         return s;
       });
