@@ -10,6 +10,7 @@ import { GrowthTreeDetailModal, GrowthTreeStudentsModal } from '@/components/ui'
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { supabase } from '@/lib/supabase';
 import { GrowthTree, GrowthGoal } from '@/types/progress';
+import { VideoCameraIcon } from '@heroicons/react/24/outline';
 
 export default function GrowthTreesPage() {
   const [trees, setTrees] = useState<GrowthTree[]>([]);
@@ -726,6 +727,13 @@ export default function GrowthTreesPage() {
             >
               <FileText className="w-4 h-4" />
               進度記錄管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => window.location.href = '/admin/student-progress/student-media'}
+            >
+              <VideoCameraIcon className="w-4 h-4" />
+              學生媒體管理
             </button>
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"

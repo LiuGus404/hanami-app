@@ -46,6 +46,8 @@ export { default as GrowthTreeStudentsModal } from './GrowthTreeStudentsModal';
 export { default as AbilityAssessmentModal } from './AbilityAssessmentModal';
 export { default as SimpleAbilityAssessmentModal } from './SimpleAbilityAssessmentModal';
 export { default as StudentTreeAssignmentModal } from './StudentTreeAssignmentModal';
+export { default as StudentMediaModal } from './StudentMediaModal';
+export { PlanUpgradeModal } from './PlanUpgradeModal';
 
 // 類型定義
  

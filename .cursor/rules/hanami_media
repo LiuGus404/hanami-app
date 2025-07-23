@@ -1,0 +1,321 @@
+```bash
+python3 -c "i = input('請輸入內容:');print(i)"
+```
+# Supabase Storage Bucket 建立與分類指南
+
+## ��️ 建立 Storage Bucket
+
+### **步驟 1: 進入 Supabase Dashboard**
+1. 登入 [Supabase Dashboard](https://supabase.com/dashboard)
+2. 選擇你的專案
+3. 點擊左側選單的 **"Storage"**
+
+### **步驟 2: 建立 Bucket**
+1. 點擊 **"Create a new bucket"**
+2. 填寫以下資訊：
+   - **Bucket name**: `hanami-media` (建議名稱)
+   - **Public bucket**: ✅ 勾選 (讓檔案可以公開訪問)
+   - **File size limit**: `20MB` (影片檔案限制)
+   - **Allowed MIME types**: `video/*,image/*`
+
+### **步驟 3: 設定 RLS (Row Level Security)**
+```sql
+-- 在 SQL Editor 中執行以下腳本
+
+-- 1. 啟用 RLS
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- 2. 建立政策：允許認證用戶上傳檔案
+CREATE POLICY "Allow authenticated users to upload files" ON storage.objects
+FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- 3. 建立政策：允許用戶查看自己的檔案
+CREATE POLICY "Allow users to view their own files" ON storage.objects
+FOR SELECT USING (auth.uid()::text = (storage.foldername(name))[1]);
+
+-- 4. 建立政策：允許用戶刪除自己的檔案
+CREATE POLICY "Allow users to delete their own files" ON storage.objects
+FOR DELETE USING (auth.uid()::text = (storage.foldername(name))[1]);
+
+-- 5. 建立政策：允許公開讀取 (因為是公開 bucket)
+CREATE POLICY "Allow public read access" ON storage.objects
+FOR SELECT USING (bucket_id = 'hanami-media');
+```
+
+## 📁 檔案分類結構
+
+### **建議的資料夾結構**
+```
+hanami-media/
+├── students/
+│   ├── {student_id}/
+│   │   ├── videos/
+│   │   │   ├── {timestamp}_{random}.mp4
+│   │   │   └── thumbnails/
+│   │   │       └── {video_id}.jpg
+│   │   └── photos/
+│   │       └── {timestamp}_{random}.jpg
+│   └── ...
+├── templates/
+│   ├── lesson-plans/
+│   ├── activities/
+│   └── resources/
+└── shared/
+    ├── avatars/
+    └── documents/
+```
+
+### **檔案命名規則**
+```typescript
+// 學生媒體檔案
+const fileName = `${studentId}/${mediaType}s/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+
+// 範例：
+// students/123e4567-e89b-12d3-a456-426614174000/videos/1703123456789_abc123def.mp4
+// students/123e4567-e89b-12d3-a456-426614174000/photos/1703123456790_xyz789ghi.jpg
+```
+
+## �� 前端整合
+
+### **更新上傳函數**
+```typescript
+// 在 StudentMediaModal.tsx 中更新上傳邏輯
+const uploadFiles = async () => {
+  if (!student || selectedFiles.length === 0) return;
+
+  setUploading(true);
+  
+  try {
+    for (const file of selectedFiles) {
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'photo';
+      const fileExt = file.name.split('.').pop();
+      
+      // 建立檔案路徑
+      const fileName = `students/${student.id}/${mediaType}s/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+
+      // 上傳到 Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('hanami-media')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 獲取公開 URL
+      const { data: urlData } = supabase.storage
+        .from('hanami-media')
+        .getPublicUrl(fileName);
+
+      // 儲存到資料庫
+      const mediaData = {
+        student_id: student.id,
+        media_type: mediaType,
+        file_name: file.name,
+        file_path: fileName,
+        file_size: file.size,
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        uploaded_by: 'current_user_id'
+      };
+
+      const { error: dbError } = await supabase
+        .from('hanami_student_media')
+        .insert(mediaData);
+
+      if (dbError) throw dbError;
+    }
+
+    toast.success('檔案上傳成功！');
+    loadStudentMedia();
+  } catch (error) {
+    console.error('上傳失敗:', error);
+    toast.error('檔案上傳失敗');
+  } finally {
+    setUploading(false);
+  }
+};
+```
+
+## 🛡️ 安全性設定
+
+### **Bucket 權限設定**
+```sql
+-- 在 SQL Editor 中執行
+
+-- 1. 建立自定義函數檢查用戶權限
+CREATE OR REPLACE FUNCTION check_student_media_permission(student_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  -- 檢查用戶是否有權限訪問該學生的媒體
+  -- 這裡可以根據你的權限邏輯進行調整
+  RETURN EXISTS (
+    SELECT 1 FROM "Hanami_Students" 
+    WHERE id = student_id 
+    AND (access_role = 'admin' OR access_role = 'teacher')
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. 更新 RLS 政策
+CREATE POLICY "Allow access to student media" ON storage.objects
+FOR ALL USING (
+  bucket_id = 'hanami-media' AND
+  check_student_media_permission(
+    (storage.foldername(name))[2]::UUID
+  )
+);
+```
+
+## 📊 監控與管理
+
+### **建立檔案統計查詢**
+```sql
+-- 查詢每個學生的媒體使用量
+SELECT 
+  s.full_name,
+  COUNT(CASE WHEN sm.media_type = 'video' THEN 1 END) as video_count,
+  COUNT(CASE WHEN sm.media_type = 'photo' THEN 1 END) as photo_count,
+  SUM(sm.file_size) as total_size_bytes
+FROM "Hanami_Students" s
+LEFT JOIN hanami_student_media sm ON s.id = sm.student_id
+GROUP BY s.id, s.full_name
+ORDER BY total_size_bytes DESC;
+```
+
+### **清理過期檔案**
+```sql
+-- 刪除超過 30 天的未使用檔案
+DELETE FROM hanami_student_media 
+WHERE created_at < NOW() - INTERVAL '30 days'
+AND student_id NOT IN (
+  SELECT DISTINCT student_id 
+  FROM hanami_student_lesson 
+  WHERE lesson_date > NOW() - INTERVAL '7 days'
+);
+```
+
+## 🎯 最佳實踐
+
+### **1. 檔案大小限制**
+- 影片：最大 20MB
+- 相片：最大 1MB
+- 總儲存空間：50GB
+
+### **2. 檔案類型限制**
+```typescript
+const allowedVideoTypes = ['video/mp4', 'video/avi', 'video/mov'];
+const allowedPhotoTypes = ['image/jpeg', 'image/png', 'image/webp'];
+```
+
+### **3. 自動清理策略**
+- 定期清理未使用的檔案
+- 監控儲存空間使用量
+- 備份重要檔案
+
+### **4. 效能優化**
+- 使用 CDN 加速檔案訪問
+- 壓縮圖片和影片
+- 實作懶加載
+
+這樣設定後，你的 Supabase Storage 就能很好地管理學生媒體檔案了！🎉
+
+```bash
+
+```
+```bash
+python3 -c "i = input('請輸入內容:');print(i)"
+```
+# 智能容量管理系統
+
+很好的想法！我來設計一個智能的容量管理系統，當用戶超出容量限制時自動清理最舊的檔案。
+
+## 📊 首先需要更新資料庫結構
+
+### **1. 添加收藏標記欄位**
+
+### **2. 創建智能清理函數**
+
+### **3. 創建收藏功能 API**
+
+### **4. 更新前端組件**
+
+## �� 智能容量管理系統功能
+
+### **🎯 核心功能**
+
+1. **自動容量檢查**：
+   - 每次上傳檔案後自動檢查容量
+   - 超出限制時自動清理最舊的非收藏檔案
+
+2. **收藏保護**：
+   - 收藏的檔案不會被自動刪除
+   - 用戶可以標記重要檔案為收藏
+
+3. **智能清理策略**：
+   - 優先刪除最舊的非收藏檔案
+   - 按上傳時間排序刪除
+   - 直到符合容量限制為止
+
+### **�� 使用方式**
+
+#### **1. 執行資料庫更新**
+```sql
+-- 在 Supabase SQL Editor 中執行
+-- 1. 執行 update_student_media_schema.sql
+-- 2. 執行 smart_storage_cleanup.sql
+```
+
+#### **2. 手動清理（管理員）**
+```sql
+-- 清理特定學生的儲存空間
+SELECT manual_storage_cleanup('student-uuid-here');
+
+-- 查看清理結果
+SELECT * FROM cleanup_student_storage('student-uuid-here');
+```
+
+#### **3. 前端收藏功能**
+```typescript
+// 切換收藏狀態
+const toggleFavorite = async (mediaId: string, isFavorite: boolean) => {
+  const response = await fetch(`/api/student-media/${mediaId}/favorite`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_favorite: !isFavorite }),
+  });
+};
+```
+
+### **�� 容量限制對照表**
+
+| 方案 | 容量限制 | 自動清理觸發 |
+|------|----------|-------------|
+| 免費版 | 250MB | 超出時自動清理 |
+| 基礎版 | 1.5GB | 超出時自動清理 |
+| 進階版 | 5GB | 超出時自動清理 |
+| 專業版 | 10GB | 超出時自動清理 |
+
+### **��️ 安全機制**
+
+1. **收藏檔案保護**：收藏的檔案不會被自動刪除
+2. **手動確認**：管理員可以手動觸發清理
+3. **日誌記錄**：所有清理操作都會記錄
+4. **錯誤處理**：清理失敗時會通知用戶
+
+### **�� 監控功能**
+
+```sql
+-- 查看各學生的儲存使用情況
+SELECT 
+  s.full_name,
+  sq.plan_type,
+  sq.storage_limit_bytes / 1024 / 1024 as limit_mb,
+  sq.total_used_space / 1024 / 1024 as used_mb,
+  ROUND((sq.total_used_space::float / sq.storage_limit_bytes) * 100, 2) as usage_percent
+FROM "Hanami_Students" s
+JOIN hanami_student_media_quota sq ON s.id = sq.student_id
+ORDER BY usage_percent DESC;
+```
+
+這個系統會自動管理用戶的儲存空間，確保不會超出限制，同時保護重要的收藏檔案！🎉

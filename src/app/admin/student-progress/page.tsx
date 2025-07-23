@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, Play, Target, FileText, Plus, CheckCircle, XCircle, Send, Brain, Edit, BarChart3, TreePine, TrendingUp, Gamepad2, FileText as FileTextIcon, Users, GraduationCap } from 'lucide-react';
+import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, Play, Target, FileText, Plus, CheckCircle, XCircle, Send, Brain, Edit, BarChart3, TreePine, TrendingUp, Gamepad2, FileText as FileTextIcon, Users, GraduationCap, Video } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
@@ -606,6 +606,13 @@ export default function StudentProgressPage() {
             >
               <FileTextIcon className="w-4 h-4" />
               進度記錄管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => window.location.href = '/admin/student-progress/student-media'}
+            >
+                                      <Video className="w-4 h-4" />
+              學生媒體管理
             </button>
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"

@@ -168,7 +168,7 @@ const Calendarui: React.FC<CalendaruiProps> = ({
               <div className="text-sm font-medium mb-2 text-[#4B4036]">已選擇：</div>
               <div className="flex flex-wrap gap-2">
                 {selectedDates.map((date, index) => (
-                  <span key={index} className="text-xs bg-[#E8E3D5] px-2 py-1 rounded-full text-[#4B4036] border border-[#D8CDBF]">
+                  <span key={`date-${index}-${formatDateLocal(date)}`} className="text-xs bg-[#E8E3D5] px-2 py-1 rounded-full text-[#4B4036] border border-[#D8CDBF]">
                     {date.toLocaleDateString('zh-TW')}
                   </span>
                 ))}

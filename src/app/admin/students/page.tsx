@@ -141,7 +141,7 @@ export default function StudentManagementPage() {
 
   const [searchInput, setSearchInput] = useState(''); // 用於輸入框
   const [searchQuery, setSearchQuery] = useState(''); // 真正觸發搜尋的值
-  
+
   // AI 訊息相關狀態
   const [showAIMessageModal, setShowAIMessageModal] = useState(false);
   const [selectedStudentsForAI, setSelectedStudentsForAI] = useState<any[]>([]);
@@ -983,7 +983,7 @@ export default function StudentManagementPage() {
 
   // 根據篩選條件決定顯示哪些學生
   const isShowingInactiveStudents = selectedCourses && selectedCourses.length > 0 && selectedCourses.includes('停用學生');
-  
+
   // 計算顯示學生數（不包括停用學生）
   const activeStudentsCount = students.filter((s: any) => !s.is_inactive).length;
 
@@ -1006,7 +1006,7 @@ export default function StudentManagementPage() {
 
       // 1. 搜尋篩選
       if (searchQuery && searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
         result = result.filter((s: any) => {
           if (!s) return false;
           try {
@@ -1469,21 +1469,21 @@ export default function StudentManagementPage() {
         <div className="mb-4 flex justify-start">
           <div className="w-full max-w-xl" style={{ minWidth: 240, width: '50%' }}>
             <div className="relative">
-              <button
+                <button
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                onClick={() => {
-                  setSearchQuery(searchInput);
+                  onClick={() => {
+                    setSearchQuery(searchInput);
                   handleSearchTermChange(searchInput);
                 }}
               >
                 <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
                   <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-                </svg>
-              </button>
+                      </svg>
+                </button>
               <HanamiInput
                 className="pl-10"
                 placeholder="搜尋學生姓名、電話或編號..."
@@ -1500,7 +1500,7 @@ export default function StudentManagementPage() {
                   }
                 }}
               />
-            </div>
+                    </div>
           </div>
         </div>
 
@@ -1749,12 +1749,12 @@ export default function StudentManagementPage() {
             selectedLessonFilter === 'custom' && typeof customLessonCount === 'number'
               ? `剩餘堂數 = ${customLessonCount}`
               : selectedLessonFilter === 'gt2'
-                ? '剩餘堂數 > 2'
-                : selectedLessonFilter === 'lte2'
-                  ? '剩餘堂數 ≤ 2'
+              ? '剩餘堂數 > 2'
+              : selectedLessonFilter === 'lte2'
+              ? '剩餘堂數 ≤ 2'
                   : selectedLessonFilter === 'lte1'
                     ? '剩餘堂數 ≤ 1'
-                    : null,
+              : null,
             selectedDates.length > 0 && `日期：${selectedDates.map(date => date.toLocaleDateString('zh-TW')).join('、')}`,
           ]
             .filter(Boolean)
@@ -1892,40 +1892,40 @@ export default function StudentManagementPage() {
                   const isInactiveStudent = student.is_inactive === true;
                   const cardFields = isTrialStudent
                     ? [
-                      {
-                        icon: CalendarClock,
-                        label: '年齡',
-                        value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
-                      },
-                      {
-                        icon: BookOpen,
-                        label: '課程',
-                        value: student.course_type || '未分班',
-                      },
-                      {
-                        icon: CalendarClock,
-                        label: '試堂時間',
-                        value: student.lesson_date && student.actual_timeslot
-                          ? `${new Date(student.lesson_date).toLocaleDateString('zh-HK')} ${student.actual_timeslot}`
-                          : '—',
-                      },
-                    ]
+                        {
+                          icon: CalendarClock,
+                          label: '年齡',
+                          value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
+                        },
+                        {
+                          icon: BookOpen,
+                          label: '課程',
+                          value: student.course_type || '未分班',
+                        },
+                        {
+                          icon: CalendarClock,
+                          label: '試堂時間',
+                          value: student.lesson_date && student.actual_timeslot
+                            ? `${new Date(student.lesson_date).toLocaleDateString('zh-HK')} ${student.actual_timeslot}`
+                            : '—',
+                        },
+                      ]
                     : [
-                      {
-                        icon: CalendarClock,
-                        label: '年齡',
-                        value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
-                      },
-                      {
-                        icon: BookOpen,
-                        label: '課程',
-                        value: student.course_type || '未分班',
-                      },
-                      {
-                        icon: Star,
-                        label: '剩餘堂數',
+                        {
+                          icon: CalendarClock,
+                          label: '年齡',
+                          value: ageInMonths ? `${years} 歲${months > 0 ? ` ${months} 個月` : ''}` : '—',
+                        },
+                        {
+                          icon: BookOpen,
+                          label: '課程',
+                          value: student.course_type || '未分班',
+                        },
+                        {
+                          icon: Star,
+                          label: '剩餘堂數',
                         value: student.student_type === '常規' ? (remainingLessonsMap[student.id] !== undefined ? `${remainingLessonsMap[student.id]} 堂` : '—') : '—',
-                      },
+                        },
                     ];
 
                   // 如果是停用學生，添加停用日期信息
@@ -2145,7 +2145,7 @@ export default function StudentManagementPage() {
                       onClick={() => handleSort('regular_weekday')}
                     >
                       <div className="flex items-center gap-1">
-                        星期
+                      星期
                         {getSortIcon('regular_weekday')}
                       </div>
                     </th>

@@ -139,6 +139,9 @@ export const FIELD_TYPES: FieldTypeOption[] = [
   // 時間類
   { type: 'date', name: 'Date', icon: 'Calendar', description: '日期選擇', category: 'basic' },
   { type: 'time', name: 'Time', icon: 'Clock', description: '時間選擇', category: 'basic' },
+  
+  // 數字類
+  { type: 'number', name: 'Number', icon: 'Hash', description: '數字輸入', category: 'basic' },
 ];
 
 export const CATEGORIES = [

@@ -522,6 +522,82 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
             </label>
           </div>
         );
+
+      case 'multiple_choice_grid':
+      case 'tick_box_grid':
+        return (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-2">欄標題 (選項)</label>
+              {fieldData.grid_columns?.map((column, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <HanamiInput
+                    placeholder={`欄標題 ${index + 1}`}
+                    value={column}
+                    onChange={(e) => {
+                      const newColumns = [...(fieldData.grid_columns || [])];
+                      newColumns[index] = e.target.value;
+                      setFieldData({ ...fieldData, grid_columns: newColumns });
+                    }}
+                  />
+                  <button
+                    className="text-red-500 hover:text-red-700 px-2"
+                    onClick={() => {
+                      const newColumns = fieldData.grid_columns?.filter((_, i) => i !== index);
+                      setFieldData({ ...fieldData, grid_columns: newColumns });
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <HanamiButton
+                variant="soft"
+                onClick={() => {
+                  const newColumns = [...(fieldData.grid_columns || []), ''];
+                  setFieldData({ ...fieldData, grid_columns: newColumns });
+                }}
+              >
+                + 新增欄標題
+              </HanamiButton>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">列標題 (問題)</label>
+              {fieldData.grid_rows?.map((row, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <HanamiInput
+                    placeholder={`問題 ${index + 1}`}
+                    value={row}
+                    onChange={(e) => {
+                      const newRows = [...(fieldData.grid_rows || [])];
+                      newRows[index] = e.target.value;
+                      setFieldData({ ...fieldData, grid_rows: newRows });
+                    }}
+                  />
+                  <button
+                    className="text-red-500 hover:text-red-700 px-2"
+                    onClick={() => {
+                      const newRows = fieldData.grid_rows?.filter((_, i) => i !== index);
+                      setFieldData({ ...fieldData, grid_rows: newRows });
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <HanamiButton
+                variant="soft"
+                onClick={() => {
+                  const newRows = [...(fieldData.grid_rows || []), ''];
+                  setFieldData({ ...fieldData, grid_rows: newRows });
+                }}
+              >
+                + 新增問題
+              </HanamiButton>
+            </div>
+          </div>
+        );
         
       default:
         return null;

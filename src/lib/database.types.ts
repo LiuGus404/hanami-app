@@ -1536,6 +1536,106 @@ export type Database = {
           }
         ];
       }
+      hanami_student_media: {
+        Row: {
+          id: string
+          student_id: string
+          media_type: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_duration: number | null
+          thumbnail_path: string | null
+          title: string | null
+          description: string | null
+          uploaded_by: string | null
+          created_at: string
+          updated_at: string
+          is_favorite: boolean | null
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          media_type: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_duration?: number | null
+          thumbnail_path?: string | null
+          title?: string | null
+          description?: string | null
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
+          is_favorite?: boolean | null
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          media_type?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_duration?: number | null
+          thumbnail_path?: string | null
+          title?: string | null
+          description?: string | null
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
+          is_favorite?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hanami_student_media_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "Hanami_Students"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      hanami_student_media_quota: {
+        Row: {
+          student_id: string
+          plan_type: string
+          video_limit: number
+          photo_limit: number
+          video_count: number
+          photo_count: number
+          total_used_space: number
+          last_updated: string
+        }
+        Insert: {
+          student_id: string
+          plan_type?: string
+          video_limit?: number
+          photo_limit?: number
+          video_count?: number
+          photo_count?: number
+          total_used_space?: number
+          last_updated?: string
+        }
+        Update: {
+          student_id?: string
+          plan_type?: string
+          video_limit?: number
+          photo_limit?: number
+          video_count?: number
+          photo_count?: number
+          total_used_space?: number
+          last_updated?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hanami_student_media_quota_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "Hanami_Students"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

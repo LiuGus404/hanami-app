@@ -690,7 +690,7 @@ export default function SimpleAbilityAssessmentModal({
             const isLastAssessment = lastAssessment && level === lastAssessment.level;
             
             return (
-              <div key={index} className="flex flex-col items-center relative">
+              <div key={`level-${index}-${level}`} className="flex flex-col items-center relative">
                 {/* 歷史評估縮圖 */}
                 {isLastAssessment && (
                   <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-[#B8D4E3] to-[#A8C4D3] rounded-full border border-[#98B4C3] flex items-center justify-center shadow-sm">
@@ -770,7 +770,7 @@ export default function SimpleAbilityAssessmentModal({
                 const isLastAssessment = lastAssessment && level === lastAssessment.level;
                 
                 return (
-                  <div key={index} className="flex items-start gap-3 text-xs group">
+                  <div key={`content-${index}-${level}`} className="flex items-start gap-3 text-xs group">
                     <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${
                       isSelected
                         ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-sm'

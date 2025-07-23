@@ -419,6 +419,13 @@ export default function StudentProgressDashboard() {
             </button>
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => window.location.href = '/admin/student-progress/student-media'}
+            >
+              <Users className="w-4 h-4" />
+              學生媒體管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
               onClick={() => window.location.href = '/admin/students'}
             >
               <Users className="w-4 h-4" />

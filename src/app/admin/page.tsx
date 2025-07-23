@@ -339,7 +339,7 @@ export default function AdminPage() {
               </div>
             </div>
             {/* 學生進度管理按鈕 */}
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/student-progress')}>
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/student-progress/dashboard')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
                   <img alt="學生進度" className="w-full h-full object-contain" src="/icons/book-elephant.PNG" />

@@ -12,7 +12,8 @@ import {
   EyeIcon,
   PencilIcon,
   TrashIcon,
-  XMarkIcon
+  XMarkIcon,
+  VideoCameraIcon
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 
@@ -498,6 +499,13 @@ export default function AbilityAssessmentsPage() {
             >
               <FileText className="w-4 h-4" />
               進度記錄管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => window.location.href = '/admin/student-progress/student-media'}
+            >
+              <VideoCameraIcon className="w-4 h-4" />
+              學生媒體管理
             </button>
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-[#A64B2A] text-white hover:bg-[#8B3A1F] transition-colors"

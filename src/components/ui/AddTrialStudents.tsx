@@ -394,9 +394,9 @@ export default function TrialQueueForm() {
         <div>
           <label className="block text-sm text-[#4B4036] mb-1">想排課程（可選多項）</label>
           <div className="flex flex-wrap gap-2">
-            {courseTypes.map((type) => (
+            {courseTypes.map((type, index) => (
               <button
-                key={type}
+                key={`${type}-${index}`}
                 className={`px-3 py-1 rounded-full text-sm border ${
                   (form.course_types).includes(type)
                     ? 'bg-[#FDE6C2] border-[#E4B888] text-[#4B4036]'
@@ -466,7 +466,7 @@ export default function TrialQueueForm() {
                         const label = option.label;
                         return (
                           <button
-                            key={label}
+                            key={`${label}-${option.timeslot}-${option.weekday}`}
                             className={`px-3 py-1 rounded-full text-sm border ${
                               (form.prefer_time).includes(label)
                                 ? 'bg-[#FDE6C2] border-[#E4B888] text-[#4B4036]'

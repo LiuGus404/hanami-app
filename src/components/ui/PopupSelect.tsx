@@ -25,6 +25,10 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
   mode = 'multi',
   errorMsg,
 }) => {
+  console.log('PopupSelect 渲染 - title:', title);
+  console.log('PopupSelect 渲染 - options:', options);
+  console.log('PopupSelect 渲染 - selected:', selected);
+  console.log('PopupSelect 渲染 - mode:', mode);
   // 統一 mode 值，支援 'multiple' 作為 'multi' 的別名
   const actualMode = mode === 'multiple' ? 'multi' : mode;
 
@@ -88,10 +92,10 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
           <div className="mb-4 p-3 bg-[#F3F0E5] rounded-lg">
             <div className="text-sm font-medium mb-2">已選擇：</div>
             <div className="flex flex-wrap gap-2">
-              {selected.map((value) => {
+              {selected.map((value, index) => {
                 const option = options.find(opt => opt.value === value);
                 return option ? (
-                  <span key={value} className="text-xs bg-[#E8E3D5] px-2 py-1 rounded">
+                  <span key={`${value}-${index}`} className="text-xs bg-[#E8E3D5] px-2 py-1 rounded">
                     {option.label}
                   </span>
                 ) : null;
@@ -101,9 +105,9 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
         )}
         
         <div className="space-y-3 overflow-y-auto flex-1 pr-2">
-          {options.map(({ label, value }) => (
+          {options.map(({ label, value }, index) => (
             <div
-              key={value}
+              key={`${value}-${index}`}
               className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${
                 isSelected(value) ? 'bg-green-50 border-2 border-green-200 shadow-md scale-[1.02]' : 'bg-white hover:bg-[#F3F0E5] hover:shadow-sm border-2 border-transparent'
               }`}

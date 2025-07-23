@@ -8,6 +8,7 @@ import HanamiButton from '@/components/ui/HanamiButton';
 import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiSelect from '@/components/ui/HanamiSelect';
 import { PopupSelect } from '@/components/ui/PopupSelect';
+import Calendarui from '@/components/ui/Calendarui';
 import { supabase } from '@/lib/supabase';
 
 interface ActivityFormProps {
@@ -28,29 +29,97 @@ interface FormField {
 
 // 統一取得範本欄位的函數
 function getTemplateFields(template: any) {
-  if (!template) return [];
+  console.log('getTemplateFields - 輸入範本:', template);
+  
+  if (!template) {
+    console.log('getTemplateFields - 範本為空，返回空陣列');
+    return [];
+  }
   
   // 如果 template_schema 是物件且有 fields 屬性
   if (template.template_schema && typeof template.template_schema === 'object' && template.template_schema.fields) {
+    console.log('getTemplateFields - 從 template_schema.fields 獲取欄位:', template.template_schema.fields);
     return template.template_schema.fields;
   }
   
   // 如果 template_schema 是陣列
   if (Array.isArray(template.template_schema)) {
+    console.log('getTemplateFields - 從 template_schema 陣列獲取欄位:', template.template_schema);
     return template.template_schema;
   }
   
   // 如果 template_schema 是物件但沒有 fields 屬性，嘗試其他可能的屬性
   if (template.template_schema && typeof template.template_schema === 'object') {
+    console.log('getTemplateFields - template_schema 物件:', template.template_schema);
     // 嘗試找到包含欄位定義的屬性
     for (const key in template.template_schema) {
       if (Array.isArray(template.template_schema[key])) {
+        console.log(`getTemplateFields - 從 ${key} 獲取欄位:`, template.template_schema[key]);
         return template.template_schema[key];
       }
     }
   }
   
+  // 如果範本直接有 fields 屬性
+  if (template.fields && Array.isArray(template.fields)) {
+    console.log('getTemplateFields - 從 template.fields 獲取欄位:', template.fields);
+    return template.fields;
+  }
+  
+  console.log('getTemplateFields - 未找到欄位定義，返回空陣列');
   return [];
+}
+
+// 獲取欄位的預設值（用於實際值）
+function getFieldDefaultValue(field: any) {
+  // 檢查欄位是否有預設值
+  if (field.default_value !== undefined && field.default_value !== null) {
+    return field.default_value;
+  }
+  
+  // 檢查欄位是否有預設內容
+  if (field.default_content !== undefined && field.default_content !== null) {
+    return field.default_content;
+  }
+  
+  // 檢查欄位是否有預設文字
+  if (field.default_text !== undefined && field.default_text !== null) {
+    return field.default_text;
+  }
+  
+  // 檢查欄位是否有預設選項
+  if (field.default_option !== undefined && field.default_option !== null) {
+    return field.default_option;
+  }
+  
+  // 如果沒有預設值，返回空字串
+  return '';
+}
+
+// 獲取欄位的預設內容（用於 placeholder）
+function getFieldDefaultPlaceholder(field: any) {
+  // 檢查欄位是否有預設內容
+  if (field.default_content !== undefined && field.default_content !== null) {
+    return field.default_content;
+  }
+  
+  // 檢查欄位是否有預設文字
+  if (field.default_text !== undefined && field.default_text !== null) {
+    return field.default_text;
+  }
+  
+  // 檢查欄位是否有預設值
+  if (field.default_value !== undefined && field.default_value !== null) {
+    return field.default_value;
+  }
+  
+  // 檢查欄位是否有預設選項
+  if (field.default_option !== undefined && field.default_option !== null) {
+    return field.default_option;
+  }
+  
+  // 如果沒有預設內容，返回標準 placeholder
+  return '';
 }
 
 export default function ActivityForm({ activity, template, onSubmit, onCancel, mode }: ActivityFormProps) {
@@ -65,6 +134,9 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   // 彈出選擇相關狀態
   const [showPopup, setShowPopup] = useState<{ field: string, open: boolean }>({ field: '', open: false });
   const [popupSelected, setPopupSelected] = useState<string | string[]>([]);
+
+  // 日期選擇器相關狀態
+  const [showDatePicker, setShowDatePicker] = useState<{ field: string, open: boolean }>({ field: '', open: false });
 
   // 自訂管理相關狀態
   const [showCustomManager, setShowCustomManager] = useState<{ field: string, open: boolean }>({ field: '', open: false });
@@ -126,8 +198,14 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         console.log('載入 custom_fields:', activity.custom_fields);
         Object.entries(activity.custom_fields).forEach(([key, value]) => {
           if (key !== 'custom_fields') { // 避免重複
-            processedActivity[key] = value;
-            console.log(`載入範本欄位 ${key}:`, value);
+            // 確保 dropdown 欄位是陣列格式
+            if (key.includes('dropdown') && !Array.isArray(value)) {
+              processedActivity[key] = value ? [value] : [];
+              console.log(`轉換 dropdown 欄位 ${key}:`, value, '->', processedActivity[key]);
+            } else {
+              processedActivity[key] = value;
+              console.log(`載入範本欄位 ${key}:`, value);
+            }
           }
         });
       }
@@ -334,10 +412,16 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   }, [activity, templates, templateFieldsLoaded]);
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      [field]: value,
-    }));
+    console.log(`handleInputChange - 欄位: ${field}, 值:`, value);
+    
+    setFormData((prev: any) => {
+      const newData = {
+        ...prev,
+        [field]: value,
+      };
+      console.log(`更新 formData - ${field}:`, newData[field]);
+      return newData;
+    });
     
     // 清除錯誤
     if (errors[field]) {
@@ -358,12 +442,47 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       setSelectedTemplate(template);
       setTemplateFieldsLoaded(false);
       
-      // 清除之前的範本欄位資料
+      // 清除之前的範本欄位資料並設置預設值
       const templateFields = getTemplateFields(template);
       const clearedData = { ...formData, template_id: templateId };
       templateFields.forEach((field: any) => {
         const fieldName = field.title || field.name || field.id;
-        clearedData[fieldName] = '';
+        // 檢查是否有預設內容
+        const fieldDefaultValue = getFieldDefaultValue(field);
+        
+        // 根據欄位類型設置正確的預設值
+        switch (field.type) {
+          case 'array':
+          case 'checkboxes':
+          case 'dropdown':
+            clearedData[fieldName] = [];
+            break;
+          case 'checkbox':
+            clearedData[fieldName] = false;
+            break;
+          case 'multiple_choice_grid':
+          case 'tick_box_grid':
+            clearedData[fieldName] = {};
+            break;
+          case 'rating':
+          case 'linear_scale':
+          case 'number':
+            clearedData[fieldName] = 0;
+            break;
+          case 'file_upload':
+            clearedData[fieldName] = [];
+            break;
+          case 'title':
+          case 'short_answer':
+          case 'paragraph':
+          case 'text':
+          case 'textarea':
+            // 對於文字欄位，如果有預設內容則使用預設內容，否則為空字串
+            clearedData[fieldName] = fieldDefaultValue || '';
+            break;
+          default:
+            clearedData[fieldName] = fieldDefaultValue || '';
+        }
       });
       setFormData(clearedData);
     } else {
@@ -382,17 +501,51 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     
     templateFields.forEach((field: any) => {
       const fieldName = field.title || field.name || field.id;
+      console.log(`處理欄位: ${fieldName}, 類型: ${field.type}, 當前值:`, updatedData[fieldName]);
+      
       if (!updatedData[fieldName]) {
-        if (field.type === 'array') {
-          updatedData[fieldName] = [];
-        } else if (field.type === 'checkbox') {
-          updatedData[fieldName] = false;
-        } else {
-          updatedData[fieldName] = '';
+        // 檢查是否有預設內容
+        const fieldDefaultValue = getFieldDefaultValue(field);
+        
+        switch (field.type) {
+          case 'array':
+            updatedData[fieldName] = [];
+            break;
+          case 'checkbox':
+            updatedData[fieldName] = false;
+            break;
+          case 'checkboxes':
+          case 'dropdown':
+            updatedData[fieldName] = [];
+            break;
+          case 'multiple_choice_grid':
+          case 'tick_box_grid':
+            updatedData[fieldName] = {};
+            break;
+          case 'rating':
+          case 'linear_scale':
+          case 'number':
+            updatedData[fieldName] = 0;
+            break;
+          case 'file_upload':
+            updatedData[fieldName] = [];
+            break;
+          case 'title':
+          case 'short_answer':
+          case 'paragraph':
+          case 'text':
+          case 'textarea':
+            // 對於文字欄位，如果有預設內容則使用預設內容，否則為空字串
+            updatedData[fieldName] = fieldDefaultValue || '';
+            break;
+          default:
+            updatedData[fieldName] = fieldDefaultValue || '';
         }
+        console.log(`初始化欄位 ${fieldName} 為:`, updatedData[fieldName]);
       }
     });
     
+    console.log('更新後的 formData:', updatedData);
     setFormData(updatedData);
   };
 
@@ -463,7 +616,19 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         
         if (fieldRequired) {
           const value = formData[fieldName];
-          if (!value || (Array.isArray(value) && value.length === 0) || (typeof value === 'string' && !value.trim())) {
+          const fieldType = field.type || 'text';
+          
+          if (['checkboxes', 'dropdown', 'file_upload'].includes(fieldType)) {
+            if (!Array.isArray(value) || value.length === 0) {
+              newErrors[fieldName] = `請填寫${fieldName}`;
+              missingFields.push(fieldName);
+            }
+          } else if (['multiple_choice_grid', 'tick_box_grid'].includes(fieldType)) {
+            if (!value || (typeof value === 'object' && Object.keys(value).length === 0)) {
+              newErrors[fieldName] = `請填寫${fieldName}`;
+              missingFields.push(fieldName);
+            }
+          } else if (!value || (Array.isArray(value) && value.length === 0) || (typeof value === 'string' && !value.trim())) {
             newErrors[fieldName] = `請填寫${fieldName}`;
             missingFields.push(fieldName);
           }
@@ -592,18 +757,30 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     // 根據欄位類型設置初始值
     if (field === 'template_id') {
       setPopupSelected(formData[field] || '');
+    } else if (field.startsWith('dropdown_')) {
+      // 處理 dropdown 欄位
+      const actualFieldName = field.replace('dropdown_', '');
+      setPopupSelected(formData[actualFieldName] || []);
     } else {
       setPopupSelected(formData[field] || []);
     }
   };
 
   const handlePopupConfirm = () => {
+    console.log('handlePopupConfirm - showPopup.field:', showPopup.field, 'popupSelected:', popupSelected);
+    
     if (['activity_types', 'categories', 'statuses', 'tags'].includes(showPopup.field)) {
       // 多選欄位
       handleInputChange(showPopup.field, Array.isArray(popupSelected) ? popupSelected : []);
     } else if (showPopup.field === 'template_id') {
       // 單選欄位
       handleTemplateChange(typeof popupSelected === 'string' ? popupSelected : '');
+    } else if (showPopup.field.startsWith('dropdown_')) {
+      // 處理 dropdown 欄位
+      const actualFieldName = showPopup.field.replace('dropdown_', '');
+      const selectedValues = Array.isArray(popupSelected) ? popupSelected : [];
+      console.log(`處理 dropdown 欄位 ${actualFieldName}:`, selectedValues);
+      handleInputChange(actualFieldName, selectedValues);
     }
     setShowPopup({ field: '', open: false });
   };
@@ -612,6 +789,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     // 根據欄位類型設置正確的初始值
     if (showPopup.field === 'template_id') {
       setPopupSelected(formData[showPopup.field] || '');
+    } else if (showPopup.field.startsWith('dropdown_')) {
+      // 處理 dropdown 欄位
+      const actualFieldName = showPopup.field.replace('dropdown_', '');
+      setPopupSelected(formData[actualFieldName] || []);
     } else {
       setPopupSelected(formData[showPopup.field] || []);
     }
@@ -885,10 +1066,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         >
           {formData.activity_types.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {formData.activity_types.map((id: string) => {
+              {formData.activity_types.map((id: string, index: number) => {
                 const option = customOptions.activity_types.find(t => t.id === id);
                 return option ? (
-                  <span key={id} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
+                  <span key={`${id}-${index}`} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
                     {option.name}
                   </span>
                 ) : null;
@@ -923,10 +1104,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         >
           {formData.categories.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {formData.categories.map((cid: string) => {
+              {formData.categories.map((cid: string, index: number) => {
                 const category = categories.find(c => c.category_name === cid);
                 return category ? (
-                  <span key={cid} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-secondary/20 text-hanami-text border border-hanami-secondary/30">
+                  <span key={`${cid}-${index}`} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-secondary/20 text-hanami-text border border-hanami-secondary/30">
                     {category.category_name}
                   </span>
                 ) : null;
@@ -958,10 +1139,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         >
           {formData.statuses.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {formData.statuses.map((sid: string) => {
+              {formData.statuses.map((sid: string, index: number) => {
                 const status = customOptions.statuses.find(s => s.id === sid);
                 return status ? (
-                  <span key={sid} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-accent/20 text-hanami-text border border-hanami-accent/30">
+                  <span key={`${sid}-${index}`} className="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-hanami-accent/20 text-hanami-text border border-hanami-accent/30">
                     {status.name}
                   </span>
                 ) : null;
@@ -1061,111 +1242,190 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     
     return (
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-hanami-text mb-4">範本欄位</h3>
-        <div className="grid grid-cols-1 gap-4">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+            <span className="text-[#4B4036] text-sm font-bold">📝</span>
+          </div>
+          <h3 className="text-xl font-bold text-[#4B4036]">範本欄位</h3>
+        </div>
+        <div className="grid grid-cols-1 gap-6">
           {templateFields.map((field: any, index: number) => {
             const fieldName = field.title || field.name || field.id;
             const fieldType = field.type || 'text';
             const fieldRequired = field.required || false;
+            const fieldDefaultPlaceholder = getFieldDefaultPlaceholder(field);
             const fieldPlaceholder = field.placeholder || `請輸入${fieldName}`;
             const fieldOptions = field.options || [];
+            
+            // 對於特定欄位類型，如果沒有值但有預設內容，自動填充預設內容
+            // 使用 formData 中的實際值
+            const fieldValue = formData[fieldName] !== undefined && formData[fieldName] !== null 
+              ? formData[fieldName] 
+              : '';
             
             return (
               <div key={fieldName}>
                 {fieldType === 'text' && (
-                  <HanamiInput
-                    error={errors[fieldName]}
-                    label={`${fieldName}${fieldRequired ? ' *' : ''}`}
-                    placeholder={fieldPlaceholder}
-                    value={formData[fieldName] || ''}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
-                )}
-                
-                {fieldType === 'select' && (
-                  <HanamiSelect
-                    error={errors[fieldName]}
-                    label={`${fieldName}${fieldRequired ? ' *' : ''}`}
-                    options={[
-                      { value: '', label: `選擇${fieldName}` },
-                      ...(fieldOptions.map((opt: string) => ({ value: opt, label: opt }))),
-                    ]}
-                    value={formData[fieldName] || ''}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
-                )}
-                
-                {fieldType === 'textarea' && (
-                  <div>
-                    <label className="block text-sm font-medium text-hanami-text mb-2">
-                      {fieldName}{fieldRequired ? ' *' : ''}
-                    </label>
-                    <textarea
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📝</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
                       placeholder={fieldPlaceholder}
-                      rows={3}
-                      value={formData[fieldName] || ''}
+                      value={fieldValue}
                       onChange={(e) => handleInputChange(fieldName, e.target.value)}
                     />
                     {errors[fieldName] && (
-                      <p className="text-red-500 text-sm mt-1">{errors[fieldName]}</p>
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {fieldType === 'select' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📋</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <select
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    >
+                      <option value="">{`選擇${fieldName}`}</option>
+                      {fieldOptions.map((opt: string) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {fieldType === 'textarea' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📝</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <textarea
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200 resize-none"
+                      placeholder={fieldPlaceholder}
+                      rows={4}
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
                     )}
                   </div>
                 )}
                 
                 {fieldType === 'number' && (
-                  <HanamiInput
-                    error={errors[fieldName]}
-                    label={`${fieldName}${fieldRequired ? ' *' : ''}`}
-                    placeholder={fieldPlaceholder}
-                    type="number"
-                    value={formData[fieldName] || ''}
-                    onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value) || 0)}
-                  />
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">🔢</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      placeholder={fieldPlaceholder}
+                      type="number"
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value) || 0)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
                 )}
                 
                 {fieldType === 'checkbox' && (
-                  <div>
-                    <label className="flex items-center gap-2">
-                      <input
-                        checked={formData[fieldName] || false}
-                        className="rounded"
-                        type="checkbox"
-                        onChange={(e) => handleInputChange(fieldName, e.target.checked)}
-                      />
-                      <span className="text-sm font-medium text-hanami-text">
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <input
+                          checked={fieldValue || false}
+                          className="w-5 h-5 text-[#FFD59A] bg-white border-2 border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-0 transition-all duration-200"
+                          type="checkbox"
+                          onChange={(e) => handleInputChange(fieldName, e.target.checked)}
+                        />
+                        {fieldValue && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-[#4B4036] text-xs font-bold">✓</span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-base font-semibold text-[#4B4036]">
                         {fieldName}{fieldRequired ? ' *' : ''}
                       </span>
-                    </label>
+                    </div>
                     {errors[fieldName] && (
-                      <p className="text-red-500 text-sm mt-1">{errors[fieldName]}</p>
+                      <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
                     )}
                   </div>
                 )}
                 
                 {fieldType === 'array' && (
-                  <div>
-                    <label className="block text-sm font-medium text-hanami-text mb-2">
-                      {fieldName}{fieldRequired ? ' *' : ''}
-                    </label>
-                    <div className="space-y-2">
-                      {formData[fieldName]?.map((item: string, index: number) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <span className="flex-1 p-2 bg-gray-50 rounded border">
-                            {item}
-                          </span>
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📋</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <div className="space-y-3">
+                      {fieldValue?.map((item: string, index: number) => (
+                        <div key={`${fieldName}-${index}-${item}`} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200">
+                          <span className="flex-1 text-[#4B4036] font-medium">{item}</span>
                           <button
-                            className="p-2 text-red-500 hover:bg-red-50 rounded"
+                            className="w-8 h-8 bg-gradient-to-br from-[#FFE0E0] to-[#FFD0D0] text-red-500 rounded-full hover:from-[#FFD0D0] hover:to-[#FFC0C0] transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
                             type="button"
                             onClick={() => removeArrayItem(fieldName, index)}
                           >
-                            ×
+                            ✕
                           </button>
                         </div>
                       ))}
-                      <div className="flex flex-col md:flex-row gap-2">
+                      <div className="flex flex-col md:flex-row gap-3 p-4 bg-white rounded-xl border-2 border-dashed border-[#EADBC8] hover:border-[#FFD59A] transition-all duration-200">
                         <input
-                          className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
+                          className="flex-1 p-3 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] transition-all duration-200"
                           placeholder={fieldPlaceholder || `新增${fieldName}`}
                           type="text"
                           onKeyPress={(e) => {
@@ -1177,7 +1437,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                           }}
                         />
                         <button
-                          className="px-4 py-2 bg-hanami-primary text-white rounded hover:bg-hanami-accent w-full md:w-auto"
+                          className="px-6 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] font-semibold rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2"
                           type="button"
                           onClick={(e) => {
                             const input = e.currentTarget.previousElementSibling as HTMLInputElement;
@@ -1185,12 +1445,16 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                             input.value = '';
                           }}
                         >
+                          <span>➕</span>
                           新增
                         </button>
                       </div>
                     </div>
                     {errors[fieldName] && (
-                      <p className="text-red-500 text-sm mt-1">{errors[fieldName]}</p>
+                      <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
                     )}
                   </div>
                 )}
@@ -1208,7 +1472,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     >
                       <option value="">請選擇</option>
                       {fieldOptions.map((option: string, index: number) => (
-                        <option key={index} value={option}>
+                        <option key={`${fieldName}-${index}-${option}`} value={option}>
                           {option}
                         </option>
                       ))}
@@ -1218,39 +1482,610 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
+
+                {/* 處理 dropdown 欄位類型 */}
+                {fieldType === 'dropdown' && (
+                  <div>
+                    <label className="block text-sm font-medium text-hanami-text mb-2">
+                      {fieldName}{fieldRequired ? ' *' : ''}
+                    </label>
+                    <button
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white"
+                      type="button"
+                      onClick={() => handlePopupOpen(`dropdown_${fieldName}`)}
+                    >
+                      {Array.isArray(fieldValue) && fieldValue.length > 0 ? 
+                        fieldValue.join(', ') : 
+                        '請選擇選項'}
+                    </button>
+                    {/* 調試信息 */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        調試: {fieldName} = {JSON.stringify(fieldValue)}
+                      </div>
+                    )}
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-1">{errors[fieldName]}</p>
+                    )}
+                  </div>
+                )}
                 
                 {/* 處理 title 欄位類型 */}
                 {fieldType === 'title' && (
-                  <HanamiInput
-                    error={errors[fieldName]}
-                    label={`${fieldName}${fieldRequired ? ' *' : ''}`}
-                    placeholder={fieldPlaceholder}
-                    value={formData[fieldName] || ''}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📝</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      placeholder={fieldPlaceholder}
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
                 )}
                 
                 {/* 處理 short_answer 欄位類型 */}
                 {fieldType === 'short_answer' && (
-                  <HanamiInput
-                    error={errors[fieldName]}
-                    label={`${fieldName}${fieldRequired ? ' *' : ''}`}
-                    placeholder={fieldPlaceholder}
-                    value={formData[fieldName] || ''}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">✏️</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      placeholder={fieldPlaceholder}
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 paragraph 欄位類型 */}
+                {fieldType === 'paragraph' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📄</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <textarea
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200 resize-none"
+                      placeholder={fieldPlaceholder}
+                      rows={4}
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
                 )}
                 
-                {/* 預設文字輸入，處理未知的欄位類型 */}
-                {!['text', 'select', 'textarea', 'number', 'checkbox', 'array', 'title', 'short_answer', 'multiple_choice'].includes(fieldType) && (
-                  <HanamiInput
-                    error={errors[fieldName]}
-                    label={`${fieldName} (${fieldType})${fieldRequired ? ' *' : ''}`}
-                    placeholder={fieldPlaceholder}
-                    value={formData[fieldName] || ''}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
+                {/* 處理 checkboxes 欄位類型 */}
+                {fieldType === 'checkboxes' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">☑️</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {fieldOptions.map((option: string, index: number) => (
+                        <label key={`${fieldName}-${index}-${option}`} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[#EADBC8] hover:border-[#FFD59A] transition-all duration-200 cursor-pointer group">
+                          <div className="relative">
+                            <input
+                              checked={Array.isArray(fieldValue) && fieldValue.includes(option)}
+                              className="w-5 h-5 text-[#FFD59A] bg-white border-2 border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-0 transition-all duration-200"
+                              type="checkbox"
+                              value={option}
+                              onChange={(e) => {
+                                const currentValues = Array.isArray(fieldValue) ? fieldValue : [];
+                                if (e.target.checked) {
+                                  handleInputChange(fieldName, [...currentValues, option]);
+                                } else {
+                                  handleInputChange(fieldName, currentValues.filter(v => v !== option));
+                                }
+                              }}
+                            />
+                            {Array.isArray(fieldValue) && fieldValue.includes(option) && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-[#4B4036] text-xs font-bold">✓</span>
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-[#4B4036] font-medium group-hover:text-[#A64B2A] transition-colors duration-200">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
                 )}
+
+                {/* 處理 linear_scale 欄位類型 */}
+                {fieldType === 'linear_scale' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📊</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-center gap-6 p-4 bg-white rounded-xl border border-[#EADBC8]">
+                      <span className="text-sm font-medium text-[#A68A64]">1</span>
+                      <div className="flex gap-3">
+                        {[1, 2, 3, 4, 5].map((scaleValue) => (
+                          <label key={scaleValue} className="flex flex-col items-center gap-2 cursor-pointer group">
+                            <div className="relative">
+                              <input
+                                checked={fieldValue === scaleValue}
+                                className="w-6 h-6 text-[#FFD59A] bg-white border-2 border-[#EADBC8] rounded-full focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-0 transition-all duration-200"
+                                name={fieldName}
+                                type="radio"
+                                value={scaleValue}
+                                onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value))}
+                              />
+                                                             {fieldValue === scaleValue && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-3 h-3 bg-[#FFD59A] rounded-full"></div>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-sm font-medium text-[#4B4036] group-hover:text-[#A64B2A] transition-colors duration-200">{scaleValue}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <span className="text-sm font-medium text-[#A68A64]">5</span>
+                    </div>
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 rating 欄位類型 */}
+                {fieldType === 'rating' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">⭐</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <div className="flex justify-center p-4 bg-white rounded-xl border border-[#EADBC8]">
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 ${
+                              fieldValue >= star 
+                                ? 'text-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FDE6C2] shadow-md' 
+                                : 'text-[#EADBC8] hover:text-[#FFD59A] hover:bg-[#FFF9F2]'
+                            }`}
+                            type="button"
+                            onClick={() => handleInputChange(fieldName, star)}
+                          >
+                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                                         {fieldValue && (
+                       <div className="mt-3 text-center">
+                         <span className="text-sm font-medium text-[#A68A64]">
+                           已選擇 {fieldValue} 顆星
+                         </span>
+                       </div>
+                     )}
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 file_upload 欄位類型 */}
+                {fieldType === 'file_upload' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📎</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <div className="relative">
+                      <input
+                        accept={field.allowed_types?.join(',') || '*'}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        multiple={field.multiple_files || false}
+                        type="file"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          handleInputChange(fieldName, files);
+                        }}
+                      />
+                      <div className="p-6 border-2 border-dashed border-[#EADBC8] rounded-xl bg-white hover:border-[#FFD59A] transition-all duration-200 text-center">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center mx-auto mb-3">
+                          <span className="text-[#4B4036] text-lg">📎</span>
+                        </div>
+                        <p className="text-[#4B4036] font-medium mb-1">點擊上傳檔案</p>
+                        <p className="text-sm text-[#A68A64]">
+                          {field.allowed_types ? `支援格式: ${field.allowed_types.join(', ')}` : '支援所有格式'}
+                        </p>
+                        {field.multiple_files && (
+                          <p className="text-xs text-[#A68A64] mt-1">可選擇多個檔案</p>
+                        )}
+                      </div>
+                    </div>
+                                         {fieldValue && fieldValue.length > 0 && (
+                      <div className="mt-3 p-3 bg-[#FFF9F2] rounded-lg border border-[#EADBC8]">
+                        <p className="text-sm font-medium text-[#4B4036] mb-2">已選擇檔案：</p>
+                        <div className="space-y-1">
+                          {Array.from(fieldValue as FileList).map((file: File, index: number) => (
+                            <div key={index} className="flex items-center gap-2 text-sm text-[#A68A64]">
+                              <span>📄</span>
+                              <span>{file.name}</span>
+                              <span className="text-xs">({(file.size / 1024).toFixed(1)} KB)</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 date 欄位類型 */}
+                {fieldType === 'date' && (
+                  <div>
+                    <label className="block text-sm font-medium text-hanami-text mb-2">
+                      {fieldName}{fieldRequired ? ' *' : ''}
+                    </label>
+                    <button
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white"
+                      type="button"
+                      onClick={() => setShowDatePicker({ field: fieldName, open: true })}
+                    >
+                      {fieldValue ? 
+                        new Date(fieldValue).toLocaleDateString('zh-TW') : 
+                        '請選擇日期'}
+                    </button>
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-1">{errors[fieldName]}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 time 欄位類型 */}
+                {fieldType === 'time' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">⏰</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      placeholder={fieldPlaceholder}
+                      type="time"
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 url 欄位類型 */}
+                {fieldType === 'url' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">🔗</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      placeholder={fieldPlaceholder}
+                      type="url"
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 email 欄位類型 */}
+                {fieldType === 'email' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📧</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      placeholder={fieldPlaceholder}
+                      type="email"
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 phone 欄位類型 */}
+                {fieldType === 'phone' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📞</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      placeholder={fieldPlaceholder}
+                      type="tel"
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 multiple_choice_grid 欄位類型 */}
+                {fieldType === 'multiple_choice_grid' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">📊</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <div className="overflow-x-auto bg-white rounded-xl border border-[#EADBC8] shadow-sm">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="bg-gradient-to-r from-[#FFF9F2] to-[#FDE6C2]">
+                            <th className="p-4 border-r border-[#EADBC8] text-left text-sm font-semibold text-[#4B4036]">
+                              問題
+                            </th>
+                            {field.grid_columns?.map((column: string, index: number) => (
+                              <th key={`${fieldName}-col-${index}-${column}`} className="p-4 border-r border-[#EADBC8] text-center text-sm font-semibold text-[#4B4036]">
+                                {column}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {field.grid_rows?.map((row: string, rowIndex: number) => (
+                            <tr key={`${fieldName}-row-${rowIndex}-${row}`} className="border-t border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors duration-200">
+                              <td className="p-4 border-r border-[#EADBC8] text-sm font-medium text-[#4B4036]">
+                                {row}
+                              </td>
+                              {field.grid_columns?.map((column: string, colIndex: number) => (
+                                <td key={`${fieldName}-cell-${rowIndex}-${colIndex}-${row}-${column}`} className="p-4 border-r border-[#EADBC8] text-center">
+                                  <div className="relative">
+                                    <input
+                                      checked={fieldValue?.[row] === column}
+                                      className="w-5 h-5 text-[#FFD59A] bg-white border-2 border-[#EADBC8] rounded-full focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-0 transition-all duration-200"
+                                      name={`${fieldName}_${row}`}
+                                      type="radio"
+                                      value={column}
+                                      onChange={(e) => {
+                                        const currentValue = fieldValue || {};
+                                        handleInputChange(fieldName, { ...currentValue, [row]: e.target.value });
+                                      }}
+                                    />
+                                    {fieldValue?.[row] === column && (
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-2.5 h-2.5 bg-[#FFD59A] rounded-full"></div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 處理 tick_box_grid 欄位類型 */}
+                {fieldType === 'tick_box_grid' && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">☑️</span>
+                      </div>
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
+                    </div>
+                    <div className="overflow-x-auto bg-white rounded-xl border border-[#EADBC8] shadow-sm">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="bg-gradient-to-r from-[#FFF9F2] to-[#FDE6C2]">
+                            <th className="p-4 border-r border-[#EADBC8] text-left text-sm font-semibold text-[#4B4036]">
+                              問題
+                            </th>
+                            {field.grid_columns?.map((column: string, index: number) => (
+                              <th key={`${fieldName}-col-${index}-${column}`} className="p-4 border-r border-[#EADBC8] text-center text-sm font-semibold text-[#4B4036]">
+                                {column}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {field.grid_rows?.map((row: string, rowIndex: number) => (
+                            <tr key={`${fieldName}-row-${rowIndex}-${row}`} className="border-t border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors duration-200">
+                              <td className="p-4 border-r border-[#EADBC8] text-sm font-medium text-[#4B4036]">
+                                {row}
+                              </td>
+                              {field.grid_columns?.map((column: string, colIndex: number) => (
+                                <td key={`${fieldName}-cell-${rowIndex}-${colIndex}-${row}-${column}`} className="p-4 border-r border-[#EADBC8] text-center">
+                                  <div className="relative">
+                                    <input
+                                      checked={fieldValue?.[row]?.includes(column)}
+                                      className="w-5 h-5 text-[#FFD59A] bg-white border-2 border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-0 transition-all duration-200"
+                                      type="checkbox"
+                                      value={column}
+                                      onChange={(e) => {
+                                        const currentValue = fieldValue || {};
+                                        const currentRowValues = currentValue[row] || [];
+                                        if (e.target.checked) {
+                                          handleInputChange(fieldName, { 
+                                            ...currentValue, 
+                                            [row]: [...currentRowValues, column] 
+                                          });
+                                        } else {
+                                          handleInputChange(fieldName, { 
+                                            ...currentValue, 
+                                            [row]: currentRowValues.filter((v: string) => v !== column) 
+                                          });
+                                        }
+                                      }}
+                                    />
+                                                                          {fieldValue?.[row]?.includes(column) && (
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="text-[#4B4036] text-xs font-bold">✓</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                                  {/* 預設文字輸入，處理未知的欄位類型 */}
+                  {!['text', 'select', 'textarea', 'number', 'checkbox', 'array', 'title', 'short_answer', 'multiple_choice', 'dropdown', 'checkboxes', 'linear_scale', 'rating', 'file_upload', 'date', 'time', 'url', 'email', 'phone', 'multiple_choice_grid', 'tick_box_grid', 'paragraph'].includes(fieldType) && (
+                    <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                          <span className="text-[#4B4036] text-xs">❓</span>
+                        </div>
+                        <label className="text-base font-semibold text-[#4B4036]">
+                          {fieldName} ({fieldType}){fieldRequired ? ' *' : ''}
+                        </label>
+                      </div>
+                      <input
+                        className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                        placeholder={fieldPlaceholder}
+                        value={fieldValue}
+                        onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                      />
+                      {errors[fieldName] && (
+                        <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                          <span>⚠️</span>
+                          {errors[fieldName]}
+                        </p>
+                      )}
+                    </div>
+                  )}
               </div>
             );
           })}
@@ -1265,7 +2100,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       <h3 className="text-lg font-semibold text-hanami-text mb-4">所需道具</h3>
       <div className="space-y-2">
         {formData.materials_needed?.map((item: string, index: number) => (
-          <div key={index} className="flex items-center gap-2">
+          <div key={`materials-${index}-${item}`} className="flex items-center gap-2">
             <span className="flex-1 p-2 bg-gray-50 rounded border">
               {item}
             </span>
@@ -1331,10 +2166,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         >
           {formData.tags.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {formData.tags.map((tagName: string) => {
+              {formData.tags.map((tagName: string, index: number) => {
                 const tag = tags.find(t => t.tag_name === tagName);
                 return tag ? (
-                  <span key={tagName} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-success/20 text-hanami-text border border-hanami-success/30">
+                  <span key={`${tagName}-${index}`} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-success/20 text-hanami-text border border-hanami-success/30">
                     {tag.tag_name}
                   </span>
                 ) : null;
@@ -1372,7 +2207,25 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     showPopup.field === 'template_id' ? [
                       { value: '', label: '不使用範本' },
                       ...templates.map(t => ({ value: t.id, label: t.template_name })),
-                    ] : []
+                    ] :
+                    showPopup.field.startsWith('dropdown_') ? 
+                      // 處理 dropdown 欄位的選項
+                      (() => {
+                        const actualFieldName = showPopup.field.replace('dropdown_', '');
+                        const templateFields = getTemplateFields(selectedTemplate);
+                        console.log('dropdown 選項處理 - actualFieldName:', actualFieldName);
+                        console.log('dropdown 選項處理 - selectedTemplate:', selectedTemplate);
+                        console.log('dropdown 選項處理 - templateFields:', templateFields);
+                        
+                        const field = templateFields.find((f: any) => 
+                          (f.title || f.name || f.id) === actualFieldName
+                        );
+                        console.log('dropdown 選項處理 - 找到的欄位:', field);
+                        
+                        const options = field?.options?.map((opt: string) => ({ value: opt, label: opt })) || [];
+                        console.log('dropdown 選項處理 - 最終選項:', options);
+                        return options;
+                      })() : []
           }
           selected={popupSelected}
           title={
@@ -1381,11 +2234,32 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                 showPopup.field === 'statuses' ? '選擇狀態' :
                   showPopup.field === 'tags' ? '選擇標籤' :
                     showPopup.field === 'template_id' ? '選擇範本' :
+                    showPopup.field.startsWith('dropdown_') ? 
+                      (() => {
+                        const actualFieldName = showPopup.field.replace('dropdown_', '');
+                        const templateFields = getTemplateFields(selectedTemplate);
+                        const field = templateFields.find((f: any) => 
+                          (f.title || f.name || f.id) === actualFieldName
+                        );
+                        return `選擇${field?.title || actualFieldName}`;
+                      })() :
                       '選擇選項'
           }
           onCancel={handlePopupCancel}
           onChange={(value: string | string[]) => setPopupSelected(value)}
           onConfirm={handlePopupConfirm}
+        />
+      )}
+
+      {/* 日期選擇器組件 */}
+      {showDatePicker.open && (
+        <Calendarui
+          value={formData[showDatePicker.field] || ''}
+          onSelect={(date: string) => {
+            handleInputChange(showDatePicker.field, date);
+            setShowDatePicker({ field: '', open: false });
+          }}
+          onClose={() => setShowDatePicker({ field: '', open: false })}
         />
       )}
 

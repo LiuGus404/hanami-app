@@ -480,20 +480,165 @@ export function TeachingActivityManagement() {
     try {
       console.log('開始插入測試資料...');
       
-      // 首先確保有標準教案範本
-      const standardTemplate = templates.find(t => 
-        t.template_name === '標準教案範本' || t.name === '標準教案範本',
-      );
-      
-      if (!standardTemplate) {
-        toast.error('找不到標準教案範本，請先確保範本已載入');
-        return;
+      // 首先創建一個包含所有新欄位類型的測試範本
+      const testTemplate = {
+        template_name: '完整欄位類型測試範本',
+        template_description: '包含所有欄位類型的測試範本',
+        template_type: 'custom',
+        template_schema: {
+          fields: [
+            {
+              id: 'title_field',
+              type: 'title',
+              title: '活動標題',
+              required: true,
+              placeholder: '請輸入活動標題'
+            },
+            {
+              id: 'short_answer_field',
+              type: 'short_answer',
+              title: '簡短回答',
+              required: true,
+              placeholder: '請輸入簡短回答'
+            },
+            {
+              id: 'paragraph_field',
+              type: 'paragraph',
+              title: '詳細描述',
+              required: false,
+              placeholder: '請輸入詳細描述'
+            },
+            {
+              id: 'multiple_choice_field',
+              type: 'multiple_choice',
+              title: '單選題',
+              required: true,
+              options: ['選項A', '選項B', '選項C', '選項D']
+            },
+            {
+              id: 'checkboxes_field',
+              type: 'checkboxes',
+              title: '多選題',
+              required: true,
+              options: ['選項1', '選項2', '選項3', '選項4']
+            },
+            {
+              id: 'dropdown_field',
+              type: 'dropdown',
+              title: '下拉選單',
+              required: true,
+              options: ['選項一', '選項二', '選項三']
+            },
+            {
+              id: 'linear_scale_field',
+              type: 'linear_scale',
+              title: '線性評分',
+              required: true,
+              min_scale: 1,
+              max_scale: 5,
+              scale_labels: { min: '非常不滿意', max: '非常滿意' }
+            },
+            {
+              id: 'rating_field',
+              type: 'rating',
+              title: '星級評分',
+              required: true
+            },
+            {
+              id: 'multiple_choice_grid_field',
+              type: 'multiple_choice_grid',
+              title: '單選網格',
+              required: true,
+              grid_columns: ['非常同意', '同意', '不同意', '非常不同意'],
+              grid_rows: ['問題1', '問題2', '問題3']
+            },
+            {
+              id: 'tick_box_grid_field',
+              type: 'tick_box_grid',
+              title: '多選網格',
+              required: true,
+              grid_columns: ['選項A', '選項B', '選項C'],
+              grid_rows: ['項目1', '項目2', '項目3']
+            },
+            {
+              id: 'file_upload_field',
+              type: 'file_upload',
+              title: '檔案上傳',
+              required: false,
+              allowed_types: ['pdf', 'jpg', 'png'],
+              max_size: 10485760,
+              multiple_files: true
+            },
+            {
+              id: 'date_field',
+              type: 'date',
+              title: '日期選擇',
+              required: true
+            },
+            {
+              id: 'time_field',
+              type: 'time',
+              title: '時間選擇',
+              required: true
+            },
+            {
+              id: 'url_field',
+              type: 'url',
+              title: '網址連結',
+              required: false,
+              placeholder: 'https://example.com'
+            },
+            {
+              id: 'email_field',
+              type: 'email',
+              title: '電子郵件',
+              required: true,
+              placeholder: 'example@email.com'
+            },
+            {
+              id: 'phone_field',
+              type: 'phone',
+              title: '電話號碼',
+              required: false,
+              placeholder: '0912345678'
+            },
+            {
+              id: 'number_field',
+              type: 'number',
+              title: '數字輸入',
+              required: true,
+              placeholder: '請輸入數字'
+            }
+          ],
+          metadata: {
+            version: "1.0",
+            author: "Hanami System",
+            last_updated: new Date().toISOString()
+          }
+        },
+        template_category: 'test',
+        is_active: true,
+        is_public: false
+      };
+
+      // 創建測試範本
+      const templateResponse = await fetch('/api/activity-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testTemplate),
+      });
+
+      if (!templateResponse.ok) {
+        throw new Error('創建測試範本失敗');
       }
+
+      const createdTemplate = await templateResponse.json();
+      console.log('創建的測試範本:', createdTemplate);
 
       // 準備測試活動資料
       const testActivity = {
-        activity_name: '測試音樂活動',
-        activity_description: '這是一個測試用的音樂教學活動，用於驗證系統功能。',
+        activity_name: '完整欄位類型測試活動',
+        activity_description: '這是一個測試所有欄位類型的教學活動，用於驗證系統功能。',
         activity_type: 'game',
         difficulty_level: 1,
         duration_minutes: 30,
@@ -501,17 +646,33 @@ export function TeachingActivityManagement() {
         objectives: ['培養節奏感', '提升音樂欣賞能力', '增進團體合作'],
         instructions: '1. 播放音樂\n2. 學生跟隨節奏拍手\n3. 分組進行節奏遊戲\n4. 總結活動心得',
         notes: '適合 3-6 歲兒童，注意音量控制',
-        template_id: standardTemplate.id,
+        template_id: createdTemplate.id,
         custom_fields: {
-          activity_name: '測試音樂活動',
-          activity_description: '這是一個測試用的音樂教學活動，用於驗證系統功能。',
-          activity_type: '遊戲活動',
-          difficulty_level: 1,
-          duration_minutes: 30,
-          objectives: ['培養節奏感', '提升音樂欣賞能力', '增進團體合作'],
-          materials_needed: ['樂器', '節奏棒', '音樂播放器'],
-          instructions: '1. 播放音樂\n2. 學生跟隨節奏拍手\n3. 分組進行節奏遊戲\n4. 總結活動心得',
-          notes: '適合 3-6 歲兒童，注意音量控制',
+          title_field: '測試活動標題',
+          short_answer_field: '這是簡短回答',
+          paragraph_field: '這是詳細描述內容',
+          multiple_choice_field: '選項B',
+          checkboxes_field: ['選項1', '選項3'],
+          dropdown_field: ['選項二', '選項三'],
+          linear_scale_field: 4,
+          rating_field: 5,
+          multiple_choice_grid_field: {
+            '問題1': '非常同意',
+            '問題2': '同意',
+            '問題3': '不同意'
+          },
+          tick_box_grid_field: {
+            '項目1': ['選項A', '選項B'],
+            '項目2': ['選項C'],
+            '項目3': ['選項A', '選項C']
+          },
+          file_upload_field: [],
+          date_field: new Date().toISOString().split('T')[0],
+          time_field: '14:30',
+          url_field: 'https://example.com',
+          email_field: 'test@example.com',
+          phone_field: '0912345678',
+          number_field: 42
         },
         status: 'published',
         tags: ['節奏訓練', '團體活動', '初學者'],
@@ -520,7 +681,7 @@ export function TeachingActivityManagement() {
 
       console.log('準備插入的測試資料:', testActivity);
 
-      // 調用 API 創建活動
+      // 創建測試活動
       const response = await fetch('/api/teaching-activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -528,18 +689,17 @@ export function TeachingActivityManagement() {
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log('測試資料插入成功:', result);
         toast.success('測試資料插入成功！');
-        loadActivities(); // 重新載入活動列表
+        loadActivities();
+        loadTemplates();
       } else {
         const errorData = await response.json();
-        console.error('API 錯誤:', errorData);
-        throw new Error(`API 錯誤: ${response.status}`);
+        console.error('插入失敗:', errorData);
+        throw new Error(`插入失敗: ${errorData.message || '未知錯誤'}`);
       }
     } catch (error) {
       console.error('插入測試資料失敗:', error);
-      toast.error('插入測試資料失敗');
+      toast.error(`插入測試資料失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
     }
   };
 
@@ -693,7 +853,7 @@ export function TeachingActivityManagement() {
                 <h4 className="font-medium mb-2">所需材料</h4>
                 <ul className="list-disc list-inside text-gray-600">
                   {viewingActivity.materials_needed.map((material, index) => (
-                    <li key={index}>{material}</li>
+                    <li key={`material-${index}-${material}`}>{material}</li>
                   ))}
                 </ul>
               </div>
@@ -734,7 +894,7 @@ export function TeachingActivityManagement() {
                             {Array.isArray(fieldValue) ? (
                               <ul className="list-disc list-inside">
                                 {fieldValue.map((item: string, index: number) => (
-                                  <li key={index}>{item}</li>
+                                  <li key={`${field.id}-${index}-${item}`}>{item}</li>
                                 ))}
                               </ul>
                             ) : (
@@ -809,9 +969,9 @@ export function TeachingActivityManagement() {
                 {filterTypes.length === 0 ? (
                   <span className="text-gray-500">活動類型</span>
                 ) : (
-                  filterTypes.map((type) => (
+                  filterTypes.map((type, index) => (
                     <span
-                      key={type}
+                      key={`${type}-${index}`}
                       className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
                     >
                       {activityTypeOptions.find(opt => opt.value === type)?.label || type}
@@ -833,9 +993,9 @@ export function TeachingActivityManagement() {
                 {filterStatuses.length === 0 ? (
                   <span className="text-gray-500">狀態</span>
                 ) : (
-                  filterStatuses.map((status) => (
+                  filterStatuses.map((status, index) => (
                     <span
-                      key={status}
+                      key={`${status}-${index}`}
                       className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full"
                     >
                       {statusOptions.find(opt => opt.value === status)?.label || status}
@@ -857,9 +1017,9 @@ export function TeachingActivityManagement() {
                 {filterTags.length === 0 ? (
                   <span className="text-gray-500">標籤</span>
                 ) : (
-                  filterTags.map((tag) => (
+                  filterTags.map((tag, index) => (
                     <span
-                      key={tag}
+                      key={`${tag}-${index}`}
                       className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"
                     >
                       {tag}

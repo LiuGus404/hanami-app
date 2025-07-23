@@ -143,4 +143,102 @@ export const DEVELOPMENT_ABILITIES = [
   '大肌肉發展',
 ] as const;
 
-export type DevelopmentAbilityName = typeof DEVELOPMENT_ABILITIES[number]; 
+export type DevelopmentAbilityName = typeof DEVELOPMENT_ABILITIES[number];
+
+// 學生媒體類型
+export interface StudentMedia {
+  id: string;
+  student_id: string;
+  media_type: 'video' | 'photo';
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  file_duration?: number;
+  thumbnail_path?: string;
+  title?: string;
+  description?: string;
+  uploaded_by?: string;
+  lesson_id?: string; // 新增：關聯的課程ID
+  created_at: string;
+  updated_at: string;
+  is_favorite?: boolean;
+}
+
+// 學生媒體配額類型
+export interface StudentMediaQuota {
+  student_id: string;
+  plan_type: 'free' | 'basic' | 'standard' | 'premium' | 'professional';
+  video_limit: number;
+  photo_limit: number;
+  video_count: number;
+  photo_count: number;
+  total_used_space: number;
+  last_updated: string;
+}
+
+// 媒體上傳限制
+export interface MediaUploadLimits {
+  video: {
+    maxSize: number; // 20MB in bytes
+    maxDuration: number; // 30 seconds
+    maxCount: number; // 5 videos
+    allowedTypes: string[];
+  };
+  photo: {
+    maxSize: number; // 1MB in bytes
+    maxCount: number; // 10 photos
+    allowedTypes: string[];
+  };
+}
+
+// 預設上傳限制
+export const DEFAULT_MEDIA_LIMITS: MediaUploadLimits = {
+  video: {
+    maxSize: 20 * 1024 * 1024, // 20MB
+    maxDuration: 30, // 30 seconds
+    maxCount: 5,
+    allowedTypes: ['video/mp4', 'video/mov', 'video/avi'],
+  },
+  photo: {
+    maxSize: 1 * 1024 * 1024, // 1MB
+    maxCount: 10,
+    allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+  },
+};
+
+// 方案配置
+export interface PlanConfig {
+  basic: {
+    video_limit: number;
+    photo_limit: number;
+    price: number;
+  };
+  premium: {
+    video_limit: number;
+    photo_limit: number;
+    price: number;
+  };
+  professional: {
+    video_limit: number;
+    photo_limit: number;
+    price: number;
+  };
+}
+
+export const PLAN_CONFIG: PlanConfig = {
+  basic: {
+    video_limit: 5,
+    photo_limit: 10,
+    price: 0,
+  },
+  premium: {
+    video_limit: 10,
+    photo_limit: 20,
+    price: 99,
+  },
+  professional: {
+    video_limit: 20,
+    photo_limit: 50,
+    price: 199,
+  },
+}; 

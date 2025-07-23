@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
 import { HanamiButton, HanamiInput, HanamiSelect, HanamiCard } from '@/components/ui';
+import Calendarui from '@/components/ui/Calendarui';
 import { ActivityTemplate, TemplateField, FieldType } from '@/types/template';
 
 
@@ -23,6 +24,7 @@ export function DynamicActivityForm({
 }: DynamicActivityFormProps) {
   const [formData, setFormData] = useState<any>(initialData || {});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showDatePicker, setShowDatePicker] = useState<{ field: string, open: boolean }>({ field: '', open: false });
 
   useEffect(() => {
     // 初始化表單資料，使用範本的預設值
@@ -36,9 +38,14 @@ export function DynamicActivityForm({
         // 根據欄位類型設定預設值
         switch (field.type) {
           case 'checkboxes':
-          case 'multiple_choice_grid':
-          case 'tick_box_grid':
+          case 'dropdown':
             initialFormData[field.id] = [];
+            break;
+          case 'multiple_choice_grid':
+            initialFormData[field.id] = {};
+            break;
+          case 'tick_box_grid':
+            initialFormData[field.id] = {};
             break;
           case 'rating':
           case 'linear_scale':
@@ -50,6 +57,9 @@ export function DynamicActivityForm({
           case 'date':
           case 'time':
             initialFormData[field.id] = '';
+            break;
+          case 'number':
+            initialFormData[field.id] = 0;
             break;
           default:
             initialFormData[field.id] = '';
@@ -66,8 +76,12 @@ export function DynamicActivityForm({
       const value = formData[field.id];
       
       if (field.required) {
-        if (['checkboxes', 'multiple_choice_grid', 'tick_box_grid', 'file_upload'].includes(field.type)) {
+        if (['checkboxes', 'dropdown', 'file_upload'].includes(field.type)) {
           if (!Array.isArray(value) || value.length === 0) {
+            newErrors[field.id] = `${field.title} 為必填欄位`;
+          }
+        } else if (['multiple_choice_grid', 'tick_box_grid'].includes(field.type)) {
+          if (!value || (typeof value === 'object' && Object.keys(value).length === 0)) {
             newErrors[field.id] = `${field.title} 為必填欄位`;
           }
         } else if (value === '' || value === null || value === undefined) {
@@ -147,13 +161,65 @@ export function DynamicActivityForm({
           testData[field.id] = '適合 3-6 歲兒童，注意音量控制';
           break;
         default:
-          // 其他欄位給預設值
-          if (field.type === 'array') {
-            testData[field.id] = [];
-          } else if (field.type === 'number') {
-            testData[field.id] = 0;
-          } else {
-            testData[field.id] = '';
+          // 根據欄位類型給預設值
+          switch (field.type) {
+            case 'checkboxes':
+              testData[field.id] = field.options?.slice(0, 2) || [];
+              break;
+            case 'multiple_choice_grid':
+              if (field.grid_rows && field.grid_columns) {
+                const gridData: any = {};
+                field.grid_rows.forEach(row => {
+                  gridData[row] = field.grid_columns?.[0] || '';
+                });
+                testData[field.id] = gridData;
+              } else {
+                testData[field.id] = {};
+              }
+              break;
+            case 'tick_box_grid':
+              if (field.grid_rows && field.grid_columns) {
+                const gridData: any = {};
+                field.grid_rows.forEach(row => {
+                  gridData[row] = field.grid_columns?.slice(0, 2) || [];
+                });
+                testData[field.id] = gridData;
+              } else {
+                testData[field.id] = {};
+              }
+              break;
+            case 'linear_scale':
+              testData[field.id] = 3;
+              break;
+            case 'rating':
+              testData[field.id] = 4;
+              break;
+            case 'file_upload':
+              testData[field.id] = [];
+              break;
+            case 'date':
+              testData[field.id] = new Date().toISOString().split('T')[0];
+              break;
+            case 'time':
+              testData[field.id] = '14:30';
+              break;
+            case 'url':
+              testData[field.id] = 'https://example.com';
+              break;
+            case 'email':
+              testData[field.id] = 'test@example.com';
+              break;
+            case 'phone':
+              testData[field.id] = '0912345678';
+              break;
+            case 'number':
+              testData[field.id] = 10;
+              break;
+            case 'array':
+              testData[field.id] = [];
+              break;
+            default:
+              testData[field.id] = '';
           }
       }
     });
@@ -259,15 +325,34 @@ export function DynamicActivityForm({
 
       case 'dropdown':
         return (
-          <HanamiSelect
-            error={error}
-            label={field.title}
-            options={field.options?.map(opt => ({ value: opt, label: opt })) || []}
-            placeholder={field.placeholder}
-            required={field.required}
-            value={value}
-            onChange={(value) => updateField(field.id, value)}
-          />
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              {field.title}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <div className="space-y-2">
+              {field.options?.map((option, index) => (
+                <label key={index} className="flex items-center gap-2">
+                  <input
+                    checked={Array.isArray(value) && value.includes(option)}
+                    className="text-blue-600"
+                    type="checkbox"
+                    value={option}
+                    onChange={(e) => {
+                      const currentValues = Array.isArray(value) ? value : [];
+                      if (e.target.checked) {
+                        updateField(field.id, [...currentValues, option]);
+                      } else {
+                        updateField(field.id, currentValues.filter(v => v !== option));
+                      }
+                    }}
+                  />
+                  <span className="text-sm">{option}</span>
+                </label>
+              ))}
+            </div>
+            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+          </div>
         );
 
       case 'linear_scale':
@@ -332,6 +417,118 @@ export function DynamicActivityForm({
           </div>
         );
 
+      case 'multiple_choice_grid':
+        return (
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              {field.title}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-gray-300 rounded-lg">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="p-2 border-r border-gray-300 text-left text-sm font-medium">
+                      問題
+                    </th>
+                    {field.grid_columns?.map((column, index) => (
+                      <th key={index} className="p-2 border-r border-gray-300 text-center text-sm font-medium">
+                        {column}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {field.grid_rows?.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="border-t border-gray-300">
+                      <td className="p-2 border-r border-gray-300 text-sm font-medium">
+                        {row}
+                      </td>
+                      {field.grid_columns?.map((column, colIndex) => (
+                        <td key={colIndex} className="p-2 border-r border-gray-300 text-center">
+                          <input
+                            checked={value?.[row] === column}
+                            className="text-blue-600"
+                            name={`${field.id}_${row}`}
+                            type="radio"
+                            value={column}
+                            onChange={(e) => {
+                              const currentValue = value || {};
+                              updateField(field.id, { ...currentValue, [row]: e.target.value });
+                            }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+          </div>
+        );
+
+      case 'tick_box_grid':
+        return (
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              {field.title}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-gray-300 rounded-lg">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="p-2 border-r border-gray-300 text-left text-sm font-medium">
+                      問題
+                    </th>
+                    {field.grid_columns?.map((column, index) => (
+                      <th key={index} className="p-2 border-r border-gray-300 text-center text-sm font-medium">
+                        {column}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {field.grid_rows?.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="border-t border-gray-300">
+                      <td className="p-2 border-r border-gray-300 text-sm font-medium">
+                        {row}
+                      </td>
+                      {field.grid_columns?.map((column, colIndex) => (
+                        <td key={colIndex} className="p-2 border-r border-gray-300 text-center">
+                          <input
+                            checked={value?.[row]?.includes(column)}
+                            className="text-blue-600"
+                            type="checkbox"
+                            value={column}
+                            onChange={(e) => {
+                              const currentValue = value || {};
+                              const currentRowValues = currentValue[row] || [];
+                              if (e.target.checked) {
+                                updateField(field.id, { 
+                                  ...currentValue, 
+                                  [row]: [...currentRowValues, column] 
+                                });
+                              } else {
+                                updateField(field.id, { 
+                                  ...currentValue, 
+                                  [row]: currentRowValues.filter((v: string) => v !== column) 
+                                });
+                              }
+                            }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+          </div>
+        );
+
       case 'file_upload':
         return (
           <div>
@@ -355,14 +552,22 @@ export function DynamicActivityForm({
 
       case 'date':
         return (
-          <HanamiInput
-            error={error}
-            label={field.title}
-            required={field.required}
-            type="date"
-            value={value}
-            onChange={(value) => updateField(field.id, value)}
-          />
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              {field.title}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <button
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-left bg-white"
+              type="button"
+              onClick={() => setShowDatePicker({ field: field.id, open: true })}
+            >
+              {value ? 
+                new Date(value).toLocaleDateString('zh-TW') : 
+                '請選擇日期'}
+            </button>
+            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+          </div>
         );
 
       case 'time':
@@ -392,6 +597,19 @@ export function DynamicActivityForm({
           />
         );
 
+      case 'number':
+        return (
+          <HanamiInput
+            error={error}
+            label={field.title}
+            placeholder={field.placeholder}
+            required={field.required}
+            type="number"
+            value={value}
+            onChange={(e) => updateField(field.id, parseInt(e.target.value) || 0)}
+          />
+        );
+
       default:
         return (
           <HanamiInput
@@ -407,7 +625,20 @@ export function DynamicActivityForm({
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      {/* 日期選擇器組件 */}
+      {showDatePicker.open && (
+        <Calendarui
+          value={formData[showDatePicker.field] || ''}
+          onSelect={(date: string) => {
+            updateField(showDatePicker.field, date);
+            setShowDatePicker({ field: '', open: false });
+          }}
+          onClose={() => setShowDatePicker({ field: '', open: false })}
+        />
+      )}
+
+      <div className="space-y-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-900">新增教學活動</h2>
         <HanamiButton
@@ -434,7 +665,7 @@ export function DynamicActivityForm({
             <div
               key={field.id}
               className={
-              ['paragraph', 'checkboxes', 'multiple_choice', 'linear_scale', 'rating', 'file_upload'].includes(field.type) 
+              ['paragraph', 'checkboxes', 'multiple_choice', 'linear_scale', 'rating', 'file_upload', 'multiple_choice_grid', 'tick_box_grid'].includes(field.type) 
                 ? 'md:col-span-2' 
                 : ''
             }
@@ -454,5 +685,6 @@ export function DynamicActivityForm({
         </HanamiButton>
       </div>
     </div>
+    </>
   );
 } 

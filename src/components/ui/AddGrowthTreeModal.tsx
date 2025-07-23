@@ -436,10 +436,10 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                         >
                           {goal.required_abilities && goal.required_abilities.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
-                              {goal.required_abilities.map(id => {
+                              {goal.required_abilities.map((id, index) => {
                                 const ability = props.abilitiesOptions.find(a => a.value === id);
                                 return ability ? (
-                                  <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
+                                  <span key={`ability-${idx}-${index}-${id}`} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
                                     {ability.label}
                                   </span>
                                 ) : null;
@@ -460,10 +460,10 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                         >
                           {goal.related_activities && goal.related_activities.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
-                              {goal.related_activities.map(id => {
+                              {goal.related_activities.map((id, index) => {
                                 const activity = props.activitiesOptions.find(a => a.value === id);
                                 return activity ? (
-                                  <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
+                                  <span key={`activity-${idx}-${index}-${id}`} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
                                     {activity.label}
                                   </span>
                                 ) : null;

@@ -175,7 +175,7 @@ export default function GrowthTreeDetailModal({
                   {tree.review_teachers && tree.review_teachers.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {getTeacherNames(tree.review_teachers).map((teacher, index) => (
-                        <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
+                        <span key={`teacher-${index}-${teacher}`} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
                           {teacher}
                         </span>
                       ))}
@@ -233,7 +233,7 @@ export default function GrowthTreeDetailModal({
                               <span className="text-xs text-hanami-text-secondary">所需能力:</span>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {getAbilityNames(goal.required_abilities).map((ability, idx) => (
-                                  <span key={idx} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                  <span key={`ability-${goal.id}-${idx}-${ability}`} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                                     {ability}
                                   </span>
                                 ))}
@@ -247,7 +247,7 @@ export default function GrowthTreeDetailModal({
                               <span className="text-xs text-hanami-text-secondary">相關活動:</span>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {getActivityNames(goal.related_activities).map((activity, idx) => (
-                                  <span key={idx} className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                                  <span key={`activity-${goal.id}-${idx}-${activity}`} className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
                                     {activity}
                                   </span>
                                 ))}

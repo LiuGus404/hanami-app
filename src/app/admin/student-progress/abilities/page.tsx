@@ -12,6 +12,7 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   AcademicCapIcon,
+  VideoCameraIcon,
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -841,6 +842,13 @@ export default function AbilitiesPage() {
             >
               <FileText className="w-4 h-4" />
               進度記錄管理
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => window.location.href = '/admin/student-progress/student-media'}
+            >
+              <VideoCameraIcon className="w-4 h-4" />
+              學生媒體管理
             </button>
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
