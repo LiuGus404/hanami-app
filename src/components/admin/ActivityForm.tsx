@@ -203,8 +203,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
               processedActivity[key] = value ? [value] : [];
               console.log(`轉換 dropdown 欄位 ${key}:`, value, '->', processedActivity[key]);
             } else {
-              processedActivity[key] = value;
-              console.log(`載入範本欄位 ${key}:`, value);
+            processedActivity[key] = value;
+            console.log(`載入範本欄位 ${key}:`, value);
             }
           }
         });
@@ -416,8 +416,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     
     setFormData((prev: any) => {
       const newData = {
-        ...prev,
-        [field]: value,
+      ...prev,
+      [field]: value,
       };
       console.log(`更新 formData - ${field}:`, newData[field]);
       return newData;
@@ -509,10 +509,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         
         switch (field.type) {
           case 'array':
-            updatedData[fieldName] = [];
+          updatedData[fieldName] = [];
             break;
           case 'checkbox':
-            updatedData[fieldName] = false;
+          updatedData[fieldName] = false;
             break;
           case 'checkboxes':
           case 'dropdown':
@@ -1277,10 +1277,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     </div>
                     <input
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                      placeholder={fieldPlaceholder}
+                    placeholder={fieldPlaceholder}
                       value={fieldValue}
-                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                    />
+                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                  />
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                         <span>⚠️</span>
@@ -1303,7 +1303,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     <select
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
                       value={fieldValue}
-                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
                     >
                       <option value="">{`選擇${fieldName}`}</option>
                       {fieldOptions.map((opt: string) => (
@@ -1326,8 +1326,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         <span className="text-[#4B4036] text-xs">📝</span>
                       </div>
                       <label className="text-base font-semibold text-[#4B4036]">
-                        {fieldName}{fieldRequired ? ' *' : ''}
-                      </label>
+                      {fieldName}{fieldRequired ? ' *' : ''}
+                    </label>
                     </div>
                     <textarea
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200 resize-none"
@@ -1357,11 +1357,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     </div>
                     <input
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                      placeholder={fieldPlaceholder}
-                      type="number"
+                    placeholder={fieldPlaceholder}
+                    type="number"
                       value={fieldValue}
-                      onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value) || 0)}
-                    />
+                    onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value) || 0)}
+                  />
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                         <span>⚠️</span>
@@ -1375,12 +1375,12 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <input
+                      <input
                           checked={fieldValue || false}
                           className="w-5 h-5 text-[#FFD59A] bg-white border-2 border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-0 transition-all duration-200"
-                          type="checkbox"
-                          onChange={(e) => handleInputChange(fieldName, e.target.checked)}
-                        />
+                        type="checkbox"
+                        onChange={(e) => handleInputChange(fieldName, e.target.checked)}
+                      />
                         {fieldValue && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-[#4B4036] text-xs font-bold">✓</span>
@@ -1407,8 +1407,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         <span className="text-[#4B4036] text-xs">📋</span>
                       </div>
                       <label className="text-base font-semibold text-[#4B4036]">
-                        {fieldName}{fieldRequired ? ' *' : ''}
-                      </label>
+                      {fieldName}{fieldRequired ? ' *' : ''}
+                    </label>
                     </div>
                     <div className="space-y-3">
                       {fieldValue?.map((item: string, index: number) => (
@@ -1523,10 +1523,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     </div>
                     <input
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                      placeholder={fieldPlaceholder}
+                    placeholder={fieldPlaceholder}
                       value={fieldValue}
-                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                    />
+                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                  />
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                         <span>⚠️</span>
@@ -1549,10 +1549,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     </div>
                     <input
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                      placeholder={fieldPlaceholder}
+                    placeholder={fieldPlaceholder}
                       value={fieldValue}
-                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                    />
+                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                  />
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                         <span>⚠️</span>
@@ -2060,8 +2060,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-
-                                  {/* 預設文字輸入，處理未知的欄位類型 */}
+                
+                {/* 預設文字輸入，處理未知的欄位類型 */}
                   {!['text', 'select', 'textarea', 'number', 'checkbox', 'array', 'title', 'short_answer', 'multiple_choice', 'dropdown', 'checkboxes', 'linear_scale', 'rating', 'file_upload', 'date', 'time', 'url', 'email', 'phone', 'multiple_choice_grid', 'tick_box_grid', 'paragraph'].includes(fieldType) && (
                     <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
                       <div className="flex items-center gap-2 mb-3">
@@ -2074,10 +2074,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                       </div>
                       <input
                         className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                        placeholder={fieldPlaceholder}
+                    placeholder={fieldPlaceholder}
                         value={fieldValue}
-                        onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                      />
+                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                  />
                       {errors[fieldName] && (
                         <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                           <span>⚠️</span>
@@ -2085,7 +2085,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         </p>
                       )}
                     </div>
-                  )}
+                )}
               </div>
             );
           })}

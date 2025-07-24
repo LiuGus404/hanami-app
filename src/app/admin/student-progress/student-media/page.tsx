@@ -104,26 +104,22 @@ export default function StudentMediaPage() {
   const loadStudents = async () => {
     setLoading(true);
     try {
-      // 載入學生資料和配額
+      // 先載入學生基本資料
       const { data: studentsData, error: studentsError } = await supabase
         .from('Hanami_Students')
-        .select(`
-          id,
-          full_name,
-          nick_name,
-          course_type,
-          hanami_student_media_quota (
-            plan_type,
-            video_limit,
-            photo_limit,
-            video_count,
-            photo_count,
-            total_used_space
-          )
-        `)
+        .select('id, full_name, nick_name, course_type')
         .order('full_name');
 
       if (studentsError) throw studentsError;
+
+      // 分別載入配額資料
+      const { data: quotaData, error: quotaError } = await supabase
+        .from('hanami_student_media_quota')
+        .select('*');
+
+      if (quotaError) {
+        console.warn('載入配額資料失敗，使用預設配額:', quotaError);
+      }
 
       // 載入媒體統計
       const { data: mediaStats, error: mediaError } = await supabase
@@ -131,11 +127,15 @@ export default function StudentMediaPage() {
         .select('student_id, media_type')
         .in('student_id', studentsData?.map(s => s.id) || []);
 
-      if (mediaError) throw mediaError;
+      if (mediaError) {
+        console.warn('載入媒體統計失敗:', mediaError);
+      }
 
       // 處理資料
       const processedStudents = (studentsData || []).map(student => {
-        const existingQuota = student.hanami_student_media_quota;
+        // 查找學生的配額資料
+        const existingQuota = quotaData?.find(q => q.student_id === student.id);
+        
         const getValidPlanType = (planType: string): 'free' | 'basic' | 'standard' | 'premium' | 'professional' => {
           if ([
             'free', 'basic', 'standard', 'premium', 'professional'
@@ -147,14 +147,14 @@ export default function StudentMediaPage() {
         };
 
         const quota: StudentMediaQuota = existingQuota ? {
-          student_id: (existingQuota as any).student_id || student.id,
-          plan_type: getValidPlanType((existingQuota as any).plan_type || 'free'),
-          video_limit: (existingQuota as any).video_limit || 5,
-          photo_limit: (existingQuota as any).photo_limit || 10,
-          video_count: (existingQuota as any).video_count || 0,
-          photo_count: (existingQuota as any).photo_count || 0,
-          total_used_space: (existingQuota as any).total_used_space || 0,
-          last_updated: (existingQuota as any).last_updated || new Date().toISOString(),
+          student_id: existingQuota.student_id,
+          plan_type: getValidPlanType(existingQuota.plan_type || 'free'),
+          video_limit: existingQuota.video_limit || 5,
+          photo_limit: existingQuota.photo_limit || 10,
+          video_count: existingQuota.video_count || 0,
+          photo_count: existingQuota.photo_count || 0,
+          total_used_space: existingQuota.total_used_space || 0,
+          last_updated: existingQuota.last_updated || new Date().toISOString(),
         } : {
           student_id: student.id,
           plan_type: 'free',
@@ -356,7 +356,7 @@ export default function StudentMediaPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-                onClick={() => window.location.href = '/admin/student-progress/dashboard'}
+                onClick={() => window.location.href = '/admin/student-progress'}
               >
                 <HomeIcon className="w-4 h-4" />
                 進度儀表板
@@ -382,13 +382,7 @@ export default function StudentMediaPage() {
                 <FileText className="w-4 h-4" />
                 教學活動管理
               </button>
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-                onClick={() => window.location.href = '/admin/student-progress'}
-              >
-                <FileText className="w-4 h-4" />
-                進度記錄管理
-              </button>
+              
               <button
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2] bg-[#FFF9F2] text-[#2B3A3B]"
                 onClick={() => window.location.href = '/admin/student-progress/student-media'}

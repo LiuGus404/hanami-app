@@ -810,7 +810,7 @@ export default function AbilitiesPage() {
         <div className="flex flex-wrap gap-3">
           <button
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-            onClick={() => window.location.href = '/admin/student-progress/dashboard'}
+            onClick={() => window.location.href = '/admin/student-progress'}
           >
             <BarChart3 className="w-4 h-4" />
             進度儀表板
@@ -836,13 +836,7 @@ export default function AbilitiesPage() {
             <Gamepad2 className="w-4 h-4" />
             教學活動管理
           </button>
-                      <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => window.location.href = '/admin/student-progress'}
-            >
-              <FileText className="w-4 h-4" />
-              進度記錄管理
-            </button>
+
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
               onClick={() => window.location.href = '/admin/student-progress/student-media'}

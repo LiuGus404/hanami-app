@@ -10,10 +10,16 @@ import { supabase } from '@/lib/supabase';
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// 固定香港時區的 Date 產生器
+const getHongKongDate = (date = new Date()) => {
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  return new Date(utc + (8 * 3600000)); // 香港是 UTC+8
+};
+
 function getTodayISO(): string {
-  const today = new Date();
+  const today = getHongKongDate();
   today.setHours(0, 0, 0, 0);
-  return today.toISOString().slice(0, 10);
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
 function formatAge(months: number | null | undefined): string {
@@ -210,7 +216,7 @@ export default function LessonAvailabilityDashboard() {
         }
           
         // 從 lesson_date 計算 weekday
-        const lessonDate = new Date(t.lesson_date);
+        const lessonDate = getHongKongDate(new Date(t.lesson_date));
         const weekdayNum = lessonDate.getDay(); // 0=星期日, 1=星期一, ..., 6=星期六
           
         const courseType = t.course_type || '';
@@ -343,7 +349,7 @@ export default function LessonAvailabilityDashboard() {
         // 取得該時段該課程的所有試堂學生
         const allTrialStudents = (trialData || []).filter(t => {
           if (!t.actual_timeslot || !t.lesson_date) return false;
-          const lessonDate = new Date(t.lesson_date);
+          const lessonDate = getHongKongDate(new Date(t.lesson_date));
           const tWeekdayNum = lessonDate.getDay();
           // 只用課程名稱比對
           return (
@@ -386,11 +392,11 @@ export default function LessonAvailabilityDashboard() {
           });
           // 計算每個日期的剩餘空位
           const dateMap: {[date: string]: number} = {};
-          const today = new Date();
+          const today = getHongKongDate();
           for (let week = 0; week < 8; week++) {
             const d = new Date(today);
             d.setDate(d.getDate() + (7 + weekdayNum - d.getDay()) % 7 + (week * 7));
-            const dateStr = d.toISOString().slice(0, 10);
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             // 計算該日該時段該課程的試堂學生數（只用課程名稱比對）
             const trialLessons = allLessonData.filter(lesson =>
               lesson.lesson_date === dateStr &&
@@ -409,7 +415,7 @@ export default function LessonAvailabilityDashboard() {
           }
           availableDates.push(...Object.entries(dateMap)
             .map(([date, remain]) => ({ date, remain }))
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+            .sort((a, b) => a.date.localeCompare(b.date))
             .slice(0, 5),
           );
           // 調試信息
@@ -833,7 +839,7 @@ export default function LessonAvailabilityDashboard() {
                                 </div>
                                 <div className="flex flex-col gap-1">
                                   {slot.available_dates.map((item, idx) => {
-                                    const dateObj = new Date(item.date);
+                                    const dateObj = getHongKongDate(new Date(item.date));
                                     const dateStr = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}`;
                                     const weekdayStr = ['日', '一', '二', '三', '四', '五', '六'][dateObj.getDay()];
                                     return (

@@ -875,36 +875,80 @@ export function TeachingActivityManagement() {
             {template && viewingActivity.custom_fields && (
               <div className="md:col-span-2">
                 <h4 className="font-medium mb-2">範本欄位</h4>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="mb-2">
-                    <span className="text-sm font-medium text-gray-700">使用範本：</span>
-                    <span className="text-sm text-gray-600 ml-2">{template.name || template.template_name}</span>
+                <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-xl border border-[#EADBC8]">
+                  <div className="mb-4 p-3 bg-[#FFD59A] rounded-lg">
+                    <span className="text-sm font-semibold text-[#4B4036]">使用範本：</span>
+                    <span className="text-sm text-[#4B4036] ml-2 font-medium">{template.name || template.template_name}</span>
                   </div>
-                  <div className="space-y-3">
-                    {template.fields && template.fields.map((field) => {
-                      const fieldValue = viewingActivity.custom_fields[field.title || field.id];
-                      if (!fieldValue) return null;
+                  <div className="space-y-4">
+                    {/* 按照範本中保存的欄位順序顯示 */}
+                    {template.fields && template.fields.map((field, index) => {
+                      // 改進欄位值匹配邏輯，與 ActivityForm 的保存邏輯保持一致
+                      let fieldValue = null;
+                      const fieldKey = field.title || field.id;
+                      
+                      // 嘗試多種可能的鍵名匹配，與 ActivityForm 的邏輯一致
+                      const fieldNames = [field.title, field.id];
+                      for (const fieldName of fieldNames) {
+                        if (fieldName && viewingActivity.custom_fields[fieldName] !== undefined) {
+                          fieldValue = viewingActivity.custom_fields[fieldName];
+                          break;
+                        }
+                      }
+                      
+                      // 如果沒有找到對應的值，跳過這個欄位
+                      if (fieldValue === null || fieldValue === undefined) {
+                        console.log(`未找到欄位值: ${fieldKey} (${field.id})`);
+                        return null;
+                      }
+                      
+                      console.log(`顯示欄位 ${index + 1}: ${fieldKey} =`, fieldValue);
                       
                       return (
-                        <div key={field.id} className="border-b border-gray-200 pb-2 last:border-b-0">
-                          <div className="text-sm font-medium text-gray-700 mb-1">
-                            {field.title || field.id}:
+                        <div key={field.id} className="bg-white p-4 rounded-lg border border-[#EADBC8] shadow-sm">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="bg-[#FFD59A] text-[#4B4036] px-2 py-1 rounded-full text-xs font-medium">
+                              {index + 1}
+                            </span>
+                            <div className="text-sm font-semibold text-[#4B4036]">
+                              {field.title || field.id}
+                            </div>
+                            <span className="px-2 py-1 bg-[#EADBC8] rounded-full text-xs text-[#A68A64]">
+                              {field.type}
+                            </span>
+                            {field.required && (
+                              <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+                                必填
+                              </span>
+                            )}
                           </div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-[#4B4036] bg-[#FFF9F2] p-3 rounded-lg border border-[#EADBC8]">
                             {Array.isArray(fieldValue) ? (
-                              <ul className="list-disc list-inside">
-                                {fieldValue.map((item: string, index: number) => (
-                                  <li key={`${field.id}-${index}-${item}`}>{item}</li>
+                              <ul className="list-disc list-inside space-y-1">
+                                {fieldValue.map((item: string, itemIndex: number) => (
+                                  <li key={`${field.id}-${itemIndex}-${item}`} className="text-[#4B4036]">
+                                    {item}
+                                  </li>
                                 ))}
                               </ul>
                             ) : (
-                              <span>{String(fieldValue)}</span>
+                              <span className="whitespace-pre-wrap">{String(fieldValue)}</span>
                             )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
+                  
+                  {/* 調試信息 - 僅在開發環境顯示 */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
+                      <div className="font-semibold mb-2">調試信息：</div>
+                      <div>範本欄位數量: {template.fields?.length || 0}</div>
+                      <div>自訂欄位數量: {Object.keys(viewingActivity.custom_fields || {}).length}</div>
+                      <div>自訂欄位鍵名: {Object.keys(viewingActivity.custom_fields || {}).join(', ')}</div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

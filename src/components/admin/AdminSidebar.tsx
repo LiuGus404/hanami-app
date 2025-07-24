@@ -100,10 +100,10 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
 
           <button
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/student-progress/dashboard')}
+            onClick={() => router.push('/admin/student-progress')}
           >
             <Image alt="學生進度" className="mr-2 w-6 h-6" height={24} src="/icons/book-elephant.PNG" width={24} />
-            學生進度
+            進度儀表板
           </button>
 
           <button
@@ -119,7 +119,7 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
             onClick={() => router.push('/admin/student-progress/abilities')}
           >
             <span className="mr-2 text-lg">📊</span>
-            發展能力
+            發展能力圖卡
           </button>
 
           <button
@@ -127,7 +127,23 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
             onClick={() => router.push('/admin/student-progress/activities')}
           >
             <span className="mr-2 text-lg">🎮</span>
-            教學活動
+            教學活動管理
+          </button>
+
+          <button
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+            onClick={() => router.push('/admin/student-progress/ability-assessments')}
+          >
+            <span className="mr-2 text-lg">📋</span>
+            能力評估管理
+          </button>
+
+          <button
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+            onClick={() => router.push('/admin/student-progress/student-media')}
+          >
+            <span className="mr-2 text-lg">📹</span>
+            學生媒體管理
           </button>
 
           <button

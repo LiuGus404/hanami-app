@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare, X, Plus } from 'lucide-react';
+import { AcademicCapIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
@@ -1338,10 +1339,10 @@ export default function StudentManagementPage() {
           <div className="flex flex-wrap gap-3">
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => router.push('/admin/student-progress/dashboard')}
+              onClick={() => router.push('/admin/student-progress')}
             >
               <BarChart3 className="w-4 h-4" />
-              進度儀表板
+              進度管理面板
             </button>
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
@@ -1366,11 +1367,19 @@ export default function StudentManagementPage() {
             </button>
             <button
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => router.push('/admin/student-progress')}
+              onClick={() => router.push('/admin/student-progress/ability-assessments')}
             >
-              <FileText className="w-4 h-4" />
-              進度記錄管理
+              <AcademicCapIcon className="w-4 h-4" />
+              能力評估管理
             </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
+              onClick={() => router.push('/admin/student-progress/student-media')}
+            >
+              <VideoCameraIcon className="w-4 h-4" />
+              學生媒體管理
+            </button>
+
           </div>
         </div>
 

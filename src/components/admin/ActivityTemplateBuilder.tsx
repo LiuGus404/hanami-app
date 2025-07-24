@@ -22,6 +22,7 @@ import {
   Upload,
   Hash,
   CircleDot,
+  FileText as DocumentTextIcon,
 } from 'lucide-react';
 import React, { useState, useRef } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -292,47 +293,95 @@ export function ActivityTemplateBuilder({
       {/* 欄位編輯器 */}
       <HanamiCard className="p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">範本欄位</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-[#4B4036]">範本欄位</h3>
+            <span className="px-3 py-1 bg-[#FFD59A] text-[#4B4036] rounded-full text-sm font-medium">
+              {template.fields?.length || 0} 個欄位
+            </span>
+          </div>
           <HanamiButton
-            className="bg-gradient-to-r from-green-500 to-green-600"
+            variant="cute"
             onClick={addField}
+            className="bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:from-[#EBC9A4] hover:to-[#FFD59A]"
           >
             <PlusIcon className="h-4 w-4 mr-2" />
             新增欄位
           </HanamiButton>
         </div>
 
+        {/* 排序說明 */}
+        <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+          <div className="flex items-center gap-2 text-blue-700">
+            <div className="flex flex-col gap-1">
+              <div className="w-4 h-1 bg-blue-400 rounded-full"></div>
+              <div className="w-4 h-1 bg-blue-400 rounded-full"></div>
+              <div className="w-4 h-1 bg-blue-400 rounded-full"></div>
+            </div>
+            <span className="text-sm font-medium">拖拽欄位可調整顯示順序</span>
+          </div>
+        </div>
+
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="fields" isCombineEnabled={false} isDropDisabled={false}>
-            {(provided) => (
+            {(provided, snapshot) => (
               <div
                 {...provided.droppableProps}
                 ref={provided.innerRef}
-                className="space-y-2"
+                className={`space-y-2 transition-colors duration-200 ${
+                  snapshot.isDraggingOver ? 'bg-blue-50 rounded-lg p-2' : ''
+                }`}
               >
                 {template.fields?.map((field, index) => (
                   <Draggable key={field.id} draggableId={field.id} index={index}>
-                    {(provided) => (
+                    {(provided, snapshot) => (
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border"
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 ${
+                          snapshot.isDragging
+                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 shadow-lg transform rotate-2'
+                            : 'bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-md'
+                        }`}
                       >
-                        <div {...provided.dragHandleProps} className="cursor-move">
-                          <CogIcon className="h-5 w-5 text-gray-400" />
+                        {/* 拖拽手柄 */}
+                        <div 
+                          {...provided.dragHandleProps} 
+                          className="flex flex-col items-center gap-1 cursor-move p-2 rounded-lg hover:bg-[#FFD59A] transition-colors"
+                        >
+                          <div className="w-4 h-1 bg-gray-400 rounded-full"></div>
+                          <div className="w-4 h-1 bg-gray-400 rounded-full"></div>
+                          <div className="w-4 h-1 bg-gray-400 rounded-full"></div>
                         </div>
+
+                        {/* 排序指示器 */}
+                        <div className="flex flex-col items-center text-xs text-gray-400 font-medium">
+                          <span className="bg-[#FFD59A] text-[#4B4036] px-2 py-1 rounded-full">
+                            {index + 1}
+                          </span>
+                        </div>
+
+                        {/* 欄位資訊 */}
                         <div className="flex-1">
-                          <div className="font-medium">{field.title}</div>
-                          <div className="text-sm text-gray-500">
-                            {getFieldTypeLabel(field.type)}
-                            {field.required && ' (必填)'}
+                          <div className="font-semibold text-[#4B4036] text-lg">{field.title}</div>
+                          <div className="text-sm text-[#A68A64] flex items-center gap-2 mt-1">
+                            <span className="px-2 py-1 bg-[#EADBC8] rounded-full text-xs">
+                              {getFieldTypeLabel(field.type)}
+                            </span>
+                            {field.required && (
+                              <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+                                必填
+                              </span>
+                            )}
                           </div>
                         </div>
+
+                        {/* 操作按鈕 */}
                         <div className="flex gap-2">
                           <HanamiButton
                             size="sm"
                             variant="secondary"
                             onClick={() => editField(index)}
+                            className="bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:from-[#EBC9A4] hover:to-[#FFD59A]"
                           >
                             編輯
                           </HanamiButton>
@@ -340,6 +389,7 @@ export function ActivityTemplateBuilder({
                             size="sm"
                             variant="danger"
                             onClick={() => deleteField(index)}
+                            className="bg-gradient-to-r from-red-400 to-red-500 hover:from-red-500 hover:to-red-600"
                           >
                             <TrashIcon className="h-4 w-4" />
                           </HanamiButton>
@@ -355,8 +405,20 @@ export function ActivityTemplateBuilder({
         </DragDropContext>
 
         {!template.fields?.length && (
-          <div className="text-center py-8 text-gray-500">
-            尚未添加任何欄位，點擊「新增欄位」開始建構範本
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+              <DocumentTextIcon className="h-8 w-8 text-[#4B4036]" />
+            </div>
+            <h3 className="text-lg font-semibold text-[#4B4036] mb-2">尚未添加任何欄位</h3>
+            <p className="text-[#A68A64] mb-4">點擊「新增欄位」開始建構您的範本</p>
+            <HanamiButton
+              variant="cute"
+              onClick={addField}
+              className="bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:from-[#EBC9A4] hover:to-[#FFD59A]"
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              新增第一個欄位
+            </HanamiButton>
           </div>
         )}
       </HanamiCard>

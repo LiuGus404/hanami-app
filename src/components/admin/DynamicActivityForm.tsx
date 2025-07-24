@@ -216,10 +216,10 @@ export function DynamicActivityForm({
               testData[field.id] = 10;
               break;
             case 'array':
-              testData[field.id] = [];
+            testData[field.id] = [];
               break;
             default:
-              testData[field.id] = '';
+            testData[field.id] = '';
           }
       }
     });
@@ -346,7 +346,7 @@ export function DynamicActivityForm({
                         updateField(field.id, currentValues.filter(v => v !== option));
                       }
                     }}
-                  />
+          />
                   <span className="text-sm">{option}</span>
                 </label>
               ))}
@@ -638,7 +638,7 @@ export function DynamicActivityForm({
         />
       )}
 
-      <div className="space-y-6">
+    <div className="space-y-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-900">新增教學活動</h2>
         <HanamiButton

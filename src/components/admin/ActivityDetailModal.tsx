@@ -17,6 +17,49 @@ import { useState, useEffect } from 'react';
 import { HanamiCard, HanamiButton } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 
+// 添加 getTemplateFields 函數，與 ActivityForm.tsx 保持一致
+function getTemplateFields(template: any) {
+  console.log('getTemplateFields - 輸入範本:', template);
+  
+  if (!template) {
+    console.log('getTemplateFields - 範本為空，返回空陣列');
+    return [];
+  }
+  
+  // 如果 template_schema 是物件且有 fields 屬性
+  if (template.template_schema && typeof template.template_schema === 'object' && template.template_schema.fields) {
+    console.log('getTemplateFields - 從 template_schema.fields 獲取欄位:', template.template_schema.fields);
+    return template.template_schema.fields;
+  }
+  
+  // 如果 template_schema 是陣列
+  if (Array.isArray(template.template_schema)) {
+    console.log('getTemplateFields - 從 template_schema 陣列獲取欄位:', template.template_schema);
+    return template.template_schema;
+  }
+  
+  // 如果 template_schema 是物件但沒有 fields 屬性，嘗試其他可能的屬性
+  if (template.template_schema && typeof template.template_schema === 'object') {
+    console.log('getTemplateFields - template_schema 物件:', template.template_schema);
+    // 嘗試找到包含欄位定義的屬性
+    for (const key in template.template_schema) {
+      if (Array.isArray(template.template_schema[key])) {
+        console.log(`getTemplateFields - 從 ${key} 獲取欄位:`, template.template_schema[key]);
+        return template.template_schema[key];
+      }
+    }
+  }
+  
+  // 如果範本直接有 fields 屬性
+  if (template.fields && Array.isArray(template.fields)) {
+    console.log('getTemplateFields - 從 template.fields 獲取欄位:', template.fields);
+    return template.fields;
+  }
+  
+  console.log('getTemplateFields - 未找到欄位定義，返回空陣列');
+  return [];
+}
+
 interface ActivityDetailModalProps {
   activity: any;
   onClose: () => void;
@@ -52,6 +95,8 @@ export default function ActivityDetailModal({
         return;
       }
 
+      console.log('載入範本，template_id:', activity.template_id);
+
       // 查詢 hanami_resource_templates 表
       const { data, error } = await supabase
         .from('hanami_resource_templates')
@@ -63,6 +108,10 @@ export default function ActivityDetailModal({
         console.log('範本載入失敗:', error);
         setTemplate(null);
       } else {
+        console.log('載入的範本資料:', data);
+        if (data && typeof data.template_schema === 'object' && data.template_schema && 'fields' in data.template_schema && Array.isArray(data.template_schema.fields)) {
+          console.log('範本欄位順序:', data.template_schema.fields.map((f: any) => f.title || f.id));
+        }
         setTemplate(data);
       }
     } catch (error) {
@@ -275,21 +324,38 @@ export default function ActivityDetailModal({
           {/* 範本資訊 */}
           {template && (
             <HanamiCard className="p-6">
-              <h3 className="text-lg font-semibold text-hanami-text mb-4">使用範本</h3>
-              <div className="p-4 bg-hanami-primary/10 rounded-lg">
-                <h4 className="font-medium text-hanami-text mb-2">
-                  {template.template_name}
-                </h4>
-                <p className="text-sm text-hanami-text-secondary mb-3">
-                  {template.template_description}
-                </p>
+              <h3 className="text-lg font-semibold text-hanami-text mb-4 flex items-center gap-2">
+                <DocumentTextIcon className="w-5 h-5" />
+                使用範本
+              </h3>
+              <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-xl border border-[#EADBC8]">
+                <div className="mb-4 p-3 bg-[#FFD59A] rounded-lg">
+                  <span className="text-sm font-semibold text-[#4B4036]">範本名稱：</span>
+                  <span className="text-sm text-[#4B4036] ml-2 font-medium">
+                    {template.template_name}
+                  </span>
+                </div>
+                
+                {template.template_description && (
+                  <div className="mb-4 p-3 bg-white rounded-lg border border-[#EADBC8]">
+                    <span className="text-sm font-semibold text-[#4B4036]">範本描述：</span>
+                    <p className="text-sm text-[#4B4036] mt-1">
+                      {template.template_description}
+                    </p>
+                  </div>
+                )}
                 
                 {/* 範本欄位資料 */}
-                {template.template_schema?.fields && activity.custom_fields && (
-                  <div className="space-y-3">
-                    {template.template_schema.fields.map((field: any) => {
-                      // 嘗試多種可能的欄位名稱
-                      const fieldNames = [field.name, field.title, field.id, field.label];
+                {template && activity.custom_fields && (
+                  <div className="space-y-4">
+                    <h5 className="font-medium text-[#4B4036] mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-[#FFD59A] rounded-full"></span>
+                      範本欄位資料
+                    </h5>
+                    {/* 使用 getTemplateFields 函數獲取欄位，確保順序一致 */}
+                    {getTemplateFields(template).map((field: any, index: number) => {
+                      // 嘗試多種可能的欄位名稱，與 ActivityForm 的邏輯一致
+                      const fieldNames = [field.title, field.id, field.name, field.label];
                       let value = null;
                       
                       for (const fieldName of fieldNames) {
@@ -299,58 +365,99 @@ export default function ActivityDetailModal({
                         }
                       }
                       
-                      if (!value) return null;
+                      if (!value) {
+                        console.log(`未找到欄位值: ${field.title || field.id} (${field.id})`);
+                        return null;
+                      }
+                      
+                      console.log(`顯示欄位 ${index + 1}: ${field.title || field.id} =`, value);
                       
                       return (
-                        <div key={field.name || field.id}>
-                          <span className="text-sm font-medium text-gray-600">
-                            {field.name || field.title || field.id}：
-                          </span>
-                          {field.type === 'array' ? (
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {Array.isArray(value) ? value.map((item: string, index: number) => (
-                                <span 
-                                  key={index}
-                                  className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm"
-                                >
-                                  {item}
-                                </span>
-                              )) : (
-                                <span className="text-sm">{value}</span>
-                              )}
+                        <div key={field.id || field.name} className="bg-white p-4 rounded-lg border border-[#EADBC8] shadow-sm">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="bg-[#FFD59A] text-[#4B4036] px-2 py-1 rounded-full text-xs font-medium">
+                              {index + 1}
+                            </span>
+                            <div className="text-sm font-semibold text-[#4B4036]">
+                              {field.title || field.name || field.id}
                             </div>
-                          ) : (
-                            <span className="text-sm ml-2">{value}</span>
-                          )}
+                            <span className="px-2 py-1 bg-[#EADBC8] rounded-full text-xs text-[#A68A64]">
+                              {field.type}
+                            </span>
+                            {field.required && (
+                              <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+                                必填
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-[#4B4036] bg-[#FFF9F2] p-3 rounded-lg border border-[#EADBC8]">
+                            {field.type === 'array' || Array.isArray(value) ? (
+                              <div className="flex flex-wrap gap-2">
+                                {Array.isArray(value) ? value.map((item: string, itemIndex: number) => (
+                                  <span 
+                                    key={itemIndex}
+                                    className="px-2 py-1 bg-[#EADBC8] text-[#4B4036] rounded text-sm"
+                                  >
+                                    {item}
+                                  </span>
+                                )) : (
+                                  <span className="text-sm">{value}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="whitespace-pre-wrap">{String(value)}</span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
+                    
+                    {/* 調試信息 - 僅在開發環境顯示 */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
+                        <div className="font-semibold mb-2">調試信息：</div>
+                        <div>範本欄位數量: {getTemplateFields(template).length}</div>
+                        <div>自訂欄位數量: {Object.keys(activity.custom_fields || {}).length}</div>
+                        <div>自訂欄位鍵名: {Object.keys(activity.custom_fields || {}).join(', ')}</div>
+                        <div>範本欄位順序: {getTemplateFields(template).map((f: any) => f.title || f.id).join(' → ')}</div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
                 {/* 如果沒有範本欄位，顯示所有 custom_fields */}
                 {(!template.template_schema?.fields || !activity.custom_fields) && activity.custom_fields && (
-                  <div className="space-y-3">
-                    <h5 className="font-medium text-gray-700">自訂欄位資料：</h5>
-                    {Object.entries(activity.custom_fields).map(([key, value]) => (
-                      <div key={key}>
-                        <span className="text-sm font-medium text-gray-600">
-                          {key}：
-                        </span>
-                        {Array.isArray(value) ? (
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {value.map((item: string, index: number) => (
-                              <span 
-                                key={index}
-                                className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm"
-                              >
-                                {item}
-                              </span>
-                            ))}
+                  <div className="space-y-4">
+                    <h5 className="font-medium text-[#4B4036] mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-[#FFD59A] rounded-full"></span>
+                      自訂欄位資料
+                    </h5>
+                    {Object.entries(activity.custom_fields).map(([key, value], index) => (
+                      <div key={key} className="bg-white p-4 rounded-lg border border-[#EADBC8] shadow-sm">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="bg-[#FFD59A] text-[#4B4036] px-2 py-1 rounded-full text-xs font-medium">
+                            {index + 1}
+                          </span>
+                          <div className="text-sm font-semibold text-[#4B4036]">
+                            {key}
                           </div>
-                        ) : (
-                          <span className="text-sm ml-2">{String(value)}</span>
-                        )}
+                        </div>
+                        <div className="text-sm text-[#4B4036] bg-[#FFF9F2] p-3 rounded-lg border border-[#EADBC8]">
+                          {Array.isArray(value) ? (
+                            <div className="flex flex-wrap gap-2">
+                              {value.map((item: string, itemIndex: number) => (
+                                <span 
+                                  key={itemIndex}
+                                  className="px-2 py-1 bg-[#EADBC8] text-[#4B4036] rounded text-sm"
+                                >
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="whitespace-pre-wrap">{String(value)}</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

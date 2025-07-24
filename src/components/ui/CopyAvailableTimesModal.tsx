@@ -313,9 +313,15 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
     setShowTrialDates(false);
   };
 
+  // 固定香港時區的 Date 產生器
+  const getHongKongDate = (date = new Date()) => {
+    const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+    return new Date(utc + (8 * 3600000)); // 香港是 UTC+8
+  };
+
   // 計算未來2個最快可試堂的日期
   const getNextTrialDates = (weekday: number, count = 2): string[] => {
-    const today = new Date();
+    const today = getHongKongDate();
     const currentWeekday = today.getDay();
     const dates: string[] = [];
     
@@ -494,7 +500,9 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `有位時間_${new Date().toISOString().slice(0, 10)}.csv`);
+          const today = getHongKongDate();
+      const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      link.setAttribute('download', `有位時間_${dateStr}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

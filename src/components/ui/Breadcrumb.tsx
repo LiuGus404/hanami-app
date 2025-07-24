@@ -109,6 +109,65 @@ function generateBreadcrumbItems(pathname: string, showHome: boolean): Breadcrum
     });
     return items;
   }
+
+  // 特殊處理學生進度管理相關路徑
+  if (pathname.startsWith('/admin/student-progress')) {
+    items.push({
+      label: '管理面板',
+      href: '/admin',
+      isCurrent: false,
+    });
+    items.push({
+      label: '學生進度管理',
+      href: '/admin/student-progress',
+      isCurrent: pathname === '/admin/student-progress',
+    });
+
+    // 處理子頁面
+    if (pathname === '/admin/student-progress/growth-trees') {
+      items.push({
+        label: '成長樹管理',
+        href: '/admin/student-progress/growth-trees',
+        isCurrent: true,
+      });
+    } else if (pathname === '/admin/student-progress/abilities') {
+      items.push({
+        label: '發展能力圖卡',
+        href: '/admin/student-progress/abilities',
+        isCurrent: true,
+      });
+    } else if (pathname === '/admin/student-progress/activities') {
+      items.push({
+        label: '教學活動管理',
+        href: '/admin/student-progress/activities',
+        isCurrent: true,
+      });
+    } else if (pathname === '/admin/student-progress') {
+      // 主頁面已經是進度儀表板，不需要額外處理
+    } else if (pathname === '/admin/student-progress/ability-assessments') {
+      items.push({
+        label: '能力評估管理',
+        href: '/admin/student-progress/ability-assessments',
+        isCurrent: true,
+      });
+    } else if (pathname === '/admin/student-progress/student-media') {
+      items.push({
+        label: '學生媒體管理',
+        href: '/admin/student-progress/student-media',
+        isCurrent: true,
+      });
+    } else {
+      // 其他子頁面，使用通用標籤
+      const lastSegment = segments[segments.length - 1];
+      const label = getBreadcrumbLabel(lastSegment, segments, segments.length - 1);
+      items.push({
+        label,
+        href: pathname,
+        isCurrent: true,
+      });
+    }
+    return items;
+  }
   
   // 生成路徑項目
   let currentPath = '';
