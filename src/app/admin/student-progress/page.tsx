@@ -434,11 +434,11 @@ export default function StudentProgressDashboard() {
             <div className="flex items-center">
               <div className="p-3 bg-gradient-to-br from-hanami-primary to-hanami-secondary rounded-full">
                 <StarIcon className="h-6 w-6 text-hanami-text" />
-              </div>
+                </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-hanami-text-secondary">發展能力</p>
                 <p className="text-2xl font-bold text-hanami-text">{abilities.length}</p>
-              </div>
+            </div>
             </div>
           </HanamiCard>
 
@@ -446,12 +446,12 @@ export default function StudentProgressDashboard() {
             <div className="flex items-center">
               <div className="p-3 bg-gradient-to-br from-hanami-accent to-hanami-primary rounded-full">
                 <TreePine className="h-6 w-6 text-hanami-text" />
-              </div>
+            </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-hanami-text-secondary">成長樹</p>
                 <p className="text-2xl font-bold text-hanami-text">{trees.length}</p>
-              </div>
-            </div>
+          </div>
+        </div>
           </HanamiCard>
 
           <HanamiCard className="p-6">
@@ -470,14 +470,14 @@ export default function StudentProgressDashboard() {
             <div className="flex items-center">
               <div className="p-3 bg-gradient-to-br from-hanami-success to-hanami-primary rounded-full">
                 <ClockIcon className="h-6 w-6 text-hanami-text" />
-              </div>
+            </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-hanami-text-secondary">最近進度</p>
                 <p className="text-2xl font-bold text-hanami-text">{recentAssessments.length}</p>
-              </div>
-            </div>
+                  </div>
+                  </div>
           </HanamiCard>
-        </div>
+            </div>
 
         {/* 主要內容區域 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -488,27 +488,27 @@ export default function StudentProgressDashboard() {
                 {selectedAssessmentDate === getHKDateString() ? '今天' : selectedAssessmentDate} 學生評估狀態
               </h3>
               <div className="flex items-center gap-2">
-                <button
+            <button
                   className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                   onClick={() => setShowDatePicker(true)}
                 >
                   <CalendarIcon className="h-4 w-4" />
                   {selectedAssessmentDate}
-                </button>
+            </button>
                 <ExclamationTriangleIcon className="h-6 w-6 text-amber-400" />
-              </div>
-            </div>
-            
+          </div>
+        </div>
+
             {/* 載入動畫 */}
             {loadingStudents && (
               <div className="flex items-center justify-center py-8">
                 <div className="flex flex-col items-center gap-3">
                   <div className="relative">
                     <div className="w-12 h-12 border-4 border-[#EADBC8] border-t-[#A64B2A] rounded-full animate-spin"></div>
-                  </div>
+            </div>
                   <p className="text-sm text-hanami-text-secondary">載入學生資料中...</p>
-                </div>
-              </div>
+            </div>
+            </div>
             )}
 
             {/* 學生評估內容 */}
@@ -529,28 +529,28 @@ export default function StudentProgressDashboard() {
                               <div className="w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-400 rounded-full flex items-center justify-center shadow-sm">
                                 <span className="text-white text-xs font-bold">
                                   {student.full_name.charAt(0)}
-                                </span>
-                              </div>
+                </span>
+          </div>
                               <div>
                                 <p className="font-medium text-hanami-text text-sm">
                                   {student.full_name}
                                 </p>
                                 <p className="text-xs text-hanami-text-secondary">
                                   {student.course_type || '未設定課程'}
-                                </p>
-                              </div>
-                            </div>
+                        </p>
+                      </div>
+                        </div>
                             <div className="flex items-center gap-3 text-xs">
                               <span className="text-amber-600 bg-amber-100 px-2 py-1 rounded-full">
                                 {student.lesson_time || '時間未定'}
-                              </span>
+                          </span>
                               <span className="text-gray-500">
                                 最後評估: {student.last_assessment_date ? new Date(student.last_assessment_date).toLocaleDateString('zh-TW') : '從未評估'}
-                              </span>
-                            </div>
+                            </span>
+                          </div>
                           </div>
                           <div className="text-right">
-                            <button
+                        <button
                               className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-gradient-to-r from-amber-400 to-orange-400 text-white hover:from-amber-500 hover:to-orange-500 transition-all duration-200 shadow-sm"
                               onClick={() => {
                                 setSelectedStudentForAssessment(student);
@@ -559,25 +559,25 @@ export default function StudentProgressDashboard() {
                             >
                               <AcademicCapIcon className="w-3 h-3" />
                               新增評估
-                            </button>
-                          </div>
-                        </div>
+                        </button>
+                      </div>
+                    </div>
                       ))
                     ) : (
                       <div className="text-center py-4 text-hanami-text-secondary text-sm">
                         <StarIcon className="h-8 w-8 mx-auto mb-1 text-green-300" />
                         <p>所有學生都已評估</p>
                       </div>
-                    )}
-                  </div>
-                </div>
+        )}
+      </div>
+    </div>
 
                 {/* 已評估學生 */}
                 <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                     <h4 className="font-semibold text-hanami-text">已評估 ({studentsAssessed.length})</h4>
-                  </div>
+          </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {studentsAssessed.length > 0 ? (
                       studentsAssessed.map((student) => (
@@ -588,16 +588,16 @@ export default function StudentProgressDashboard() {
                                 <span className="text-white text-xs font-bold">
                                   {student.full_name.charAt(0)}
                                 </span>
-                              </div>
-                              <div>
+        </div>
+            <div>
                                 <p className="font-medium text-hanami-text text-sm">
                                   {student.full_name}
                                 </p>
                                 <p className="text-xs text-hanami-text-secondary">
                                   {student.course_type || '未設定課程'}
                                 </p>
-                              </div>
-                            </div>
+                    </div>
+                    </div>
                             <div className="flex items-center gap-3 text-xs">
                               <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full">
                                 {student.lesson_time || '時間未定'}
@@ -605,12 +605,12 @@ export default function StudentProgressDashboard() {
                               <span className="text-gray-500">
                                 已評估 ✓
                               </span>
-                            </div>
-                          </div>
+                    </div>
+                  </div>
                           <div className="text-right">
                             <span className="text-green-600 text-xs font-medium">已完成</span>
-                          </div>
-                        </div>
+              </div>
+            </div>
                       ))
                     ) : (
                       <div className="text-center py-4 text-hanami-text-secondary text-sm">
@@ -618,15 +618,15 @@ export default function StudentProgressDashboard() {
                         <p>沒有已評估的學生</p>
                       </div>
                     )}
-                  </div>
-                </div>
+                    </div>
+                          </div>
 
                 {/* 未分配成長樹學生 */}
                 <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-3 h-3 bg-red-400 rounded-full"></div>
                     <h4 className="font-semibold text-hanami-text">未分配成長樹 ({studentsNoTree.length})</h4>
-                  </div>
+                          </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {studentsNoTree.length > 0 ? (
                       studentsNoTree.map((student) => (
@@ -637,7 +637,7 @@ export default function StudentProgressDashboard() {
                                 <span className="text-white text-xs font-bold">
                                   {student.full_name.charAt(0)}
                                 </span>
-                              </div>
+                    </div>
                               <div>
                                 <p className="font-medium text-hanami-text text-sm">
                                   {student.full_name}
@@ -645,8 +645,8 @@ export default function StudentProgressDashboard() {
                                 <p className="text-xs text-hanami-text-secondary">
                                   {student.course_type || '未設定課程'}
                                 </p>
-                              </div>
-                            </div>
+                  </div>
+              </div>
                             <div className="flex items-center gap-3 text-xs">
                               <span className="text-red-600 bg-red-100 px-2 py-1 rounded-full">
                                 {student.lesson_time || '時間未定'}
@@ -654,31 +654,31 @@ export default function StudentProgressDashboard() {
                               <span className="text-gray-500">
                                 最後評估: {student.last_assessment_date ? new Date(student.last_assessment_date).toLocaleDateString('zh-TW') : '從未評估'}
                               </span>
-                            </div>
-                          </div>
+                </div>
+            </div>
                           <div className="text-right">
-                            <button
+                <button
                               className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-gradient-to-r from-red-400 to-rose-400 text-white hover:from-red-500 hover:to-rose-500 transition-all duration-200 shadow-sm"
-                              onClick={() => {
+                          onClick={() => {
                                 // 設置選中的學生並開啟成長樹分配模態視窗
                                 setSelectedStudentForTreeAssignment(student);
                                 setShowTreeAssignmentModal(true);
-                              }}
-                            >
+                          }}
+                        >
                               <TreePine className="w-3 h-3" />
                               分配成長樹
-                            </button>
-                          </div>
-                        </div>
+                        </button>
+                    </div>
+                  </div>
                       ))
                     ) : (
                       <div className="text-center py-4 text-hanami-text-secondary text-sm">
                         <TreePine className="h-8 w-8 mx-auto mb-1 text-gray-300" />
                         <p>所有學生都已分配成長樹</p>
-                      </div>
-                    )}
                   </div>
-                </div>
+                )}
+              </div>
+            </div>
               </>
             )}
           </HanamiCard>
@@ -690,7 +690,7 @@ export default function StudentProgressDashboard() {
                 最近能力評估記錄
               </h3>
               <div className="flex items-center gap-2">
-                <select
+            <select
                   className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
                   value={assessmentLimit}
                   onChange={(e) => setAssessmentLimit(Number(e.target.value))}
@@ -699,9 +699,9 @@ export default function StudentProgressDashboard() {
                   <option value={10}>10 筆</option>
                   <option value={20}>20 筆</option>
                   <option value={50}>50 筆</option>
-                </select>
-              </div>
-            </div>
+            </select>
+          </div>
+          </div>
             
             {/* 搜尋區域 */}
             <div className="mb-4">
@@ -715,7 +715,7 @@ export default function StudentProgressDashboard() {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {(searchQuery ? filteredAssessments : recentAssessments).map((assessment) => (
                 <div 
@@ -730,7 +730,7 @@ export default function StudentProgressDashboard() {
                           {assessment.student?.full_name?.charAt(0) || '?'}
                         </span>
                       </div>
-                      <div>
+                    <div>
                         <p className="font-medium text-hanami-text text-sm">
                           {assessment.student?.full_name || '未知學生'}
                         </p>
@@ -738,7 +738,7 @@ export default function StudentProgressDashboard() {
                           {assessment.tree?.tree_name || '未知成長樹'}
                         </p>
                       </div>
-                    </div>
+                      </div>
                     <div className="flex items-center gap-3 text-xs">
                       <span className="text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
                         {new Date(assessment.assessment_date).toLocaleDateString('zh-TW')}
@@ -747,25 +747,25 @@ export default function StudentProgressDashboard() {
                         評估完成 ✓
                       </span>
                     </div>
-                  </div>
+                    </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-gradient-to-r from-blue-400 to-indigo-400 text-white hover:from-blue-500 hover:to-indigo-500 transition-all duration-200 shadow-sm">
                       <AcademicCapIcon className="w-3 h-3" />
                       查看詳情
-                    </div>
-                  </div>
+                          </div>
+                          </div>
                 </div>
-              ))}
+                      ))}
               {((searchQuery ? filteredAssessments : recentAssessments).length === 0) && (
                 <div className="text-center py-8 text-hanami-text-secondary">
                   <AcademicCapIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                   <p>沒有找到符合條件的評估記錄</p>
+                  </div>
+                )}
                 </div>
-              )}
-            </div>
           </HanamiCard>
-        </div>
-      </div>
+              </div>
+            </div>
 
       {/* 能力評估模態視窗 */}
       {showAssessmentModal && (

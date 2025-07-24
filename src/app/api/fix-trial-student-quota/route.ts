@@ -1,33 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// 檢查環境變數
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('缺少必要的環境變數:', {
-    supabaseUrl: !!supabaseUrl,
-    supabaseServiceKey: !!supabaseServiceKey
-  });
-}
-
-const supabase = createClient(
-  supabaseUrl || '',
-  supabaseServiceKey || ''
-);
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
     console.log('開始修復試堂學生媒體配額問題...');
-
-    // 檢查環境變數
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return NextResponse.json(
-        { error: '缺少必要的環境變數配置' },
-        { status: 500 }
-      );
-    }
 
     // 檢查試堂學生是否有配額記錄
     const { data: trialStudents, error: trialError } = await supabase
