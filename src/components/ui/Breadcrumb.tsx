@@ -207,6 +207,7 @@ function getBreadcrumbLabel(segment: string, allSegments: string[], index: numbe
     'ai-select': 'AI 選擇',
     'hanami-tc': 'Hanami TC',
     'permissions': '權限管理',
+    'permission-management': '權限管理',
     'schema-scanner': '資料庫掃描',
     'tools': '工具',
     'removebg': '背景移除',

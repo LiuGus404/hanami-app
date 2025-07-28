@@ -1,6 +1,6 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-
 import { Database } from './database.types';
+import { checkPermission, PermissionCheck } from './permissionUtils';
 
 export type UserRole = 'admin' | 'teacher' | 'parent';
 
@@ -349,4 +349,51 @@ export function clearUserSession() {
 
 export function isUserLoggedIn(): boolean {
   return getUserSession() !== null;
+}
+
+// 新的權限檢查函數
+export async function checkUserPermission(
+  user_email: string,
+  resource_type: 'page' | 'feature' | 'data',
+  operation: 'view' | 'create' | 'edit' | 'delete',
+  resource_id?: string
+): Promise<boolean> {
+  try {
+    const check: PermissionCheck = {
+      user_email,
+      resource_type,
+      operation,
+      resource_id,
+    };
+
+    const result = await checkPermission(check);
+    return result.has_permission;
+  } catch (error) {
+    console.error('權限檢查錯誤:', error);
+    return false;
+  }
+}
+
+// 檢查頁面權限
+export async function checkPagePermission(user_email: string, page_path: string): Promise<boolean> {
+  return checkUserPermission(user_email, 'page', 'view', page_path);
+}
+
+// 檢查功能權限
+export async function checkFeaturePermission(
+  user_email: string, 
+  feature_name: string, 
+  operation: 'view' | 'create' | 'edit' | 'delete' = 'view'
+): Promise<boolean> {
+  return checkUserPermission(user_email, 'feature', operation, feature_name);
+}
+
+// 檢查資料權限
+export async function checkDataPermission(
+  user_email: string, 
+  data_type: string, 
+  operation: 'view' | 'create' | 'edit' | 'delete' = 'view',
+  resource_id?: string
+): Promise<boolean> {
+  return checkUserPermission(user_email, 'data', operation, resource_id || data_type);
 } 

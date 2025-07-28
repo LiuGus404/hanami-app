@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 
 import HanamiBadge from '@/components/ui/HanamiBadge';
-import HanamiButton from '@/components/ui/HanamiButton';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { HanamiButton } from '@/components/ui/HanamiButton';
+import { HanamiCard } from '@/components/ui/HanamiCard';
 import { supabase } from '@/lib/supabase';
 import { RegistrationRequest, RegistrationStatus, UserRole } from '@/types/auth';
 

@@ -18,8 +18,8 @@ import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'luci
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
-import HanamiButton from '@/components/ui/HanamiButton';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { HanamiButton } from '@/components/ui/HanamiButton';
+import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiSelect from '@/components/ui/HanamiSelect';
 import AbilityLevelManager from '@/components/admin/AbilityLevelManager';

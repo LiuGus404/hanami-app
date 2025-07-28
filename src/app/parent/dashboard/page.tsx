@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 
 import HanamiBadge from '@/components/ui/HanamiBadge';
-import HanamiButton from '@/components/ui/HanamiButton';
+import { HanamiButton } from '@/components/ui/HanamiButton';
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiDashboardLayout from '@/components/ui/HanamiDashboardLayout';
 import { getUserSession, clearUserSession } from '@/lib/authUtils';
 import { Database } from '@/lib/database.types';

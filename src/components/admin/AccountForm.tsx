@@ -4,8 +4,8 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useState, useEffect } from 'react';
 
 import AccountIcon from '@/components/ui/AccountIcon';
-import HanamiButton from '@/components/ui/HanamiButton';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { HanamiButton } from '@/components/ui/HanamiButton';
+import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiSelect from '@/components/ui/HanamiSelect';
 import { Database } from '@/lib/database.types';

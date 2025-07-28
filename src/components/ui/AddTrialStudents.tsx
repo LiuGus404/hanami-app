@@ -253,7 +253,7 @@ export default function TrialQueueForm() {
       notes: form.notes || null,
       status: '未試堂',
       created_at: now,
-      course_types: Array.isArray(form.course_types) ? form.course_types : null,
+      course_types: Array.isArray(form.course_types) ? JSON.stringify(form.course_types) : null,
     };
     
     // 只有在 student_id 不為空時才包含

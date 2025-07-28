@@ -41,7 +41,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
-      url: `${baseUrl}/admin/permissions`,
+      url: `${baseUrl}/admin/permission-management`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.6,

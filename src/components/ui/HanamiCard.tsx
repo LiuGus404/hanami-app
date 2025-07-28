@@ -9,7 +9,7 @@ interface HanamiCardProps {
   variant?: 'default' | 'hover' | 'interactive';
 }
 
-export default function HanamiCard({ 
+export function HanamiCard({ 
   children, 
   className = '', 
   onClick, 

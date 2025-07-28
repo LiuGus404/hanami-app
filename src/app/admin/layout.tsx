@@ -15,7 +15,7 @@ const setPageTitle = (pathname: string) => {
     '/admin': '管理面板 - Hanami 教育管理系統',
     '/admin/students': '學生管理 - Hanami 教育管理系統',
     '/admin/teachers': '老師管理 - Hanami 教育管理系統',
-    '/admin/permissions': '權限管理 - Hanami 教育管理系統',
+    '/admin/permission-management': '權限管理 - Hanami 教育管理系統',
     '/admin/hanami-tc': '課堂管理 - Hanami 教育管理系統',
     '/admin/ai-select': 'AI 助理 - Hanami 教育管理系統',
     '/admin/lesson-availability': '課堂空缺 - Hanami 教育管理系統',

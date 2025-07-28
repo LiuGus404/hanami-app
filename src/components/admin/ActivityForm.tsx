@@ -4,7 +4,7 @@ import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
-import HanamiButton from '@/components/ui/HanamiButton';
+import { HanamiButton } from '@/components/ui/HanamiButton';
 import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiSelect from '@/components/ui/HanamiSelect';
 import { PopupSelect } from '@/components/ui/PopupSelect';

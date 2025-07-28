@@ -1,8 +1,8 @@
 // Hanami UI 組件庫 - 統一導出文件
 
 // 基礎組件
-export { default as HanamiButton } from './HanamiButton';
-export { default as HanamiCard } from './HanamiCard';
+export { HanamiButton } from './HanamiButton';
+export { HanamiCard } from './HanamiCard';
 export { default as HanamiInput } from './HanamiInput';
 export { default as HanamiSelect } from './HanamiSelect';
 export { default as HanamiCalendar } from './HanamiCalendar';

@@ -13,7 +13,7 @@ interface HanamiButtonProps {
   animated?: boolean;
 }
 
-export default function HanamiButton({
+export function HanamiButton({
   children,
   onClick,
   variant = 'primary',

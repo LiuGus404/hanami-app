@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-import HanamiButton from './HanamiButton';
+import { HanamiButton } from './HanamiButton';
 import { PopupSelect } from './PopupSelect';
 import { FunnelIcon } from '@heroicons/react/24/outline';
 

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 
-import HanamiButton from '@/components/ui/HanamiButton';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { HanamiButton } from '@/components/ui/HanamiButton';
+import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
 import { supabase } from '@/lib/supabase';
 import { AbilityLevel } from '@/types/progress';

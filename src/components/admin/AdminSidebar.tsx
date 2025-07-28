@@ -44,11 +44,42 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
 
           <button
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/permissions')}
+            onClick={() => router.push('/admin/permission-management')}
           >
             <span className="mr-2 text-lg">👥</span>
             帳戶管理
           </button>
+
+          <button
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+              onClick={() => router.push('/admin/permission-management')}
+            >
+              <span className="mr-2 text-lg">🔐</span>
+              權限管理
+            </button>
+            <button
+              className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+              onClick={() => router.push('/admin/permission-test')}
+            >
+              <span className="mr-2 text-lg">🧪</span>
+              權限測試
+            </button>
+            
+            <button
+              className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+              onClick={() => router.push('/admin/permission-integration-test')}
+            >
+              <span className="mr-2 text-lg">🔗</span>
+              權限整合測試
+            </button>
+            
+            <button
+              className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+              onClick={() => router.push('/admin/rls-policy-test')}
+            >
+              <span className="mr-2 text-lg">🛡️</span>
+              RLS政策測試
+            </button>
 
           <button
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
@@ -156,6 +187,14 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
 
           <button
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
+            onClick={() => router.push('/admin/rls-checker')}
+          >
+            <span className="mr-2 text-lg">🔒</span>
+            RLS 權限檢查
+          </button>
+
+          <button
+            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
             onClick={() => {
               router.back();
               setTimeout(() => window.location.reload(), 500);
@@ -182,5 +221,3 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
     </div>
   );
 }
-
-// ⚠️ 請記得在 /app/(admin)/layout.tsx 或根目錄的 layout.tsx 中引入 <AdminSidebar isLoggedIn={true} /> 元件，確保它出現在所有頁面中。

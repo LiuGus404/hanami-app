@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { PlusIcon, TrashIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 
-import HanamiButton from '@/components/ui/HanamiButton';
-import HanamiCard from '@/components/ui/HanamiCard';
+import { HanamiButton } from '@/components/ui/HanamiButton';
+import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
 import { supabase } from '@/lib/supabase';
 
