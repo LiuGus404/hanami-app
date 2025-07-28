@@ -1195,9 +1195,9 @@ function RoleForm({
             調試信息 (點擊展開)
           </summary>
           <div className="p-3 bg-gray-100 rounded-lg text-xs font-mono">
-            <div><strong>當前角色ID:</strong> {formData.role_id}</div>
-            <div><strong>角色權限:</strong> {JSON.stringify(getRolePermissions(formData.role_id), null, 2)}</div>
-            <div><strong>自定義權限:</strong> {JSON.stringify(formData.custom_permissions, null, 2)}</div>
+            <div><strong>角色名稱:</strong> {formData.role_name}</div>
+            <div><strong>顯示名稱:</strong> {formData.display_name}</div>
+            <div><strong>角色權限:</strong> {JSON.stringify(formData.permissions, null, 2)}</div>
           </div>
         </details>
       </div>
@@ -1381,7 +1381,7 @@ function PermissionForm({
         </label>
         <HanamiInput
           value={formData.user_email}
-          onChange={(value) => setFormData({ ...formData, user_email: value })}
+          onChange={(e) => setFormData({ ...formData, user_email: e.target.value })}
           placeholder="user@example.com"
           type="email"
           required
@@ -1394,7 +1394,7 @@ function PermissionForm({
         </label>
         <HanamiInput
           value={formData.user_phone}
-          onChange={(value) => setFormData({ ...formData, user_phone: value })}
+          onChange={(e) => setFormData({ ...formData, user_phone: e.target.value })}
           placeholder="+886 912 345 678"
         />
       </div>

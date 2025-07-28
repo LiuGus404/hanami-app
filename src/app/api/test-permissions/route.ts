@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
   try {
     // 測試1: 檢查環境變數
     const envCheck = {
+      success: !!supabaseUrl && !!supabaseServiceKey,
       supabaseUrl: !!supabaseUrl,
       supabaseServiceKey: !!supabaseServiceKey,
     };
@@ -66,7 +67,7 @@ async function checkPermissionTables() {
     }
 
     // 檢查權限相關表
-    const permissionTables = allHanamiTables?.filter(table => 
+    const permissionTables = allHanamiTables?.filter((table: any) => 
       table.table_name.includes('permission')
     ) || [];
 
@@ -81,9 +82,9 @@ async function checkPermissionTables() {
       'hanami_permission_configs'
     ];
 
-    const foundTables = permissionTables.map(row => row.table_name);
-    const missingTables = expectedTables.filter(table => !foundTables.includes(table));
-    const allHanamiTableNames = allHanamiTables?.map(row => row.table_name) || [];
+    const foundTables = permissionTables.map((row: any) => row.table_name);
+    const missingTables = expectedTables.filter((table: any) => !foundTables.includes(table));
+    const allHanamiTableNames = allHanamiTables?.map((row: any) => row.table_name) || [];
 
     return {
       success: missingTables.length === 0,

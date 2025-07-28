@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
       
       results.push({
         test_name: '權限檢查觸發器檢查',
-        success: hasTrigger,
+        success: !!hasTrigger,
         message: hasTrigger ? '學生權限檢查觸發器已創建' : '學生權限檢查觸發器未創建或未正常工作',
         details: {
           trigger_exists: hasTrigger,
