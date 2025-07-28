@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 獲取用戶權限記錄
-    const { data: userPermission, error: userError } = await (supabase as any)
+    const { data: userPermission, error: userError } = await supabase
       .from('hanami_user_permissions_v2')
       .select(`
         *,

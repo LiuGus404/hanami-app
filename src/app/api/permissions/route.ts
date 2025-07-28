@@ -120,7 +120,7 @@ async function getUserPermissions(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userEmail = searchParams.get('user_email');
 
-  let query = (supabase as any)
+  let query = supabase
     .from('hanami_user_permissions_v2')
     .select(`
       *,
@@ -246,7 +246,7 @@ async function updateRole(data: any) {
 }
 
 async function createUserPermission(data: any) {
-  const { data: result, error } = await (supabase as any)
+  const { data: result, error } = await supabase
     .from('hanami_user_permissions_v2')
     .insert(data)
     .select()
@@ -264,7 +264,7 @@ async function createUserPermission(data: any) {
 async function updateUserPermission(data: any) {
   const { id, ...updateData } = data;
 
-  const { data: result, error } = await (supabase as any)
+  const { data: result, error } = await supabase
     .from('hanami_user_permissions_v2')
     .update(updateData)
     .eq('id', id)
@@ -332,7 +332,7 @@ async function approveApplication(data: any) {
   if (applicationError) throw applicationError;
 
   // 創建用戶權限記錄
-  const { error: permissionError } = await (supabase as any)
+  const { error: permissionError } = await supabase
     .from('hanami_user_permissions_v2')
     .insert({
       user_email: application.applicant_email,
@@ -414,7 +414,7 @@ async function deleteRole(id: string) {
 }
 
 async function deleteUserPermission(id: string) {
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('hanami_user_permissions_v2')
     .delete()
     .eq('id', id);

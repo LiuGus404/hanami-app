@@ -13,9 +13,6 @@ interface RegistrationRequest {
   additional_info: any;
   created_at: string;
   updated_at: string;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
-  rejection_reason: string | null;
 }
 
 export default function RegistrationRequestsPage() {

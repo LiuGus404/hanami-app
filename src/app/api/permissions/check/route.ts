@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 獲取用戶權限記錄
-    const { data: userPermissions, error: permissionError } = await (supabase as any)
+    const { data: userPermissions, error: permissionError } = await supabase
       .from('hanami_user_permissions_v2')
       .select(`
         *,

@@ -259,12 +259,12 @@ export default function StudentSelector({
           setCourseTypes(data.map((course: any) => course.name).filter(Boolean));
         } else {
           // 如果 API 失敗，使用學生數據中的課程類型作為備用
-          setCourseTypes(getUniqueValues('course_type').map(String).filter(Boolean));
+          setCourseTypes(getUniqueValues('course_type'));
         }
       } catch (error) {
         console.error('載入課程類型失敗:', error);
         // 使用學生數據中的課程類型作為備用
-        setCourseTypes(getUniqueValues('course_type').map(String).filter(Boolean));
+        setCourseTypes(getUniqueValues('course_type'));
       }
     };
     
@@ -292,7 +292,7 @@ export default function StudentSelector({
           </div>
           <HanamiInput
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={setSearchQuery}
             placeholder="搜尋姓名、暱稱、電話或郵箱..."
             type="text"
             className="pl-10"
@@ -458,7 +458,7 @@ export default function StudentSelector({
                       </div>
                       <div className="flex items-center gap-3 text-xs">
                         <span className="text-[#4B4036] bg-[#FFD59A] px-2 py-1 rounded-full">
-                          {student.course_type} • {convertMonthsToAge(student.student_age ?? null)} • {student.gender}
+                          {student.course_type} • {convertMonthsToAge(student.student_age)} • {student.gender}
                         </span>
                         {student.regular_weekday !== undefined && student.regular_weekday !== null && (
                           <span className="text-[#2B3A3B]">

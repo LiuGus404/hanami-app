@@ -247,8 +247,7 @@ export function usePermissionGuard() {
     setLoading(prev => ({ ...prev, [key]: true }));
     
     try {
-      const { checkPermission: checkPermissionFn } = await import('@/lib/permissionUtils');
-      const result = await checkPermissionFn(check);
+      const result = await checkPermission(check);
       setPermissionStates(prev => ({ ...prev, [key]: result.has_permission }));
       return result.has_permission;
     } catch (error) {

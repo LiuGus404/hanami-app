@@ -39,16 +39,9 @@ export async function GET(request: NextRequest) {
     }
 
     // 檢查 RLS 政策
-    let policies = null;
-    let policiesError = null;
-    try {
-      const result = await supabase
-        .rpc('get_table_policies', { table_name: 'registration_requests' });
-      policies = result.data;
-      policiesError = result.error;
-    } catch (error) {
-      policiesError = { message: '無法獲取 RLS 政策' };
-    }
+    const { data: policies, error: policiesError } = await supabase
+      .rpc('get_table_policies', { table_name: 'registration_requests' })
+      .catch(() => ({ data: null, error: { message: '無法獲取 RLS 政策' } }));
 
     return NextResponse.json({
       success: true,
