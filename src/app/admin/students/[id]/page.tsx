@@ -37,6 +37,12 @@ export default function StudentDetailPage() {
   const currentIdRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
 
+  // 處理返回按鈕
+  const handleBack = () => {
+    // 直接返回，讓 usePageState 自動處理狀態恢復
+    router.back();
+  };
+
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
     if (loading || !user) return;
@@ -312,6 +318,16 @@ export default function StudentDetailPage() {
   return (
     <div className="min-h-screen bg-[#FFF9F2] p-6">
       <div className="max-w-4xl mx-auto">
+        {/* 返回按鈕 */}
+        <div className="mb-6">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors"
+          >
+            <span>←</span>
+            <span>返回學生管理</span>
+          </button>
+        </div>
         {/* 停用學生警告 */}
         {isInactiveStudent && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">

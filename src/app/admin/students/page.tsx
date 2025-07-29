@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
 import HanamiInput from '@/components/ui/HanamiInput';
 import Calendarui from '@/components/ui/Calendarui';
+import { usePageState } from '@/hooks/usePageState';
 
 // 新增一個 hook：useStudentRemainingLessons
 function useStudentRemainingLessons(studentId: string | undefined) {
@@ -55,55 +56,146 @@ const fetchStudentsWithLessons = async (body: any) => {
 };
 
 export default function StudentManagementPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const filterParam = searchParams.get('filter');
   
+  // 使用 usePageState 管理頁面狀態
+  const { state: pageState, updateState: updatePageState } = usePageState<{
+    selectedCourses: string[];
+    selectedWeekdays: string[];
+    selectedLessonFilter: 'all' | 'gt2' | 'lte2' | 'lte1' | 'custom';
+    customLessonCount: number | '';
+    searchTerm: string;
+    displayMode: 'grid' | 'list';
+    pageSize: number;
+    currentPage: number;
+    selectedColumns: string[];
+    sortField: string;
+    sortDirection: 'asc' | 'desc';
+  }>({
+    selectedCourses: [],
+    selectedWeekdays: [],
+    selectedLessonFilter: 'all',
+    customLessonCount: '',
+    searchTerm: '',
+    displayMode: 'list',
+    pageSize: 20,
+    currentPage: 1,
+    selectedColumns: [
+      'student_oid',
+      'full_name',
+      'student_age',
+      'student_type',
+      'course_type',
+      'regular_weekday',
+      'regular_timeslot',
+      'remaining_lessons',
+      'contact_number',
+      'health_notes',
+    ],
+    sortField: '',
+    sortDirection: 'asc',
+  }, {
+    key: 'studentManagement',
+    persistTo: 'sessionStorage',
+    debounceMs: 500
+  });
+
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
-  const [selectedCourses, setSelectedCourses] = useState<string[]>(() => {
-    if (filterParam === 'regular') return ['常規'];
-    if (filterParam === 'trial') return ['試堂'];
-    if (filterParam === 'inactive') return ['停用學生'];
-    return [];
-  });
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  // 移除 inactiveStudents 狀態，統一使用 API 查詢的資料
-  // const [inactiveStudents, setInactiveStudents] = useState<any[]>([]);
-  const [selectedWeekdays, setSelectedWeekdays] = useState<string[]>([]);
   const [weekdayDropdownOpen, setWeekdayDropdownOpen] = useState(false);
-  const [selectedLessonFilter, setSelectedLessonFilter] = useState<'all' | 'gt2' | 'lte2' | 'lte1' | 'custom'>(() => {
-    if (filterParam === 'lastLesson') return 'lte1';
-    return 'all';
-  });
-  const [customLessonCount, setCustomLessonCount] = useState<number | ''>(() => {
-    if (filterParam === 'lastLesson') return 1;
-    return '';
-  });
   const [lessonDropdownOpen, setLessonDropdownOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
-  const [pageSize, setPageSize] = useState(20);
-  const [currentPage, setCurrentPage] = useState(1);
   const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false);
   const [columnSelectorOpen, setColumnSelectorOpen] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'student_oid',
-    'full_name',
-    'student_age',
-    'student_type',
-    'course_type',
-    'regular_weekday',
-    'regular_timeslot',
-    'remaining_lessons',
-    'contact_number',
-    'health_notes',
-  ]);
 
-  // 排序相關狀態
-  const [sortField, setSortField] = useState<string>('');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  // 從 pageState 中提取狀態
+  const {
+    selectedCourses,
+    selectedWeekdays,
+    selectedLessonFilter,
+    customLessonCount,
+    searchTerm,
+    displayMode,
+    pageSize,
+    currentPage,
+    selectedColumns,
+    sortField,
+    sortDirection
+  } = pageState;
 
-  const router = useRouter();
+  // 更新狀態的函數
+  const handleSelectedCoursesChange = useCallback((courses: string[]) => {
+    updatePageState({ selectedCourses: courses });
+    setApiFilter(prev => ({
+      ...prev,
+      selectedCourses: courses
+    }));
+  }, [updatePageState]);
+  
+  const handleSelectedWeekdaysChange = useCallback((weekdays: string[]) => {
+    updatePageState({ selectedWeekdays: weekdays });
+    setApiFilter(prev => ({
+      ...prev,
+      selectedWeekdays: weekdays
+    }));
+  }, [updatePageState]);
+  
+  const handleSelectedDatesChange = useCallback((dates: Date[]) => {
+    setSelectedDates(dates);
+    setApiFilter(prev => ({
+      ...prev,
+      selectedDates: dates.map(d => d.toLocaleDateString('sv-SE'))
+    }));
+  }, []);
+  
+  const handleSearchTermChange = useCallback((term: string) => {
+    updatePageState({ searchTerm: term });
+    setApiFilter(prev => ({
+      ...prev,
+      searchTerm: term
+    }));
+  }, [updatePageState]);
+
+  const handleDisplayModeChange = useCallback((mode: 'grid' | 'list') => {
+    updatePageState({ displayMode: mode });
+  }, [updatePageState]);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    updatePageState({ pageSize: size, currentPage: 1 });
+  }, [updatePageState]);
+
+  const handleCurrentPageChange = useCallback((page: number) => {
+    updatePageState({ currentPage: page });
+  }, [updatePageState]);
+
+  const handleSelectedColumnsChange = useCallback((columns: string[]) => {
+    // 確保基本欄位始終被選中
+    const newSelected = columns;
+    if (!newSelected.includes('student_oid')) newSelected.push('student_oid');
+    if (!newSelected.includes('full_name')) newSelected.push('full_name');
+    if (!newSelected.includes('student_age')) newSelected.push('student_age');
+    updatePageState({ selectedColumns: newSelected });
+  }, [updatePageState]);
+
+  const handleSort = useCallback((field: string) => {
+    if (sortField === field) {
+      // 如果點擊的是同一個欄位，切換排序方向
+      const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      updatePageState({ sortDirection: newDirection });
+    } else {
+      // 如果點擊的是新欄位，設置為升序
+      updatePageState({ sortField: field, sortDirection: 'asc' });
+    }
+  }, [sortField, sortDirection, updatePageState]);
+
+  // 處理導航到學生詳細資料
+  const handleNavigateToStudent = useCallback((studentId: string) => {
+    // 導航到學生詳細資料頁面
+    router.push(`/admin/students/${studentId}`);
+  }, [router]);
+
   const { user, loading: userLoading } = useUser();
   const { id } = useParams();
 
@@ -141,7 +233,7 @@ export default function StudentManagementPage() {
   const [remainingLoading, setRemainingLoading] = useState(false);
 
   const [searchInput, setSearchInput] = useState(''); // 用於輸入框
-  const [searchQuery, setSearchQuery] = useState(''); // 真正觸發搜尋的值
+  const searchQuery = searchTerm; // 使用 pageState 中的 searchTerm
 
   // AI 訊息相關狀態
   const [showAIMessageModal, setShowAIMessageModal] = useState(false);
@@ -160,79 +252,31 @@ export default function StudentManagementPage() {
     selectedWeekdays: string[];
     searchTerm: string;
   };
-  const [apiFilter, setApiFilter] = useState<ApiFilter>(() => {
-    const initialCourses = (() => {
-      if (filterParam === 'regular') return ['常規'];
-      if (filterParam === 'trial') return ['試堂'];
-      if (filterParam === 'inactive') return ['停用學生'];
-      return [];
-    })();
-    return {
-      selectedDates: [],
-      selectedCourses: initialCourses,
-      selectedWeekdays: [],
-      searchTerm: '',
-    };
+
+  const [apiFilter, setApiFilter] = useState<ApiFilter>({
+    selectedDates: [],
+    selectedCourses: selectedCourses,
+    selectedWeekdays: selectedWeekdays,
+    searchTerm: searchTerm,
   });
 
-  // 當 filterParam 變化時更新 apiFilter
+  // 當用戶變化時重置防抖狀態
   useEffect(() => {
-    const initialCourses = (() => {
-      if (filterParam === 'regular') return ['常規'];
-      if (filterParam === 'trial') return ['試堂'];
-      if (filterParam === 'inactive') return ['停用學生'];
-      return [];
-    })();
-    
-    setApiFilter(prev => ({
-      ...prev,
-      selectedCourses: initialCourses
-    }));
-  }, [filterParam]);
+    if (user) {
+      dataFetchedRef.current = false;
+      loadingRef.current = false;
+    }
+  }, [user]);
 
-  // 監控篩選條件變化，自動查詢API
-  // useEffect(() => {
-  //   setApiFilter({
-  //     selectedDates: selectedDates.map(d => d.toLocaleDateString('sv-SE')),
-  //     selectedCourses,
-  //     selectedWeekdays,
-  //     searchTerm,
-  //   });
-  // }, [selectedDates, selectedCourses, selectedWeekdays, searchTerm]);
-
-  // 改為每次 filter 變動時直接 setApiFilter
-  const handleSelectedCoursesChange = useCallback((courses: string[]) => {
-    // 允許同時選擇常規和試堂學生
-    setSelectedCourses(courses);
+  // 同步 pageState 到 apiFilter
+  useEffect(() => {
     setApiFilter(prev => ({
       ...prev,
-      selectedCourses: courses
+      selectedCourses: selectedCourses,
+      selectedWeekdays: selectedWeekdays,
+      searchTerm: searchTerm,
     }));
-  }, []);
-  
-  const handleSelectedWeekdaysChange = useCallback((weekdays: string[]) => {
-    setSelectedWeekdays(weekdays);
-    setApiFilter(prev => ({
-      ...prev,
-      selectedWeekdays: weekdays
-    }));
-  }, []);
-  
-  const handleSelectedDatesChange = useCallback((dates: Date[]) => {
-    setSelectedDates(dates);
-    setApiFilter(prev => ({
-      ...prev,
-      selectedDates: dates.map(d => d.toLocaleDateString('sv-SE'))
-    }));
-  }, []);
-  
-  const handleSearchTermChange = useCallback((term: string) => {
-    setSearchTerm(term);
-    setApiFilter(prev => ({
-      ...prev,
-      searchTerm: term
-    }));
-  }, []);
+  }, [selectedCourses, selectedWeekdays, searchTerm]);
 
   // 使用 SWR 進行資料獲取
   const { data: apiData, error: apiError, isValidating } = useSWR(
@@ -255,13 +299,7 @@ export default function StudentManagementPage() {
     }
   }, [user, userLoading, router]);
 
-  // 當用戶變化時重置防抖狀態
-  useEffect(() => {
-    if (user) {
-      dataFetchedRef.current = false;
-      loadingRef.current = false;
-    }
-  }, [user]);
+
 
   // 計算剩餘堂數 - 不受篩選條件影響，直接查詢所有常規學生
   useEffect(() => {
@@ -1278,17 +1316,7 @@ export default function StudentManagementPage() {
     return result;
   }, [filteredStudents, sortField, sortDirection, selectedCourses]);
 
-  // 排序功能
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      // 如果點擊的是同一個欄位，切換排序方向
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      // 如果點擊的是新欄位，設置為升序
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+  // 排序功能已經在 usePageState 中處理
 
   // 獲取排序圖標
   const getSortIcon = (field: string) => {
@@ -1325,9 +1353,38 @@ export default function StudentManagementPage() {
   // 確保當前頁數不超過總頁數
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
+      handleCurrentPageChange(1);
     }
-  }, [totalPages]); // 移除 currentPage 依賴，避免無窮迴圈
+  }, [totalPages, currentPage, handleCurrentPageChange]); // 移除 currentPage 依賴，避免無窮迴圈
+
+  // 處理 URL 參數的初始狀態設置
+  useEffect(() => {
+    if (filterParam) {
+      const initialCourses = (() => {
+        if (filterParam === 'regular') return ['常規'];
+        if (filterParam === 'trial') return ['試堂'];
+        if (filterParam === 'inactive') return ['停用學生'];
+        return [];
+      })();
+      
+      const initialLessonFilter = (() => {
+        if (filterParam === 'lastLesson') return 'lte1';
+        return 'all';
+      })();
+      
+      const initialCustomLessonCount = (() => {
+        if (filterParam === 'lastLesson') return 1;
+        return '';
+      })();
+      
+      // 只有在沒有恢復狀態時才設置 URL 參數的初始值
+      updatePageState({
+        selectedCourses: initialCourses,
+        selectedLessonFilter: initialLessonFilter,
+        customLessonCount: initialCustomLessonCount,
+      });
+    }
+  }, [filterParam, updatePageState]);
 
   return (
     <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
@@ -1481,8 +1538,7 @@ export default function StudentManagementPage() {
                 <button
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                   onClick={() => {
-                    setSearchQuery(searchInput);
-                  handleSearchTermChange(searchInput);
+                    handleSearchTermChange(searchInput);
                 }}
               >
                 <svg
@@ -1503,7 +1559,6 @@ export default function StudentManagementPage() {
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {
-                    setSearchQuery(searchInput);
                     handleSearchTermChange(searchInput);
                     if (e.preventDefault) e.preventDefault();
                   }
@@ -1614,7 +1669,7 @@ export default function StudentManagementPage() {
                   selected={selectedLessonFilter}
                   title="篩選剩餘堂數"
                   onCancel={() => { console.log('父層 cancel'); setLessonDropdownOpen(false); }}
-                  onChange={(value) => setSelectedLessonFilter(value as any)}
+                  onChange={(value) => updatePageState({ selectedLessonFilter: value as any })}
                   onConfirm={() => { console.log('父層 confirm'); setLessonDropdownOpen(false); }}
                 />
               )}
@@ -1624,7 +1679,7 @@ export default function StudentManagementPage() {
                   placeholder="數字"
                   type="number"
                   value={customLessonCount}
-                  onChange={(e) => setCustomLessonCount(Number(e.target.value))}
+                  onChange={(e) => updatePageState({ customLessonCount: Number(e.target.value) })}
                 />
               )}
             </div>
@@ -1656,7 +1711,7 @@ export default function StudentManagementPage() {
             <div className="mb-4">
               <button
                 className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
-                onClick={() => setDisplayMode(displayMode === 'grid' ? 'list' : 'grid')}
+                onClick={() => handleDisplayModeChange(displayMode === 'grid' ? 'list' : 'grid')}
               >
                 {displayMode === 'grid' ? (
                   <>
@@ -1682,13 +1737,15 @@ export default function StudentManagementPage() {
                 <button
                   className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
                   onClick={() => {
-                    setSelectedCourses([]);
-                    setSelectedWeekdays([]);
-                    setSelectedLessonFilter('all');
-                    setCustomLessonCount('');
+                    updatePageState({
+                      selectedCourses: [],
+                      selectedWeekdays: [],
+                      selectedLessonFilter: 'all',
+                      customLessonCount: '',
+                      searchTerm: '',
+                    });
                     setSelectedDates([]);
                     setSearchInput('');
-                    setSearchQuery('');
                     // 同時清除 API 篩選狀態
                     setApiFilter({
                       selectedDates: [],
@@ -1793,8 +1850,7 @@ export default function StudentManagementPage() {
                 title="選擇顯示數量"
                 onCancel={() => { console.log('父層 cancel'); setPageSizeDropdownOpen(false); }}
                 onChange={(value) => {
-                  setPageSize(value === 'all' ? Infinity : Number(value));
-                  setCurrentPage(1);
+                  handlePageSizeChange(value === 'all' ? Infinity : Number(value));
                 }}
                 onConfirm={() => { console.log('父層 confirm'); setPageSizeDropdownOpen(false); }}
               />
@@ -1829,7 +1885,7 @@ export default function StudentManagementPage() {
                   if (!newSelected.includes('student_oid')) newSelected.push('student_oid');
                   if (!newSelected.includes('full_name')) newSelected.push('full_name');
                   if (!newSelected.includes('student_age')) newSelected.push('student_age');
-                  setSelectedColumns(newSelected);
+                  updatePageState({ selectedColumns: newSelected });
                 }}
                 onConfirm={() => { console.log('父層 confirm'); setColumnSelectorOpen(false); }}
               />
@@ -1843,7 +1899,7 @@ export default function StudentManagementPage() {
                       : 'text-[#2B3A3B] hover:bg-[#FFF9F2]'
                   }`}
                   disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  onClick={() => handleCurrentPageChange(Math.max(1, currentPage - 1))}
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
@@ -1857,7 +1913,7 @@ export default function StudentManagementPage() {
                       : 'text-[#2B3A3B] hover:bg-[#FFF9F2]'
                   }`}
                   disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  onClick={() => handleCurrentPageChange(Math.min(totalPages, currentPage + 1))}
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
@@ -1968,7 +2024,7 @@ export default function StudentManagementPage() {
                             e.stopPropagation();
                             // 對於停用學生，使用 inactive_student_list 的 ID
                             const studentId = isInactiveStudent ? student.id : student.id;
-                            router.push(`/admin/students/${studentId}`);
+                            handleNavigateToStudent(studentId);
                           }}
                         >
                           <img
@@ -2320,7 +2376,7 @@ export default function StudentManagementPage() {
                                     e.stopPropagation();
                                     // 對於停用學生，使用 inactive_student_list 的 ID
                                     const studentId = student.is_inactive ? student.id : student.id;
-                                    router.push(`/admin/students/${studentId}`);
+                                    handleNavigateToStudent(studentId);
                                   }}
                                 >
                                   <img

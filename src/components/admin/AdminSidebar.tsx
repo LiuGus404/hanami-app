@@ -1,7 +1,6 @@
 'use client';
 
 import { ChevronUp, X } from 'lucide-react';
-import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 
@@ -13,6 +12,17 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
   const pathname = usePathname();
 
   if (pathname === '/admin/login') return null;
+
+  const handleGoBack = () => {
+    // 檢查是否有上一頁的歷史記錄
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      // 如果沒有歷史記錄，回到管理員首頁
+      router.push('/admin');
+    }
+  };
+
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end space-y-3">
       <button
@@ -25,180 +35,8 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
       {open && (
         <>
           <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFD59A] text-[#2B3A3B] text-sm font-semibold shadow border-2 border-[#EAC29D]"
-            onClick={() => router.push('/admin')}
-          >
-            <Image alt="管理面板" className="mr-2 w-6 h-6" height={24} src="/owlui.png" width={24} />
-            管理面板
-          </button>
-
-          {pathname?.startsWith('/admin/students') && (
-            <button
-              className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-              onClick={() => router.push('/admin/students/new')}
-            >
-              <Image alt="新增學生" className="mr-2 w-6 h-6" height={24} src="/boy.png" width={24} />
-              新增學生
-            </button>
-          )}
-
-          <button
             className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/permission-management')}
-          >
-            <span className="mr-2 text-lg">👥</span>
-            帳戶管理
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-              onClick={() => router.push('/admin/permission-management')}
-            >
-              <span className="mr-2 text-lg">🔐</span>
-              權限管理
-            </button>
-            <button
-              className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-              onClick={() => router.push('/admin/permission-test')}
-            >
-              <span className="mr-2 text-lg">🧪</span>
-              權限測試
-            </button>
-            
-            <button
-              className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-              onClick={() => router.push('/admin/permission-integration-test')}
-            >
-              <span className="mr-2 text-lg">🔗</span>
-              權限整合測試
-            </button>
-            
-            <button
-              className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-              onClick={() => router.push('/admin/rls-policy-test')}
-            >
-              <span className="mr-2 text-lg">🛡️</span>
-              RLS政策測試
-            </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/registration-requests')}
-          >
-            <span className="mr-2 text-lg">📝</span>
-            註冊申請
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/ai-select')}
-          >
-            <Image alt="AI Chatbot" className="mr-2 w-6 h-6" height={24} src="/foxcat.png" width={24} />
-            AI Chatbot
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/control')}
-          >
-            <Image alt="AI 任務列表" className="mr-2 w-6 h-6" height={24} src="/owlui.png" width={24} />
-            AI 任務列表
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/class-management')}
-          >
-            <Image alt="班別管理" className="mr-2 w-6 h-6" height={24} src="/icons/book-elephant.PNG" width={24} />
-            班別管理
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/schedule-management')}
-          >
-            <Image alt="管理課程" className="mr-2 w-6 h-6" height={24} src="/icons/clock.PNG" width={24} />
-            管理課程
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/lesson-availability')}
-          >
-            <Image alt="課堂空缺" className="mr-2 w-6 h-6" height={24} src="/rabbit.png" width={24} />
-            課堂空缺
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/student-progress')}
-          >
-            <Image alt="學生進度" className="mr-2 w-6 h-6" height={24} src="/icons/book-elephant.PNG" width={24} />
-            進度儀表板
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/student-progress/growth-trees')}
-          >
-            <span className="mr-2 text-lg">🌳</span>
-            成長樹管理
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/student-progress/abilities')}
-          >
-            <span className="mr-2 text-lg">📊</span>
-            發展能力圖卡
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/student-progress/activities')}
-          >
-            <span className="mr-2 text-lg">🎮</span>
-            教學活動管理
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/student-progress/ability-assessments')}
-          >
-            <span className="mr-2 text-lg">📋</span>
-            能力評估管理
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/student-progress/student-media')}
-          >
-            <span className="mr-2 text-lg">📹</span>
-            學生媒體管理
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/ai-message-history')}
-          >
-            <span className="mr-2 text-lg">💬</span>
-            AI 訊息記錄
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => router.push('/admin/rls-checker')}
-          >
-            <span className="mr-2 text-lg">🔒</span>
-            RLS 權限檢查
-          </button>
-
-          <button
-            className="flex items-center px-5 py-3 rounded-xl bg-[#FFF3E0] text-[#2B3A3B] text-sm font-semibold shadow"
-            onClick={() => {
-              router.back();
-              setTimeout(() => window.location.reload(), 500);
-            }}
+            onClick={handleGoBack}
           >
             <span className="mr-2 text-lg">←</span>
             上一頁
