@@ -1,67 +1,78 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-import { supabase } from '@/lib/supabase';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-export async function GET() {
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+export async function GET(request: NextRequest) {
   try {
-    // 嘗試獲取 hanami_growth_trees 資料表的所有資料
-    const { data: treesData, error: treesError } = await supabase
-      .from('hanami_growth_trees')
-      .select('*')
-      .limit(1);
+    const { searchParams } = new URL(request.url);
+    const table = searchParams.get('table');
+    const email = searchParams.get('email');
 
-    if (treesError) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '無法獲取成長樹資料',
-        details: treesError,
-      });
+    if (!table || !email) {
+      return NextResponse.json({
+        error: '缺少必要參數: table, email'
+      }, { status: 400 });
     }
 
-    // 嘗試插入一個簡單的測試記錄
-    const testTreeData = {
-      tree_name: '測試成長樹',
-      tree_description: '這是一個測試成長樹',
-      tree_icon: '🌳',
-      course_type: 'test-course-id',
-      tree_level: 1,
-      is_active: true,
-    };
+    let query;
+    let emailField;
 
-    const { data: insertData, error: insertError } = await supabase
-      .from('hanami_growth_trees')
-      .insert([testTreeData])
-      .select()
-      .single();
-
-    if (insertError) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '插入測試資料失敗',
-        details: insertError,
-        testData: testTreeData,
-        existingData: treesData,
-      });
+    switch (table) {
+      case 'hanami_admin':
+        emailField = 'admin_email';
+        break;
+      case 'hanami_employee':
+        emailField = 'teacher_email';
+        break;
+      case 'Hanami_Students':
+        // 學生表可能有多個郵箱欄位
+        query = supabase
+          .from(table)
+          .select('*')
+          .or(`student_email.eq.${email},parent_email.eq.${email}`);
+        break;
+      default:
+        return NextResponse.json({
+          error: '不支援的表名'
+        }, { status: 400 });
     }
 
-    // 刪除測試資料
-    await supabase
-      .from('hanami_growth_trees')
-      .delete()
-      .eq('id', insertData.id);
+    if (!query) {
+      if (emailField) {
+        query = supabase
+          .from(table)
+          .select('*')
+          .eq(emailField, email);
+      } else {
+        query = supabase
+          .from(table)
+          .select('*');
+      }
+    }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: '測試成功',
-      insertedData: insertData,
-      existingData: treesData,
+    const { data, error } = await query;
+
+    if (error) {
+      console.error(`查詢 ${table} 表錯誤:`, error);
+      return NextResponse.json({
+        error: `查詢失敗: ${error.message}`
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: data || [],
+      count: data?.length || 0
     });
 
-  } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
-      error: '測試失敗',
-      details: error,
-    });
+  } catch (error: any) {
+    console.error('測試API錯誤:', error);
+    return NextResponse.json({
+      error: error.message || '查詢時發生錯誤'
+    }, { status: 500 });
   }
 } 

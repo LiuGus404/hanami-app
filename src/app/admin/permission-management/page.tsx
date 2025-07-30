@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
@@ -97,6 +98,21 @@ export default function PermissionManagementPage() {
   const [showPermissionForm, setShowPermissionForm] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [selectedPermission, setSelectedPermission] = useState<UserPermission | null>(null);
+
+  // 多選狀態
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
+
+  // 當選中的權限變化時，更新全選狀態
+  useEffect(() => {
+    if (selectedPermissions.length === 0) {
+      setSelectAll(false);
+    } else if (selectedPermissions.length === userPermissions.length) {
+      setSelectAll(true);
+    } else {
+      setSelectAll(false);
+    }
+  }, [selectedPermissions, userPermissions.length]);
 
   // 載入資料
   useEffect(() => {
@@ -197,26 +213,38 @@ export default function PermissionManagementPage() {
 
         console.log('成功刪除被拒絕的申請');
       } else {
-        // 批准：創建用戶權限後刪除註冊申請
-        console.log('批准申請，創建用戶權限...');
+        // 批准：創建用戶權限和用戶帳號後刪除註冊申請
+        console.log('批准申請，開始創建用戶權限和用戶帳號...');
         
-        // 創建用戶權限記錄
-        await createUserPermissionsFromRequest(request);
-        
-        console.log('用戶權限創建成功，刪除註冊申請...');
-        
-        // 刪除註冊申請
-        const deleteResponse = await fetch(`/api/registration-requests?id=${requestId}`, {
-          method: 'DELETE',
-        });
+        try {
+          // 1. 創建用戶權限記錄
+          console.log('步驟 1: 創建用戶權限記錄...');
+          await createUserPermissionsFromRequest(request);
+          console.log('✅ 用戶權限記錄創建成功');
+          
+          // 2. 創建實際用戶帳號
+          console.log('步驟 2: 創建實際用戶帳號...');
+          await createUserAccountFromRequest(request);
+          console.log('✅ 用戶帳號創建成功');
+          
+          // 3. 刪除註冊申請（只有在權限和帳號都創建成功後才刪除）
+          console.log('步驟 3: 刪除註冊申請...');
+          const deleteResponse = await fetch(`/api/registration-requests?id=${requestId}`, {
+            method: 'DELETE',
+          });
 
-        if (!deleteResponse.ok) {
-          const errorText = await deleteResponse.text();
-          console.error('刪除 API 錯誤響應:', errorText);
-          throw new Error(`刪除申請失敗: ${errorText}`);
+          if (!deleteResponse.ok) {
+            const errorText = await deleteResponse.text();
+            console.error('刪除 API 錯誤響應:', errorText);
+            console.warn('刪除註冊申請失敗，但不影響用戶帳號創建');
+          } else {
+            console.log('✅ 註冊申請已刪除');
+          }
+          
+        } catch (createError) {
+          console.error('創建用戶帳號或權限記錄失敗:', createError);
+          throw new Error(`創建用戶帳號失敗: ${createError instanceof Error ? createError.message : '未知錯誤'}`);
         }
-
-        console.log('成功刪除已批准的申請');
       }
 
       // 重新載入數據
@@ -236,58 +264,169 @@ export default function PermissionManagementPage() {
   // 從註冊申請創建用戶權限
   const createUserPermissionsFromRequest = async (request: RegistrationRequest) => {
     try {
-      console.log('開始創建用戶權限，申請:', request); // Added
+      console.log('開始創建用戶權限，申請:', request);
       
-      // 獲取角色ID
-      const roleId = await getRoleId(request.role);
-      console.log('獲取到角色ID:', roleId); // Added
+      // 1. 檢查是否已有權限記錄
+      const { data: existingPermission, error: checkError } = await supabase
+        .from('hanami_user_permissions_v2')
+        .select('id, user_email, status')
+        .eq('user_email', request.email)
+        .single();
+
+      if (existingPermission) {
+        console.log(`權限記錄已存在: ${request.email}，跳過創建`);
+        return; // 如果已存在，直接返回，不拋出錯誤
+      }
+
+      // 2. 直接使用 Supabase 查詢獲取角色ID，避免 getRoleId 函數的問題
+      const { data: roleData, error: roleError } = await supabase
+        .from('hanami_roles')
+        .select('id, role_name')
+        .eq('role_name', request.role)
+        .single();
+
+      if (roleError || !roleData) {
+        console.error('角色查詢錯誤:', roleError);
+        throw new Error(`找不到角色: ${request.role}`);
+      }
+
+      console.log('找到角色:', roleData);
       
-      // 創建用戶權限記錄
+      // 3. 創建用戶權限記錄
       const permissionData = {
         user_email: request.email,
-        user_phone: request.phone,
-        role_id: roleId,
+        user_phone: request.phone || '',
+        role_id: roleData.id,
         status: 'approved',
         is_active: true
       };
 
-      console.log('準備創建的權限數據:', permissionData); // Added
+      console.log('準備創建的權限數據:', permissionData);
 
-      const response = await fetch('/api/permissions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'create_user_permission',
-          data: permissionData
-        }),
-      });
+      const { data: newPermission, error: insertError } = await supabase
+        .from('hanami_user_permissions_v2')
+        .insert(permissionData)
+        .select()
+        .single();
 
-      console.log('權限創建 API 響應狀態:', response.status); // Added
-
-      if (!response.ok) {
-        const errorText = await response.text(); // Added
-        console.error('權限創建 API 錯誤響應:', errorText); // Added
-        
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          errorData = { error: errorText };
-        }
-        
-        throw new Error(errorData.error || `HTTP ${response.status}: ${errorText}`);
+      if (insertError) {
+        console.error('權限記錄插入錯誤:', insertError);
+        throw insertError;
       }
 
-      const result = await response.json();
-      console.log('權限創建成功響應:', result); // Added
-      console.log('成功創建用戶權限:', request.email);
+      console.log(`已為 ${request.email} 創建權限記錄:`, newPermission);
     } catch (err) {
-      console.error('創建用戶權限錯誤:', err);
-      throw err;
+      console.error('創建權限記錄錯誤:', err);
+      throw new Error(`創建權限記錄失敗: ${err instanceof Error ? err.message : '未知錯誤'}`);
     }
   };
+
+  // 從註冊申請創建用戶帳號
+  const createUserAccountFromRequest = async (request: RegistrationRequest) => {
+    try {
+      console.log('=== 開始創建用戶帳號 ===');
+      console.log('請求數據:', request);
+      console.log('角色:', request.role);
+      console.log('郵箱:', request.email);
+      console.log('姓名:', request.full_name);
+      
+      // 從 additional_info 中提取密碼，如果沒有則使用默認密碼
+      const userPassword = request.additional_info?.password || 'hanami123';
+      console.log('使用的密碼:', userPassword ? '已設置' : '使用默認密碼');
+      console.log('additional_info:', request.additional_info);
+      
+      switch (request.role) {
+        case 'admin': {
+          // 創建管理員帳號
+          const { error: adminError } = await supabase
+            .from('hanami_admin')
+            .insert({
+              admin_email: request.email,
+              admin_name: request.full_name,
+              role: 'admin',
+              admin_password: userPassword
+            });
+          
+          if (adminError) {
+            console.error('創建管理員帳號錯誤:', adminError);
+            throw adminError;
+          }
+          console.log('管理員帳號創建成功');
+          break;
+        }
+          
+        case 'teacher': {
+          // 創建教師帳號
+          console.log('開始創建教師帳號...');
+          
+          const teacherData = {
+            teacher_email: request.email,
+            teacher_fullname: request.full_name,
+            teacher_nickname: request.full_name || '教師', // teacher_nickname 是 NOT NULL
+            teacher_phone: request.phone || '',
+            teacher_password: userPassword,
+            teacher_role: 'teacher',
+            teacher_status: 'active',
+            teacher_background: request.additional_info?.teacherBackground || '',
+            teacher_bankid: request.additional_info?.teacherBankId || '',
+            teacher_address: request.additional_info?.teacherAddress || '',
+            teacher_dob: request.additional_info?.teacherDob || null
+          };
+          
+          console.log('準備插入的教師數據:', teacherData);
+          
+          const { data: newTeacher, error: teacherError } = await supabase
+            .from('hanami_employee')
+            .insert(teacherData)
+            .select();
+          
+          if (teacherError) {
+            console.error('創建教師帳號錯誤:', teacherError);
+            throw teacherError;
+          }
+          console.log('教師帳號創建成功:', newTeacher);
+          break;
+        }
+          
+        case 'parent': {
+          // 創建家長帳號（使用新的 hanami_parents 表）
+          console.log('開始創建家長帳號...');
+          
+          const parentData = {
+            parent_email: request.email,
+            parent_name: request.full_name,
+            parent_phone: request.phone || '',
+            parent_password: userPassword,
+            parent_address: request.additional_info?.address || '',
+            parent_status: 'active',
+            parent_notes: request.additional_info?.notes || ''
+          };
+          
+          console.log('準備插入的家長數據:', parentData);
+          
+          const { data: newParent, error: parentError } = await supabase
+            .from('hanami_parents')
+            .insert(parentData)
+            .select();
+          
+          if (parentError) {
+            console.error('創建家長帳號錯誤:', parentError);
+            throw parentError;
+          }
+          console.log('家長帳號創建成功:', newParent);
+          break;
+        }
+          
+        default:
+          throw new Error(`不支援的角色類型: ${request.role}`);
+      }
+    } catch (err) {
+      console.error('創建用戶帳號錯誤:', err);
+      throw new Error(`創建用戶帳號失敗: ${err instanceof Error ? err.message : '未知錯誤'}`);
+    }
+  };
+
+
 
   // 獲取角色ID
   const getRoleId = async (roleName: string): Promise<string> => {
@@ -563,6 +702,120 @@ export default function PermissionManagementPage() {
     }
   };
 
+  // 多選相關函數
+  const handleSelectPermission = (permissionId: string) => {
+    setSelectedPermissions(prev => 
+      prev.includes(permissionId) 
+        ? prev.filter(id => id !== permissionId)
+        : [...prev, permissionId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedPermissions([]);
+      setSelectAll(false);
+    } else {
+      setSelectedPermissions(userPermissions.map(p => p.id));
+      setSelectAll(true);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedPermissions.length === 0) {
+      alert('請選擇要刪除的權限記錄');
+      return;
+    }
+
+    if (!confirm(`確定要刪除選中的 ${selectedPermissions.length} 條權限記錄嗎？此操作不可撤銷。`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // 批量刪除選中的權限記錄
+      const deletePromises = selectedPermissions.map(id => {
+        const requestBody = {
+          type: 'user_permission',
+          id: id
+        };
+        console.log(`發送批量刪除請求，ID: ${id}`, requestBody);
+        
+        return fetch('/api/permissions', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+      });
+
+      const results = await Promise.all(deletePromises);
+      const failedDeletes = results.filter(r => !r.ok);
+
+      if (failedDeletes.length > 0) {
+        alert(`刪除完成，但有 ${failedDeletes.length} 條記錄刪除失敗`);
+      } else {
+        alert(`成功刪除 ${selectedPermissions.length} 條權限記錄`);
+      }
+
+      // 清空選中狀態並重新載入數據
+      setSelectedPermissions([]);
+      setSelectAll(false);
+      await loadUserPermissions();
+      
+    } catch (error) {
+      console.error('批量刪除錯誤:', error);
+      alert('批量刪除過程中發生錯誤');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSingle = async (permissionId: string) => {
+    if (!confirm('確定要刪除此權限記錄嗎？此操作不可撤銷。')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const requestBody = {
+        type: 'user_permission',
+        id: permissionId
+      };
+      
+      console.log('發送刪除請求:', requestBody);
+      
+      const response = await fetch('/api/permissions', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('刪除響應狀態:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('刪除成功:', result);
+        alert('權限記錄刪除成功');
+        await loadUserPermissions();
+      } else {
+        const error = await response.json();
+        console.error('刪除失敗:', error);
+        alert(`刪除失敗: ${error.error || '未知錯誤'}`);
+      }
+    } catch (error) {
+      console.error('刪除錯誤:', error);
+      alert('刪除過程中發生錯誤');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
@@ -669,20 +922,55 @@ export default function PermissionManagementPage() {
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-semibold text-[#4B4036]">用戶權限</h2>
-            <HanamiButton
-              onClick={() => setShowPermissionForm(true)}
-              variant="primary"
-              size="md"
-            >
-              <span className="mr-2">➕</span>
-              新增權限
-            </HanamiButton>
+            <div className="flex gap-2">
+              {selectedPermissions.length > 0 && (
+                <HanamiButton
+                  onClick={handleDeleteSelected}
+                  variant="danger"
+                  size="md"
+                >
+                  <span className="mr-2">🗑️</span>
+                  刪除選中 ({selectedPermissions.length})
+                </HanamiButton>
+              )}
+              {userPermissions.length > 0 && (
+                <HanamiButton
+                  onClick={handleSelectAll}
+                  variant="secondary"
+                  size="md"
+                >
+                  <span className="mr-2">📋</span>
+                  {selectAll ? '取消全選' : '全選'}
+                </HanamiButton>
+              )}
+              <HanamiButton
+                onClick={() => setShowPermissionForm(true)}
+                variant="primary"
+                size="md"
+              >
+                <span className="mr-2">➕</span>
+                新增權限
+              </HanamiButton>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full bg-white rounded-lg shadow">
+          {userPermissions.length === 0 ? (
+            <div className="text-center py-8 text-[#2B3A3B]">
+              暫無用戶權限記錄
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full bg-white rounded-lg shadow">
               <thead className="bg-[#FFD59A]">
                 <tr>
+                  <th className="px-4 py-3 text-left text-[#4B4036] font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={selectAll}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 text-[#FFD59A] bg-white border-[#EADBC8] rounded focus:ring-[#FFD59A] focus:ring-2"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-[#4B4036] font-semibold">用戶郵箱</th>
                   <th className="px-4 py-3 text-left text-[#4B4036] font-semibold">角色</th>
                   <th className="px-4 py-3 text-left text-[#4B4036] font-semibold">狀態</th>
@@ -693,6 +981,14 @@ export default function PermissionManagementPage() {
               <tbody>
                 {userPermissions.map((permission) => (
                   <tr key={permission.id} className="border-b border-[#EADBC8]">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedPermissions.includes(permission.id)}
+                        onChange={() => handleSelectPermission(permission.id)}
+                        className="w-4 h-4 text-[#FFD59A] bg-white border-[#EADBC8] rounded focus:ring-[#FFD59A] focus:ring-2"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-[#2B3A3B]">
                       {permission.user_email}
                     </td>
@@ -711,19 +1007,29 @@ export default function PermissionManagementPage() {
                       {permission.approved_at ? new Date(permission.approved_at).toLocaleDateString() : '-'}
                     </td>
                     <td className="px-4 py-3">
-                      <HanamiButton
-                        onClick={() => setSelectedPermission(permission)}
-                        variant="secondary"
-                        size="sm"
-                      >
-                        編輯
-                      </HanamiButton>
+                      <div className="flex gap-2">
+                        <HanamiButton
+                          onClick={() => setSelectedPermission(permission)}
+                          variant="secondary"
+                          size="sm"
+                        >
+                          編輯
+                        </HanamiButton>
+                        <HanamiButton
+                          onClick={() => handleDeleteSingle(permission.id)}
+                          variant="danger"
+                          size="sm"
+                        >
+                          刪除
+                        </HanamiButton>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          )}
         </div>
       )}
 

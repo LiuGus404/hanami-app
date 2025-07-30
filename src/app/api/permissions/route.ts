@@ -72,13 +72,56 @@ export async function POST(request: NextRequest) {
 // 刪除權限
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    const id = searchParams.get('id');
+    console.log('DELETE請求開始處理...');
+    
+    // 嘗試從請求體獲取數據
+    let body;
+    try {
+      body = await request.json();
+      console.log('從請求體獲取數據:', body);
+    } catch (parseError) {
+      console.log('無法從請求體解析JSON，嘗試URL參數...');
+      // 如果無法解析JSON，嘗試從URL參數獲取
+      const { searchParams } = new URL(request.url);
+      const type = searchParams.get('type');
+      const id = searchParams.get('id');
+      
+      console.log('URL參數:', { type, id });
+
+      if (!id) {
+        console.log('缺少ID參數');
+        return NextResponse.json({ error: '缺少ID參數' }, { status: 400 });
+      }
+
+      switch (type) {
+        case 'role':
+          return await deleteRole(id);
+        case 'user_permission':
+          return await deleteUserPermission(id);
+        case 'template':
+          return await deleteTemplate(id);
+        case 'application':
+          return await deleteApplication(id);
+        default:
+          return NextResponse.json({ error: '無效的刪除類型' }, { status: 400 });
+      }
+    }
+
+    // 從請求體獲取數據
+    const { type, id } = body;
+    console.log('解析的數據:', { type, id });
 
     if (!id) {
+      console.log('缺少ID參數');
       return NextResponse.json({ error: '缺少ID參數' }, { status: 400 });
     }
+
+    if (!type) {
+      console.log('缺少類型參數');
+      return NextResponse.json({ error: '缺少類型參數' }, { status: 400 });
+    }
+
+    console.log(`開始刪除 ${type}，ID: ${id}`);
 
     switch (type) {
       case 'role':
@@ -414,16 +457,25 @@ async function deleteRole(id: string) {
 }
 
 async function deleteUserPermission(id: string) {
-  const { error } = await supabase
+  console.log(`開始刪除用戶權限，ID: ${id}`);
+  
+  const { data, error } = await supabase
     .from('hanami_user_permissions_v2')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select();
 
-  if (error) throw error;
+  if (error) {
+    console.error('刪除用戶權限錯誤:', error);
+    throw error;
+  }
+
+  console.log('刪除結果:', data);
 
   return NextResponse.json({
     success: true,
-    message: '用戶權限刪除成功'
+    message: '用戶權限刪除成功',
+    data: data
   });
 }
 

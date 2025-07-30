@@ -112,7 +112,6 @@ export default function ParentLoginPage() {
     <HanamiLoginForm
       error={error}
       loading={isLoading}
-      userType="parent"
       onSubmit={handleLogin}
     />
   );

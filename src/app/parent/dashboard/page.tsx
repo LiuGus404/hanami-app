@@ -83,11 +83,29 @@ export default function ParentDashboard() {
 
   const loadParentData = async (userSession: any) => {
     try {
+      // 檢查是否有連結的學生
+      if (!userSession.relatedIds || userSession.relatedIds.length === 0) {
+        console.log('家長沒有連結的學生，顯示空狀態');
+        setChildren([]);
+        setStudentCount(0);
+        setUpcomingLessonCount(0);
+        setLoading(false);
+        return;
+      }
+
       // 獲取家長的孩子資料
-      const { data: childrenData } = await supabase
+      const { data: childrenData, error: childrenError } = await supabase
         .from('Hanami_Students')
         .select('*')
-        .in('id', userSession.relatedIds || []);
+        .in('id', userSession.relatedIds);
+
+      if (childrenError) {
+        console.error('獲取學生資料錯誤:', childrenError);
+        setChildren([]);
+        setStudentCount(0);
+        setLoading(false);
+        return;
+      }
 
       if (childrenData && childrenData.length > 0) {
         // 計算孩子的剩餘堂數
@@ -107,7 +125,9 @@ export default function ParentDashboard() {
         // 載入第一個孩子的資料
         loadChildData(childrenWithRemaining[0].id);
       } else {
-        router.push('/parent/login');
+        console.log('沒有找到連結的學生資料');
+        setChildren([]);
+        setStudentCount(0);
       }
 
       // 獲取即將到來的課程數量
@@ -126,6 +146,8 @@ export default function ParentDashboard() {
 
     } catch (error) {
       console.error('Error loading parent data:', error);
+      setChildren([]);
+      setStudentCount(0);
     } finally {
       setLoading(false);
     }
@@ -198,104 +220,139 @@ export default function ParentDashboard() {
 
   const renderOverview = () => (
     <div className="space-y-6">
-      {renderChildSelector()}
-
-      {/* 統計卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 沒有連結學生的提示 */}
+      {children.length === 0 && (
         <HanamiCard>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-brown-700">{studentCount}</div>
-            <div className="text-sm text-brown-500">孩子數量</div>
-          </div>
-        </HanamiCard>
-        <HanamiCard>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-brown-700">{upcomingLessonCount}</div>
-            <div className="text-sm text-brown-500">即將到來的課程</div>
-          </div>
-        </HanamiCard>
-        <HanamiCard>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-brown-700">{packages.length}</div>
-            <div className="text-sm text-brown-500">課程包</div>
-          </div>
-        </HanamiCard>
-      </div>
-
-      {/* 孩子資訊 */}
-      {selectedChild && (
-        <HanamiCard>
-          <h3 className="text-lg font-semibold text-brown-700 mb-4">{selectedChild.full_name}的資訊</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-brown-500">課程類型</p>
-              <p className="font-medium text-brown-700">{selectedChild.course_type}</p>
-            </div>
-            <div>
-              <p className="text-sm text-brown-500">年齡</p>
-              <p className="font-medium text-brown-700">{selectedChild.student_age}歲</p>
-            </div>
-            <div>
-              <p className="text-sm text-brown-500">剩餘課程</p>
-              <p className="font-medium text-brown-700">
-                {packages.reduce((total, pkg) => total + pkg.remaining_lessons, 0)}堂
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-brown-500">固定上課時間</p>
-              <p className="font-medium text-brown-700">
-                {selectedChild.regular_weekday && getWeekdayName(selectedChild.regular_weekday)} {selectedChild.regular_timeslot}
+          <div className="text-center py-8">
+            <div className="text-6xl mb-4">👨‍👩‍👧‍👦</div>
+            <h3 className="text-xl font-semibold text-brown-700 mb-2">歡迎來到家長儀表板！</h3>
+            <p className="text-brown-500 mb-4">
+              您目前還沒有連結的學生帳戶。請聯繫管理員為您連結學生帳戶。
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-700">
+                💡 <strong>提示：</strong> 管理員需要將您的家長帳戶與學生帳戶進行連結，
+                這樣您就可以查看孩子的學習進度和課程資訊了。
               </p>
             </div>
           </div>
         </HanamiCard>
       )}
 
-      {/* 最近課程 */}
-      <HanamiCard>
-        <h3 className="text-lg font-semibold text-brown-700 mb-4">最近課程</h3>
-        <div className="space-y-3">
-          {recentLessons.slice(0, 5).map((lesson) => (
-            <div key={lesson.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <div className="font-medium text-brown-700">{lesson.lesson_date}</div>
-                <div className="text-sm text-brown-500">{lesson.course_type}</div>
-                {lesson.progress_notes && (
-                  <div className="text-sm text-brown-500 mt-1">{lesson.progress_notes}</div>
-                )}
-              </div>
-              <HanamiBadge 
-                variant={lesson.lesson_status === 'completed' ? 'success' : 'warning'}
-              >
-                {lesson.lesson_status === 'completed' ? '已完成' : '進行中'}
-              </HanamiBadge>
-            </div>
-          ))}
-        </div>
-      </HanamiCard>
+      {children.length > 0 && (
+        <>
+          {renderChildSelector()}
 
-      {/* 課程包 */}
-      <HanamiCard>
-        <h3 className="text-lg font-semibold text-brown-700 mb-4">課程包</h3>
-        <div className="space-y-3">
-          {packages.map((pkg) => (
-            <div key={pkg.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <div className="font-medium text-brown-700">{pkg.course_name}</div>
-                <div className="text-sm text-brown-500">
-                  剩餘 {pkg.remaining_lessons} / {pkg.total_lessons} 堂
+          {/* 統計卡片 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <HanamiCard>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-brown-700">{studentCount}</div>
+                <div className="text-sm text-brown-500">孩子數量</div>
+              </div>
+            </HanamiCard>
+            <HanamiCard>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-brown-700">{upcomingLessonCount}</div>
+                <div className="text-sm text-brown-500">即將到來的課程</div>
+              </div>
+            </HanamiCard>
+            <HanamiCard>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-brown-700">{packages.length}</div>
+                <div className="text-sm text-brown-500">課程包</div>
+              </div>
+            </HanamiCard>
+          </div>
+
+          {/* 孩子資訊 */}
+          {selectedChild && (
+            <HanamiCard>
+              <h3 className="text-lg font-semibold text-brown-700 mb-4">{selectedChild.full_name}的資訊</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-brown-500">課程類型</p>
+                  <p className="font-medium text-brown-700">{selectedChild.course_type}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-brown-500">年齡</p>
+                  <p className="font-medium text-brown-700">{selectedChild.student_age}歲</p>
+                </div>
+                <div>
+                  <p className="text-sm text-brown-500">剩餘課程</p>
+                  <p className="font-medium text-brown-700">
+                    {packages.reduce((total, pkg) => total + pkg.remaining_lessons, 0)}堂
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-brown-500">固定上課時間</p>
+                  <p className="font-medium text-brown-700">
+                    {selectedChild.regular_weekday && getWeekdayName(selectedChild.regular_weekday)} {selectedChild.regular_timeslot}
+                  </p>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-sm font-medium text-brown-700">${pkg.price}</div>
-                <HanamiBadge variant={pkg.status === 'active' ? 'success' : 'warning'}>
-                  {pkg.status === 'active' ? '使用中' : '暫停'}
-                </HanamiBadge>
-              </div>
+            </HanamiCard>
+          )}
+
+          {/* 最近課程 */}
+          <HanamiCard>
+            <h3 className="text-lg font-semibold text-brown-700 mb-4">最近課程</h3>
+            <div className="space-y-3">
+              {recentLessons.length > 0 ? (
+                recentLessons.slice(0, 5).map((lesson) => (
+                  <div key={lesson.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-brown-700">{lesson.lesson_date}</div>
+                      <div className="text-sm text-brown-500">{lesson.course_type}</div>
+                      {lesson.progress_notes && (
+                        <div className="text-sm text-brown-500 mt-1">{lesson.progress_notes}</div>
+                      )}
+                    </div>
+                    <HanamiBadge 
+                      variant={lesson.lesson_status === 'completed' ? 'success' : 'warning'}
+                    >
+                      {lesson.lesson_status === 'completed' ? '已完成' : '進行中'}
+                    </HanamiBadge>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-brown-500">
+                  還沒有課程記錄
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      </HanamiCard>
+          </HanamiCard>
+
+          {/* 課程包 */}
+          <HanamiCard>
+            <h3 className="text-lg font-semibold text-brown-700 mb-4">課程包</h3>
+            <div className="space-y-3">
+              {packages.length > 0 ? (
+                packages.map((pkg) => (
+                  <div key={pkg.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-brown-700">{pkg.course_name}</div>
+                      <div className="text-sm text-brown-500">
+                        剩餘 {pkg.remaining_lessons} / {pkg.total_lessons} 堂
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-brown-700">${pkg.price}</div>
+                      <HanamiBadge variant={pkg.status === 'active' ? 'success' : 'warning'}>
+                        {pkg.status === 'active' ? '使用中' : '暫停'}
+                      </HanamiBadge>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-brown-500">
+                  還沒有課程包
+                </div>
+              )}
+            </div>
+          </HanamiCard>
+        </>
+      )}
     </div>
   );
 

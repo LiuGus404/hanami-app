@@ -1636,6 +1636,174 @@ export type Database = {
           }
         ]
       }
+      hanami_user_permissions_v2: {
+        Row: {
+          id: string
+          user_email: string
+          user_phone: string
+          role_id: string
+          status: string
+          approved_by: string | null
+          approved_at: string | null
+          custom_permissions: any
+          student_access_list: string[]
+          page_access_list: string[]
+          feature_access_list: string[]
+          data_access_config: any
+          expires_at: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_email: string
+          user_phone: string
+          role_id: string
+          status?: string
+          approved_by?: string | null
+          approved_at?: string | null
+          custom_permissions?: any
+          student_access_list?: string[]
+          page_access_list?: string[]
+          feature_access_list?: string[]
+          data_access_config?: any
+          expires_at?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_email?: string
+          user_phone?: string
+          role_id?: string
+          status?: string
+          approved_by?: string | null
+          approved_at?: string | null
+          custom_permissions?: any
+          student_access_list?: string[]
+          page_access_list?: string[]
+          feature_access_list?: string[]
+          data_access_config?: any
+          expires_at?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hanami_roles: {
+        Row: {
+          id: string
+          role_name: string
+          display_name: string
+          description: string | null
+          is_system_role: boolean
+          permissions: any
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          role_name: string
+          display_name: string
+          description?: string | null
+          is_system_role?: boolean
+          permissions?: any
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          role_name?: string
+          display_name?: string
+          description?: string | null
+          is_system_role?: boolean
+          permissions?: any
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hanami_parents: {
+        Row: {
+          id: string
+          parent_email: string
+          parent_name: string
+          parent_phone: string
+          parent_password: string
+          parent_address: string | null
+          parent_status: string
+          parent_notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          parent_email: string
+          parent_name: string
+          parent_phone: string
+          parent_password: string
+          parent_address?: string | null
+          parent_status?: string
+          parent_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          parent_email?: string
+          parent_name?: string
+          parent_phone?: string
+          parent_password?: string
+          parent_address?: string | null
+          parent_status?: string
+          parent_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hanami_parent_student_links: {
+        Row: {
+          id: string
+          parent_id: string
+          student_id: string
+          relationship_type: string
+          is_primary_contact: boolean
+          can_view_progress: boolean
+          can_receive_notifications: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          parent_id: string
+          student_id: string
+          relationship_type?: string
+          is_primary_contact?: boolean
+          can_view_progress?: boolean
+          can_receive_notifications?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          parent_id?: string
+          student_id?: string
+          relationship_type?: string
+          is_primary_contact?: boolean
+          can_view_progress?: boolean
+          can_receive_notifications?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

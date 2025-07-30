@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
           .from(tableName)
           .select('*')
           .limit(1);
-
+      
         // 檢查是否有RLS政策 - 使用更準確的方法
         let policies = [];
         let rlsEnabled = false;
@@ -173,7 +173,7 @@ export async function GET(request: NextRequest) {
         try {
           const { data: policyData, error: policyError } = await supabase
             .rpc('get_table_policies', { table_name: tableName });
-          
+
           if (!policyError && policyData) {
             policies = policyData;
             rlsEnabled = policies.length > 0;
@@ -182,18 +182,18 @@ export async function GET(request: NextRequest) {
           // 方法2: 如果RPC不存在，使用直接查詢
           try {
             const { data: directPolicies, error: directError } = await supabase
-              .from('pg_policies')
-              .select('*')
-              .eq('tablename', tableName);
-            
+        .from('pg_policies')
+        .select('*')
+        .eq('tablename', tableName);
+
             if (!directError && directPolicies) {
               policies = directPolicies.map(p => ({
-                policyname: p.policyname,
-                permissive: p.permissive,
-                roles: p.roles,
-                cmd: p.cmd,
-                qual: p.qual,
-                with_check: p.with_check
+          policyname: p.policyname,
+          permissive: p.permissive,
+          roles: p.roles,
+          cmd: p.cmd,
+          qual: p.qual,
+          with_check: p.with_check
               }));
               rlsEnabled = policies.length > 0;
             }
@@ -314,12 +314,12 @@ export async function GET(request: NextRequest) {
           query_error: error instanceof Error ? error.message : '未知錯誤',
           exists: false,
           category: getTableCategory(tableName)
-        });
+      });
       }
     }
 
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       data: results,
       summary: summary,
       recommendations: generateRecommendations(summary)
@@ -453,7 +453,7 @@ export async function POST(request: NextRequest) {
             .rpc('execute_sql', { 
               sql_query: `ALTER TABLE "${table_name}" ENABLE ROW LEVEL SECURITY;` 
             });
-          
+        
           if (sqlError) {
             return NextResponse.json({ 
               success: false, 
@@ -461,11 +461,11 @@ export async function POST(request: NextRequest) {
               suggestion: `請在Supabase SQL Editor中手動執行：ALTER TABLE "${table_name}" ENABLE ROW LEVEL SECURITY;`
             });
           }
-          
-          return NextResponse.json({ 
-            success: true, 
-            message: `已為表 ${table_name} 啟用RLS` 
-          });
+        
+        return NextResponse.json({ 
+          success: true, 
+          message: `已為表 ${table_name} 啟用RLS` 
+        });
         } catch (err) {
           return NextResponse.json({ 
             success: false, 
@@ -482,7 +482,7 @@ export async function POST(request: NextRequest) {
             .rpc('execute_sql', { 
               sql_query: `ALTER TABLE "${table_name}" DISABLE ROW LEVEL SECURITY;` 
             });
-          
+        
           if (sqlError) {
             return NextResponse.json({ 
               success: false, 
@@ -490,11 +490,11 @@ export async function POST(request: NextRequest) {
               suggestion: `請在Supabase SQL Editor中手動執行：ALTER TABLE "${table_name}" DISABLE ROW LEVEL SECURITY;`
             });
           }
-          
-          return NextResponse.json({ 
-            success: true, 
-            message: `已為表 ${table_name} 停用RLS` 
-          });
+        
+        return NextResponse.json({ 
+          success: true, 
+          message: `已為表 ${table_name} 停用RLS` 
+        });
         } catch (err) {
           return NextResponse.json({ 
             success: false, 
@@ -514,7 +514,7 @@ export async function POST(request: NextRequest) {
                 FOR SELECT USING (auth.role() = 'authenticated');
               ` 
             });
-          
+        
           if (sqlError) {
             return NextResponse.json({ 
               success: false, 
@@ -522,11 +522,11 @@ export async function POST(request: NextRequest) {
               suggestion: `請在Supabase SQL Editor中手動執行：CREATE POLICY "Enable read access for authenticated users" ON "${table_name}" FOR SELECT USING (auth.role() = 'authenticated');`
             });
           }
-          
-          return NextResponse.json({ 
-            success: true, 
-            message: `已為表 ${table_name} 創建基本RLS政策` 
-          });
+        
+        return NextResponse.json({ 
+          success: true, 
+          message: `已為表 ${table_name} 創建基本RLS政策` 
+        });
         } catch (err) {
           return NextResponse.json({ 
             success: false, 

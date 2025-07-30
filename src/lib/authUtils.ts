@@ -23,6 +23,105 @@ export async function validateUserCredentials(email: string, password: string): 
   const supabase = createClientComponentClient<Database>();
   
   try {
+    // 首先檢查 hanami_user_permissions_v2 表（新權限系統）
+    const { data: permissionData, error: permissionError } = await supabase
+      .from('hanami_user_permissions_v2')
+      .select('id, user_email, user_phone, role_id, status, is_active')
+      .eq('user_email', email)
+      .eq('status', 'approved')
+      .eq('is_active', true)
+      .single();
+
+    if (permissionData && !permissionError) {
+      // 根據 role_id 查詢角色名稱
+      const { data: roleData, error: roleError } = await supabase
+        .from('hanami_roles')
+        .select('role_name')
+        .eq('id', permissionData.role_id)
+        .single();
+
+      const roleName = roleData?.role_name;
+      
+      if (roleName === 'admin') {
+        // 檢查管理員表
+        const { data: adminData, error: adminError } = await supabase
+          .from('hanami_admin')
+          .select('id, admin_name, admin_email')
+          .eq('admin_email', email)
+          .single();
+
+        if (adminData && !adminError) {
+          // 這裡可以添加密碼驗證邏輯
+          // 暫時跳過密碼檢查，直接返回成功
+          return {
+            success: true,
+            user: {
+              id: adminData.id,
+              email: adminData.admin_email || email,
+              role: 'admin',
+              name: adminData.admin_name || '管理員',
+            },
+          };
+        }
+      } else if (roleName === 'teacher') {
+        // 檢查教師表
+        const { data: teacherData, error: teacherError } = await supabase
+          .from('hanami_employee')
+          .select('id, teacher_fullname, teacher_email, teacher_password, teacher_nickname')
+          .eq('teacher_email', email)
+          .eq('teacher_password', password)
+          .single();
+
+        if (teacherData && !teacherError) {
+          // 獲取老師負責的學生ID列表
+          const { data: students } = await supabase
+            .from('Hanami_Students')
+            .select('id')
+            .eq('student_teacher', teacherData.id);
+
+          return {
+            success: true,
+            user: {
+              id: teacherData.id,
+              email: teacherData.teacher_email || email,
+              role: 'teacher',
+              name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
+              relatedIds: students?.map(s => s.id) || [],
+            },
+          };
+        }
+      } else if (roleName === 'parent') {
+        // 檢查家長表（新的家長帳戶系統）
+        const { data: parentData, error: parentError } = await supabase
+          .from('hanami_parents')
+          .select('id, parent_name, parent_email, parent_password, parent_status')
+          .eq('parent_email', email)
+          .eq('parent_password', password)
+          .eq('parent_status', 'active')
+          .single();
+
+        if (parentData && !parentError) {
+          // 獲取家長連結的學生ID列表
+          const { data: linkedStudents } = await supabase
+            .from('hanami_parent_student_links')
+            .select('student_id')
+            .eq('parent_id', parentData.id);
+
+          return {
+            success: true,
+            user: {
+              id: parentData.id,
+              email: parentData.parent_email || email,
+              role: 'parent',
+              name: parentData.parent_name || '家長',
+              relatedIds: linkedStudents?.map(s => s.student_id) || [],
+            },
+          };
+        }
+      }
+    }
+
+    // 如果新權限系統沒有找到，回退到舊的驗證方式
     // 檢查管理員
     const { data: adminData, error: adminError } = await supabase
       .from('hanami_admin')
@@ -92,16 +191,15 @@ export async function validateUserCredentials(email: string, password: string): 
       };
     }
 
-    // 檢查家長 (通過學生資料的 parent_email)
+    // 檢查家長 (通過學生資料的 parent_email 和 student_password)
     const { data: parentData, error: parentError } = await supabase
       .from('Hanami_Students')
-      .select('id, full_name, parent_email')
+      .select('id, full_name, parent_email, student_password')
       .eq('parent_email', email)
+      .eq('student_password', password)
       .single();
 
     if (parentData && !parentError) {
-      // 注意：這裡家長沒有密碼驗證，可能需要額外的驗證邏輯
-      // 暫時返回成功，但建議添加家長密碼欄位
       return {
         success: true,
         user: {
@@ -224,19 +322,26 @@ export async function getUserProfile(): Promise<UserProfile | null> {
       }
 
       case 'parent': {
-        // 取得家長相關的學生資料
-        const { data: students } = await supabase
-          .from('Hanami_Students')
-          .select('id, full_name, parent_email')
-          .eq('parent_email', user.email);
+        // 取得家長資料（新的家長帳戶系統）
+        const { data: parentData } = await supabase
+          .from('hanami_parents')
+          .select('id, parent_name, parent_email')
+          .eq('parent_email', user.email)
+          .single();
 
-        if (students && students.length > 0) {
+        if (parentData) {
+          // 取得家長連結的學生ID列表
+          const { data: linkedStudents } = await supabase
+            .from('hanami_parent_student_links')
+            .select('student_id')
+            .eq('parent_id', parentData.id);
+
           return {
-            id: user.id,
-            email: user.email,
+            id: parentData.id,
+            email: parentData.parent_email || user.email,
             role: 'parent',
-            name: `${students[0].full_name}的家長`,
-            relatedIds: students.map(s => s.id),
+            name: parentData.parent_name || '家長',
+            relatedIds: linkedStudents?.map(s => s.student_id) || [],
           };
         }
         break;

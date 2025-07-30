@@ -1,100 +1,94 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 export default function TestRegistrationPage() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<string>('');
+  const [email, setEmail] = useState('');
 
-  const testCreateRegistration = async () => {
-    setLoading(true);
-    setResult('');
+  const handleReapprove = async () => {
+    if (!email) {
+      toast.error('請輸入郵箱地址');
+      return;
+    }
 
     try {
-      const response = await fetch('/api/registration-requests', {
-        method: 'POST',
+      setLoading(true);
+      
+      // 首先獲取該郵箱的註冊申請
+      const response = await fetch('/api/registration-requests');
+      const result = await response.json();
+      
+      const request = result.data?.find((r: any) => r.email === email);
+      
+      if (!request) {
+        toast.error('找不到該郵箱的註冊申請');
+        return;
+      }
+
+      if (request.status === 'approved') {
+        toast.error('該申請已經被批准了');
+        return;
+      }
+
+      // 重新批准申請
+      const approveResponse = await fetch('/api/registration-requests', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: `test.${Date.now()}@example.com`,
-          full_name: `測試用戶 ${Date.now()}`,
-          phone: '55147485',
-          role: 'teacher',
-          additional_info: { reason: '測試申請' }
+          id: request.id,
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: 'admin'
         }),
       });
 
-      const data = await response.json();
-      
-      if (response.ok) {
-        setResult(`✅ 成功創建註冊申請: ${JSON.stringify(data, null, 2)}`);
+      if (approveResponse.ok) {
+        toast.success('註冊申請已重新批准！用戶帳號已創建，默認密碼為 "hanami123"');
+        setEmail('');
       } else {
-        setResult(`❌ 創建失敗: ${JSON.stringify(data, null, 2)}`);
+        const error = await approveResponse.json();
+        toast.error(`批准失敗: ${error.error || '未知錯誤'}`);
       }
     } catch (error) {
-      setResult(`❌ 錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testGetRegistrations = async () => {
-    setLoading(true);
-    setResult('');
-
-    try {
-      const response = await fetch('/api/registration-requests', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        setResult(`✅ 成功獲取註冊申請: ${data.data?.length || 0} 條記錄\n${JSON.stringify(data, null, 2)}`);
-      } else {
-        setResult(`❌ 獲取失敗: ${JSON.stringify(data, null, 2)}`);
-      }
-    } catch (error) {
-      setResult(`❌ 錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
+      console.error('重新批准錯誤:', error);
+      toast.error('重新批准過程中發生錯誤');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF9F2] p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h1 className="text-2xl font-bold text-brown-700 mb-6">註冊申請功能測試</h1>
-          
-          <div className="space-y-4 mb-6">
-            <button
-              onClick={testCreateRegistration}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-            >
-              {loading ? '測試中...' : '測試創建註冊申請'}
-            </button>
-            
-            <button
-              onClick={testGetRegistrations}
-              disabled={loading}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 ml-4"
-            >
-              {loading ? '測試中...' : '測試獲取註冊申請'}
-            </button>
-          </div>
-
-          {result && (
-            <div className="bg-gray-100 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">測試結果:</h3>
-              <pre className="text-sm whitespace-pre-wrap">{result}</pre>
-            </div>
-          )}
+    <div className="container mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">重新批准註冊申請測試</h1>
+      
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">郵箱地址</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="輸入要重新批准的郵箱"
+            className="w-full p-2 border border-gray-300 rounded-md"
+          />
+        </div>
+        
+        <button
+          onClick={handleReapprove}
+          disabled={loading}
+          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50"
+        >
+          {loading ? '處理中...' : '重新批准申請'}
+        </button>
+        
+        <div className="mt-4 text-sm text-gray-600">
+          <p>• 這將重新批准指定的註冊申請</p>
+          <p>• 自動創建用戶帳號</p>
+          <p>• 默認密碼為 "hanami123"</p>
         </div>
       </div>
     </div>

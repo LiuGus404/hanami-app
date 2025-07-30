@@ -15,7 +15,9 @@ export interface RegisterFormData {
   teacherDob?: string;
   // 家長專用欄位
   parentStudentName?: string;
-  parentStudentAge?: number;
+  parentStudentDob?: string;
+  // 人機驗證
+  captchaAnswer?: string;
 }
 
 export interface AuthError {

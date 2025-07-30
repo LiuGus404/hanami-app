@@ -112,7 +112,6 @@ export default function TeacherLoginPage() {
     <HanamiLoginForm
       error={error}
       loading={isLoading}
-      userType="teacher"
       onSubmit={handleLogin}
     />
   );

@@ -1,7 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { useEffect, useState } from 'react';
 
 interface RegistrationRequest {
   id: string;
@@ -85,6 +85,8 @@ export default function RegistrationRequestsPage() {
         throw new Error('找不到申請記錄');
       }
 
+      console.log('審核申請:', { request, status, rejectionReason });
+
       // 更新申請狀態
       const response = await fetch('/api/registration-requests', {
         method: 'PUT',
@@ -104,12 +106,59 @@ export default function RegistrationRequestsPage() {
         throw new Error(errorData.error || '更新失敗');
       }
 
-      // 如果批准，創建用戶權限記錄
+      // 如果批准，創建用戶權限記錄和用戶帳號
       if (status === 'approved') {
-        await createUserPermissions(request);
-      }
+        try {
+          console.log('開始批准流程...');
+          
+          // 1. 創建用戶權限記錄
+          console.log('步驟 1: 創建用戶權限記錄...');
+          try {
+            await createUserPermissions(request);
+            console.log('✅ 用戶權限記錄創建成功');
+          } catch (permError) {
+            console.error('❌ 權限記錄創建失敗:', permError);
+            throw new Error(`權限記錄創建失敗: ${permError instanceof Error ? permError.message : '未知錯誤'}`);
+          }
+          
+          // 2. 創建實際用戶帳號
+          console.log('步驟 2: 創建實際用戶帳號...');
+          try {
+            await createUserAccount(request);
+            console.log('✅ 用戶帳號創建成功');
+          } catch (accountError) {
+            console.error('❌ 用戶帳號創建失敗:', accountError);
+            throw new Error(`用戶帳號創建失敗: ${accountError instanceof Error ? accountError.message : '未知錯誤'}`);
+          }
+          
+          // 3. 刪除註冊申請（只有在權限和帳號都創建成功後才刪除）
+          console.log('步驟 3: 刪除註冊申請...');
+          const deleteResponse = await fetch('/api/registration-requests', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id: requestId }),
+          });
 
-      setSuccess(`申請已${status === 'approved' ? '批准' : '拒絕'}`);
+          if (!deleteResponse.ok) {
+            console.warn('刪除註冊申請失敗，但不影響用戶帳號創建');
+          } else {
+            console.log('✅ 註冊申請已刪除');
+          }
+          
+          console.log('註冊申請已批准！用戶帳號已自動創建，用戶將使用註冊時設定的密碼登入。');
+          setRequests(requests.filter(req => req.id !== requestId));
+        } catch (createError) {
+          console.error('創建用戶帳號或權限記錄失敗:', createError);
+          setError(`批准成功，但創建用戶帳號失敗: ${createError instanceof Error ? createError.message : '未知錯誤'}`);
+          console.log('批准成功，但創建用戶帳號失敗');
+        }
+      } else {
+        console.log('申請已拒絕');
+        setSuccess(`申請已拒絕`);
+      }
+      
       fetchRequests(); // 重新獲取列表
     } catch (err) {
       console.error('審核錯誤:', err);
@@ -122,34 +171,166 @@ export default function RegistrationRequestsPage() {
   // 創建用戶權限記錄
   const createUserPermissions = async (request: RegistrationRequest) => {
     try {
-      // 根據角色獲取對應的 role_id
-      let roleId: string;
+      console.log('開始創建用戶權限記錄...');
+      console.log('申請:', request);
       
-      if (request.role === 'admin') {
-        roleId = await getRoleId('admin');
-      } else if (request.role === 'teacher') {
-        roleId = await getRoleId('teacher');
-      } else {
-        roleId = await getRoleId('parent');
+      // 1. 檢查是否已有權限記錄
+      const { data: existingPermission, error: checkError } = await supabase
+        .from('hanami_user_permissions_v2')
+        .select('id, user_email, status')
+        .eq('user_email', request.email)
+        .single();
+
+      if (existingPermission) {
+        console.log(`權限記錄已存在: ${request.email}，跳過創建`);
+        return; // 如果已存在，直接返回，不拋出錯誤
       }
 
-      // 創建權限記錄
-      const { error: insertError } = await supabase
+      // 2. 直接使用 Supabase 查詢獲取角色ID，避免 getRoleId 函數的問題
+      const { data: roleData, error: roleError } = await supabase
+        .from('hanami_roles')
+        .select('id, role_name')
+        .eq('role_name', request.role)
+        .single();
+
+      if (roleError || !roleData) {
+        console.error('角色查詢錯誤:', roleError);
+        throw new Error(`找不到角色: ${request.role}`);
+      }
+
+      console.log('找到角色:', roleData);
+
+      // 3. 創建權限記錄
+      const { data: newPermission, error: insertError } = await supabase
         .from('hanami_user_permissions_v2')
         .insert({
           user_email: request.email,
-          user_phone: request.phone,
-          role_id: roleId,
+          user_phone: request.phone || '',
+          role_id: roleData.id,
           status: 'approved',
           is_active: true
-        });
+        })
+        .select()
+        .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('權限記錄插入錯誤:', insertError);
+        throw insertError;
+      }
 
-      console.log(`已為 ${request.email} 創建權限記錄`);
+      console.log(`已為 ${request.email} 創建權限記錄:`, newPermission);
     } catch (err) {
       console.error('創建權限記錄錯誤:', err);
       throw new Error(`創建權限記錄失敗: ${err instanceof Error ? err.message : '未知錯誤'}`);
+    }
+  };
+
+  // 創建用戶帳號
+  const createUserAccount = async (request: RegistrationRequest) => {
+    try {
+      console.log('=== 開始創建用戶帳號 ===');
+      console.log('請求數據:', request);
+      console.log('角色:', request.role);
+      console.log('郵箱:', request.email);
+      console.log('姓名:', request.full_name);
+      
+      // 從 additional_info 中提取密碼，如果沒有則使用默認密碼
+      const userPassword = request.additional_info?.password || 'hanami123';
+      console.log('使用的密碼:', userPassword ? '已設置' : '使用默認密碼');
+      console.log('additional_info:', request.additional_info);
+      
+      switch (request.role) {
+        case 'admin': {
+          // 創建管理員帳號
+          const { error: adminError } = await supabase
+            .from('hanami_admin')
+            .insert({
+              admin_email: request.email,
+              admin_name: request.full_name,
+              role: 'admin',
+              admin_password: userPassword
+            });
+          
+          if (adminError) {
+            console.error('創建管理員帳號錯誤:', adminError);
+            throw adminError;
+          }
+          console.log('管理員帳號創建成功');
+          break;
+        }
+          
+        case 'teacher': {
+          // 創建教師帳號
+          console.log('開始創建教師帳號...');
+          
+          const teacherData = {
+            teacher_email: request.email,
+            teacher_fullname: request.full_name,
+            teacher_nickname: request.full_name || '教師', // teacher_nickname 是 NOT NULL
+            teacher_phone: request.phone || '',
+            teacher_password: userPassword,
+            teacher_role: 'teacher',
+            teacher_status: 'active',
+            teacher_background: request.additional_info?.teacherBackground || '',
+            teacher_bankid: request.additional_info?.teacherBankId || '',
+            teacher_address: request.additional_info?.teacherAddress || '',
+            teacher_dob: request.additional_info?.teacherDob || null
+          };
+          
+          console.log('準備插入的教師數據:', teacherData);
+          
+          const { data: newTeacher, error: teacherError } = await supabase
+            .from('hanami_employee')
+            .insert(teacherData)
+            .select();
+          
+          if (teacherError) {
+            console.error('創建教師帳號錯誤:', teacherError);
+            console.error('錯誤詳情:', teacherError);
+            throw teacherError;
+          }
+          
+          console.log('教師帳號創建成功:', newTeacher);
+          break;
+        }
+          
+        case 'parent': {
+          // 創建家長帳號（使用新的 hanami_parents 表）
+          console.log('開始創建家長帳號...');
+          
+          const parentData = {
+            parent_email: request.email,
+            parent_name: request.full_name,
+            parent_phone: request.phone || '',
+            parent_password: userPassword,
+            parent_address: request.additional_info?.address || '',
+            parent_status: 'active',
+            parent_notes: request.additional_info?.notes || ''
+          };
+          
+          console.log('準備插入的家長數據:', parentData);
+          
+          const { data: newParent, error: parentError } = await supabase
+            .from('hanami_parents')
+            .insert(parentData)
+            .select();
+          
+          if (parentError) {
+            console.error('創建家長帳號錯誤:', parentError);
+            throw parentError;
+          }
+          console.log('家長帳號創建成功:', newParent);
+          break;
+        }
+          
+        default:
+          throw new Error(`不支援的角色類型: ${request.role}`);
+      }
+      
+      console.log(`用戶帳號創建成功: ${request.email}`);
+    } catch (err) {
+      console.error('創建用戶帳號錯誤:', err);
+      throw new Error(`創建用戶帳號失敗: ${err instanceof Error ? err.message : '未知錯誤'}`);
     }
   };
 
@@ -220,10 +401,31 @@ export default function RegistrationRequestsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      case 'approved': return 'text-green-600 bg-green-100';
-      case 'rejected': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'email_confirmed':
+        return 'bg-blue-100 text-blue-800';
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return '等待確認';
+      case 'email_confirmed':
+        return 'Email已確認';
+      case 'approved':
+        return '已批准';
+      case 'rejected':
+        return '已拒絕';
+      default:
+        return status;
     }
   };
 
@@ -318,8 +520,7 @@ export default function RegistrationRequestsPage() {
                     </td>
                     <td className="border border-[#EADBC8] px-4 py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-                        {request.status === 'pending' ? '待審核' :
-                         request.status === 'approved' ? '已批准' : '已拒絕'}
+                        {getStatusText(request.status)}
                       </span>
                     </td>
                     <td className="border border-[#EADBC8] px-4 py-3">
