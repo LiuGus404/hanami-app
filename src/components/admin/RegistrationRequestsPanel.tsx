@@ -305,11 +305,9 @@ export default function RegistrationRequestsPanel() {
                     <div className="text-sm font-medium text-gray-900">
                       {request.full_name}
                     </div>
-                    {request.phone && (
                       <div className="text-sm text-gray-500">
                         {request.phone}
                       </div>
-                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {request.email}
@@ -386,7 +384,7 @@ export default function RegistrationRequestsPanel() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">電話</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedRequest.phone || '未提供'}</p>
+                  <p className="mt-1 text-sm text-gray-900">{selectedRequest.phone}</p>
                 </div>
 
                 <div>

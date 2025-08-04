@@ -6,6 +6,8 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
     
+    console.log('開始獲取學生數據...');
+    
     // 獲取所有學生數據
     const { data: students, error } = await supabase
       .from('Hanami_Students')
@@ -34,7 +36,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '獲取學生數據失敗' }, { status: 500 });
     }
 
-    return NextResponse.json(students || []);
+    console.log('成功獲取學生數據:', students?.length || 0, '個學生');
+
+    return NextResponse.json({ 
+      data: students || [],
+      count: students?.length || 0,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
     console.error('API錯誤:', error);
     return NextResponse.json({ error: '內部服務器錯誤' }, { status: 500 });

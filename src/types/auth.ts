@@ -6,7 +6,7 @@ export interface RegisterFormData {
   confirmPassword: string;
   role: UserRole;
   fullName: string;
-  phone?: string;
+  phone: string;
   additionalInfo?: Record<string, any>;
   // 教師專用欄位
   teacherBackground?: string;
@@ -33,7 +33,7 @@ export interface RegistrationRequest {
   id: string;
   email: string;
   full_name: string;
-  phone?: string;
+  phone: string;
   role: UserRole;
   status: RegistrationStatus;
   additional_info?: Record<string, any>;

@@ -18,7 +18,7 @@ const registerSchema = z.object({
   confirmPassword: z.string(),
   role: z.enum(['admin', 'teacher', 'parent'] as const),
   fullName: z.string().min(2, '請輸入姓名'),
-  phone: z.string().optional(),
+  phone: z.string().min(1, '請輸入電話號碼'),
   // 根據角色添加額外欄位
   teacherBackground: z.string().optional(),
   teacherBankId: z.string().optional(),
@@ -287,10 +287,13 @@ export default function RegisterPage() {
       setSuccess('註冊成功！請檢查您的郵箱並點擊驗證連結。驗證後，管理員將審核您的申請。');
       setShowConfirmation(false);
       
-      // 3秒後跳轉到登入頁面
+      // 重置表單
+      reset();
+      
+      // 5秒後跳轉到登入頁面
       setTimeout(() => {
         router.push('/login');
-      }, 3000);
+      }, 5000);
 
     } catch (err) {
       console.error('註冊錯誤詳情:', err);
@@ -351,16 +354,29 @@ export default function RegisterPage() {
           )}
         
           {success && (
-          <div className="mb-4 bg-[#E8F5E8] border border-[#4CAF50] text-[#2E7D32] px-4 py-3 rounded-xl text-sm animate-pulse">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+          <div className="mb-6 bg-gradient-to-r from-[#E8F5E8] to-[#C8E6C9] border-2 border-[#4CAF50] text-[#2E7D32] px-6 py-4 rounded-2xl text-center shadow-lg animate-pulse">
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 bg-[#4CAF50] rounded-full flex items-center justify-center mb-3 animate-bounce">
+                <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              {success}
+              </div>
+              <h3 className="text-lg font-bold mb-2">🎉 註冊成功！</h3>
+              <p className="text-sm leading-relaxed">{success}</p>
+              <div className="mt-3 text-xs text-[#1B5E20] opacity-80 mb-4">
+                5秒後自動跳轉到登入頁面...
+              </div>
+              <button
+                onClick={() => router.push('/login')}
+                className="px-6 py-2 bg-[#4CAF50] text-white rounded-lg hover:bg-[#45A049] transition-colors text-sm font-medium"
+              >
+                立即前往登入
+              </button>
             </div>
           </div>
           )}
 
+          {!success && (
           <form className="space-y-6" onSubmit={handleSubmit(handleFormSubmit)}>
             <div className="space-y-4">
               {/* 基本資訊 */}
@@ -429,12 +445,12 @@ export default function RegisterPage() {
 
               <div>
                 <label className="block text-sm font-medium text-brown-700" htmlFor="phone">
-                  電話
+                  電話 *
                 </label>
                 <input
                   {...register('phone')}
                   className="mt-1 appearance-none relative block w-full px-4 py-3 border border-[#E0E0E0] placeholder-brown-400 text-brown-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFD59A] bg-white text-sm transition-all duration-200"
-                  placeholder="請輸入電話號碼（選填）"
+                  placeholder="請輸入電話號碼"
                   type="tel"
                 />
                 {errors.phone && (
@@ -723,10 +739,11 @@ export default function RegisterPage() {
               </p>
             </div>
           </form>
+          )}
 
           {/* 確認對話框 */}
-          {showConfirmation && formData && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          {showConfirmation && formData && !success && (
+          <div className="fixed inset-0 bg-transparent backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
             <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl transform transition-all duration-300 animate-slideIn">
               <h3 className="text-lg font-bold text-brown-700 mb-4">確認註冊資訊</h3>
               
@@ -746,12 +763,10 @@ export default function RegisterPage() {
                       formData.role === 'teacher' ? '教師' : '家長'}
                   </span>
                 </div>
-                {formData.phone && (
                   <div>
                     <span className="text-sm font-medium text-brown-600">電話：</span>
                     <span className="text-sm text-brown-700 ml-2">{formData.phone}</span>
                   </div>
-                )}
                 {formData.role === 'teacher' && formData.teacherBackground && (
                   <div>
                     <span className="text-sm font-medium text-brown-600">教學背景：</span>

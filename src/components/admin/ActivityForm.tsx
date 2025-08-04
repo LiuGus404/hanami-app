@@ -699,8 +699,24 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         });
       }
       
+      // 過濾掉自定義欄位，只保留標準欄位
+      const standardFields = [
+        'activity_name', 'activity_description', 'activity_type', 'difficulty_level',
+        'target_abilities', 'materials_needed', 'duration_minutes', 'age_range_min',
+        'age_range_max', 'notion_id', 'is_active', 'template_id', 'tags', 'category',
+        'status', 'version', 'created_by', 'updated_by', 'estimated_duration',
+        'instructions', 'notes', 'activity_types', 'categories', 'statuses', 'duration'
+      ];
+      
+      const filteredFormData: any = {};
+      standardFields.forEach(field => {
+        if (formData[field] !== undefined) {
+          filteredFormData[field] = formData[field];
+        }
+      });
+      
       const submitData = {
-        ...formData,
+        ...filteredFormData,
         custom_fields: customFields,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

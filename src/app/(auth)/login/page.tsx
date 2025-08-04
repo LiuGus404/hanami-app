@@ -19,6 +19,13 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+interface AccountOption {
+  role: string;
+  displayName: string;
+  name: string;
+  id: string;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,6 +34,10 @@ export default function LoginPage() {
   const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [captchaText, setCaptchaText] = useState('');
   const [captchaImage, setCaptchaImage] = useState('');
+  const [showAccountSelection, setShowAccountSelection] = useState(false);
+  const [availableAccounts, setAvailableAccounts] = useState<AccountOption[]>([]);
+  const [currentEmail, setCurrentEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const supabase = createClientComponentClient();
 
   // 生成圖片驗證碼
@@ -152,6 +163,16 @@ export default function LoginPage() {
 
       const result = await response.json();
 
+      if (result.multipleAccounts) {
+        // 顯示帳戶選擇對話框
+        setAvailableAccounts(result.accounts);
+        setCurrentEmail(email);
+        setCurrentPassword(password);
+        setShowAccountSelection(true);
+        setLoading(false);
+        return;
+      }
+
       if (result.success && result.user) {
         // 設置用戶會話
         setUserSession(result.user);
@@ -182,6 +203,63 @@ export default function LoginPage() {
     }
   };
 
+  const handleAccountSelection = async (selectedRole: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/auth/login-table-based', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email: currentEmail, 
+          password: currentPassword, 
+          selectedRole 
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.user) {
+        // 設置用戶會話
+        setUserSession(result.user);
+
+        // 根據角色重定向到相應的儀表板
+        switch (result.user.role) {
+          case 'admin':
+            router.push('/admin');
+            break;
+          case 'teacher':
+            router.push('/teacher/dashboard');
+            break;
+          case 'parent':
+            router.push('/parent/dashboard');
+            break;
+          default:
+            setError('未知的用戶角色');
+        }
+      } else {
+        setError(result.error || '登入失敗');
+      }
+
+    } catch (err) {
+      console.error('登入錯誤:', err);
+      setError('登入過程中發生錯誤，請重試');
+    } finally {
+      setLoading(false);
+      setShowAccountSelection(false);
+    }
+  };
+
+  const handleCancelAccountSelection = () => {
+    setShowAccountSelection(false);
+    setAvailableAccounts([]);
+    setCurrentEmail('');
+    setCurrentPassword('');
+  };
+
   return (
     <div className="min-h-screen bg-[#FFF9F2] font-['Quicksand',_sans-serif] flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-sm">
@@ -202,6 +280,57 @@ export default function LoginPage() {
           onCaptchaAnswerChange={setCaptchaAnswer}
           onRegenerateCaptcha={generateCaptcha}
         />
+
+        {/* 帳戶選擇對話框 */}
+        {showAccountSelection && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+              <h3 className="text-lg font-bold text-brown-700 mb-4 text-center">
+                🎯 選擇登入帳戶
+              </h3>
+              <p className="text-sm text-brown-600 mb-6 text-center">
+                檢測到您的郵箱有多個帳戶，請選擇要登入的帳戶類型：
+              </p>
+              
+              <div className="space-y-3 mb-6">
+                {availableAccounts.map((account, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleAccountSelection(account.role)}
+                    disabled={loading}
+                    className="w-full p-4 border-2 border-[#EADBC8] rounded-xl hover:border-[#FFD59A] hover:bg-[#FFF9F2] transition-all duration-200 text-left group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-brown-700 group-hover:text-brown-800">
+                          {account.displayName}
+                        </div>
+                        <div className="text-sm text-brown-500 group-hover:text-brown-600">
+                          {account.name}
+                        </div>
+                      </div>
+                      <div className="text-brown-400 group-hover:text-brown-500">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleCancelAccountSelection}
+                  disabled={loading}
+                  className="flex-1 py-2 px-4 border border-[#E0E0E0] text-brown-700 rounded-xl hover:bg-gray-50 transition-all duration-200"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

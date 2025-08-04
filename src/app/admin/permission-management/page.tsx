@@ -9,6 +9,13 @@ import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiSelect from '@/components/ui/HanamiSelect';
 import StudentSelector from '@/components/ui/StudentSelector';
 import { PopupSelect } from '@/components/ui/PopupSelect';
+import {
+  AdminIcon, UserManagementIcon, PermissionIcon, SettingsIcon, StudentIcon, TeacherIcon,
+  CourseIcon, ScheduleIcon, AIIcon, ProgressIcon, ResourceIcon, TrialIcon, RegistrationIcon,
+  DashboardIcon, ProfileIcon, MediaIcon, ChildIcon, PageIcon, ExportIcon, FinanceIcon,
+  LessonIcon, GrowthTreeIcon, AbilityIcon, ActivityIcon, AssessmentIcon, CommunicationIcon,
+  FeatureIcon
+} from '@/components/ui/PermissionIcons';
 
 interface Role {
   id: string;
@@ -1282,6 +1289,65 @@ function RoleForm({
       }
     };
 
+    // 根據角色設置預設權限
+    const getDefaultPermissionsByRole = (roleName: string) => {
+      switch (roleName) {
+        case 'admin':
+          return {
+            pages: {
+              '/admin/*': { access: 'allow', operations: ['view', 'create', 'edit', 'delete'] },
+              '/teacher/*': { access: 'deny', operations: [] },
+              '/parent/*': { access: 'deny', operations: [] }
+            },
+            features: {
+              'user_management': { access: 'allow', operations: ['view', 'create', 'edit', 'delete'] },
+              'permission_management': { access: 'allow', operations: ['view', 'create', 'edit', 'delete'] },
+              'system_settings': { access: 'allow', operations: ['view', 'edit'] },
+              'student_management': { access: 'allow', operations: ['view', 'create', 'edit', 'delete'] },
+              'teacher_management': { access: 'allow', operations: ['view', 'create', 'edit', 'delete'] },
+              'course_management': { access: 'allow', operations: ['view', 'create', 'edit', 'delete'] },
+              'ai_tools': { access: 'allow', operations: ['view', 'create', 'edit', 'delete'] }
+            }
+          };
+        case 'teacher':
+          return {
+            pages: {
+              '/teacher/*': { access: 'allow', operations: ['view', 'create', 'edit'] },
+              '/teacher/dashboard': { access: 'allow', operations: ['view'] },
+              '/teacher/profile': { access: 'allow', operations: ['view', 'edit'] }
+            },
+            features: {
+              'lesson_management': { access: 'allow', operations: ['view', 'create', 'edit'] },
+              'student_progress': { access: 'allow', operations: ['view', 'edit'] },
+              'media_management': { access: 'allow', operations: ['view', 'create', 'edit'] },
+              'growth_tree_management': { access: 'allow', operations: ['view', 'create', 'edit'] },
+              'ability_development': { access: 'allow', operations: ['view', 'create', 'edit'] },
+              'teaching_activities': { access: 'allow', operations: ['view', 'create', 'edit'] },
+              'ability_assessment': { access: 'allow', operations: ['view', 'create', 'edit'] },
+              'schedule_management': { access: 'allow', operations: ['view', 'edit'] }
+            }
+          };
+        case 'parent':
+          return {
+            pages: {
+              '/parent/*': { access: 'allow', operations: ['view'] },
+              '/parent/dashboard': { access: 'allow', operations: ['view'] },
+              '/parent/profile': { access: 'allow', operations: ['view', 'edit'] }
+            },
+            features: {
+              'child_info': { access: 'allow', operations: ['view'] },
+              'progress_tracking': { access: 'allow', operations: ['view'] },
+              'lesson_records': { access: 'allow', operations: ['view'] },
+              'media_viewing': { access: 'allow', operations: ['view'] },
+              'communication': { access: 'allow', operations: ['view', 'create'] },
+              'schedule_viewing': { access: 'allow', operations: ['view'] }
+            }
+          };
+        default:
+          return defaultPermissions;
+      }
+    };
+
     return {
       role_name: initialData?.role_name || '',
       display_name: initialData?.display_name || '',
@@ -1291,36 +1357,105 @@ function RoleForm({
     };
   });
 
-  // 預定義的頁面列表
-  const predefinedPages = [
-    { path: '/admin/*', label: '管理員頁面', description: '所有管理員相關頁面' },
-    { path: '/admin/students', label: '學生管理', description: '學生管理頁面' },
-    { path: '/admin/teachers', label: '教師管理', description: '教師管理頁面' },
-    { path: '/admin/class-management', label: '課程管理', description: '課程管理頁面' },
-    { path: '/admin/schedule-management', label: '排程管理', description: '排程管理頁面' },
-    { path: '/admin/ai-hub', label: 'AI 工具', description: 'AI 工具中心' },
-    { path: '/admin/permission-management', label: '權限管理', description: '權限管理頁面' },
-    { path: '/admin/student-progress', label: '學生進度', description: '學生進度管理' },
-    { path: '/admin/resource-library', label: '資源庫', description: '教學資源庫' },
-    { path: '/teacher/*', label: '教師頁面', description: '所有教師相關頁面' },
-    { path: '/teacher/dashboard', label: '教師儀表板', description: '教師儀表板' },
-    { path: '/parent/*', label: '家長頁面', description: '所有家長相關頁面' },
-    { path: '/parent/dashboard', label: '家長儀表板', description: '家長儀表板' }
+  // 篩選狀態
+  const [filterRole, setFilterRole] = useState<'all' | 'admin' | 'teacher' | 'parent'>('all');
+
+  // 統一的頁面權限列表 - 包含所有角色的頁面
+  const allPages = [
+    // 管理員頁面
+    { path: '/admin/*', label: '管理員頁面', description: '所有管理員相關頁面', role: 'admin', icon: AdminIcon },
+    { path: '/admin/students', label: '學生管理', description: '學生管理頁面', role: 'admin', icon: StudentIcon },
+    { path: '/admin/teachers', label: '教師管理', description: '教師管理頁面', role: 'admin', icon: TeacherIcon },
+    { path: '/admin/class-management', label: '課程管理', description: '課程管理頁面', role: 'admin', icon: CourseIcon },
+    { path: '/admin/schedule-management', label: '排程管理', description: '排程管理頁面', role: 'admin', icon: ScheduleIcon },
+    { path: '/admin/ai-hub', label: 'AI 工具', description: 'AI 工具中心', role: 'admin', icon: AIIcon },
+    { path: '/admin/permission-management', label: '權限管理', description: '權限管理頁面', role: 'admin', icon: PermissionIcon },
+    { path: '/admin/student-progress', label: '學生進度', description: '學生進度管理', role: 'admin', icon: ProgressIcon },
+    { path: '/admin/resource-library', label: '資源庫', description: '教學資源庫', role: 'admin', icon: ResourceIcon },
+    { path: '/admin/trial-queue', label: '試聽隊列', description: '試聽學生管理', role: 'admin', icon: TrialIcon },
+    { path: '/admin/registration-requests', label: '註冊申請', description: '用戶註冊申請管理', role: 'admin', icon: RegistrationIcon },
+    
+    // 教師頁面
+    { path: '/teacher/*', label: '教師頁面', description: '所有教師相關頁面', role: 'teacher', icon: TeacherIcon },
+    { path: '/teacher/dashboard', label: '教師儀表板', description: '教師儀表板', role: 'teacher', icon: DashboardIcon },
+    { path: '/teacher/profile', label: '個人資料', description: '教師個人資料管理', role: 'teacher', icon: ProfileIcon },
+    { path: '/teacher/students', label: '學生管理', description: '教師的學生管理', role: 'teacher', icon: StudentIcon },
+    { path: '/teacher/lessons', label: '課程記錄', description: '課程記錄管理', role: 'teacher', icon: PageIcon },
+    { path: '/teacher/schedule', label: '課程安排', description: '個人課程安排', role: 'teacher', icon: ScheduleIcon },
+    { path: '/teacher/progress', label: '學生進度', description: '學生學習進度', role: 'teacher', icon: ProgressIcon },
+    { path: '/teacher/media', label: '媒體管理', description: '學生作品管理', role: 'teacher', icon: MediaIcon },
+    
+    // 家長頁面
+    { path: '/parent/*', label: '家長頁面', description: '所有家長相關頁面', role: 'parent', icon: ProfileIcon },
+    { path: '/parent/dashboard', label: '家長儀表板', description: '家長儀表板', role: 'parent', icon: DashboardIcon },
+    { path: '/parent/profile', label: '個人資料', description: '家長個人資料', role: 'parent', icon: ProfileIcon },
+    { path: '/parent/children', label: '子女管理', description: '子女資料管理', role: 'parent', icon: ChildIcon },
+    { path: '/parent/progress', label: '學習進度', description: '子女學習進度', role: 'parent', icon: ProgressIcon },
+    { path: '/parent/schedule', label: '課程安排', description: '子女課程安排', role: 'parent', icon: ScheduleIcon },
+    { path: '/parent/media', label: '作品展示', description: '子女作品展示', role: 'parent', icon: MediaIcon },
   ];
 
-  // 預定義的功能列表
-  const predefinedFeatures = [
-    { name: 'user_management', label: '用戶管理', description: '管理用戶帳號和權限' },
-    { name: 'permission_management', label: '權限管理', description: '管理角色和權限' },
-    { name: 'system_settings', label: '系統設定', description: '系統配置和設定' },
-    { name: 'student_management', label: '學生管理', description: '學生資料管理' },
-    { name: 'teacher_management', label: '教師管理', description: '教師資料管理' },
-    { name: 'course_management', label: '課程管理', description: '課程和排程管理' },
-    { name: 'ai_tools', label: 'AI 工具', description: 'AI 輔助功能' },
-    { name: 'lesson_management', label: '課程記錄', description: '課程記錄管理' },
-    { name: 'student_progress', label: '學生進度', description: '學生學習進度追蹤' },
-    { name: 'media_management', label: '媒體管理', description: '學生作品管理' }
+  // 統一的功能權限列表 - 包含所有角色的功能
+  const allFeatures = [
+    // 管理員功能
+    { name: 'user_management', label: '用戶管理', description: '管理用戶帳號和權限', role: 'admin', icon: UserManagementIcon },
+    { name: 'permission_management', label: '權限管理', description: '管理角色和權限', role: 'admin', icon: PermissionIcon },
+    { name: 'system_settings', label: '系統設定', description: '系統配置和設定', role: 'admin', icon: SettingsIcon },
+    { name: 'student_management', label: '學生管理', description: '學生資料管理', role: 'admin', icon: StudentIcon },
+    { name: 'teacher_management', label: '教師管理', description: '教師資料管理', role: 'admin', icon: TeacherIcon },
+    { name: 'course_management', label: '課程管理', description: '課程和排程管理', role: 'admin', icon: CourseIcon },
+    { name: 'ai_tools', label: 'AI 工具', description: 'AI 輔助功能', role: 'admin', icon: AIIcon },
+    { name: 'data_export', label: '數據導出', description: '數據導出功能', role: 'admin', icon: ExportIcon },
+    { name: 'financial_data', label: '財務數據', description: '財務數據管理', role: 'admin', icon: FinanceIcon },
+    
+    // 教師功能
+    { name: 'lesson_management', label: '課程記錄', description: '課程記錄管理', role: 'teacher', icon: LessonIcon },
+    { name: 'student_progress', label: '學生進度', description: '學生學習進度追蹤', role: 'teacher', icon: ProgressIcon },
+    { name: 'media_management', label: '媒體管理', description: '學生作品管理', role: 'teacher', icon: MediaIcon },
+    { name: 'growth_tree_management', label: '成長樹管理', description: '學生成長樹管理', role: 'teacher', icon: GrowthTreeIcon },
+    { name: 'ability_development', label: '發展能力圖卡', description: '能力發展圖卡', role: 'teacher', icon: AbilityIcon },
+    { name: 'teaching_activities', label: '教學活動管理', description: '教學活動管理', role: 'teacher', icon: ActivityIcon },
+    { name: 'ability_assessment', label: '能力評估管理', description: '學生能力評估', role: 'teacher', icon: AssessmentIcon },
+    { name: 'schedule_management', label: '排程管理', description: '個人課程排程', role: 'teacher', icon: ScheduleIcon },
+    
+    // 家長功能
+    { name: 'child_info', label: '子女資訊', description: '查看子女基本資訊', role: 'parent', icon: ChildIcon },
+    { name: 'progress_tracking', label: '進度追蹤', description: '追蹤子女學習進度', role: 'parent', icon: ProgressIcon },
+    { name: 'lesson_records', label: '課程記錄', description: '查看子女課程記錄', role: 'parent', icon: LessonIcon },
+    { name: 'media_viewing', label: '作品查看', description: '查看子女作品', role: 'parent', icon: MediaIcon },
+    { name: 'communication', label: '溝通功能', description: '與教師溝通', role: 'parent', icon: CommunicationIcon },
+    { name: 'schedule_viewing', label: '課程安排查看', description: '查看子女課程安排', role: 'parent', icon: ScheduleIcon },
   ];
+
+  // 批量操作函數
+  const handleBatchOperation = (role: string, access: 'allow' | 'deny') => {
+    const updatedPermissions = { ...formData.permissions };
+    
+    // 批量設置頁面權限
+    allPages
+      .filter(page => role === 'all' || page.role === role)
+      .forEach(page => {
+        updatedPermissions.pages[page.path] = {
+          access,
+          operations: access === 'allow' ? ['view', 'create', 'edit', 'delete'] : []
+        };
+      });
+    
+    // 批量設置功能權限
+    allFeatures
+      .filter(feature => role === 'all' || feature.role === role)
+      .forEach(feature => {
+        updatedPermissions.features[feature.name] = {
+          access,
+          operations: access === 'allow' ? ['view', 'create', 'edit', 'delete'] : []
+        };
+      });
+    
+    setFormData(prev => ({
+      ...prev,
+      permissions: updatedPermissions
+    }));
+  };
 
   // 切換頁面權限
   const togglePagePermission = (pagePath: string) => {
@@ -1334,7 +1469,7 @@ function RoleForm({
         pages: {
           ...prev.permissions.pages,
           [pagePath]: {
-            access: newAccess,
+            access: newAccess as "allow" | "deny",
             operations: newAccess === 'allow' ? ['view', 'create', 'edit', 'delete'] : []
           }
         }
@@ -1354,7 +1489,7 @@ function RoleForm({
         features: {
           ...prev.permissions.features,
           [featureName]: {
-            access: newAccess,
+            access: newAccess as "allow" | "deny",
             operations: newAccess === 'allow' ? ['view', 'create', 'edit', 'delete'] : []
           }
         }
@@ -1421,20 +1556,96 @@ function RoleForm({
         </label>
       </div>
 
+      {/* 角色篩選 */}
+      <div className="border-t border-[#EADBC8] pt-4">
+        <h4 className="text-lg font-semibold text-[#4B4036] mb-3">角色篩選</h4>
+        <div className="flex space-x-2 mb-4">
+          {(['all', 'admin', 'teacher', 'parent'] as const).map((role) => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => setFilterRole(role)}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                filterRole === role
+                  ? 'bg-[#FFD59A] text-[#4B4036] shadow-md'
+                  : 'bg-[#FFF9F2] text-[#8B7355] hover:bg-[#EADBC8]'
+              }`}
+            >
+              {role === 'all' ? '全部' : role === 'admin' ? '管理員' : role === 'teacher' ? '教師' : '家長'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 批量操作 */}
+      <div className="border-t border-[#EADBC8] pt-4">
+        <h4 className="text-lg font-semibold text-[#4B4036] mb-3">批量操作</h4>
+        <div className="flex space-x-2 mb-4">
+          <button
+            type="button"
+            onClick={() => handleBatchOperation(filterRole, 'allow')}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
+          >
+            全部啟用
+          </button>
+          <button
+            type="button"
+            onClick={() => handleBatchOperation(filterRole, 'deny')}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+          >
+            全部停用
+          </button>
+        </div>
+      </div>
+
+      {/* 權限統計 */}
+      <div className="border-t border-[#EADBC8] pt-4">
+        <h4 className="text-lg font-semibold text-[#4B4036] mb-3">權限統計</h4>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-[#FFF9F2] p-3 rounded-lg">
+            <div className="text-sm text-[#8B7355]">頁面權限</div>
+            <div className="text-lg font-bold text-[#4B4036]">
+              {Object.values(formData.permissions.pages || {}).filter((p: any) => p.access === 'allow').length} / {allPages.length}
+            </div>
+          </div>
+          <div className="bg-[#FFF9F2] p-3 rounded-lg">
+            <div className="text-sm text-[#8B7355]">功能權限</div>
+            <div className="text-lg font-bold text-[#4B4036]">
+              {Object.values(formData.permissions.features || {}).filter((f: any) => f.access === 'allow').length} / {allFeatures.length}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 頁面權限控制 */}
       <div className="border-t border-[#EADBC8] pt-4">
         <h4 className="text-lg font-semibold text-[#4B4036] mb-3">頁面權限控制</h4>
         <div className="space-y-2 max-h-60 overflow-y-auto">
-          {predefinedPages.map((page) => {
+          {allPages
+            .filter(page => filterRole === 'all' || page.role === filterRole)
+            .map((page) => {
             const isAllowed = formData.permissions.pages?.[page.path]?.access === 'allow';
+              const IconComponent = page.icon;
             return (
-              <div key={page.path} className="flex items-center justify-between p-3 bg-[#FFF9F2] rounded-lg">
+                <div key={page.path} className="flex items-center justify-between p-3 bg-[#FFF9F2] rounded-lg hover:bg-[#EADBC8] transition-colors">
+                  <div className="flex items-center flex-1">
+                    <div className="mr-3 text-[#FFD59A]">
+                      <IconComponent className="w-5 h-5" />
+                    </div>
                 <div className="flex-1">
                   <div className="font-medium text-[#4B4036]">{page.label}</div>
                   <div className="text-sm text-[#2B3A3B]">{page.description}</div>
-                  <div className="text-xs text-[#2B3A3B] opacity-75">{page.path}</div>
+                      <div className="text-xs text-[#8B7355]">{page.path}</div>
                 </div>
-                <div className="flex items-center space-x-2">
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      page.role === 'admin' ? 'bg-red-100 text-red-700' :
+                      page.role === 'teacher' ? 'bg-blue-100 text-blue-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      {page.role === 'admin' ? '管理員' : page.role === 'teacher' ? '教師' : '家長'}
+                    </span>
                   <span className={`text-sm font-medium ${isAllowed ? 'text-green-600' : 'text-red-600'}`}>
                     {isAllowed ? '啟用' : '停用'}
                   </span>
@@ -1442,7 +1653,7 @@ function RoleForm({
                     type="button"
                     onClick={() => togglePagePermission(page.path)}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2 ${
-                      isAllowed ? 'bg-green-500' : 'bg-gray-300'
+                        isAllowed ? 'bg-[#FFD59A]' : 'bg-gray-300'
                     }`}
                   >
                     <span
@@ -1462,15 +1673,30 @@ function RoleForm({
       <div className="border-t border-[#EADBC8] pt-4">
         <h4 className="text-lg font-semibold text-[#4B4036] mb-3">功能權限控制</h4>
         <div className="space-y-2 max-h-60 overflow-y-auto">
-          {predefinedFeatures.map((feature) => {
+          {allFeatures
+            .filter(feature => filterRole === 'all' || feature.role === filterRole)
+            .map((feature) => {
             const isAllowed = formData.permissions.features?.[feature.name]?.access === 'allow';
+              const IconComponent = feature.icon;
             return (
-              <div key={feature.name} className="flex items-center justify-between p-3 bg-[#FFF9F2] rounded-lg">
+                <div key={feature.name} className="flex items-center justify-between p-3 bg-[#FFF9F2] rounded-lg hover:bg-[#EADBC8] transition-colors">
+                  <div className="flex items-center flex-1">
+                    <div className="mr-3 text-[#FFD59A]">
+                      <IconComponent className="w-5 h-5" />
+                    </div>
                 <div className="flex-1">
                   <div className="font-medium text-[#4B4036]">{feature.label}</div>
                   <div className="text-sm text-[#2B3A3B]">{feature.description}</div>
                 </div>
-                <div className="flex items-center space-x-2">
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      feature.role === 'admin' ? 'bg-red-100 text-red-700' :
+                      feature.role === 'teacher' ? 'bg-blue-100 text-blue-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      {feature.role === 'admin' ? '管理員' : feature.role === 'teacher' ? '教師' : '家長'}
+                    </span>
                   <span className={`text-sm font-medium ${isAllowed ? 'text-green-600' : 'text-red-600'}`}>
                     {isAllowed ? '啟用' : '停用'}
                   </span>
@@ -1478,7 +1704,7 @@ function RoleForm({
                     type="button"
                     onClick={() => toggleFeaturePermission(feature.name)}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2 ${
-                      isAllowed ? 'bg-green-500' : 'bg-gray-300'
+                        isAllowed ? 'bg-[#FFD59A]' : 'bg-gray-300'
                     }`}
                   >
                     <span
@@ -1600,35 +1826,110 @@ function PermissionForm({
     }
   }, [formData.role_id, roles, initialData?.custom_permissions]);
 
-  // 預定義的頁面列表
-  const predefinedPages = [
-    { path: '/admin/*', label: '管理員頁面', description: '所有管理員相關頁面' },
-    { path: '/admin/students', label: '學生管理', description: '學生管理頁面' },
-    { path: '/admin/teachers', label: '教師管理', description: '教師管理頁面' },
-    { path: '/admin/class-management', label: '課程管理', description: '課程管理頁面' },
-    { path: '/admin/schedule-management', label: '排程管理', description: '排程管理頁面' },
-    { path: '/admin/ai-hub', label: 'AI 工具', description: 'AI 工具中心' },
-    { path: '/admin/permission-management', label: '權限管理', description: '權限管理頁面' },
-    { path: '/admin/student-progress', label: '學生進度', description: '學生進度管理' },
-    { path: '/admin/resource-library', label: '資源庫', description: '教學資源庫' },
-    { path: '/teacher/*', label: '教師頁面', description: '所有教師相關頁面' },
-    { path: '/teacher/dashboard', label: '教師儀表板', description: '教師儀表板' },
-    { path: '/parent/*', label: '家長頁面', description: '所有家長相關頁面' },
-    { path: '/parent/dashboard', label: '家長儀表板', description: '家長儀表板' }
+  // 獲取當前選中角色的名稱
+  const getCurrentRoleName = () => {
+    const selectedRole = roles.find(role => role.id === formData.role_id);
+    return selectedRole?.role_name || 'admin';
+  };
+
+  // 篩選狀態
+  const [filterRole, setFilterRole] = useState<'all' | 'admin' | 'teacher' | 'parent'>('all');
+
+  // 批量操作函數
+  const handleBatchOperation = (role: string, access: 'allow' | 'deny') => {
+    const updatedPermissions = { ...formData.custom_permissions };
+    
+    // 批量設置頁面權限
+    allPages
+      .filter(page => role === 'all' || page.role === role)
+      .forEach(page => {
+        updatedPermissions.pages[page.path] = {
+          access,
+          operations: access === 'allow' ? ['view', 'create', 'edit', 'delete'] : []
+        };
+      });
+    
+    // 批量設置功能權限
+    allFeatures
+      .filter(feature => role === 'all' || feature.role === role)
+      .forEach(feature => {
+        updatedPermissions.features[feature.name] = {
+          access,
+          operations: access === 'allow' ? ['view', 'create', 'edit', 'delete'] : []
+        };
+      });
+    
+    setFormData(prev => ({
+      ...prev,
+      custom_permissions: updatedPermissions
+    }));
+  };
+
+  // 統一的頁面權限列表 - 包含所有角色的頁面
+  const allPages = [
+    // 管理員頁面
+    { path: '/admin/*', label: '管理員頁面', description: '所有管理員相關頁面', role: 'admin', icon: AdminIcon },
+    { path: '/admin/students', label: '學生管理', description: '學生管理頁面', role: 'admin', icon: StudentIcon },
+    { path: '/admin/teachers', label: '教師管理', description: '教師管理頁面', role: 'admin', icon: TeacherIcon },
+    { path: '/admin/class-management', label: '課程管理', description: '課程管理頁面', role: 'admin', icon: CourseIcon },
+    { path: '/admin/schedule-management', label: '排程管理', description: '排程管理頁面', role: 'admin', icon: ScheduleIcon },
+    { path: '/admin/ai-hub', label: 'AI 工具', description: 'AI 工具中心', role: 'admin', icon: AIIcon },
+    { path: '/admin/permission-management', label: '權限管理', description: '權限管理頁面', role: 'admin', icon: PermissionIcon },
+    { path: '/admin/student-progress', label: '學生進度', description: '學生進度管理', role: 'admin', icon: ProgressIcon },
+    { path: '/admin/resource-library', label: '資源庫', description: '教學資源庫', role: 'admin', icon: ResourceIcon },
+    { path: '/admin/trial-queue', label: '試聽隊列', description: '試聽學生管理', role: 'admin', icon: TrialIcon },
+    { path: '/admin/registration-requests', label: '註冊申請', description: '用戶註冊申請管理', role: 'admin', icon: RegistrationIcon },
+    
+    // 教師頁面
+    { path: '/teacher/*', label: '教師頁面', description: '所有教師相關頁面', role: 'teacher', icon: TeacherIcon },
+    { path: '/teacher/dashboard', label: '教師儀表板', description: '教師儀表板', role: 'teacher', icon: DashboardIcon },
+    { path: '/teacher/profile', label: '個人資料', description: '教師個人資料管理', role: 'teacher', icon: ProfileIcon },
+    { path: '/teacher/students', label: '學生管理', description: '教師的學生管理', role: 'teacher', icon: StudentIcon },
+    { path: '/teacher/lessons', label: '課程記錄', description: '課程記錄管理', role: 'teacher', icon: PageIcon },
+    { path: '/teacher/schedule', label: '課程安排', description: '個人課程安排', role: 'teacher', icon: ScheduleIcon },
+    { path: '/teacher/progress', label: '學生進度', description: '學生學習進度', role: 'teacher', icon: ProgressIcon },
+    { path: '/teacher/media', label: '媒體管理', description: '學生作品管理', role: 'teacher', icon: MediaIcon },
+    
+    // 家長頁面
+    { path: '/parent/*', label: '家長頁面', description: '所有家長相關頁面', role: 'parent', icon: ProfileIcon },
+    { path: '/parent/dashboard', label: '家長儀表板', description: '家長儀表板', role: 'parent', icon: DashboardIcon },
+    { path: '/parent/profile', label: '個人資料', description: '家長個人資料', role: 'parent', icon: ProfileIcon },
+    { path: '/parent/children', label: '子女管理', description: '子女資料管理', role: 'parent', icon: ChildIcon },
+    { path: '/parent/progress', label: '學習進度', description: '子女學習進度', role: 'parent', icon: ProgressIcon },
+    { path: '/parent/schedule', label: '課程安排', description: '子女課程安排', role: 'parent', icon: ScheduleIcon },
+    { path: '/parent/media', label: '作品展示', description: '子女作品展示', role: 'parent', icon: MediaIcon },
   ];
 
-  // 預定義的功能列表
-  const predefinedFeatures = [
-    { name: 'user_management', label: '用戶管理', description: '管理用戶帳號和權限' },
-    { name: 'permission_management', label: '權限管理', description: '管理角色和權限' },
-    { name: 'system_settings', label: '系統設定', description: '系統配置和設定' },
-    { name: 'student_management', label: '學生管理', description: '學生資料管理' },
-    { name: 'teacher_management', label: '教師管理', description: '教師資料管理' },
-    { name: 'course_management', label: '課程管理', description: '課程和排程管理' },
-    { name: 'ai_tools', label: 'AI 工具', description: 'AI 輔助功能' },
-    { name: 'lesson_management', label: '課程記錄', description: '課程記錄管理' },
-    { name: 'student_progress', label: '學生進度', description: '學生學習進度追蹤' },
-    { name: 'media_management', label: '媒體管理', description: '學生作品管理' }
+  // 統一的功能權限列表 - 包含所有角色的功能
+  const allFeatures = [
+    // 管理員功能
+    { name: 'user_management', label: '用戶管理', description: '管理用戶帳號和權限', role: 'admin', icon: UserManagementIcon },
+    { name: 'permission_management', label: '權限管理', description: '管理角色和權限', role: 'admin', icon: PermissionIcon },
+    { name: 'system_settings', label: '系統設定', description: '系統配置和設定', role: 'admin', icon: SettingsIcon },
+    { name: 'student_management', label: '學生管理', description: '學生資料管理', role: 'admin', icon: StudentIcon },
+    { name: 'teacher_management', label: '教師管理', description: '教師資料管理', role: 'admin', icon: TeacherIcon },
+    { name: 'course_management', label: '課程管理', description: '課程和排程管理', role: 'admin', icon: CourseIcon },
+    { name: 'ai_tools', label: 'AI 工具', description: 'AI 輔助功能', role: 'admin', icon: AIIcon },
+    { name: 'data_export', label: '數據導出', description: '數據導出功能', role: 'admin', icon: ExportIcon },
+    { name: 'financial_data', label: '財務數據', description: '財務數據管理', role: 'admin', icon: FinanceIcon },
+    
+    // 教師功能
+    { name: 'lesson_management', label: '課程記錄', description: '課程記錄管理', role: 'teacher', icon: LessonIcon },
+    { name: 'student_progress', label: '學生進度', description: '學生學習進度追蹤', role: 'teacher', icon: ProgressIcon },
+    { name: 'media_management', label: '媒體管理', description: '學生作品管理', role: 'teacher', icon: MediaIcon },
+    { name: 'growth_tree_management', label: '成長樹管理', description: '學生成長樹管理', role: 'teacher', icon: GrowthTreeIcon },
+    { name: 'ability_development', label: '發展能力圖卡', description: '能力發展圖卡', role: 'teacher', icon: AbilityIcon },
+    { name: 'teaching_activities', label: '教學活動管理', description: '教學活動管理', role: 'teacher', icon: ActivityIcon },
+    { name: 'ability_assessment', label: '能力評估管理', description: '學生能力評估', role: 'teacher', icon: AssessmentIcon },
+    { name: 'schedule_management', label: '排程管理', description: '個人課程排程', role: 'teacher', icon: ScheduleIcon },
+    
+    // 家長功能
+    { name: 'child_info', label: '子女資訊', description: '查看子女基本資訊', role: 'parent', icon: ChildIcon },
+    { name: 'progress_tracking', label: '進度追蹤', description: '追蹤子女學習進度', role: 'parent', icon: ProgressIcon },
+    { name: 'lesson_records', label: '課程記錄', description: '查看子女課程記錄', role: 'parent', icon: LessonIcon },
+    { name: 'media_viewing', label: '作品查看', description: '查看子女作品', role: 'parent', icon: MediaIcon },
+    { name: 'communication', label: '溝通功能', description: '與教師溝通', role: 'parent', icon: CommunicationIcon },
+    { name: 'schedule_viewing', label: '課程安排查看', description: '查看子女課程安排', role: 'parent', icon: ScheduleIcon },
   ];
 
   // 切換頁面權限
@@ -1752,51 +2053,77 @@ function PermissionForm({
         </div>
       )}
 
-      {/* 頁面權限控制 */}
+      {/* 統一權限控制 */}
       <div className="border-t border-[#EADBC8] pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-lg font-semibold text-[#4B4036]">頁面權限控制</h4>
+        <h4 className="text-lg font-semibold text-[#4B4036] mb-3">統一權限控制</h4>
+        
+        {/* 角色篩選器 */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-[#4B4036] mb-2">篩選角色</label>
+          <div className="flex space-x-2">
+            {['all', 'admin', 'teacher', 'parent'].map((role) => (
           <button
+                key={role}
             type="button"
-            onClick={() => {
-              const rolePermissions = getRolePermissions(formData.role_id);
-              setFormData(prev => ({
-                ...prev,
-                custom_permissions: {
-                  ...prev.custom_permissions,
-                  pages: rolePermissions.pages || {}
-                }
-              }));
-            }}
-            className="px-3 py-1 text-sm bg-[#FFD59A] text-[#4B4036] rounded-lg hover:bg-[#EBC9A4] transition-colors"
-          >
-            重置為角色預設
+                onClick={() => setFilterRole(role as any)}
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                  filterRole === role
+                    ? 'bg-[#FFD59A] text-[#4B4036]'
+                    : 'bg-[#F9F2EF] text-[#8B7355] hover:bg-[#EADBC8]'
+                }`}
+              >
+                {role === 'all' ? '全部' : role === 'admin' ? '管理員' : role === 'teacher' ? '教師' : '家長'}
           </button>
+            ))}
         </div>
-        <div className="space-y-2 max-h-60 overflow-y-auto">
-          {predefinedPages.map((page) => {
+        </div>
+
+                  {/* 權限列表 */}
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {/* 頁面權限 */}
+            <div>
+              <h5 className="text-md font-medium text-[#4B4036] mb-3 flex items-center">
+                <PageIcon className="w-5 h-5 mr-2 text-[#FFD59A]" />
+                頁面權限
+              </h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {allPages
+                  .filter(page => filterRole === 'all' || page.role === filterRole)
+                  .map((page) => {
             const isAllowed = formData.custom_permissions.pages?.[page.path]?.access === 'allow';
+                    const IconComponent = page.icon;
             return (
-              <div key={page.path} className="flex items-center justify-between p-3 bg-[#FFF9F2] rounded-lg">
-                <div className="flex-1">
-                  <div className="font-medium text-[#4B4036]">{page.label}</div>
-                  <div className="text-sm text-[#2B3A3B]">{page.description}</div>
-                  <div className="text-xs text-[#2B3A3B] opacity-75">{page.path}</div>
+                      <div key={page.path} className="flex items-center justify-between p-3 bg-[#FFF9F2] rounded-lg border border-[#EADBC8] hover:bg-[#F9F2EF] transition-colors">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <IconComponent className="w-5 h-5 text-[#FFD59A]" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-[#4B4036] text-sm truncate">{page.label}</div>
+                            <div className="text-xs text-[#8B7355] truncate">{page.description}</div>
+                            <div className={`text-xs px-2 py-1 rounded-full mt-1 inline-block ${
+                              page.role === 'admin' 
+                                ? 'text-[#A64B2A] bg-[#FFE0E0]' 
+                                : page.role === 'teacher' 
+                                ? 'text-[#2B3A3B] bg-[#E0F2E0]' 
+                                : 'text-[#4B4036] bg-[#EADBC8]'
+                            }`}>
+                              {page.role === 'admin' ? '管理員' : page.role === 'teacher' ? '教師' : '家長'}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-sm font-medium ${isAllowed ? 'text-green-600' : 'text-red-600'}`}>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 ml-3">
+                          <span className={`text-xs font-medium ${isAllowed ? 'text-green-600' : 'text-red-600'}`}>
                     {isAllowed ? '啟用' : '停用'}
                   </span>
                   <button
                     type="button"
                     onClick={() => togglePagePermission(page.path)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2 ${
-                      isAllowed ? 'bg-green-500' : 'bg-gray-300'
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-1 ${
+                              isAllowed ? 'bg-[#4CAF50]' : 'bg-[#EADBC8]'
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${
-                        isAllowed ? 'translate-x-6' : 'translate-x-1'
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${
+                                isAllowed ? 'translate-x-5' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -1807,50 +2134,50 @@ function PermissionForm({
         </div>
       </div>
 
-      {/* 功能權限控制 */}
-      <div className="border-t border-[#EADBC8] pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-lg font-semibold text-[#4B4036]">功能權限控制</h4>
-          <button
-            type="button"
-            onClick={() => {
-              const rolePermissions = getRolePermissions(formData.role_id);
-              setFormData(prev => ({
-                ...prev,
-                custom_permissions: {
-                  ...prev.custom_permissions,
-                  features: rolePermissions.features || {}
-                }
-              }));
-            }}
-            className="px-3 py-1 text-sm bg-[#FFD59A] text-[#4B4036] rounded-lg hover:bg-[#EBC9A4] transition-colors"
-          >
-            重置為角色預設
-          </button>
-        </div>
-        <div className="space-y-2 max-h-60 overflow-y-auto">
-          {predefinedFeatures.map((feature) => {
+            {/* 功能權限 */}
+            <div>
+              <h5 className="text-md font-medium text-[#4B4036] mb-3 flex items-center">
+                <FeatureIcon className="w-5 h-5 mr-2 text-[#FFD59A]" />
+                功能權限
+              </h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {allFeatures
+                  .filter(feature => filterRole === 'all' || feature.role === filterRole)
+                  .map((feature) => {
             const isAllowed = formData.custom_permissions.features?.[feature.name]?.access === 'allow';
+                    const IconComponent = feature.icon;
             return (
-              <div key={feature.name} className="flex items-center justify-between p-3 bg-[#FFF9F2] rounded-lg">
-                <div className="flex-1">
-                  <div className="font-medium text-[#4B4036]">{feature.label}</div>
-                  <div className="text-sm text-[#2B3A3B]">{feature.description}</div>
+                      <div key={feature.name} className="flex items-center justify-between p-3 bg-[#FFF9F2] rounded-lg border border-[#EADBC8] hover:bg-[#F9F2EF] transition-colors">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <IconComponent className="w-5 h-5 text-[#FFD59A]" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-[#4B4036] text-sm truncate">{feature.label}</div>
+                            <div className="text-xs text-[#8B7355] truncate">{feature.description}</div>
+                            <div className={`text-xs px-2 py-1 rounded-full mt-1 inline-block ${
+                              feature.role === 'admin' 
+                                ? 'text-[#A64B2A] bg-[#FFE0E0]' 
+                                : feature.role === 'teacher' 
+                                ? 'text-[#2B3A3B] bg-[#E0F2E0]' 
+                                : 'text-[#4B4036] bg-[#EADBC8]'
+                            }`}>
+                              {feature.role === 'admin' ? '管理員' : feature.role === 'teacher' ? '教師' : '家長'}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-sm font-medium ${isAllowed ? 'text-green-600' : 'text-red-600'}`}>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 ml-3">
+                          <span className={`text-xs font-medium ${isAllowed ? 'text-green-600' : 'text-red-600'}`}>
                     {isAllowed ? '啟用' : '停用'}
                   </span>
                   <button
                     type="button"
                     onClick={() => toggleFeaturePermission(feature.name)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2 ${
-                      isAllowed ? 'bg-green-500' : 'bg-gray-300'
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-1 ${
+                              isAllowed ? 'bg-[#4CAF50]' : 'bg-[#EADBC8]'
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${
-                        isAllowed ? 'translate-x-6' : 'translate-x-1'
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${
+                                isAllowed ? 'translate-x-5' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -1858,6 +2185,43 @@ function PermissionForm({
               </div>
             );
           })}
+              </div>
+            </div>
+          </div>
+
+                  {/* 批量操作 */}
+          <div className="mt-4 pt-4 border-t border-[#EADBC8]">
+            <h5 className="text-md font-medium text-[#4B4036] mb-3">批量操作</h5>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => handleBatchOperation('all', 'allow')}
+                className="px-3 py-1 bg-[#4CAF50] text-white rounded-lg text-sm font-medium hover:bg-[#45a049] transition-colors"
+              >
+                全部啟用
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchOperation('all', 'deny')}
+                className="px-3 py-1 bg-[#F44336] text-white rounded-lg text-sm font-medium hover:bg-[#d32f2f] transition-colors"
+              >
+                全部停用
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchOperation(filterRole, 'allow')}
+                className="px-3 py-1 bg-[#FFD59A] text-[#4B4036] rounded-lg text-sm font-medium hover:bg-[#EBC9A4] transition-colors"
+              >
+                當前角色全部啟用
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchOperation(filterRole, 'deny')}
+                className="px-3 py-1 bg-[#EADBC8] text-[#4B4036] rounded-lg text-sm font-medium hover:bg-[#D4C4B8] transition-colors"
+              >
+                當前角色全部停用
+              </button>
+            </div>
         </div>
       </div>
 
