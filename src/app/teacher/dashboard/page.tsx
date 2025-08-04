@@ -413,6 +413,26 @@ export default function TeacherDashboard() {
     return undefined;
   }, [teacherData]);
 
+  // 當教師資料載入完成後，同步到個人資料表單
+  useEffect(() => {
+    if (teacherData) {
+      setProfileForm({
+        teacher_fullname: teacherData.teacher_fullname || '',
+        teacher_nickname: teacherData.teacher_nickname || '',
+        teacher_email: teacherData.teacher_email || '',
+        teacher_phone: teacherData.teacher_phone || '',
+        teacher_address: teacherData.teacher_address || '',
+        teacher_dob: teacherData.teacher_dob || '',
+        teacher_background: teacherData.teacher_background || '',
+        teacher_bankid: teacherData.teacher_bankid || '',
+        course_roles_note: teacherData.course_roles_note || '',
+        old_password: '',
+        new_password: '',
+        confirm_password: ''
+      });
+    }
+  }, [teacherData]);
+
   // 當媒體模態視窗打開時載入學生媒體資料
   useEffect(() => {
     if (showMediaUploadModal && selectedStudentForMediaUpload) {
@@ -597,11 +617,16 @@ export default function TeacherDashboard() {
         await loadTodayLessons(completeTeacherData);
         console.log('=== 今日課程載入完成 ===');
       } else {
-        console.log('設置教師資料為 null');
-        setTeacherData(null);
+        // ID 查詢成功，設置教師資料
+        console.log('ID 查詢成功，設置教師資料');
+        const completeTeacherData: TeacherProfile = {
+          ...teacherData,
+          course_roles_note: null
+        };
+        setTeacherData(completeTeacherData);
         // 載入今日課程
         console.log('=== 開始載入今日課程 ===');
-        await loadTodayLessons(null as any); // 傳 null，讓下游判斷
+        await loadTodayLessons(completeTeacherData);
         console.log('=== 今日課程載入完成 ===');
       }
       
