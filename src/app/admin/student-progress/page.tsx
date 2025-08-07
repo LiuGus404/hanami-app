@@ -47,6 +47,17 @@ interface StudentWithoutAssessment {
   lesson_time?: string;
 }
 
+interface StudentMediaStatus {
+  id: string;
+  full_name: string;
+  nick_name?: string | null;
+  course_type?: string | null;
+  lesson_time?: string;
+  has_media: boolean;
+  media_count?: number;
+  last_media_upload?: string | null;
+}
+
 export default function StudentProgressDashboard() {
   const [abilities, setAbilities] = useState<DevelopmentAbility[]>([]);
   const [trees, setTrees] = useState<GrowthTree[]>([]);
@@ -55,6 +66,8 @@ export default function StudentProgressDashboard() {
   const [studentsWithoutAssessment, setStudentsWithoutAssessment] = useState<StudentWithoutAssessment[]>([]);
   const [studentsAssessed, setStudentsAssessed] = useState<StudentWithoutAssessment[]>([]);
   const [studentsNoTree, setStudentsNoTree] = useState<StudentWithoutAssessment[]>([]);
+  const [studentsWithoutMedia, setStudentsWithoutMedia] = useState<StudentMediaStatus[]>([]);
+  const [studentsWithMedia, setStudentsWithMedia] = useState<StudentMediaStatus[]>([]);
   const [loading, setLoading] = useState(true);
   
   // 搜尋和篩選狀態
@@ -62,6 +75,7 @@ export default function StudentProgressDashboard() {
   const [selectedDate, setSelectedDate] = useState(getHKDateString());
   const [assessmentLimit, setAssessmentLimit] = useState(5);
   const [selectedAssessmentDate, setSelectedAssessmentDate] = useState(getHKDateString());
+  const [selectedMediaDate, setSelectedMediaDate] = useState(getHKDateString());
   
   // 篩選相關狀態
   const [showFilterPopup, setShowFilterPopup] = useState(false);
@@ -77,6 +91,7 @@ export default function StudentProgressDashboard() {
 
   // 日期選擇器狀態
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showMediaDatePicker, setShowMediaDatePicker] = useState(false);
 
   // 學生資料載入狀態
   const [loadingStudents, setLoadingStudents] = useState(false);
@@ -89,6 +104,11 @@ export default function StudentProgressDashboard() {
   useEffect(() => {
     loadStudentsWithoutAssessment();
   }, [selectedAssessmentDate]);
+
+  // 當選擇的媒體日期改變時，重新載入學生媒體狀態
+  useEffect(() => {
+    loadStudentsMediaStatus();
+  }, [selectedMediaDate]);
 
   // 處理能力評估提交
   const handleAssessmentSubmit = async (assessment: any) => {
@@ -338,10 +358,123 @@ export default function StudentProgressDashboard() {
       }));
       setRecentAssessments(fixedAssessments);
 
+      // 載入需要評估的學生
+      await loadStudentsWithoutAssessment();
+      
+      // 載入學生媒體狀態
+      await loadStudentsMediaStatus();
+
     } catch (error) {
       console.error('載入管理面板資料時發生錯誤:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 載入學生媒體狀態
+  const loadStudentsMediaStatus = async () => {
+    try {
+      setLoadingStudents(true);
+      
+      // 獲取指定日期的學生課程記錄
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('hanami_student_lesson')
+        .select(`
+          student_id,
+          lesson_date,
+          actual_timeslot,
+          full_name,
+          course_type
+        `)
+        .eq('lesson_date', selectedMediaDate)
+        .not('student_id', 'is', null);
+
+      if (lessonsError) throw lessonsError;
+
+      if (!lessonsData || lessonsData.length === 0) {
+        setStudentsWithoutMedia([]);
+        setStudentsWithMedia([]);
+        return;
+      }
+
+      // 獲取這些學生的媒體上傳狀態
+      const studentIds = [...new Set(lessonsData.map(lesson => lesson.student_id).filter(id => id !== null))] as string[];
+      
+      const { data: mediaData, error: mediaError } = await supabase
+        .from('hanami_student_media')
+        .select(`
+          student_id,
+          created_at,
+          media_type
+        `)
+        .in('student_id', studentIds)
+        .gte('created_at', `${selectedMediaDate}T00:00:00`)
+        .lte('created_at', `${selectedMediaDate}T23:59:59`);
+
+      if (mediaError) throw mediaError;
+
+      // 處理學生媒體狀態
+      const studentsWithMediaMap = new Map();
+      const studentsWithoutMediaList: StudentMediaStatus[] = [];
+
+      // 初始化所有學生為未上傳狀態
+      lessonsData.forEach(lesson => {
+        const studentId = lesson.student_id;
+        if (!studentsWithMediaMap.has(studentId)) {
+          studentsWithMediaMap.set(studentId, {
+            id: studentId,
+            full_name: lesson.full_name || '未知學生',
+            nick_name: null,
+            course_type: lesson.course_type,
+            lesson_time: lesson.actual_timeslot,
+            has_media: false,
+            media_count: 0,
+            last_media_upload: null
+          });
+        }
+      });
+
+      // 更新有媒體的學生狀態
+      if (mediaData) {
+        mediaData.forEach(media => {
+          const studentId = media.student_id;
+          if (studentsWithMediaMap.has(studentId)) {
+            const student = studentsWithMediaMap.get(studentId);
+            student.has_media = true;
+            student.media_count = (student.media_count || 0) + 1;
+            if (!student.last_media_upload || media.created_at > student.last_media_upload) {
+              student.last_media_upload = media.created_at;
+            }
+          }
+        });
+      }
+
+      // 分類學生
+      const withMedia: StudentMediaStatus[] = [];
+      const withoutMedia: StudentMediaStatus[] = [];
+
+      studentsWithMediaMap.forEach(student => {
+        if (student.has_media) {
+          withMedia.push(student);
+        } else {
+          withoutMedia.push(student);
+        }
+      });
+
+      // 按時間排序
+      const sortByTime = (a: StudentMediaStatus, b: StudentMediaStatus) => {
+        const timeA = a.lesson_time || '';
+        const timeB = b.lesson_time || '';
+        return timeA.localeCompare(timeB);
+      };
+
+      setStudentsWithMedia(withMedia.sort(sortByTime));
+      setStudentsWithoutMedia(withoutMedia.sort(sortByTime));
+
+    } catch (error) {
+      console.error('載入學生媒體狀態時發生錯誤:', error);
+    } finally {
+      setLoadingStudents(false);
     }
   };
 
@@ -429,7 +562,7 @@ export default function StudentProgressDashboard() {
         </div>
 
         {/* 統計卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <HanamiCard className="p-6">
             <div className="flex items-center">
               <div className="p-3 bg-gradient-to-br from-hanami-primary to-hanami-secondary rounded-full">
@@ -477,10 +610,22 @@ export default function StudentProgressDashboard() {
                   </div>
                   </div>
           </HanamiCard>
+
+          <HanamiCard className="p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full">
+                <VideoCameraIcon className="h-6 w-6 text-white" />
+            </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-hanami-text-secondary">今日媒體</p>
+                <p className="text-2xl font-bold text-hanami-text">{studentsWithMedia.length}</p>
+                  </div>
+                  </div>
+          </HanamiCard>
             </div>
 
         {/* 主要內容區域 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 學生評估狀態 - 左邊 */}
           <HanamiCard className="p-6">
             <div className="flex justify-between items-center mb-4">
@@ -764,6 +909,180 @@ export default function StudentProgressDashboard() {
                 )}
                 </div>
           </HanamiCard>
+
+          {/* 學生媒體狀態 - 第三個卡片 */}
+          <HanamiCard className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-hanami-text">
+                {selectedMediaDate === getHKDateString() ? '今天' : selectedMediaDate} 學生媒體狀態
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  onClick={() => setShowMediaDatePicker(true)}
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  {selectedMediaDate}
+                </button>
+                <VideoCameraIcon className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+
+            {/* 載入動畫 */}
+            {loadingStudents && (
+              <div className="flex items-center justify-center py-8">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative">
+                    <div className="w-12 h-12 border-4 border-[#EADBC8] border-t-[#A64B2A] rounded-full animate-spin"></div>
+                  </div>
+                  <p className="text-sm text-hanami-text-secondary">載入學生媒體狀態中...</p>
+                </div>
+              </div>
+            )}
+
+            {/* 媒體狀態統計 */}
+            {!loadingStudents && (
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-red-600">未上傳媒體</p>
+                      <p className="text-2xl font-bold text-red-700">{studentsWithoutMedia.length}</p>
+                    </div>
+                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                      <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-600">已上傳媒體</p>
+                      <p className="text-2xl font-bold text-green-700">{studentsWithMedia.length}</p>
+                    </div>
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 學生列表 */}
+            {!loadingStudents && (studentsWithoutMedia.length > 0 || studentsWithMedia.length > 0) && (
+              <div className="space-y-4">
+                {/* 未上傳媒體學生 */}
+                {studentsWithoutMedia.length > 0 && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-hanami-text mb-3 flex items-center">
+                      <span className="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+                      未上傳媒體學生 ({studentsWithoutMedia.length})
+                    </h4>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {studentsWithoutMedia.map((student) => (
+                        <div key={student.id} className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-rose-50 rounded-lg border border-red-200 hover:border-red-300 transition-colors">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-6 h-6 bg-gradient-to-br from-red-400 to-rose-400 rounded-full flex items-center justify-center shadow-sm">
+                                <span className="text-white text-xs font-bold">
+                                  {student.full_name.charAt(0)}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium text-hanami-text text-sm">
+                                  {student.full_name}
+                                </p>
+                                <p className="text-xs text-hanami-text-secondary">
+                                  {student.course_type || '未設定課程'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs">
+                              <span className="text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                                {student.lesson_time || '時間未定'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <button
+                              className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-gradient-to-r from-red-400 to-rose-400 text-white hover:from-red-500 hover:to-rose-500 transition-all duration-200 shadow-sm"
+                              onClick={() => window.location.href = `/admin/student-progress/student-media?student_id=${student.id}`}
+                            >
+                              <VideoCameraIcon className="w-3 h-3" />
+                              查看媒體
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 已上傳媒體學生 */}
+                {studentsWithMedia.length > 0 && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-hanami-text mb-3 flex items-center">
+                      <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                      已上傳媒體學生 ({studentsWithMedia.length})
+                    </h4>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {studentsWithMedia.map((student) => (
+                        <div key={student.id} className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 hover:border-green-300 transition-colors">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full flex items-center justify-center shadow-sm">
+                                <span className="text-white text-xs font-bold">
+                                  {student.full_name.charAt(0)}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium text-hanami-text text-sm">
+                                  {student.full_name}
+                                </p>
+                                <p className="text-xs text-hanami-text-secondary">
+                                  {student.course_type || '未設定課程'} • {student.media_count} 個檔案
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs">
+                              <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                {student.lesson_time || '時間未定'}
+                              </span>
+                              <span className="text-gray-500">
+                                已上傳 ✓
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <button
+                              className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-gradient-to-r from-green-400 to-emerald-400 text-white hover:from-green-500 hover:to-emerald-500 transition-all duration-200 shadow-sm"
+                              onClick={() => window.location.href = `/admin/student-progress/student-media?student_id=${student.id}`}
+                            >
+                              <VideoCameraIcon className="w-3 h-3" />
+                              查看媒體
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 沒有學生時顯示 */}
+            {!loadingStudents && studentsWithoutMedia.length === 0 && studentsWithMedia.length === 0 && (
+              <div className="text-center py-8 text-hanami-text-secondary">
+                <VideoCameraIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                <p>該日期沒有學生課程安排</p>
+              </div>
+            )}
+          </HanamiCard>
               </div>
             </div>
 
@@ -814,6 +1133,18 @@ export default function StudentProgressDashboard() {
             setShowDatePicker(false);
           }}
           onClose={() => setShowDatePicker(false)}
+        />
+      )}
+
+      {/* 媒體日期選擇器 */}
+      {showMediaDatePicker && (
+        <Calendarui
+          value={selectedMediaDate}
+          onSelect={(date) => {
+            setSelectedMediaDate(date);
+            setShowMediaDatePicker(false);
+          }}
+          onClose={() => setShowMediaDatePicker(false)}
         />
       )}
     </div>

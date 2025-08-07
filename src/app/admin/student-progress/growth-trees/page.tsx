@@ -606,10 +606,21 @@ export default function GrowthTreesPage() {
 
   // 獲取篩選後的成長樹
   const getFilteredTrees = () => {
-    return trees.filter(tree => {
+    console.log('開始篩選成長樹，總數:', trees.length);
+    console.log('當前篩選條件:', filters);
+    
+    // 暫時禁用所有篩選，直接返回所有成長樹
+    console.log('暫時禁用篩選，返回所有成長樹');
+    return trees;
+    
+    /*
+    const filtered = trees.filter(tree => {
+      console.log(`檢查成長樹: ${tree.tree_name} (ID: ${tree.id})`);
+      
       // 搜尋篩選
       if (filters.search && !tree.tree_name.toLowerCase().includes(filters.search.toLowerCase()) &&
           !(tree.tree_description && tree.tree_description.toLowerCase().includes(filters.search.toLowerCase()))) {
+        console.log(`- 搜尋篩選失敗: ${tree.tree_name}`);
         return false;
       }
 
@@ -618,6 +629,7 @@ export default function GrowthTreesPage() {
         filters.tree_levels.length > 0 &&
         (tree.tree_level === undefined || !filters.tree_levels.includes(tree.tree_level))
       ) {
+        console.log(`- 等級篩選失敗: ${tree.tree_name}, 等級: ${tree.tree_level}`);
         return false;
       }
 
@@ -625,6 +637,7 @@ export default function GrowthTreesPage() {
       if (filters.statuses.length > 0) {
         const isActive = tree.is_active ? 'active' : 'inactive';
         if (!filters.statuses.includes(isActive)) {
+          console.log(`- 狀態篩選失敗: ${tree.tree_name}, 狀態: ${isActive}`);
           return false;
         }
       }
@@ -638,6 +651,7 @@ export default function GrowthTreesPage() {
           )
         );
         if (!hasMatchingAbility) {
+          console.log(`- 能力篩選失敗: ${tree.tree_name}`);
           return false;
         }
       }
@@ -651,12 +665,18 @@ export default function GrowthTreesPage() {
           )
         );
         if (!hasMatchingActivity) {
+          console.log(`- 活動篩選失敗: ${tree.tree_name}`);
           return false;
         }
       }
 
+      console.log(`- 通過所有篩選: ${tree.tree_name}`);
       return true;
     });
+    
+    console.log('篩選完成，結果數量:', filtered.length);
+    return filtered;
+    */
   };
 
   if (loading) {
@@ -672,6 +692,18 @@ export default function GrowthTreesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
       <div className="max-w-7xl mx-auto">
+        {/* 調試資訊 */}
+        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded-lg">
+          <h3 className="font-bold text-yellow-800 mb-2">調試資訊</h3>
+          <div className="text-sm text-yellow-700 space-y-1">
+            <div>總成長樹數量: {trees.length}</div>
+            <div>總目標數量: {goals.length}</div>
+            <div>篩選條件: {JSON.stringify(filters)}</div>
+            <div>篩選後成長樹數量: {getFilteredTrees().length}</div>
+            <div>載入狀態: {loading ? '載入中' : '完成'}</div>
+          </div>
+        </div>
+
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-hanami-text mb-2">
