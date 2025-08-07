@@ -3,20 +3,59 @@
 import { useState } from 'react';
 import { HanamiCard, HanamiButton } from '@/components/ui';
 
-export default function TestRlsFixPage() {
+export default function TestSimpleUpdatePage() {
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  const testGetLevels = async () => {
+  const testSimpleUpdate = async () => {
     setLoading(true);
     setResult('');
     
     try {
-      const response = await fetch('/api/media-quota-levels');
+      // 測試更新基礎版
+      const response = await fetch('/api/media-quota-levels', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: 'b4eef4c7-6e07-41b4-90f4-0d196162a717',
+          photo_limit: 15, // 只更新一個欄位
+        }),
+      });
+      
       const result = await response.json();
-      setResult(`GET 測試結果:\n狀態碼: ${response.status}\n回應: ${JSON.stringify(result, null, 2)}`);
+      setResult(`簡單更新測試結果:\n狀態碼: ${response.status}\n回應: ${JSON.stringify(result, null, 2)}`);
+      
     } catch (error) {
-      setResult(`GET 測試錯誤: ${error}`);
+      setResult(`簡單更新測試錯誤: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testToggleActive = async () => {
+    setLoading(true);
+    setResult('');
+    
+    try {
+      // 測試切換狀態
+      const response = await fetch('/api/media-quota-levels', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: 'b4eef4c7-6e07-41b4-90f4-0d196162a717',
+          is_active: false,
+        }),
+      });
+      
+      const result = await response.json();
+      setResult(`切換狀態測試結果:\n狀態碼: ${response.status}\n回應: ${JSON.stringify(result, null, 2)}`);
+      
+    } catch (error) {
+      setResult(`切換狀態測試錯誤: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -27,6 +66,7 @@ export default function TestRlsFixPage() {
     setResult('');
     
     try {
+      // 測試創建新等級
       const response = await fetch('/api/media-quota-levels', {
         method: 'POST',
         headers: {
@@ -44,55 +84,10 @@ export default function TestRlsFixPage() {
       });
       
       const result = await response.json();
-      setResult(`POST 測試結果:\n狀態碼: ${response.status}\n回應: ${JSON.stringify(result, null, 2)}`);
-    } catch (error) {
-      setResult(`POST 測試錯誤: ${error}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testUpdateLevel = async () => {
-    setLoading(true);
-    setResult('');
-    
-    try {
-      const response = await fetch('/api/media-quota-levels', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: 'b4eef4c7-6e07-41b4-90f4-0d196162a717',
-          photo_limit: 12,
-        }),
-      });
+      setResult(`創建測試結果:\n狀態碼: ${response.status}\n回應: ${JSON.stringify(result, null, 2)}`);
       
-      const result = await response.json();
-      setResult(`PUT 測試結果:\n狀態碼: ${response.status}\n回應: ${JSON.stringify(result, null, 2)}`);
     } catch (error) {
-      setResult(`PUT 測試錯誤: ${error}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testFixData = async () => {
-    setLoading(true);
-    setResult('');
-    
-    try {
-      const response = await fetch('/api/fix-media-quota-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      const result = await response.json();
-      setResult(`修復資料測試結果:\n狀態碼: ${response.status}\n回應: ${JSON.stringify(result, null, 2)}`);
-    } catch (error) {
-      setResult(`修復資料測試錯誤: ${error}`);
+      setResult(`創建測試錯誤: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -100,7 +95,7 @@ export default function TestRlsFixPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">RLS 修復測試</h1>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">簡單更新測試</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 測試控制面板 */}
@@ -110,38 +105,29 @@ export default function TestRlsFixPage() {
           <div className="space-y-4">
             <HanamiButton
               variant="primary"
-              onClick={testGetLevels}
+              onClick={testSimpleUpdate}
               disabled={loading}
               className="w-full"
             >
-              {loading ? '測試中...' : '測試 GET 請求'}
+              {loading ? '測試中...' : '測試簡單更新'}
             </HanamiButton>
             
             <HanamiButton
               variant="secondary"
-              onClick={testCreateLevel}
+              onClick={testToggleActive}
               disabled={loading}
               className="w-full"
             >
-              {loading ? '測試中...' : '測試 POST 請求'}
-            </HanamiButton>
-            
-            <HanamiButton
-              variant="cute"
-              onClick={testUpdateLevel}
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? '測試中...' : '測試 PUT 請求'}
+              {loading ? '測試中...' : '測試切換狀態'}
             </HanamiButton>
             
             <HanamiButton
               variant="danger"
-              onClick={testFixData}
+              onClick={testCreateLevel}
               disabled={loading}
               className="w-full"
             >
-              {loading ? '測試中...' : '測試資料修復'}
+              {loading ? '測試中...' : '測試創建等級'}
             </HanamiButton>
           </div>
         </HanamiCard>
@@ -164,17 +150,12 @@ export default function TestRlsFixPage() {
       
       <div className="mt-8">
         <HanamiCard className="p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">修復說明</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">測試說明</h2>
           
           <div className="space-y-2 text-sm text-gray-600">
-            <p><strong>問題:</strong> RLS 政策阻擋了 API 請求</p>
-            <p><strong>解決方案:</strong> 使用 service_role_key 繞過 RLS 政策</p>
-            <p><strong>修改檔案:</strong></p>
-            <ul className="list-disc list-inside ml-4">
-              <li>src/app/api/media-quota-levels/route.ts</li>
-              <li>src/app/api/fix-media-quota-data/route.ts</li>
-            </ul>
-            <p><strong>測試順序:</strong> 先測試 GET，再測試 POST/PUT，最後測試資料修復</p>
+            <p><strong>簡單更新測試:</strong> 只更新 photo_limit 欄位，測試最小化更新</p>
+            <p><strong>切換狀態測試:</strong> 只更新 is_active 欄位，測試布林值更新</p>
+            <p><strong>創建等級測試:</strong> 創建新的配額等級，測試 POST 方法</p>
           </div>
         </HanamiCard>
       </div>

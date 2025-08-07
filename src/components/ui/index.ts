@@ -48,6 +48,7 @@ export { default as SimpleAbilityAssessmentModal } from './SimpleAbilityAssessme
 export { default as StudentTreeAssignmentModal } from './StudentTreeAssignmentModal';
 export { default as StudentMediaModal } from './StudentMediaModal';
 export { PlanUpgradeModal } from './PlanUpgradeModal';
+export { MediaQuotaSettingsModal } from './MediaQuotaSettingsModal';
 
 // 類型定義
  

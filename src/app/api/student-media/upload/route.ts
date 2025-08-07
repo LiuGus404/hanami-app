@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { QuotaChecker } from '@/lib/quota-checker';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +46,38 @@ export async function POST(request: NextRequest) {
       studentId,
       mediaType
     });
+
+    // 檢查配額限制
+    try {
+      const quotaChecker = new QuotaChecker();
+      const quotaCheck = await quotaChecker.checkUploadQuota(
+        studentId,
+        mediaType as 'video' | 'photo',
+        file.size
+      );
+
+      if (!quotaCheck.allowed) {
+        console.log('配額檢查失敗:', quotaCheck.reason);
+        return NextResponse.json({
+          error: quotaCheck.reason || '配額檢查失敗',
+          quotaInfo: {
+            currentUsage: quotaCheck.currentUsage,
+            limits: quotaCheck.limits
+          }
+        }, { status: 403 });
+      }
+
+      console.log('配額檢查通過:', {
+        currentUsage: quotaCheck.currentUsage,
+        limits: quotaCheck.limits
+      });
+    } catch (quotaError) {
+      console.error('配額檢查錯誤:', quotaError);
+      return NextResponse.json({
+        error: '配額檢查失敗',
+        details: quotaError instanceof Error ? quotaError.message : '未知錯誤'
+      }, { status: 500 });
+    }
 
     // 生成檔案路徑
     const fileExt = file.name.split('.').pop();
@@ -105,6 +138,41 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('資料庫插入成功:', dbData);
+
+    // 更新學生配額使用情況
+    try {
+      const { data: currentQuota, error: quotaError } = await supabase
+        .from('hanami_student_media_quota')
+        .select('*')
+        .eq('student_id', studentId)
+        .single();
+
+      if (!quotaError && currentQuota) {
+        const updates: any = {};
+        
+        if (mediaType === 'video') {
+          updates.video_count = (currentQuota.video_count || 0) + 1;
+        } else {
+          updates.photo_count = (currentQuota.photo_count || 0) + 1;
+        }
+        
+        updates.total_used_space = (currentQuota.total_used_space || 0) + file.size;
+        updates.last_updated = new Date().toISOString();
+
+        const { error: updateError } = await supabase
+          .from('hanami_student_media_quota')
+          .update(updates)
+          .eq('student_id', studentId);
+
+        if (updateError) {
+          console.error('更新配額失敗:', updateError);
+        } else {
+          console.log('配額更新成功:', updates);
+        }
+      }
+    } catch (quotaUpdateError) {
+      console.error('配額更新錯誤:', quotaUpdateError);
+    }
 
     // 確保返回的資料是有效的 JSON
     const responseData = {

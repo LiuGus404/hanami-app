@@ -23,7 +23,7 @@ import { toast } from 'react-hot-toast';
 
 import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
 import { PopupSelect } from '@/components/ui/PopupSelect';
-import { StudentMediaModal, PlanUpgradeModal } from '@/components/ui';
+import { StudentMediaModal, PlanUpgradeModal, MediaQuotaSettingsModal } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { StudentMediaQuota, StudentMedia } from '@/types/progress';
 
@@ -47,6 +47,7 @@ export default function StudentMediaPage() {
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showQuotaSettingsModal, setShowQuotaSettingsModal] = useState(false);
   const [courseTypes, setCourseTypes] = useState<Array<{id: string, name: string}>>([]);
 
   // 篩選狀態
@@ -274,6 +275,12 @@ export default function StudentMediaPage() {
     loadStudents();
   };
 
+  // 新增：處理配額設定更新
+  const handleQuotaSettingsUpdated = () => {
+    // 重新載入學生資料
+    loadStudents();
+  };
+
   const handleFilterChange = (key: keyof typeof filters, value: any) => {
     setFilters(prev => ({
       ...prev,
@@ -407,6 +414,13 @@ export default function StudentMediaPage() {
               <p className="text-gray-600 mt-1">管理每位學生的影片和相片媒體檔案</p>
             </div>
             <div className="flex gap-3 items-center">
+              <HanamiButton 
+                variant="secondary"
+                onClick={() => setShowQuotaSettingsModal(true)}
+              >
+                <Cog6ToothIcon className="h-5 w-5 mr-2" />
+                配額設定
+              </HanamiButton>
               <HanamiButton 
                 variant="primary" 
                 onClick={() => setShowUploadModal(true)}
@@ -759,6 +773,13 @@ export default function StudentMediaPage() {
             onClose={() => setShowUpgradeModal(false)}
             student={selectedStudent}
             onUpgradeSuccess={handleUpgradeSuccess}
+          />
+
+          {/* 配額設定模態視窗 */}
+          <MediaQuotaSettingsModal
+            isOpen={showQuotaSettingsModal}
+            onClose={() => setShowQuotaSettingsModal(false)}
+            onSettingsUpdated={handleQuotaSettingsUpdated}
           />
         </div>
       </div>

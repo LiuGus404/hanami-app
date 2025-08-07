@@ -1636,6 +1636,48 @@ export type Database = {
           }
         ]
       }
+      hanami_media_quota_levels: {
+        Row: {
+          id: string
+          level_name: string
+          video_limit: number
+          photo_limit: number
+          storage_limit_mb: number
+          video_size_limit_mb: number
+          photo_size_limit_mb: number
+          description: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          level_name: string
+          video_limit: number
+          photo_limit: number
+          storage_limit_mb: number
+          video_size_limit_mb: number
+          photo_size_limit_mb: number
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          level_name?: string
+          video_limit?: number
+          photo_limit?: number
+          storage_limit_mb?: number
+          video_size_limit_mb?: number
+          photo_size_limit_mb?: number
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hanami_user_permissions_v2: {
         Row: {
           id: string

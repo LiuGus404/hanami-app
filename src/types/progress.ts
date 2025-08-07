@@ -197,12 +197,32 @@ export const DEFAULT_MEDIA_LIMITS: MediaUploadLimits = {
     maxSize: 20 * 1024 * 1024, // 20MB
     maxDuration: 30, // 30 seconds
     maxCount: 5,
-    allowedTypes: ['video/mp4', 'video/mov', 'video/avi'],
+    allowedTypes: [
+      'video/mp4', 
+      'video/mov', 
+      'video/avi', 
+      'video/quicktime',  // QuickTime 格式
+      'video/x-msvideo',  // AVI 格式
+      'video/x-ms-wmv',   // WMV 格式
+      'video/webm',       // WebM 格式
+      'video/ogg',        // OGG 格式
+      'video/m4v',        // M4V 格式
+      'video/3gpp',       // 3GPP 格式
+      'video/3gpp2'       // 3GPP2 格式
+    ],
   },
   photo: {
     maxSize: 1 * 1024 * 1024, // 1MB
     maxCount: 10,
-    allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    allowedTypes: [
+      'image/jpeg', 
+      'image/png', 
+      'image/webp',
+      'image/gif',        // GIF 格式
+      'image/bmp',        // BMP 格式
+      'image/tiff',       // TIFF 格式
+      'image/svg+xml'     // SVG 格式
+    ],
   },
 };
 

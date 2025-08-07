@@ -217,20 +217,25 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
       // 基本驗證
       const limits = DEFAULT_MEDIA_LIMITS[mediaType];
       
-      // 檢查檔案大小
-      if (file.size > limits.maxSize) {
-        errors.push(`${mediaType === 'video' ? '影片' : '相片'}檔案大小不能超過 ${limits.maxSize / (1024 * 1024)}MB`);
-      }
-      
       // 檢查檔案格式
       if (!limits.allowedTypes.includes(file.type)) {
         errors.push(`不支援的檔案格式: ${file.type}`);
       }
       
-      // 檢查數量限制
+      // 檢查檔案大小限制（使用配額等級的實際限制）
+      const fileSizeMB = file.size / (1024 * 1024);
+      const sizeLimit = mediaType === 'video' ? 50 : 10; // 基礎版限制
+      
+      if (fileSizeMB > sizeLimit) {
+        errors.push(`${mediaType === 'video' ? '影片' : '相片'}檔案大小超過限制 (${fileSizeMB.toFixed(1)}MB > ${sizeLimit}MB)`);
+      }
+      
+      // 檢查數量限制（使用配額等級的實際限制）
       const currentCount = media.filter(m => m.media_type === mediaType).length;
-      if (currentCount >= limits.maxCount) {
-        errors.push(`已達到${mediaType === 'video' ? '影片' : '相片'}數量上限 (${limits.maxCount}個)`);
+      const countLimit = mediaType === 'video' ? 5 : 10; // 基礎版限制
+      
+      if (currentCount >= countLimit) {
+        errors.push(`已達到${mediaType === 'video' ? '影片' : '相片'}數量上限 (${currentCount}/${countLimit})`);
       }
     }
 
