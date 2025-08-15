@@ -103,6 +103,7 @@ export default function TeacherDashboard() {
   const [studentsAssessed, setStudentsAssessed] = useState<StudentWithoutAssessment[]>([]);
   const [studentsNoTree, setStudentsNoTree] = useState<StudentWithoutAssessment[]>([]);
   const [isWorking, setIsWorking] = useState(false);
+  const [hasTodaySchedule, setHasTodaySchedule] = useState(false); // 新增：老師今天是否有課程安排
   const [isHovered, setIsHovered] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1051,6 +1052,31 @@ export default function TeacherDashboard() {
       console.log('教師ID:', teacher.id);
       console.log('教師Email:', teacher.teacher_email);
 
+      // 首先檢查老師今天是否有排程
+      const { data: teacherScheduleData, error: scheduleError } = await supabase
+        .from('teacher_schedule')
+        .select('*')
+        .eq('teacher_id', teacher.id)
+        .eq('scheduled_date', todayAssessmentDate);
+
+      if (scheduleError) {
+        console.error('檢查老師排程失敗:', scheduleError);
+        throw scheduleError;
+      }
+
+      // 檢查老師今天是否有上班
+      const hasSchedule = teacherScheduleData && teacherScheduleData.length > 0;
+      setHasTodaySchedule(hasSchedule);
+      console.log('老師今天是否有上班:', hasSchedule, '排程數量:', teacherScheduleData?.length || 0);
+
+      if (!hasSchedule) {
+        console.log('老師今天沒有上班，跳過學生資料載入');
+        setStudentsWithoutAssessment([]);
+        setStudentsAssessed([]);
+        setStudentsNoTree([]);
+        return;
+      }
+
       // 優化：一次性獲取所有需要的數據，減少數據庫請求次數
       const [
         { data: todayLessonsData, error: todayLessonsError },
@@ -1083,6 +1109,8 @@ export default function TeacherDashboard() {
       
       // 獲取選擇日期有上課的學生ID列表（保持時間順序）
       const todayStudentIds = [...new Set((todayLessonsData || []).map(lesson => lesson.student_id).filter((id): id is string => id !== null))];
+      
+      console.log('當日有課程的學生數量:', todayStudentIds.length);
       
       if (todayStudentIds.length > 0) {
         // 獲取這些學生的詳細資訊
@@ -1192,6 +1220,30 @@ export default function TeacherDashboard() {
       console.log('教師ID:', teacher.id);
       console.log('教師Email:', teacher.teacher_email);
 
+      // 首先檢查老師今天是否有排程
+      const { data: teacherScheduleData, error: scheduleError } = await supabase
+        .from('teacher_schedule')
+        .select('*')
+        .eq('teacher_id', teacher.id)
+        .eq('scheduled_date', todayMediaDate);
+
+      if (scheduleError) {
+        console.error('檢查老師排程失敗:', scheduleError);
+        throw scheduleError;
+      }
+
+      // 檢查老師今天是否有上班
+      const hasSchedule = teacherScheduleData && teacherScheduleData.length > 0;
+      setHasTodaySchedule(hasSchedule);
+      console.log('老師今天是否有上班（媒體狀態）:', hasSchedule, '排程數量:', teacherScheduleData?.length || 0);
+
+      if (!hasSchedule) {
+        console.log('老師今天沒有上班，跳過媒體狀態載入');
+        setStudentsWithMedia([]);
+        setStudentsWithoutMedia([]);
+        return;
+      }
+
       // 優化：一次性獲取所有需要的數據，減少數據庫請求次數
       const [
         { data: todayLessonsData, error: todayLessonsError },
@@ -1216,6 +1268,8 @@ export default function TeacherDashboard() {
       
       // 獲取選擇日期有上課的學生ID列表（保持時間順序）
       const todayStudentIds = [...new Set((todayLessonsData || []).map(lesson => lesson.student_id).filter((id): id is string => id !== null))];
+      
+      console.log('當日有課程的學生數量（媒體狀態）:', todayStudentIds.length);
       
       if (todayStudentIds.length > 0) {
         // 獲取這些學生的詳細資訊
@@ -5449,6 +5503,23 @@ export default function TeacherDashboard() {
         <p className="text-[#8B7355]">查看今天的學生評估進度</p>
       </div>
 
+      {/* 當老師今天沒有上班時顯示提示 */}
+      {!hasTodaySchedule && (
+        <div className="mb-6 p-6 bg-blue-50 border border-blue-200 rounded-xl">
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-blue-800">今天沒有上班</h3>
+              <p className="text-blue-600">根據您的排程安排，您今天沒有上班，因此沒有學生需要評估。</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 學生評估狀態卡片 */}
       <Card3D>
         <div className="flex items-center justify-between mb-4">
@@ -5479,8 +5550,8 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        {/* 評估狀態統計 */}
-        {!loadingStudents && (
+        {/* 評估狀態統計 - 只有當有課程安排時才顯示 */}
+        {!loadingStudents && hasTodaySchedule && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
               <div className="flex items-center justify-between">
@@ -5530,8 +5601,8 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        {/* 學生列表 */}
-        {!loadingStudents && (studentsWithoutAssessment.length > 0 || studentsAssessed.length > 0 || studentsNoTree.length > 0) && (
+        {/* 學生列表 - 只有當有課程安排時才顯示 */}
+        {!loadingStudents && hasTodaySchedule && (studentsWithoutAssessment.length > 0 || studentsAssessed.length > 0 || studentsNoTree.length > 0) && (
     <div className="space-y-4">
             {/* 未評估學生 */}
             {studentsWithoutAssessment.length > 0 && (
@@ -5647,6 +5718,23 @@ export default function TeacherDashboard() {
         <p className="text-[#8B7355]">查看今天的學生媒體上傳進度</p>
       </div>
 
+      {/* 當老師今天沒有上班時顯示提示 */}
+      {!hasTodaySchedule && (
+        <div className="mb-6 p-6 bg-blue-50 border border-blue-200 rounded-xl">
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-blue-800">今天沒有上班</h3>
+              <p className="text-blue-600">根據您的排程安排，您今天沒有上班，因此沒有學生需要上傳媒體。</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 學生媒體狀態卡片 */}
       <Card3D>
         <div className="flex items-center justify-between mb-4">
@@ -5677,8 +5765,8 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        {/* 媒體狀態統計 */}
-        {!loadingMediaStudents && (
+        {/* 媒體狀態統計 - 只有當有課程安排時才顯示 */}
+        {!loadingMediaStudents && hasTodaySchedule && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
           <div className="flex items-center justify-between">
@@ -5710,8 +5798,8 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        {/* 學生列表 */}
-        {!loadingMediaStudents && (studentsWithoutMedia.length > 0 || studentsWithMedia.length > 0) && (
+        {/* 學生列表 - 只有當有課程安排時才顯示 */}
+        {!loadingMediaStudents && hasTodaySchedule && (studentsWithoutMedia.length > 0 || studentsWithMedia.length > 0) && (
           <div className="space-y-4">
             {/* 未上傳媒體學生 */}
             {studentsWithoutMedia.length > 0 && (
@@ -6130,6 +6218,7 @@ export default function TeacherDashboard() {
             nick_name: selectedStudentForAssessment.nick_name ?? undefined
           } : undefined}
           defaultAssessmentDate={selectedAssessmentDate}
+          showOnlyTodayStudents={true} // 老師版面只顯示當日學生
         />
       )}
 

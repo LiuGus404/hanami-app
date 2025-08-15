@@ -1214,4 +1214,4 @@ export default function StudentProgressDashboard() {
       />
     </div>
   );
-} 
+}

@@ -345,6 +345,7 @@ export default function AbilityAssessmentsPage() {
         tree_id: assessmentData.tree_id,
         assessment_date: assessmentData.assessment_date,
         notes: assessmentData.general_notes || '',  // 確保 notes 不為 undefined
+        overall_performance_rating: assessmentData.overall_performance_rating || 1, // 添加整體表現評分
         goals: goals || []
       };
 
@@ -419,10 +420,12 @@ export default function AbilityAssessmentsPage() {
       
       // 準備 API 調用的資料格式
       const apiData = {
+        assessment_id: editingAssessment.id, // 添加現有記錄的 ID
         student_id: assessmentData.student_id,
         tree_id: assessmentData.tree_id,
         assessment_date: assessmentData.assessment_date,
         notes: assessmentData.general_notes || '',  // 確保 notes 不為 undefined
+        overall_performance_rating: assessmentData.overall_performance_rating || 1, // 添加整體表現評分
         goals: goals || []
       };
 
@@ -1110,34 +1113,64 @@ export default function AbilityAssessmentsPage() {
                         學習目標進度
                       </h3>
                       <div className="space-y-6">
-                                                  {(() => {
-                            const goals = treeGoals[viewingAssessment.tree.id] || [];
-                            const selectedGoals = (viewingAssessment as any).selected_goals || [];
-                            
-                            return goals.length > 0 ? (
-                              goals.map((goal) => {
-                                // 查找此目標的評估資料
-                                const goalAssessment = selectedGoals.find((g: any) => g.goal_id === goal.id);
-                                const assessmentMode = goalAssessment?.assessment_mode || goal.assessment_mode || 'progress';
-                                
-                                // 計算完成度
-                                let completionPercentage = 0;
-                                let selectedCount = 0;
-                                let totalCount = 0;
-                                
-                                if (assessmentMode === 'multi_select') {
-                                  const selectedLevels = goalAssessment?.selected_levels || [];
-                                  const maxLevels = goal.multi_select_levels?.length || 5;
-                                  selectedCount = selectedLevels.length;
-                                  totalCount = maxLevels;
-                                  completionPercentage = maxLevels > 0 ? Math.round((selectedCount / maxLevels) * 100) : 0;
-                                } else {
-                                  const progressLevel = goalAssessment?.progress_level || 0;
-                                  const maxLevel = goal.progress_max || 5;
-                                  selectedCount = progressLevel;
-                                  totalCount = maxLevel;
-                                  completionPercentage = maxLevel > 0 ? Math.round((progressLevel / maxLevel) * 100) : 0;
+                        {(() => {
+                          const goals = treeGoals[viewingAssessment.tree.id] || [];
+                          const selectedGoals = (viewingAssessment as any).selected_goals || [];
+                          const abilityAssessments = viewingAssessment.ability_assessments || {};
+                          
+                          return goals.length > 0 ? (
+                            goals.map((goal) => {
+                              // 優先從 selected_goals 欄位查找此目標的評估資料
+                              let goalAssessment = selectedGoals.find((g: any) => g.goal_id === goal.id);
+                              let assessmentMode = goal.assessment_mode || 'progress';
+                              
+                              if (goalAssessment) {
+                                // 使用 selected_goals 中的資料
+                                assessmentMode = goalAssessment.assessment_mode || assessmentMode;
+                              } else {
+                                // 如果 selected_goals 中沒有，則從 ability_assessments 中查找
+                                goalAssessment = abilityAssessments[goal.id];
+                                if (goalAssessment) {
+                                  assessmentMode = goalAssessment.assessment_mode || assessmentMode;
                                 }
+                              }
+                              
+                              // 計算完成度
+                              let completionPercentage = 0;
+                              let selectedCount = 0;
+                              let totalCount = 0;
+                              
+                              if (assessmentMode === 'multi_select') {
+                                let selectedLevels: string[] = [];
+                                if (selectedGoals.find((g: any) => g.goal_id === goal.id)) {
+                                  // 從 selected_goals 中獲取
+                                  const sg = selectedGoals.find((g: any) => g.goal_id === goal.id);
+                                  selectedLevels = sg?.selected_levels || [];
+                                } else if (abilityAssessments[goal.id]) {
+                                  // 從 ability_assessments 中獲取
+                                  selectedLevels = (abilityAssessments[goal.id] as any)?.selected_levels || [];
+                                }
+                                
+                                const maxLevels = goal.multi_select_levels?.length || 5;
+                                selectedCount = selectedLevels.length;
+                                totalCount = maxLevels;
+                                completionPercentage = maxLevels > 0 ? Math.round((selectedCount / maxLevels) * 100) : 0;
+                              } else {
+                                let progressLevel = 0;
+                                if (selectedGoals.find((g: any) => g.goal_id === goal.id)) {
+                                  // 從 selected_goals 中獲取
+                                  const sg = selectedGoals.find((g: any) => g.goal_id === goal.id);
+                                  progressLevel = sg?.progress_level || 0;
+                                } else if (abilityAssessments[goal.id]) {
+                                  // 從 ability_assessments 中獲取
+                                  progressLevel = abilityAssessments[goal.id]?.level || 0;
+                                }
+                                
+                                const maxLevel = goal.progress_max || 5;
+                                selectedCount = progressLevel;
+                                totalCount = maxLevel;
+                                completionPercentage = maxLevel > 0 ? Math.round((progressLevel / maxLevel) * 100) : 0;
+                              }
                               
                               return (
                                 <div key={goal.id} className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-6 rounded-xl border border-[#EADBC8]">

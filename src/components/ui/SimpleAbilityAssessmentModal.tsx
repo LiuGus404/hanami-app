@@ -104,6 +104,7 @@ interface SimpleAbilityAssessmentModalProps {
   initialData?: AbilityAssessment; // 新增：用於編輯模式的初始資料
   defaultStudent?: { id: string; full_name: string; nick_name?: string }; // 新增：預設學生資料
   defaultAssessmentDate?: string; // 新增：預設評估日期
+  showOnlyTodayStudents?: boolean; // 新增：是否只顯示當日學生
 }
 
 export default function SimpleAbilityAssessmentModal({
@@ -111,7 +112,8 @@ export default function SimpleAbilityAssessmentModal({
   onSubmit,
   initialData,
   defaultStudent,
-  defaultAssessmentDate
+  defaultAssessmentDate,
+  showOnlyTodayStudents
 }: SimpleAbilityAssessmentModalProps) {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -228,19 +230,127 @@ export default function SimpleAbilityAssessmentModal({
       setLoading(true);
       
       console.log('開始載入學生和成長樹資料...');
+      console.log('showOnlyTodayStudents:', showOnlyTodayStudents);
       
-      // 載入學生基本資訊和成長樹分配
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('Hanami_Students')
-        .select('id, full_name, nick_name')
-        .order('full_name');
+      let studentsData: any[] = [];
+      
+      if (showOnlyTodayStudents) {
+        // 只載入當日有課程的學生
+        const today = new Date().toISOString().split('T')[0];
+        console.log('載入當日學生，日期:', today);
+        
+        // 先檢查當日是否有任何課程記錄
+        const { data: allTodayLessons, error: checkError } = await supabase
+          .from('hanami_student_lesson')
+          .select('*')
+          .eq('lesson_date', today);
 
-      if (studentsError) {
-        console.error('載入學生失敗:', studentsError);
-        throw studentsError;
+        if (checkError) {
+          console.error('檢查當日課程失敗:', checkError);
+          throw checkError;
+        }
+        
+        console.log('當日所有課程記錄:', allTodayLessons);
+        
+        // 先獲取當日有課程的學生ID
+        const { data: todayLessonData, error: lessonError } = await supabase
+          .from('hanami_student_lesson')
+          .select('student_id')
+          .eq('lesson_date', today)
+          .not('student_id', 'is', null);
+
+        if (lessonError) {
+          console.error('載入當日課程失敗:', lessonError);
+          throw lessonError;
+        }
+        
+        console.log('當日課程資料:', todayLessonData);
+        
+        // 去重學生ID
+        const uniqueStudentIds = [...new Set(todayLessonData?.map(lesson => lesson.student_id) || [])];
+        console.log('去重後的學生ID:', uniqueStudentIds);
+        
+        if (uniqueStudentIds.length === 0) {
+          console.log('當日沒有學生課程，嘗試載入最近7天的課程');
+          
+          // 獲取最近7天的日期
+          const recentDates = [];
+          for (let i = 0; i < 7; i++) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            recentDates.push(date.toISOString().split('T')[0]);
+          }
+          
+          console.log('最近7天日期:', recentDates);
+          
+          // 查詢最近7天的課程記錄
+          const { data: recentLessonData, error: recentError } = await supabase
+            .from('hanami_student_lesson')
+            .select('student_id')
+            .in('lesson_date', recentDates)
+            .not('student_id', 'is', null);
+
+          if (recentError) {
+            console.error('載入最近課程失敗:', recentError);
+            throw recentError;
+          }
+          
+          console.log('最近7天課程資料:', recentLessonData);
+          
+          // 去重學生ID
+          const recentStudentIds = [...new Set(recentLessonData?.map(lesson => lesson.student_id) || [])];
+          console.log('最近7天學生ID:', recentStudentIds);
+          
+          if (recentStudentIds.length === 0) {
+            console.log('最近7天也沒有學生課程');
+            studentsData = [];
+          } else {
+                      // 根據學生ID獲取學生詳細資訊
+          const { data: recentStudentsData, error: studentsError } = await supabase
+            .from('Hanami_Students')
+            .select('id, full_name, nick_name')
+            .in('id', recentStudentIds.filter((id): id is string => id !== null))
+            .order('full_name');
+
+            if (studentsError) {
+              console.error('載入最近學生失敗:', studentsError);
+              throw studentsError;
+            }
+            
+            studentsData = recentStudentsData;
+            console.log('最近7天學生資料載入成功:', studentsData);
+          }
+        } else {
+          // 根據學生ID獲取學生詳細資訊
+          const { data: todayStudentsData, error: studentsError } = await supabase
+            .from('Hanami_Students')
+            .select('id, full_name, nick_name')
+            .in('id', uniqueStudentIds.filter((id): id is string => id !== null))
+            .order('full_name');
+
+          if (studentsError) {
+            console.error('載入當日學生失敗:', studentsError);
+            throw studentsError;
+          }
+          
+          studentsData = todayStudentsData;
+          console.log('當日學生資料載入成功:', studentsData);
+        }
+      } else {
+        // 載入所有學生
+        const { data: allStudentsData, error: studentsError } = await supabase
+          .from('Hanami_Students')
+          .select('id, full_name, nick_name')
+          .order('full_name');
+
+        if (studentsError) {
+          console.error('載入學生失敗:', studentsError);
+          throw studentsError;
+        }
+        
+        studentsData = allStudentsData;
+        console.log('所有學生資料載入成功:', studentsData);
       }
-      
-      console.log('學生資料載入成功:', studentsData);
       
       setStudents(studentsData || []);
 
@@ -507,25 +617,45 @@ export default function SimpleAbilityAssessmentModal({
           const initialGoalAssessments: {[key: string]: any} = {};
           const initialMultiSelectAssessments: {[key: string]: string[]} = {};
 
-          // 從 selected_goals 欄位讀取目標評估資料 (JSONB 格式)
-          if (latestAssessment && latestAssessment.selected_goals && latestAssessment.selected_goals.length > 0) {
-            console.log('從 selected_goals 讀取歷史評估資料 (JSONB):', latestAssessment.selected_goals);
-            
-            latestAssessment.selected_goals.forEach((goalData: any) => {
-              const { goal_id, assessment_mode, progress_level, selected_levels } = goalData;
+          // 優先從 selected_goals 欄位讀取目標評估資料，如果沒有則從 ability_assessments 欄位讀取
+          if (latestAssessment) {
+            if (latestAssessment.selected_goals && latestAssessment.selected_goals.length > 0) {
+              console.log('從 selected_goals 讀取歷史評估資料:', latestAssessment.selected_goals);
               
-              if (assessment_mode === 'multi_select') {
-                if (selected_levels && selected_levels.length > 0) {
-                  initialMultiSelectAssessments[goal_id] = selected_levels;
-                  console.log(`從歷史資料設置目標 ${goal_id} 的多選初始值:`, selected_levels);
+              latestAssessment.selected_goals.forEach((goalData: any) => {
+                const { goal_id, assessment_mode, progress_level, selected_levels } = goalData;
+                
+                if (assessment_mode === 'multi_select') {
+                  if (selected_levels && selected_levels.length > 0) {
+                    initialMultiSelectAssessments[goal_id] = selected_levels;
+                    console.log(`從歷史資料設置目標 ${goal_id} 的多選初始值:`, selected_levels);
+                  }
+                } else if (assessment_mode === 'progress') {
+                  if (progress_level && progress_level > 0) {
+                    initialGoalAssessments[goal_id] = { level: progress_level };
+                    console.log(`從歷史資料設置目標 ${goal_id} 的進度初始值:`, progress_level);
+                  }
                 }
-              } else if (assessment_mode === 'progress') {
-                if (progress_level && progress_level > 0) {
-                  initialGoalAssessments[goal_id] = { level: progress_level };
-                  console.log(`從歷史資料設置目標 ${goal_id} 的進度初始值:`, progress_level);
+              });
+            } else if (latestAssessment.ability_assessments) {
+              console.log('從 ability_assessments 讀取歷史評估資料:', latestAssessment.ability_assessments);
+              
+              Object.entries(latestAssessment.ability_assessments).forEach(([goalId, goalData]: [string, any]) => {
+                const { assessment_mode, selected_levels, level } = goalData;
+                
+                if (assessment_mode === 'multi_select') {
+                  if (selected_levels && selected_levels.length > 0) {
+                    initialMultiSelectAssessments[goalId] = selected_levels;
+                    console.log(`從歷史資料設置目標 ${goalId} 的多選初始值:`, selected_levels);
+                  }
+                } else if (assessment_mode === 'progress') {
+                  if (level && level > 0) {
+                    initialGoalAssessments[goalId] = { level: level };
+                    console.log(`從歷史資料設置目標 ${goalId} 的進度初始值:`, level);
+                  }
                 }
-              }
-            });
+              });
+            }
           }
 
           (goalsData || []).forEach(goal => {

@@ -851,4 +851,4 @@ export function AIToolsStatusPanelFixed({ className = '' }: AIToolsStatusPanelPr
       </div>
     </div>
   );
-}
+} 

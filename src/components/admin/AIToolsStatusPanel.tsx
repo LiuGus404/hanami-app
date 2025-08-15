@@ -1000,4 +1000,4 @@ export function AIToolsStatusPanel({ className = '' }: AIToolsStatusPanelProps) 
       </div>
     </div>
   );
-}
+} 
