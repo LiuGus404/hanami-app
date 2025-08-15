@@ -187,23 +187,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     return errors;
   };
 
-  const checkVideoDuration = (file: File): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-      
-      video.onloadedmetadata = () => {
-        const duration = video.duration;
-        resolve(duration <= DEFAULT_MEDIA_LIMITS.video.maxDuration);
-      };
-      
-      video.onerror = () => {
-        resolve(false);
-      };
-      
-      video.src = URL.createObjectURL(file);
-    });
-  };
+
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -216,10 +200,15 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     // 獲取學生的配額設定
     let studentQuota = null;
     try {
+      if (!student?.id) {
+        errors.push('學生ID無效');
+        return;
+      }
+      
       const { data: quota, error: quotaError } = await supabase
         .from('hanami_student_media_quota')
         .select('*')
-        .eq('student_id', student?.id)
+        .eq('student_id', student.id)
         .single();
 
       if (quotaError) {
