@@ -8,7 +8,6 @@ export type StorageCategory = 'students' | 'templates' | 'shared' | 'public';
 export const FILE_LIMITS = {
   video: {
     maxSize: 20 * 1024 * 1024, // 20MB
-    maxDuration: 30, // 30秒
     allowedTypes: [
       'video/mp4', 
       'video/mov', 

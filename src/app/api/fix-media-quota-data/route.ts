@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
             video_limit: 5,
             photo_limit: 10,
             storage_limit_mb: 250,
-            video_size_limit_mb: 50,
-            photo_size_limit_mb: 10,
+            video_size_limit_mb: 20,
+            photo_size_limit_mb: 1,
             description: '適合新學生的基礎方案，提供基本的媒體上傳功能',
             is_active: true
           },

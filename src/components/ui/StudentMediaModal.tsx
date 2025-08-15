@@ -84,10 +84,14 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
   const [showQuotaDetails, setShowQuotaDetails] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
 
+  // 新增：配額等級狀態
+  const [quotaLevel, setQuotaLevel] = useState<any>(null);
+
   useEffect(() => {
     if (isOpen && student) {
       loadStudentMedia();
       loadStudentLessons();
+      loadQuotaLevel();
     }
   }, [isOpen, student]);
 
@@ -209,6 +213,59 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     const fileArray = Array.from(files);
     const errors: string[] = [];
 
+    // 獲取學生的配額設定
+    let studentQuota = null;
+    try {
+      const { data: quota, error: quotaError } = await supabase
+        .from('hanami_student_media_quota')
+        .select('*')
+        .eq('student_id', student?.id)
+        .single();
+
+      if (quotaError) {
+        console.error('獲取學生配額失敗:', quotaError);
+        errors.push('無法獲取學生配額設定');
+      } else {
+        studentQuota = quota;
+      }
+    } catch (error) {
+      console.error('獲取配額錯誤:', error);
+      errors.push('獲取配額設定失敗');
+    }
+
+    // 獲取配額等級設定
+    let quotaLevel = null;
+    if (studentQuota) {
+      try {
+        const planTypeToLevelName = (planType: string) => {
+          const mapping: { [key: string]: string } = {
+            'free': '基礎版',
+            'basic': '標準版',
+            'premium': '進階版',
+            'professional': '專業版'
+          };
+          return mapping[planType] || '基礎版';
+        };
+
+        const { data: level, error: levelError } = await supabase
+          .from('hanami_media_quota_levels')
+          .select('*')
+          .eq('level_name', planTypeToLevelName(studentQuota.plan_type))
+          .eq('is_active', true)
+          .single();
+
+        if (levelError) {
+          console.error('獲取配額等級失敗:', levelError);
+          errors.push('無法獲取配額等級設定');
+        } else {
+          quotaLevel = level;
+        }
+      } catch (error) {
+        console.error('獲取配額等級錯誤:', error);
+        errors.push('獲取配額等級失敗');
+      }
+    }
+
     for (const file of fileArray) {
       console.log('處理檔案:', file.name, '類型:', file.type, '大小:', file.size);
       
@@ -224,7 +281,14 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
       
       // 檢查檔案大小限制（使用配額等級的實際限制）
       const fileSizeMB = file.size / (1024 * 1024);
-      const sizeLimit = mediaType === 'video' ? 50 : 10; // 基礎版限制
+      let sizeLimit = 0;
+      
+      if (quotaLevel) {
+        sizeLimit = mediaType === 'video' ? quotaLevel.video_size_limit_mb : quotaLevel.photo_size_limit_mb;
+      } else {
+        // 如果無法獲取配額等級，使用預設限制
+        sizeLimit = mediaType === 'video' ? 20 : 1;
+      }
       
       if (fileSizeMB > sizeLimit) {
         errors.push(`${mediaType === 'video' ? '影片' : '相片'}檔案大小超過限制 (${fileSizeMB.toFixed(1)}MB > ${sizeLimit}MB)`);
@@ -232,7 +296,14 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
       
       // 檢查數量限制（使用配額等級的實際限制）
       const currentCount = media.filter(m => m.media_type === mediaType).length;
-      const countLimit = mediaType === 'video' ? 5 : 10; // 基礎版限制
+      let countLimit = 0;
+      
+      if (quotaLevel) {
+        countLimit = mediaType === 'video' ? quotaLevel.video_limit : quotaLevel.photo_limit;
+      } else {
+        // 如果無法獲取配額等級，使用預設限制
+        countLimit = mediaType === 'video' ? 5 : 10;
+      }
       
       if (currentCount >= countLimit) {
         errors.push(`已達到${mediaType === 'video' ? '影片' : '相片'}數量上限 (${currentCount}/${countLimit})`);
@@ -608,6 +679,52 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/hanami-media/${mediaItem.file_path}`;
   };
 
+  // 新增：載入配額等級
+  const loadQuotaLevel = async () => {
+    if (!student) return;
+    
+    try {
+      // 獲取學生的配額設定
+      const { data: studentQuota, error: quotaError } = await supabase
+        .from('hanami_student_media_quota')
+        .select('*')
+        .eq('student_id', student.id)
+        .single();
+
+      if (quotaError) {
+        console.error('獲取學生配額失敗:', quotaError);
+        return;
+      }
+
+      // 獲取配額等級設定
+      const planTypeToLevelName = (planType: string) => {
+        const mapping: { [key: string]: string } = {
+          'free': '基礎版',
+          'basic': '標準版',
+          'premium': '進階版',
+          'professional': '專業版'
+        };
+        return mapping[planType] || '基礎版';
+      };
+
+      const { data: level, error: levelError } = await supabase
+        .from('hanami_media_quota_levels')
+        .select('*')
+        .eq('level_name', planTypeToLevelName(studentQuota.plan_type))
+        .eq('is_active', true)
+        .single();
+
+      if (levelError) {
+        console.error('獲取配額等級失敗:', levelError);
+        return;
+      }
+
+      setQuotaLevel(level);
+    } catch (error) {
+      console.error('載入配額等級錯誤:', error);
+    }
+  };
+
   if (!isOpen || !student) return null;
 
   return (
@@ -965,11 +1082,11 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                 <div className="mt-4 text-xs sm:text-sm text-[#2B3A3B] space-y-1">
                   <p className="flex items-center gap-1 justify-center">
                     <span className="p-1 bg-[#FFD59A] rounded-full">📹</span>
-                    影片: 最多 {DEFAULT_MEDIA_LIMITS.video.maxCount} 個，每個 ≤ {DEFAULT_MEDIA_LIMITS.video.maxSize / (1024 * 1024)}MB，時長 ≤ {DEFAULT_MEDIA_LIMITS.video.maxDuration} 秒
+                    影片: 最多 {quotaLevel?.video_limit || DEFAULT_MEDIA_LIMITS.video.maxCount} 個，每個 ≤ {quotaLevel?.video_size_limit_mb || DEFAULT_MEDIA_LIMITS.video.maxSize / (1024 * 1024)}MB
                   </p>
                   <p className="flex items-center gap-1 justify-center">
                     <span className="p-1 bg-[#EBC9A4] rounded-full">📸</span>
-                    相片: 最多 {DEFAULT_MEDIA_LIMITS.photo.maxCount} 張，每張 ≤ {DEFAULT_MEDIA_LIMITS.photo.maxSize / (1024 * 1024)}MB
+                    相片: 最多 {quotaLevel?.photo_limit || DEFAULT_MEDIA_LIMITS.photo.maxCount} 張，每張 ≤ {quotaLevel?.photo_size_limit_mb || DEFAULT_MEDIA_LIMITS.photo.maxSize / (1024 * 1024)}MB
                   </p>
                 </div>
 

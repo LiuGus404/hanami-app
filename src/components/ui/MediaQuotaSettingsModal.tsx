@@ -43,8 +43,8 @@ export function MediaQuotaSettingsModal({
     video_limit: 5,
     photo_limit: 10,
     storage_limit_mb: 250,
-    video_size_limit_mb: 50,
-    photo_size_limit_mb: 10,
+    video_size_limit_mb: 20,
+    photo_size_limit_mb: 1,
     description: '',
   });
 
@@ -154,8 +154,8 @@ export function MediaQuotaSettingsModal({
           video_limit: 5,
           photo_limit: 10,
           storage_limit_mb: 250,
-          video_size_limit_mb: 50,
-          photo_size_limit_mb: 10,
+          video_size_limit_mb: 20,
+          photo_size_limit_mb: 1,
           description: '',
         });
         setShowAddForm(false);

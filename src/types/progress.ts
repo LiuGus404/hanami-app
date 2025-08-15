@@ -180,7 +180,6 @@ export interface StudentMediaQuota {
 export interface MediaUploadLimits {
   video: {
     maxSize: number; // 20MB in bytes
-    maxDuration: number; // 30 seconds
     maxCount: number; // 5 videos
     allowedTypes: string[];
   };
@@ -195,7 +194,6 @@ export interface MediaUploadLimits {
 export const DEFAULT_MEDIA_LIMITS: MediaUploadLimits = {
   video: {
     maxSize: 20 * 1024 * 1024, // 20MB
-    maxDuration: 30, // 30 seconds
     maxCount: 5,
     allowedTypes: [
       'video/mp4', 

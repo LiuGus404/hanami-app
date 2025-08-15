@@ -188,12 +188,11 @@ export class QuotaChecker {
           photo_size_limit_mb: quotaLevel.photo_size_limit_mb
         }
       };
-
     } catch (error) {
       console.error('配額檢查錯誤:', error);
       return {
         allowed: false,
-        reason: '配額檢查失敗',
+        reason: '配額檢查過程中發生錯誤',
         currentUsage: { video_count: 0, photo_count: 0, total_used_space: 0 },
         limits: { video_limit: 0, photo_limit: 0, storage_limit_bytes: 0, video_size_limit_mb: 0, photo_size_limit_mb: 0 }
       };

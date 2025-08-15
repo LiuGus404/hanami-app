@@ -65,6 +65,26 @@ export async function POST(request: NextRequest) {
 
     if (quotaError) throw quotaError;
 
+    // 獲取配額等級設定
+    const planTypeToLevelName = (planType: string) => {
+      const mapping: { [key: string]: string } = {
+        'free': '基礎版',
+        'basic': '標準版',
+        'premium': '進階版',
+        'professional': '專業版'
+      };
+      return mapping[planType] || '基礎版';
+    };
+
+    const { data: quotaLevel, error: levelError } = await supabase
+      .from('hanami_media_quota_levels')
+      .select('*')
+      .eq('level_name', planTypeToLevelName(quota.plan_type))
+      .eq('is_active', true)
+      .single();
+
+    if (levelError) throw levelError;
+
     // 檢查數量限制
     const { data: currentMedia, error: countError } = await supabase
       .from('hanami_student_media')
@@ -75,7 +95,7 @@ export async function POST(request: NextRequest) {
     if (countError) throw countError;
 
     const currentCount = currentMedia?.length || 0;
-    const limit = mediaType === 'video' ? quota.video_limit : quota.photo_limit;
+    const limit = mediaType === 'video' ? quotaLevel.video_limit : quotaLevel.photo_limit;
 
     if (currentCount >= limit) {
       return NextResponse.json(
@@ -84,11 +104,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 檢查檔案大小
-    const maxSize = mediaType === 'video' ? 20 * 1024 * 1024 : 1 * 1024 * 1024; // 20MB for video, 1MB for photo
+    // 檢查檔案大小（使用配額等級的設定）
+    const maxSizeMB = mediaType === 'video' ? quotaLevel.video_size_limit_mb : quotaLevel.photo_size_limit_mb;
+    const maxSize = maxSizeMB * 1024 * 1024;
+    
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: `檔案大小不能超過 ${maxSize / (1024 * 1024)}MB` },
+        { error: `${mediaType === 'video' ? '影片' : '相片'}檔案大小超過限制 (${(file.size / (1024 * 1024)).toFixed(1)}MB > ${maxSizeMB}MB)` },
         { status: 400 }
       );
     }
