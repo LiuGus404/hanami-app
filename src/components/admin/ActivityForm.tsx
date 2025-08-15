@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import HanamiInput from '@/components/ui/HanamiInput';
-import HanamiSelect from '@/components/ui/HanamiSelect';
+import { HanamiSelect } from '@/components/ui/HanamiSelect';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import Calendarui from '@/components/ui/Calendarui';
 import { supabase } from '@/lib/supabase';

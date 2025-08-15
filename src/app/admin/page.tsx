@@ -329,6 +329,15 @@ export default function AdminPage() {
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">AI 助理</h3>
               </div>
             </div>
+            {/* AI 工具按鈕 */}
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/ai-tools')}>
+              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
+                <div className="w-12 h-12 mb-2">
+                  <img alt="AI 工具" className="w-full h-full object-contain" src="/owlui.png" />
+                </div>
+                <h3 className="text-lg font-semibold text-[#2B3A3B]">AI 工具</h3>
+              </div>
+            </div>
             {/* 課堂空缺按鈕 */}
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/lesson-availability')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">

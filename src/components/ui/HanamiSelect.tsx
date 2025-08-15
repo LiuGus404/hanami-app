@@ -19,7 +19,7 @@ interface HanamiSelectProps {
   error?: string;
 }
 
-export default function HanamiSelect({
+export function HanamiSelect({
   options,
   value,
   onChange,

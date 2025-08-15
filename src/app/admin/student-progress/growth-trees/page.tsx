@@ -96,6 +96,10 @@ export default function GrowthTreesPage() {
           related_activities: Array.isArray(g.related_activities) ? g.related_activities : (g.related_activities ? [g.related_activities] : []),
           progress_contents: progressContents,
           goal_description: g.goal_description ?? '',
+          // 確保評估模式欄位存在
+          assessment_mode: g.assessment_mode || 'progress',
+          multi_select_levels: Array.isArray(g.multi_select_levels) ? g.multi_select_levels : [],
+          multi_select_descriptions: Array.isArray(g.multi_select_descriptions) ? g.multi_select_descriptions : [],
         };
         console.log(`處理後目標 ${g.goal_name} 的資料:`, fixedGoal);
         return fixedGoal;
@@ -204,6 +208,10 @@ export default function GrowthTreesPage() {
             required_abilities: Array.isArray(g.required_abilities) ? g.required_abilities : (g.required_abilities ? [g.required_abilities] : []),
             related_activities: Array.isArray(g.related_activities) ? g.related_activities : (g.related_activities ? [g.related_activities] : []),
             progress_contents: progressContents,
+            // 添加評估模式欄位
+            assessment_mode: g.assessment_mode || 'progress',
+            multi_select_levels: Array.isArray(g.multi_select_levels) ? g.multi_select_levels : [],
+            multi_select_descriptions: Array.isArray(g.multi_select_descriptions) ? g.multi_select_descriptions : [],
           };
           console.log(`新增目標 ${g.goal_name} 的資料:`, goalData);
           return goalData;
@@ -327,6 +335,14 @@ export default function GrowthTreesPage() {
               ? g.related_activities 
               : (Array.isArray(existingGoal?.related_activities) ? existingGoal.related_activities : []),
             progress_contents: progressContents,
+            // 添加評估模式欄位
+            assessment_mode: g.assessment_mode || existingGoal?.assessment_mode || 'progress',
+            multi_select_levels: Array.isArray(g.multi_select_levels) && g.multi_select_levels.length > 0
+              ? g.multi_select_levels 
+              : (Array.isArray(existingGoal?.multi_select_levels) ? existingGoal.multi_select_levels : []),
+            multi_select_descriptions: Array.isArray(g.multi_select_descriptions) && g.multi_select_descriptions.length > 0
+              ? g.multi_select_descriptions 
+              : (Array.isArray(existingGoal?.multi_select_descriptions) ? existingGoal.multi_select_descriptions : []),
           };
           console.log(`目標 ${g.goal_name} 的資料:`, goalData);
           return goalData;
@@ -417,6 +433,10 @@ export default function GrowthTreesPage() {
           required_abilities: Array.isArray(g.required_abilities) ? g.required_abilities : (g.required_abilities ? [g.required_abilities] : []),
           related_activities: Array.isArray(g.related_activities) ? g.related_activities : (g.related_activities ? [g.related_activities] : []),
           progress_contents: progressContents,
+          // 添加評估模式欄位
+          assessment_mode: g.assessment_mode || 'progress',
+          multi_select_levels: Array.isArray(g.multi_select_levels) ? g.multi_select_levels : [],
+          multi_select_descriptions: Array.isArray(g.multi_select_descriptions) ? g.multi_select_descriptions : [],
         };
       });
     } catch (error) {
@@ -1033,6 +1053,10 @@ export default function GrowthTreesPage() {
                   required_abilities: Array.isArray(g.required_abilities) ? g.required_abilities : (g.required_abilities ? [g.required_abilities] : []),
                   related_activities: Array.isArray(g.related_activities) ? g.related_activities : (g.related_activities ? [g.related_activities] : []),
                   progress_contents: progressContents,
+                  // 添加評估模式欄位
+                  assessment_mode: g.assessment_mode || 'progress',
+                  multi_select_levels: Array.isArray(g.multi_select_levels) ? g.multi_select_levels : [],
+                  multi_select_descriptions: Array.isArray(g.multi_select_descriptions) ? g.multi_select_descriptions : [],
                 };
               }),
             }}

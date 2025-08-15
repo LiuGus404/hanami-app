@@ -8,7 +8,7 @@ import HanamiBadge from '@/components/ui/HanamiBadge';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
-import HanamiSelect from '@/components/ui/HanamiSelect';
+import { HanamiSelect } from '@/components/ui/HanamiSelect';
 import { supabase } from '@/lib/supabase';
 
 interface UserPermission {

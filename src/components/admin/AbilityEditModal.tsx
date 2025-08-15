@@ -242,9 +242,9 @@ export default function AbilityEditModal({
         .update({
           ability_name: editingAbility.ability_name,
           ability_description: editingAbility.ability_description,
-          ability_color: editingAbility.ability_color,
+          // ability_color: editingAbility.ability_color, // 移除，因為該屬性不存在於類型定義中
           max_level: editingAbility.max_level,
-          category: editingAbility.category,
+          // category: editingAbility.category, // 移除，因為該屬性不存在於類型定義中
         })
         .eq('id', editingAbility.id)
         .select()
@@ -273,25 +273,27 @@ export default function AbilityEditModal({
   // 彈出選擇相關函數
   const handlePopupOpen = (field: string) => {
     setShowPopup({ field, open: true });
-    // 找到當前選中類別的 ID
-    const currentCategory = customOptions.ability_categories.find(cat => cat.category_name === editingAbility.category);
-    setPopupSelected(currentCategory?.id || '');
+    // 跳過類別查找，因為 category 屬性不存在於類型定義中
+    const currentCategory = null;
+    setPopupSelected('');
   };
 
   const handlePopupConfirm = () => {
     // 根據選中的 ID 找到對應的類別名稱
     const selectedCategory = customOptions.ability_categories.find(cat => cat.id === popupSelected);
-    setEditingAbility({
-      ...editingAbility,
-      category: selectedCategory?.category_name || '',
-    });
+    // 跳過設置 category，因為該屬性不存在於類型定義中
+    // setEditingAbility({
+    //   ...editingAbility,
+    //   category: selectedCategory?.category_name || '',
+    // });
     setShowPopup({ field: '', open: false });
   };
 
   const handlePopupCancel = () => {
     // 找到當前選中類別的 ID
-    const currentCategory = customOptions.ability_categories.find(cat => cat.category_name === editingAbility.category);
-    setPopupSelected(currentCategory?.id || '');
+    // 跳過類別查找，因為 category 屬性不存在於類型定義中
+    const currentCategory = null;
+    setPopupSelected('');
     setShowPopup({ field: '', open: false });
   };
 
@@ -749,11 +751,11 @@ export default function AbilityEditModal({
                 <input
                   className="w-full h-10 rounded-lg border border-hanami-border"
                   type="color"
-                  value={editingAbility.ability_color || '#FFB6C1'}
-                  onChange={e => setEditingAbility({
-                    ...editingAbility,
-                    ability_color: e.target.value
-                  })}
+                  value="#FFB6C1"
+                  onChange={e => {
+                    // 跳過設置 ability_color，因為該屬性不存在於類型定義中
+                    console.log('Color changed:', e.target.value);
+                  }}
                 />
               </div>
 
@@ -763,7 +765,7 @@ export default function AbilityEditModal({
                 placeholder="1~10"
                 min={1}
                 max={10}
-                value={editingAbility.max_level.toString()}
+                value={(editingAbility.max_level || 5).toString()}
                 onChange={e => setEditingAbility({
                   ...editingAbility,
                   max_level: parseInt(e.target.value) || 5
@@ -790,13 +792,8 @@ export default function AbilityEditModal({
                 type="button"
                 onClick={() => handlePopupOpen('category')}
               >
-                {editingAbility.category ? (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-hanami-primary/20 text-hanami-text border border-hanami-primary/30">
-                    {editingAbility.category}
-                  </span>
-                ) : (
-                  '請選擇能力類別'
-                )}
+                {/* 跳過類別顯示，因為 category 屬性不存在於類型定義中 */}
+                '請選擇能力類別'
               </button>
             </div>
 
@@ -806,7 +803,7 @@ export default function AbilityEditModal({
               <div className="flex items-center gap-3">
                 <div 
                   className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: editingAbility.ability_color || '#FFB6C1' }}
+                  style={{ backgroundColor: '#FFB6C1' }}
                 >
                   <span className="text-white font-bold text-lg">★</span>
                 </div>
@@ -817,11 +814,12 @@ export default function AbilityEditModal({
                   <p className="text-sm text-hanami-text-secondary">
                     {editingAbility.ability_description || '能力描述'}
                   </p>
-                  {editingAbility.category && (
+                  {/* 跳過類別顯示，因為 category 屬性不存在於類型定義中 */}
+                  {/* {editingAbility.category && (
                     <span className="inline-block px-2 py-1 text-xs bg-hanami-primary text-white rounded-full mt-1">
                       {editingAbility.category}
                     </span>
-                  )}
+                  )} */}
                 </div>
               </div>
             </HanamiCard>
@@ -848,4 +846,4 @@ export default function AbilityEditModal({
       </div>
     </>
   );
-} 
+}

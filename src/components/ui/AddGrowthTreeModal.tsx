@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { HanamiButton } from './HanamiButton';
 import { PopupSelect } from './PopupSelect';
 import { FunnelIcon } from '@heroicons/react/24/outline';
+import { ASSESSMENT_MODES, DEFAULT_MULTI_SELECT_LEVELS, DEFAULT_MULTI_SELECT_DESCRIPTIONS } from '@/types/progress';
 
 interface GoalInput {
   goal_name: string;
@@ -12,6 +13,10 @@ interface GoalInput {
   required_abilities: string[];
   related_activities: string[];
   progress_contents: string[];
+  // 新增評估模式相關欄位
+  assessment_mode: 'progress' | 'multi_select';
+  multi_select_levels: string[];
+  multi_select_descriptions: string[];
 }
 
 interface AddGrowthTreeModalProps {
@@ -66,6 +71,10 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
         progress_contents: Array.isArray(goal.progress_contents) 
           ? goal.progress_contents.filter((content: string) => content && content.trim() !== '')
           : [],
+        // 新增評估模式相關欄位
+        assessment_mode: goal.assessment_mode || 'progress',
+        multi_select_levels: Array.isArray(goal.multi_select_levels) ? goal.multi_select_levels : [],
+        multi_select_descriptions: Array.isArray(goal.multi_select_descriptions) ? goal.multi_select_descriptions : [],
       }));
     }
     // 新增模式：使用預設值
@@ -77,6 +86,9 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
       required_abilities: [],
       related_activities: [],
       progress_contents: [],
+      assessment_mode: 'progress',
+      multi_select_levels: DEFAULT_MULTI_SELECT_LEVELS,
+      multi_select_descriptions: DEFAULT_MULTI_SELECT_DESCRIPTIONS,
     }];
   });
   const [loading, setLoading] = useState(false);
@@ -91,6 +103,9 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const [showAbilitySelector, setShowAbilitySelector] = useState<{open: boolean, goalIdx: number | null}>({ open: false, goalIdx: null });
   const [abilitySearchText, setAbilitySearchText] = useState('');
   const [abilityTempSelected, setAbilityTempSelected] = useState<string[]>([]);
+
+  // 3. 新增評估模式選擇器狀態
+  const [showAssessmentModeDropdown, setShowAssessmentModeDropdown] = useState<number | null>(null);
 
   // 監控每個目標的 progress_max 變化
   useEffect(() => {
@@ -114,15 +129,64 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
     }));
   }, [goals.map(g => g.progress_max).join(',')]);
 
+  // 監控評估模式變化
+  useEffect(() => {
+    setGoals(goals => goals.map(goal => {
+      if (goal.assessment_mode === 'multi_select') {
+        // 如果是多選模式且沒有配置，才設置預設值
+        if (!goal.multi_select_levels || goal.multi_select_levels.length === 0) {
+          goal.multi_select_levels = [...DEFAULT_MULTI_SELECT_LEVELS];
+        }
+        if (!goal.multi_select_descriptions || goal.multi_select_descriptions.length === 0) {
+          goal.multi_select_descriptions = [...DEFAULT_MULTI_SELECT_DESCRIPTIONS];
+        }
+      }
+      return goal;
+    }));
+  }, [goals.map(g => g.assessment_mode).join(',')]);
+
   const handleGoalChange = (idx: number, key: keyof GoalInput, value: any) => {
     setGoals(goals => goals.map((g, i) => i === idx ? { ...g, [key]: value } : g));
   };
+
   const handleProgressContentChange = (goalIdx: number, contentIdx: number, value: string) => {
     setGoals(goals => goals.map((g, i) => i === goalIdx ? {
       ...g,
       progress_contents: g.progress_contents.map((c, j) => j === contentIdx ? value : c),
     } : g));
   };
+
+  // 新增多選等級處理函數
+  const handleMultiSelectLevelChange = (goalIdx: number, levelIdx: number, value: string) => {
+    setGoals(goals => goals.map((g, i) => i === goalIdx ? {
+      ...g,
+      multi_select_levels: g.multi_select_levels.map((level, j) => j === levelIdx ? value : level),
+    } : g));
+  };
+
+  const handleMultiSelectDescriptionChange = (goalIdx: number, descIdx: number, value: string) => {
+    setGoals(goals => goals.map((g, i) => i === goalIdx ? {
+      ...g,
+      multi_select_descriptions: g.multi_select_descriptions.map((desc, j) => j === descIdx ? value : desc),
+    } : g));
+  };
+
+  const addMultiSelectLevel = (goalIdx: number) => {
+    setGoals(goals => goals.map((g, i) => i === goalIdx ? {
+      ...g,
+      multi_select_levels: [...g.multi_select_levels, `等級${g.multi_select_levels.length + 1}`],
+      multi_select_descriptions: [...g.multi_select_descriptions, '請輸入等級描述'],
+    } : g));
+  };
+
+  const removeMultiSelectLevel = (goalIdx: number, levelIdx: number) => {
+    setGoals(goals => goals.map((g, i) => i === goalIdx ? {
+      ...g,
+      multi_select_levels: g.multi_select_levels.filter((_, j) => j !== levelIdx),
+      multi_select_descriptions: g.multi_select_descriptions.filter((_, j) => j !== levelIdx),
+    } : g));
+  };
+
   const addGoal = () => setGoals(goals => [...goals, { 
     goal_name: '', 
     goal_description: '', 
@@ -131,6 +195,9 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
     required_abilities: [], 
     related_activities: [], 
     progress_contents: [], 
+    assessment_mode: 'progress',
+    multi_select_levels: DEFAULT_MULTI_SELECT_LEVELS,
+    multi_select_descriptions: DEFAULT_MULTI_SELECT_DESCRIPTIONS,
   }]);
   const removeGoal = (idx: number) => setGoals(goals => goals.filter((_, i) => i !== idx));
 
@@ -199,6 +266,11 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   };
   const filteredAbilities = props.abilitiesOptions.filter(a => a.label.includes(abilitySearchText));
 
+  // 4. 評估模式選擇器函數
+  const openAssessmentModeSelector = (goalIdx: number) => {
+    setShowAssessmentModeDropdown(showAssessmentModeDropdown === goalIdx ? null : goalIdx);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -215,6 +287,10 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
           progress_contents: filteredProgressContents,
           related_activities: Array.isArray(g.related_activities) ? g.related_activities : [],
           required_abilities: Array.isArray(g.required_abilities) ? g.required_abilities : [],
+          // 確保評估模式欄位被包含
+          assessment_mode: g.assessment_mode || 'progress',
+          multi_select_levels: Array.isArray(g.multi_select_levels) ? g.multi_select_levels : [],
+          multi_select_descriptions: Array.isArray(g.multi_select_descriptions) ? g.multi_select_descriptions : [],
         };
       });
       
@@ -424,6 +500,125 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                         提示：修改上方的「進度條最大值」會自動調整進度內容的數量
                       </p>
                     </div>
+
+                    {/* 評估模式選擇 */}
+                    <div>
+                      <label className="block text-sm font-medium text-[#2B3A3B] mb-2">評估模式</label>
+                      <div className="relative">
+                        <button
+                          className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left bg-white hover:bg-[#FFF9F2] transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
+                          type="button"
+                          onClick={() => openAssessmentModeSelector(idx)}
+                        >
+                          <div className="font-medium text-[#2B3A3B]">
+                            {goal.assessment_mode === 'progress' ? '進度條' : '多選題'}
+                          </div>
+                          <div className="text-sm text-[#A68A64]">
+                            {goal.assessment_mode === 'progress' ? '使用進度條評估學習進度' : '使用多選題評估學習成果'}
+                          </div>
+                        </button>
+                        {showAssessmentModeDropdown === idx && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EADBC8] rounded-lg shadow-lg z-10">
+                            <button
+                              className={`w-full px-4 py-3 text-left hover:bg-[#FFF9F2] border-b border-[#EADBC8] ${
+                                goal.assessment_mode === 'progress' ? 'bg-[#FFF9F2]' : ''
+                              }`}
+                              type="button"
+                              onClick={() => {
+                                handleGoalChange(idx, 'assessment_mode', 'progress');
+                                setShowAssessmentModeDropdown(null);
+                              }}
+                            >
+                              <div className="font-medium text-[#2B3A3B]">進度條</div>
+                              <div className="text-sm text-[#A68A64]">使用進度條評估學習進度</div>
+                              {goal.assessment_mode === 'progress' && (
+                                <div className="text-sm text-[#A64B2A]">✓ 已選擇</div>
+                              )}
+                            </button>
+                            <button
+                              className={`w-full px-4 py-3 text-left hover:bg-[#FFF9F2] ${
+                                goal.assessment_mode === 'multi_select' ? 'bg-[#FFF9F2]' : ''
+                              }`}
+                              type="button"
+                              onClick={() => {
+                                handleGoalChange(idx, 'assessment_mode', 'multi_select');
+                                setShowAssessmentModeDropdown(null);
+                              }}
+                            >
+                              <div className="font-medium text-[#2B3A3B]">多選題</div>
+                              <div className="text-sm text-[#A68A64]">使用多選題評估學習成果</div>
+                              {goal.assessment_mode === 'multi_select' && (
+                                <div className="text-sm text-[#A64B2A]">✓ 已選擇</div>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 多選等級和描述 */}
+                    {goal.assessment_mode === 'multi_select' && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-[#2B3A3B] mb-2">等級</label>
+                          {goal.multi_select_levels.map((level, lidx) => (
+                            <div key={lidx} className="flex items-center gap-2 mb-2">
+                              <input
+                                className="flex-1 px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
+                                type="text"
+                                value={level}
+                                onChange={e => handleMultiSelectLevelChange(idx, lidx, e.target.value)}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeMultiSelectLevel(idx, lidx)}
+                                className="text-[#A64B2A] hover:text-[#8B3A1F] transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => addMultiSelectLevel(idx)}
+                            className="w-full px-4 py-3 text-[#A64B2A] border border-[#EADBC8] rounded-lg hover:bg-[#FFF9F2] transition-colors"
+                          >
+                            + 新增等級
+                          </button>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-[#2B3A3B] mb-2">描述</label>
+                          {goal.multi_select_descriptions.map((desc, didx) => (
+                            <div key={didx} className="flex items-center gap-2 mb-2">
+                              <input
+                                className="flex-1 px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
+                                type="text"
+                                value={desc}
+                                onChange={e => handleMultiSelectDescriptionChange(idx, didx, e.target.value)}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeMultiSelectLevel(idx, didx)} // 移除描述時也移除等級
+                                className="text-[#A64B2A] hover:text-[#8B3A1F] transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => addMultiSelectLevel(idx)} // 新增描述時也新增等級
+                            className="w-full px-4 py-3 text-[#A64B2A] border border-[#EADBC8] rounded-lg hover:bg-[#FFF9F2] transition-colors"
+                          >
+                            + 新增描述
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* 發展能力和活動 */}
                     <div className="grid grid-cols-2 gap-4">

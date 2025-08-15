@@ -13,13 +13,19 @@ import {
   VideoCameraIcon
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
-import { HanamiCard, HanamiButton, HanamiInput, PopupSelect, SimpleAbilityAssessmentModal, StudentTreeAssignmentModal } from '@/components/ui';
+import { HanamiCard, HanamiButton, HanamiInput, PopupSelect, SimpleAbilityAssessmentModal, StudentTreeAssignmentModal, PerformanceMonitor } from '@/components/ui';
 import Calendarui from '@/components/ui/Calendarui';
 import { supabase } from '@/lib/supabase';
 import { getHKDateString } from '@/lib/utils';
 import { DevelopmentAbility, GrowthTree, TeachingActivity, StudentProgress } from '@/types/progress';
+import { 
+  getStudentAssessmentStatus, 
+  getStudentMediaStatus, 
+  getBaseDashboardData,
+  clearCache 
+} from '@/lib/optimizedQueries';
 
 interface AbilityAssessment {
   id: string;
@@ -57,6 +63,20 @@ interface StudentMediaStatus {
   media_count?: number;
   last_media_upload?: string | null;
 }
+
+// 快取介面
+interface DashboardCache {
+  abilities: DevelopmentAbility[];
+  trees: GrowthTree[];
+  activities: TeachingActivity[];
+  recentAssessments: AbilityAssessment[];
+  lastUpdated: number;
+  assessmentDate: string;
+  mediaDate: string;
+}
+
+// 快取過期時間（5分鐘）
+const CACHE_EXPIRY = 5 * 60 * 1000;
 
 export default function StudentProgressDashboard() {
   const [abilities, setAbilities] = useState<DevelopmentAbility[]>([]);
@@ -96,19 +116,341 @@ export default function StudentProgressDashboard() {
   // 學生資料載入狀態
   const [loadingStudents, setLoadingStudents] = useState(false);
 
+  // 快取狀態
+  const [cache, setCache] = useState<DashboardCache | null>(null);
+
+  // 性能監控狀態
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    pageLoadTime: 0,
+    dataLoadTime: 0,
+    cacheHitRate: 0,
+    queryCount: 0
+  });
+
+  // 檢查快取是否有效
+  const isCacheValid = useCallback((cacheData: DashboardCache | null, currentAssessmentDate: string, currentMediaDate: string) => {
+    if (!cacheData) return false;
+    
+    const now = Date.now();
+    const isExpired = now - cacheData.lastUpdated > CACHE_EXPIRY;
+    const isSameAssessmentDate = cacheData.assessmentDate === currentAssessmentDate;
+    const isSameMediaDate = cacheData.mediaDate === currentMediaDate;
+    
+    return !isExpired && isSameAssessmentDate && isSameMediaDate;
+  }, []);
+
+  // 優化的基礎資料載入函數
+  const loadBaseData = useCallback(async () => {
+    try {
+      // 開始性能監控
+      if ((window as any).performanceMonitor) {
+        (window as any).performanceMonitor.startDataLoad();
+      }
+
+      const baseData = await getBaseDashboardData(assessmentLimit);
+
+      // 確保資料是陣列格式
+      const abilitiesData = Array.isArray(baseData.abilities) ? baseData.abilities : [];
+      const treesData = Array.isArray(baseData.trees) ? baseData.trees : [];
+      const activitiesData = Array.isArray(baseData.activities) ? baseData.activities : [];
+      const assessmentsData = Array.isArray(baseData.assessments) ? baseData.assessments : [];
+
+      // 修正資料格式
+      const fixedAbilities = abilitiesData.map((a: any) => ({
+        ...a,
+        ability_description: a.ability_description ?? undefined,
+        ability_icon: a.ability_icon ?? undefined,
+        ability_color: a.ability_color ?? undefined,
+      }));
+
+      const fixedTrees = treesData.map((t: any) => ({
+        ...t,
+        course_type: t.course_type_id ?? t.course_type ?? '',
+        tree_description: t.tree_description ?? undefined,
+      }));
+
+      const fixedActivities = activitiesData.map((a: any) => ({
+        ...a,
+        estimated_duration: a.estimated_duration ?? a.duration_minutes ?? 0,
+        activity_description: a.activity_description ?? undefined,
+        materials_needed: a.materials_needed ?? [],
+        instructions: a.instructions ?? undefined,
+      }));
+
+      const fixedAssessments = assessmentsData.map((a: any) => ({
+        ...a,
+        assessment_date: a.assessment_date ?? a.created_at?.split('T')[0] ?? '',
+        general_notes: a.general_notes ?? undefined,
+        next_lesson_focus: a.next_lesson_focus ?? undefined,
+      }));
+
+      // 結束性能監控
+      if ((window as any).performanceMonitor) {
+        (window as any).performanceMonitor.endDataLoad();
+      }
+
+      return {
+        abilities: fixedAbilities,
+        trees: fixedTrees,
+        activities: fixedActivities,
+        assessments: fixedAssessments
+      };
+    } catch (error) {
+      console.error('載入基礎資料時發生錯誤:', error);
+      throw error;
+    }
+  }, [assessmentLimit]);
+
+  // 優化的學生評估狀態載入函數
+  const loadStudentsWithoutAssessment = useCallback(async () => {
+    try {
+      setLoadingStudents(true);
+
+      const data = await getStudentAssessmentStatus(selectedAssessmentDate);
+      
+      // 確保資料是陣列格式
+      const lessonsData = Array.isArray(data.lessons) ? data.lessons : [];
+      const assessmentsData = Array.isArray(data.assessments) ? data.assessments : [];
+      const studentsData = Array.isArray(data.students) ? data.students : [];
+      const treesData = Array.isArray(data.trees) ? data.trees : [];
+
+      // 建立映射表以提高查詢效率
+      const lessonTimeMap = new Map();
+      lessonsData.forEach((lesson: any) => {
+        lessonTimeMap.set(lesson.student_id, lesson.actual_timeslot);
+      });
+
+      const assessedStudentIds = new Set(assessmentsData.map((a: any) => a.student_id));
+      const studentTreeMap = new Map();
+      treesData.forEach((item: any) => {
+        studentTreeMap.set(item.student_id, item.tree_id);
+      });
+
+      // 獲取所有學生的最後評估日期（批量查詢）
+      const studentIds = [...new Set(lessonsData.map((lesson: any) => lesson.student_id).filter((id: any): id is string => id !== null))] as string[];
+      
+      let lastAssessmentMap = new Map();
+      if (studentIds.length > 0) {
+        const { data: lastAssessmentsData } = await supabase
+          .from('hanami_ability_assessments')
+          .select('student_id, assessment_date')
+          .in('student_id', studentIds)
+          .order('assessment_date', { ascending: false });
+
+        // 建立最後評估日期映射
+        lastAssessmentsData?.forEach((assessment: any) => {
+          if (!lastAssessmentMap.has(assessment.student_id)) {
+            lastAssessmentMap.set(assessment.student_id, assessment.assessment_date);
+          }
+        });
+      }
+
+      // 分類學生
+      const categorizedStudents = {
+        assessed: [] as StudentWithoutAssessment[],
+        unassessed: [] as StudentWithoutAssessment[],
+        noTree: [] as StudentWithoutAssessment[]
+      };
+
+      // 處理每個學生
+      studentsData.forEach((student: any) => {
+        const hasLesson = lessonTimeMap.has(student.id);
+        const isAssessedToday = assessedStudentIds.has(student.id);
+        const hasTree = studentTreeMap.has(student.id);
+        const lastAssessmentDate = lastAssessmentMap.get(student.id) || null;
+        const lessonTime = lessonTimeMap.get(student.id) || '';
+
+        const studentWithData = {
+          ...student,
+          last_assessment_date: lastAssessmentDate,
+          lesson_time: lessonTime
+        };
+
+        if (hasLesson) {
+          if (isAssessedToday) {
+            categorizedStudents.assessed.push(studentWithData);
+          } else if (hasTree) {
+            categorizedStudents.unassessed.push(studentWithData);
+          } else {
+            categorizedStudents.noTree.push(studentWithData);
+          }
+        }
+      });
+
+      // 按時間排序
+      const sortByTime = (a: StudentWithoutAssessment, b: StudentWithoutAssessment) => {
+        const timeA = a.lesson_time || '';
+        const timeB = b.lesson_time || '';
+        return timeA.localeCompare(timeB);
+      };
+
+      categorizedStudents.assessed.sort(sortByTime);
+      categorizedStudents.unassessed.sort(sortByTime);
+      categorizedStudents.noTree.sort(sortByTime);
+
+      setStudentsWithoutAssessment(categorizedStudents.unassessed);
+      setStudentsAssessed(categorizedStudents.assessed);
+      setStudentsNoTree(categorizedStudents.noTree);
+
+    } catch (error) {
+      console.error('載入需要評估的學生時發生錯誤:', error);
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, [selectedAssessmentDate]);
+
+  // 優化的學生媒體狀態載入函數
+  const loadStudentsMediaStatus = useCallback(async () => {
+    try {
+      setLoadingStudents(true);
+
+      const data = await getStudentMediaStatus(selectedMediaDate);
+      
+      // 確保資料是陣列格式
+      const lessonsData = Array.isArray(data.lessons) ? data.lessons : [];
+      const mediaData = Array.isArray(data.media) ? data.media : [];
+
+      if (lessonsData.length === 0) {
+        setStudentsWithoutMedia([]);
+        setStudentsWithMedia([]);
+        return;
+      }
+
+      // 建立媒體狀態映射
+      const mediaStatusMap = new Map();
+
+      // 初始化所有學生為未上傳狀態
+      lessonsData.forEach((lesson: any) => {
+        const studentId = lesson.student_id;
+        if (!mediaStatusMap.has(studentId)) {
+          mediaStatusMap.set(studentId, {
+            id: studentId,
+            full_name: lesson.full_name || '未知學生',
+            nick_name: null,
+            course_type: lesson.course_type,
+            lesson_time: lesson.actual_timeslot,
+            has_media: false,
+            media_count: 0,
+            last_media_upload: null
+          });
+        }
+      });
+
+      // 更新有媒體的學生狀態
+      mediaData.forEach((media: any) => {
+        const studentId = media.student_id;
+        if (mediaStatusMap.has(studentId)) {
+          const student = mediaStatusMap.get(studentId);
+          student.has_media = true;
+          student.media_count = (student.media_count || 0) + 1;
+          if (!student.last_media_upload || media.created_at > student.last_media_upload) {
+            student.last_media_upload = media.created_at;
+          }
+        }
+      });
+
+      // 分類學生
+      const withMedia: StudentMediaStatus[] = [];
+      const withoutMedia: StudentMediaStatus[] = [];
+
+      mediaStatusMap.forEach((student: any) => {
+        if (student.has_media) {
+          withMedia.push(student);
+        } else {
+          withoutMedia.push(student);
+        }
+      });
+
+      // 按時間排序
+      const sortByTime = (a: StudentMediaStatus, b: StudentMediaStatus) => {
+        const timeA = a.lesson_time || '';
+        const timeB = b.lesson_time || '';
+        return timeA.localeCompare(timeB);
+      };
+
+      setStudentsWithMedia(withMedia.sort(sortByTime));
+      setStudentsWithoutMedia(withoutMedia.sort(sortByTime));
+
+    } catch (error) {
+      console.error('載入學生媒體狀態時發生錯誤:', error);
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, [selectedMediaDate]);
+
+  // 主載入函數
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // 檢查快取
+      if (isCacheValid(cache, selectedAssessmentDate, selectedMediaDate)) {
+        console.log('使用快取資料');
+        setAbilities(cache!.abilities);
+        setTrees(cache!.trees);
+        setActivities(cache!.activities);
+        setRecentAssessments(cache!.recentAssessments);
+        
+        // 更新快取命中率
+        if ((window as any).performanceMonitor) {
+          (window as any).performanceMonitor.updateCacheHitRate(1);
+        }
+      } else {
+        console.log('載入新資料');
+        const baseData = await loadBaseData();
+        setAbilities(baseData.abilities);
+        setTrees(baseData.trees);
+        setActivities(baseData.activities);
+        setRecentAssessments(baseData.assessments);
+
+        // 更新快取
+        setCache({
+          abilities: baseData.abilities,
+          trees: baseData.trees,
+          activities: baseData.activities,
+          recentAssessments: baseData.assessments,
+          lastUpdated: Date.now(),
+          assessmentDate: selectedAssessmentDate,
+          mediaDate: selectedMediaDate
+        });
+        
+        // 更新快取命中率
+        if ((window as any).performanceMonitor) {
+          (window as any).performanceMonitor.updateCacheHitRate(0);
+        }
+      }
+
+      // 並行載入學生相關資料
+      await Promise.all([
+        loadStudentsWithoutAssessment(),
+        loadStudentsMediaStatus()
+      ]);
+
+    } catch (error) {
+      console.error('載入管理面板資料時發生錯誤:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [cache, selectedAssessmentDate, selectedMediaDate, isCacheValid, loadBaseData, loadStudentsWithoutAssessment, loadStudentsMediaStatus]);
+
   useEffect(() => {
     loadDashboardData();
-  }, [assessmentLimit]);
+  }, [loadDashboardData]);
 
   // 當選擇的評估日期改變時，重新載入需要評估的學生
   useEffect(() => {
-    loadStudentsWithoutAssessment();
-  }, [selectedAssessmentDate]);
+    if (!loading) {
+      loadStudentsWithoutAssessment();
+    }
+  }, [selectedAssessmentDate, loadStudentsWithoutAssessment, loading]);
 
   // 當選擇的媒體日期改變時，重新載入學生媒體狀態
   useEffect(() => {
-    loadStudentsMediaStatus();
-  }, [selectedMediaDate]);
+    if (!loading) {
+      loadStudentsMediaStatus();
+    }
+  }, [selectedMediaDate, loadStudentsMediaStatus, loading]);
 
   // 處理能力評估提交
   const handleAssessmentSubmit = async (assessment: any) => {
@@ -123,141 +465,15 @@ export default function StudentProgressDashboard() {
       setShowAssessmentModal(false);
       setSelectedStudentForAssessment(null);
       
+      // 清除相關快取
+      clearCache('student_assessment_status');
+      
       // 重新載入需要評估的學生列表
       loadStudentsWithoutAssessment();
       
     } catch (error) {
       console.error('提交能力評估失敗:', error);
       alert('提交失敗: ' + (error as Error).message);
-    }
-  };
-
-  // 載入需要評估的學生
-  const loadStudentsWithoutAssessment = async () => {
-    try {
-      setLoadingStudents(true);
-
-      // 先獲取選擇日期有上課的學生，按上課時間排序
-      const { data: todayLessonsData, error: todayLessonsError } = await supabase
-        .from('hanami_student_lesson')
-        .select('student_id, actual_timeslot')
-        .eq('lesson_date', selectedAssessmentDate)
-        .order('actual_timeslot', { ascending: true });
-
-      if (todayLessonsError) throw todayLessonsError;
-      
-      // 獲取選擇日期有上課的學生ID列表（保持時間順序）
-      const todayStudentIds = [...new Set((todayLessonsData || []).map(lesson => lesson.student_id).filter((id): id is string => id !== null))];
-      
-      if (todayStudentIds.length > 0) {
-        // 檢查這些學生選擇日期是否有能力評估記錄
-        const { data: todayAssessmentsData, error: todayAssessmentsError } = await supabase
-          .from('hanami_ability_assessments')
-          .select('student_id')
-          .eq('assessment_date', selectedAssessmentDate)
-          .in('student_id', todayStudentIds);
-
-        if (todayAssessmentsError) throw todayAssessmentsError;
-        
-        // 獲取選擇日期有評估記錄的學生ID列表
-        const todayAssessedStudentIds = (todayAssessmentsData || []).map(assessment => assessment.student_id);
-        
-        // 獲取這些學生的詳細資訊
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('Hanami_Students')
-          .select('id, full_name, nick_name, course_type')
-          .in('id', todayStudentIds);
-
-        if (studentsError) throw studentsError;
-        
-        // 獲取學生的成長樹分配資訊
-        const { data: studentTreesData, error: studentTreesError } = await supabase
-          .from('hanami_student_trees')
-          .select('student_id, tree_id, status')
-          .in('student_id', todayStudentIds)
-          .eq('status', 'active');
-
-        if (studentTreesError) throw studentTreesError;
-        
-        // 建立學生ID到成長樹的映射
-        const studentTreeMap = new Map();
-        (studentTreesData || []).forEach(item => {
-          studentTreeMap.set(item.student_id, item.tree_id);
-        });
-        
-        // 分類學生
-        const categorizedStudents = {
-          assessed: [] as StudentWithoutAssessment[],
-          unassessed: [] as StudentWithoutAssessment[],
-          noTree: [] as StudentWithoutAssessment[]
-        };
-        
-        // 處理每個學生
-        for (const student of studentsData || []) {
-          // 獲取最後評估日期和上課時間
-          const [lastAssessmentData, lessonData] = await Promise.all([
-            supabase
-              .from('hanami_ability_assessments')
-              .select('assessment_date')
-              .eq('student_id', student.id)
-              .order('assessment_date', { ascending: false })
-              .limit(1),
-            supabase
-              .from('hanami_student_lesson')
-              .select('actual_timeslot')
-              .eq('student_id', student.id)
-              .eq('lesson_date', selectedAssessmentDate)
-              .limit(1)
-          ]);
-          
-          const studentWithData = {
-            ...student,
-            last_assessment_date: lastAssessmentData.data?.[0]?.assessment_date || null,
-            lesson_time: lessonData.data?.[0]?.actual_timeslot || ''
-          };
-          
-          // 檢查是否有成長樹
-          const hasTree = studentTreeMap.has(student.id);
-          
-          // 檢查今天是否已評估
-          const isAssessedToday = todayAssessedStudentIds.includes(student.id);
-          
-          if (isAssessedToday) {
-            // 已評估
-            categorizedStudents.assessed.push(studentWithData);
-          } else if (hasTree) {
-            // 未評估但有成長樹
-            categorizedStudents.unassessed.push(studentWithData);
-          } else {
-            // 未分配成長樹
-            categorizedStudents.noTree.push(studentWithData);
-          }
-        }
-        
-        // 按上課時間排序每個類別
-        const sortByTime = (a: StudentWithoutAssessment, b: StudentWithoutAssessment) => {
-          const timeA = a.lesson_time || '';
-          const timeB = b.lesson_time || '';
-          return timeA.localeCompare(timeB);
-        };
-        
-        categorizedStudents.assessed.sort(sortByTime);
-        categorizedStudents.unassessed.sort(sortByTime);
-        categorizedStudents.noTree.sort(sortByTime);
-        
-        setStudentsWithoutAssessment(categorizedStudents.unassessed);
-        setStudentsAssessed(categorizedStudents.assessed);
-        setStudentsNoTree(categorizedStudents.noTree);
-        
-      } else {
-        setStudentsWithoutAssessment([]);
-        setStudentsAssessed([]);
-        setStudentsNoTree([]);
-      }
-    } catch (error) {
-      console.error('載入需要評估的學生時發生錯誤:', error);
-    } finally {
-      setLoadingStudents(false);
     }
   };
 
@@ -285,211 +501,33 @@ export default function StudentProgressDashboard() {
     setFilteredAssessments(filtered);
   }, [recentAssessments, searchQuery, selectedDate]);
 
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-
-      // 載入發展能力
-      const { data: abilitiesData, error: abilitiesError } = await supabase
-        .from('hanami_development_abilities')
-        .select('*')
-        .order('ability_name');
-
-      if (abilitiesError) throw abilitiesError;
-      // 修正 null 欄位為 undefined
-      const fixedAbilities = (abilitiesData || []).map((a: any) => ({
-        ...a,
-        ability_description: a.ability_description ?? undefined,
-        ability_icon: a.ability_icon ?? undefined,
-        ability_color: a.ability_color ?? undefined,
-      }));
-      setAbilities(fixedAbilities);
-
-      // 載入成長樹
-      const { data: treesData, error: treesError } = await supabase
-        .from('hanami_growth_trees')
-        .select('*')
-        .eq('is_active', true)
-        .order('tree_name');
-
-      if (treesError) throw treesError;
-      // 欄位轉換與 null 處理
-      const fixedTrees = (treesData || []).map((t: any) => ({
-        ...t,
-        course_type: t.course_type_id ?? t.course_type ?? '',
-        tree_description: t.tree_description ?? undefined,
-      }));
-      setTrees(fixedTrees);
-
-      // 載入教學活動
-      const { data: activitiesData, error: activitiesError } = await supabase
-        .from('hanami_teaching_activities')
-        .select('*')
-        .order('activity_name');
-
-      if (activitiesError) throw activitiesError;
-      // 欄位轉換與 null 處理
-      const fixedActivities = (activitiesData || []).map((a: any) => ({
-        ...a,
-        estimated_duration: a.estimated_duration ?? a.duration_minutes ?? 0,
-        activity_description: a.activity_description ?? undefined,
-        materials_needed: a.materials_needed ?? [],
-        instructions: a.instructions ?? undefined,
-      }));
-      setActivities(fixedActivities);
-
-      // 載入能力評估記錄
-      const { data: assessmentsData, error: assessmentsError } = await supabase
-        .from('hanami_ability_assessments')
-        .select(`
-          *,
-          student:Hanami_Students(full_name, nick_name),
-          tree:hanami_growth_trees(tree_name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(assessmentLimit);
-
-      if (assessmentsError) throw assessmentsError;
-      const fixedAssessments = (assessmentsData || []).map((a: any) => ({
-        ...a,
-        assessment_date: a.assessment_date ?? a.created_at?.split('T')[0] ?? '',
-        general_notes: a.general_notes ?? undefined,
-        next_lesson_focus: a.next_lesson_focus ?? undefined,
-      }));
-      setRecentAssessments(fixedAssessments);
-
-      // 載入需要評估的學生
-      await loadStudentsWithoutAssessment();
-      
-      // 載入學生媒體狀態
-      await loadStudentsMediaStatus();
-
-    } catch (error) {
-      console.error('載入管理面板資料時發生錯誤:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 載入學生媒體狀態
-  const loadStudentsMediaStatus = async () => {
-    try {
-      setLoadingStudents(true);
-      
-      // 獲取指定日期的學生課程記錄
-      const { data: lessonsData, error: lessonsError } = await supabase
-        .from('hanami_student_lesson')
-        .select(`
-          student_id,
-          lesson_date,
-          actual_timeslot,
-          full_name,
-          course_type
-        `)
-        .eq('lesson_date', selectedMediaDate)
-        .not('student_id', 'is', null);
-
-      if (lessonsError) throw lessonsError;
-
-      if (!lessonsData || lessonsData.length === 0) {
-        setStudentsWithoutMedia([]);
-        setStudentsWithMedia([]);
-        return;
-      }
-
-      // 獲取這些學生的媒體上傳狀態
-      const studentIds = [...new Set(lessonsData.map(lesson => lesson.student_id).filter(id => id !== null))] as string[];
-      
-      const { data: mediaData, error: mediaError } = await supabase
-        .from('hanami_student_media')
-        .select(`
-          student_id,
-          created_at,
-          media_type
-        `)
-        .in('student_id', studentIds)
-        .gte('created_at', `${selectedMediaDate}T00:00:00`)
-        .lte('created_at', `${selectedMediaDate}T23:59:59`);
-
-      if (mediaError) throw mediaError;
-
-      // 處理學生媒體狀態
-      const studentsWithMediaMap = new Map();
-      const studentsWithoutMediaList: StudentMediaStatus[] = [];
-
-      // 初始化所有學生為未上傳狀態
-      lessonsData.forEach(lesson => {
-        const studentId = lesson.student_id;
-        if (!studentsWithMediaMap.has(studentId)) {
-          studentsWithMediaMap.set(studentId, {
-            id: studentId,
-            full_name: lesson.full_name || '未知學生',
-            nick_name: null,
-            course_type: lesson.course_type,
-            lesson_time: lesson.actual_timeslot,
-            has_media: false,
-            media_count: 0,
-            last_media_upload: null
-          });
-        }
-      });
-
-      // 更新有媒體的學生狀態
-      if (mediaData) {
-        mediaData.forEach(media => {
-          const studentId = media.student_id;
-          if (studentsWithMediaMap.has(studentId)) {
-            const student = studentsWithMediaMap.get(studentId);
-            student.has_media = true;
-            student.media_count = (student.media_count || 0) + 1;
-            if (!student.last_media_upload || media.created_at > student.last_media_upload) {
-              student.last_media_upload = media.created_at;
-            }
-          }
-        });
-      }
-
-      // 分類學生
-      const withMedia: StudentMediaStatus[] = [];
-      const withoutMedia: StudentMediaStatus[] = [];
-
-      studentsWithMediaMap.forEach(student => {
-        if (student.has_media) {
-          withMedia.push(student);
-        } else {
-          withoutMedia.push(student);
-        }
-      });
-
-      // 按時間排序
-      const sortByTime = (a: StudentMediaStatus, b: StudentMediaStatus) => {
-        const timeA = a.lesson_time || '';
-        const timeB = b.lesson_time || '';
-        return timeA.localeCompare(timeB);
-      };
-
-      setStudentsWithMedia(withMedia.sort(sortByTime));
-      setStudentsWithoutMedia(withoutMedia.sort(sortByTime));
-
-    } catch (error) {
-      console.error('載入學生媒體狀態時發生錯誤:', error);
-    } finally {
-      setLoadingStudents(false);
-    }
-  };
-
   // 處理能力評估記錄點擊
   const handleAssessmentClick = (assessment: AbilityAssessment) => {
     // 導航到能力評估管理頁面並顯示該學生的評估詳情
     window.location.href = `/admin/student-progress/ability-assessments?student_id=${assessment.student_id}&assessment_id=${assessment.id}`;
   };
 
+  // 性能監控回調
+  const handlePerformanceMetricsUpdate = useCallback((metrics: any) => {
+    setPerformanceMetrics(metrics);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="text-hanami-text">載入中...</div>
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-[#EADBC8] border-t-[#A64B2A] rounded-full animate-spin"></div>
+            </div>
+            <p className="text-hanami-text font-medium">載入學生進度管理中...</p>
+            <p className="text-hanami-text-secondary text-sm">正在優化載入速度</p>
+          </div>
         </div>
+        <PerformanceMonitor 
+          onMetricsUpdate={handlePerformanceMetricsUpdate}
+          showDebugInfo={showPerformanceMonitor}
+        />
       </div>
     );
   }
@@ -498,12 +536,33 @@ export default function StudentProgressDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-hanami-text mb-2">
-            學生進度管理
-          </h1>
-          <p className="text-hanami-text-secondary">
-            管理學生發展能力、成長樹和教學活動
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-hanami-text mb-2">
+                學生進度管理
+              </h1>
+              <p className="text-hanami-text-secondary">
+                管理學生發展能力、成長樹和教學活動
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                onClick={() => setShowPerformanceMonitor(!showPerformanceMonitor)}
+              >
+                {showPerformanceMonitor ? '隱藏' : '顯示'}性能監控
+              </button>
+              <button
+                className="px-3 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded-md transition-colors"
+                onClick={() => {
+                  clearCache();
+                  alert('快取已清除');
+                }}
+              >
+                清除快取
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* 學生進度管理導航按鈕區域 */}
@@ -1147,6 +1206,12 @@ export default function StudentProgressDashboard() {
           onClose={() => setShowMediaDatePicker(false)}
         />
       )}
+
+      {/* 性能監控組件 */}
+      <PerformanceMonitor 
+        onMetricsUpdate={handlePerformanceMetricsUpdate}
+        showDebugInfo={showPerformanceMonitor}
+      />
     </div>
   );
 } 

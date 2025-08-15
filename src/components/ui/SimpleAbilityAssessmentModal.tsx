@@ -47,6 +47,10 @@ interface GrowthGoal {
   completion_percentage?: number; // 完成百分比
   progress_max?: number; // 目標的最大進度值
   progress_contents?: string[]; // 每個等級對應的內容
+  // 新增評估模式相關欄位
+  assessment_mode?: 'progress' | 'multi_select';
+  multi_select_levels?: string[];
+  multi_select_descriptions?: string[];
   last_assessment?: {
     level: number;
     date: string;
@@ -83,6 +87,12 @@ interface AbilityAssessment {
       rating: number;
     };
   };
+  goals?: Array<{
+    goal_id: string;
+    assessment_mode: 'progress' | 'multi_select';
+    progress_level?: number;
+    selected_levels?: string[];
+  }>;
   overall_performance_rating: number;
   general_notes: string | null;
   next_lesson_focus: string | null;
@@ -139,6 +149,9 @@ export default function SimpleAbilityAssessmentModal({
   // 能力評估狀態
   const [abilityAssessments, setAbilityAssessments] = useState<{[key: string]: any}>(initialData?.ability_assessments || {});
   const [goalAssessments, setGoalAssessments] = useState<{[key: string]: any}>({});
+  
+  // 多選模式評估狀態
+  const [multiSelectAssessments, setMultiSelectAssessments] = useState<{[goalId: string]: string[]}>({});
 
   // 檢查是否為編輯模式
   const isEditMode = !!initialData;
@@ -169,7 +182,7 @@ export default function SimpleAbilityAssessmentModal({
   useEffect(() => {
     // 每次模組打開時都重新載入資料
     loadStudentsAndTrees();
-  }, []); // 移除依賴，確保每次組件掛載時都執行
+  }, []); // 只在組件掛載時執行一次
 
   useEffect(() => {
     if (selectedStudentId) {
@@ -454,11 +467,32 @@ export default function SimpleAbilityAssessmentModal({
           .eq('tree_id', treeId);
 
         if (!progressError && progressData) {
+          console.log('載入的進度資料:', progressData);
+          
           // 將進度資料合併到能力中
           const progressMap = new Map();
           progressData.forEach(progress => {
             progressMap.set(progress.ability_id, progress);
           });
+
+          console.log('進度資料映射:', Object.fromEntries(progressMap));
+          
+          // 載入歷史評估資料並設置初始值
+          const { data: assessmentData, error: assessmentError } = await supabase
+            .from('hanami_ability_assessments')
+            .select('*')
+            .eq('student_id', selectedStudentId)
+            .eq('tree_id', treeId)
+            .order('assessment_date', { ascending: false })
+            .limit(1);
+
+          let latestAssessment: any = null;
+          if (!assessmentError && assessmentData && assessmentData.length > 0) {
+            latestAssessment = assessmentData[0];
+            setOverallRating(latestAssessment.overall_performance_rating || 1);
+            setGeneralNotes(latestAssessment.general_notes || '');
+            setNextFocus(latestAssessment.next_lesson_focus || '');
+          }
 
           abilitiesData = abilitiesData.map(ability => {
             const progress = progressMap.get(ability.id);
@@ -468,6 +502,113 @@ export default function SimpleAbilityAssessmentModal({
               progress_percentage: progress?.progress_percentage || 0
             };
           });
+
+          // 設置目標評估的初始值
+          const initialGoalAssessments: {[key: string]: any} = {};
+          const initialMultiSelectAssessments: {[key: string]: string[]} = {};
+
+          // 從 selected_goals 欄位讀取目標評估資料 (JSONB 格式)
+          if (latestAssessment && latestAssessment.selected_goals && latestAssessment.selected_goals.length > 0) {
+            console.log('從 selected_goals 讀取歷史評估資料 (JSONB):', latestAssessment.selected_goals);
+            
+            latestAssessment.selected_goals.forEach((goalData: any) => {
+              const { goal_id, assessment_mode, progress_level, selected_levels } = goalData;
+              
+              if (assessment_mode === 'multi_select') {
+                if (selected_levels && selected_levels.length > 0) {
+                  initialMultiSelectAssessments[goal_id] = selected_levels;
+                  console.log(`從歷史資料設置目標 ${goal_id} 的多選初始值:`, selected_levels);
+                }
+              } else if (assessment_mode === 'progress') {
+                if (progress_level && progress_level > 0) {
+                  initialGoalAssessments[goal_id] = { level: progress_level };
+                  console.log(`從歷史資料設置目標 ${goal_id} 的進度初始值:`, progress_level);
+                }
+              }
+            });
+          }
+
+          (goalsData || []).forEach(goal => {
+            console.log(`處理目標 ${goal.id}:`, goal);
+            console.log(`目標評估模式:`, (goal as any).assessment_mode);
+            console.log(`目標所需能力:`, goal.required_abilities);
+            
+            if ((goal as any).assessment_mode === 'multi_select') {
+              // 多選模式：從進度資料中獲取選中的等級
+              const goalAbilities = goal.required_abilities || [];
+              const selectedLevels: string[] = [];
+              
+              console.log(`目標 ${goal.id} 的多選等級:`, (goal as any).multi_select_levels);
+              
+              if (goalAbilities.length > 0) {
+                // 有關聯能力的情況
+                goalAbilities.forEach(abilityId => {
+                  const progress = progressMap.get(abilityId);
+                  console.log(`能力 ${abilityId} 的進度資料:`, progress);
+                  if (progress && progress.selected_levels) {
+                    console.log(`能力 ${abilityId} 的選中等級:`, progress.selected_levels);
+                    // 只添加不重複的等級
+                    progress.selected_levels.forEach((level: any) => {
+                      if (!selectedLevels.includes(level)) {
+                        selectedLevels.push(level);
+                      }
+                    });
+                  }
+                });
+              } else {
+                // 沒有關聯能力的情況：直接從目標ID查找虛擬能力記錄
+                const virtualProgress = progressMap.get(goal.id);
+                console.log(`目標 ${goal.id} 的虛擬能力記錄:`, virtualProgress);
+                if (virtualProgress && virtualProgress.selected_levels) {
+                  console.log(`目標 ${goal.id} 的虛擬選中等級:`, virtualProgress.selected_levels);
+                  selectedLevels.push(...virtualProgress.selected_levels);
+                }
+              }
+              
+              console.log(`目標 ${goal.id} 的最終選中等級:`, selectedLevels);
+              
+              if (selectedLevels.length > 0) {
+                initialMultiSelectAssessments[goal.id] = selectedLevels;
+                console.log(`設置目標 ${goal.id} 的多選初始值:`, selectedLevels);
+              }
+            } else {
+              // 進度模式：從進度資料中獲取等級
+              const goalAbilities = goal.required_abilities || [];
+              let totalLevel = 0;
+              let abilityCount = 0;
+              
+              if (goalAbilities.length > 0) {
+                // 有關聯能力的情況
+                goalAbilities.forEach(abilityId => {
+                  const progress = progressMap.get(abilityId);
+                  if (progress && progress.current_level) {
+                    totalLevel += progress.current_level;
+                    abilityCount++;
+                  }
+                });
+              } else {
+                // 沒有關聯能力的情況：直接從目標ID查找虛擬能力記錄
+                const virtualProgress = progressMap.get(goal.id);
+                console.log(`目標 ${goal.id} 的虛擬能力記錄:`, virtualProgress);
+                if (virtualProgress && virtualProgress.current_level) {
+                  totalLevel = virtualProgress.current_level;
+                  abilityCount = 1;
+                }
+              }
+              
+              if (abilityCount > 0) {
+                const averageLevel = Math.round(totalLevel / abilityCount);
+                initialGoalAssessments[goal.id] = { level: averageLevel };
+                console.log(`設置目標 ${goal.id} 的進度初始值:`, averageLevel);
+              }
+            }
+          });
+
+          setGoalAssessments(initialGoalAssessments);
+          setMultiSelectAssessments(initialMultiSelectAssessments);
+          
+          console.log('設置的目標評估初始值:', initialGoalAssessments);
+          console.log('設置的多選評估初始值:', initialMultiSelectAssessments);
 
           // 計算目標完成度
           const goalsWithProgress = (goalsData || []).map(goal => {
@@ -483,9 +624,26 @@ export default function SimpleAbilityAssessmentModal({
               return { ...goal, is_completed: false, completion_percentage: 0 };
             }
 
-            // 計算目標完成度
+            // 根據評估模式計算完成度
+            if ((goal as any).assessment_mode === 'multi_select') {
+              // 多選模式：檢查是否有選中的等級
+              const completedAbilities = requiredAbilities.filter(ability => {
+                const progress = progressMap.get(ability.id);
+                return progress && progress.selected_levels && progress.selected_levels.length > 0;
+              });
+              const completionPercentage = Math.round((completedAbilities.length / requiredAbilities.length) * 100);
+              const isCompleted = completionPercentage >= 100;
+              
+              return {
+                ...goal,
+                is_completed: isCompleted,
+                completion_percentage: completionPercentage
+              };
+            } else {
+              // 進度模式：計算平均進度
             const totalProgress = requiredAbilities.reduce((sum, ability) => {
-              return sum + (ability?.progress_percentage || 0);
+                const progress = progressMap.get(ability.id);
+                return sum + (progress?.progress_percentage || 0);
             }, 0);
 
             const completionPercentage = Math.round(totalProgress / requiredAbilities.length);
@@ -496,6 +654,7 @@ export default function SimpleAbilityAssessmentModal({
               is_completed: isCompleted,
               completion_percentage: completionPercentage
             };
+            }
           });
 
           setGoals(goalsWithProgress);
@@ -563,6 +722,24 @@ export default function SimpleAbilityAssessmentModal({
     console.log(`目標評估更新: ${goalId} - ${field} = ${value}`);
   };
 
+  // 處理多選模式評估變更
+  const handleMultiSelectAssessmentChange = (goalId: string, level: string, checked: boolean) => {
+    setMultiSelectAssessments(prev => {
+      const currentLevels = prev[goalId] || [];
+      if (checked) {
+        return {
+          ...prev,
+          [goalId]: [...currentLevels, level]
+        };
+      } else {
+        return {
+          ...prev,
+          [goalId]: currentLevels.filter(l => l !== level)
+        };
+      }
+    });
+  };
+
   const getLevelColor = (level: number, maxLevel: number) => {
     const percentage = (level / maxLevel) * 100;
     if (percentage >= 80) return 'bg-green-500';
@@ -580,11 +757,12 @@ export default function SimpleAbilityAssessmentModal({
     try {
       setLoading(true);
       
-      console.log('提交評估資料...');
+      console.log('準備提交評估資料...');
       console.log('學生:', selectedStudent.full_name);
       console.log('成長樹:', selectedTreeId);
       console.log('能力評估:', abilityAssessments);
       console.log('目標評估:', goalAssessments);
+      console.log('多選評估:', multiSelectAssessments);
 
       // 嘗試獲取當前用戶ID（如果可用）
       let currentTeacherId: string | undefined;
@@ -604,27 +782,59 @@ export default function SimpleAbilityAssessmentModal({
         }
       }
 
-      // 準備評估資料
+      // 準備評估資料給父組件處理
       const assessment: AbilityAssessment = {
         student_id: selectedStudent.id,
         tree_id: selectedTreeId,
-        assessment_date: new Date().toISOString().split('T')[0], // 評估日期自動設定為現在
+        assessment_date: new Date().toISOString().split('T')[0],
         lesson_date: lessonDate,
-        teacher_id: currentTeacherId, // 使用實際的用戶ID或 undefined
+        teacher_id: currentTeacherId,
         ability_assessments: abilityAssessments,
         overall_performance_rating: overallRating,
         general_notes: generalNotes,
         next_lesson_focus: nextFocus
       };
 
-      // 提交評估
-      onSubmit(assessment);
+      // 準備目標評估資料（用於 API 調用）
+      const goalsData = goals.map(goal => {
+        if ((goal as any).assessment_mode === 'multi_select') {
+          return {
+            goal_id: goal.id,
+            assessment_mode: 'multi_select' as const,
+            selected_levels: multiSelectAssessments[goal.id] || []
+          };
+        } else {
+          return {
+            goal_id: goal.id,
+            assessment_mode: 'progress' as const,
+            progress_level: goalAssessments[goal.id]?.level || 0
+          };
+        }
+      });
+
+      // 將目標資料添加到評估物件中（用於父組件處理）
+      const assessmentWithGoals = {
+        ...assessment,
+        goals: goalsData
+      };
+
+      console.log('準備調用父組件的 onSubmit');
+      console.log('assessmentWithGoals:', assessmentWithGoals);
+      console.log('onSubmit 函數:', onSubmit);
       
-      console.log('評估提交成功');
+      try {
+        onSubmit(assessmentWithGoals);
+        console.log('✅ onSubmit 調用成功');
+      } catch (error) {
+        console.error('❌ onSubmit 調用失敗:', error);
+        throw error;
+      }
+      
+      onClose();
       
     } catch (error) {
-      console.error('提交評估失敗:', error);
-      alert('提交評估失敗: ' + (error as Error).message);
+      console.error('準備評估資料失敗:', error);
+      alert('準備評估資料失敗: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -1330,13 +1540,128 @@ export default function SimpleAbilityAssessmentModal({
                                 {goalAssessments[goal.id]?.level && (
                                   <span className="text-blue-600 text-sm">📊 已評估 (等級 {goalAssessments[goal.id].level})</span>
                                 )}
+                                {(goal as any).assessment_mode === 'multi_select' && (
+                                  <span className="text-purple-600 text-sm">🔗 多選模式</span>
+                                )}
+                                {(goal as any).assessment_mode === 'multi_select' && multiSelectAssessments[goal.id] && multiSelectAssessments[goal.id].length > 0 && (
+                                  <span className="text-blue-600 text-sm">📊 已評估 ({multiSelectAssessments[goal.id].length} 項)</span>
+                                )}
                               </div>
                               {goal.goal_description && (
                                 <div className="text-sm text-[#87704e] mt-1">{goal.goal_description}</div>
                               )}
                             </div>
                             
-                            {/* 目標等級選擇進度條 */}
+                            {/* 根據評估模式顯示不同的評估界面 */}
+                            {(goal as any).assessment_mode === 'multi_select' ? (
+                              /* 多選模式評估 */
+                              <div className="space-y-3">
+                                {/* 渲染目標 ${goal.id} 的多選項目，當前狀態: ${JSON.stringify(multiSelectAssessments[goal.id])} */}
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-[#2B3A3B]">{goal.goal_name} 完成等級</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-[#A68A64]">
+                                      已選 {(multiSelectAssessments[goal.id] || []).length} / {(goal as any).multi_select_levels?.length || 0} 項
+                                    </span>
+                                    <span className="text-sm font-medium text-[#E8B4A0]">
+                                      ({Math.round(((multiSelectAssessments[goal.id] || []).length / ((goal as any).multi_select_levels?.length || 1)) * 100)}%)
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {/* 多選等級選擇 */}
+                                <div className="flex items-center justify-center space-x-2 relative">
+                                  {(goal as any).multi_select_levels?.map((level: string, index: number) => {
+                                    const isSelected = (multiSelectAssessments[goal.id] || []).includes(level);
+                                    const isClickable = true;
+                                    
+                                    return (
+                                      <div key={`level-${index}-${level}`} className="flex flex-col items-center relative">
+                                        <div
+                                          className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ease-out flex items-center justify-center text-xs font-bold shadow-sm ${
+                                            isSelected
+                                              ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-md transform scale-105'
+                                              : 'bg-white border-[#E8D5C4] text-[#8B7355] hover:border-[#D4A5A5] hover:bg-[#FDF6F0]'
+                                          } ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}`}
+                                          onClick={() => handleMultiSelectAssessmentChange(goal.id, level, !isSelected)}
+                                          title={isClickable ? `點擊${isSelected ? '取消' : '選擇'}等級: ${level}` : level}
+                                        >
+                                          {index + 1}
+                                        </div>
+                                        {index < ((goal as any).multi_select_levels?.length || 0) - 1 && (
+                                          <div className={`w-12 h-0.5 mt-2 transition-all duration-300 ${
+                                            isSelected ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5]' : 'bg-[#E8D5C4]'
+                                          }`} />
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                
+                                {/* 完成度進度條 */}
+                                <div className="mt-2">
+                                  <div className="flex justify-between items-center text-xs text-[#8B7355] mb-1">
+                                    <span>完成度</span>
+                                    <span>{Math.round(((multiSelectAssessments[goal.id] || []).length / ((goal as any).multi_select_levels?.length || 1)) * 100)}%</span>
+                                  </div>
+                                  <div className="w-full bg-[#F5F0EB] rounded-full h-3 shadow-inner">
+                                    <div 
+                                      className="bg-gradient-to-r from-[#E8B4A0] via-[#D4A5A5] to-[#C89B9B] h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
+                                      style={{ width: `${Math.round(((multiSelectAssessments[goal.id] || []).length / ((goal as any).multi_select_levels?.length || 1)) * 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* 等級內容說明 */}
+                                <div className="mt-3 p-4 bg-gradient-to-br from-[#FDF6F0] to-[#F5F0EB] rounded-lg border border-[#E8D5C4] shadow-sm">
+                                  <h6 className="text-xs font-medium text-[#2B3A3B] mb-3">等級內容說明：</h6>
+                                  <div className="space-y-2">
+                                    {(goal as any).multi_select_levels?.map((level: string, index: number) => {
+                                      const isSelected = (multiSelectAssessments[goal.id] || []).includes(level);
+                                      
+                                      return (
+                                        <div key={`content-${index}-${level}`} className="flex items-start gap-3 text-xs group">
+                                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${
+                                            isSelected
+                                              ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-sm'
+                                              : 'bg-white border-[#E8D5C4] text-[#8B7355] group-hover:border-[#D4A5A5]'
+                                          }`}>
+                                            {index + 1}
+                                          </span>
+                                          <div className="flex-1">
+                                            <span className={`text-[#2B3A3B] transition-all duration-200 ${
+                                              isSelected ? 'font-medium text-[#8B7355]' : ''
+                                            }`}>
+                                              {level}
+                                            </span>
+                                            {(goal as any).multi_select_descriptions?.[index] && (
+                                              <p className={`text-[#87704e] transition-all duration-200 ${
+                                                isSelected ? 'font-medium' : ''
+                                              }`}>
+                                                {(goal as any).multi_select_descriptions[index]}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                
+                                {/* 等級說明 */}
+                                <div className="text-xs text-[#8B7355] text-center italic">
+                                  {(multiSelectAssessments[goal.id] || []).length === 0 && "請選擇等級"}
+                                  {(multiSelectAssessments[goal.id] || []).length > 0 && (multiSelectAssessments[goal.id] || []).length <= Math.ceil(((goal as any).multi_select_levels?.length || 1) * 0.2) && "初學者"}
+                                  {(multiSelectAssessments[goal.id] || []).length > Math.ceil(((goal as any).multi_select_levels?.length || 1) * 0.2) && (multiSelectAssessments[goal.id] || []).length <= Math.ceil(((goal as any).multi_select_levels?.length || 1) * 0.4) && "基礎"}
+                                  {(multiSelectAssessments[goal.id] || []).length > Math.ceil(((goal as any).multi_select_levels?.length || 1) * 0.4) && (multiSelectAssessments[goal.id] || []).length <= Math.ceil(((goal as any).multi_select_levels?.length || 1) * 0.6) && "進階"}
+                                  {(multiSelectAssessments[goal.id] || []).length > Math.ceil(((goal as any).multi_select_levels?.length || 1) * 0.6) && (multiSelectAssessments[goal.id] || []).length <= Math.ceil(((goal as any).multi_select_levels?.length || 1) * 0.8) && "熟練"}
+                                  {(multiSelectAssessments[goal.id] || []).length > Math.ceil(((goal as any).multi_select_levels?.length || 1) * 0.8) && (multiSelectAssessments[goal.id] || []).length <= ((goal as any).multi_select_levels?.length || 1) && "精通"}
+                                </div>
+                              </div>
+                            ) : (
+                              /* 進度模式評估 */
+                              <div>
+                                {/* 渲染目標 ${goal.id} 的進度項目，當前狀態: ${JSON.stringify(goalAssessments[goal.id])} */}
                             <LevelProgressBar 
                               current={goalAssessments[goal.id]?.level || 
                                 (goal.completion_percentage ? Math.ceil(goal.completion_percentage / (100 / (goal.progress_max || 20))) : 0)
@@ -1361,6 +1686,8 @@ export default function SimpleAbilityAssessmentModal({
                                 updateGoalAssessment(goal.id, 'progress_percentage', newProgress);
                               }}
                             />
+                              </div>
+                            )}
                             
                             {/* 相關能力 */}
                             {goal.required_abilities && goal.required_abilities.length > 0 && (

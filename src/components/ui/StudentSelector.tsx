@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import HanamiInput from './HanamiInput';
-import HanamiSelect from './HanamiSelect';
+import { HanamiSelect } from './HanamiSelect';
 
 interface Student {
   id: string;

@@ -6,8 +6,7 @@ export interface GrowthTree {
   tree_description?: string;
   tree_icon?: string;
   course_type: string;
-  tree_level?: number;
-  difficulty_level: number;
+  tree_level: number;
   is_active: boolean;
   created_at: string;
 }
@@ -24,18 +23,89 @@ export interface GrowthGoal {
   progress_contents?: string[];
   required_abilities?: string[];
   related_activities?: string[];
+  // 新增評估模式相關欄位
+  assessment_mode?: 'progress' | 'multi_select';
+  multi_select_levels?: string[];
+  multi_select_descriptions?: string[];
+  progress_max?: number;
 }
 
 export interface DevelopmentAbility {
   id: string;
   ability_name: string;
   ability_description?: string;
-  ability_icon?: string;
-  ability_color?: string;
-  max_level: number;
-  category?: string;
+  ability_category?: string;
+  max_level?: number;
   created_at: string;
 }
+
+// 新增評估模式相關類型
+export interface AssessmentModeConfig {
+  mode: 'progress' | 'multi_select';
+  displayName: string;
+  description: string;
+}
+
+export interface ProgressAssessmentConfig {
+  mode: 'progress';
+  progressMax: number;
+  progressContents: string[];
+}
+
+export interface MultiSelectAssessmentConfig {
+  mode: 'multi_select';
+  levels: string[];
+  descriptions: string[];
+}
+
+export type AssessmentConfig = ProgressAssessmentConfig | MultiSelectAssessmentConfig;
+
+// 學生能力評估結果類型
+export interface StudentAbilityAssessment {
+  id: string;
+  student_id: string;
+  ability_id: string;
+  tree_id: string;
+  assessment_date: string;
+  // 進度模式評估結果
+  current_level?: number;
+  progress_percentage?: number;
+  // 多選模式評估結果
+  selected_levels?: string[];
+  // 通用欄位
+  notes?: string;
+  teacher_name?: string;
+  created_at: string;
+}
+
+// 評估模式選項
+export const ASSESSMENT_MODES: AssessmentModeConfig[] = [
+  {
+    mode: 'progress',
+    displayName: '進度式評估',
+    description: '單選進度，如「未開始」、「進行中」、「已完成」'
+  },
+  {
+    mode: 'multi_select',
+    displayName: '多選等級評估',
+    description: '多選完成等級，如「基礎掌握」、「熟練運用」、「創新應用」'
+  }
+];
+
+// 預設多選等級配置
+export const DEFAULT_MULTI_SELECT_LEVELS = [
+  '基礎掌握',
+  '熟練運用', 
+  '創新應用',
+  '教學指導'
+];
+
+export const DEFAULT_MULTI_SELECT_DESCRIPTIONS = [
+  '能夠基本理解並執行相關技能',
+  '能夠熟練地運用技能解決問題',
+  '能夠創新性地應用技能創造新價值',
+  '能夠指導他人學習和運用技能'
+];
 
 export interface AbilityCategory {
   id: string;
@@ -225,6 +295,8 @@ export const DEFAULT_MEDIA_LIMITS: MediaUploadLimits = {
     ],
   },
 };
+
+
 
 // 方案配置
 export interface PlanConfig {

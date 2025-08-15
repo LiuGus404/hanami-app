@@ -1465,86 +1465,64 @@ export default function TeacherDashboard() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleAssessmentSubmit = async (assessment: any) => {
-    try {
-      console.log('提交能力評估:', assessment);
+          const handleAssessmentSubmit = async (assessment: any) => {
+          console.log('=== handleAssessmentSubmit 函數被調用 ===');
+          console.log('傳入的 assessment 參數:', assessment);
+          
+          try {
+            console.log('提交能力評估:', assessment);
       
-      // 檢查是否已存在該學生在該日期的評估記錄
-      const { data: existingAssessment, error: checkError } = await supabase
-        .from('hanami_ability_assessments')
-        .select('id')
-        .eq('student_id', assessment.student_id)
-        .eq('assessment_date', assessment.assessment_date)
-        .single();
+                   // 準備 API 調用的資料格式
+             const apiData = {
+               student_id: assessment.student_id,
+               tree_id: assessment.tree_id,
+               assessment_date: assessment.assessment_date,
+               notes: assessment.general_notes || '',  // 確保 notes 不為 undefined
+               goals: assessment.goals || []
+             };
 
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 表示沒有找到記錄
-        console.error('檢查現有評估記錄失敗:', checkError);
-        throw new Error('檢查現有評估記錄失敗: ' + checkError.message);
-      }
+      console.log('準備的 API 資料:', apiData);
+      console.log('goals 數量:', apiData.goals.length);
+      apiData.goals.forEach((goal: any, index: number) => {
+        console.log(`目標 ${index + 1}:`, {
+          goal_id: goal.goal_id,
+          assessment_mode: goal.assessment_mode,
+          progress_level: goal.progress_level,
+          selected_levels: goal.selected_levels
+        });
+      });
 
-      let assessmentData;
-      let assessmentError;
+      // 調用 API
+      console.log('調用 API...');
+      const response = await fetch('/api/student-ability-assessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData),
+      });
 
-      if (existingAssessment) {
-        // 更新現有評估記錄
-        console.log('更新現有評估記錄:', existingAssessment.id);
-        const { data, error } = await supabase
-          .from('hanami_ability_assessments')
-          .update({
-            tree_id: assessment.tree_id,
-            lesson_date: assessment.assessment_date,
-            teacher_id: teacherData?.id,
-            ability_assessments: assessment.goal_assessments || [],
-            overall_performance_rating: assessment.overall_performance_rating || 0,
-            general_notes: assessment.general_notes,
-            next_lesson_focus: assessment.next_lesson_focus
-          })
-          .eq('id', existingAssessment.id)
-          .select()
-          .single();
+      console.log('API 回應狀態:', response.status);
+      const result = await response.json();
+      console.log('API 回應:', result);
+
+      if (result.success) {
+        console.log('✅ API 調用成功');
+        console.log('能力評估記錄儲存成功:', result.data);
         
-        assessmentData = data;
-        assessmentError = error;
+        // 顯示成功訊息
+        alert('能力評估已成功提交！');
+        
+        // 關閉模態視窗
+        setShowAssessmentModal(false);
+        setSelectedStudentForAssessment(null);
+        
+        // 重新載入需要評估的學生列表
+        loadStudentsWithoutAssessment(selectedTree);
+        
       } else {
-        // 新增評估記錄
-        console.log('新增評估記錄');
-        const { data, error } = await supabase
-          .from('hanami_ability_assessments')
-          .insert({
-            student_id: assessment.student_id,
-            tree_id: assessment.tree_id,
-            assessment_date: assessment.assessment_date,
-            lesson_date: assessment.assessment_date,
-            teacher_id: teacherData?.id,
-            ability_assessments: assessment.goal_assessments || [],
-            overall_performance_rating: assessment.overall_performance_rating || 0,
-            general_notes: assessment.general_notes,
-            next_lesson_focus: assessment.next_lesson_focus
-          })
-          .select()
-          .single();
-        
-        assessmentData = data;
-        assessmentError = error;
-      }
-
-      if (assessmentError) {
-        console.error('儲存能力評估記錄失敗:', assessmentError);
-        throw new Error('儲存能力評估記錄失敗: ' + assessmentError.message);
-      }
-
-      console.log('能力評估記錄儲存成功:', assessmentData);
-
-      // 顯示成功訊息
-      alert(existingAssessment ? '能力評估已成功修改並儲存！' : '能力評估已成功提交並儲存！');
-      
-      // 關閉模態視窗
-      setShowAssessmentModal(false);
-      setSelectedStudentForAssessment(null);
-      
-      // 重新載入需要評估的學生列表
-      if (teacherData) {
-        loadStudentsWithoutAssessment(teacherData);
+        console.error('❌ API 調用失敗:', result.error);
+        throw new Error('儲存能力評估記錄失敗: ' + result.error);
       }
       
     } catch (error) {

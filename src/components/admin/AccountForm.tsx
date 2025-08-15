@@ -7,7 +7,7 @@ import AccountIcon from '@/components/ui/AccountIcon';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiInput from '@/components/ui/HanamiInput';
-import HanamiSelect from '@/components/ui/HanamiSelect';
+import { HanamiSelect } from '@/components/ui/HanamiSelect';
 import { Database } from '@/lib/database.types';
 
 interface AccountFormProps {

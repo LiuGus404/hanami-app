@@ -91,23 +91,40 @@ export default function AbilityAssessmentsPage() {
 
   // 當打開詳細資訊視窗時載入成長樹能力
   useEffect(() => {
+    console.log('=== 詳細資訊視窗載入邏輯 ===');
+    console.log('viewingAssessment:', viewingAssessment);
+    console.log('viewingAssessment?.tree?.id:', viewingAssessment?.tree?.id);
+    
     if (viewingAssessment?.tree?.id) {
+      console.log('開始載入成長樹資料，treeId:', viewingAssessment.tree.id);
       loadTreeAbilities(viewingAssessment.tree.id);
       loadTreeGoals(viewingAssessment.tree.id);
+    } else {
+      console.log('❌ viewingAssessment 或 tree.id 為空');
     }
   }, [viewingAssessment?.tree?.id]);
 
   // 載入成長樹的所有能力
   const loadTreeAbilities = async (treeId: string) => {
-    if (treeAbilities[treeId]) return treeAbilities[treeId];
+    console.log('=== 載入成長樹能力 ===');
+    console.log('treeId:', treeId);
+    console.log('已快取的能力:', treeAbilities[treeId]);
+    
+    if (treeAbilities[treeId]) {
+      console.log('使用快取的能力資料');
+      return treeAbilities[treeId];
+    }
 
     try {
+      console.log('開始載入能力資料...');
       // 載入成長樹的目標
+      console.log('查詢目標資料，treeId:', treeId);
       const { data: goalsData, error: goalsError } = await supabase
         .from('hanami_growth_goals')
         .select('required_abilities')
         .eq('tree_id', treeId);
 
+      console.log('目標查詢結果:', { goalsData, goalsError });
       if (goalsError) throw goalsError;
 
       // 提取所有需要的能力ID
@@ -122,23 +139,31 @@ export default function AbilityAssessmentsPage() {
 
       // 載入能力詳細資訊
       let abilitiesData: any[] = [];
+      console.log('提取的能力ID:', Array.from(abilityIds));
+      
       if (abilityIds.size > 0) {
+        console.log('查詢能力詳細資訊...');
         const { data: abilitiesResult, error: abilitiesError } = await supabase
           .from('hanami_development_abilities')
           .select('*')
           .in('id', Array.from(abilityIds))
           .order('ability_name');
 
+        console.log('能力查詢結果:', { abilitiesResult, abilitiesError });
         if (abilitiesError) throw abilitiesError;
         abilitiesData = abilitiesResult || [];
+      } else {
+        console.log('沒有找到需要的能力ID');
       }
 
       // 快取結果
+      console.log('快取能力資料:', abilitiesData);
       setTreeAbilities(prev => ({
         ...prev,
         [treeId]: abilitiesData
       }));
 
+      console.log('✅ 能力載入完成');
       return abilitiesData;
     } catch (error) {
       console.error('載入成長樹能力失敗:', error);
@@ -148,23 +173,35 @@ export default function AbilityAssessmentsPage() {
 
   // 載入成長樹的目標
   const loadTreeGoals = async (treeId: string) => {
-    if (treeGoals[treeId]) return treeGoals[treeId];
+    console.log('=== 載入成長樹目標 ===');
+    console.log('treeId:', treeId);
+    console.log('已快取的目標:', treeGoals[treeId]);
+    
+    if (treeGoals[treeId]) {
+      console.log('使用快取的目標資料');
+      return treeGoals[treeId];
+    }
 
     try {
+      console.log('開始載入目標資料...');
+      console.log('查詢目標詳細資料，treeId:', treeId);
       const { data: goalsData, error: goalsError } = await supabase
         .from('hanami_growth_goals')
         .select('*')
         .eq('tree_id', treeId)
         .order('goal_order');
 
+      console.log('目標詳細查詢結果:', { goalsData, goalsError });
       if (goalsError) throw goalsError;
 
       // 快取結果
+      console.log('快取目標資料:', goalsData || []);
       setTreeGoals(prev => ({
         ...prev,
         [treeId]: goalsData || []
       }));
 
+      console.log('✅ 目標載入完成');
       return goalsData || [];
     } catch (error) {
       console.error('載入成長樹目標失敗:', error);
@@ -292,49 +329,152 @@ export default function AbilityAssessmentsPage() {
   };
 
   const handleCreateAssessment = async (assessment: Omit<AbilityAssessment, 'id' | 'created_at'>) => {
+    console.log('=== handleCreateAssessment 函數被調用 ===');
+    console.log('傳入的 assessment 參數:', assessment);
+    
     try {
-      const { data, error } = await supabase
-        .from('hanami_ability_assessments')
-        .insert(assessment)
-        .select()
-        .single();
+      console.log('=== 開始處理新增評估提交 ===');
+      console.log('新增的評估資料:', assessment);
+      
+      // 提取 goals 資料（如果存在）
+      const { goals, ...assessmentData } = assessment as any;
+      
+      // 準備 API 調用的資料格式
+      const apiData = {
+        student_id: assessmentData.student_id,
+        tree_id: assessmentData.tree_id,
+        assessment_date: assessmentData.assessment_date,
+        notes: assessmentData.general_notes || '',  // 確保 notes 不為 undefined
+        goals: goals || []
+      };
 
-      if (error) {
-        console.error('創建評估失敗:', error);
-        alert('創建評估失敗: ' + error.message);
-        return;
+      console.log('準備的 API 資料:', apiData);
+      console.log('goals 數量:', apiData.goals.length);
+      apiData.goals.forEach((goal: any, index: number) => {
+        console.log(`目標 ${index + 1}:`, {
+          goal_id: goal.goal_id,
+          assessment_mode: goal.assessment_mode,
+          progress_level: goal.progress_level,
+          selected_levels: goal.selected_levels
+        });
+      });
+
+      // 調用 API
+      console.log('調用 API...');
+      console.log('API 請求 URL:', '/api/student-ability-assessment');
+      console.log('API 請求方法:', 'POST');
+      console.log('API 請求標頭:', { 'Content-Type': 'application/json' });
+      console.log('API 請求主體:', JSON.stringify(apiData, null, 2));
+      
+      const response = await fetch('/api/student-ability-assessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData),
+      });
+
+      console.log('API 回應狀態:', response.status);
+      const result = await response.json();
+      console.log('API 回應:', result);
+
+      if (result.success) {
+        console.log('✅ API 調用成功');
+        console.log('能力評估記錄創建成功:', result.data);
+        
+        // 顯示成功訊息
+        alert('能力評估已成功創建！');
+        
+        // 重新載入資料
+        await loadData();
+        setShowAssessmentModal(false);
+        
+      } else {
+        console.error('❌ API 調用失敗:', result.error);
+        throw new Error('創建能力評估記錄失敗: ' + result.error);
       }
-
-      // 重新載入資料
-      await loadData();
-      setShowAssessmentModal(false);
+      
     } catch (error) {
       console.error('創建評估失敗:', error);
-      alert('創建評估失敗');
+      alert('創建評估失敗: ' + (error as Error).message);
     }
   };
 
   const handleEditAssessment = async (assessment: Omit<AbilityAssessment, 'id' | 'created_at'>) => {
-    if (!editingAssessment) return;
+    console.log('=== handleEditAssessment 函數被調用 ===');
+    console.log('傳入的 assessment 參數:', assessment);
+    console.log('editingAssessment 狀態:', editingAssessment);
+    
+    if (!editingAssessment) {
+      console.log('❌ editingAssessment 為空，函數提前返回');
+      return;
+    }
     
     try {
-      const { error } = await supabase
-        .from('hanami_ability_assessments')
-        .update(assessment)
-        .eq('id', editingAssessment.id);
+      console.log('=== 開始處理編輯評估提交 ===');
+      console.log('編輯的評估資料:', assessment);
+      
+      // 提取 goals 資料（如果存在）
+      const { goals, ...assessmentData } = assessment as any;
+      
+      // 準備 API 調用的資料格式
+      const apiData = {
+        student_id: assessmentData.student_id,
+        tree_id: assessmentData.tree_id,
+        assessment_date: assessmentData.assessment_date,
+        notes: assessmentData.general_notes || '',  // 確保 notes 不為 undefined
+        goals: goals || []
+      };
 
-      if (error) {
-        console.error('更新評估失敗:', error);
-        alert('更新評估失敗: ' + error.message);
-        return;
+      console.log('準備的 API 資料:', apiData);
+      console.log('goals 數量:', apiData.goals.length);
+      apiData.goals.forEach((goal: any, index: number) => {
+        console.log(`目標 ${index + 1}:`, {
+          goal_id: goal.goal_id,
+          assessment_mode: goal.assessment_mode,
+          progress_level: goal.progress_level,
+          selected_levels: goal.selected_levels
+        });
+      });
+
+      // 調用 API
+      console.log('調用 API...');
+      console.log('API 請求 URL:', '/api/student-ability-assessment');
+      console.log('API 請求方法:', 'POST');
+      console.log('API 請求標頭:', { 'Content-Type': 'application/json' });
+      console.log('API 請求主體:', JSON.stringify(apiData, null, 2));
+      
+      const response = await fetch('/api/student-ability-assessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData),
+      });
+
+      console.log('API 回應狀態:', response.status);
+      const result = await response.json();
+      console.log('API 回應:', result);
+
+      if (result.success) {
+        console.log('✅ API 調用成功');
+        console.log('能力評估記錄更新成功:', result.data);
+        
+        // 顯示成功訊息
+        alert('能力評估已成功更新！');
+        
+        // 重新載入資料
+        await loadData();
+        setEditingAssessment(null);
+        
+      } else {
+        console.error('❌ API 調用失敗:', result.error);
+        throw new Error('更新能力評估記錄失敗: ' + result.error);
       }
-
-      // 重新載入資料
-      await loadData();
-      setEditingAssessment(null);
+      
     } catch (error) {
       console.error('更新評估失敗:', error);
-      alert('更新評估失敗');
+      alert('更新評估失敗: ' + (error as Error).message);
     }
   };
 
@@ -872,73 +1012,91 @@ export default function AbilityAssessmentsPage() {
                       <div className="space-y-6">
                         {(() => {
                           const abilities = treeAbilities[viewingAssessment.tree.id] || [];
-                          return abilities.length > 0 ? (
-                            abilities.map((ability) => {
-                              const assessment_data = viewingAssessment.ability_assessments?.[ability.id];
-                              const isAssessed = !!assessment_data;
-                              
-                              return (
-                                <div key={ability.id} className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-6 rounded-xl border border-[#EADBC8]">
-                                  {/* 能力標題 */}
+                          const goals = treeGoals[viewingAssessment.tree.id] || [];
+                          
+                          // 檢查是否已經載入完成
+                          const hasLoadedData = goals.length > 0;
+                          
+                          if (!hasLoadedData) {
+                            return (
+                              <div className="text-center py-8 text-gray-500">
+                                <p>正在載入能力資料...</p>
+                              </div>
+                            );
+                          }
+                          
+                          // 如果沒有能力資料但有目標資料，顯示提示
+                          if (abilities.length === 0) {
+                            return (
+                              <div className="text-center py-8 text-gray-500">
+                                <p>此成長樹沒有配置能力評估項目</p>
+                                <p className="text-sm mt-2">請查看下方的學習目標進度</p>
+                              </div>
+                            );
+                          }
+                          
+                          // 顯示能力評估
+                          return abilities.map((ability) => {
+                            const assessment_data = viewingAssessment.ability_assessments?.[ability.id];
+                            const isAssessed = !!assessment_data;
+                            
+                            return (
+                              <div key={ability.id} className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-6 rounded-xl border border-[#EADBC8]">
+                                {/* 能力標題 */}
+                                <div className="mb-4">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-lg font-semibold text-[#2B3A3B] mb-2">
+                                      {ability.ability_name} 完成等級
+                                    </h4>
+                                    {isAssessed && (
+                                      <span className="text-xs bg-[#A64B2A] text-white px-2 py-1 rounded-full">
+                                        已評估
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-[#A68A64]">
+                                    {ability.ability_description || '無描述'}
+                                  </p>
+                                </div>
+
+                                {/* 等級進度條 */}
+                                {isAssessed && (
                                   <div className="mb-4">
-                                    <div className="flex items-center justify-between">
-                                      <h4 className="text-lg font-semibold text-[#2B3A3B] mb-2">
-                                        {ability.ability_name} 完成等級
-                                      </h4>
-                                      {isAssessed && (
-                                        <span className="text-xs bg-[#A64B2A] text-white px-2 py-1 rounded-full">
-                                          已評估
-                                        </span>
-                                      )}
+                                    <label className="block text-sm font-medium text-[#A68A64] mb-2">
+                                      完成等級: {assessment_data.level} / {ability.max_level}
+                                    </label>
+                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                      <div 
+                                        className="bg-[#A64B2A] h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${Math.min((assessment_data.level / ability.max_level) * 100, 100)}%` }}
+                                      />
                                     </div>
-                                    <p className="text-sm text-[#A68A64]">
-                                      {ability.ability_description || '無描述'}
+                                  </div>
+                                )}
+
+                                {/* 備註 */}
+                                {isAssessed && assessment_data.notes && (
+                                  <div>
+                                    <label className="block text-sm font-medium text-[#A68A64] mb-2">
+                                      備註
+                                    </label>
+                                    <div className="bg-white p-3 rounded-lg border border-[#EADBC8] text-[#2B3A3B] text-sm">
+                                      {assessment_data.notes}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 未評估提示 */}
+                                {!isAssessed && (
+                                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                    <p className="text-sm text-gray-500 text-center">
+                                      此能力尚未在此次評估中進行評分
                                     </p>
                                   </div>
-
-                                  {/* 等級進度條 */}
-                                  {isAssessed && (
-                                    <div className="mb-4">
-                                      <label className="block text-sm font-medium text-[#A68A64] mb-2">
-                                        完成等級: {assessment_data.level} / {ability.max_level}
-                                      </label>
-                                      <div className="w-full bg-gray-200 rounded-full h-2">
-                                        <div 
-                                          className="bg-[#A64B2A] h-2 rounded-full transition-all duration-300"
-                                          style={{ width: `${Math.min((assessment_data.level / ability.max_level) * 100, 100)}%` }}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* 備註 */}
-                                  {isAssessed && assessment_data.notes && (
-                                    <div>
-                                      <label className="block text-sm font-medium text-[#A68A64] mb-2">
-                                        備註
-                                      </label>
-                                      <div className="bg-white p-3 rounded-lg border border-[#EADBC8] text-[#2B3A3B] text-sm">
-                                        {assessment_data.notes}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* 未評估提示 */}
-                                  {!isAssessed && (
-                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                      <p className="text-sm text-gray-500 text-center">
-                                        此能力尚未在此次評估中進行評分
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-center py-8 text-gray-500">
-                              <p>正在載入能力資料...</p>
-                            </div>
-                          );
+                                )}
+                              </div>
+                            );
+                          });
                         })()}
                       </div>
                     </div>
@@ -952,13 +1110,34 @@ export default function AbilityAssessmentsPage() {
                         學習目標進度
                       </h3>
                       <div className="space-y-6">
-                        {(() => {
-                          const goals = treeGoals[viewingAssessment.tree.id] || [];
-                          return goals.length > 0 ? (
-                            goals.map((goal) => {
-                              const isCompleted = goal.is_completed || false;
-                              const progressMax = goal.progress_max || 5;
-                              const progressContents = goal.progress_contents || [];
+                                                  {(() => {
+                            const goals = treeGoals[viewingAssessment.tree.id] || [];
+                            const selectedGoals = (viewingAssessment as any).selected_goals || [];
+                            
+                            return goals.length > 0 ? (
+                              goals.map((goal) => {
+                                // 查找此目標的評估資料
+                                const goalAssessment = selectedGoals.find((g: any) => g.goal_id === goal.id);
+                                const assessmentMode = goalAssessment?.assessment_mode || goal.assessment_mode || 'progress';
+                                
+                                // 計算完成度
+                                let completionPercentage = 0;
+                                let selectedCount = 0;
+                                let totalCount = 0;
+                                
+                                if (assessmentMode === 'multi_select') {
+                                  const selectedLevels = goalAssessment?.selected_levels || [];
+                                  const maxLevels = goal.multi_select_levels?.length || 5;
+                                  selectedCount = selectedLevels.length;
+                                  totalCount = maxLevels;
+                                  completionPercentage = maxLevels > 0 ? Math.round((selectedCount / maxLevels) * 100) : 0;
+                                } else {
+                                  const progressLevel = goalAssessment?.progress_level || 0;
+                                  const maxLevel = goal.progress_max || 5;
+                                  selectedCount = progressLevel;
+                                  totalCount = maxLevel;
+                                  completionPercentage = maxLevel > 0 ? Math.round((progressLevel / maxLevel) * 100) : 0;
+                                }
                               
                               return (
                                 <div key={goal.id} className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-6 rounded-xl border border-[#EADBC8]">
@@ -968,46 +1147,185 @@ export default function AbilityAssessmentsPage() {
                                       <h4 className="text-lg font-semibold text-[#2B3A3B] mb-2">
                                         {goal.goal_name}
                                       </h4>
-                                      {isCompleted && (
-                                        <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full">
-                                          已完成
+                                      <div className="flex items-center gap-2">
+                                        {goalAssessment && (
+                                          <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
+                                            已評估
+                                          </span>
+                                        )}
+                                        <span className={`text-xs px-2 py-1 rounded-full ${
+                                          assessmentMode === 'multi_select' 
+                                            ? 'bg-purple-600 text-white' 
+                                            : 'bg-green-600 text-white'
+                                        }`}>
+                                          {assessmentMode === 'multi_select' ? '多選模式' : '進度模式'}
                                         </span>
-                                      )}
+                                      </div>
                                     </div>
                                     <p className="text-sm text-[#A68A64]">
                                       {goal.goal_description || '無描述'}
                                     </p>
                                   </div>
 
-                                  {/* 進度條 */}
-                                  <div className="mb-4">
-                                    <label className="block text-sm font-medium text-[#A68A64] mb-2">
-                                      進度: {progressContents.length} / {progressMax}
-                                    </label>
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
-                                      <div 
-                                        className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                                        style={{ width: `${Math.min((progressContents.length / progressMax) * 100, 100)}%` }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* 進度內容 */}
-                                  {progressContents.length > 0 && (
-                                    <div className="mb-4">
-                                      <label className="block text-sm font-medium text-[#A68A64] mb-2">
-                                        已完成項目
-                                      </label>
-                                      <div className="space-y-2">
-                                        {progressContents.map((content: string, index: number) => (
-                                          <div key={index} className="bg-white p-3 rounded-lg border border-[#EADBC8] text-[#2B3A3B] text-sm">
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-green-600">✓</span>
-                                              <span>{content}</span>
+                                  {/* 評估結果顯示 */}
+                                  {goalAssessment ? (
+                                    <div className="space-y-4">
+                                      {assessmentMode === 'multi_select' ? (
+                                        // 多選模式顯示
+                                        <div>
+                                          <div className="mb-4">
+                                            <label className="block text-sm font-medium text-[#A68A64] mb-2">
+                                              {goal.goal_name} 完成等級
+                                            </label>
+                                            {/* 等級選擇圓圈 */}
+                                            <div className="flex items-center justify-center space-x-2 mb-3">
+                                              {goal.multi_select_levels?.map((level: string, index: number) => {
+                                                const isSelected = goalAssessment.selected_levels?.includes(level);
+                                                return (
+                                                  <div key={index} className="flex flex-col items-center">
+                                                    <div className={`w-8 h-8 rounded-full border-2 transition-all duration-300 flex items-center justify-center text-xs font-bold ${
+                                                      isSelected
+                                                        ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white'
+                                                        : 'bg-white border-[#E8D5C4] text-[#8B7355]'
+                                                    }`}>
+                                                      {index + 1}
+                                                    </div>
+                                                    {isSelected && <div className="w-4 h-0.5 bg-[#E8B4A0] mt-1"></div>}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                            <div className="text-center text-sm text-[#A68A64]">
+                                              已選 {selectedCount} / {totalCount} 項 ({completionPercentage}%)
                                             </div>
                                           </div>
-                                        ))}
-                                      </div>
+                                          
+                                          {/* 完成度進度條 */}
+                                          <div className="mb-4">
+                                            <label className="block text-sm font-medium text-[#A68A64] mb-2">
+                                              完成度
+                                            </label>
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                              <div 
+                                                className="bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] h-2 rounded-full transition-all duration-300"
+                                                style={{ width: `${completionPercentage}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                          
+                                          {/* 等級內容說明 */}
+                                          {goal.multi_select_descriptions && goal.multi_select_descriptions.length > 0 && (
+                                            <div className="mb-4">
+                                              <label className="block text-sm font-medium text-[#A68A64] mb-2">
+                                                等級內容說明:
+                                              </label>
+                                              <div className="space-y-2">
+                                                {goal.multi_select_descriptions.map((desc: string, index: number) => {
+                                                  const level = goal.multi_select_levels?.[index];
+                                                  const isSelected = goalAssessment.selected_levels?.includes(level);
+                                                  return (
+                                                    <div key={index} className={`p-3 rounded-lg border text-sm ${
+                                                      isSelected 
+                                                        ? 'bg-[#FFF9F2] border-[#E8B4A0] text-[#2B3A3B]' 
+                                                        : 'bg-gray-50 border-gray-200 text-gray-600'
+                                                    }`}>
+                                                      <div className="flex items-center gap-2">
+                                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold ${
+                                                          isSelected 
+                                                            ? 'bg-[#E8B4A0] text-white' 
+                                                            : 'bg-gray-300 text-gray-600'
+                                                        }`}>
+                                                          {index + 1}
+                                                        </div>
+                                                        <span>{desc}</span>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        // 進度模式顯示
+                                        <div>
+                                          <div className="mb-4">
+                                            <label className="block text-sm font-medium text-[#A68A64] mb-2">
+                                              {goal.goal_name} 完成等級
+                                            </label>
+                                            {/* 等級選擇圓圈 */}
+                                            <div className="flex items-center justify-center space-x-2 mb-3">
+                                              {Array.from({ length: totalCount }, (_, index) => {
+                                                const level = index + 1;
+                                                const isSelected = level <= selectedCount;
+                                                return (
+                                                  <div key={index} className="flex flex-col items-center">
+                                                    <div className={`w-8 h-8 rounded-full border-2 transition-all duration-300 flex items-center justify-center text-xs font-bold ${
+                                                      isSelected
+                                                        ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white'
+                                                        : 'bg-white border-[#E8D5C4] text-[#8B7355]'
+                                                    }`}>
+                                                      {level}
+                                                    </div>
+                                                    {isSelected && <div className="w-4 h-0.5 bg-[#E8B4A0] mt-1"></div>}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                            <div className="text-center text-sm text-[#A68A64]">
+                                              等級 {selectedCount} / {totalCount} ({completionPercentage}%)
+                                            </div>
+                                          </div>
+                                          
+                                          {/* 完成度進度條 */}
+                                          <div className="mb-4">
+                                            <label className="block text-sm font-medium text-[#A68A64] mb-2">
+                                              完成度
+                                            </label>
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                              <div 
+                                                className="bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] h-2 rounded-full transition-all duration-300"
+                                                style={{ width: `${completionPercentage}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                          
+                                          {/* 進度內容 */}
+                                          {goal.progress_contents && goal.progress_contents.length > 0 && (
+                                            <div className="mb-4">
+                                              <label className="block text-sm font-medium text-[#A68A64] mb-2">
+                                                進度內容
+                                              </label>
+                                              <div className="space-y-2">
+                                                {goal.progress_contents.map((content: string, index: number) => {
+                                                  const isCompleted = index < selectedCount;
+                                                  return (
+                                                    <div key={index} className={`p-3 rounded-lg border text-sm ${
+                                                      isCompleted 
+                                                        ? 'bg-[#FFF9F2] border-[#E8B4A0] text-[#2B3A3B]' 
+                                                        : 'bg-gray-50 border-gray-200 text-gray-600'
+                                                    }`}>
+                                                      <div className="flex items-center gap-2">
+                                                        <span className={isCompleted ? 'text-[#E8B4A0]' : 'text-gray-500'}>
+                                                          {isCompleted ? '✓' : '○'}
+                                                        </span>
+                                                        <span>{content}</span>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    // 未評估提示
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                      <p className="text-sm text-gray-500 text-center">
+                                        此學習目標在此次評估中未進行評分
+                                      </p>
                                     </div>
                                   )}
 
@@ -1041,14 +1359,7 @@ export default function AbilityAssessmentsPage() {
                                     </div>
                                   )}
 
-                                  {/* 未完成提示 */}
-                                  {!isCompleted && progressContents.length === 0 && (
-                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                      <p className="text-sm text-gray-500 text-center">
-                                        此學習目標尚未開始進行
-                                      </p>
-                                    </div>
-                                  )}
+
                                 </div>
                               );
                             })
@@ -1111,4 +1422,4 @@ export default function AbilityAssessmentsPage() {
       </div>
     </div>
   );
-} 
+}
