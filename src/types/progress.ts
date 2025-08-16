@@ -23,7 +23,72 @@ export interface GrowthGoal {
   created_at: string;
   progress_contents?: string[];
   required_abilities?: string[];
-  related_activities?: string[];
+  related_activities?: string[]; // 關聯的活動ID列表
+}
+
+// 新增：成長樹活動型別
+export interface TreeActivity {
+  id: string;
+  tree_id: string;
+  activity_name: string;
+  activity_description?: string;
+  activity_type: 'custom' | 'teaching' | 'assessment' | 'practice';
+  difficulty_level: number; // 1-5
+  estimated_duration?: number; // 分鐘
+  materials_needed: string[];
+  instructions?: string;
+  learning_objectives: string[];
+  target_abilities: string[];
+  prerequisites: string[];
+  activity_order: number;
+  is_required: boolean;
+  is_active: boolean;
+  created_by?: string;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 新增：活動模板型別
+export interface TreeActivityTemplate {
+  id: string;
+  template_name: string;
+  template_description?: string;
+  activity_type: 'custom' | 'teaching' | 'assessment' | 'practice';
+  difficulty_level: number; // 1-5
+  estimated_duration?: number; // 分鐘
+  materials_needed: string[];
+  instructions?: string;
+  learning_objectives: string[];
+  target_abilities: string[];
+  prerequisites: string[];
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 新增：學生活動進度型別
+export interface StudentTreeActivityProgress {
+  id: string;
+  student_id: string;
+  tree_activity_id: string;
+  completion_status: 'not_started' | 'in_progress' | 'completed' | 'skipped';
+  completion_date?: string;
+  performance_rating?: number; // 1-5分
+  student_notes?: string;
+  teacher_notes?: string;
+  evidence_files: string[];
+  time_spent?: number; // 分鐘
+  attempts_count: number;
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// 新增：學生活動進度詳細型別（包含活動資訊）
+export interface StudentTreeActivityProgressDetail extends StudentTreeActivityProgress {
+  activity: TreeActivity;
 }
 
 export interface DevelopmentAbility {
@@ -32,8 +97,9 @@ export interface DevelopmentAbility {
   ability_description?: string;
   ability_icon?: string;
   ability_color?: string;
-  max_level: number;
   category?: string;
+  max_level?: number;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -71,20 +137,31 @@ export interface TeachingActivity {
   activity_name: string;
   activity_description?: string;
   activity_type: string;
-  difficulty_level: number;
-  estimated_duration: number;
+  difficulty_level?: number;
+  target_abilities?: string[];
   materials_needed?: string[];
-  instructions?: string;
+  duration_minutes?: number;
+  age_range_min?: number;
+  age_range_max?: number;
+  notion_id?: string;
+  is_active: boolean;
   template_id?: string;
   custom_fields?: any;
   tags?: string[];
   category?: string;
   status?: string;
+  version?: number;
+  created_by?: string;
+  updated_by?: string;
+  estimated_duration?: number;
+  instructions?: string;
+  notes?: string;
   created_at: string;
   updated_at?: string;
 }
 
-export interface TreeActivity {
+// 原有的 TreeActivity 型別（保持向後相容）
+export interface TreeActivityLegacy {
   id: string;
   tree_id: string;
   activity_id: string;
@@ -284,3 +361,88 @@ export const DEFAULT_MULTI_SELECT_DESCRIPTIONS = [
   '能夠指導他人學習相關內容',
   '請輸入等級描述'
 ];
+
+// 新增：活動相關的常數
+export const ACTIVITY_TYPES = {
+  CUSTOM: 'custom',
+  TEACHING: 'teaching',
+  ASSESSMENT: 'assessment',
+  PRACTICE: 'practice'
+} as const;
+
+export const ACTIVITY_TYPE_LABELS = {
+  [ACTIVITY_TYPES.CUSTOM]: '自訂活動',
+  [ACTIVITY_TYPES.TEACHING]: '教學活動',
+  [ACTIVITY_TYPES.ASSESSMENT]: '評估活動',
+  [ACTIVITY_TYPES.PRACTICE]: '練習活動'
+} as const;
+
+export const DIFFICULTY_LEVELS = {
+  1: '初級',
+  2: '中級',
+  3: '高級',
+  4: '進階',
+  5: '專家'
+} as const;
+
+export const COMPLETION_STATUS = {
+  NOT_STARTED: 'not_started',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  SKIPPED: 'skipped'
+} as const;
+
+export const COMPLETION_STATUS_LABELS = {
+  [COMPLETION_STATUS.NOT_STARTED]: '未開始',
+  [COMPLETION_STATUS.IN_PROGRESS]: '進行中',
+  [COMPLETION_STATUS.COMPLETED]: '已完成',
+  [COMPLETION_STATUS.SKIPPED]: '已跳過'
+} as const;
+
+// 新增：活動創建/更新請求型別
+export interface CreateTreeActivityRequest {
+  tree_id: string;
+  activity_name: string;
+  activity_description?: string;
+  activity_type: 'custom' | 'teaching' | 'assessment' | 'practice';
+  difficulty_level: number;
+  estimated_duration?: number;
+  materials_needed?: string[];
+  instructions?: string;
+  learning_objectives?: string[];
+  target_abilities?: string[];
+  prerequisites?: string[];
+  activity_order?: number;
+  is_required?: boolean;
+  created_by?: string;
+}
+
+export interface UpdateTreeActivityRequest {
+  activity_name?: string;
+  activity_description?: string;
+  activity_type?: 'custom' | 'teaching' | 'assessment' | 'practice';
+  difficulty_level?: number;
+  estimated_duration?: number;
+  materials_needed?: string[];
+  instructions?: string;
+  learning_objectives?: string[];
+  target_abilities?: string[];
+  prerequisites?: string[];
+  activity_order?: number;
+  is_required?: boolean;
+  is_active?: boolean;
+  updated_by?: string;
+}
+
+// 新增：活動進度更新請求型別
+export interface UpdateActivityProgressRequest {
+  student_id: string;
+  tree_activity_id: string;
+  completion_status: 'not_started' | 'in_progress' | 'completed' | 'skipped';
+  performance_rating?: number;
+  student_notes?: string;
+  teacher_notes?: string;
+  time_spent?: number;
+  evidence_files?: string[];
+  is_favorite?: boolean;
+}

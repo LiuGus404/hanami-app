@@ -42,10 +42,15 @@ export async function POST(request: NextRequest) {
     console.log('開始上傳檔案:', {
       fileName: file.name,
       fileSize: file.size,
+      fileSizeMB: (file.size / (1024 * 1024)).toFixed(2) + 'MB',
       fileType: file.type,
       studentId,
       mediaType
     });
+
+    // 注意：Supabase 免費計劃有 50MB 檔案大小限制
+    // 如果檔案超過此限制，會在上傳時失敗
+    // 建議升級到 Pro 計劃或壓縮檔案
 
     // 檢查配額限制
     try {

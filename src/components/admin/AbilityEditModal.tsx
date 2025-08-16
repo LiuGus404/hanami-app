@@ -259,6 +259,7 @@ export default function AbilityEditModal({
         ability_icon: data.ability_icon ?? undefined,
         ability_color: data.ability_color ?? undefined,
         category: data.category ?? undefined,
+        is_active: true, // 新更新的能力預設為啟用狀態
       };
       
       onUpdate(fixedData);

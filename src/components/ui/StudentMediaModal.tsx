@@ -10,13 +10,16 @@ import {
   HeartIcon,
   StarIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  InformationCircleIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import { Video } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 
 import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
+import { PlanUpgradeModal } from '@/components/ui/PlanUpgradeModal';
 import { supabase } from '@/lib/supabase';
 import { StudentMedia, StudentMediaQuota, DEFAULT_MEDIA_LIMITS } from '@/types/progress';
 import { 
@@ -56,9 +59,27 @@ interface StudentMediaModalProps {
   isOpen: boolean;
   onClose: () => void;
   student: StudentWithMedia | null;
+  onQuotaChanged?: () => void; // 新增：配額更改回調
 }
 
-export default function StudentMediaModal({ isOpen, onClose, student }: StudentMediaModalProps) {
+export default function StudentMediaModal({ isOpen, onClose, student, onQuotaChanged }: StudentMediaModalProps) {
+  // 自定義關閉函數，重置所有狀態
+  const handleClose = () => {
+    // 重置所有上傳相關狀態
+    setUploading(false);
+    setUploadProgress({});
+    setSelectedFiles([]);
+    setShowUploadArea(false);
+    setEditingMedia(null);
+    setEditTitle('');
+    setIsEditing(false);
+    setShowLessonSelector(false);
+    setSelectedMediaForLesson(null);
+    setSelectedLessonId('');
+    
+    // 調用原始的 onClose
+    onClose();
+  };
   const [media, setMedia] = useState<StudentMedia[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -80,6 +101,9 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
   const [selectedMediaForLesson, setSelectedMediaForLesson] = useState<StudentMedia | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string>('');
   
+  // 新增：方案升級相關狀態
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  
   // 新增：展開/收起狀態
   const [showQuotaDetails, setShowQuotaDetails] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
@@ -89,9 +113,20 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
 
   useEffect(() => {
     if (isOpen && student) {
-      loadStudentMedia();
-      loadStudentLessons();
-      loadQuotaLevel();
+      // 使用 Promise.all 來並行載入所有資料
+      Promise.all([
+        loadStudentMedia(),
+        loadStudentLessons(),
+        loadQuotaLevel()
+      ]).catch(error => {
+        console.error('載入資料時發生錯誤:', error);
+      });
+    } else if (!isOpen) {
+      // 當模態框關閉時，清空資料
+      setMedia([]);
+      setStudentLessons([]);
+      setQuotaLevel(null);
+      setLoading(false);
     }
   }, [isOpen, student]);
 
@@ -106,7 +141,11 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
         .eq('student_id', student.id)
         .order('lesson_date', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('載入課程資料庫錯誤:', error);
+        throw error;
+      }
+      
       setStudentLessons((data || []).map(lesson => ({
         id: lesson.id,
         lesson_date: lesson.lesson_date,
@@ -119,6 +158,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     } catch (error) {
       console.error('載入學生課程失敗:', error);
       toast.error('載入課程資料失敗');
+      setStudentLessons([]); // 設定為空陣列
     }
   };
 
@@ -149,7 +189,11 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
         .eq('student_id', student.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('載入媒體資料庫錯誤:', error);
+        throw error;
+      }
+      
       setMedia((data || []).map(media => ({
         ...media,
         media_type: media.media_type as 'video' | 'photo',
@@ -163,6 +207,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     } catch (error) {
       console.error('載入媒體失敗:', error);
       toast.error('載入媒體失敗');
+      setMedia([]); // 設定為空陣列而不是保持舊資料
     } finally {
       setLoading(false);
     }
@@ -191,10 +236,21 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-
-    console.log('選擇的檔案數量:', files.length);
     
+    // 重置上傳狀態
+    setUploading(false);
+    setUploadProgress({});
+    // 保持上傳區域展開，讓用戶可以看到選中的檔案
+    setShowUploadArea(true);
+
     const fileArray = Array.from(files);
+    
+    // 立即檢查容量是否足夠
+    const capacityCheck = await checkStudentCapacity(fileArray);
+    if (!capacityCheck.hasSpace) {
+      toast.error(`無法上傳：${capacityCheck.message}`);
+      return;
+    }
     const errors: string[] = [];
 
     // 獲取學生的配額設定
@@ -256,7 +312,6 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     }
 
     for (const file of fileArray) {
-      console.log('處理檔案:', file.name, '類型:', file.type, '大小:', file.size);
       
       const mediaType = file.type.startsWith('video/') ? 'video' : 'photo';
       
@@ -294,8 +349,16 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
         countLimit = mediaType === 'video' ? 5 : 10;
       }
       
-      if (currentCount >= countLimit) {
-        errors.push(`已達到${mediaType === 'video' ? '影片' : '相片'}數量上限 (${currentCount}/${countLimit})`);
+      // 計算同類型檔案的數量
+      const sameTypeFiles = fileArray.filter(f => {
+        const fMediaType = f.type.startsWith('video/') ? 'video' : 'photo';
+        return fMediaType === mediaType;
+      }).length;
+      
+      if (currentCount + sameTypeFiles > countLimit) {
+        errors.push(`上傳後將超過${mediaType === 'video' ? '影片' : '相片'}數量上限 (當前: ${currentCount}, 新增: ${sameTypeFiles}, 限制: ${countLimit})`);
+        // 立即返回，不繼續檢查其他檔案
+        return;
       }
     }
 
@@ -309,24 +372,199 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     setSelectedFiles(fileArray);
   };
 
+  // 新增：檢查學生容量使用情況
+  const checkStudentCapacity = async (selectedFiles?: File[]): Promise<{ hasSpace: boolean; message: string }> => {
+    if (!student) {
+      return { hasSpace: false, message: '學生資訊無效' };
+    }
+
+    try {
+      // 使用 quotaLevel 狀態變數，確保與 UI 顯示一致
+      const videoLimit = quotaLevel?.video_limit || 5;
+      const photoLimit = quotaLevel?.photo_limit || 10;
+      const storageLimitMB = quotaLevel?.storage_limit_mb || 250; // 儲存空間限制
+
+      // 檢查當前影片和相片數量
+      const currentVideoCount = media.filter(m => m.media_type === 'video').length;
+      const currentPhotoCount = media.filter(m => m.media_type === 'photo').length;
+
+      // 計算當前使用的儲存空間
+      const currentStorageUsedMB = media.reduce((total, item) => {
+        return total + ((item.file_size || 0) / (1024 * 1024));
+      }, 0);
+
+      // 容量檢查日誌已移除以提高性能
+
+      // 如果沒有選擇檔案，只檢查當前容量
+      if (!selectedFiles || selectedFiles.length === 0) {
+        if (currentVideoCount >= videoLimit) {
+          return { hasSpace: false, message: `影片數量已達上限 (${currentVideoCount}/${videoLimit})` };
+        }
+
+        if (currentPhotoCount >= photoLimit) {
+          return { hasSpace: false, message: `相片數量已達上限 (${currentPhotoCount}/${photoLimit})` };
+        }
+
+        if (currentStorageUsedMB >= storageLimitMB) {
+          return { hasSpace: false, message: `儲存空間已達上限 (${currentStorageUsedMB.toFixed(2)}MB/${storageLimitMB}MB)` };
+        }
+
+        return { hasSpace: true, message: '容量充足' };
+      }
+
+      // 計算即將上傳的檔案類型
+      const newVideoCount = selectedFiles.filter(file => file.type.startsWith('video/')).length;
+      const newPhotoCount = selectedFiles.filter(file => file.type.startsWith('image/')).length;
+
+      // 計算即將上傳的檔案總大小
+      const newStorageSizeMB = selectedFiles.reduce((total, file) => {
+        return total + (file.size / (1024 * 1024));
+      }, 0);
+
+      // 檢查上傳後的總數量是否會超過限制
+      const totalVideoCount = currentVideoCount + newVideoCount;
+      const totalPhotoCount = currentPhotoCount + newPhotoCount;
+      const totalStorageUsedMB = currentStorageUsedMB + newStorageSizeMB;
+
+      // 容量檢查日誌已移除以提高性能
+
+      if (totalVideoCount > videoLimit) {
+        return { 
+          hasSpace: false, 
+          message: `影片數量將超過上限 (當前: ${currentVideoCount}, 新增: ${newVideoCount}, 限制: ${videoLimit})` 
+        };
+      }
+
+      if (totalPhotoCount > photoLimit) {
+        return { 
+          hasSpace: false, 
+          message: `相片數量將超過上限 (當前: ${currentPhotoCount}, 新增: ${newPhotoCount}, 限制: ${photoLimit})` 
+        };
+      }
+
+      if (totalStorageUsedMB > storageLimitMB) {
+        return { 
+          hasSpace: false, 
+          message: `儲存空間將超過上限 (當前: ${currentStorageUsedMB.toFixed(2)}MB, 新增: ${newStorageSizeMB.toFixed(2)}MB, 限制: ${storageLimitMB}MB)` 
+        };
+      }
+
+      return { hasSpace: true, message: '容量充足' };
+    } catch (error) {
+      console.error('檢查容量失敗:', error);
+      return { hasSpace: true, message: '無法檢查容量，允許上傳' };
+    }
+  };
+
+  // 新增：檢查當前容量狀態
+  const getCurrentCapacityStatus = () => {
+    const videoCount = media.filter(m => m.media_type === 'video').length;
+    const photoCount = media.filter(m => m.media_type === 'photo').length;
+    
+    // 使用實際的配額限制（從 quotaLevel 或預設值）
+    const videoLimit = quotaLevel?.video_limit || 5;
+    const photoLimit = quotaLevel?.photo_limit || 10;
+    const storageLimitMB = quotaLevel?.storage_limit_mb || 250;
+    
+    // 計算當前使用的儲存空間
+    const currentStorageUsedMB = media.reduce((total, item) => {
+      return total + ((item.file_size || 0) / (1024 * 1024));
+    }, 0);
+    
+    // 檢查是否達到任何限制
+    const isVideoFull = videoCount >= videoLimit;
+    const isPhotoFull = photoCount >= photoLimit;
+    const isStorageFull = currentStorageUsedMB >= storageLimitMB;
+    
+    if (isVideoFull || isPhotoFull || isStorageFull) {
+      return { status: 'full', message: '容量已滿' };
+    } else if (videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2 || currentStorageUsedMB >= storageLimitMB * 0.9) {
+      return { status: 'near', message: '容量緊張' };
+    } else {
+      return { status: 'ok', message: '容量充足' };
+    }
+  };
+
+  // 新增：取消上傳函數
+  const cancelUpload = useCallback(() => {
+    setUploading(false);
+    setUploadProgress({});
+    setSelectedFiles([]);
+    setShowUploadArea(false);
+    toast.success('上傳已取消');
+  }, []);
+
+  // 新增：處理方案升級成功
+  const handleUpgradeSuccess = useCallback(() => {
+    // 重新載入配額資訊
+    loadQuotaLevel();
+    // 重新載入學生資料以獲取最新的配額設定
+    if (student) {
+      // 重新獲取學生的配額設定
+      supabase
+        .from('hanami_student_media_quota')
+        .select('*')
+        .eq('student_id', student.id)
+        .single()
+        .then(({ data: updatedQuota, error }) => {
+          if (!error && updatedQuota) {
+            // 更新 student 物件的 quota 屬性
+            if (student) {
+              student.quota = updatedQuota as any;
+            }
+          }
+        });
+    }
+    // 通知父組件配額已更改
+    if (onQuotaChanged) {
+      onQuotaChanged();
+    }
+  }, [student, onQuotaChanged]);
+
   const uploadFiles = async () => {
     if (!student || selectedFiles.length === 0) return;
 
+    // 立即檢查容量
+    const capacityCheck = await checkStudentCapacity(selectedFiles);
+    if (!capacityCheck.hasSpace) {
+      toast.error(`容量不足，無法上傳：${capacityCheck.message}`);
+      return;
+    }
+    
+    // 重置並開始上傳
     setUploading(true);
+    setUploadProgress({});
     const newProgress: { [key: string]: number } = {};
     selectedFiles.forEach(file => newProgress[file.name] = 0);
     setUploadProgress(newProgress);
 
     try {
       for (const file of selectedFiles) {
-        console.log('開始上傳檔案:', file.name);
+        try {
         
         const mediaType = file.type.startsWith('video/') ? 'video' : 'photo';
+
+        // 獲取檔案大小限制
+        let maxSizeMB = 20; // 預設值
+        if (quotaLevel) {
+          maxSizeMB = mediaType === 'video' ? quotaLevel.video_size_limit_mb : quotaLevel.photo_size_limit_mb;
+        }
+        
+        // 檢查檔案大小是否超過媒體配額限制
+        const fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > maxSizeMB) {
+          throw new Error(`檔案 ${file.name} (${fileSizeMB.toFixed(1)}MB) 超過媒體配額限制 (${maxSizeMB}MB)。請壓縮檔案後再試。`);
+        }
+        
+        // 壓縮檔案（如果需要）
+        const compressedFile = await compressFile(file, maxSizeMB);
+        
+        console.log('檔案壓縮後大小:', (compressedFile.size / (1024 * 1024)).toFixed(2) + 'MB');
 
         // 首先嘗試使用 API 路由上傳
         try {
           const formData = new FormData();
-          formData.append('file', file);
+          formData.append('file', compressedFile);
           formData.append('studentId', student.id);
           formData.append('mediaType', mediaType);
 
@@ -356,10 +594,12 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
         const fileExt = file.name.split('.').pop();
         const fileName = `${student.id}/${mediaType}s/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
+        // 注意：Supabase Pro 版本支援更大的檔案，讓 Supabase 自己處理檔案大小限制
+
         // 直接上傳到 Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('hanami-media')
-          .upload(fileName, file, {
+          .upload(fileName, compressedFile, {
             cacheControl: '3600',
             upsert: false
           });
@@ -380,10 +620,10 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
         const mediaData = {
           student_id: student.id,
           media_type: mediaType,
-          file_name: file.name,
+          file_name: compressedFile.name,
           file_path: fileName,
-          file_size: file.size,
-          title: file.name.replace(/\.[^/.]+$/, ''),
+          file_size: compressedFile.size,
+          title: compressedFile.name.replace(/\.[^/.]+$/, ''),
           uploaded_by: null // 設為 null 而不是字串
         };
 
@@ -421,9 +661,39 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
 
         console.log('資料庫插入成功:', dbData);
         setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+        
+        // 立即更新本地媒體列表，確保容量檢查準確
+        setMedia(prev => [...prev, {
+          ...dbData,
+          media_type: dbData.media_type as 'video' | 'photo',
+          file_duration: dbData.file_duration ?? undefined,
+          thumbnail_path: dbData.thumbnail_path ?? undefined,
+          title: dbData.title ?? undefined,
+          description: dbData.description ?? undefined,
+          uploaded_by: dbData.uploaded_by ?? undefined,
+          is_favorite: dbData.is_favorite ?? undefined
+        }]);
+        } catch (fileError) {
+          console.error(`檔案 ${file.name} 上傳失敗:`, fileError);
+          toast.error(`檔案 ${file.name} 上傳失敗: ${fileError instanceof Error ? fileError.message : '未知錯誤'}`);
+          setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // -1 表示錯誤
+          continue; // 繼續處理下一個檔案
+        }
       }
 
-      toast.success('檔案上傳成功！');
+      // 檢查是否有檔案上傳成功
+      const successCount = Object.values(uploadProgress).filter(progress => progress === 100).length;
+      const errorCount = Object.values(uploadProgress).filter(progress => progress === -1).length;
+      
+      if (successCount > 0) {
+        if (errorCount === 0) {
+          toast.success('所有檔案上傳成功！');
+        } else {
+          toast.success(`部分檔案上傳成功！成功 ${successCount} 個，失敗 ${errorCount} 個`);
+        }
+      } else {
+        toast.error('所有檔案上傳失敗！');
+      }
       setSelectedFiles([]);
       setUploadProgress({});
       setShowUploadArea(false);
@@ -431,6 +701,8 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
     } catch (error) {
       console.error('上傳失敗:', error);
       toast.error(`檔案上傳失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
+      // 重置上傳狀態
+      setUploadProgress({});
     } finally {
       setUploading(false);
     }
@@ -615,12 +887,18 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
   };
 
   // 新增：獲取總使用容量
-  const getTotalUsedSize = () => {
+  const getTotalUsedSize = useMemo(() => {
     return media.reduce((sum, item) => sum + item.file_size, 0);
-  };
+  }, [media]);
 
   // 新增：獲取計劃容量
-  const getPlanSize = () => {
+  const getPlanSize = useMemo(() => {
+    // 優先使用 quotaLevel 中的儲存空間限制
+    if (quotaLevel?.storage_limit_mb) {
+      return quotaLevel.storage_limit_mb * 1024 * 1024; // 轉換為 bytes
+    }
+    
+    // 如果沒有 quotaLevel，使用 plan_type 映射
     const planType = student?.quota?.plan_type;
     switch (planType) {
       case 'free':
@@ -634,10 +912,19 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
       default:
         return 250 * 1024 * 1024; // 預設 250MB
     }
-  };
+  }, [quotaLevel, student?.quota?.plan_type]);
 
   // 新增：獲取計劃類型文字
-  const getPlanTypeText = () => {
+  const getPlanTypeText = useMemo(() => {
+    // 優先使用 quotaLevel 中的等級名稱和儲存空間限制
+    if (quotaLevel?.level_name && quotaLevel?.storage_limit_mb) {
+      const sizeText = quotaLevel.storage_limit_mb >= 1024 
+        ? `${(quotaLevel.storage_limit_mb / 1024).toFixed(0)}GB`
+        : `${quotaLevel.storage_limit_mb}MB`;
+      return `${quotaLevel.level_name} (${sizeText})`;
+    }
+    
+    // 如果沒有 quotaLevel，使用 plan_type 映射
     const planType = student?.quota?.plan_type;
     switch (planType) {
       case 'free':
@@ -651,7 +938,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
       default:
         return '免費計劃 (250MB)';
     }
-  };
+  }, [quotaLevel, student?.quota?.plan_type]);
 
   // 新增：獲取媒體縮圖 URL
   const getMediaThumbnailUrl = (mediaItem: StudentMedia) => {
@@ -682,6 +969,28 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
 
       if (quotaError) {
         console.error('獲取學生配額失敗:', quotaError);
+        // 如果沒有配額設定，使用預設的基礎版配額
+        const { data: defaultLevel, error: defaultLevelError } = await supabase
+          .from('hanami_media_quota_levels')
+          .select('*')
+          .eq('level_name', '基礎版')
+          .eq('is_active', true)
+          .single();
+
+        if (defaultLevelError) {
+          console.error('獲取預設配額等級失敗:', defaultLevelError);
+          // 設定一個預設的配額等級
+          setQuotaLevel({
+            level_name: '基礎版',
+            video_limit: 5,
+            photo_limit: 10,
+            video_size_limit_mb: 20,
+            photo_size_limit_mb: 1,
+            is_active: true
+          });
+        } else {
+          setQuotaLevel(defaultLevel);
+        }
         return;
       }
 
@@ -705,13 +1014,134 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
 
       if (levelError) {
         console.error('獲取配額等級失敗:', levelError);
+        // 如果無法獲取指定等級，使用基礎版
+        const { data: defaultLevel, error: defaultLevelError } = await supabase
+          .from('hanami_media_quota_levels')
+          .select('*')
+          .eq('level_name', '基礎版')
+          .eq('is_active', true)
+          .single();
+
+        if (defaultLevelError) {
+          console.error('獲取預設配額等級失敗:', defaultLevelError);
+          // 設定一個預設的配額等級
+          setQuotaLevel({
+            level_name: '基礎版',
+            video_limit: 5,
+            photo_limit: 10,
+            video_size_limit_mb: 20,
+            photo_size_limit_mb: 1,
+            is_active: true
+          });
+        } else {
+          setQuotaLevel(defaultLevel);
+        }
         return;
       }
 
       setQuotaLevel(level);
     } catch (error) {
       console.error('載入配額等級錯誤:', error);
+      // 設定預設配額等級
+      setQuotaLevel({
+        level_name: '基礎版',
+        video_limit: 5,
+        photo_limit: 10,
+        video_size_limit_mb: 20,
+        photo_size_limit_mb: 1,
+        is_active: true
+      });
     }
+  };
+
+  // 新增：檔案壓縮功能
+  const compressFile = async (file: File, maxSizeMB: number): Promise<File> => {
+    return new Promise((resolve) => {
+      // 如果檔案已經小於配額限制，直接返回
+      if (file.size <= maxSizeMB * 1024 * 1024) {
+        resolve(file);
+        return;
+      }
+
+      // 對於影片檔案，顯示配額警告但允許上傳
+      if (file.type.startsWith('video/')) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        const maxSizeMBFormatted = maxSizeMB.toString();
+        
+        // 顯示配額警告，但允許上傳（因為 Supabase Pro 支援更大的檔案）
+        toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制 (${maxSizeMBFormatted}MB)，但將嘗試上傳。`, {
+          icon: '⚠️',
+          duration: 5000
+        });
+        
+        const compressedFile = new File([file], file.name, {
+          type: file.type,
+          lastModified: file.lastModified,
+        });
+        resolve(compressedFile);
+        return;
+      }
+
+      // 對於圖片檔案，使用更強的壓縮
+      if (file.type.startsWith('image/')) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+          // 計算壓縮比例 - 更激進的壓縮
+          const maxDimension = 1280; // 降低最大尺寸
+          let { width, height } = img;
+          
+          if (width > height && width > maxDimension) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          } else if (height > maxDimension) {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // 繪製壓縮後的圖片
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // 轉換為 Blob，使用更低的品質
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: file.type,
+                lastModified: file.lastModified,
+              });
+              
+              const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+              const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
+              
+              toast.success(`圖片 ${file.name} 已壓縮: ${originalSizeMB}MB → ${compressedSizeMB}MB`);
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          }, file.type, 0.6); // 降低到 60% 品質
+        };
+        
+        img.onerror = () => {
+          toast.error(`圖片 ${file.name} 壓縮失敗`);
+          resolve(file);
+        };
+        
+        img.src = URL.createObjectURL(file);
+      } else {
+        // 對於其他檔案類型，顯示配額警告但允許上傳
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制，但將嘗試上傳。`, {
+          icon: '⚠️',
+          duration: 4000
+        });
+        resolve(file);
+      }
+    });
   };
 
   if (!isOpen || !student) return null;
@@ -730,7 +1160,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-[#FFF9F2] rounded-full transition-all duration-200 flex-shrink-0 ml-2 group"
           >
             <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#A64B2A] group-hover:text-[#8B3A1F] transition-colors" />
@@ -748,6 +1178,40 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                 </svg>
               </div>
               <h3 className="text-base sm:text-lg font-semibold text-[#A64B2A]">媒體統計</h3>
+              {/* 容量狀態指示器 */}
+              <div className="flex items-center gap-1 ml-2">
+                {(() => {
+                  const videoCount = media.filter(m => m.media_type === 'video').length;
+                  const photoCount = media.filter(m => m.media_type === 'photo').length;
+                  const videoLimit = quotaLevel?.video_limit || 5;
+                  const photoLimit = quotaLevel?.photo_limit || 10;
+                  const isNearLimit = videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2;
+                  const isAtLimit = videoCount >= videoLimit || photoCount >= photoLimit;
+                  
+                  if (isAtLimit) {
+                    return (
+                      <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                        容量已滿
+                      </div>
+                    );
+                  } else if (isNearLimit) {
+                    return (
+                      <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        容量緊張
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        容量充足
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
             </div>
             <button
               onClick={() => setShowQuotaDetails(!showQuotaDetails)}
@@ -843,7 +1307,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                       {/* 進度圓圈 */}
                       <path
                         className={`transition-all duration-1000 ease-out ${
-                          getPlanSize() > 0 && (getTotalUsedSize() / getPlanSize()) >= 0.8 
+                          getPlanSize > 0 && (getTotalUsedSize / getPlanSize) >= 0.8 
                             ? 'text-red-400' 
                             : 'text-[#FFD59A]'
                         }`}
@@ -851,7 +1315,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                         strokeWidth="3"
                         strokeLinecap="round"
                         fill="none"
-                        strokeDasharray={`${Math.min((getPlanSize() > 0 ? (getTotalUsedSize() / getPlanSize()) * 100 : 0), 100)}, 100`}
+                        strokeDasharray={`${Math.min((getPlanSize > 0 ? (getTotalUsedSize / getPlanSize) * 100 : 0), 100)}, 100`}
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       />
                     </svg>
@@ -859,7 +1323,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center">
                         <div className="text-xs sm:text-sm font-bold text-[#A64B2A]">
-                          {Math.round(getPlanSize() > 0 ? (getTotalUsedSize() / getPlanSize()) * 100 : 0)}%
+                          {Math.round(getPlanSize > 0 ? (getTotalUsedSize / getPlanSize) * 100 : 0)}%
                         </div>
                       </div>
                     </div>
@@ -869,13 +1333,13 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                 {/* 容量資訊 */}
                 <div className="text-center space-y-1">
                   <div className="text-lg sm:text-xl font-bold text-[#A64B2A]">
-                    {formatFileSize(getTotalUsedSize())}
+                    {formatFileSize(getTotalUsedSize)}
                   </div>
                   <div className="text-xs text-[#2B3A3B]">
-                    / {formatFileSize(getPlanSize())}
+                    / {formatFileSize(getPlanSize)}
                   </div>
                   <div className="text-xs text-[#2B3A3B]">
-                    {getPlanTypeText()}
+                    {getPlanTypeText}
                   </div>
                 </div>
                 
@@ -883,11 +1347,11 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                 <div className="mt-3 text-xs text-[#2B3A3B] space-y-1">
                   <div className="flex justify-between">
                     <span>已使用:</span>
-                    <span className="font-medium">{formatFileSize(getTotalUsedSize())}</span>
+                    <span className="font-medium">{formatFileSize(getTotalUsedSize)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>剩餘:</span>
-                    <span className="font-medium">{formatFileSize(Math.max(0, getPlanSize() - getTotalUsedSize()))}</span>
+                    <span className="font-medium">{formatFileSize(Math.max(0, getPlanSize - getTotalUsedSize))}</span>
                   </div>
                 </div>
               </div>
@@ -919,11 +1383,11 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                     </svg>
                   </div>
                   <span className="font-medium text-[#A64B2A]">
-                    {formatFileSize(getTotalUsedSize())} / {formatFileSize(getPlanSize())}
+                    {formatFileSize(getTotalUsedSize)} / {formatFileSize(getPlanSize)}
                   </span>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs shadow-sm bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#A64B2A]`}>
-                  {Math.round(getPlanSize() > 0 ? (getTotalUsedSize() / getPlanSize()) * 100 : 0)}%
+                  {Math.round(getPlanSize > 0 ? (getTotalUsedSize / getPlanSize) * 100 : 0)}%
                 </span>
               </div>
             </div>
@@ -961,14 +1425,77 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
           }`}>
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-center sm:justify-between">
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <button
-                  onClick={() => setShowUploadArea(true)}
-                  disabled={showUploadArea}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#A64B2A] to-[#8B3A1F] text-white rounded-xl hover:from-[#8B3A1F] hover:to-[#6B2A0F] disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 w-full sm:w-auto justify-center shadow-md hover:shadow-lg transform hover:scale-105 disabled:transform-none"
-                >
-                  <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="font-medium">上傳媒體</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const capacityStatus = getCurrentCapacityStatus();
+                    const isCapacityFull = capacityStatus.status === 'full';
+                    
+                    return (
+                      <button
+                        onClick={() => {
+                          if (isCapacityFull) {
+                            toast.error('容量已滿，無法上傳新檔案');
+                            return;
+                          }
+                          setShowUploadArea(true);
+                        }}
+                        disabled={showUploadArea || isCapacityFull}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 w-full sm:w-auto justify-center shadow-md hover:shadow-lg transform hover:scale-105 disabled:transform-none ${
+                          isCapacityFull 
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                            : 'bg-gradient-to-r from-[#A64B2A] to-[#8B3A1F] text-white hover:from-[#8B3A1F] hover:to-[#6B2A0F]'
+                        }`}
+                      >
+                        <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className="font-medium">
+                          {isCapacityFull ? '容量已滿' : '上傳媒體'}
+                        </span>
+                      </button>
+                    );
+                  })()}
+                  
+                  {/* 容量狀態提示 */}
+                  {(() => {
+                    const videoCount = media.filter(m => m.media_type === 'video').length;
+                    const photoCount = media.filter(m => m.media_type === 'photo').length;
+                    const videoLimit = quotaLevel?.video_limit || 5;
+                    const photoLimit = quotaLevel?.photo_limit || 10;
+                    const isNearLimit = videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2;
+                    const isAtLimit = videoCount >= videoLimit || photoCount >= photoLimit;
+                    
+                    if (isAtLimit) {
+                      return (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs border border-red-200">
+                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                          容量已滿
+                        </div>
+                      );
+                    } else if (isNearLimit) {
+                      return (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs border border-yellow-200">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                          容量緊張
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs border border-green-200">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          可上傳
+                        </div>
+                      );
+                    }
+                  })()}
+                  
+                  {/* 方案升級按鈕 */}
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs border border-blue-200 hover:bg-blue-200 transition-colors"
+                  >
+                    <Cog6ToothIcon className="h-3 w-3" />
+                    升級方案
+                  </button>
+                </div>
                 
                 <button
                   onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
@@ -1077,6 +1604,19 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                     <span className="p-1 bg-[#EBC9A4] rounded-full">📸</span>
                     相片: 最多 {quotaLevel?.photo_limit || DEFAULT_MEDIA_LIMITS.photo.maxCount} 張，每張 ≤ {quotaLevel?.photo_size_limit_mb || DEFAULT_MEDIA_LIMITS.photo.maxSize / (1024 * 1024)}MB
                   </p>
+                  
+                  {/* 檔案上傳指南連結 */}
+                  <div className="mt-3 pt-3 border-t border-[#EADBC8]">
+                    <a 
+                      href="/admin/file-upload-guide" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[#A64B2A] hover:text-[#8B3A1F] transition-colors text-xs"
+                    >
+                      <InformationCircleIcon className="h-3 w-3" />
+                      查看檔案上傳指南
+                    </a>
+                  </div>
                 </div>
 
                 {/* 選中的檔案 */}
@@ -1113,7 +1653,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                         )}
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={uploading ? cancelUpload : () => {
                           setSelectedFiles([]);
                           setShowUploadArea(false);
                         }}
@@ -1122,7 +1662,7 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                        <span>取消</span>
+                        <span>{uploading ? '取消上傳' : '取消'}</span>
                       </button>
                     </div>
                   </div>
@@ -1592,6 +2132,16 @@ export default function StudentMediaModal({ isOpen, onClose, student }: StudentM
             </div>
           </div>
         </div>
+      )}
+
+      {/* 方案升級模態視窗 */}
+      {showUpgradeModal && student && (
+        <PlanUpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          student={student}
+          onUpgradeSuccess={handleUpgradeSuccess}
+        />
       )}
     </div>
   );

@@ -282,10 +282,10 @@ export default function AbilitiesPage() {
         return false;
       }
 
-      // 能力等級篩選
-      if (filters.ability_levels.length > 0 && !filters.ability_levels.includes(ability.max_level)) {
-        return false;
-      }
+      // 能力等級篩選 - 暫時跳過，因為 DevelopmentAbility 沒有 max_level 屬性
+      // if (filters.ability_levels.length > 0 && !filters.ability_levels.includes(ability.max_level)) {
+      //   return false;
+      // }
 
       // 成長樹篩選
       if (filters.growth_trees.length > 0) {
@@ -649,6 +649,7 @@ export default function AbilitiesPage() {
         ability_icon: data.ability_icon ?? undefined,
         ability_color: data.ability_color ?? undefined,
         category: data.category ?? undefined,
+        is_active: true, // 新創建的能力預設為啟用狀態
       };
       setAbilities([...abilities, fixedData]);
       setShowCreateModal(false);
@@ -1419,7 +1420,7 @@ export default function AbilitiesPage() {
         <AbilityLevelManager
           abilityId={selectedAbility.id}
           abilityName={selectedAbility.ability_name}
-          maxLevel={selectedAbility.max_level}
+          maxLevel={selectedAbility.max_level || 5}
           onClose={() => {
             setShowLevelManager(false);
             setSelectedAbility(null);

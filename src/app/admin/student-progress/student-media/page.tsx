@@ -49,6 +49,9 @@ export default function StudentMediaPage() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showQuotaSettingsModal, setShowQuotaSettingsModal] = useState(false);
   const [courseTypes, setCourseTypes] = useState<Array<{id: string, name: string}>>([]);
+  
+  // 防止重複載入的標記
+  const [isLoading, setIsLoading] = useState(false);
 
   // 篩選狀態
   const [filters, setFilters] = useState({
@@ -62,6 +65,7 @@ export default function StudentMediaPage() {
   const [popupSelected, setPopupSelected] = useState<string | string[]>([]);
 
   useEffect(() => {
+    console.log('學生媒體頁面 useEffect 執行');
     loadStudents();
     loadCourseTypes();
   }, []);
@@ -103,36 +107,100 @@ export default function StudentMediaPage() {
   };
 
   const loadStudents = async () => {
+    // 防止重複執行
+    if (isLoading) {
+      console.log('loadStudents 已在執行中，跳過重複調用');
+      return;
+    }
+    
+    console.log('loadStudents 函數開始執行');
+    setIsLoading(true);
     setLoading(true);
     try {
+      console.log('開始載入學生資料...');
+      
       // 先載入學生基本資料
       const { data: studentsData, error: studentsError } = await supabase
         .from('Hanami_Students')
         .select('id, full_name, nick_name, course_type')
         .order('full_name');
 
-      if (studentsError) throw studentsError;
+      if (studentsError) {
+        console.error('學生資料載入失敗:', studentsError);
+        throw studentsError;
+      }
+
+      console.log('學生資料載入成功，數量:', studentsData?.length || 0);
+
+      // 檢查是否有學生資料
+      if (!studentsData || studentsData.length === 0) {
+        console.log('沒有找到學生資料');
+        setStudents([]);
+        return;
+      }
 
       // 分別載入配額資料
+      console.log('開始載入配額資料...');
       const { data: quotaData, error: quotaError } = await supabase
         .from('hanami_student_media_quota')
         .select('*');
 
       if (quotaError) {
         console.warn('載入配額資料失敗，使用預設配額:', quotaError);
+      } else {
+        console.log('配額資料載入成功，數量:', quotaData?.length || 0);
       }
 
-      // 載入媒體統計
-      const { data: mediaStats, error: mediaError } = await supabase
-        .from('hanami_student_media')
-        .select('student_id, media_type')
-        .in('student_id', studentsData?.map(s => s.id) || []);
-
-      if (mediaError) {
-        console.warn('載入媒體統計失敗:', mediaError);
+      // 載入媒體統計 - 只在有學生資料時執行
+      let mediaStats: any[] = [];
+      
+      if (studentsData.length > 0) {
+        console.log('開始載入媒體統計...');
+        const studentIds = studentsData.map(s => s.id);
+        console.log('學生ID列表:', studentIds);
+        
+        try {
+          // 將學生ID分批處理，每批50個
+          const batchSize = 50;
+          const batches = [];
+          for (let i = 0; i < studentIds.length; i += batchSize) {
+            batches.push(studentIds.slice(i, i + batchSize));
+          }
+          
+          console.log(`將 ${studentIds.length} 個學生ID分成 ${batches.length} 批處理`);
+          
+          // 分批查詢媒體統計
+          for (let i = 0; i < batches.length; i++) {
+            console.log(`處理第 ${i + 1}/${batches.length} 批，包含 ${batches[i].length} 個學生ID`);
+            
+            const { data, error } = await supabase
+              .from('hanami_student_media')
+              .select('student_id, media_type')
+              .in('student_id', batches[i]);
+            
+            if (error) {
+              console.warn(`第 ${i + 1} 批媒體統計載入失敗:`, error);
+              continue; // 繼續處理下一批
+            } else {
+              mediaStats = mediaStats.concat(data || []);
+              console.log(`第 ${i + 1} 批媒體統計載入成功，本批數量: ${(data || []).length}`);
+            }
+          }
+          
+          console.log('所有批次媒體統計載入完成，總數量:', mediaStats.length);
+        } catch (statsError) {
+          console.warn('媒體統計查詢異常:', statsError);
+          mediaStats = [];
+        }
+        
+        // 如果媒體統計載入失敗，設定一個超時，避免無限等待
+        if (mediaStats.length === 0 && studentsData.length > 0) {
+          console.log('媒體統計載入失敗，使用預設值繼續處理');
+        }
       }
 
       // 處理資料
+      console.log('開始處理資料...');
       const processedStudents = (studentsData || []).map(student => {
         // 查找學生的配額資料
         const existingQuota = quotaData?.find(q => q.student_id === student.id);
@@ -167,7 +235,7 @@ export default function StudentMediaPage() {
           last_updated: new Date().toISOString(),
         };
 
-        const studentMedia = mediaStats?.filter(m => m.student_id === student.id) || [];
+        const studentMedia = mediaStats.filter(m => m.student_id === student.id) || [];
         const mediaCount = {
           video: studentMedia.filter(m => m.media_type === 'video').length,
           photo: studentMedia.filter(m => m.media_type === 'photo').length,
@@ -183,12 +251,18 @@ export default function StudentMediaPage() {
         };
       });
 
+      console.log('資料處理完成，學生數量:', processedStudents.length);
       setStudents(processedStudents);
+      console.log('學生資料已設定到狀態');
+      
     } catch (error) {
       console.error('載入學生資料失敗:', error);
       toast.error('載入學生資料失敗');
+      setStudents([]); // 設置空陣列避免無限載入
     } finally {
+      console.log('loadStudents 函數執行完成，設定 loading = false');
       setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -270,8 +344,32 @@ export default function StudentMediaPage() {
   };
 
   // 新增：處理升級成功
-  const handleUpgradeSuccess = () => {
-    // 重新載入學生資料
+  const handleUpgradeSuccess = async () => {
+    console.log('方案升級成功，重新載入資料');
+    
+    // 如果有選中的學生，先更新該學生的配額資訊
+    if (selectedStudent) {
+      try {
+        const { data: updatedQuota, error } = await supabase
+          .from('hanami_student_media_quota')
+          .select('*')
+          .eq('student_id', selectedStudent.id)
+          .single();
+        
+        if (!error && updatedQuota) {
+          console.log('更新選中學生的配額:', updatedQuota);
+          // 更新選中學生的配額資訊
+          setSelectedStudent(prev => prev ? {
+            ...prev,
+            quota: updatedQuota as any
+          } : null);
+        }
+      } catch (error) {
+        console.error('更新選中學生配額失敗:', error);
+      }
+    }
+    
+    // 重新載入所有學生資料
     loadStudents();
   };
 
@@ -320,6 +418,10 @@ export default function StudentMediaPage() {
   };
 
   const getFilteredStudents = () => {
+    if (!students || students.length === 0) {
+      return [];
+    }
+    
     return students.filter(student => {
       // 搜尋篩選
       const matchesSearch = student.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -348,8 +450,15 @@ export default function StudentMediaPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-hanami-primary"></div>
+      <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
+        <div className="container mx-auto px-4 py-6 max-w-7xl">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-hanami-primary mx-auto mb-4"></div>
+              <p className="text-gray-600">載入學生媒體資料中...</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -765,6 +874,7 @@ export default function StudentMediaPage() {
             isOpen={showMediaModal}
             onClose={() => setShowMediaModal(false)}
             student={selectedStudent}
+            onQuotaChanged={handleUpgradeSuccess}
           />
 
           {/* 方案升級模態視窗 */}
