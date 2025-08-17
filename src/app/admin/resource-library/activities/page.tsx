@@ -875,7 +875,7 @@ export default function ResourceActivitiesPage() {
                   { value: 'estimated_duration', label: '時長' },
                 ]}
                 value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value)}
               />
 
               <button

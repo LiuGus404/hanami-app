@@ -1093,7 +1093,7 @@ export default function GrowthTreesPage() {
           <GrowthTreeStudentsModal
             treeId={selectedTreeForStudents.id}
             treeName={selectedTreeForStudents.tree_name}
-            treeCourseType={selectedTreeForStudents.course_type}
+            treeCourseType={selectedTreeForStudents.course_type || ''}
             requiredAbilities={getGoalsForTree(selectedTreeForStudents.id)
               .flatMap((goal: any) => goal.required_abilities || [])
               .filter((ability: string, index: number, arr: string[]) => arr.indexOf(ability) === index)}

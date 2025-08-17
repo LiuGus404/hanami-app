@@ -3,11 +3,11 @@
 export interface GrowthTree {
   id: string;
   tree_name: string;
-  tree_description?: string;
-  tree_icon?: string;
-  course_type_id?: string; // 修正：使用 course_type_id 與資料庫一致
+  tree_description?: string | null;
+  tree_icon?: string | null;
+  course_type_id?: string | null; // 修正：使用 course_type_id 與資料庫一致
   course_type?: string; // 保留用於顯示
-  tree_level?: number;
+  tree_level?: number | null;
   difficulty_level?: number;
   is_active: boolean;
   created_at: string;
@@ -151,29 +151,29 @@ export interface StudentAbility {
 export interface TeachingActivity {
   id: string;
   activity_name: string;
-  activity_description?: string;
+  activity_description?: string | null;
   activity_type: string;
-  difficulty_level?: number;
-  target_abilities?: string[];
-  materials_needed?: string[];
-  duration_minutes?: number;
-  age_range_min?: number;
-  age_range_max?: number;
-  notion_id?: string;
+  difficulty_level?: number | null;
+  target_abilities?: string[] | null;
+  materials_needed?: string[] | null;
+  duration_minutes?: number | null;
+  age_range_min?: number | null;
+  age_range_max?: number | null;
+  notion_id?: string | null;
   is_active: boolean;
-  template_id?: string;
+  template_id?: string | null;
   custom_fields?: any;
-  tags?: string[];
-  category?: string;
-  status?: string;
-  version?: number;
-  created_by?: string;
-  updated_by?: string;
-  estimated_duration?: number;
-  instructions?: string;
-  notes?: string;
+  tags?: string[] | null;
+  category?: string | null;
+  status?: string | null;
+  version?: number | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  estimated_duration?: number | null;
+  instructions?: string | null;
+  notes?: string | null;
   created_at: string;
-  updated_at?: string;
+  updated_at?: string | null;
 }
 
 // 原有的 TreeActivity 型別（保持向後相容）

@@ -65,7 +65,7 @@ export default function GrowthTreeActivitiesPanel({
   const loadActivities = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('hanami_tree_activities')
         .select(`
           *,
@@ -109,7 +109,7 @@ export default function GrowthTreeActivitiesPanel({
         .order('activity_name');
 
       if (error) throw error;
-      setTeachingActivities(data || []);
+      setTeachingActivities(data as TeachingActivity[] || []);
     } catch (error) {
       console.error('載入教學活動失敗:', error);
       toast.error('載入教學活動失敗');
@@ -230,7 +230,7 @@ export default function GrowthTreeActivitiesPanel({
   // 新增：獲取教學活動的完整詳情
   const getTeachingActivityDetails = (activity: TreeActivity) => {
     if (activity.activity_source === 'teaching' && activity.hanami_teaching_activities) {
-      const teachingActivity = activity.hanami_teaching_activities;
+      const teachingActivity = activity.hanami_teaching_activities as any;
       return {
         ...teachingActivity,
         custom_fields: teachingActivity.custom_fields || {},

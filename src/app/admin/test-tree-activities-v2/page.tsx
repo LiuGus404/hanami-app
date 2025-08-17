@@ -76,10 +76,29 @@ export default function TestTreeActivitiesV2Page() {
   const loadActivities = async (treeId: string) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('hanami_tree_activities')
         .select(`
-          *,
+          id,
+          tree_id,
+          activity_id,
+          goal_id,
+          activity_source,
+          custom_activity_name,
+          custom_activity_description,
+          activity_type,
+          difficulty_level,
+          estimated_duration,
+          materials_needed,
+          instructions,
+          learning_objectives,
+          target_abilities,
+          prerequisites,
+          priority_order,
+          activity_order,
+          is_required,
+          is_active,
+          created_at,
           hanami_teaching_activities (
             id,
             activity_name,
@@ -88,7 +107,13 @@ export default function TestTreeActivitiesV2Page() {
             difficulty_level,
             duration_minutes,
             materials_needed,
-            instructions
+            instructions,
+            custom_fields,
+            template_id,
+            status,
+            tags,
+            category,
+            created_at
           )
         `)
         .eq('tree_id', treeId)
@@ -96,7 +121,7 @@ export default function TestTreeActivitiesV2Page() {
         .order('activity_order', { ascending: true });
 
       if (error) throw error;
-      setActivities(data || []);
+      setActivities(data as TreeActivity[] || []);
     } catch (error) {
       console.error('載入活動失敗:', error);
       toast.error('載入活動失敗');
