@@ -5,9 +5,10 @@ export interface GrowthTree {
   tree_name: string;
   tree_description?: string;
   tree_icon?: string;
-  course_type: string;
+  course_type_id?: string; // 修正：使用 course_type_id 與資料庫一致
+  course_type?: string; // 保留用於顯示
   tree_level?: number;
-  difficulty_level: number;
+  difficulty_level?: number;
   is_active: boolean;
   created_at: string;
 }
@@ -26,12 +27,15 @@ export interface GrowthGoal {
   related_activities?: string[]; // 關聯的活動ID列表
 }
 
-// 新增：成長樹活動型別
+// 新增：成長樹活動關聯型別（基於現有表結構）
 export interface TreeActivity {
   id: string;
   tree_id: string;
-  activity_name: string;
-  activity_description?: string;
+  activity_id?: string; // 關聯到 hanami_teaching_activities
+  goal_id?: string; // 關聯到 hanami_growth_goals
+  activity_source: 'teaching' | 'custom' | 'template'; // 活動來源
+  custom_activity_name?: string; // 自訂活動名稱
+  custom_activity_description?: string; // 自訂活動描述
   activity_type: 'custom' | 'teaching' | 'assessment' | 'practice';
   difficulty_level: number; // 1-5
   estimated_duration?: number; // 分鐘
@@ -40,13 +44,25 @@ export interface TreeActivity {
   learning_objectives: string[];
   target_abilities: string[];
   prerequisites: string[];
-  activity_order: number;
+  priority_order: number; // 現有欄位
+  activity_order: number; // 新增欄位
   is_required: boolean;
   is_active: boolean;
   created_by?: string;
   updated_by?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
+  // 關聯查詢結果
+  hanami_teaching_activities?: {
+    id: string;
+    activity_name: string;
+    activity_description?: string;
+    activity_type: string;
+    difficulty_level?: number;
+    duration_minutes?: number;
+    materials_needed?: string[];
+    instructions?: string;
+  };
 }
 
 // 新增：活動模板型別
@@ -363,21 +379,19 @@ export const DEFAULT_MULTI_SELECT_DESCRIPTIONS = [
 ];
 
 // 新增：活動相關的常數
-export const ACTIVITY_TYPES = {
-  CUSTOM: 'custom',
-  TEACHING: 'teaching',
-  ASSESSMENT: 'assessment',
-  PRACTICE: 'practice'
-} as const;
+export const ACTIVITY_TYPES = ['custom', 'teaching', 'assessment', 'practice', 'game'] as const;
 
 export const ACTIVITY_TYPE_LABELS = {
-  [ACTIVITY_TYPES.CUSTOM]: '自訂活動',
-  [ACTIVITY_TYPES.TEACHING]: '教學活動',
-  [ACTIVITY_TYPES.ASSESSMENT]: '評估活動',
-  [ACTIVITY_TYPES.PRACTICE]: '練習活動'
+  custom: '自訂活動',
+  teaching: '教學活動',
+  assessment: '評估活動',
+  practice: '練習活動',
+  game: '遊戲活動'
 } as const;
 
-export const DIFFICULTY_LEVELS = {
+export const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5] as const;
+
+export const DIFFICULTY_LEVEL_LABELS = {
   1: '初級',
   2: '中級',
   3: '高級',
@@ -402,8 +416,11 @@ export const COMPLETION_STATUS_LABELS = {
 // 新增：活動創建/更新請求型別
 export interface CreateTreeActivityRequest {
   tree_id: string;
-  activity_name: string;
-  activity_description?: string;
+  activity_source: 'teaching' | 'custom' | 'template';
+  activity_name?: string; // 用於自訂活動
+  activity_description?: string; // 用於自訂活動
+  activity_id?: string; // 用於關聯教學活動
+  goal_id?: string; // 用於關聯成長目標
   activity_type: 'custom' | 'teaching' | 'assessment' | 'practice';
   difficulty_level: number;
   estimated_duration?: number;
@@ -412,6 +429,7 @@ export interface CreateTreeActivityRequest {
   learning_objectives?: string[];
   target_abilities?: string[];
   prerequisites?: string[];
+  priority_order?: number;
   activity_order?: number;
   is_required?: boolean;
   created_by?: string;

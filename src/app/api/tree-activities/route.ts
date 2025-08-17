@@ -73,27 +73,43 @@ export async function POST(request: NextRequest) {
     const body: CreateTreeActivityRequest = await request.json();
 
     // 驗證必填欄位
-    if (!body.tree_id || !body.activity_name || !body.activity_type || !body.difficulty_level) {
+    if (!body.tree_id) {
       return NextResponse.json(
-        { error: '缺少必填欄位', required: ['tree_id', 'activity_name', 'activity_type', 'difficulty_level'] },
+        { error: '缺少必填欄位', required: ['tree_id'] },
         { status: 400 }
       );
     }
 
-    // 驗證活動類型
-    if (!Object.values(ACTIVITY_TYPES).includes(body.activity_type)) {
-      return NextResponse.json(
-        { error: '無效的活動類型', valid_types: Object.values(ACTIVITY_TYPES) },
-        { status: 400 }
-      );
-    }
+    // 根據活動來源驗證不同的必填欄位
+    if (body.activity_source === 'teaching') {
+      if (!body.activity_id) {
+        return NextResponse.json(
+          { error: '教學活動必須提供 activity_id' },
+          { status: 400 }
+        );
+      }
+    } else if (body.activity_source === 'custom') {
+      if (!body.activity_name || !body.activity_type || !body.difficulty_level) {
+        return NextResponse.json(
+          { error: '自訂活動必須提供 activity_name, activity_type, difficulty_level' },
+          { status: 400 }
+        );
+      }
+      
+      // 只有自訂活動才需要驗證活動類型和難度等級
+      if (!Object.values(ACTIVITY_TYPES).includes(body.activity_type)) {
+        return NextResponse.json(
+          { error: '無效的活動類型', valid_types: Object.values(ACTIVITY_TYPES) },
+          { status: 400 }
+        );
+      }
 
-    // 驗證難度等級
-    if (body.difficulty_level < 1 || body.difficulty_level > 5) {
-      return NextResponse.json(
-        { error: '難度等級必須在1-5之間' },
-        { status: 400 }
-      );
+      if (body.difficulty_level < 1 || body.difficulty_level > 5) {
+        return NextResponse.json(
+          { error: '難度等級必須在1-5之間' },
+          { status: 400 }
+        );
+      }
     }
 
     // 檢查成長樹是否存在
@@ -111,23 +127,33 @@ export async function POST(request: NextRequest) {
     }
 
     // 準備插入資料
-    const activityData = {
+    const activityData: any = {
       tree_id: body.tree_id,
-      activity_name: body.activity_name,
-      activity_description: body.activity_description || null,
-      activity_type: body.activity_type,
-      difficulty_level: body.difficulty_level,
-      estimated_duration: body.estimated_duration || null,
-      materials_needed: body.materials_needed || [],
-      instructions: body.instructions || null,
-      learning_objectives: body.learning_objectives || [],
-      target_abilities: body.target_abilities || [],
-      prerequisites: body.prerequisites || [],
+      activity_source: body.activity_source || 'custom',
+      priority_order: body.priority_order || 1,
       activity_order: body.activity_order || 0,
       is_required: body.is_required || false,
       is_active: true,
       created_by: body.created_by || null
     };
+
+    // 根據活動來源添加不同的欄位
+    if (body.activity_source === 'teaching') {
+      // 教學活動：只保存關聯信息
+      activityData.activity_id = body.activity_id;
+    } else if (body.activity_source === 'custom') {
+      // 自訂活動：保存所有詳細資料
+      activityData.custom_activity_name = body.activity_name;
+      activityData.custom_activity_description = body.activity_description;
+      activityData.activity_type = body.activity_type;
+      activityData.difficulty_level = body.difficulty_level;
+      activityData.estimated_duration = body.estimated_duration || null;
+      activityData.materials_needed = body.materials_needed || [];
+      activityData.instructions = body.instructions || null;
+      activityData.learning_objectives = body.learning_objectives || [];
+      activityData.target_abilities = body.target_abilities || [];
+      activityData.prerequisites = body.prerequisites || [];
+    }
 
     const { data, error } = await supabase
       .from('hanami_tree_activities')
@@ -221,6 +247,8 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
+    console.log('DELETE 請求 - 活動ID:', id);
+
     if (!id) {
       return NextResponse.json(
         { error: '請提供活動ID' },
@@ -231,24 +259,41 @@ export async function DELETE(request: NextRequest) {
     // 檢查活動是否存在
     const { data: activityExists, error: checkError } = await supabase
       .from('hanami_tree_activities')
-      .select('id, activity_name')
+      .select('id, activity_source, activity_id, custom_activity_name')
       .eq('id', id)
       .single();
 
+    console.log('檢查活動結果:', { activityExists, checkError });
+
     if (checkError || !activityExists) {
       return NextResponse.json(
-        { error: '指定的活動不存在' },
+        { error: '指定的活動不存在', details: checkError?.message },
         { status: 404 }
       );
     }
 
-    // 軟刪除（設置為非活躍）
+    // 獲取活動名稱用於回應
+    let activityName = '未命名活動';
+    if (activityExists.activity_source === 'custom') {
+      activityName = activityExists.custom_activity_name || '自訂活動';
+    } else if (activityExists.activity_source === 'teaching') {
+      // 如果是教學活動，嘗試獲取教學活動名稱
+      if (activityExists.activity_id) {
+        const { data: teachingActivity } = await supabase
+          .from('hanami_teaching_activities')
+          .select('activity_name')
+          .eq('id', activityExists.activity_id)
+          .single();
+        activityName = teachingActivity?.activity_name || '教學活動';
+      } else {
+        activityName = '教學活動';
+      }
+    }
+
+    // 真正刪除活動
     const { error } = await supabase
       .from('hanami_tree_activities')
-      .update({ 
-        is_active: false,
-        updated_at: new Date().toISOString()
-      })
+      .delete()
       .eq('id', id);
 
     if (error) {
@@ -261,7 +306,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `活動 "${activityExists.activity_name}" 已成功刪除`
+      message: `活動 "${activityName}" 已成功刪除`
     });
 
   } catch (error) {

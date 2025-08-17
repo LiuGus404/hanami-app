@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 
 import { HanamiButton } from './HanamiButton';
 import { PopupSelect } from './PopupSelect';
-import { FunnelIcon } from '@heroicons/react/24/outline';
+import { GrowthTreeActivitiesPanel } from './index';
+import { FunnelIcon, PuzzlePieceIcon } from '@heroicons/react/24/outline';
 import { ASSESSMENT_MODES, DEFAULT_MULTI_SELECT_LEVELS, DEFAULT_MULTI_SELECT_DESCRIPTIONS } from '@/types/progress';
 
 interface GoalInput {
@@ -98,6 +99,9 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const [showActivitySelector, setShowActivitySelector] = useState<{open: boolean, goalIdx: number | null}>({ open: false, goalIdx: null });
   const [activitySearchText, setActivitySearchText] = useState('');
   const [activityTempSelected, setActivityTempSelected] = useState<string[]>([]);
+  
+  // 活動管理面板狀態
+  const [showActivitiesPanel, setShowActivitiesPanel] = useState(false);
 
   // 2. 新增能力選擇器狀態
   const [showAbilitySelector, setShowAbilitySelector] = useState<{open: boolean, goalIdx: number | null}>({ open: false, goalIdx: null });
@@ -318,14 +322,27 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
         <div className="bg-[#FFF9F2] px-6 py-4 border-b border-[#EADBC8]">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-[#2B3A3B]">{props.editingTree ? '編輯成長樹' : '新增成長樹'}</h2>
-            <button
-              className="text-[#A68A64] hover:text-[#8B7355] transition-colors"
-              onClick={props.onClose}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              {props.editingTree && (
+                <HanamiButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowActivitiesPanel(true)}
+                  className="bg-white/20 hover:bg-white/30 text-hanami-text border-white/30"
+                >
+                  <PuzzlePieceIcon className="h-4 w-4 mr-1" />
+                  活動管理
+                </HanamiButton>
+              )}
+              <button
+                className="text-[#A68A64] hover:text-[#8B7355] transition-colors"
+                onClick={props.onClose}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
         {/* 表單內容 - 可滾動 */}
@@ -866,6 +883,38 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
           onChange={(value) => setTempSelectedCourseType(Array.isArray(value) ? value[0] || '' : value)}
           onConfirm={handleCourseTypeConfirm}
         />
+      )}
+
+      {/* 活動管理面板 */}
+      {showActivitiesPanel && props.editingTree && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <PuzzlePieceIcon className="h-6 w-6 text-hanami-text" />
+                  <h3 className="text-xl font-bold text-hanami-text">
+                    {props.editingTree.tree_name} - 活動管理
+                  </h3>
+                </div>
+                <button
+                  className="text-hanami-text hover:text-hanami-text-secondary transition-colors"
+                  onClick={() => setShowActivitiesPanel(false)}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              <GrowthTreeActivitiesPanel
+                treeId={props.editingTree.id}
+                treeName={props.editingTree.tree_name}
+                onClose={() => setShowActivitiesPanel(false)}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,7 @@
 export { HanamiButton } from './HanamiButton';
 export { HanamiCard } from './HanamiCard';
 export { default as HanamiInput } from './HanamiInput';
-export { HanamiSelect } from './HanamiSelect';
+export { default as HanamiSelect } from './HanamiSelect';
 export { default as HanamiCalendar } from './HanamiCalendar';
 export { default as CuteButton } from './CuteButton';
 export { default as HanamiBadge } from './HanamiBadge';
@@ -49,7 +49,7 @@ export { default as StudentTreeAssignmentModal } from './StudentTreeAssignmentMo
 export { default as StudentMediaModal } from './StudentMediaModal';
 export { PlanUpgradeModal } from './PlanUpgradeModal';
 export { MediaQuotaSettingsModal } from './MediaQuotaSettingsModal';
-export { PerformanceMonitor } from './PerformanceMonitor';
+export { default as GrowthTreeActivitiesPanel } from './GrowthTreeActivitiesPanel';
 
 // 類型定義
  

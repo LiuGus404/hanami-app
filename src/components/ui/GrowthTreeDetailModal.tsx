@@ -1,6 +1,6 @@
-import React from 'react';
-import { XMarkIcon, UserIcon, AcademicCapIcon, BookOpenIcon, StarIcon } from '@heroicons/react/24/outline';
-import { HanamiButton } from './index';
+import React, { useState } from 'react';
+import { XMarkIcon, UserIcon, AcademicCapIcon, BookOpenIcon, StarIcon, PuzzlePieceIcon } from '@heroicons/react/24/outline';
+import { HanamiButton, GrowthTreeActivitiesPanel } from './index';
 
 interface GrowthTreeDetailModalProps {
   tree: any;
@@ -25,6 +25,7 @@ export default function GrowthTreeDetailModal({
   onEdit,
   onManageStudents
 }: GrowthTreeDetailModalProps) {
+  const [showActivitiesPanel, setShowActivitiesPanel] = useState(false);
   const completedGoals = goals.filter(goal => goal.is_completed).length;
   const progressPercentage = goals.length > 0 ? (completedGoals / goals.length) * 100 : 0;
 
@@ -74,6 +75,14 @@ export default function GrowthTreeDetailModal({
               <h2 className="text-2xl font-bold text-hanami-text">{tree.tree_name}</h2>
             </div>
             <div className="flex items-center gap-2">
+              <HanamiButton
+                variant="secondary"
+                onClick={() => setShowActivitiesPanel(true)}
+                className="bg-white/20 hover:bg-white/30 text-hanami-text border-white/30"
+              >
+                <PuzzlePieceIcon className="h-4 w-4 mr-1" />
+                活動管理
+              </HanamiButton>
               {onEdit && (
                 <HanamiButton
                   variant="secondary"
@@ -305,6 +314,38 @@ export default function GrowthTreeDetailModal({
           </HanamiButton>
         </div>
       </div>
+
+      {/* 活動管理面板 */}
+      {showActivitiesPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <PuzzlePieceIcon className="h-6 w-6 text-hanami-text" />
+                  <h3 className="text-xl font-bold text-hanami-text">
+                    {tree.tree_name} - 活動管理
+                  </h3>
+                </div>
+                <button
+                  className="text-hanami-text hover:text-hanami-text-secondary transition-colors"
+                  onClick={() => setShowActivitiesPanel(false)}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              <GrowthTreeActivitiesPanel
+                treeId={tree.id}
+                treeName={tree.tree_name}
+                onClose={() => setShowActivitiesPanel(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
