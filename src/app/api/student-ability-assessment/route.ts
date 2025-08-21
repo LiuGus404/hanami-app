@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
@@ -7,13 +8,11 @@ export async function POST(request: NextRequest) {
     console.log('收到 API 請求:', body);
 
     const {
-      assessment_id, // 新增：現有評估記錄的 ID
       student_id,
       tree_id,
       assessment_date,
       notes,
-      goals,
-      overall_performance_rating // 新增：整體表現評分
+      goals
     } = body;
 
     // 驗證必要欄位
@@ -24,43 +23,21 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 處理學習目標評估資料，轉換為 ability_assessments 格式
-    const abilityAssessments: any = {};
-    const selectedGoals: any[] = [];
-    
-    if (goals && Array.isArray(goals)) {
-      goals.forEach((goal: any) => {
-        const { goal_id, assessment_mode, selected_levels, progress_level } = goal;
-        
-        if (goal_id) {
-          // 準備 selected_goals 格式的資料
-          const selectedGoalData = {
-            goal_id,
-            assessment_mode,
-            selected_levels: selected_levels || [],
-            progress_level: progress_level || 0
-          };
-          selectedGoals.push(selectedGoalData);
-          
-          // 準備 ability_assessments 格式的資料
-          if (assessment_mode === 'multi_select') {
-            abilityAssessments[goal_id] = {
-              level: 0, // 多選模式不需要等級
-              notes: '',
-              rating: 0,
-              assessment_mode: 'multi_select',
-              selected_levels: selected_levels || []
-            };
-          } else if (assessment_mode === 'progress') {
-            abilityAssessments[goal_id] = {
-              level: progress_level || 0,
-              notes: '',
-              rating: progress_level || 0,
-              assessment_mode: 'progress'
-            };
-          }
-        }
-      });
+    // 檢查是否已存在該日期的評估記錄
+    const { data: existingAssessment, error: checkError } = await supabase
+      .from('hanami_ability_assessments')
+      .select('id')
+      .eq('student_id', student_id)
+      .eq('tree_id', tree_id)
+      .eq('assessment_date', assessment_date)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('檢查現有評估記錄時出錯:', checkError);
+      return NextResponse.json({
+        success: false,
+        error: '檢查現有評估記錄時出錯: ' + checkError.message
+      }, { status: 500 });
     }
 
     let assessmentId: string;
@@ -68,22 +45,18 @@ export async function POST(request: NextRequest) {
       student_id,
       tree_id,
       assessment_date,
-      lesson_date: assessment_date, // 使用 assessment_date 作為 lesson_date
-      ability_assessments: abilityAssessments, // 使用處理後的學習目標資料
-      selected_goals: selectedGoals, // 同時更新 selected_goals 欄位
-      overall_performance_rating: overall_performance_rating || 1, // 使用前端傳遞的評分值
       general_notes: notes || null,
       updated_at: new Date().toISOString()
     };
 
-    // 如果有提供 assessment_id，直接更新該記錄
-    if (assessment_id) {
-      console.log('更新現有評估記錄:', assessment_id);
+    if (existingAssessment) {
+      // 更新現有記錄
+      console.log('更新現有評估記錄:', existingAssessment.id);
       
       const { data: updatedAssessment, error: updateError } = await supabase
         .from('hanami_ability_assessments')
         .update(updateData)
-        .eq('id', assessment_id)
+        .eq('id', existingAssessment.id)
         .select()
         .single();
 
@@ -95,9 +68,9 @@ export async function POST(request: NextRequest) {
         }, { status: 500 });
       }
 
-      assessmentId = assessment_id;
+      assessmentId = existingAssessment.id;
     } else {
-      // 新增模式：直接創建新記錄，不檢查是否存在
+      // 創建新記錄
       console.log('創建新評估記錄');
       
       const { data: newAssessment, error: insertError } = await supabase
@@ -118,6 +91,58 @@ export async function POST(request: NextRequest) {
       }
 
       assessmentId = newAssessment.id;
+    }
+
+    // 處理學習目標評估
+    if (goals && Array.isArray(goals)) {
+      for (const goal of goals) {
+        const { goal_id, assessment_mode, selected_levels, progress_level } = goal;
+        
+        if (!goal_id) continue;
+
+        // 檢查是否已存在該目標的評估記錄
+        const { data: existingGoalAssessment, error: checkGoalError } = await (supabase as any)
+          .from('hanami_goal_assessments')
+          .select('id')
+          .eq('assessment_id', assessmentId)
+          .eq('goal_id', goal_id)
+          .single();
+
+        const goalAssessmentData = {
+          assessment_id: assessmentId,
+          goal_id,
+          assessment_mode,
+          selected_levels: selected_levels ? JSON.stringify(selected_levels) : null,
+          progress_level: progress_level || null,
+          updated_at: new Date().toISOString()
+        };
+
+        if (existingGoalAssessment) {
+          // 更新現有目標評估記錄
+          const { error: updateGoalError } = await (supabase as any)
+            .from('hanami_goal_assessments')
+            .update(goalAssessmentData)
+            .eq('id', existingGoalAssessment.id);
+
+          if (updateGoalError) {
+            console.error('更新目標評估記錄時出錯:', updateGoalError);
+            // 繼續處理其他目標，不中斷整個流程
+          }
+        } else {
+          // 創建新目標評估記錄
+          const { error: insertGoalError } = await (supabase as any)
+            .from('hanami_goal_assessments')
+            .insert({
+              ...goalAssessmentData,
+              created_at: new Date().toISOString()
+            });
+
+          if (insertGoalError) {
+            console.error('創建目標評估記錄時出錯:', insertGoalError);
+            // 繼續處理其他目標，不中斷整個流程
+          }
+        }
+      }
     }
 
     // 獲取更新後的完整評估記錄
@@ -144,7 +169,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: finalAssessment,
-      message: assessment_id ? '評估記錄已更新' : '評估記錄已創建'
+      message: existingAssessment ? '評估記錄已更新' : '評估記錄已創建'
     });
 
   } catch (error) {

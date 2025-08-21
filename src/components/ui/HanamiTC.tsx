@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
 
 import LessonCard from './LessonCard';
 import MiniLessonCard from './MiniLessonCard';
@@ -105,7 +106,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
       materials: string[];
     };
     onEdit: () => void;
-      } | null>(null);
+  } | null>(null);
   const [selectedTeacher1, setSelectedTeacher1] = useState<string[]>([]);
   const [selectedTeacher2, setSelectedTeacher2] = useState<string[]>([]);
   const [showPopup, setShowPopup] = useState<'main' | 'assist' | null>(null);
@@ -118,11 +119,12 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isAISchedulerOpen, setIsAISchedulerOpen] = useState(false);
 
-  // 添加防抖機制
+  // 添加防抖機制和初始化標記
   const lessonsFetchedRef = useRef(false);
   const currentViewRef = useRef<string>('');
   const currentDateRef = useRef<string>('');
   const loadingRef = useRef(false);
+  const isInitializedRef = useRef(false);
 
   const getDateString = (date: Date): string => {
     const year = date.getFullYear();
@@ -202,7 +204,16 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     // 合併常規和試堂學生的課堂
     const allLessons = [...processedRegularLessons, ...processedTrialLessons];
     console.log('All processed lessons:', allLessons);
-    setLessons(allLessons);
+    
+    // 檢查 lessons 是否真的需要更新
+    setLessons(prevLessons => {
+      // 如果內容相同，不更新狀態
+      if (prevLessons.length === allLessons.length && 
+          prevLessons.every((lesson, index) => lesson.id === allLessons[index].id)) {
+        return prevLessons;
+      }
+      return allLessons;
+    });
 
     // 獲取所有學生資料
     const { data: studentsData, error: studentsError } = await supabase
@@ -247,7 +258,15 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
       actual_timeslot: null,
     }));
 
-    setStudents(processedStudents);
+    // 檢查 students 是否真的需要更新
+    setStudents(prevStudents => {
+      // 如果內容相同，不更新狀態
+      if (prevStudents.length === processedStudents.length && 
+          prevStudents.every((student, index) => student.id === processedStudents[index].id)) {
+        return prevStudents;
+      }
+      return processedStudents;
+    });
   };
 
   const fetchPlans = async (startDate: Date, endDate: Date) => {
@@ -263,7 +282,17 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
       .lte('lesson_date', endDateStr);
 
     console.log('Fetched plans:', data);
-    setPlans(data || []);
+    
+    // 檢查 plans 是否真的需要更新
+    setPlans(prevPlans => {
+      const newPlans = data || [];
+      // 如果內容相同，不更新狀態
+      if (prevPlans.length === newPlans.length && 
+          prevPlans.every((plan, index) => plan.id === newPlans[index].id)) {
+        return prevPlans;
+      }
+      return newPlans;
+    });
   };
 
   const fetchTodayTeachers = async (date: Date) => {
@@ -294,8 +323,14 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
   const TodayTeachersSection = ({ date }: { date: Date }) => {
     const [teachers, setTeachers] = useState<{name: string, start: string, end: string}[]>([]);
     const [loading, setLoading] = useState(true);
+    const dateRef = useRef<string>('');
 
     useEffect(() => {
+      const dateString = date.toISOString().split('T')[0];
+      // 如果日期沒有變化，不重新載入
+      if (dateRef.current === dateString) return;
+      dateRef.current = dateString;
+      
       const loadTeachers = async () => {
         setLoading(true);
         const teacherList = await fetchTodayTeachers(date);
@@ -303,7 +338,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
         setLoading(false);
       };
       loadTeachers();
-    }, [date]);
+    }, [date.toISOString().split('T')[0]]); // 只監聽日期字符串，不是整個 date 對象
 
     if (loading) {
       return <div className="text-xs text-[#A68A64] mt-1">載入中...</div>;
@@ -338,21 +373,12 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     );
   };
 
-  // 主要資料載入邏輯
+  // 主要資料載入邏輯 - 只在初始化時載入一次
   useEffect(() => {
-    // 如果 view 和 currentDate 沒有變化且已經載入過，不重複載入
-    const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
-    if (currentViewRef.current === viewKey && lessonsFetchedRef.current) return;
+    // 只在第一次載入時執行
+    if (isInitializedRef.current) return;
     
-    // 防止重複載入
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    
-    // 更新當前 view 和 date
-    currentViewRef.current = viewKey;
-    currentDateRef.current = currentDate.toISOString().split('T')[0];
-
-    const loadData = async () => {
+    const loadInitialData = async () => {
       try {
         if (view === 'week') {
           const startOfWeek = new Date(currentDate);
@@ -375,24 +401,57 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
         }
 
         lessonsFetchedRef.current = true;
-        loadingRef.current = false;
+        isInitializedRef.current = true;
       } catch (error) {
-        console.error('Error loading data:', error);
-        loadingRef.current = false;
+        console.error('Error loading initial data:', error);
       }
     };
 
-    loadData();
-  }, [view, currentDate]);
+    loadInitialData();
+  }, []); // 空依賴項，只在組件掛載時執行一次
 
-  // 當 view 或 currentDate 變化時重置防抖狀態
-  useEffect(() => {
-    const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
-    if (currentViewRef.current !== viewKey) {
+  // 手動重新載入資料的函數
+  const reloadData = async () => {
+    try {
       lessonsFetchedRef.current = false;
+      loadingRef.current = true;
+      
+      if (view === 'week') {
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+        await Promise.all([
+          fetchLessons(startOfWeek, endOfWeek),
+          fetchPlans(startOfWeek, endOfWeek),
+        ]);
+      } else if (view === 'day') {
+        const startOfDay = new Date(currentDate);
+        const endOfDay = new Date(currentDate);
+
+        await Promise.all([
+          fetchLessons(startOfDay, endOfDay),
+          fetchPlans(startOfDay, endOfDay),
+        ]);
+      }
+
+      lessonsFetchedRef.current = true;
+      loadingRef.current = false;
+    } catch (error) {
+      console.error('Error reloading data:', error);
       loadingRef.current = false;
     }
-  }, [view, currentDate]);
+  };
+
+  // 當 view 或 currentDate 變化時重置防抖狀態
+  // useEffect(() => {
+  //   const viewKey = `${view}_${currentDate.toISOString().split('T')[0]}`;
+  //   if (currentViewRef.current !== viewKey) {
+  //     lessonsFetchedRef.current = false;
+  //     loadingRef.current = false;
+  //   }
+  // }, [view, currentDate]);
 
   const handlePrev = (): void => {
     const newDate = new Date(currentDate);
@@ -402,6 +461,8 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
       newDate.setDate(newDate.getDate() - 7);
     }
     setCurrentDate(newDate);
+    // 手動重新載入資料
+    setTimeout(() => reloadData(), 0);
   };
 
   const handleNext = (): void => {
@@ -412,6 +473,8 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
       newDate.setDate(newDate.getDate() + 7);
     }
     setCurrentDate(newDate);
+    // 手動重新載入資料
+    setTimeout(() => reloadData(), 0);
   };
 
   const formatDate = (date: Date): string => {
@@ -487,15 +550,10 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
   const renderDayLessons = (date: Date) => {
     const dateStr = getDateString(date);
     
-    console.log('Checking lessons for date:', dateStr);
-    
     const dayLessons = lessons.filter(l => {
       const lessonDateStr = l.lesson_date;
-      console.log('Comparing:', { lessonDateStr, dateStr });
       return lessonDateStr === dateStr;
     });
-    
-    console.log('Filtered dayLessons:', dayLessons);
     
     dayLessons.sort((a, b) => a.regular_timeslot.localeCompare(b.regular_timeslot));
     
@@ -621,7 +679,17 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
       .select('*')
       .gte('lesson_date', startDate.toISOString())
       .lte('lesson_date', endDate.toISOString());
-    setPlans(data || []);
+    
+    // 檢查 plans 是否真的需要更新
+    setPlans(prevPlans => {
+      const newPlans = data || [];
+      // 如果內容相同，不更新狀態
+      if (prevPlans.length === newPlans.length && 
+          prevPlans.every((plan, index) => plan.id === newPlans[index].id)) {
+        return prevPlans;
+      }
+      return newPlans;
+    });
   };
 
   return (
@@ -666,24 +734,17 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
               <img alt="課堂活動" className="w-4 h-4" src="/details.png" />
               <span className="text-xs">{allShowPlan ? '收起活動' : '展示活動'}</span>
             </button>
-            <button
-              className="flex items-center gap-1 px-2 py-1 rounded-full border bg-white border-[#EBC9A4] text-[#4B4036] hover:bg-[#f7f3ec]"
-              title="刷新資料"
-              onClick={async (e) => {
-                const btn = e.currentTarget.querySelector('img');
-                if (btn) {
-                  btn.classList.add('animate-spin');
-                  setTimeout(() => btn.classList.remove('animate-spin'), 1000);
-                }
-                const weekStart = getHongKongDate(currentDate);
-                weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-                const weekEnd = getHongKongDate(weekStart);
-                weekEnd.setDate(weekEnd.getDate() + 6);
-                await fetchLessons(weekStart, weekEnd);
-                await fetchPlans(weekStart, weekEnd);
-              }}
+
+            {/* 重新載入按鈕 */}
+            <button 
+              className="flex items-center gap-1 px-2 py-1 hanami-btn text-[#4B4036]" 
+              onClick={reloadData}
+              disabled={loadingRef.current}
             >
-              <img alt="Refresh" className="w-4 h-4" src="/refresh.png" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="text-xs">{loadingRef.current ? '載入中...' : '重新載入'}</span>
             </button>
           </div>
         </div>
@@ -817,11 +878,8 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
             timeslot={modalInfo.time}
             onClose={() => setIsModalOpen(false)}
             onSaved={async () => {
-              const weekStart = getHongKongDate(currentDate);
-              weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-              const weekEnd = getHongKongDate(weekStart);
-              weekEnd.setDate(weekEnd.getDate() + 6);
-              await updatePlan(weekStart, weekEnd);
+              // 使用 reloadData 而不是 updatePlan，避免無限循環
+              await reloadData();
             }}
           />
         )}

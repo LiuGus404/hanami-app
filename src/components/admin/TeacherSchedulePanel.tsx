@@ -102,93 +102,118 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
   const [draggedTeacher, setDraggedTeacher] = useState<Teacher | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setErrorMsg(null);
-        setErrorMsg(null);
-        
-        // Calculate month start and end
-        const monthStart = startOfMonth(currentMonth);
-        const monthEnd = endOfMonth(currentMonth);
-        const monthStartStr = format(monthStart, 'yyyy-MM-dd');
-        const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
+  // 新增：日期選擇彈窗狀態
+  const [showDateTeacherSelect, setShowDateTeacherSelect] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedTeachersForDate, setSelectedTeachersForDate] = useState<string[]>([]);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<{
+    start_time: string;
+    end_time: string;
+  }>({
+    start_time: '09:00',
+    end_time: '18:00',
+  });
 
-        // Fetch lessons for the month with student information
-        const lessonQuery = supabase
-          .from('hanami_student_lesson')
-          .select(`
+  // 新增：單個老師排班彈窗狀態
+  const [showSingleTeacherSchedule, setShowSingleTeacherSchedule] = useState(false);
+  const [selectedSingleTeacher, setSelectedSingleTeacher] = useState<Teacher | null>(null);
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState<string>('');
+  const [selectedScheduleTime, setSelectedScheduleTime] = useState<{
+    start_time: string;
+    end_time: string;
+  }>({
+    start_time: '09:00',
+    end_time: '18:00',
+  });
+
+  // 提取資料獲取邏輯為可重用函數
+  const fetchData = async () => {
+    try {
+      setErrorMsg(null);
+      setErrorMsg(null);
+      
+      // Calculate month start and end
+      const monthStart = startOfMonth(currentMonth);
+      const monthEnd = endOfMonth(currentMonth);
+      const monthStartStr = format(monthStart, 'yyyy-MM-dd');
+      const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
+
+      // Fetch lessons for the month with student information
+      const lessonQuery = supabase
+        .from('hanami_student_lesson')
+        .select(`
+          id,
+          lesson_date,
+          student_id,
+          regular_timeslot,
+          course_type,
+          Hanami_Students!hanami_student_lesson_student_id_fkey (
             id,
-            lesson_date,
-            student_id,
-            regular_timeslot,
-            course_type,
-            Hanami_Students!hanami_student_lesson_student_id_fkey (
-              id,
-              full_name,
-              student_age
-            )
-          `)
-          .gte('lesson_date', monthStartStr)
-          .lte('lesson_date', monthEndStr);
+            full_name,
+            student_age
+          )
+        `)
+        .gte('lesson_date', monthStartStr)
+        .lte('lesson_date', monthEndStr);
 
-        // Fetch schedules for the month
-        let scheduleQuery = supabase
-          .from('teacher_schedule')
-          .select('id, teacher_id, scheduled_date, start_time, end_time, created_at, updated_at')
-          .gte('scheduled_date', monthStartStr)
-          .lte('scheduled_date', monthEndStr);
+      // Fetch schedules for the month
+      let scheduleQuery = supabase
+        .from('teacher_schedule')
+        .select('id, teacher_id, scheduled_date, start_time, end_time, created_at, updated_at')
+        .gte('scheduled_date', monthStartStr)
+        .lte('scheduled_date', monthEndStr);
 
-        // Fetch teachers
-        let teacherQuery = supabase
-          .from('hanami_employee')
-          .select('id, teacher_fullname, teacher_nickname');
+      // Fetch teachers
+      let teacherQuery = supabase
+        .from('hanami_employee')
+        .select('id, teacher_fullname, teacher_nickname');
 
-        if (teacherIds && teacherIds.length > 0 && teacherIds[0] !== '*') {
-          scheduleQuery = scheduleQuery.in('teacher_id', teacherIds);
-          teacherQuery = teacherQuery.in('id', teacherIds);
-        }
-
-        const [lessonResult, scheduleResult, teacherResult] = await Promise.all([
-          lessonQuery,
-          scheduleQuery,
-          teacherQuery,
-        ]);
-
-        // Handle lesson data
-        if (lessonResult.error) {
-          console.warn('Warning fetching lessons:', lessonResult.error.message);
-        } else if (lessonResult.data) {
-          // 類型轉換，確保 Hanami_Students 欄位型別正確
-          const lessons: Lesson[] = lessonResult.data.map((l: any) => ({
-            ...l,
-            Hanami_Students: l.Hanami_Students && Array.isArray(l.Hanami_Students)
-              ? l.Hanami_Students[0]
-              : l.Hanami_Students,
-          }));
-          setLessons(lessons);
-        }
-
-        // Handle schedule data
-        if (scheduleResult.error) {
-          console.warn('Warning fetching schedules:', scheduleResult.error.message);
-        } else if (scheduleResult.data) {
-          setSchedules(scheduleResult.data as Schedule[]);
-        }
-
-        // Handle teacher data
-        if (teacherResult.error) {
-          console.warn('Warning fetching teachers:', teacherResult.error.message);
-        } else if (teacherResult.data) {
-          setTeachers(teacherResult.data as Teacher[]);
-        }
-
-      } catch (error) {
-        console.warn('Unexpected error in fetchData:', error);
-        setErrorMsg('載入資料時發生錯誤，請重新整理頁面');
+      if (teacherIds && teacherIds.length > 0 && teacherIds[0] !== '*') {
+        scheduleQuery = scheduleQuery.in('teacher_id', teacherIds);
+        teacherQuery = teacherQuery.in('id', teacherIds);
       }
-    };
 
+      const [lessonResult, scheduleResult, teacherResult] = await Promise.all([
+        lessonQuery,
+        scheduleQuery,
+        teacherQuery,
+      ]);
+
+      // Handle lesson data
+      if (lessonResult.error) {
+        console.warn('Warning fetching lessons:', lessonResult.error.message);
+      } else if (lessonResult.data) {
+        // 類型轉換，確保 Hanami_Students 欄位型別正確
+        const lessons: Lesson[] = lessonResult.data.map((l: any) => ({
+          ...l,
+          Hanami_Students: l.Hanami_Students && Array.isArray(l.Hanami_Students)
+            ? l.Hanami_Students[0]
+            : l.Hanami_Students,
+        }));
+        setLessons(lessons);
+      }
+
+      // Handle schedule data
+      if (scheduleResult.error) {
+        console.warn('Warning fetching schedules:', scheduleResult.error.message);
+      } else if (scheduleResult.data) {
+        setSchedules(scheduleResult.data as Schedule[]);
+      }
+
+      // Handle teacher data
+      if (teacherResult.error) {
+        console.warn('Warning fetching teachers:', teacherResult.error.message);
+      } else if (teacherResult.data) {
+        setTeachers(teacherResult.data as Teacher[]);
+      }
+
+    } catch (error) {
+      console.warn('Unexpected error in fetchData:', error);
+      setErrorMsg('載入資料時發生錯誤，請重新整理頁面');
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [currentMonth, teacherIds]);
 
@@ -242,38 +267,17 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
   // Handle date cell click
   const handleDateClick = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    const scheduledTeachers = schedulesByDate[dateStr] || [];
     
-    // Group lessons by time and course (合併同時段同課程)
-    const dayLessons = lessons.filter(l => l.lesson_date === dateStr);
-    const groupedMap: Record<string, GroupedLesson> = {};
-    dayLessons.forEach(lesson => {
-      const key = `${lesson.regular_timeslot || ''}_${lesson.course_type || ''}`;
-      if (!groupedMap[key]) {
-        groupedMap[key] = {
-          time: lesson.regular_timeslot,
-          course: lesson.course_type,
-          students: [],
-        };
-      }
-      if (lesson.Hanami_Students) {
-        groupedMap[key].students.push({
-          name: lesson.Hanami_Students.full_name,
-          student_id: lesson.student_id,
-          age: lesson.Hanami_Students.student_age ? String(lesson.Hanami_Students.student_age) : null,
-        });
-      }
+    // 設置選中的日期和初始化選擇
+    setSelectedDate(dateStr);
+    setSelectedTeachersForDate([]);
+    setSelectedTimeRange({
+      start_time: '09:00',
+      end_time: '18:00',
     });
-    const groupedLessons = Object.values(groupedMap).sort((a, b) => {
-      if (!a.time || !b.time) return 0;
-      return a.time.localeCompare(b.time);
-    });
-
-    setSelectedDetail({
-      date: day,
-      teachers: scheduledTeachers,
-      groups: groupedLessons,
-    });
+    
+    // 顯示老師選擇彈窗
+    setShowDateTeacherSelect(true);
   };
 
   // Handle save teacher schedule
@@ -431,6 +435,32 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
     setDraggedTeacher(teacher);
   };
 
+  // 自動滾動功能
+  const handleAutoScroll = (e: React.DragEvent) => {
+    const scrollThreshold = 80; // 距離邊緣多少像素開始滾動
+    const scrollSpeed = 8; // 滾動速度
+    
+    const mouseY = e.clientY;
+    const windowHeight = window.innerHeight;
+    
+    // 檢查是否接近頁面底部
+    if (mouseY > windowHeight - scrollThreshold) {
+      // 向下滾動
+      window.scrollBy({
+        top: scrollSpeed,
+        behavior: 'smooth'
+      });
+    }
+    // 檢查是否接近頁面頂部
+    else if (mouseY < scrollThreshold) {
+      // 向上滾動
+      window.scrollBy({
+        top: -scrollSpeed,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   const handleTeacherDragEnd = () => {
     setDraggedTeacher(null);
     setDragOverDate(null);
@@ -518,22 +548,298 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
     ));
   };
 
+  // 處理老師選擇
+  const handleTeacherSelection = (teacherId: string) => {
+    setSelectedTeachersForDate(prev => {
+      if (prev.includes(teacherId)) {
+        return prev.filter(id => id !== teacherId);
+      } else {
+        return [...prev, teacherId];
+      }
+    });
+  };
+
+  // 處理時間範圍變更
+  const handleTimeRangeChange = (field: 'start_time' | 'end_time', value: string) => {
+    setSelectedTimeRange(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // 處理單個老師排班時間變更
+  const handleSingleTeacherTimeChange = (field: 'start_time' | 'end_time', value: string) => {
+    setSelectedScheduleTime(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // 處理單個老師排班
+  const handleSingleTeacherSchedule = async () => {
+    if (!selectedSingleTeacher) {
+      setErrorMsg('請選擇老師');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+
+      // 準備排班資料
+      const scheduleData = {
+        teacher_id: selectedSingleTeacher.id,
+        scheduled_date: selectedScheduleDate,
+        start_time: selectedScheduleTime.start_time,
+        end_time: selectedScheduleTime.end_time,
+      };
+
+      // 先檢查是否已有該日期的排班
+      const { data: existingSchedule } = await supabase
+        .from('teacher_schedule')
+        .select('*')
+        .eq('teacher_id', selectedSingleTeacher.id)
+        .eq('scheduled_date', selectedScheduleDate)
+        .single();
+
+      if (existingSchedule) {
+        // 更新現有排班
+        const { error: updateError } = await supabase
+          .from('teacher_schedule')
+          .update({
+            start_time: selectedScheduleTime.start_time,
+            end_time: selectedScheduleTime.end_time,
+          })
+          .eq('teacher_id', selectedSingleTeacher.id)
+          .eq('scheduled_date', selectedScheduleDate);
+
+        if (updateError) {
+          console.warn('Error updating schedule:', updateError.message);
+          setErrorMsg(`更新排班失敗：${updateError.message}`);
+          return;
+        }
+      } else {
+        // 插入新排班
+        const { error: insertError } = await supabase
+          .from('teacher_schedule')
+          .insert(scheduleData);
+
+        if (insertError) {
+          console.warn('Error inserting schedule:', insertError.message);
+          setErrorMsg(`儲存排班失敗：${insertError.message}`);
+          return;
+        }
+      }
+
+      // 重新載入資料
+      await fetchData();
+
+      // 關閉彈窗並重置狀態
+      setShowSingleTeacherSchedule(false);
+      setSelectedSingleTeacher(null);
+      setSelectedScheduleDate('');
+      setSelectedScheduleTime({
+        start_time: '09:00',
+        end_time: '18:00',
+      });
+
+      setErrorMsg(`已成功安排 ${selectedSingleTeacher.teacher_nickname} 在 ${selectedScheduleDate} 的排班！`);
+      setTimeout(() => setErrorMsg(null), 3000);
+
+    } catch (error) {
+      console.warn('Unexpected error in single teacher scheduling:', error);
+      setErrorMsg('安排排班時發生未預期的錯誤');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 處理老師排班按鈕點擊
+  const handleTeacherScheduleClick = (teacher: Teacher) => {
+    // 設置選中的老師和當前日期
+    setSelectedSingleTeacher(teacher);
+    setSelectedScheduleDate(format(new Date(), 'yyyy-MM-dd'));
+    setSelectedScheduleTime({
+      start_time: '09:00',
+      end_time: '18:00',
+    });
+    
+    // 顯示單個老師排班彈窗
+    setShowSingleTeacherSchedule(true);
+  };
+
+  // 處理刪除老師排班
+  const handleTeacherScheduleDelete = (teacher: Teacher) => {
+    // 設置選中的老師
+    setSelectedSingleTeacher(teacher);
+    
+    // 顯示刪除確認彈窗
+    if (confirm(`確定要刪除 ${teacher.teacher_nickname} 的所有排班記錄嗎？\n\n此操作將刪除該老師的所有排班資料，無法復原。`)) {
+      deleteTeacherAllSchedules(teacher.id);
+    }
+  };
+
+  // 刪除老師所有排班記錄
+  const deleteTeacherAllSchedules = async (teacherId: string) => {
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+
+      // 刪除該老師的所有排班記錄
+      const { error: deleteError } = await supabase
+        .from('teacher_schedule')
+        .delete()
+        .eq('teacher_id', teacherId);
+
+      if (deleteError) {
+        console.warn('Error deleting teacher schedules:', deleteError.message);
+        setErrorMsg(`刪除排班失敗：${deleteError.message}`);
+        return;
+      }
+
+      // 重新載入資料
+      await fetchData();
+
+      setErrorMsg(`已成功刪除 ${teachers.find(t => t.id === teacherId)?.teacher_nickname} 的所有排班記錄！`);
+      setTimeout(() => setErrorMsg(null), 3000);
+
+    } catch (error) {
+      console.warn('Unexpected error deleting teacher schedules:', error);
+      setErrorMsg('刪除排班時發生未預期的錯誤');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 刪除單個排班記錄
+  const handleSingleScheduleDelete = (scheduleId: string, teacherName: string, scheduleDate: string) => {
+    if (confirm(`確定要刪除 ${teacherName} 在 ${scheduleDate} 的排班記錄嗎？`)) {
+      deleteSingleSchedule(scheduleId, teacherName, scheduleDate);
+    }
+  };
+
+    // 刪除單個排班記錄
+  const deleteSingleSchedule = async (scheduleId: string, teacherName: string, scheduleDate: string) => {
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+
+      // 刪除指定的排班記錄
+      const { error: deleteError } = await supabase
+        .from('teacher_schedule')
+        .delete()
+        .eq('id', scheduleId);
+
+      if (deleteError) {
+        console.warn('Error deleting single schedule:', deleteError.message);
+        setErrorMsg(`刪除排班失敗：${deleteError.message}`);
+        return;
+      }
+
+      // 重新載入資料
+      await fetchData();
+
+      setErrorMsg(`已成功刪除 ${teacherName} 在 ${scheduleDate} 的排班記錄！`);
+      setTimeout(() => setErrorMsg(null), 3000);
+
+    } catch (error) {
+      console.warn('Unexpected error deleting single schedule:', error);
+      setErrorMsg('刪除排班時發生未預期的錯誤');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 處理批量安排老師排班
+  const handleBatchScheduleTeachers = async () => {
+    if (selectedTeachersForDate.length === 0) {
+      setErrorMsg('請至少選擇一位老師');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+
+      // 準備批量插入的資料
+      const schedulesToInsert = selectedTeachersForDate.map(teacherId => ({
+        teacher_id: teacherId,
+        scheduled_date: selectedDate,
+        start_time: selectedTimeRange.start_time,
+        end_time: selectedTimeRange.end_time,
+      }));
+
+      // 先刪除該日期現有的排班（可選）
+      const { error: deleteError } = await supabase
+        .from('teacher_schedule')
+        .delete()
+        .eq('scheduled_date', selectedDate)
+        .in('teacher_id', selectedTeachersForDate);
+
+      if (deleteError) {
+        console.warn('Warning deleting existing schedules:', deleteError.message);
+      }
+
+      // 插入新的排班
+      const { error: insertError } = await supabase
+        .from('teacher_schedule')
+        .insert(schedulesToInsert);
+
+      if (insertError) {
+        console.warn('Error inserting schedules:', insertError.message);
+        setErrorMsg(`儲存失敗：${insertError.message}`);
+        return;
+      }
+
+      // 重新載入資料
+      await fetchData();
+
+      // 關閉彈窗並重置狀態
+      setShowDateTeacherSelect(false);
+      setSelectedTeachersForDate([]);
+      setSelectedTimeRange({
+        start_time: '09:00',
+        end_time: '18:00',
+      });
+
+      setErrorMsg('排班安排成功！');
+      setTimeout(() => setErrorMsg(null), 3000);
+
+    } catch (error) {
+      console.warn('Unexpected error in batch scheduling:', error);
+      setErrorMsg('安排排班時發生未預期的錯誤');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSaveEditMode = async () => {
     try {
       setLoading(true);
       setErrorMsg(null);
 
-      // 刪除所有現有排班
-      const { error: deleteError } = await supabase
-        .from('teacher_schedule')
-        .delete()
-        .gte('scheduled_date', format(startOfMonth(currentMonth), 'yyyy-MM-dd'))
-        .lte('scheduled_date', format(endOfMonth(currentMonth), 'yyyy-MM-dd'));
+      // 獲取當前月份的所有教師ID（包括已排班和未排班的）
+      const allTeacherIds = new Set([
+        ...filteredTeachers.map(t => t.id),
+        ...schedules.map(s => s.teacher_id)
+      ]);
 
-      if (deleteError) {
-        console.warn('Error deleting schedules:', deleteError.message);
-        setErrorMsg(`刪除舊排班失敗：${deleteError.message}`);
-        return;
+      // 只刪除當前編輯的教師在當前月份的排班記錄
+      const teacherIdsToUpdate = Array.from(allTeacherIds);
+      
+      if (teacherIdsToUpdate.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('teacher_schedule')
+          .delete()
+          .in('teacher_id', teacherIdsToUpdate)
+          .gte('scheduled_date', format(startOfMonth(currentMonth), 'yyyy-MM-dd'))
+          .lte('scheduled_date', format(endOfMonth(currentMonth), 'yyyy-MM-dd'));
+
+        if (deleteError) {
+          console.warn('Error deleting schedules:', deleteError.message);
+          setErrorMsg(`刪除舊排班失敗：${deleteError.message}`);
+          return;
+        }
       }
 
       // 插入新排班
@@ -677,10 +983,32 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
             {filteredTeachers.map(teacher => {
               const teacherSchedules = filteredSchedules.filter(s => s.teacher_id === teacher.id);
               if (teacherSchedules.length === 0) return null;
+              
+              // 按日期排序（升序）
+              const sortedSchedules = [...teacherSchedules].sort((a, b) => 
+                new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime()
+              );
+              
               return (
                 <div key={teacher.id} className="mb-6">
                   <div className="flex items-center gap-2 mb-1">
                     <div className="font-bold text-[#4B4036] text-lg">{teacher.teacher_nickname || teacher.teacher_fullname}</div>
+                    <button
+                      className="px-3 py-1 text-xs bg-[#EADBC8] text-[#4B4036] rounded hover:bg-[#FFE8C2] border border-[#EADBC8] transition-colors flex items-center gap-1"
+                      onClick={() => handleTeacherScheduleClick(teacher)}
+                      title="安排老師排班"
+                    >
+                      <img src="/calendar.png" alt="calendar" className="w-3 h-3" />
+                      安排排班
+                    </button>
+                    <button
+                      className="px-3 py-1 text-xs bg-red-200 text-red-700 rounded hover:bg-red-300 border border-red-200 transition-colors flex items-center gap-1"
+                      onClick={() => handleTeacherScheduleDelete(teacher)}
+                      title="刪除老師排班"
+                    >
+                      <img src="/close.png" alt="delete" className="w-3 h-3" />
+                      刪除排班
+                    </button>
                     <button
                       className="px-2 py-1 text-xs bg-[#EADBC8] rounded hover:bg-[#FFE8C2] border border-[#EADBC8]"
                       onClick={() => exportTeacherCSV(teacher)}
@@ -699,15 +1027,25 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                         <th className="p-2 border-b border-[#EADBC8] text-left">老師</th>
                         <th className="p-2 border-b border-[#EADBC8] text-left">上班時間</th>
                         <th className="p-2 border-b border-[#EADBC8] text-left">下班時間</th>
+                        <th className="p-2 border-b border-[#EADBC8] text-left">操作</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {teacherSchedules.map(sch => (
-                        <tr key={sch.id}>
-                          <td className="p-2 border-b border-[#EADBC8]">{sch.scheduled_date}</td>
+                      {sortedSchedules.map(sch => (
+                        <tr key={sch.id} className="hover:bg-[#FFFCF5]">
+                          <td className="p-2 border-b border-[#EADBC8] font-medium">{sch.scheduled_date}</td>
                           <td className="p-2 border-b border-[#EADBC8]">{teacher.teacher_nickname || teacher.teacher_fullname}</td>
                           <td className="p-2 border-b border-[#EADBC8]">{sch.start_time?.slice(0, 5) || ''}</td>
                           <td className="p-2 border-b border-[#EADBC8]">{sch.end_time?.slice(0, 5) || ''}</td>
+                          <td className="p-2 border-b border-[#EADBC8]">
+                            <button
+                              className="px-2 py-1 text-xs bg-red-200 text-red-700 rounded hover:bg-red-300 border border-red-200 transition-colors flex items-center justify-center"
+                              onClick={() => handleSingleScheduleDelete(sch.id || '', teacher.teacher_nickname || teacher.teacher_fullname || '', sch.scheduled_date || '')}
+                              title="刪除此排班"
+                            >
+                              <img src="/close.png" alt="delete" className="w-3 h-3" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -739,7 +1077,13 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
         )}
 
         {viewMode === 'calendar' ? (
-          <div className="grid grid-cols-7 gap-2 text-center text-sm text-[#2B3A3B]">
+          <div 
+            className="grid grid-cols-7 gap-2 text-center text-sm text-[#2B3A3B]"
+            onDragOver={editMode ? (e) => {
+              e.preventDefault();
+              handleAutoScroll(e);
+            } : undefined}
+          >
             {['日', '一', '二', '三', '四', '五', '六'].map(day => (
               <div key={day} className="font-semibold border-b border-[#EADBC8] pb-1">
                 {day}
@@ -761,16 +1105,19 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
               return (
                 <div
                   key={dateStr}
-                  className={`relative border border-[#EADBC8] rounded p-1 flex flex-col justify-between min-h-[90px] ${
-                    editMode ? 'cursor-default' : 'cursor-pointer hover:bg-[#FFFCF5]'
+                  className={`relative border border-[#EADBC8] rounded p-1 flex flex-col justify-between min-h-[130px] transition-all duration-300 ${
+                    editMode ? 'cursor-default' : 'cursor-pointer hover:bg-[#FFFCF5] hover:shadow-md'
                   } ${
-                    dragOverDate === dateStr ? 'bg-[#FFE8C2] border-[#A68A64] shadow-lg' : ''
+                    dragOverDate === dateStr ? 'bg-[#FFE8C2] border-[#A68A64] shadow-lg transform scale-105' : ''
+                  } ${
+                    scheduledTeachers.length > 0 ? 'bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] shadow-sm' : ''
                   }`}
                   style={{ overflow: 'hidden' }}
                   onClick={editMode ? undefined : () => handleDateClick(day)}
                   onDragOver={editMode ? (e) => {
                     e.preventDefault();
                     handleDateDragOver(dateStr);
+                    handleAutoScroll(e);
                   } : undefined}
                   onDrop={editMode ? (e) => {
                     e.preventDefault();
@@ -785,57 +1132,121 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                       return (
                         <div
                           key={t.id}
-                          className={`w-full max-w-full bg-[#FFE8C2] rounded-md shadow flex flex-col items-center p-1 overflow-hidden border border-[#EADBC8] ${
-                          editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'bg-green-50 border-green-300' : ''
-                        }`}
+                          className={`w-full max-w-full bg-gradient-to-br from-[#FFE8C2] to-[#FFD59A] rounded-md shadow-lg flex flex-col items-center p-1 overflow-hidden border border-[#EADBC8] min-w-0 transform hover:scale-105 transition-all duration-300 hover:shadow-xl ${
+                          editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-300 shadow-green-200' : ''
+                        } ${editMode ? 'p-1.5' : 'p-1'}`}
                           style={{ zIndex: 10, marginBottom: 2 }}
                           onClick={e => e.stopPropagation()}
                         >
-                          <div className="flex items-center justify-between w-full">
-                          <span
-                            className={`text-xs font-bold truncate ${
-                              editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'text-green-700' : ''
-                            }`}
-                          >
-                            {editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? (
-                              <img alt="confirmed" className="w-3 h-3 inline mr-1" src="/leaf-sprout.png" />
-                            ) : null}
-                            {t.teacher_nickname}
-                          </span>
-                          {editMode && (
-                            <div className="flex gap-0.5 ml-1 pointer-events-auto">
-                              <button
-                                className="w-5 h-5 text-green-600 hover:text-green-800 flex items-center justify-center rounded-full border border-green-200 bg-white text-xs"
-                                title="確認"
-                                type="button"
-                                onClick={e => { e.preventDefault(); e.stopPropagation(); handleScheduleConfirm(t.id, dateStr); }}
-                              >✓
-                              </button>
-                              <button
-                                className="w-5 h-5 text-[#A68A64] hover:text-red-600 flex items-center justify-center rounded-full border border-[#EADBC8] bg-white text-xs"
-                                title="取消"
-                                type="button"
-                                onClick={e => { e.preventDefault(); e.stopPropagation(); handleScheduleCancel(t.id, dateStr); }}
-                              >×
-                              </button>
+                          <div className="flex flex-col items-center w-full gap-1">
+                            {/* 老師名字 */}
+                            <span
+                              className={`text-xs font-bold w-full text-center bg-white bg-opacity-80 rounded-full px-2 py-0.5 shadow-sm transform hover:scale-110 transition-all duration-200 ${
+                                editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'text-green-700 bg-green-50' : 'text-[#4B4036]'
+                              }`}
+                            >
+                              {editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? (
+                                <img alt="confirmed" className="w-3 h-3 inline mr-1 animate-pulse" src="/leaf-sprout.png" />
+                              ) : null}
+                              {t.teacher_nickname}
+                            </span>
+                            
+                            {/* 編輯模式按鈕 */}
+                            {editMode && (
+                              <div className="flex gap-1 pointer-events-auto">
+                                <button
+                                  className="w-5 h-5 text-green-600 hover:text-green-800 flex items-center justify-center rounded-full border border-green-200 bg-white text-xs shadow-sm transform hover:scale-125 hover:shadow-md transition-all duration-200 hover:bg-green-50"
+                                  title="確認"
+                                  type="button"
+                                  onClick={e => { e.preventDefault(); e.stopPropagation(); handleScheduleConfirm(t.id, dateStr); }}
+                                >
+                                  <img src="/leaf-sprout.png" alt="confirm" className="w-3 h-3 animate-pulse" />
+                                </button>
+                                <button
+                                  className="w-5 h-5 text-[#A68A64] hover:text-red-600 flex items-center justify-center rounded-full border border-[#EADBC8] bg-white text-xs shadow-sm transform hover:scale-125 hover:shadow-md transition-all duration-200 hover:bg-red-50"
+                                  title="取消"
+                                  type="button"
+                                  onClick={e => { e.preventDefault(); e.stopPropagation(); handleScheduleCancel(t.id, dateStr); }}
+                                >
+                                  <img src="/close.png" alt="cancel" className="w-3 h-3 hover:animate-bounce" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {/* 時間顯示區域 */}
+                          <div className="flex flex-col items-center gap-1 mt-1 w-full px-1">
+                                                         {/* 編輯模式：24小時制時間輸入框 */}
+                             {editMode && (
+                               <div className="flex flex-col items-center gap-1 w-full">
+                                 {/* 起始時間 */}
+                                 <div className="w-full relative">
+                                   <input
+                                     className="w-full text-[9px] sm:text-[10px] px-1 py-1 bg-white border border-[#EADBC8] rounded text-center flex-shrink-0 min-w-[50px]"
+                                     type="text"
+                                     pattern="[0-9]{2}:[0-9]{2}"
+                                     placeholder="HH:MM"
+                                     value={schedule?.start_time?.slice(0, 5) || '09:00'}
+                                     onChange={e => {
+                                       const value = e.target.value;
+                                       // 格式化輸入為 HH:MM
+                                       let formatted = value.replace(/[^\d:]/g, '');
+                                       if (formatted.length === 4 && !formatted.includes(':')) {
+                                         formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
+                                       }
+                                       handleScheduleTimeChange(t.id, dateStr, 'start_time', formatted);
+                                     }}
+                                     onBlur={e => {
+                                       const value = e.target.value;
+                                       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                                       if (!timeRegex.test(value)) {
+                                         handleScheduleTimeChange(t.id, dateStr, 'start_time', '09:00');
+                                       }
+                                     }}
+                                   />
+                                 </div>
+                                 {/* 分隔符號 */}
+                                 <span className="text-[9px] sm:text-[10px] text-[#A68A64] flex-shrink-0">-</span>
+                                 {/* 結束時間 */}
+                                 <div className="w-full relative">
+                                   <input
+                                     className="w-full text-[9px] sm:text-[10px] px-1 py-1 bg-white border border-[#EADBC8] rounded text-center flex-shrink-0 min-w-[50px]"
+                                     type="text"
+                                     pattern="[0-9]{2}:[0-9]{2}"
+                                     placeholder="HH:MM"
+                                     value={schedule?.end_time?.slice(0, 5) || '18:00'}
+                                     onChange={e => {
+                                       const value = e.target.value;
+                                       // 格式化輸入為 HH:MM
+                                       let formatted = value.replace(/[^\d:]/g, '');
+                                       if (formatted.length === 4 && !formatted.includes(':')) {
+                                         formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
+                                       }
+                                       handleScheduleTimeChange(t.id, dateStr, 'end_time', formatted);
+                                     }}
+                                     onBlur={e => {
+                                       const value = e.target.value;
+                                       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                                       if (!timeRegex.test(value)) {
+                                         handleScheduleTimeChange(t.id, dateStr, 'end_time', '18:00');
+                                       }
+                                     }}
+                                   />
+                                 </div>
+                               </div>
+                             )}
+                            {/* 美化時間文字顯示 - 編輯和非編輯模式都顯示 */}
+                            <div className="text-[8px] sm:text-[9px] text-center w-full mt-1">
+                              <div className="bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] rounded-full px-2 py-0.5 shadow-sm border border-[#EADBC8] transform hover:scale-105 transition-all duration-200">
+                                <span className="text-[#4B4036] font-medium">
+                                  {schedule?.start_time?.slice(0, 5) || '09:00'}
+                                </span>
+                                <span className="text-[#A68A64] mx-1">→</span>
+                                <span className="text-[#4B4036] font-medium">
+                                  {schedule?.end_time?.slice(0, 5) || '18:00'}
+                                </span>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                          <div className="flex items-center gap-1 mt-1 w-full">
-                          <input
-                            className="w-14 text-[10px] px-1 bg-white border border-[#EADBC8] rounded"
-                            type="time"
-                            value={schedule?.start_time?.slice(0, 5) || '09:00'}
-                            onChange={e => handleScheduleTimeChange(t.id, dateStr, 'start_time', e.target.value)}
-                          />
-                          <span className="text-[10px]">-</span>
-                          <input
-                            className="w-14 text-[10px] px-1 bg-white border border-[#EADBC8] rounded"
-                            type="time"
-                            value={schedule?.end_time?.slice(0, 5) || '18:00'}
-                            onChange={e => handleScheduleTimeChange(t.id, dateStr, 'end_time', e.target.value)}
-                          />
-                        </div>
+                          </div>
                         </div>
                       );
                     }) : <span className="text-[#aaa] text-xs">無</span>}
@@ -891,8 +1302,10 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                       <span className="bg-[#FFE8C2] text-[#4B4036] rounded-full px-2 py-0.5 text-xs font-medium flex items-center gap-1">
                         {teacher.teacher_nickname}
                         {schedule && (
-                          <span className="ml-1 text-[10px] text-[#A68A64]">
-                            ({schedule.start_time?.slice(0, 5) || ''}-{schedule.end_time?.slice(0, 5) || ''})
+                          <span className="ml-1 text-[10px] text-[#A68A64] flex items-center gap-1">
+                            <span>({schedule.start_time?.slice(0, 5) || ''}</span>
+                            <img src="/arrow-right.png" alt="to" className="w-2 h-2" />
+                            <span>{schedule.end_time?.slice(0, 5) || ''})</span>
                           </span>
                         )}
                       </span>
@@ -903,7 +1316,8 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
                           const confirmed = window.confirm('確定要移除此老師的排班嗎？');
                           if (confirmed) handleDeleteTeacherSchedule(teacher.id);
                         }}
-                      >×
+                      >
+                        <img src="/close.png" alt="remove" className="w-4 h-4" />
                       </button>
                     </div>
                   );
@@ -943,9 +1357,10 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
           <div className="bg-[#FFFDF8] rounded-2xl shadow-2xl p-8 w-[400px] max-h-[90vh] overflow-y-auto border border-[#EADBC8] relative">
             <button
               aria-label="關閉"
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-xl text-[#A68A64] hover:bg-[#F3F0E5] shadow"
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow"
               onClick={() => setShowArrangeTeacher(false)}
-            >×
+            >
+              <img src="/close.png" alt="close" className="w-4 h-4" />
             </button>
             <div className="text-xl font-bold mb-4 text-[#4B4036]">安排老師</div>
             <div className="mb-4">
@@ -1008,6 +1423,204 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
             }}
           />
           )}
+        </div>
+      )}
+
+      {/* 日期老師選擇彈窗 */}
+      {showDateTeacherSelect && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+          <div className="bg-[#FFFDF8] rounded-2xl shadow-2xl p-8 w-[500px] max-h-[90vh] overflow-y-auto border border-[#EADBC8] relative">
+            <button
+              aria-label="關閉"
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow"
+              onClick={() => setShowDateTeacherSelect(false)}
+            >
+              <img src="/close.png" alt="close" className="w-4 h-4" />
+            </button>
+            
+            <div className="text-xl font-bold mb-4 text-[#4B4036]">
+              安排老師排班 - {selectedDate}
+            </div>
+
+            {/* 老師選擇區域 */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-3 text-[#4B4036]">選擇老師：</label>
+              <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto">
+                {teachers.map(teacher => (
+                  <label
+                    key={teacher.id}
+                    className={`flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                      selectedTeachersForDate.includes(teacher.id)
+                        ? 'border-[#A68A64] bg-[#FFE8C2] shadow-md'
+                        : 'border-[#EADBC8] bg-white hover:bg-[#FFFCF5]'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedTeachersForDate.includes(teacher.id)}
+                      onChange={() => handleTeacherSelection(teacher.id)}
+                      className="mr-3 w-4 h-4 text-[#A68A64] border-[#EADBC8] rounded focus:ring-[#A68A64]"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-[#4B4036]">{teacher.teacher_nickname}</div>
+                      <div className="text-xs text-[#A68A64]">{teacher.teacher_fullname}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* 時間設置區域 */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-3 text-[#4B4036]">上班時間：</label>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs text-[#A68A64] mb-1">開始時間</label>
+                  <input
+                    type="time"
+                    value={selectedTimeRange.start_time}
+                    onChange={(e) => handleTimeRangeChange('start_time', e.target.value)}
+                    className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-[#A68A64] mb-1">結束時間</label>
+                  <input
+                    type="time"
+                    value={selectedTimeRange.end_time}
+                    onChange={(e) => handleTimeRangeChange('end_time', e.target.value)}
+                    className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 預覽區域 */}
+            {selectedTeachersForDate.length > 0 && (
+              <div className="mb-6 p-4 bg-[#FFF9F2] rounded-lg border border-[#EADBC8]">
+                <div className="text-sm font-medium text-[#4B4036] mb-2">預覽安排：</div>
+                <div className="space-y-1">
+                  {selectedTeachersForDate.map(teacherId => {
+                    const teacher = teachers.find(t => t.id === teacherId);
+                    return (
+                      <div key={teacherId} className="text-sm text-[#4B4036]">
+                        • {teacher?.teacher_nickname}：{selectedTimeRange.start_time} - {selectedTimeRange.end_time}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {errorMsg && <div className="text-red-500 text-sm mb-4">{errorMsg}</div>}
+
+            {/* 操作按鈕 */}
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-6 py-2 bg-gray-200 rounded-full text-sm text-[#4B4036] hover:bg-gray-300 transition-colors"
+                onClick={() => setShowDateTeacherSelect(false)}
+              >
+                取消
+              </button>
+              <button
+                className="px-6 py-2 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036] hover:bg-[#DDBA90] transition-colors disabled:opacity-50"
+                disabled={loading || selectedTeachersForDate.length === 0}
+                onClick={handleBatchScheduleTeachers}
+              >
+                {loading ? '安排中...' : '安排排班'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 單個老師排班彈窗 */}
+      {showSingleTeacherSchedule && selectedSingleTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+          <div className="bg-[#FFFDF8] rounded-2xl shadow-2xl p-8 w-[450px] max-h-[90vh] overflow-y-auto border border-[#EADBC8] relative">
+            <button
+              aria-label="關閉"
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow"
+              onClick={() => setShowSingleTeacherSchedule(false)}
+            >
+              <img src="/close.png" alt="close" className="w-4 h-4" />
+            </button>
+            
+            <div className="text-xl font-bold mb-4 text-[#4B4036]">
+              安排老師排班
+            </div>
+
+            {/* 老師資訊 */}
+            <div className="mb-6 p-4 bg-[#FFF9F2] rounded-lg border border-[#EADBC8]">
+              <div className="text-sm font-medium text-[#4B4036] mb-2">老師資訊：</div>
+              <div className="text-lg font-bold text-[#4B4036]">{selectedSingleTeacher.teacher_nickname}</div>
+              <div className="text-sm text-[#A68A64]">{selectedSingleTeacher.teacher_fullname}</div>
+            </div>
+
+            {/* 日期選擇 */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-3 text-[#4B4036]">排班日期：</label>
+              <input
+                type="date"
+                value={selectedScheduleDate}
+                onChange={(e) => setSelectedScheduleDate(e.target.value)}
+                className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+              />
+            </div>
+
+            {/* 時間設置區域 */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-3 text-[#4B4036]">上班時間：</label>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs text-[#A68A64] mb-1">開始時間</label>
+                  <input
+                    type="time"
+                    value={selectedScheduleTime.start_time}
+                    onChange={(e) => handleSingleTeacherTimeChange('start_time', e.target.value)}
+                    className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-[#A68A64] mb-1">結束時間</label>
+                  <input
+                    type="time"
+                    value={selectedScheduleTime.end_time}
+                    onChange={(e) => handleSingleTeacherTimeChange('end_time', e.target.value)}
+                    className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 預覽區域 */}
+            <div className="mb-6 p-4 bg-[#FFF9F2] rounded-lg border border-[#EADBC8]">
+              <div className="text-sm font-medium text-[#4B4036] mb-2">預覽安排：</div>
+              <div className="text-sm text-[#4B4036]">
+                • {selectedSingleTeacher.teacher_nickname}：{selectedScheduleDate} {selectedScheduleTime.start_time} - {selectedScheduleTime.end_time}
+              </div>
+            </div>
+
+            {errorMsg && <div className="text-red-500 text-sm mb-4">{errorMsg}</div>}
+
+            {/* 操作按鈕 */}
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-6 py-2 bg-gray-200 rounded-full text-sm text-[#4B4036] hover:bg-gray-300 transition-colors"
+                onClick={() => setShowSingleTeacherSchedule(false)}
+                disabled={loading}
+              >
+                取消
+              </button>
+              <button
+                className="px-6 py-2 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036] hover:bg-[#DDBA90] transition-colors disabled:opacity-50"
+                disabled={loading}
+                onClick={handleSingleTeacherSchedule}
+              >
+                {loading ? '安排中...' : '安排排班'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

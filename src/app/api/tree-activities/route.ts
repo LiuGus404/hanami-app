@@ -18,20 +18,103 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const treeId = searchParams.get('tree_id');
+    const studentId = searchParams.get('student_id'); // 新增：學生ID參數
     const activityType = searchParams.get('activity_type');
     const difficultyLevel = searchParams.get('difficulty_level');
     const isActive = searchParams.get('is_active');
 
+    console.log('tree-activities API received parameters:', { treeId, studentId, activityType, difficultyLevel, isActive });
+
     let query = supabase
       .from('hanami_tree_activities')
-      .select('*')
+      .select(`
+        *,
+        hanami_growth_trees!inner (
+          id,
+          tree_name,
+          tree_description
+        ),
+        hanami_teaching_activities (
+          id,
+          activity_name,
+          activity_description,
+          activity_type,
+          difficulty_level,
+          duration_minutes,
+          materials_needed,
+          instructions
+        )
+      `)
       .order('activity_order', { ascending: true })
       .order('created_at', { ascending: false });
 
-    // 應用篩選器
-    if (treeId) {
+    // 如果提供了學生ID，先獲取學生所在的成長樹
+    if (studentId && !treeId) {
+      console.log('Fetching trees for student:', studentId);
+      
+      // 首先嘗試從 Hanami_Students 表的 assigned_tree_id 獲取
+      const { data: studentData, error: studentError } = await supabase
+        .from('Hanami_Students')
+        .select('assigned_tree_id')
+        .eq('id', studentId)
+        .single();
+
+      if (studentError) {
+        console.error('獲取學生資料失敗:', studentError);
+        return NextResponse.json(
+          { error: '獲取學生資料失敗', details: studentError.message },
+          { status: 500 }
+        );
+      }
+
+      console.log('Student data:', studentData);
+
+      if (studentData && studentData.assigned_tree_id) {
+        // 如果學生有直接分配的成長樹，使用它
+        console.log('Using assigned tree ID:', studentData.assigned_tree_id);
+        query = query.eq('tree_id', studentData.assigned_tree_id);
+      } else {
+        // 如果沒有直接分配的成長樹，嘗試從 hanami_student_trees 表獲取
+        const { data: studentTrees, error: studentTreeError } = await supabase
+          .from('hanami_student_trees')
+          .select('tree_id')
+          .eq('student_id', studentId)
+          .or('status.eq.active,tree_status.eq.active');
+
+        if (studentTreeError) {
+          console.error('獲取學生成長樹失敗:', studentTreeError);
+          return NextResponse.json(
+            { error: '獲取學生成長樹失敗', details: studentTreeError.message },
+            { status: 500 }
+          );
+        }
+
+        console.log('Student trees from hanami_student_trees:', studentTrees);
+
+        if (studentTrees && studentTrees.length > 0) {
+          const treeIds = studentTrees.map(st => st.tree_id);
+          console.log('Filtering activities by tree IDs:', treeIds);
+          query = query.in('tree_id', treeIds);
+        } else {
+          // 如果學生沒有成長樹，返回空結果
+          console.log('No trees found for student, returning empty result');
+          return NextResponse.json({
+            success: true,
+            data: [],
+            count: 0
+          });
+        }
+      }
+    } else if (treeId) {
+      // 如果直接提供了成長樹ID，使用它
+      console.log('Using specific tree ID:', treeId);
       query = query.eq('tree_id', treeId);
+    } else {
+      // 如果沒有提供學生ID也沒有提供成長樹ID，返回所有活動
+      console.log('No studentId or treeId provided, returning all activities');
     }
+
+    // 應用其他篩選器
     if (activityType) {
       query = query.eq('activity_type', activityType);
     }
@@ -52,10 +135,40 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log('Raw data from database:', data);
+
+    // 處理資料，將成長樹資訊映射到活動中
+    const processedData = (data || []).map(activity => {
+      // 根據活動來源處理活動名稱和描述
+      let activityName = '';
+      let activityDescription = '';
+      
+      if (activity.activity_source === 'teaching' && activity.hanami_teaching_activities) {
+        // 教學活動：從 hanami_teaching_activities 表獲取
+        activityName = activity.hanami_teaching_activities.activity_name || '';
+        activityDescription = activity.hanami_teaching_activities.activity_description || '';
+      } else {
+        // 自訂活動：從 hanami_tree_activities 表獲取
+        activityName = activity.custom_activity_name || '';
+        activityDescription = activity.custom_activity_description || '';
+      }
+
+      return {
+        ...activity,
+        activity_name: activityName,
+        activity_description: activityDescription,
+        tree_name: activity.hanami_growth_trees?.tree_name,
+        tree_description: activity.hanami_growth_trees?.tree_description,
+        tree: activity.hanami_growth_trees
+      };
+    });
+
+    console.log('Processed data:', processedData);
+
     return NextResponse.json({
       success: true,
-      data: data || [],
-      count: data?.length || 0
+      data: processedData,
+      count: processedData.length
     });
 
   } catch (error) {

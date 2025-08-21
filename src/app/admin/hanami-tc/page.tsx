@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -44,13 +45,21 @@ export default function HanamiTCPage() {
         <div className="bg-white rounded-2xl p-6 mb-6 border border-[#EADBC8]">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold text-[#2B3A3B]">課堂管理</h1>
-            <button
-              className="flex items-center gap-2 hanami-btn px-4 py-2"
-              onClick={() => setIsAISchedulerOpen(true)}
-            >
-              <img alt="AI" className="w-5 h-5" src="/icons/edit-pencil.png" />
-              <span className="text-base font-bold">AI 安排老師</span>
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                className="flex items-center gap-2 hanami-btn px-4 py-2"
+                onClick={() => setIsAISchedulerOpen(true)}
+              >
+                <img alt="AI" className="w-5 h-5" src="/icons/edit-pencil.png" />
+                <span className="text-base font-bold">AI 安排老師</span>
+              </button>
+              <Link href="/admin/class-activities">
+                <button className="flex items-center gap-2 hanami-btn px-4 py-2">
+                  <img alt="列表" className="w-5 h-5" src="/details.png" />
+                  <span className="text-base font-bold">列表顯示</span>
+                </button>
+              </Link>
+            </div>
           </div>
           <HanamiTC teachers={teachers} />
         </div>

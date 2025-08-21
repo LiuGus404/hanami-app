@@ -307,3 +307,12 @@ export function getCacheStats(): {
     hitRate: 0 // 需要實現命中率追蹤
   };
 } 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
