@@ -26,101 +26,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 獲取本次課堂的活動
-    let currentLessonActivities: any[] = [];
+    // 並行查詢所有活動類型
+    console.log('開始並行查詢學生活動，學生ID:', studentId);
+    
+    const queries = [];
+    
+    // 本次課堂活動查詢
     if (lessonDate && timeslot) {
-      const { data: currentLesson, error: currentLessonError } = await supabase
-        .from('hanami_student_lesson')
-        .select('id')
-        .eq('student_id', studentId)
-        .eq('lesson_date', lessonDate)
-        .eq('actual_timeslot', timeslot)
-        .single();
-
-      if (currentLesson && !currentLessonError) {
-        const { data: activities, error: activitiesError } = await supabase
-          .from('hanami_student_lesson_activities')
+      queries.push(
+        supabase
+          .from('hanami_student_activities')
           .select(`
             id,
             completion_status,
-            performance_rating,
-            student_notes,
-            teacher_notes,
-            time_spent,
-            attempts_count,
-            is_favorite,
             assigned_at,
-            tree_activity_id,
-            hanami_tree_activities (
-              id,
-              custom_activity_name,
-              custom_activity_description,
-              activity_type,
-              difficulty_level,
-              estimated_duration,
-              materials_needed,
-              instructions,
-              learning_objectives,
-              target_abilities,
-              activity_source,
-              activity_id,
-              hanami_teaching_activities (
-                id,
-                activity_name,
-                activity_description,
-                activity_type,
-                difficulty_level,
-                duration_minutes,
-                materials_needed,
-                instructions
-              )
-            )
-          `)
-          .eq('lesson_id', currentLesson.id);
-
-        if (!activitiesError) {
-          currentLessonActivities = activities || [];
-        }
-      }
-    }
-
-    // 獲取上次課堂的活動
-    const { data: previousLesson, error: previousLessonError } = await supabase
-      .from('hanami_student_lesson')
-      .select('id, lesson_date, actual_timeslot')
-      .eq('student_id', studentId)
-      .lt('lesson_date', lessonDate || new Date().toISOString().split('T')[0])
-      .order('lesson_date', { ascending: false })
-      .limit(1)
-      .single();
-
-    let previousLessonActivities: any[] = [];
-    if (previousLesson && !previousLessonError) {
-      const { data: activities, error: activitiesError } = await supabase
-        .from('hanami_student_lesson_activities')
-        .select(`
-          id,
-          completion_status,
-          performance_rating,
-          student_notes,
-          teacher_notes,
-          time_spent,
-          attempts_count,
-          is_favorite,
-          assigned_at,
-          tree_activity_id,
-          hanami_tree_activities (
-            id,
-            custom_activity_name,
-            custom_activity_description,
-            activity_type,
-            difficulty_level,
-            estimated_duration,
-            materials_needed,
-            instructions,
-            learning_objectives,
-            target_abilities,
-            activity_source,
+            time_spent,
+            teacher_notes,
+            student_feedback,
+            progress,
             activity_id,
             hanami_teaching_activities (
               id,
@@ -132,43 +55,65 @@ export async function GET(request: NextRequest) {
               materials_needed,
               instructions
             )
-          )
-        `)
-        .eq('lesson_id', previousLesson.id);
-
-      if (!activitiesError) {
-        previousLessonActivities = activities || [];
-      }
+          `)
+          .eq('student_id', studentId)
+          .eq('activity_type', 'lesson')
+          .eq('lesson_date', lessonDate)
+          .eq('timeslot', timeslot)
+      );
+    } else {
+      queries.push(Promise.resolve({ data: [], error: null }));
     }
-
-    // 獲取正在學習的活動（跨多個課堂的活動）
-    console.log('查詢正在學習的活動，學生ID:', studentId);
-    const { data: ongoingActivities, error: ongoingError } = await supabase
-      .from('hanami_student_tree_activity_progress')
-      .select(`
-        id,
-        completion_status,
-        performance_rating,
-        student_notes,
-        teacher_notes,
-        time_spent,
-        attempts_count,
-        is_favorite,
-        completion_date,
-        created_at,
-        tree_activity_id,
-        hanami_tree_activities (
+    
+    // 上次課堂活動查詢
+    if (lessonDate) {
+      queries.push(
+        supabase
+          .from('hanami_student_activities')
+          .select(`
+            id,
+            completion_status,
+            assigned_at,
+            time_spent,
+            teacher_notes,
+            student_feedback,
+            progress,
+            lesson_date,
+            timeslot,
+            activity_id,
+            hanami_teaching_activities (
+              id,
+              activity_name,
+              activity_description,
+              activity_type,
+              difficulty_level,
+              duration_minutes,
+              materials_needed,
+              instructions
+            )
+          `)
+          .eq('student_id', studentId)
+          .eq('activity_type', 'lesson')
+          .lt('lesson_date', lessonDate)
+          .order('lesson_date', { ascending: false })
+          .limit(5)
+      );
+    } else {
+      queries.push(Promise.resolve({ data: [], error: null }));
+    }
+    
+    // 正在學習的活動查詢
+    queries.push(
+      supabase
+        .from('hanami_student_activities')
+        .select(`
           id,
-          custom_activity_name,
-          custom_activity_description,
-          activity_type,
-          difficulty_level,
-          estimated_duration,
-          materials_needed,
-          instructions,
-          learning_objectives,
-          target_abilities,
-          activity_source,
+          completion_status,
+          assigned_at,
+          time_spent,
+          teacher_notes,
+          student_feedback,
+          progress,
           activity_id,
           hanami_teaching_activities (
             id,
@@ -180,72 +125,48 @@ export async function GET(request: NextRequest) {
             materials_needed,
             instructions
           )
-        )
-      `)
-      .eq('student_id', studentId)
-      .in('completion_status', ['in_progress', 'not_started'])
-      .order('created_at', { ascending: false });
-
-    console.log('正在學習的活動查詢結果:', ongoingActivities, '錯誤:', ongoingError);
-
-    if (ongoingError) {
-      console.error('獲取正在學習的活動失敗:', ongoingError);
-    }
+        `)
+        .eq('student_id', studentId)
+        .eq('activity_type', 'ongoing')
+        .in('completion_status', ['in_progress', 'not_started'])
+        .order('assigned_at', { ascending: false })
+    );
+    
+    // 執行並行查詢
+    const [currentResult, previousResult, ongoingResult] = await Promise.all(queries);
+    
+    const currentLessonActivities = currentResult.data || [];
+    const previousLessonActivities = previousResult.data || [];
+    const ongoingActivities = ongoingResult.data || [];
+    
+    console.log('並行查詢完成:', {
+      current: currentLessonActivities.length,
+      previous: previousLessonActivities.length,
+      ongoing: ongoingActivities.length
+    });
 
     // 處理活動資料，統一格式
     const processActivity = (activity: any) => {
-      const treeActivity = activity.hanami_tree_activities;
-      if (!treeActivity) return null;
-
-      let activityName = '';
-      let activityDescription = '';
-      let activityType = '';
-      let difficultyLevel = 1;
-      let estimatedDuration = 0;
-      let materialsNeeded: string[] = [];
-      let instructions = '';
-      let learningObjectives: string[] = [];
-
-      if (treeActivity.activity_source === 'teaching' && treeActivity.hanami_teaching_activities) {
-        const teachingActivity = treeActivity.hanami_teaching_activities;
-        activityName = teachingActivity.activity_name;
-        activityDescription = teachingActivity.activity_description;
-        activityType = teachingActivity.activity_type;
-        difficultyLevel = teachingActivity.difficulty_level || 1;
-        estimatedDuration = teachingActivity.duration_minutes || 0;
-        materialsNeeded = teachingActivity.materials_needed || [];
-        instructions = teachingActivity.instructions || '';
-      } else {
-        activityName = treeActivity.custom_activity_name;
-        activityDescription = treeActivity.custom_activity_description;
-        activityType = treeActivity.activity_type;
-        difficultyLevel = treeActivity.difficulty_level || 1;
-        estimatedDuration = treeActivity.estimated_duration || 0;
-        materialsNeeded = treeActivity.materials_needed || [];
-        instructions = treeActivity.instructions || '';
-        learningObjectives = treeActivity.learning_objectives || [];
-      }
+      const teachingActivity = activity.hanami_teaching_activities;
+      if (!teachingActivity) return null;
 
       return {
         id: activity.id,
-        treeActivityId: treeActivity.id,
-        activityName,
-        activityDescription,
-        activityType,
-        difficultyLevel,
-        estimatedDuration,
-        materialsNeeded,
-        instructions,
-        learningObjectives,
+        activityName: teachingActivity.activity_name,
+        activityDescription: teachingActivity.activity_description,
+        activityType: teachingActivity.activity_type,
+        difficultyLevel: teachingActivity.difficulty_level || 1,
+        estimatedDuration: teachingActivity.duration_minutes || 0,
+        materialsNeeded: teachingActivity.materials_needed || [],
+        instructions: teachingActivity.instructions || '',
         completionStatus: activity.completion_status,
-        performanceRating: activity.performance_rating,
-        studentNotes: activity.student_notes,
         teacherNotes: activity.teacher_notes,
-        timeSpent: activity.time_spent,
-        attemptsCount: activity.attempts_count,
-        isFavorite: activity.is_favorite,
+        studentFeedback: activity.student_feedback,
+        timeSpent: activity.time_spent || 0,
+        progress: activity.progress || 0,
         assignedAt: activity.assigned_at,
-        createdAt: activity.created_at
+        lessonDate: activity.lesson_date,
+        timeslot: activity.timeslot
       };
     };
 

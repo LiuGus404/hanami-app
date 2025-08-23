@@ -18,37 +18,80 @@ export async function GET(request: NextRequest) {
 
     console.log('Fetching lessons between:', { weekStart, weekEnd });
 
-    // 獲取本週的課程記錄
-    const { data: lessons, error: lessonsError } = await supabase
-      .from('hanami_student_lesson')
-      .select(`
-        id,
-        student_id,
-        lesson_date,
-        actual_timeslot,
-        lesson_duration,
-        lesson_status,
-        lesson_teacher,
-        lesson_activities,
-        progress_notes,
-        next_target,
-        notes,
-        remarks,
-        full_name,
-        Hanami_Students (
+    // 並行查詢正式學生和試聽學生課程記錄
+    console.log('開始並行查詢課程記錄...');
+    
+    const [lessonsResult, trialLessonsResult] = await Promise.all([
+      // 查詢正式學生課程
+      supabase
+        .from('hanami_student_lesson')
+        .select(`
+          id,
+          student_id,
+          lesson_date,
+          actual_timeslot,
+          lesson_duration,
+          lesson_status,
+          lesson_teacher,
+          full_name,
+          course_type,
+          Hanami_Students!hanami_student_lesson_student_id_fkey (
+            id,
+            full_name,
+            nick_name,
+            student_age,
+            gender,
+            course_type,
+            student_teacher
+          )
+        `)
+        .gte('lesson_date', weekStart)
+        .lte('lesson_date', weekEnd)
+        .order('lesson_date', { ascending: true })
+        .order('actual_timeslot', { ascending: true }),
+      
+      // 查詢試聽學生課程
+      supabase
+        .from('hanami_trial_students')
+        .select(`
           id,
           full_name,
           nick_name,
           student_age,
           gender,
           course_type,
-          student_teacher
-        )
-      `)
-      .gte('lesson_date', weekStart)
-      .lte('lesson_date', weekEnd)
-      .order('lesson_date', { ascending: true })
-      .order('actual_timeslot', { ascending: true });
+          lesson_date,
+          actual_timeslot,
+          lesson_duration,
+          trial_status
+        `)
+        .not('lesson_date', 'is', null)
+        .gte('lesson_date', weekStart)
+        .lte('lesson_date', weekEnd)
+        .order('lesson_date', { ascending: true })
+        .order('actual_timeslot', { ascending: true })
+    ]);
+
+    let lessons: any[] = [];
+    let trialLessons: any[] = [];
+    let lessonsError: any = null;
+    let trialLessonsError: any = null;
+
+    if (lessonsResult.error) {
+      console.error('獲取課程記錄失敗:', lessonsResult.error);
+      lessonsError = lessonsResult.error;
+    } else {
+      lessons = lessonsResult.data || [];
+      console.log(`成功獲取 ${lessons.length} 條正式學生課程記錄`);
+    }
+
+    if (trialLessonsResult.error) {
+      console.error('獲取試聽學生記錄失敗:', trialLessonsResult.error);
+      trialLessonsError = trialLessonsResult.error;
+    } else {
+      trialLessons = trialLessonsResult.data || [];
+      console.log(`成功獲取 ${trialLessons.length} 條試聽學生記錄`);
+    }
 
     if (lessonsError) {
       console.error('獲取課程記錄失敗:', lessonsError);
@@ -58,76 +101,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Fetched lessons:', lessons);
+    // 暫時跳過成長樹活動查詢，改為延遲載入
+    let treeActivities: any[] = [];
+    console.log('跳過成長樹活動查詢，將在需要時延遲載入');
 
-    // 獲取所有成長樹活動
-    const { data: treeActivities, error: activitiesError } = await (supabase as any)
-      .from('hanami_tree_activities')
-      .select(`
-        id,
-        tree_id,
-        activity_id,
-        activity_source,
-        custom_activity_name,
-        custom_activity_description,
-        activity_type,
-        difficulty_level,
-        estimated_duration,
-        materials_needed,
-        instructions,
-        learning_objectives,
-        target_abilities,
-        prerequisites,
-        priority_order,
-        activity_order,
-        is_required,
-        is_active,
-        hanami_teaching_activities (
-          id,
-          activity_name,
-          activity_description,
-          activity_type,
-          difficulty_level,
-          duration_minutes,
-          materials_needed,
-          instructions,
-          custom_fields,
-          template_id,
-          status,
-          tags,
-          category,
-          created_at
-        ),
-        hanami_growth_trees (
-          id,
-          tree_name,
-          tree_description,
-          tree_icon,
-          course_type_id,
-          tree_level
-        )
-      `)
-      .eq('is_active', true)
-      .order('priority_order', { ascending: true })
-      .order('activity_order', { ascending: true });
-
-    if (activitiesError) {
-      console.error('獲取成長樹活動失敗:', activitiesError);
-      return NextResponse.json(
-        { error: '獲取成長樹活動失敗', details: activitiesError.message },
-        { status: 500 }
-      );
-    }
-
-    console.log('Fetched tree activities:', treeActivities);
-
-    // 暫時返回空的已分配活動列表，直到表創建完成
+    // 暫時返回空的已分配活動列表
     const assignedActivities: any[] = [];
+
+    console.log('API 響應準備完成:', {
+      lessonsCount: lessons.length,
+      trialLessonsCount: trialLessons.length,
+      treeActivitiesCount: treeActivities.length,
+      assignedActivitiesCount: assignedActivities.length
+    });
+
+    // 檢查是否有試聽學生資料
+    if (trialLessons.length === 0) {
+      console.log('警告：沒有找到試聽學生資料');
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         lessons: lessons || [],
+        trialLessons: trialLessons || [],
         treeActivities: treeActivities || [],
         assignedActivities
       }
@@ -136,7 +133,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('獲取課堂活動資料失敗:', error);
     return NextResponse.json(
-      { error: '獲取課堂活動資料失敗' },
+      { error: '獲取課堂活動資料失敗', details: error instanceof Error ? error.message : '未知錯誤' },
       { status: 500 }
     );
   }

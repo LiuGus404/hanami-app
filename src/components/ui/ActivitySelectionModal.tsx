@@ -60,8 +60,6 @@ const ActivitySelectionModal: React.FC<ActivitySelectionModalProps> = ({
   const [activities, setActivities] = useState<TreeActivity[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTree, setSelectedTree] = useState<string>(''); // 新增：選中的成長樹
-  const [trees, setTrees] = useState<any[]>([]); // 新增：成長樹列表
   const [tempSelected, setTempSelected] = useState<TreeActivity[]>([]);
   const tempSelectedRef = useRef<TreeActivity[]>([]);
   const initializedRef = useRef(false);
@@ -90,22 +88,29 @@ const ActivitySelectionModal: React.FC<ActivitySelectionModalProps> = ({
         try {
           const params = new URLSearchParams();
           params.append('is_active', 'true');
-          
-          // 如果選擇了特定的成長樹，優先使用它
-          if (selectedTree) {
-            params.append('tree_id', selectedTree);
-          } else if (studentId) {
-            // 如果沒有選擇成長樹但有學生ID，使用學生ID
-            params.append('student_id', studentId);
-          }
 
           console.log('Fetching activities with params:', params.toString());
-          const response = await fetch(`/api/tree-activities?${params.toString()}`);
+          const response = await fetch(`/api/teaching-activities?${params.toString()}`);
           if (response.ok) {
             const result = await response.json();
             if (result.success) {
-              setActivities(result.data || []);
-              console.log('Fetched activities:', result.data);
+              // 轉換數據格式以匹配 TreeActivity 接口
+              const convertedActivities = result.data.map((activity: any) => ({
+                id: activity.id,
+                activity_name: activity.activity_name,
+                activity_description: activity.activity_description,
+                activity_type: activity.activity_type,
+                difficulty_level: activity.difficulty_level || 1,
+                estimated_duration: activity.duration_minutes,
+                materials_needed: activity.materials_needed || [],
+                instructions: activity.instructions || '',
+                learning_objectives: [],
+                tree_id: '', // 教學活動沒有 tree_id
+                tree_name: '',
+                is_active: activity.is_active || true
+              }));
+              setActivities(convertedActivities);
+              console.log('Fetched activities:', convertedActivities);
             }
           }
         } catch (error) {
@@ -117,31 +122,9 @@ const ActivitySelectionModal: React.FC<ActivitySelectionModalProps> = ({
       };
       updateActivities();
     }
-  }, [open, selectedTree, studentId]); // 篩選條件變化時重新獲取
+  }, [open]); // 只在打開時獲取
 
-  // 載入成長樹列表
-  useEffect(() => {
-    if (open) {
-      const loadTrees = async () => {
-        try {
-          const params = new URLSearchParams();
-          if (studentId) params.append('student_id', studentId);
-          
-          const response = await fetch(`/api/growth-trees?${params.toString()}`);
-          if (response.ok) {
-            const result = await response.json();
-            if (result.success) {
-              setTrees(result.data || []);
-            }
-          }
-        } catch (error) {
-          console.error('獲取成長樹失敗:', error);
-          setTrees([]);
-        }
-      };
-      loadTrees();
-    }
-  }, [open, studentId]);
+  // 移除成長樹載入邏輯，因為我們直接使用教學活動
 
   const handleFilter = useCallback(() => {
     // 篩選條件變化時會自動重新獲取，這裡不需要做任何事情
@@ -153,10 +136,7 @@ const ActivitySelectionModal: React.FC<ActivitySelectionModalProps> = ({
     onClose();
   }, [onClose]);
 
-  const handleTreeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTree(e.target.value);
-    // 移除自動重新載入
-  }, []);
+  // 移除成長樹選擇邏輯
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -219,25 +199,7 @@ const ActivitySelectionModal: React.FC<ActivitySelectionModalProps> = ({
             />
           </div>
           
-          <select
-            value={selectedTree}
-            onChange={handleTreeChange}
-            className="w-full px-4 py-2 border border-[#EADBC8] rounded-lg bg-[#FFFDF8] text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] transition-all hover:border-[#DDBA90] placeholder-[#8B7D6B] appearance-none cursor-pointer"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%234B4036' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-              backgroundPosition: 'right 0.5rem center',
-              backgroundRepeat: 'no-repeat',
-              backgroundSize: '1.5em 1.5em',
-              paddingRight: '2.5rem'
-            }}
-          >
-            <option value="" className="bg-[#FFFDF8] text-[#4B4036] hover:bg-[#FFF3E0]">所有成長樹</option>
-            {trees.map((tree) => (
-              <option key={tree.id} value={tree.id} className="bg-[#FFFDF8] text-[#4B4036] hover:bg-[#FFF3E0]">
-                {tree.tree_name}
-              </option>
-            ))}
-          </select>
+          {/* 移除成長樹選擇器 */}
           
           <button
             onClick={handleFilter}

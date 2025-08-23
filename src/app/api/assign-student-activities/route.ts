@@ -33,46 +33,55 @@ export async function POST(request: NextRequest) {
 
     // 根據分配類型決定處理方式
     if (assignmentType === 'current_lesson') {
-      // 本次課堂活動：需要找到對應的課堂記錄
-      const { data: lessonData, error: lessonError } = await supabase
-        .from('hanami_student_lesson')
+      // 本次課堂活動：直接插入到 hanami_student_activities 表
+      console.log('分配本次課堂活動，參數:', { studentId, activityIds, lessonDate, timeslot });
+      
+      // 先檢查活動是否存在
+      const { data: existingActivities, error: checkError } = await supabase
+        .from('hanami_teaching_activities')
         .select('id')
-        .eq('student_id', studentId)
-        .eq('lesson_date', lessonDate)
-        .eq('regular_timeslot', timeslot)
-        .single();
+        .in('id', activityIds);
 
-      if (lessonError || !lessonData) {
-        console.error('找不到課堂記錄:', lessonError);
+      if (checkError) {
+        console.error('檢查活動存在性失敗:', checkError);
         return NextResponse.json(
-          { error: '找不到對應的課堂記錄' },
-          { status: 404 }
+          { error: '檢查活動存在性失敗', details: checkError.message },
+          { status: 500 }
         );
       }
 
-      const lessonId = lessonData.id;
+      if (!existingActivities || existingActivities.length !== activityIds.length) {
+        const existingIds = existingActivities?.map(a => a.id) || [];
+        const missingIds = activityIds.filter(id => !existingIds.includes(id));
+        console.error('部分活動不存在:', { missingIds, existingIds, requestedIds: activityIds });
+        return NextResponse.json(
+          { error: '部分活動不存在', details: `找不到活動ID: ${missingIds.join(', ')}` },
+          { status: 400 }
+        );
+      }
 
-      // 準備要插入的活動分配記錄
       const activityAssignments = activityIds.map((activityId: string) => ({
-        lesson_id: lessonId,
         student_id: studentId,
-        tree_activity_id: activityId,
-        assigned_by: 'system', // 可以改為實際的用戶ID
+        activity_id: activityId,
+        activity_type: 'lesson',
+        lesson_date: lessonDate,
+        timeslot: timeslot,
         completion_status: 'not_started',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        assigned_at: new Date().toISOString()
       }));
 
-      // 批量插入活動分配記錄
+      console.log('準備插入的本次課堂活動:', activityAssignments);
+
+      // 使用 hanami_student_activities 表
       const { data: insertedData, error: insertError } = await supabase
-        .from('hanami_student_lesson_activities')
+        .from('hanami_student_activities')
         .insert(activityAssignments)
         .select();
 
       if (insertError) {
-        console.error('插入活動分配記錄失敗:', insertError);
+        console.error('插入本次課堂活動失敗:', insertError);
         return NextResponse.json(
-          { error: '分配活動失敗' },
+          { error: '分配本次課堂活動失敗', details: insertError.message },
           { status: 500 }
         );
       }
@@ -89,33 +98,51 @@ export async function POST(request: NextRequest) {
       });
 
     } else if (assignmentType === 'ongoing') {
-      // 正在學習的活動：直接更新學生的長期活動進度
+      // 正在學習的活動：插入到 hanami_student_activities 表
       console.log('分配長期活動，參數:', { studentId, activityIds });
       
+      // 先檢查活動是否存在
+      const { data: existingActivities, error: checkError } = await supabase
+        .from('hanami_teaching_activities')
+        .select('id')
+        .in('id', activityIds);
+
+      if (checkError) {
+        console.error('檢查活動存在性失敗:', checkError);
+        return NextResponse.json(
+          { error: '檢查活動存在性失敗', details: checkError.message },
+          { status: 500 }
+        );
+      }
+
+      if (!existingActivities || existingActivities.length !== activityIds.length) {
+        const existingIds = existingActivities?.map(a => a.id) || [];
+        const missingIds = activityIds.filter(id => !existingIds.includes(id));
+        console.error('部分活動不存在:', { missingIds, existingIds, requestedIds: activityIds });
+        return NextResponse.json(
+          { error: '部分活動不存在', details: `找不到活動ID: ${missingIds.join(', ')}` },
+          { status: 400 }
+        );
+      }
+
       const activityAssignments = activityIds.map((activityId: string) => ({
         student_id: studentId,
-        tree_activity_id: activityId,
-        completion_status: 'in_progress',
-        attempts_count: 0,
-        is_favorite: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        activity_id: activityId,
+        activity_type: 'ongoing',
+        completion_status: 'not_started',
+        assigned_at: new Date().toISOString()
       }));
 
-      console.log('準備插入的活動分配:', activityAssignments);
+      console.log('準備插入的長期活動:', activityAssignments);
 
-      // 使用 hanami_student_tree_activity_progress 表
-      console.log('開始執行 upsert 操作...');
-      
+      // 使用 hanami_student_activities 表
       const { data: insertedData, error: insertError } = await supabase
-        .from('hanami_student_tree_activity_progress')
-        .upsert(activityAssignments, { 
-          onConflict: 'student_id,tree_activity_id'
-        })
+        .from('hanami_student_activities')
+        .insert(activityAssignments)
         .select();
 
       if (insertError) {
-        console.error('插入長期活動進度記錄失敗:', insertError);
+        console.error('插入長期活動失敗:', insertError);
         console.error('錯誤詳情:', {
           message: insertError.message,
           details: insertError.details,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { 
   TreeActivity, 
   CreateTreeActivityRequest, 
@@ -8,173 +8,53 @@ import {
   DIFFICULTY_LEVELS 
 } from '@/types/progress';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-// GET: 獲取成長樹活動列表
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const treeId = searchParams.get('tree_id');
-    const studentId = searchParams.get('student_id'); // 新增：學生ID參數
-    const activityType = searchParams.get('activity_type');
-    const difficultyLevel = searchParams.get('difficulty_level');
-    const isActive = searchParams.get('is_active');
-
-    console.log('tree-activities API received parameters:', { treeId, studentId, activityType, difficultyLevel, isActive });
-
-    let query = supabase
-      .from('hanami_tree_activities')
+    console.log('開始查詢 hanami_tree_activities 表...');
+    
+    const { data: activitiesData, error: activitiesQueryError } = await supabase
+      .from('hanami_tree_activities' as any)
       .select(`
-        *,
-        hanami_growth_trees!inner (
-          id,
-          tree_name,
-          tree_description
-        ),
-        hanami_teaching_activities (
-          id,
-          activity_name,
-          activity_description,
-          activity_type,
-          difficulty_level,
-          duration_minutes,
-          materials_needed,
-          instructions
-        )
+        id,
+        tree_id,
+        activity_id,
+        activity_source,
+        custom_activity_name,
+        custom_activity_description,
+        activity_type,
+        difficulty_level,
+        estimated_duration,
+        priority_order,
+        activity_order,
+        is_required,
+        is_active
       `)
-      .order('activity_order', { ascending: true })
-      .order('created_at', { ascending: false });
+      .eq('is_active', true)
+      .order('priority_order', { ascending: true })
+      .order('activity_order', { ascending: true });
 
-    // 如果提供了學生ID，先獲取學生所在的成長樹
-    if (studentId && !treeId) {
-      console.log('Fetching trees for student:', studentId);
-      
-      // 首先嘗試從 Hanami_Students 表的 assigned_tree_id 獲取
-      const { data: studentData, error: studentError } = await supabase
-        .from('Hanami_Students')
-        .select('assigned_tree_id')
-        .eq('id', studentId)
-        .single();
+    console.log('查詢結果:', { data: activitiesData?.length, error: activitiesQueryError });
 
-      if (studentError) {
-        console.error('獲取學生資料失敗:', studentError);
-        return NextResponse.json(
-          { error: '獲取學生資料失敗', details: studentError.message },
-          { status: 500 }
-        );
-      }
-
-      console.log('Student data:', studentData);
-
-      if (studentData && studentData.assigned_tree_id) {
-        // 如果學生有直接分配的成長樹，使用它
-        console.log('Using assigned tree ID:', studentData.assigned_tree_id);
-        query = query.eq('tree_id', studentData.assigned_tree_id);
-      } else {
-        // 如果沒有直接分配的成長樹，嘗試從 hanami_student_trees 表獲取
-        const { data: studentTrees, error: studentTreeError } = await supabase
-          .from('hanami_student_trees')
-          .select('tree_id')
-          .eq('student_id', studentId)
-          .or('status.eq.active,tree_status.eq.active');
-
-        if (studentTreeError) {
-          console.error('獲取學生成長樹失敗:', studentTreeError);
-          return NextResponse.json(
-            { error: '獲取學生成長樹失敗', details: studentTreeError.message },
-            { status: 500 }
-          );
-        }
-
-        console.log('Student trees from hanami_student_trees:', studentTrees);
-
-        if (studentTrees && studentTrees.length > 0) {
-          const treeIds = studentTrees.map(st => st.tree_id);
-          console.log('Filtering activities by tree IDs:', treeIds);
-          query = query.in('tree_id', treeIds);
-        } else {
-          // 如果學生沒有成長樹，返回空結果
-          console.log('No trees found for student, returning empty result');
-          return NextResponse.json({
-            success: true,
-            data: [],
-            count: 0
-          });
-        }
-      }
-    } else if (treeId) {
-      // 如果直接提供了成長樹ID，使用它
-      console.log('Using specific tree ID:', treeId);
-      query = query.eq('tree_id', treeId);
-    } else {
-      // 如果沒有提供學生ID也沒有提供成長樹ID，返回所有活動
-      console.log('No studentId or treeId provided, returning all activities');
-    }
-
-    // 應用其他篩選器
-    if (activityType) {
-      query = query.eq('activity_type', activityType);
-    }
-    if (difficultyLevel) {
-      query = query.eq('difficulty_level', parseInt(difficultyLevel));
-    }
-    if (isActive !== null) {
-      query = query.eq('is_active', isActive === 'true');
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('獲取成長樹活動失敗:', error);
+    if (activitiesQueryError) {
+      console.error('獲取成長樹活動失敗:', activitiesQueryError);
       return NextResponse.json(
-        { error: '獲取成長樹活動失敗', details: error.message },
+        { error: '獲取成長樹活動失敗', details: activitiesQueryError.message },
         { status: 500 }
       );
     }
 
-    console.log('Raw data from database:', data);
-
-    // 處理資料，將成長樹資訊映射到活動中
-    const processedData = (data || []).map(activity => {
-      // 根據活動來源處理活動名稱和描述
-      let activityName = '';
-      let activityDescription = '';
-      
-      if (activity.activity_source === 'teaching' && activity.hanami_teaching_activities) {
-        // 教學活動：從 hanami_teaching_activities 表獲取
-        activityName = activity.hanami_teaching_activities.activity_name || '';
-        activityDescription = activity.hanami_teaching_activities.activity_description || '';
-      } else {
-        // 自訂活動：從 hanami_tree_activities 表獲取
-        activityName = activity.custom_activity_name || '';
-        activityDescription = activity.custom_activity_description || '';
-      }
-
-      return {
-        ...activity,
-        activity_name: activityName,
-        activity_description: activityDescription,
-        tree_name: activity.hanami_growth_trees?.tree_name,
-        tree_description: activity.hanami_growth_trees?.tree_description,
-        tree: activity.hanami_growth_trees
-      };
-    });
-
-    console.log('Processed data:', processedData);
+    const treeActivities = activitiesData || [];
+    console.log(`成功獲取 ${treeActivities.length} 條成長樹活動`);
 
     return NextResponse.json({
       success: true,
-      data: processedData,
-      count: processedData.length
+      data: treeActivities
     });
 
   } catch (error) {
-    console.error('獲取成長樹活動時發生錯誤:', error);
+    console.error('獲取成長樹活動失敗:', error);
     return NextResponse.json(
-      { error: '獲取成長樹活動時發生錯誤' },
+      { error: '獲取成長樹活動失敗', details: error instanceof Error ? error.message : '未知錯誤' },
       { status: 500 }
     );
   }
@@ -269,7 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('hanami_tree_activities')
+      .from('hanami_tree_activities' as any)
       .insert(activityData)
       .select()
       .single();
@@ -321,7 +201,7 @@ export async function PUT(request: NextRequest) {
       }
 
       const { data, error } = await supabase
-        .from('hanami_tree_activities')
+        .from('hanami_tree_activities' as any)
         .update({
           ...updates,
           updated_at: new Date().toISOString()
@@ -371,7 +251,7 @@ export async function DELETE(request: NextRequest) {
 
     // 檢查活動是否存在
     const { data: activityExists, error: checkError } = await supabase
-      .from('hanami_tree_activities')
+      .from('hanami_tree_activities' as any)
       .select('id, activity_source, activity_id, custom_activity_name')
       .eq('id', id)
       .single();
@@ -387,15 +267,15 @@ export async function DELETE(request: NextRequest) {
 
     // 獲取活動名稱用於回應
     let activityName = '未命名活動';
-    if (activityExists.activity_source === 'custom') {
-      activityName = activityExists.custom_activity_name || '自訂活動';
-    } else if (activityExists.activity_source === 'teaching') {
+    if ((activityExists as any).activity_source === 'custom') {
+      activityName = (activityExists as any).custom_activity_name || '自訂活動';
+    } else if ((activityExists as any).activity_source === 'teaching') {
       // 如果是教學活動，嘗試獲取教學活動名稱
-      if (activityExists.activity_id) {
+      if ((activityExists as any).activity_id) {
         const { data: teachingActivity } = await supabase
           .from('hanami_teaching_activities')
           .select('activity_name')
-          .eq('id', activityExists.activity_id)
+          .eq('id', (activityExists as any).activity_id)
           .single();
         activityName = teachingActivity?.activity_name || '教學活動';
       } else {
@@ -405,7 +285,7 @@ export async function DELETE(request: NextRequest) {
 
     // 真正刪除活動
     const { error } = await supabase
-      .from('hanami_tree_activities')
+      .from('hanami_tree_activities' as any)
       .delete()
       .eq('id', id);
 

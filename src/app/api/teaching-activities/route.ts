@@ -2,25 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { supabase } from '@/lib/supabase';
 
-// 獲取所有教學活動
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabase
+    // 查詢所有教學活動
+    const { data: activities, error } = await supabase
       .from('hanami_teaching_activities')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, activity_name, activity_description, activity_type, difficulty_level')
+      .order('activity_name');
 
     if (error) {
-      console.error('獲取教學活動失敗:', error);
-      throw error;
+      console.error('查詢教學活動失敗:', error);
+      return NextResponse.json(
+        { success: false, error: '查詢教學活動失敗' },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({
+      success: true,
+      data: activities || []
+    });
+
   } catch (error) {
     console.error('獲取教學活動失敗:', error);
     return NextResponse.json(
-      { error: '獲取教學活動失敗' },
-      { status: 500 },
+      { success: false, error: '獲取教學活動失敗' },
+      { status: 500 }
     );
   }
 }

@@ -50,6 +50,8 @@ export { default as StudentMediaModal } from './StudentMediaModal';
 export { PlanUpgradeModal } from './PlanUpgradeModal';
 export { MediaQuotaSettingsModal } from './MediaQuotaSettingsModal';
 export { default as GrowthTreeActivitiesPanel } from './GrowthTreeActivitiesPanel';
+export { default as StudentActivitiesPanel } from './StudentActivitiesPanel';
+export { default as ActivitySelectionModal } from './ActivitySelectionModal';
 export { PerformanceMonitor } from './PerformanceMonitor';
 
 // 類型定義

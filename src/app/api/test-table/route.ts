@@ -1,50 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const table = searchParams.get('table');
+    const tableName = searchParams.get('table');
 
-    if (!table) {
-      return NextResponse.json({
-        error: '缺少表名參數'
-      }, { status: 400 });
+    if (!tableName) {
+      return NextResponse.json(
+        { error: '請提供表名' },
+        { status: 400 }
+      );
     }
 
-    // 嘗試獲取表的基本信息
+    console.log(`Testing table: ${tableName}`);
+
+    // 嘗試查詢表是否存在
     const { data, error } = await supabase
-      .from(table)
+      .from(tableName as any)
       .select('*')
       .limit(1);
 
     if (error) {
-      console.error(`查詢 ${table} 表錯誤:`, error);
+      console.error(`Table ${tableName} error:`, error);
       return NextResponse.json({
-        error: `查詢失敗: ${error.message}`,
+        exists: false,
+        error: error.message,
         code: error.code,
         details: error.details,
         hint: error.hint
-      }, { status: 500 });
+      });
+    }
+
+    // 獲取表的記錄數
+    const { count, error: countError } = await supabase
+      .from(tableName as any)
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      console.error(`Count error for ${tableName}:`, countError);
     }
 
     return NextResponse.json({
-      success: true,
-      table: table,
-      data: data,
-      count: data?.length || 0,
-      message: '表查詢成功'
+      exists: true,
+      recordCount: count || 0,
+      sampleData: data,
+      message: `表 ${tableName} 存在且可查詢`
     });
 
-  } catch (error: any) {
-    console.error('測試API錯誤:', error);
-    return NextResponse.json({
-      error: error.message || '查詢時發生錯誤'
-    }, { status: 500 });
+  } catch (error) {
+    console.error('Test table error:', error);
+    return NextResponse.json(
+      { error: '測試表時發生錯誤', details: error },
+      { status: 500 }
+    );
   }
 } 

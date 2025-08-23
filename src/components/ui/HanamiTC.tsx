@@ -297,7 +297,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
 
   const fetchTodayTeachers = async (date: Date) => {
     const supabase = getSupabaseClient();
-    const dateStr = date.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    const dateStr = getDateString(date); // 使用本地日期字符串，避免時區問題
     const { data, error } = await supabase
       .from('teacher_schedule')
       .select(`
@@ -326,7 +326,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     const dateRef = useRef<string>('');
 
     useEffect(() => {
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = getDateString(date); // 使用本地日期字符串，避免時區問題
       // 如果日期沒有變化，不重新載入
       if (dateRef.current === dateString) return;
       dateRef.current = dateString;
@@ -338,7 +338,7 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
         setLoading(false);
       };
       loadTeachers();
-    }, [date.toISOString().split('T')[0]]); // 只監聽日期字符串，不是整個 date 對象
+    }, [getDateString(date)]); // 使用本地日期字符串，避免時區問題
 
     if (loading) {
       return <div className="text-xs text-[#A68A64] mt-1">載入中...</div>;

@@ -9,13 +9,16 @@ import {
   UserIcon,
   CalendarIcon,
   BookOpenIcon,
-  PlusIcon
+  PlusIcon,
+  TrashIcon,
+  PencilIcon
 } from '@heroicons/react/24/outline';
 import ActivitySelectionModal from './ActivitySelectionModal';
+import StudentTreeAssignmentModal from './StudentTreeAssignmentModal';
 
 interface StudentActivity {
   id: string;
-  treeActivityId: string;
+  treeActivityId?: string;
   activityName: string;
   activityDescription: string;
   activityType: string;
@@ -23,7 +26,7 @@ interface StudentActivity {
   estimatedDuration: number;
   materialsNeeded: string[];
   instructions: string;
-  learningObjectives: string[];
+  learningObjectives?: string[];
   completionStatus: string;
   performanceRating?: number;
   studentNotes?: string;
@@ -31,8 +34,12 @@ interface StudentActivity {
   timeSpent?: number;
   attemptsCount?: number;
   isFavorite?: boolean;
+  progress?: number;
+  tempProgress?: number; // 臨時進度值
   assignedAt?: string;
   createdAt?: string;
+  lessonDate?: string;
+  timeslot?: string;
 }
 
 interface TreeActivity {
@@ -71,10 +78,18 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
     ongoingActivities: []
   });
   const [loading, setLoading] = useState(true);
+  const [loadingText, setLoadingText] = useState('載入學生活動中...');
   const [error, setError] = useState<string | null>(null);
   const [studentInfo, setStudentInfo] = useState<any>(null);
   const [showActivitySelectionModal, setShowActivitySelectionModal] = useState(false);
   const [currentActivityType, setCurrentActivityType] = useState<'current' | 'ongoing'>('current');
+  
+  // 成長樹相關狀態
+  const [hasGrowthTree, setHasGrowthTree] = useState<boolean | null>(null);
+  const [showTreeAssignmentModal, setShowTreeAssignmentModal] = useState(false);
+  const [studentGrowthTrees, setStudentGrowthTrees] = useState<any[]>([]);
+  const [activityStatusFilter, setActivityStatusFilter] = useState<'all' | 'completed' | 'not_completed'>('not_completed');
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
 
   const fetchStudentInfo = useCallback(async () => {
     try {
@@ -90,9 +105,35 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
     }
   }, [studentId]); // 恢復 studentId 依賴項
 
+  // 檢查學生是否有成長樹
+  const checkStudentGrowthTree = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/student-growth-trees?studentId=${studentId}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          const trees = result.data || [];
+          setStudentGrowthTrees(trees);
+          setHasGrowthTree(trees.length > 0);
+        }
+      }
+    } catch (err) {
+      console.error('檢查學生成長樹失敗:', err);
+      setHasGrowthTree(false);
+      setStudentGrowthTrees([]);
+    }
+  }, [studentId]);
+
+
+
   const fetchStudentActivities = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
+      setLoadingText('載入學生活動中...');
+      
+      console.log('開始載入學生活動:', { studentId, lessonDate, timeslot });
+      
       const response = await fetch(
         `/api/student-activities?studentId=${studentId}&lessonDate=${lessonDate}&timeslot=${timeslot}`
       );
@@ -103,16 +144,18 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
 
       const result = await response.json();
       if (result.success) {
+        console.log('學生活動載入成功:', result.data);
         setActivities(result.data);
       } else {
         throw new Error(result.error || '獲取學生活動失敗');
       }
     } catch (err) {
+      console.error('載入學生活動失敗:', err);
       setError(err instanceof Error ? err.message : '獲取學生活動失敗');
     } finally {
       setLoading(false);
     }
-  }, [studentId, lessonDate, timeslot]); // 恢復所有依賴項
+  }, [studentId, lessonDate, timeslot]);
 
   const handleActivitySelect = useCallback(async (selectedActivities: TreeActivity[]) => {
     try {
@@ -198,12 +241,343 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
     setShowActivitySelectionModal(true);
   }, []);
 
+  // 處理分配成長樹
+  const handleAssignGrowthTree = useCallback(() => {
+    setShowTreeAssignmentModal(true);
+  }, []);
+
+  // 處理成長樹分配成功
+  const handleGrowthTreeAssigned = useCallback(async () => {
+    try {
+      // 重新檢查學生成長樹狀態
+      await checkStudentGrowthTree();
+      setShowTreeAssignmentModal(false);
+    } catch (error) {
+      console.error('處理成長樹分配失敗:', error);
+    }
+  }, [checkStudentGrowthTree]);
+
+  // 移除學生成長樹
+  const handleRemoveGrowthTree = useCallback(async (treeId: string) => {
+    if (!confirm('確定要移除這個成長樹嗎？這將清除所有相關的活動分配。')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/remove-student-growth-trees', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          studentId, 
+          treeId 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('移除成長樹失敗');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        alert('成長樹移除成功！');
+        await checkStudentGrowthTree();
+        // 重新載入學生活動
+        await fetchStudentActivities();
+      } else {
+        throw new Error(result.error || '移除成長樹失敗');
+      }
+    } catch (error) {
+      console.error('移除成長樹失敗:', error);
+      alert(`移除成長樹失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    }
+  }, [studentId, checkStudentGrowthTree, fetchStudentActivities]);
+
+  // 移除單個學生活動
+  const handleRemoveSingleActivity = useCallback(async (activityId: string) => {
+    if (!confirm('確定要移除這個活動嗎？')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/remove-single-student-activity', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          activityId 
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || '移除活動失敗');
+      }
+
+      if (result.success) {
+        alert('活動移除成功！');
+        // 重新載入學生活動
+        await fetchStudentActivities();
+      } else {
+        throw new Error(result.error || '移除活動失敗');
+      }
+    } catch (error) {
+      console.error('移除活動失敗:', error);
+      alert(`移除活動失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    }
+  }, [fetchStudentActivities]);
+
+  // 更新活動完成狀態
+  const handleUpdateActivityStatus = useCallback(async (activityId: string, newStatus: string) => {
+    try {
+      const response = await fetch('/api/update-activity-status', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          activityId,
+          status: newStatus
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || '更新活動狀態失敗');
+      }
+
+      if (result.success) {
+        // 重新載入學生活動
+        await fetchStudentActivities();
+      } else {
+        throw new Error(result.error || '更新活動狀態失敗');
+      }
+    } catch (error) {
+      console.error('更新活動狀態失敗:', error);
+      alert(`更新活動狀態失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    }
+  }, [fetchStudentActivities]);
+
+  // 處理進度條變更（臨時）
+  const handleProgressChange = useCallback((activityId: string, progress: number) => {
+    setActivities(prev => ({
+      ...prev,
+      currentLessonActivities: prev.currentLessonActivities.map(activity => 
+        activity.id === activityId ? { ...activity, tempProgress: progress } : activity
+      ),
+      previousLessonActivities: prev.previousLessonActivities.map(activity => 
+        activity.id === activityId ? { ...activity, tempProgress: progress } : activity
+      ),
+      ongoingActivities: prev.ongoingActivities.map(activity => 
+        activity.id === activityId ? { ...activity, tempProgress: progress } : activity
+      )
+    }));
+  }, []);
+
+  // 儲存活動進度
+  const handleSaveActivityProgress = useCallback(async (activityId: string, progress: number) => {
+    try {
+      const response = await fetch('/api/update-activity-progress', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          activityId,
+          progress
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || '儲存活動進度失敗');
+      }
+
+      if (result.success) {
+        // 立即更新前端狀態，包括進度和完成狀態
+        const newCompletionStatus = progress === 100 ? 'completed' : progress > 0 ? 'in_progress' : 'not_started';
+        
+        setActivities(prev => ({
+          ...prev,
+          currentLessonActivities: prev.currentLessonActivities.map(activity => 
+            activity.id === activityId ? { 
+              ...activity, 
+              tempProgress: undefined,
+              progress: progress,
+              completionStatus: newCompletionStatus
+            } : activity
+          ),
+          previousLessonActivities: prev.previousLessonActivities.map(activity => 
+            activity.id === activityId ? { 
+              ...activity, 
+              tempProgress: undefined,
+              progress: progress,
+              completionStatus: newCompletionStatus
+            } : activity
+          ),
+          ongoingActivities: prev.ongoingActivities.map(activity => 
+            activity.id === activityId ? { 
+              ...activity, 
+              tempProgress: undefined,
+              progress: progress,
+              completionStatus: newCompletionStatus
+            } : activity
+          )
+        }));
+        
+        // 關閉編輯模式
+        setEditingActivityId(null);
+        
+        // 顯示成功訊息
+        alert('進度儲存成功！');
+      } else {
+        throw new Error(result.error || '儲存活動進度失敗');
+      }
+    } catch (error) {
+      console.error('儲存活動進度失敗:', error);
+      alert(`儲存活動進度失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    }
+  }, [fetchStudentActivities]);
+
+  // 取消進度變更
+  const handleCancelProgressChange = useCallback((activityId: string) => {
+    setActivities(prev => ({
+      ...prev,
+      currentLessonActivities: prev.currentLessonActivities.map(activity => 
+        activity.id === activityId ? { ...activity, tempProgress: undefined } : activity
+      ),
+      previousLessonActivities: prev.previousLessonActivities.map(activity => 
+        activity.id === activityId ? { ...activity, tempProgress: undefined } : activity
+      ),
+      ongoingActivities: prev.ongoingActivities.map(activity => 
+        activity.id === activityId ? { ...activity, tempProgress: undefined } : activity
+      )
+    }));
+    
+    // 關閉編輯模式
+    setEditingActivityId(null);
+  }, []);
+
+  // 重設進度為 0
+  const handleResetProgress = useCallback(async (activityId: string) => {
+    try {
+      const response = await fetch('/api/update-activity-progress', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          activityId,
+          progress: 0
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || '重設活動進度失敗');
+      }
+
+      if (result.success) {
+        // 立即更新前端狀態，重設進度和完成狀態
+        setActivities(prev => ({
+          ...prev,
+          currentLessonActivities: prev.currentLessonActivities.map(activity => 
+            activity.id === activityId ? { 
+              ...activity, 
+              tempProgress: undefined,
+              progress: 0,
+              completionStatus: 'not_started'
+            } : activity
+          ),
+          previousLessonActivities: prev.previousLessonActivities.map(activity => 
+            activity.id === activityId ? { 
+              ...activity, 
+              tempProgress: undefined,
+              progress: 0,
+              completionStatus: 'not_started'
+            } : activity
+          ),
+          ongoingActivities: prev.ongoingActivities.map(activity => 
+            activity.id === activityId ? { 
+              ...activity, 
+              tempProgress: undefined,
+              progress: 0,
+              completionStatus: 'not_started'
+            } : activity
+          )
+        }));
+        
+        // 關閉編輯模式
+        setEditingActivityId(null);
+        
+        // 顯示成功訊息
+        alert('進度重設成功！');
+      } else {
+        throw new Error(result.error || '重設活動進度失敗');
+      }
+    } catch (error) {
+      console.error('重設活動進度失敗:', error);
+      alert(`重設活動進度失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    }
+  }, [fetchStudentActivities]);
+
+  // 移除學生活動（批量）
+  const handleRemoveActivities = useCallback(async (activityType: 'current' | 'ongoing') => {
+    const typeText = activityType === 'current' ? '本次課堂活動' : '正在學習的活動';
+    if (!confirm(`確定要移除學生的${typeText}嗎？`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/remove-student-activities', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          studentId, 
+          activityType,
+          lessonDate: activityType === 'current' ? lessonDate : undefined,
+          timeslot: activityType === 'current' ? timeslot : undefined
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('移除活動失敗');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        alert(`${typeText}移除成功！`);
+        // 重新載入學生活動
+        await fetchStudentActivities();
+      } else {
+        throw new Error(result.error || '移除活動失敗');
+      }
+    } catch (error) {
+      console.error('移除活動失敗:', error);
+      alert(`移除活動失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    }
+  }, [studentId, lessonDate, timeslot, fetchStudentActivities]);
+
   useEffect(() => {
     if (studentId && lessonDate && timeslot) {
+      // 優先載入學生活動，其他資訊延遲載入
       fetchStudentActivities();
-      fetchStudentInfo();
+      
+      // 延遲載入學生資訊和成長樹檢查
+      setTimeout(() => {
+        fetchStudentInfo();
+        checkStudentGrowthTree();
+      }, 100);
     }
-  }, [studentId, lessonDate, timeslot]); // 恢復依賴項，但移除函數依賴項
+  }, [studentId, lessonDate, timeslot]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -265,38 +639,197 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
     }
   };
 
-  const renderActivityCard = (activity: StudentActivity, type: string) => (
-    <div key={activity.id} className="bg-white rounded-lg border border-gray-200 p-4 mb-3 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          {getStatusIcon(activity.completionStatus)}
-          <h4 className="font-medium text-gray-900">{activity.activityName}</h4>
-          {activity.isFavorite && (
-            <StarIcon className="w-4 h-4 text-yellow-500" />
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(activity.difficultyLevel)}`}>
-            難度 {activity.difficultyLevel}
-          </span>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getActivityTypeColor(activity.activityType)}`}>
-            {activity.activityType}
-          </span>
-          {activity.estimatedDuration > 0 && (
-            <div className="flex items-center gap-1 text-xs text-gray-500">
-              <ClockIcon className="w-3 h-3" />
-              {activity.estimatedDuration}分鐘
+  // 過濾活動
+  const getFilteredActivities = (activities: StudentActivity[]) => {
+    switch (activityStatusFilter) {
+      case 'completed':
+        return activities.filter(activity => activity.completionStatus === 'completed');
+      case 'not_completed':
+        return activities.filter(activity => activity.completionStatus !== 'completed');
+      default:
+        return activities;
+    }
+  };
+
+  const renderActivityCard = (activity: StudentActivity, type: string) => {
+    const isNotStarted = activity.completionStatus === 'not_started';
+    
+    return (
+      <div key={activity.id} className="bg-white rounded-lg border border-stone-200 p-4 mb-3 hover:shadow-md transition-shadow">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2">
+            {/* 狀態顯示 - 未開始狀態不顯示按鈕 */}
+            {isNotStarted ? (
+              <div className="flex items-center gap-1">
+                {getStatusIcon(activity.completionStatus)}
+                <span className="text-xs text-gray-600">{getStatusText(activity.completionStatus)}</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => handleUpdateActivityStatus(activity.id, 
+                  activity.completionStatus === 'completed' ? 'not_started' : 'completed'
+                )}
+                className="flex items-center gap-1 hover:bg-gray-100 rounded p-1 transition-colors"
+                title={activity.completionStatus === 'completed' ? '標記為未完成' : '標記為已完成'}
+              >
+                {getStatusIcon(activity.completionStatus)}
+                <span className="text-xs text-gray-600">{getStatusText(activity.completionStatus)}</span>
+              </button>
+            )}
+            <h4 className="font-medium text-gray-900">{activity.activityName}</h4>
+            {activity.isFavorite && (
+              <StarIcon className="w-4 h-4 text-yellow-500" />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(activity.difficultyLevel)}`}>
+              難度 {activity.difficultyLevel}
+            </span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getActivityTypeColor(activity.activityType)}`}>
+              {activity.activityType}
+            </span>
+            {activity.estimatedDuration > 0 && (
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <ClockIcon className="w-3 h-3" />
+                {activity.estimatedDuration}分鐘
+              </div>
+            )}
+            {/* 操作按鈕 */}
+            <div className="flex items-center gap-2">
+              {/* 編輯按鈕 */}
+              <button
+                onClick={() => setEditingActivityId(editingActivityId === activity.id ? null : activity.id)}
+                className="flex items-center gap-1 px-2 py-1 bg-slate-200 text-slate-700 rounded text-xs hover:bg-slate-300 transition-colors"
+                title="編輯活動進度"
+              >
+                <PencilIcon className="w-3 h-3" />
+                編輯
+              </button>
+              
+              {/* 移除按鈕 - 未開始狀態不顯示 */}
+              {!isNotStarted && (
+                <button
+                  onClick={() => handleRemoveSingleActivity(activity.id)}
+                  className="flex items-center gap-1 px-2 py-1 bg-rose-200 text-rose-700 rounded text-xs hover:bg-rose-300 transition-colors"
+                  title="移除這個活動"
+                >
+                  <TrashIcon className="w-3 h-3" />
+                  移除
+                </button>
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
 
       {activity.activityDescription && (
-        <p className="text-sm text-gray-600 mb-2">{activity.activityDescription}</p>
+        <p className="text-sm text-stone-600 mb-2">{activity.activityDescription}</p>
       )}
 
-      <div className="flex items-center justify-between text-xs text-gray-500">
-        <span>{getStatusText(activity.completionStatus)}</span>
+      {/* 進度設定區域 - 只在編輯模式下顯示 */}
+      {editingActivityId === activity.id && (
+        <div className="mt-3 p-3 bg-stone-50 rounded-lg border border-stone-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-stone-700">編輯完成進度</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-stone-600">{activity.tempProgress !== undefined ? activity.tempProgress : (activity.progress || 0)}%</span>
+              <button
+                onClick={() => handleSaveActivityProgress(activity.id, activity.tempProgress !== undefined ? activity.tempProgress : (activity.progress || 0))}
+                className="px-3 py-1 text-xs bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors font-medium"
+                disabled={activity.tempProgress === undefined}
+              >
+                儲存
+              </button>
+              <button
+                onClick={() => {
+                  handleCancelProgressChange(activity.id);
+                  setEditingActivityId(null);
+                }}
+                className="px-3 py-1 text-xs bg-slate-500 text-white rounded hover:bg-slate-600 transition-colors font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => handleResetProgress(activity.id)}
+                className="px-3 py-1 text-xs bg-rose-500 text-white rounded hover:bg-rose-600 transition-colors font-medium"
+              >
+                重設
+              </button>
+            </div>
+          </div>
+          
+          {/* 可拖動的進度條 */}
+          <div className="relative w-full mb-2">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={activity.tempProgress !== undefined ? activity.tempProgress : (activity.progress || 0)}
+              onChange={(e) => handleProgressChange(activity.id, parseInt(e.target.value))}
+              className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer slider"
+              style={{
+                background: `linear-gradient(to right, #94A3B8 0%, #10B981 100%)`
+              }}
+            />
+            <div className="flex justify-between text-xs text-stone-500 mt-1">
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
+            </div>
+          </div>
+          
+          {/* 快速設定按鈕 */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-stone-600">快速設定:</span>
+            <button
+              onClick={() => handleProgressChange(activity.id, 0)}
+              className="px-2 py-1 text-xs bg-stone-200 text-stone-700 rounded hover:bg-stone-300 transition-colors"
+            >
+              0%
+            </button>
+            <button
+              onClick={() => handleProgressChange(activity.id, 25)}
+              className="px-2 py-1 text-xs bg-rose-200 text-rose-700 rounded hover:bg-rose-300 transition-colors"
+            >
+              25%
+            </button>
+            <button
+              onClick={() => handleProgressChange(activity.id, 50)}
+              className="px-2 py-1 text-xs bg-amber-200 text-amber-700 rounded hover:bg-amber-300 transition-colors"
+            >
+              50%
+            </button>
+            <button
+              onClick={() => handleProgressChange(activity.id, 75)}
+              className="px-2 py-1 text-xs bg-orange-200 text-orange-700 rounded hover:bg-orange-300 transition-colors"
+            >
+              75%
+            </button>
+            <button
+              onClick={() => handleProgressChange(activity.id, 100)}
+              className="px-2 py-1 text-xs bg-emerald-200 text-emerald-700 rounded hover:bg-emerald-300 transition-colors"
+            >
+              100%
+            </button>
+          </div>
+          
+          <div className="flex items-center justify-between text-xs text-stone-500">
+            <span>狀態: {getStatusText(activity.completionStatus)}</span>
+            {activity.tempProgress !== undefined && activity.tempProgress !== (activity.progress || 0) && (
+              <span className="text-amber-600 font-medium">未儲存</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between text-xs text-stone-500 mt-3">
+        <div className="flex items-center gap-2">
+          <span>分配時間: {activity.assignedAt ? new Date(activity.assignedAt).toLocaleDateString() : '未知'}</span>
+          {activity.timeSpent && (
+            <span>• 已用時: {activity.timeSpent}分鐘</span>
+          )}
+        </div>
         {activity.performanceRating && (
           <div className="flex items-center gap-1">
             <AcademicCapIcon className="w-3 h-3" />
@@ -306,20 +839,19 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
       </div>
 
       {activity.teacherNotes && (
-        <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+        <div className="mt-2 p-2 bg-slate-50 rounded text-xs">
           <strong>教師備註:</strong> {activity.teacherNotes}
         </div>
       )}
     </div>
   );
+  };
 
   if (loading) {
     return (
-      <div className="p-4">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-        </div>
+      <div className="p-6 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
+        <p className="text-[#2B3A3B] text-sm">{loadingText}</p>
       </div>
     );
   }
@@ -351,6 +883,45 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         </div>
       </div>
 
+      {/* 活動狀態過濾器 */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-medium text-gray-900">活動狀態過濾</h4>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActivityStatusFilter('all')}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                activityStatusFilter === 'all'
+                  ? 'bg-[#FFD59A] text-[#4B4036]'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              全部
+            </button>
+            <button
+              onClick={() => setActivityStatusFilter('completed')}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                activityStatusFilter === 'completed'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              已完成
+            </button>
+            <button
+              onClick={() => setActivityStatusFilter('not_completed')}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                activityStatusFilter === 'not_completed'
+                  ? 'bg-orange-100 text-orange-800'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              未完成
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* 本次課堂活動 */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -362,26 +933,44 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
             </h3>
             <span className="text-sm text-gray-500">（僅限本次課堂）</span>
           </div>
-          <button
-            onClick={handleCurrentActivitySelect}
-            className="flex items-center gap-2 px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-          >
-            <PlusIcon className="w-4 h-4" />
-            選擇活動
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCurrentActivitySelect}
+              className="flex items-center gap-2 px-3 py-1 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors text-sm font-medium shadow-sm"
+            >
+              <PlusIcon className="w-4 h-4" />
+              選擇活動
+            </button>
+            {activities.currentLessonActivities.length > 0 && (
+              <button
+                onClick={() => handleRemoveActivities('current')}
+                className="flex items-center gap-2 px-3 py-1 bg-[#FFE0E0] text-[#4B4036] rounded-lg hover:bg-[#FFD0D0] transition-colors text-sm font-medium shadow-sm"
+                title="移除本次課堂活動"
+              >
+                <TrashIcon className="w-4 h-4" />
+                移除活動
+              </button>
+            )}
+          </div>
         </div>
         
-        {activities.currentLessonActivities.length > 0 ? (
-          <div className="space-y-3">
-            {activities.currentLessonActivities.map((activity) => renderActivityCard(activity, 'current'))}
-          </div>
-        ) : (
-          <div className="text-center py-6 bg-gray-50 rounded-lg">
-            <BookOpenIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">暫無本次課堂活動</p>
-            <p className="text-xs text-gray-400 mt-1">點擊上方按鈕選擇活動</p>
-          </div>
-        )}
+        {(() => {
+          const filteredActivities = getFilteredActivities(activities.currentLessonActivities);
+          return filteredActivities.length > 0 ? (
+            <div className="space-y-3">
+              {filteredActivities.map((activity) => renderActivityCard(activity, 'current'))}
+            </div>
+          ) : (
+            <div className="text-center py-6 bg-gray-50 rounded-lg">
+              <BookOpenIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">
+                {activityStatusFilter === 'all' ? '暫無本次課堂活動' : 
+                 activityStatusFilter === 'completed' ? '暫無已完成的活動' : '暫無未完成的活動'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">點擊上方按鈕選擇活動</p>
+            </div>
+          );
+        })()}
       </div>
 
       {/* 上次課堂活動 */}
@@ -419,24 +1008,122 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
             </h3>
             <span className="text-sm text-gray-500">（跨多個課堂）</span>
           </div>
-          <button
-            onClick={handleOngoingActivitySelect}
-            className="flex items-center gap-2 px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-          >
-            <PlusIcon className="w-4 h-4" />
-            選擇活動
-          </button>
+          <div className="flex items-center gap-2">
+            {hasGrowthTree === false ? (
+              <button
+                onClick={handleAssignGrowthTree}
+                className="flex items-center gap-2 px-3 py-1 bg-[#EBC9A4] text-[#4B4036] rounded-lg hover:bg-[#DDBA90] transition-colors text-sm font-medium shadow-sm"
+              >
+                <PlusIcon className="w-4 h-4" />
+                分配成長樹
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleAssignGrowthTree}
+                  className="flex items-center gap-2 px-3 py-1 bg-[#FFD59A] text-[#4B4036] rounded-lg hover:bg-[#FFC97A] transition-colors text-sm font-medium shadow-sm"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  選擇成長樹
+                </button>
+                <button
+                  onClick={handleOngoingActivitySelect}
+                  className="flex items-center gap-2 px-3 py-1 bg-[#FFB6C1] text-[#4B4036] rounded-lg hover:bg-[#FFA0B0] transition-colors text-sm font-medium shadow-sm"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  選擇活動
+                </button>
+                {activities.ongoingActivities.length > 0 && (
+                  <button
+                    onClick={() => handleRemoveActivities('ongoing')}
+                    className="flex items-center gap-2 px-3 py-1 bg-[#FFE0E0] text-[#4B4036] rounded-lg hover:bg-[#FFD0D0] transition-colors text-sm font-medium shadow-sm"
+                    title="移除正在學習的活動"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                    移除活動
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
         
-        {activities.ongoingActivities.length > 0 ? (
-          <div className="space-y-3">
-            {activities.ongoingActivities.map((activity) => renderActivityCard(activity, 'ongoing'))}
+        {hasGrowthTree === false ? (
+          <div className="text-center py-6 bg-[#FFF3E0] rounded-lg border border-[#EADBC8]">
+            <AcademicCapIcon className="w-8 h-8 text-[#EBC9A4] mx-auto mb-2" />
+            <p className="text-sm text-[#4B4036] font-medium">學生尚未分配成長樹</p>
+            <p className="text-xs text-[#2B3A3B] mt-1 mb-3">需要先為學生分配成長樹才能分配長期活動</p>
+            <button
+              onClick={handleAssignGrowthTree}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#EBC9A4] text-[#4B4036] rounded-lg hover:bg-[#DDBA90] transition-colors text-sm font-medium shadow-sm"
+            >
+              <PlusIcon className="w-4 h-4" />
+              立即分配成長樹
+            </button>
           </div>
         ) : (
-          <div className="text-center py-6 bg-gray-50 rounded-lg">
-            <AcademicCapIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">暫無正在學習的活動</p>
-            <p className="text-xs text-gray-400 mt-1">點擊上方按鈕選擇長期活動</p>
+          <div className="space-y-4">
+            {/* 顯示學生的成長樹 */}
+            {studentGrowthTrees.length > 0 && (
+              <div className="bg-[#FFF9F2] rounded-lg border border-[#EADBC8] p-4">
+                <h4 className="text-sm font-medium text-[#4B4036] mb-3 flex items-center gap-2">
+                  <span className="text-lg">🌳</span>
+                  學生的成長樹 ({studentGrowthTrees.length})
+                </h4>
+                <div className="space-y-2">
+                  {studentGrowthTrees.map((treeAssignment) => (
+                    <div key={treeAssignment.id} className="flex items-center justify-between bg-white rounded-lg p-3 border border-[#EADBC8]">
+                      <div className="flex-1">
+                        <div className="font-medium text-[#4B4036]">
+                          {treeAssignment.hanami_growth_trees?.tree_name || '未命名成長樹'}
+                        </div>
+                        <div className="text-xs text-[#2B3A3B]">
+                          {treeAssignment.hanami_growth_trees?.tree_description || '無描述'}
+                        </div>
+                        <div className="text-xs text-[#A68A64] mt-1">
+                          分配日期：{treeAssignment.start_date}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveGrowthTree(treeAssignment.tree_id)}
+                        className="flex items-center gap-1 px-2 py-1 bg-[#FFE0E0] text-[#4B4036] rounded text-xs hover:bg-[#FFD0D0] transition-colors"
+                        title="移除這個成長樹"
+                      >
+                        <TrashIcon className="w-3 h-3" />
+                        移除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 顯示正在學習的活動 */}
+            {(() => {
+              const filteredOngoingActivities = getFilteredActivities(activities.ongoingActivities);
+              return filteredOngoingActivities.length > 0 ? (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-[#4B4036] mb-2">正在學習的活動</h4>
+                  {filteredOngoingActivities.map((activity) => renderActivityCard(activity, 'ongoing'))}
+                </div>
+              ) : (
+              <div className="text-center py-6 bg-[#FFF9F2] rounded-lg border border-[#EADBC8]">
+                <AcademicCapIcon className="w-8 h-8 text-[#FFD59A] mx-auto mb-2" />
+                <p className="text-sm text-[#4B4036] font-medium">
+                  {activityStatusFilter === 'all' ? '暫無正在學習的活動' : 
+                   activityStatusFilter === 'completed' ? '暫無已完成的活動' : '暫無未完成的活動'}
+                </p>
+                <p className="text-xs text-[#2B3A3B] mt-1 mb-3">可以為成長樹分配長期活動</p>
+                <button
+                  onClick={handleOngoingActivitySelect}
+                  className="inline-flex items-center gap-2 px-3 py-1 bg-[#FFB6C1] text-[#4B4036] rounded-lg hover:bg-[#FFA0B0] transition-colors text-sm font-medium shadow-sm"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  選擇活動
+                </button>
+              </div>
+            );
+          })()}
           </div>
         )}
       </div>
@@ -469,6 +1156,21 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
           mode="multiple"
           activityType={currentActivityType}
           studentId={studentId}
+        />
+      )}
+
+      {/* 分配成長樹模態 */}
+      {showTreeAssignmentModal && (
+        <StudentTreeAssignmentModal
+          isOpen={showTreeAssignmentModal}
+          onClose={() => setShowTreeAssignmentModal(false)}
+          student={studentInfo ? {
+            id: studentId,
+            full_name: studentInfo.full_name || '',
+            nick_name: studentInfo.nick_name,
+            course_type: studentInfo.course_type
+          } : undefined}
+          onSuccess={handleGrowthTreeAssigned}
         />
       )}
     </div>

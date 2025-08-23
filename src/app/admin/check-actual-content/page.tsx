@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -19,11 +18,11 @@ export default function CheckActualContentPage() {
     try {
       setLoading(true);
 
-      // 直接查詢Supabase - 使用 any 類型來繞過類型檢查
-      const { data, error } = await (supabase as any)
-        .from('hanami_ai_tool_usage')
+      // 直接查詢Supabase
+      const { data, error } = await supabase
+        .from('ai_tasks')
         .select('*')
-        .contains('input_data', { request_id: requestId })
+        .eq('id', requestId)
         .single();
 
       if (error) {
@@ -40,18 +39,25 @@ export default function CheckActualContentPage() {
       setRecordData(data);
       console.log('完整的記錄數據:', JSON.stringify(data, null, 2));
 
-      // 檢查output_data的結構
-      if (data.output_data) {
-        console.log('output_data結構:', Object.keys(data.output_data));
+      // 檢查result的結構
+      if (data.result) {
+        console.log('result內容:', data.result);
+        console.log('result長度:', data.result.length);
+        console.log('result前200字符:', data.result.substring(0, 200));
         
-        if (data.output_data.generated_content) {
-          console.log('generated_content內容:', data.output_data.generated_content);
-          console.log('generated_content長度:', data.output_data.generated_content.length);
-          console.log('generated_content前200字符:', data.output_data.generated_content.substring(0, 200));
-        }
-        
-        if (data.output_data.ai_stats) {
-          console.log('ai_stats:', data.output_data.ai_stats);
+        try {
+          const parsedResult = JSON.parse(data.result);
+          console.log('解析後的result結構:', Object.keys(parsedResult));
+          
+          if (parsedResult.generated_content) {
+            console.log('generated_content內容:', parsedResult.generated_content);
+          }
+          
+          if (parsedResult.ai_stats) {
+            console.log('ai_stats:', parsedResult.ai_stats);
+          }
+        } catch (e) {
+          console.log('result不是有效的JSON格式');
         }
       }
 

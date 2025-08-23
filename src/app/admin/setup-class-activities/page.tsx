@@ -89,3 +89,6 @@ export default function SetupClassActivitiesPage() {
     </div>
   );
 } 
+ 
+ 
+ 
