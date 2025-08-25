@@ -32,35 +32,39 @@ export async function GET(request: NextRequest) {
     const queries = [];
     
     // 本次課堂活動查詢
-    if (lessonDate && timeslot) {
-      queries.push(
-        supabase
-          .from('hanami_student_activities')
-          .select(`
+    if (lessonDate) {
+      let query = supabase
+        .from('hanami_student_activities')
+        .select(`
+          id,
+          completion_status,
+          assigned_at,
+          time_spent,
+          teacher_notes,
+          student_feedback,
+          progress,
+          activity_id,
+          hanami_teaching_activities (
             id,
-            completion_status,
-            assigned_at,
-            time_spent,
-            teacher_notes,
-            student_feedback,
-            progress,
-            activity_id,
-            hanami_teaching_activities (
-              id,
-              activity_name,
-              activity_description,
-              activity_type,
-              difficulty_level,
-              duration_minutes,
-              materials_needed,
-              instructions
-            )
-          `)
-          .eq('student_id', studentId)
-          .eq('activity_type', 'lesson')
-          .eq('lesson_date', lessonDate)
-          .eq('timeslot', timeslot)
-      );
+            activity_name,
+            activity_description,
+            activity_type,
+            difficulty_level,
+            duration_minutes,
+            materials_needed,
+            instructions
+          )
+        `)
+        .eq('student_id', studentId)
+        .eq('activity_type', 'lesson')
+        .eq('lesson_date', lessonDate);
+      
+      // 如果有 timeslot，則添加 timeslot 條件
+      if (timeslot) {
+        query = query.eq('timeslot', timeslot);
+      }
+      
+      queries.push(query);
     } else {
       queries.push(Promise.resolve({ data: [], error: null }));
     }

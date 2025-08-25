@@ -2,6 +2,7 @@
 
 import { PlusIcon, MagnifyingGlassIcon, FunnelIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
+import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { useState, useEffect } from 'react';
 
 import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
@@ -744,58 +745,53 @@ export default function GrowthTreesPage() {
 
         {/* 學生進度管理導航按鈕區域 */}
         <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => window.location.href = '/admin/student-progress'}
-            >
-              <BarChart3 className="w-4 h-4" />
-              進度儀表板
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-[#A64B2A] text-white hover:bg-[#8B3A1F] transition-colors"
-              onClick={() => window.location.href = '/admin/student-progress/growth-trees'}
-            >
-              <TreePine className="w-4 h-4" />
-              成長樹管理
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => window.location.href = '/admin/student-progress/abilities'}
-            >
-              <TrendingUp className="w-4 h-4" />
-              發展能力圖卡
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => window.location.href = '/admin/student-progress/activities'}
-            >
-              <Gamepad2 className="w-4 h-4" />
-              教學活動管理
-            </button>
-
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => window.location.href = '/admin/student-progress/student-media'}
-            >
-              <VideoCameraIcon className="w-4 h-4" />
-              學生媒體管理
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => window.location.href = '/admin/student-progress/ability-assessments'}
-            >
-              <AcademicCapIcon className="w-4 h-4" />
-              能力評估管理
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => window.location.href = '/admin/students'}
-            >
-              <Users className="w-4 h-4" />
-              返回學生管理
-            </button>
-          </div>
+          <ResponsiveNavigationDropdown
+            items={[
+              {
+                icon: BarChart3,
+                label: "進度管理面板",
+                href: "/admin/student-progress",
+                variant: "secondary"
+              },
+              {
+                icon: TreePine,
+                label: "成長樹管理",
+                href: "/admin/student-progress/growth-trees",
+                variant: "primary"
+              },
+              {
+                icon: TrendingUp,
+                label: "發展能力圖卡",
+                href: "/admin/student-progress/abilities",
+                variant: "secondary"
+              },
+              {
+                icon: Gamepad2,
+                label: "教學活動管理",
+                href: "/admin/student-progress/activities",
+                variant: "secondary"
+              },
+              {
+                icon: VideoCameraIcon,
+                label: "學生媒體管理",
+                href: "/admin/student-progress/student-media",
+                variant: "secondary"
+              },
+              {
+                icon: AcademicCapIcon,
+                label: "能力評估管理",
+                href: "/admin/student-progress/ability-assessments",
+                variant: "secondary"
+              },
+              {
+                icon: Users,
+                label: "返回學生管理",
+                href: "/admin/students",
+                variant: "accent"
+              }
+            ]}
+            currentPage="/admin/student-progress/growth-trees"
+          />
         </div>
 
         {/* 搜尋和篩選工具列 */}
