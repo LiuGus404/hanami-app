@@ -86,7 +86,7 @@ export default function TeachingActivitiesPage() {
     { value: 'estimated_duration', label: '時長' },
   ];
 
-  const NOTION_TOKEN = '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';
+  const NOTION_TOKEN = process.env.NEXT_PUBLIC_NOTION_TOKEN || '';
 
   useEffect(() => {
     loadActivities();
