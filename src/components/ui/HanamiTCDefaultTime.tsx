@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
+import { calculateRemainingLessonsBatch } from '@/lib/utils';
 import MiniLessonCard from './MiniLessonCard';
 import LessonCard from './LessonCard';
 import LessonPlanModal from './LessonPlanModal';
@@ -127,24 +128,8 @@ const HanamiTCDefaultTime: React.FC<HanamiTCDefaultTimeProps> = ({ teachers }) =
       );
 
       // 批量計算剩餘課程數
-      const calculateRemainingLessonsBatch = async (studentIds: string[]) => {
-        const { data: packagesData } = await supabase
-          .from('Hanami_Student_Package')
-          .select('student_id, remaining_lessons')
-          .in('student_id', studentIds)
-          .eq('status', 'active');
-
-        const remainingLessonsMap: Record<string, number> = {};
-        packagesData?.forEach(pkg => {
-          if (pkg.student_id && pkg.remaining_lessons !== null) {
-            remainingLessonsMap[pkg.student_id] = pkg.remaining_lessons;
-          }
-        });
-        return remainingLessonsMap;
-      };
-
       const studentIds = validStudents.map(s => s.id);
-      const remainingLessonsMap = await calculateRemainingLessonsBatch(studentIds);
+      const remainingLessonsMap = await calculateRemainingLessonsBatch(studentIds, new Date());
 
       // 處理資料
       const processedDefaultLessons: ProcessedDefaultLesson[] = validStudents.map((student) => ({

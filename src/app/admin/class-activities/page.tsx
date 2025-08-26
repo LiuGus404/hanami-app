@@ -24,6 +24,8 @@ import {
 
 import { HanamiCard, HanamiButton, LessonPlanModal, GrowthTreeDetailModal, StudentActivitiesPanel } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
+import { calculateRemainingLessonsBatch } from '@/lib/utils';
+import SimpleAbilityAssessmentModal from '@/components/ui/SimpleAbilityAssessmentModal';
 
 interface Lesson {
   id: string;
@@ -181,7 +183,31 @@ export default function ClassActivitiesPage() {
     lessonDate: string;
     timeslot: string;
   } | null>(null);
-
+  
+  // 新增：學生活動狀態
+  const [studentActivitiesMap, setStudentActivitiesMap] = useState<Map<string, any[]>>(new Map());
+  const [loadingStudentActivities, setLoadingStudentActivities] = useState<Set<string>>(new Set());
+  
+  // 新增：剩餘堂數狀態
+  const [remainingLessonsMap, setRemainingLessonsMap] = useState<Record<string, number>>({});
+  const [loadingRemainingLessons, setLoadingRemainingLessons] = useState(false);
+  
+  // 新增：進度編輯狀態
+  const [editingProgressActivityId, setEditingProgressActivityId] = useState<string | null>(null);
+  
+  // 新增：能力評估模態框狀態
+  const [showAbilityAssessmentModal, setShowAbilityAssessmentModal] = useState(false);
+  const [selectedStudentForAssessment, setSelectedStudentForAssessment] = useState<{
+    id: string;
+    full_name: string;
+    nick_name?: string;
+  } | null>(null);
+  const [selectedTreeForAssessment, setSelectedTreeForAssessment] = useState<{
+    id: string;
+    tree_name: string;
+    tree_description?: string;
+    course_type: string;
+  } | null>(null);
 
 
   // 獲取單日日期範圍
@@ -376,10 +402,142 @@ export default function ClassActivitiesPage() {
   };
 
   // 獲取學生已分配的活動
-  const getStudentAssignedActivities = (lessonId: string, studentId: string) => {
-    return assignedActivities.filter(
-      aa => aa.lesson_id === lessonId && aa.student_id === studentId
-    );
+  const getStudentAssignedActivities = async (lessonId: string, studentId: string) => {
+    try {
+      // 使用 API 獲取學生的所有活動，包括跨多個課堂的長期活動
+      const response = await fetch(`/api/student-activities?studentId=${studentId}&lessonDate=${new Date().toISOString().split('T')[0]}&timeslot=`);
+      
+      if (!response.ok) {
+        console.error('獲取學生活動失敗:', response.status);
+        return [];
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        // 合併所有類型的活動
+        const allActivities = [
+          ...result.data.currentLessonActivities,
+          ...result.data.previousLessonActivities,
+          ...result.data.ongoingActivities
+        ];
+        
+        // 過濾出未完成的活動
+        return allActivities.filter(activity => activity.completionStatus !== 'completed');
+      } else {
+        console.error('獲取學生活動失敗:', result.error);
+        return [];
+      }
+    } catch (error) {
+      console.error('獲取學生活動失敗:', error);
+      return [];
+    }
+  };
+
+  // 載入學生活動
+  const loadStudentActivities = async (studentId: string) => {
+    if (studentActivitiesMap.has(studentId) || loadingStudentActivities.has(studentId)) {
+      return;
+    }
+
+    setLoadingStudentActivities(prev => new Set(prev).add(studentId));
+    
+    try {
+      const activities = await getStudentAssignedActivities('', studentId);
+      setStudentActivitiesMap(prev => new Map(prev).set(studentId, activities));
+    } catch (error) {
+      console.error('載入學生活動失敗:', error);
+    } finally {
+      setLoadingStudentActivities(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(studentId);
+        return newSet;
+      });
+    }
+  };
+
+  // 載入所有學生的活動
+  useEffect(() => {
+    if (lessons.length > 0) {
+      const studentIds = lessons
+        .filter(lesson => 'student_id' in lesson)
+        .map(lesson => lesson.student_id);
+      
+      studentIds.forEach(studentId => {
+        if (!studentActivitiesMap.has(studentId) && !loadingStudentActivities.has(studentId)) {
+          loadStudentActivities(studentId);
+        }
+      });
+    }
+  }, [lessons]);
+
+  // 載入所有學生的剩餘堂數
+  const loadRemainingLessons = async () => {
+    if (loadingRemainingLessons || lessons.length === 0) {
+      return;
+    }
+
+    setLoadingRemainingLessons(true);
+    
+    try {
+      const studentIds = lessons
+        .filter(lesson => 'student_id' in lesson)
+        .map(lesson => lesson.student_id);
+      
+      if (studentIds.length > 0) {
+        const remainingLessons = await calculateRemainingLessonsBatch(studentIds, new Date());
+        setRemainingLessonsMap(remainingLessons);
+        console.log('剩餘堂數載入完成:', remainingLessons);
+      }
+    } catch (error) {
+      console.error('載入剩餘堂數失敗:', error);
+    } finally {
+      setLoadingRemainingLessons(false);
+    }
+  };
+
+  // 載入剩餘堂數
+  useEffect(() => {
+    loadRemainingLessons();
+  }, [lessons]);
+
+  // 根據剩餘堂數獲取背景顏色
+  const getStudentBackgroundColor = (remainingLessons: number, isTrial: boolean) => {
+    if (isTrial) {
+      return 'bg-gradient-to-br from-orange-100 to-red-100 border-orange-200';
+    }
+    
+    if (remainingLessons === 0) {
+      return 'bg-gradient-to-br from-red-100 to-red-200 border-red-300';
+    } else if (remainingLessons <= 2) {
+      return 'bg-gradient-to-br from-orange-100 to-yellow-100 border-orange-300';
+    } else {
+      return 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200';
+    }
+  };
+
+  // 開啟能力評估模態框
+  const openAbilityAssessmentModal = async (student: any) => {
+    try {
+      // 直接開啟能力評估模態框，不檢查成長樹
+      setSelectedStudentForAssessment({
+        id: student.id,
+        full_name: student.full_name || getStudentName(student),
+        nick_name: student.nick_name || getStudentNickname(student)
+      });
+      
+      // 使用預設的成長樹資訊
+      setSelectedTreeForAssessment({
+        id: 'default',
+        tree_name: '幼兒鋼琴學習評估表 — 階段零',
+        tree_description: '英文譜 + 五音域 (約 2 個月)',
+        course_type: '鋼琴'
+      });
+      
+      setShowAbilityAssessmentModal(true);
+    } catch (error) {
+      console.error('開啟能力評估模態框失敗:', error);
+      toast.error('開啟能力評估失敗');
+    }
   };
 
   // 分配活動給學生
@@ -1005,8 +1163,11 @@ export default function ClassActivitiesPage() {
                 {/* 學生卡片網格 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {group.lessons.map((lesson, lessonIndex) => {
-                    const studentAssignedActivities = getStudentAssignedActivities(lesson.id, 'student_id' in lesson ? lesson.student_id : lesson.id);
+                    const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                    const studentAssignedActivities = studentActivitiesMap.get(studentId) || [];
+                    const isLoadingActivities = loadingStudentActivities.has(studentId);
                     const isTrial = 'trial_status' in lesson;
+                    const remainingLessons = remainingLessonsMap[studentId] || 0;
                     
                     return (
                       <div 
@@ -1014,17 +1175,64 @@ export default function ClassActivitiesPage() {
                         className="group/card relative animate-fade-in-up"
                         style={{ animationDelay: `${(groupIndex * 100) + (lessonIndex * 50)}ms` }}
                       >
-                        <div className="student-card rounded-2xl p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden">
+                        <div className={`student-card rounded-2xl p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden border-2 ${getStudentBackgroundColor(remainingLessons, isTrial)}`}>
                           {/* 背景裝飾 */}
                           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-hanami-primary/10 to-hanami-accent/10 rounded-full -translate-y-8 translate-x-8 group-hover/card:scale-150 transition-transform duration-500"></div>
                           <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-hanami-secondary/10 to-hanami-primary/10 rounded-full translate-y-6 -translate-x-6 group-hover/card:scale-125 transition-transform duration-700"></div>
                           
                           {/* 試堂徽章 */}
                           {isTrial && (
-                            <div className="absolute top-3 right-3 z-10">
+                            <div className="absolute top-3 right-16 z-10">
                               <div className="trial-badge bg-gradient-to-r from-orange-400 to-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 animate-pulse">
                                 <SparklesIcon className="w-3 h-3" />
                                 <span>試堂</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 能力評估按鈕 */}
+                          <div className="absolute top-3 right-3 z-50">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const student = {
+                                  id: 'student_id' in lesson ? lesson.student_id : lesson.id,
+                                  full_name: getStudentName(lesson),
+                                  nick_name: getStudentNickname(lesson)
+                                };
+                                openAbilityAssessmentModal(student);
+                              }}
+                              className="group/assessment relative cursor-pointer"
+                            >
+                              {/* 主按鈕 */}
+                              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12">
+                                <AcademicCapIcon className="w-5 h-5 text-white" />
+                              </div>
+                              
+                              {/* 動畫裝飾 */}
+                              <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full animate-ping opacity-75"></div>
+                              <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-cyan-400 rounded-full animate-bounce"></div>
+                              
+                              {/* 懸停提示 */}
+                              <div className="absolute top-12 right-0 bg-emerald-600/90 text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/assessment:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20">
+                                能力評估
+                                <div className="absolute -top-1 right-3 w-2 h-2 bg-emerald-600/90 transform rotate-45"></div>
+                              </div>
+                            </button>
+                          </div>
+
+                          {/* 剩餘堂數徽章 */}
+                          {!isTrial && (
+                            <div className="absolute top-3 left-3 z-10">
+                              <div className={`px-2 py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 ${
+                                remainingLessons === 0 
+                                  ? 'bg-red-500 text-white' 
+                                  : remainingLessons <= 2 
+                                  ? 'bg-orange-500 text-white' 
+                                  : 'bg-green-500 text-white'
+                              }`}>
+                                <span>{remainingLessons} 堂</span>
                               </div>
                             </div>
                           )}
@@ -1105,70 +1313,172 @@ export default function ClassActivitiesPage() {
                             )}
                           </div>
 
-                          {/* 已分配活動 */}
-                          {studentAssignedActivities.length > 0 && (
-                            <div className="relative z-10 mb-4">
-                              <h4 className="text-sm font-bold text-hanami-text mb-2 flex items-center">
-                                <TagIcon className="w-4 h-4 mr-2 text-hanami-primary" />
-                                已分配活動
-                              </h4>
-                              <div className="space-y-2">
-                                {studentAssignedActivities.map((assignment, assignmentIndex) => {
-                                  const activity = treeActivities.find(ta => ta.id === assignment.tree_activity_id);
-                                  return (
-                                    <div key={`${assignment.id}-${assignmentIndex}`} className="bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-hanami-border/30 hover:bg-white transition-colors">
+                          {/* 學習中活動 */}
+                          <div className="relative z-10 mb-4">
+                            <h4 className="text-sm font-bold text-hanami-text mb-2 flex items-center">
+                              <AcademicCapIcon className="w-4 h-4 mr-2 text-hanami-primary" />
+                              學習中活動
+                            </h4>
+                            <div className="space-y-2">
+                              {isLoadingActivities ? (
+                                <div className="bg-gray-50/80 backdrop-blur-sm rounded-lg p-3 border border-gray-200/30">
+                                  <p className="text-xs text-gray-500 text-center">
+                                    載入中...
+                                  </p>
+                                </div>
+                              ) : studentAssignedActivities.length === 0 ? (
+                                <div className="bg-gray-50/80 backdrop-blur-sm rounded-lg p-3 border border-gray-200/30">
+                                  <p className="text-xs text-gray-500 text-center">
+                                    暫無未完成的活動
+                                  </p>
+                                </div>
+                              ) : (
+                                studentAssignedActivities.map((activity, activityIndex) => (
+                                  <div key={`ongoing-${activity.id}-${activityIndex}`} className="bg-gradient-to-r from-blue-50 to-indigo-50 backdrop-blur-sm rounded-lg p-3 border border-blue-200/30 hover:bg-blue-100/50 transition-colors">
+                                    <div className="space-y-2">
+                                      {/* 活動狀態和名稱 */}
                                       <div className="flex items-center justify-between">
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-medium text-hanami-text truncate">
-                                            {activity ? getActivityDisplayName(activity) : '未知活動'}
-                                          </p>
-                                          <p className="text-xs text-hanami-text-secondary flex items-center space-x-1">
-                                            {assignment.completion_status === 'not_started' ? (
-                                              <>
-                                                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                                <span>未開始</span>
-                                              </>
-                                            ) : assignment.completion_status === 'in_progress' ? (
-                                              <>
-                                                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                                                <span>進行中</span>
-                                              </>
-                                            ) : assignment.completion_status === 'completed' ? (
-                                              <>
-                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                <span>已完成</span>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                                                <span>未知</span>
-                                              </>
+                                        <div className="flex items-center space-x-2">
+                                          {activity.completionStatus === 'not_started' ? (
+                                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                          ) : activity.completionStatus === 'in_progress' ? (
+                                            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                                          ) : (
+                                            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                                          )}
+                                          <span className="text-xs text-gray-600">
+                                            {activity.completionStatus === 'not_started' ? '未開始' : 
+                                             activity.completionStatus === 'in_progress' ? '進行中' : '學習中'}
+                                          </span>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            if (editingProgressActivityId === activity.id) {
+                                              // 如果已經在編輯模式，則退出編輯模式
+                                              setEditingProgressActivityId(null);
+                                              toast('已退出編輯模式');
+                                            } else {
+                                              // 進入編輯模式
+                                              setEditingProgressActivityId(activity.id);
+                                              toast('已進入編輯模式，可以拖拽調整進度');
+                                            }
+                                          }}
+                                          className={`p-1 transition-colors hover:scale-110 transform ${
+                                            editingProgressActivityId === activity.id 
+                                              ? 'text-green-600 hover:text-green-800' 
+                                              : 'text-blue-600 hover:text-blue-800'
+                                          }`}
+                                        >
+                                          <PencilIcon className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                      
+                                      {/* 活動詳細資訊 */}
+                                      <div className="space-y-1">
+                                        <p className="text-sm font-medium text-blue-800">
+                                          {activity.activityName || '未知活動'}
+                                        </p>
+                                        
+                                        <div className="flex items-center space-x-3 text-xs text-blue-600">
+                                          <span className="flex items-center space-x-1">
+                                            <AcademicCapIcon className="w-3 h-3" />
+                                            <span>難度 {activity.difficultyLevel || 'N/A'}</span>
+                                          </span>
+                                          <span className="flex items-center space-x-1">
+                                            <MusicalNoteIcon className="w-3 h-3" />
+                                            <span>{activity.activityType || '未知類型'}</span>
+                                          </span>
+                                        </div>
+                                        
+                                        {/* 進度條 */}
+                                        <div className="space-y-1">
+                                          <div className="flex items-center justify-between text-xs text-blue-600">
+                                            <span>進度</span>
+                                            <span className="progress-text">{(() => {
+                                              const progress = activity.progress || 0;
+                                              // 如果進度值大於1，可能是百分比形式，需要除以100
+                                              const normalizedProgress = progress > 1 ? progress / 100 : progress;
+                                              return Math.round(normalizedProgress * 100);
+                                            })()}%</span>
+                                          </div>
+                                          <div className="relative">
+                                            <div 
+                                              className={`w-full bg-blue-200 rounded-full h-2 ${editingProgressActivityId === activity.id ? 'ring-2 ring-blue-400 ring-opacity-50 cursor-pointer' : ''}`}
+                                              onClick={(e) => {
+                                                if (editingProgressActivityId !== activity.id) return;
+                                                
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const x = e.clientX - rect.left;
+                                                const percentage = Math.round((x / rect.width) * 100);
+                                                const normalizedPercentage = Math.max(0, Math.min(percentage, 100));
+                                                
+                                                // 更新進度顯示
+                                                const progressText = e.currentTarget.parentElement?.querySelector('.progress-text');
+                                                const progressBarFill = e.currentTarget.querySelector('.progress-bar-fill');
+                                                
+                                                if (progressText) {
+                                                  progressText.textContent = `${normalizedPercentage}%`;
+                                                }
+                                                
+                                                if (progressBarFill instanceof HTMLElement) {
+                                                  progressBarFill.style.width = `${normalizedPercentage}%`;
+                                                }
+                                                
+                                                // 更新編輯指示器位置
+                                                const editIndicator = e.currentTarget.parentElement?.querySelector('.edit-indicator');
+                                                if (editIndicator instanceof HTMLElement) {
+                                                  editIndicator.style.left = `${normalizedPercentage}%`;
+                                                }
+                                                
+                                                console.log(`更新活動 ${activity.id} 進度為 ${normalizedPercentage}%`);
+                                                toast.success(`進度已更新為 ${normalizedPercentage}%`);
+                                              }}
+                                            >
+                                              <div 
+                                                className="progress-bar-fill bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300 ease-out"
+                                                style={{ width: `${(() => {
+                                                  const progress = activity.progress || 0;
+                                                  // 如果進度值大於1，可能是百分比形式，需要除以100
+                                                  const normalizedProgress = progress > 1 ? progress / 100 : progress;
+                                                  // 確保進度不超過100%
+                                                  return Math.min(normalizedProgress * 100, 100);
+                                                })()}%` }}
+                                              ></div>
+                                            </div>
+                                            {/* 編輯模式指示器 - 顯示在進度條右端 */}
+                                            {editingProgressActivityId === activity.id && (
+                                              <div 
+                                                className="edit-indicator absolute top-1/2 transform -translate-y-1/2 pointer-events-none"
+                                                style={{ 
+                                                  left: `${(() => {
+                                                    const progress = activity.progress || 0;
+                                                    const normalizedProgress = progress > 1 ? progress / 100 : progress;
+                                                    return Math.min(normalizedProgress * 100, 100);
+                                                  })()}%`
+                                                }}
+                                              >
+                                                <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                                                  <PencilIcon className="w-2 h-2 text-white" />
+                                                </div>
+                                              </div>
                                             )}
-                                          </p>
+                                          </div>
                                         </div>
-                                        <div className="flex items-center space-x-1">
-                                          <button
-                                            onClick={() => {
-                                              toast('編輯功能開發中...');
-                                            }}
-                                            className="p-1 text-hanami-text-secondary hover:text-hanami-primary transition-colors hover:scale-110 transform"
-                                          >
-                                            <PencilIcon className="w-3 h-3" />
-                                          </button>
-                                          <button
-                                            onClick={() => removeActivityAssignment(assignment.id)}
-                                            className="p-1 text-red-400 hover:text-red-600 transition-colors hover:scale-110 transform"
-                                          >
-                                            <TrashIcon className="w-3 h-3" />
-                                          </button>
-                                        </div>
+                                        
+                                        {/* 分配時間 */}
+                                        {activity.assignedAt && (
+                                          <div className="flex items-center space-x-1 text-xs text-blue-600">
+                                            <CalendarIcon className="w-3 h-3" />
+                                            <span>分配時間: {new Date(activity.assignedAt).toLocaleDateString('zh-TW')}</span>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
-                                  );
-                                })}
-                              </div>
+                                  </div>
+                                ))
+                              )}
                             </div>
-                          )}
+                          </div>
 
                           {/* 課程備註 */}
                           {getLessonNotes(lesson) && (
@@ -1408,7 +1718,30 @@ export default function ClassActivitiesPage() {
             }}
           />
         )}
+
+        {/* 能力評估模態框 */}
+        {showAbilityAssessmentModal && selectedStudentForAssessment && selectedTreeForAssessment && (
+          <SimpleAbilityAssessmentModal
+            defaultStudent={selectedStudentForAssessment}
+            defaultAssessmentDate={new Date().toISOString().split('T')[0]}
+            onClose={() => {
+              setShowAbilityAssessmentModal(false);
+              setSelectedStudentForAssessment(null);
+              setSelectedTreeForAssessment(null);
+            }}
+            onSubmit={(assessment) => {
+              console.log('能力評估提交:', assessment);
+              toast.success('能力評估已保存');
+              setShowAbilityAssessmentModal(false);
+              setSelectedStudentForAssessment(null);
+              setSelectedTreeForAssessment(null);
+            }}
+          />
+        )}
       </div>
     </div>
   );
 }
+
+
+
