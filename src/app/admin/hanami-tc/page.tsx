@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 
 import AITeacherSchedulerModal from '@/components/ui/AITeacherSchedulerModal';
 import HanamiTC from '@/components/ui/HanamiTC';
+import HanamiTCDefaultTime from '@/components/ui/HanamiTCDefaultTime';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Teacher } from '@/types';
 
@@ -13,6 +14,7 @@ export default function HanamiTCPage() {
   const router = useRouter();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [isAISchedulerOpen, setIsAISchedulerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'actual' | 'default'>('actual');
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -61,7 +63,35 @@ export default function HanamiTCPage() {
               </Link>
             </div>
           </div>
-          <HanamiTC teachers={teachers} />
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <button
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                viewMode === 'actual' 
+                  ? 'hanami-btn text-[#4B4036]' 
+                  : 'hanami-btn-soft text-[#4B4036]'
+              }`}
+              onClick={() => setViewMode('actual')}
+            >
+              <img alt="實際時間" className="w-5 h-5" src="/calendar.png" />
+              <span className="text-base font-bold">實際時間</span>
+            </button>
+            <button
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                viewMode === 'default' 
+                  ? 'hanami-btn text-[#4B4036]' 
+                  : 'hanami-btn-soft text-[#4B4036]'
+              }`}
+              onClick={() => setViewMode('default')}
+            >
+              <img alt="預設時間" className="w-5 h-5" src="/refresh.png" />
+              <span className="text-base font-bold">預設時間</span>
+            </button>
+          </div>
+                      {viewMode === 'actual' ? (
+              <HanamiTC teachers={teachers} />
+            ) : (
+              <HanamiTCDefaultTime teachers={teachers} />
+            )}
         </div>
       </div>
     </div>

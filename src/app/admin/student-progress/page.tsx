@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
+import { HanamiNumberSelector } from '@/components/ui/HanamiNumberSelector';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { HanamiCard, HanamiButton, HanamiInput, PopupSelect, SimpleAbilityAssessmentModal, StudentTreeAssignmentModal, PerformanceMonitor } from '@/components/ui';
@@ -891,17 +892,15 @@ export default function StudentProgressDashboard() {
                 最近能力評估記錄
               </h3>
               <div className="flex items-center gap-2">
-            <select
-                  className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
+                <HanamiNumberSelector
                   value={assessmentLimit}
-                  onChange={(e) => setAssessmentLimit(Number(e.target.value))}
-                >
-                  <option value={5}>5 筆</option>
-                  <option value={10}>10 筆</option>
-                  <option value={20}>20 筆</option>
-                  <option value={50}>50 筆</option>
-            </select>
-          </div>
+                  onChange={setAssessmentLimit}
+                  min={1}
+                  max={100}
+                  step={1}
+                  suffix="筆"
+                />
+              </div>
           </div>
             
             {/* 搜尋區域 */}
