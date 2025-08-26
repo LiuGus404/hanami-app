@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare, X, Plus } from 'lucide-react';
+import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { AcademicCapIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -1393,51 +1394,47 @@ export default function StudentManagementPage() {
 
         {/* 學生進度管理按鈕區域 */}
         <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => router.push('/admin/student-progress')}
-            >
-              <BarChart3 className="w-4 h-4" />
-              進度管理面板
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => router.push('/admin/student-progress/growth-trees')}
-            >
-              <TreePine className="w-4 h-4" />
-              成長樹管理
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => router.push('/admin/student-progress/abilities')}
-            >
-              <TrendingUp className="w-4 h-4" />
-              發展能力圖卡
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => router.push('/admin/student-progress/activities')}
-            >
-              <Gamepad2 className="w-4 h-4" />
-              教學活動管理
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => router.push('/admin/student-progress/ability-assessments')}
-            >
-              <AcademicCapIcon className="w-4 h-4" />
-              能力評估管理
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-              onClick={() => router.push('/admin/student-progress/student-media')}
-            >
-              <VideoCameraIcon className="w-4 h-4" />
-              學生媒體管理
-            </button>
-
-          </div>
+          <ResponsiveNavigationDropdown
+            items={[
+              {
+                icon: BarChart3,
+                label: "進度管理面板",
+                href: "/admin/student-progress",
+                variant: "secondary"
+              },
+              {
+                icon: TreePine,
+                label: "成長樹管理",
+                href: "/admin/student-progress/growth-trees",
+                variant: "secondary"
+              },
+              {
+                icon: TrendingUp,
+                label: "發展能力圖卡",
+                href: "/admin/student-progress/abilities",
+                variant: "secondary"
+              },
+              {
+                icon: Gamepad2,
+                label: "教學活動管理",
+                href: "/admin/student-progress/activities",
+                variant: "secondary"
+              },
+              {
+                icon: AcademicCapIcon,
+                label: "能力評估管理",
+                href: "/admin/student-progress/ability-assessments",
+                variant: "secondary"
+              },
+              {
+                icon: VideoCameraIcon,
+                label: "學生媒體管理",
+                href: "/admin/student-progress/student-media",
+                variant: "secondary"
+              }
+            ]}
+            currentPage="/admin/students"
+          />
         </div>
 
         {/* 操作按鈕區域 */}

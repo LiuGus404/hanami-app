@@ -573,7 +573,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
       
       // 延遲載入學生資訊和成長樹檢查
       setTimeout(() => {
-        fetchStudentInfo();
+      fetchStudentInfo();
         checkStudentGrowthTree();
       }, 100);
     }
@@ -656,8 +656,8 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
     
     return (
       <div key={activity.id} className="bg-white rounded-lg border border-stone-200 p-4 mb-3 hover:shadow-md transition-shadow">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
             {/* 狀態顯示 - 未開始狀態不顯示按鈕 */}
             {isNotStarted ? (
               <div className="flex items-center gap-1">
@@ -672,28 +672,28 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
                 className="flex items-center gap-1 hover:bg-gray-100 rounded p-1 transition-colors"
                 title={activity.completionStatus === 'completed' ? '標記為未完成' : '標記為已完成'}
               >
-                {getStatusIcon(activity.completionStatus)}
+          {getStatusIcon(activity.completionStatus)}
                 <span className="text-xs text-gray-600">{getStatusText(activity.completionStatus)}</span>
               </button>
             )}
-            <h4 className="font-medium text-gray-900">{activity.activityName}</h4>
-            {activity.isFavorite && (
-              <StarIcon className="w-4 h-4 text-yellow-500" />
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(activity.difficultyLevel)}`}>
-              難度 {activity.difficultyLevel}
-            </span>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getActivityTypeColor(activity.activityType)}`}>
-              {activity.activityType}
-            </span>
-            {activity.estimatedDuration > 0 && (
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <ClockIcon className="w-3 h-3" />
-                {activity.estimatedDuration}分鐘
-              </div>
-            )}
+          <h4 className="font-medium text-gray-900">{activity.activityName}</h4>
+          {activity.isFavorite && (
+            <StarIcon className="w-4 h-4 text-yellow-500" />
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(activity.difficultyLevel)}`}>
+            難度 {activity.difficultyLevel}
+          </span>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getActivityTypeColor(activity.activityType)}`}>
+            {activity.activityType}
+          </span>
+          {activity.estimatedDuration > 0 && (
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <ClockIcon className="w-3 h-3" />
+              {activity.estimatedDuration}分鐘
+            </div>
+          )}
             {/* 操作按鈕 */}
             <div className="flex items-center gap-2">
               {/* 編輯按鈕 */}
@@ -719,7 +719,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
               )}
             </div>
           </div>
-        </div>
+      </div>
 
       {activity.activityDescription && (
         <p className="text-sm text-stone-600 mb-2">{activity.activityDescription}</p>
@@ -934,13 +934,13 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
             <span className="text-sm text-gray-500">（僅限本次課堂）</span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleCurrentActivitySelect}
+          <button
+            onClick={handleCurrentActivitySelect}
               className="flex items-center gap-2 px-3 py-1 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-colors text-sm font-medium shadow-sm"
-            >
-              <PlusIcon className="w-4 h-4" />
-              選擇活動
-            </button>
+          >
+            <PlusIcon className="w-4 h-4" />
+            選擇活動
+          </button>
             {activities.currentLessonActivities.length > 0 && (
               <button
                 onClick={() => handleRemoveActivities('current')}
@@ -957,18 +957,18 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         {(() => {
           const filteredActivities = getFilteredActivities(activities.currentLessonActivities);
           return filteredActivities.length > 0 ? (
-            <div className="space-y-3">
+          <div className="space-y-3">
               {filteredActivities.map((activity) => renderActivityCard(activity, 'current'))}
-            </div>
-          ) : (
-            <div className="text-center py-6 bg-gray-50 rounded-lg">
-              <BookOpenIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          </div>
+        ) : (
+          <div className="text-center py-6 bg-gray-50 rounded-lg">
+            <BookOpenIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
               <p className="text-sm text-gray-500">
                 {activityStatusFilter === 'all' ? '暫無本次課堂活動' : 
                  activityStatusFilter === 'completed' ? '暫無已完成的活動' : '暫無未完成的活動'}
               </p>
-              <p className="text-xs text-gray-400 mt-1">點擊上方按鈕選擇活動</p>
-            </div>
+            <p className="text-xs text-gray-400 mt-1">點擊上方按鈕選擇活動</p>
+          </div>
           );
         })()}
       </div>
@@ -1026,13 +1026,13 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
                   <PlusIcon className="w-4 h-4" />
                   選擇成長樹
                 </button>
-                <button
-                  onClick={handleOngoingActivitySelect}
+          <button
+            onClick={handleOngoingActivitySelect}
                   className="flex items-center gap-2 px-3 py-1 bg-[#FFB6C1] text-[#4B4036] rounded-lg hover:bg-[#FFA0B0] transition-colors text-sm font-medium shadow-sm"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  選擇活動
-                </button>
+          >
+            <PlusIcon className="w-4 h-4" />
+            選擇活動
+          </button>
                 {activities.ongoingActivities.length > 0 && (
                   <button
                     onClick={() => handleRemoveActivities('ongoing')}

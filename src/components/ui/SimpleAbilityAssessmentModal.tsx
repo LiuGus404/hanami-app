@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, StarIcon, UserIcon, CalendarIcon, CheckCircleIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, StarIcon, UserIcon, CalendarIcon, CheckCircleIcon, AcademicCapIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { HanamiButton, HanamiCard, HanamiInput } from './index';
 import { supabase } from '@/lib/supabase';
+import ActivitySelectionModal from './ActivitySelectionModal';
 
 interface Student {
   id: string;
@@ -155,6 +156,26 @@ export default function SimpleAbilityAssessmentModal({
   // 多選模式評估狀態
   const [multiSelectAssessments, setMultiSelectAssessments] = useState<{[goalId: string]: string[]}>({});
 
+  // 活動管理相關狀態
+  const [showActivitySelectionModal, setShowActivitySelectionModal] = useState(false);
+  const [currentActivityType, setCurrentActivityType] = useState<'current' | 'ongoing'>('current');
+  const [studentActivities, setStudentActivities] = useState<{
+    currentLessonActivities: any[];
+    previousLessonActivities: any[];
+    ongoingActivities: any[];
+  }>({
+    currentLessonActivities: [],
+    previousLessonActivities: [],
+    ongoingActivities: []
+  });
+  
+  // 活動編輯狀態
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const [tempProgress, setTempProgress] = useState<{[activityId: string]: number}>({});
+  
+  // 活動篩選狀態
+  const [activityFilter, setActivityFilter] = useState<'all' | 'incomplete' | 'completed'>('incomplete');
+
   // 檢查是否為編輯模式
   const isEditMode = !!initialData;
 
@@ -200,6 +221,13 @@ export default function SimpleAbilityAssessmentModal({
       loadTreeGoalsAndAbilities(selectedTreeId);
     }
   }, [selectedTreeId]);
+
+  // 載入學生活動
+  useEffect(() => {
+    if (selectedStudentId && lessonDate) {
+      loadStudentActivities();
+    }
+  }, [selectedStudentId, lessonDate]);
 
   // 點擊外部關閉下拉選單
   useEffect(() => {
@@ -503,6 +531,57 @@ export default function SimpleAbilityAssessmentModal({
       console.error('載入學生成長樹失敗:', error);
       setStudentTrees([]);
       setSelectedTreeId('');
+    }
+  };
+
+  // 載入學生活動
+  const loadStudentActivities = async () => {
+    if (!selectedStudentId || !lessonDate) return;
+    
+    try {
+      console.log('載入學生活動:', selectedStudentId, lessonDate);
+      
+      // 構建查詢參數
+      const params = new URLSearchParams({
+        studentId: selectedStudentId,
+        lessonDate: lessonDate
+      });
+      
+      // 添加 timeslot 參數（如果有的話）
+      // 這裡我們先不傳 timeslot，讓 API 處理沒有 timeslot 的情況
+      
+      const response = await fetch(`/api/student-activities?${params.toString()}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setStudentActivities(result.data);
+          console.log('學生活動載入成功:', result.data);
+        } else {
+          console.error('載入學生活動失敗:', result.error);
+          // 設置空數據
+          setStudentActivities({
+            currentLessonActivities: [],
+            previousLessonActivities: [],
+            ongoingActivities: []
+          });
+        }
+      } else {
+        console.error('載入學生活動失敗:', response.statusText);
+        // 設置空數據
+        setStudentActivities({
+          currentLessonActivities: [],
+          previousLessonActivities: [],
+          ongoingActivities: []
+        });
+      }
+    } catch (error) {
+      console.error('載入學生活動失敗:', error);
+      // 設置空數據
+      setStudentActivities({
+        currentLessonActivities: [],
+        previousLessonActivities: [],
+        ongoingActivities: []
+      });
     }
   };
 
@@ -878,6 +957,352 @@ export default function SimpleAbilityAssessmentModal({
     return 'bg-red-500';
   };
 
+  // 活動卡片組件
+  const ActivityCard = ({ activity, type }: { activity: any; type: 'current' | 'previous' | 'ongoing' }) => {
+    const isEditing = editingActivityId === activity.id;
+    const currentProgress = isEditing ? (tempProgress[activity.id] || 0) : (activity.progress || 0);
+    const isNotStarted = activity.completionStatus === 'not_started';
+    
+    const getStatusText = () => {
+      if (currentProgress >= 100) return '✅ 已完成';
+      if (currentProgress > 0) return '⏳ 進行中';
+      return '|| 未開始';
+    };
+
+    const getDifficultyColor = (level: number) => {
+      switch (level) {
+        case 1: return 'bg-green-100 text-green-800';
+        case 2: return 'bg-blue-100 text-blue-800';
+        case 3: return 'bg-yellow-100 text-yellow-800';
+        case 4: return 'bg-orange-100 text-orange-800';
+        case 5: return 'bg-red-100 text-red-800';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    };
+
+    return (
+      <div className="p-4 bg-white border border-[#EADBC8] rounded-lg hover:border-[#D4A5A5] transition-all duration-200">
+        {/* 活動標題區域 */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex-1">
+            <div className="font-medium text-sm text-[#2B3A3B] flex items-center gap-2">
+              <span>{getStatusText()}</span>
+              <span>{activity.activityName}</span>
+            </div>
+            <div className="text-xs text-[#A68A64] mt-1">{activity.activityDescription}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(activity.difficultyLevel)}`}>
+              難度 {activity.difficultyLevel}
+            </span>
+            <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+              {activity.activityType}
+            </span>
+            <button
+              className="p-1 text-gray-500 hover:text-[#A68A64] transition-colors"
+              onClick={() => handleActivityEdit(activity.id)}
+              title="編輯進度"
+            >
+              <PencilIcon className="w-4 h-4" />
+            </button>
+            {type !== 'previous' && (
+              <button
+                className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                onClick={() => handleActivityDelete(activity.id)}
+                title="刪除活動"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 進度編輯區域 */}
+        {isEditing && (
+          <div className="mb-3 p-3 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
+            <h6 className="text-xs font-medium text-[#2B3A3B] mb-2">編輯完成進度</h6>
+            
+            {/* 進度條 */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-[#2B3A3B]">進度</span>
+                <span className="text-xs text-[#A68A64] font-medium">{currentProgress}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={currentProgress}
+                onChange={(e) => handleProgressChange(activity.id, parseInt(e.target.value))}
+                className="w-full h-3 bg-[#F5F0EB] rounded-lg appearance-none cursor-pointer slider"
+                style={{
+                  background: `linear-gradient(to right, #E8B4A0 0%, #E8B4A0 ${currentProgress}%, #F5F0EB ${currentProgress}%, #F5F0EB 100%)`
+                }}
+              />
+              <div className="flex justify-between text-xs text-[#8B7355] mt-1">
+                <span>0%</span>
+                <span>25%</span>
+                <span>50%</span>
+                <span>75%</span>
+                <span>100%</span>
+              </div>
+            </div>
+
+            {/* 快速設定按鈕 */}
+            <div className="mb-3">
+              <div className="text-xs font-medium text-[#2B3A3B] mb-2">快速設定:</div>
+              <div className="flex gap-2">
+                {[0, 25, 50, 75, 100].map((progress) => (
+                  <button
+                    key={progress}
+                    className={`px-3 py-1 text-xs rounded-lg transition-all duration-200 ${
+                      currentProgress === progress
+                        ? 'bg-[#E8B4A0] text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    onClick={() => handleProgressChange(activity.id, progress)}
+                  >
+                    {progress}%
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 狀態顯示 */}
+            <div className="mb-3">
+              <span className="text-xs text-[#2B3A3B]">
+                狀態: {currentProgress >= 100 ? '已完成' : currentProgress > 0 ? '進行中' : '未開始'}
+              </span>
+            </div>
+
+            {/* 操作按鈕 */}
+            <div className="flex gap-2">
+              <button
+                className="px-3 py-1 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors"
+                onClick={() => handleProgressSave(activity.id)}
+              >
+                儲存
+              </button>
+              <button
+                className="px-3 py-1 bg-gray-500 text-white text-xs rounded-lg hover:bg-gray-600 transition-colors"
+                onClick={() => handleProgressCancel(activity.id)}
+              >
+                取消
+              </button>
+              <button
+                className="px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
+                onClick={() => handleProgressReset(activity.id)}
+              >
+                重設
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 進度顯示（非編輯模式） */}
+        {!isEditing && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-[#2B3A3B]">完成進度</span>
+              <span className="text-xs text-[#A68A64]">{currentProgress}%</span>
+            </div>
+            <div className="w-full bg-[#F5F0EB] rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] h-2 rounded-full transition-all duration-300"
+                style={{ width: `${currentProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+
+        {/* 分配時間 */}
+        <div className="text-xs text-[#87704e]">
+          分配時間: {activity.assignedAt ? new Date(activity.assignedAt).toLocaleDateString('zh-TW') : '未知'}
+        </div>
+      </div>
+    );
+  };
+
+  // 處理活動選擇
+  const handleActivitySelection = (type: 'current' | 'ongoing') => {
+    setCurrentActivityType(type);
+    setShowActivitySelectionModal(true);
+  };
+
+  // 處理活動編輯
+  const handleActivityEdit = (activityId: string) => {
+    setEditingActivityId(activityId);
+    // 初始化臨時進度
+    const activity = [...studentActivities.currentLessonActivities, ...studentActivities.ongoingActivities]
+      .find(a => a.id === activityId);
+    if (activity) {
+      setTempProgress(prev => ({
+        ...prev,
+        [activityId]: activity.progress || 0
+      }));
+    }
+  };
+
+  // 處理進度變更
+  const handleProgressChange = (activityId: string, progress: number) => {
+    setTempProgress(prev => ({
+      ...prev,
+      [activityId]: progress
+    }));
+  };
+
+  // 處理進度保存
+  const handleProgressSave = async (activityId: string) => {
+    try {
+      const progress = tempProgress[activityId] || 0;
+      
+      const response = await fetch('/api/update-activity-progress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          activityId: activityId,
+          progress: progress
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log('進度更新成功');
+          // 重新載入活動
+          await loadStudentActivities();
+          setEditingActivityId(null);
+        } else {
+          console.error('進度更新失敗:', result.error);
+          alert('進度更新失敗: ' + result.error);
+        }
+      } else {
+        console.error('進度更新失敗:', response.statusText);
+        alert('進度更新失敗');
+      }
+    } catch (error) {
+      console.error('進度更新失敗:', error);
+      alert('進度更新失敗: ' + (error as Error).message);
+    }
+  };
+
+  // 處理進度取消
+  const handleProgressCancel = (activityId: string) => {
+    setEditingActivityId(null);
+    // 重置臨時進度
+    setTempProgress(prev => {
+      const newTemp = { ...prev };
+      delete newTemp[activityId];
+      return newTemp;
+    });
+  };
+
+  // 處理進度重設
+  const handleProgressReset = (activityId: string) => {
+    setTempProgress(prev => ({
+      ...prev,
+      [activityId]: 0
+    }));
+  };
+
+  // 篩選活動
+  const getFilteredActivities = (activities: any[]) => {
+    switch (activityFilter) {
+      case 'completed':
+        return activities.filter(activity => (activity.progress || 0) >= 100);
+      case 'incomplete':
+        return activities.filter(activity => (activity.progress || 0) < 100);
+      default:
+        return activities;
+    }
+  };
+
+  // 處理活動刪除
+  const handleActivityDelete = async (activityId: string) => {
+    if (!confirm('確定要刪除此活動嗎？')) return;
+    
+    try {
+      const response = await fetch('/api/remove-single-student-activity', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          activityId: activityId
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log('活動刪除成功');
+          // 重新載入活動
+          await loadStudentActivities();
+        } else {
+          console.error('活動刪除失敗:', result.error);
+          alert('活動刪除失敗: ' + result.error);
+        }
+      } else {
+        console.error('活動刪除失敗:', response.statusText);
+        alert('活動刪除失敗');
+      }
+    } catch (error) {
+      console.error('活動刪除失敗:', error);
+      alert('活動刪除失敗: ' + (error as Error).message);
+    }
+  };
+
+  // 處理活動分配成功
+  const handleActivityAssignmentSuccess = async (selectedActivities: any[]) => {
+    try {
+      console.log('處理活動分配:', selectedActivities);
+      
+      if (selectedActivities.length === 0) {
+        setShowActivitySelectionModal(false);
+        return;
+      }
+
+      // 準備活動分配數據
+      const activityIds = selectedActivities.map(activity => activity.id);
+      const assignmentType = currentActivityType === 'current' ? 'current_lesson' : 'ongoing';
+      
+      const response = await fetch('/api/assign-student-activities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId: selectedStudentId,
+          activityIds: activityIds,
+          assignmentType: assignmentType,
+          lessonDate: lessonDate
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log('活動分配成功');
+          // 重新載入活動
+          await loadStudentActivities();
+        } else {
+          console.error('活動分配失敗:', result.error);
+          alert('活動分配失敗: ' + result.error);
+        }
+      } else {
+        console.error('活動分配失敗:', response.statusText);
+        alert('活動分配失敗');
+      }
+    } catch (error) {
+      console.error('活動分配失敗:', error);
+      alert('活動分配失敗: ' + (error as Error).message);
+    } finally {
+      setShowActivitySelectionModal(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedStudent || !selectedTreeId) {
       alert('請選擇學生和成長樹');
@@ -1225,6 +1650,45 @@ export default function SimpleAbilityAssessmentModal({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+      <style jsx>{`
+        .slider {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 12px;
+          border-radius: 6px;
+          outline: none;
+        }
+        .slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #E8B4A0;
+          cursor: pointer;
+          border: 2px solid #D4A5A5;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .slider::-moz-range-thumb {
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #E8B4A0;
+          cursor: pointer;
+          border: 2px solid #D4A5A5;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .slider::-webkit-slider-track {
+          background: #F5F0EB;
+          border-radius: 6px;
+          height: 12px;
+        }
+        .slider::-moz-range-track {
+          background: #F5F0EB;
+          border-radius: 6px;
+          height: 12px;
+        }
+      `}</style>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
         {/* 標題欄 */}
         <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
@@ -1590,7 +2054,7 @@ export default function SimpleAbilityAssessmentModal({
               </div>
             </div>
 
-            {/* 右側：成長目標和能力評估 */}
+            {/* 右側：成長目標和能力評估 + 活動管理 */}
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-[#2B3A3B] border-b border-[#EADBC8] pb-2">
                 成長目標與能力評估
@@ -1863,6 +2327,280 @@ export default function SimpleAbilityAssessmentModal({
                   )}
                 </>
               )}
+
+              {/* 活動管理區域 */}
+              {selectedStudent && (
+                <div className="mt-8 pt-6 border-t border-[#EADBC8]">
+                  <h3 className="text-lg font-semibold text-[#2B3A3B] border-b border-[#EADBC8] pb-2 mb-4">
+                    活動管理
+                  </h3>
+                  
+                                 {/* 本次課堂活動 */}
+               <div className="mb-6">
+                 <div className="flex items-center justify-between mb-3">
+                   <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2">
+                     <span className="text-lg">📚</span>
+                     本次課堂活動
+                     <span className="text-xs text-[#A68A64]">（僅限本次課堂）</span>
+                   </h4>
+                   <div className="flex items-center gap-2">
+                     {/* 篩選按鈕 */}
+                     <div className="flex bg-[#F5F0EB] rounded-lg p-1">
+                       <button
+                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
+                           activityFilter === 'incomplete'
+                             ? 'bg-white text-[#2B3A3B] shadow-sm'
+                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                         }`}
+                         onClick={() => setActivityFilter('incomplete')}
+                       >
+                         未完成
+                       </button>
+                       <button
+                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
+                           activityFilter === 'completed'
+                             ? 'bg-white text-[#2B3A3B] shadow-sm'
+                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                         }`}
+                         onClick={() => setActivityFilter('completed')}
+                       >
+                         已完成
+                       </button>
+                       <button
+                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
+                           activityFilter === 'all'
+                             ? 'bg-white text-[#2B3A3B] shadow-sm'
+                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                         }`}
+                         onClick={() => setActivityFilter('all')}
+                       >
+                         全部
+                       </button>
+                     </div>
+                     <button
+                       className="px-3 py-1.5 bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] text-white text-xs rounded-lg hover:from-[#D4A5A5] hover:to-[#C89B9B] transition-all duration-200"
+                       onClick={() => handleActivitySelection('current')}
+                     >
+                       選擇活動
+                     </button>
+                   </div>
+                 </div>
+                    <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
+                      {(() => {
+                        const filteredActivities = getFilteredActivities(studentActivities.currentLessonActivities);
+                        if (filteredActivities.length > 0) {
+                          return (
+                            <div className="space-y-3">
+                              {filteredActivities.map((activity, index) => (
+                                <ActivityCard key={activity.id || index} activity={activity} type="current" />
+                              ))}
+                            </div>
+                          );
+                        } else {
+                          const totalActivities = studentActivities.currentLessonActivities.length;
+                          if (totalActivities === 0) {
+                            return (
+                              <>
+                                <p className="text-[#A68A64] text-sm">暫無活動</p>
+                                <p className="text-[#87704e] text-xs mt-1">點擊上方按鈕選擇活動</p>
+                              </>
+                            );
+                          } else {
+                            return (
+                              <>
+                                <p className="text-[#A68A64] text-sm">
+                                  {activityFilter === 'completed' ? '暫無已完成的活動' : 
+                                   activityFilter === 'incomplete' ? '暫無未完成的活動' : '暫無活動'}
+                                </p>
+                                <p className="text-[#87704e] text-xs mt-1">
+                                  共 {totalActivities} 個活動，請選擇其他篩選條件
+                                </p>
+                              </>
+                            );
+                          }
+                        }
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* 上次課堂活動 */}
+                  <div className="mb-6">
+                    <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2 mb-3">
+                      <span className="text-lg">📖</span>
+                      上次課堂活動
+                      <span className="text-xs text-[#A68A64]">（供參考）</span>
+                    </h4>
+                    <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
+                      {studentActivities.previousLessonActivities.length > 0 ? (
+                        <div className="space-y-3">
+                          {studentActivities.previousLessonActivities.map((activity, index) => (
+                            <ActivityCard key={activity.id || index} activity={activity} type="previous" />
+                          ))}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-[#A68A64] text-sm">暫無上次課堂活動</p>
+                          <p className="text-[#87704e] text-xs mt-1">這是學生上次課堂的活動記錄</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                                 {/* 正在學習的活動 */}
+               <div className="mb-6">
+                 <div className="flex items-center justify-between mb-3">
+                   <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2">
+                     <span className="text-lg">🎯</span>
+                     正在學習的活動
+                     <span className="text-xs text-[#A68A64]">（跨多個課堂）</span>
+                   </h4>
+                   <div className="flex items-center gap-2">
+                     {/* 篩選按鈕 */}
+                     <div className="flex bg-[#F5F0EB] rounded-lg p-1">
+                       <button
+                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
+                           activityFilter === 'incomplete'
+                             ? 'bg-white text-[#2B3A3B] shadow-sm'
+                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                         }`}
+                         onClick={() => setActivityFilter('incomplete')}
+                       >
+                         未完成
+                       </button>
+                       <button
+                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
+                           activityFilter === 'completed'
+                             ? 'bg-white text-[#2B3A3B] shadow-sm'
+                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                         }`}
+                         onClick={() => setActivityFilter('completed')}
+                       >
+                         已完成
+                       </button>
+                       <button
+                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
+                           activityFilter === 'all'
+                             ? 'bg-white text-[#2B3A3B] shadow-sm'
+                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                         }`}
+                         onClick={() => setActivityFilter('all')}
+                       >
+                         全部
+                       </button>
+                     </div>
+                     {studentTrees.length > 0 ? (
+                       <button
+                         className="px-3 py-1.5 bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] text-white text-xs rounded-lg hover:from-[#D4A5A5] hover:to-[#C89B9B] transition-all duration-200"
+                         onClick={() => handleActivitySelection('ongoing')}
+                       >
+                         選擇活動
+                       </button>
+                     ) : (
+                       <button
+                         className="px-3 py-1.5 bg-gradient-to-r from-[#A68A64] to-[#8B7355] text-white text-xs rounded-lg hover:from-[#8B7355] hover:to-[#6B5B47] transition-all duration-200"
+                         onClick={() => {/* TODO: 實現分配成長樹功能 */}}
+                       >
+                         立即分配成長樹
+                       </button>
+                     )}
+                   </div>
+                 </div>
+                    {studentTrees.length > 0 ? (
+                                              <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
+                          {(() => {
+                            const filteredActivities = getFilteredActivities(studentActivities.ongoingActivities);
+                            if (filteredActivities.length > 0) {
+                              return (
+                                <div className="space-y-3">
+                                  {filteredActivities.map((activity, index) => (
+                                    <ActivityCard key={activity.id || index} activity={activity} type="ongoing" />
+                                  ))}
+                                </div>
+                              );
+                            } else {
+                              const totalActivities = studentActivities.ongoingActivities.length;
+                              if (totalActivities === 0) {
+                                return (
+                                  <>
+                                    <p className="text-[#A68A64] text-sm">暫無進行中的活動</p>
+                                    <p className="text-[#87704e] text-xs mt-1">點擊上方按鈕選擇長期活動</p>
+                                  </>
+                                );
+                              } else {
+                                return (
+                                  <>
+                                    <p className="text-[#A68A64] text-sm">
+                                      {activityFilter === 'completed' ? '暫無已完成的活動' : 
+                                       activityFilter === 'incomplete' ? '暫無未完成的活動' : '暫無活動'}
+                                    </p>
+                                    <p className="text-[#87704e] text-xs mt-1">
+                                      共 {totalActivities} 個活動，請選擇其他篩選條件
+                                    </p>
+                                  </>
+                                );
+                              }
+                            }
+                          })()}
+                        </div>
+                    ) : (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-yellow-600 text-lg">⚠️</span>
+                          <div>
+                            <h5 className="text-yellow-800 font-medium text-sm">學生尚未分配成長樹</h5>
+                            <p className="text-yellow-700 text-xs mt-1">
+                              需要先為學生分配成長樹才能分配長期活動
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                                 {/* 活動統計 */}
+               <div className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-4 rounded-lg border border-[#EADBC8]">
+                 <h4 className="font-medium text-[#2B3A3B] mb-3 flex items-center gap-2">
+                   <span className="text-lg">📊</span>
+                   活動統計
+                 </h4>
+                 <div className="grid grid-cols-3 gap-4">
+                   <div className="text-center">
+                     <div className="text-2xl font-bold text-[#A68A64]">
+                       {studentActivities.currentLessonActivities.length}
+                     </div>
+                     <div className="text-xs text-[#87704e]">本次活動</div>
+                   </div>
+                   <div className="text-center">
+                     <div className="text-2xl font-bold text-[#A68A64]">
+                       {studentActivities.ongoingActivities.length}
+                     </div>
+                     <div className="text-xs text-[#87704e]">進行中活動</div>
+                   </div>
+                   <div className="text-center">
+                     <div className="text-2xl font-bold text-[#A68A64]">
+                       {(() => {
+                         const allActivities = [...studentActivities.currentLessonActivities, ...studentActivities.ongoingActivities];
+                         const completedCount = allActivities.filter(activity => (activity.progress || 0) >= 100).length;
+                         return completedCount;
+                       })()}
+                     </div>
+                     <div className="text-xs text-[#87704e]">已完成</div>
+                   </div>
+                 </div>
+                 {/* 篩選狀態顯示 */}
+                 <div className="mt-3 pt-3 border-t border-[#EADBC8]">
+                   <div className="text-center">
+                     <span className="text-xs text-[#8B7355]">
+                       當前顯示: {
+                         activityFilter === 'completed' ? '已完成活動' :
+                         activityFilter === 'incomplete' ? '未完成活動' : '全部活動'
+                       }
+                     </span>
+                   </div>
+                 </div>
+               </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1892,6 +2630,16 @@ export default function SimpleAbilityAssessmentModal({
           </div>
         </div>
       </div>
+
+      {/* 活動選擇模態框 */}
+      <ActivitySelectionModal
+        open={showActivitySelectionModal}
+        onClose={() => setShowActivitySelectionModal(false)}
+        onSelect={handleActivityAssignmentSuccess}
+        mode="multiple"
+        activityType={currentActivityType}
+        studentId={selectedStudentId}
+      />
     </div>
   );
 } 

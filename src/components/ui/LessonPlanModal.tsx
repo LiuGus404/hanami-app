@@ -22,6 +22,7 @@ interface LessonPlanModalProps {
     id: string;
     name: string;
   }>;
+  isDefaultTime?: boolean; // 新增：是否為預設時間模式
 }
 
 interface ClassStudent {
@@ -53,6 +54,7 @@ const LessonPlanModal = ({
   existingPlan,
   onSaved,
   students = [],
+  isDefaultTime = false,
 }: LessonPlanModalProps) => {
   const [topic, setTopic] = useState('');
   const [objectives, setObjectives] = useState<string[]>(['']);
@@ -80,6 +82,8 @@ const LessonPlanModal = ({
   const [lastFetchKey, setLastFetchKey] = useState<string>('');
   // 學習活動分類狀態
   const [ongoingActivityTab, setOngoingActivityTab] = useState<'in_progress' | 'completed'>('in_progress');
+  // 預設時間模式下的日期選擇
+  const [selectedLessonDate, setSelectedLessonDate] = useState<Date>(lessonDate);
 
   const supabase = getSupabaseClient();
   const { teachers, loading } = useTeachers();
@@ -95,7 +99,7 @@ const LessonPlanModal = ({
 
   // 獲取課堂學生資料
   const fetchClassStudents = async () => {
-    if (!open || !lessonDate || !timeslot || !courseType) return;
+    if (!open || !selectedLessonDate || !timeslot || !courseType) return;
     
     // 清理舊的活動數據
     clearActivities();
@@ -103,7 +107,7 @@ const LessonPlanModal = ({
     setLoadingStudents(true);
     try {
       // 確保日期格式一致，使用香港時區
-      const hkDate = new Date(lessonDate.getTime() + 8 * 60 * 60 * 1000);
+      const hkDate = new Date(selectedLessonDate.getTime() + 8 * 60 * 60 * 1000);
       const lessonDateStr = hkDate.toISOString().split('T')[0];
       console.log('Fetching students for:', { lessonDateStr, timeslot, courseType });
       const response = await fetch(
@@ -154,12 +158,12 @@ const LessonPlanModal = ({
 
   // 獲取課堂學生活動
   const fetchClassActivities = async (forceRefresh = false) => {
-    if (!open || !lessonDate || !timeslot || !courseType || classStudents.length === 0) return;
+    if (!open || !selectedLessonDate || !timeslot || !courseType || classStudents.length === 0) return;
     
     console.log('fetchClassActivities called:', { forceRefresh, classStudents: classStudents.length });
     
     // 生成當前請求的唯一鍵
-    const currentKey = `${lessonDate?.toISOString()}-${timeslot}-${courseType}-${classStudents.length}`;
+    const currentKey = `${selectedLessonDate?.toISOString()}-${timeslot}-${courseType}-${classStudents.length}`;
     
     // 如果不是強制刷新且與上次請求相同，則跳過
     if (!forceRefresh && currentKey === lastFetchKey) {
@@ -170,7 +174,7 @@ const LessonPlanModal = ({
     setLastFetchKey(currentKey);
     setLoadingClassActivities(true);
     try {
-      const hkDate = new Date(lessonDate.getTime() + 8 * 60 * 60 * 1000);
+      const hkDate = new Date(selectedLessonDate.getTime() + 8 * 60 * 60 * 1000);
       const lessonDateStr = hkDate.toISOString().split('T')[0];
       
       // 分別存儲不同類型的活動
@@ -260,7 +264,7 @@ const LessonPlanModal = ({
 
   // 獲取該時段的班別活動
   const fetchLessonPlanActivities = async () => {
-    if (!open || !lessonDate || !timeslot || !courseType) return;
+    if (!open || !selectedLessonDate || !timeslot || !courseType) return;
     
     try {
       const hkDate = new Date(lessonDate.getTime() + 8 * 60 * 60 * 1000);
@@ -618,6 +622,24 @@ const LessonPlanModal = ({
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <form className="space-y-4" onSubmit={handleSubmit}>
+              {isDefaultTime && (
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-[#4B4036]">課堂日期</label>
+                  <input
+                    type="date"
+                    className="w-full p-2 border border-[#EADBC8] rounded bg-[#FFFDF8] text-[#4B4036]"
+                    value={selectedLessonDate.toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      const [year, month, day] = e.target.value.split('-').map(Number);
+                      const newDate = new Date(year, month - 1, day);
+                      setSelectedLessonDate(newDate);
+                    }}
+                  />
+                  <p className="text-xs text-[#7A6654] mt-1">
+                    預設時間：{timeslot} | 課程：{courseType}
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium mb-1 text-[#4B4036]">教學主題</label>
                 <input
@@ -1145,8 +1167,8 @@ const LessonPlanModal = ({
               
               // 保存班別活動到資料庫
               if (lessonDate && timeslot && courseType) {
-                const hkDate = new Date(lessonDate.getTime() + 8 * 60 * 60 * 1000);
-                const lessonDateStr = hkDate.toISOString().split('T')[0];
+                      const hkDate = new Date(selectedLessonDate.getTime() + 8 * 60 * 60 * 1000);
+      const lessonDateStr = hkDate.toISOString().split('T')[0];
                 
                 const classActivityIds = tempSelectedActivities
                   .filter(a => a.type === 'tree_activity')

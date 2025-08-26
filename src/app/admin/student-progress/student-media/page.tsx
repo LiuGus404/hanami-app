@@ -16,8 +16,12 @@ import {
   TreePine,
   FileText,
   Users,
-  Video
+  Video,
+  BarChart3,
+  TrendingUp,
+  Gamepad2
 } from 'lucide-react';
+import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
@@ -468,52 +472,48 @@ export default function StudentMediaPage() {
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         <div className="space-y-6">
           {/* 導航欄 */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-                onClick={() => window.location.href = '/admin/student-progress'}
-              >
-                <HomeIcon className="w-4 h-4" />
-                進度儀表板
-              </button>
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-                onClick={() => window.location.href = '/admin/student-progress/growth-trees'}
-              >
-                <TreePine className="w-4 h-4" />
-                成長樹管理
-              </button>
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-                onClick={() => window.location.href = '/admin/student-progress/abilities'}
-              >
-                <AcademicCapIcon className="w-4 h-4" />
-                發展能力圖卡
-              </button>
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-                onClick={() => window.location.href = '/admin/student-progress/activities'}
-              >
-                <FileText className="w-4 h-4" />
-                教學活動管理
-              </button>
-              
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2] bg-[#FFF9F2] text-[#2B3A3B]"
-                onClick={() => window.location.href = '/admin/student-progress/student-media'}
-              >
-                <Video className="w-4 h-4" />
-                學生媒體管理
-              </button>
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:bg-[#FFF9F2]"
-                onClick={() => window.location.href = '/admin/students'}
-              >
-                <Users className="w-4 h-4" />
-                返回學生管理
-              </button>
-            </div>
+          <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
+            <ResponsiveNavigationDropdown
+              items={[
+                {
+                  icon: BarChart3,
+                  label: "進度管理面板",
+                  href: "/admin/student-progress",
+                  variant: "secondary"
+                },
+                {
+                  icon: TreePine,
+                  label: "成長樹管理",
+                  href: "/admin/student-progress/growth-trees",
+                  variant: "secondary"
+                },
+                {
+                  icon: TrendingUp,
+                  label: "發展能力圖卡",
+                  href: "/admin/student-progress/abilities",
+                  variant: "secondary"
+                },
+                {
+                  icon: Gamepad2,
+                  label: "教學活動管理",
+                  href: "/admin/student-progress/activities",
+                  variant: "secondary"
+                },
+                {
+                  icon: Video,
+                  label: "學生媒體管理",
+                  href: "/admin/student-progress/student-media",
+                  variant: "primary"
+                },
+                {
+                  icon: Users,
+                  label: "返回學生管理",
+                  href: "/admin/students",
+                  variant: "accent"
+                }
+              ]}
+              currentPage="/admin/student-progress/student-media"
+            />
           </div>
 
           {/* 標題和操作按鈕 */}
