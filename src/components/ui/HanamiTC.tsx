@@ -7,6 +7,7 @@ import MiniLessonCard from './MiniLessonCard';
 
 import AITeacherSchedulerModal from '@/components/ui/AITeacherSchedulerModal';
 import LessonPlanModal from '@/components/ui/LessonPlanModal';
+import StudentActivitiesPanel from '@/components/ui/StudentActivitiesPanel';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { getSupabaseClient } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
@@ -118,6 +119,15 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
   const [view, setView] = useState<'week' | 'day'>('week');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isAISchedulerOpen, setIsAISchedulerOpen] = useState(false);
+  const [isStudentActivitiesOpen, setIsStudentActivitiesOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<{
+    id: string;
+    name: string;
+    courseType: string;
+    age?: string;
+    lessonDate?: string;
+    timeslot?: string;
+  } | null>(null);
 
   // 添加防抖機制和初始化標記
   const lessonsFetchedRef = useRef(false);
@@ -665,6 +675,19 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
                 setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
                 setIsModalOpen(true);
               }}
+              onStudentClick={(student) => {
+                // 打開學生活動面板
+                const studentData = group.students.find(s => s.student_id === student.id);
+                setSelectedStudent({
+                  id: student.id || '',
+                  name: student.name,
+                  courseType: group.course,
+                  age: studentData?.age,
+                  lessonDate: getDateString(date),
+                  timeslot: group.time || '',
+                });
+                setIsStudentActivitiesOpen(true);
+              }}
             />
           ))}
         </div>
@@ -835,6 +858,19 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
                               setModalInfo({ date, time: group.time, course: group.course, plan: matchedPlan });
                               setIsModalOpen(true);
                             }}
+                            onStudentClick={(student) => {
+                              // 打開學生活動面板
+                              const studentData = group.students.find(s => s.student_id === student.id);
+                              setSelectedStudent({
+                                id: student.id || '',
+                                name: student.name,
+                                courseType: group.course,
+                                age: studentData?.age,
+                                lessonDate: getDateString(date),
+                                timeslot: group.time || '',
+                              });
+                              setIsStudentActivitiesOpen(true);
+                            }}
                           />
                         );
                       })}
@@ -890,6 +926,46 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
           teachers={teachers}
           onClose={() => setIsAISchedulerOpen(false)}
         />
+
+        {/* 學生活動面板模態框 */}
+        {selectedStudent && isStudentActivitiesOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+            <div className="bg-[#FFFDF8] rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border border-[#EADBC8] pointer-events-auto relative">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#FFD59A] to-[#FFB6C1] rounded-full flex items-center justify-center shadow-sm">
+                    <span className="text-[#4B4036] text-sm font-medium">
+                      {selectedStudent.name.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-[#4B4036]">{selectedStudent.name}</h2>
+                    <p className="text-sm text-[#2B3A3B] opacity-70">
+                      {selectedStudent.courseType} • {selectedStudent.age ? `${Math.floor(parseInt(selectedStudent.age) / 12)}歲` : '年齡未知'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsStudentActivitiesOpen(false);
+                    setSelectedStudent(null);
+                  }}
+                  className="p-2 hover:bg-[#F5E7D4] rounded-full transition-colors"
+                >
+                  <svg className="w-6 h-6 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <StudentActivitiesPanel
+                studentId={selectedStudent.id}
+                lessonDate={selectedStudent.lessonDate || ''}
+                timeslot={selectedStudent.timeslot || ""}
+              />
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 interface MiniLessonCardProps {
   time: string;
   course: { name: string; icon?: string; activities?: string[] };
-  students: { name: string; isTrial?: boolean; remainingLessons?: number; age?: string }[];
+  students: { name: string; isTrial?: boolean; remainingLessons?: number; age?: string; id?: string }[];
   plan?: {
     teacherNames1?: string[];
     teacherNames2?: string[];
@@ -18,6 +18,7 @@ interface MiniLessonCardProps {
   allShowTeachers?: boolean;
   allShowStudents?: boolean;
   allShowPlan?: boolean;
+  onStudentClick?: (student: { id?: string; name: string }) => void;
 }
 
 const getStudentBg = (remainingLessons?: number, isTrial?: boolean) => {
@@ -39,6 +40,7 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
   allShowTeachers = true,
   allShowStudents = true,
   allShowPlan = true,
+  onStudentClick,
 }) => {
   const [showStudents, setShowStudents] = useState(true);
   const [showPlan, setShowPlan] = useState(true);
@@ -127,12 +129,16 @@ const MiniLessonCard: React.FC<MiniLessonCardProps> = ({
         </button>
       </div>
       {showStudents && (
-        <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto">
+        <div className="flex flex-col gap-1 max-h=[120px] overflow-y-auto">
           {students.map((stu, i) => (
             <div
               key={i}
-              className="inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs transition-all duration-200 shadow-sm max-w-full break-words"
+              className="inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs transition-all duration-200 shadow-sm max-w-full break-words hover:brightness-95"
               style={{ backgroundColor: getStudentBg(stu.remainingLessons, stu.isTrial), wordBreak: 'break-all' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStudentClick?.({ id: stu.id, name: stu.name });
+              }}
             >
               <div className="flex flex-col items-start w-full">
                 <span className="font-semibold w-full text-left break-words whitespace-pre-line leading-snug">{stu.name}</span>

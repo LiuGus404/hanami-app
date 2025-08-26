@@ -23,6 +23,7 @@ interface LessonPlanModalProps {
     name: string;
   }>;
   isDefaultTime?: boolean; // 新增：是否為預設時間模式
+  initialExpandedStudentId?: string; // 新增：預設展開的學生
 }
 
 interface ClassStudent {
@@ -55,6 +56,7 @@ const LessonPlanModal = ({
   onSaved,
   students = [],
   isDefaultTime = false,
+  initialExpandedStudentId,
 }: LessonPlanModalProps) => {
   const [topic, setTopic] = useState('');
   const [objectives, setObjectives] = useState<string[]>(['']);
@@ -87,6 +89,15 @@ const LessonPlanModal = ({
 
   const supabase = getSupabaseClient();
   const { teachers, loading } = useTeachers();
+
+  useEffect(() => {
+    // 從全域暫存讀取（若有）
+    if (typeof window !== 'undefined' && (window as any).__hanami_initial_student_id) {
+      const sid = (window as any).__hanami_initial_student_id as string;
+      setExpandedStudents(new Set([sid]));
+      delete (window as any).__hanami_initial_student_id;
+    }
+  }, []);
 
   // 清理活動數據
   const clearActivities = () => {
@@ -370,6 +381,13 @@ const LessonPlanModal = ({
       setSelectedTeacher2([]);
     }
   }, [existingPlan]);
+
+  useEffect(() => {
+    // 初始展開指定學生
+    if (open && classStudents.length > 0 && initialExpandedStudentId) {
+      setExpandedStudents(new Set([initialExpandedStudentId]));
+    }
+  }, [open, classStudents, initialExpandedStudentId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -567,7 +567,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
   }, [studentId, lessonDate, timeslot, fetchStudentActivities]);
 
   useEffect(() => {
-    if (studentId && lessonDate && timeslot) {
+    if (studentId && lessonDate) {
       // 優先載入學生活動，其他資訊延遲載入
       fetchStudentActivities();
       
