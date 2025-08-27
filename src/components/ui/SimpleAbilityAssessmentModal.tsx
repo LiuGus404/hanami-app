@@ -229,6 +229,27 @@ export default function SimpleAbilityAssessmentModal({
     }
   }, [selectedStudentId, lessonDate]);
 
+  // 監聽 initialData 變化並重新初始化狀態
+  useEffect(() => {
+    if (initialData) {
+      console.log('🔄 initialData 變化，重新初始化狀態:', initialData);
+      
+      // 更新基本表單狀態
+      setSelectedStudentId(initialData.student_id || '');
+      setSelectedTreeId(initialData.tree_id || '');
+      setSelectedTeacherId(initialData.teacher_id || '');
+      setLessonDate(initialData.lesson_date || new Date().toISOString().split('T')[0]);
+      setOverallRating(initialData.overall_performance_rating || 3);
+      setGeneralNotes(initialData.general_notes || '');
+      setNextFocus(initialData.next_lesson_focus || '');
+      
+      // 更新能力評估狀態
+      setAbilityAssessments(initialData.ability_assessments || {});
+      
+      console.log('✅ 狀態重新初始化完成');
+    }
+  }, [initialData]);
+
   // 點擊外部關閉下拉選單
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

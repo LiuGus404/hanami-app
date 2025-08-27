@@ -345,8 +345,13 @@ export default function AbilityAssessmentsPage() {
         student_id: assessmentData.student_id,
         tree_id: assessmentData.tree_id,
         assessment_date: assessmentData.assessment_date,
-        notes: assessmentData.general_notes || '',  // 確保 notes 不為 undefined
-        overall_performance_rating: assessmentData.overall_performance_rating || 1, // 添加整體表現評分
+        lesson_date: assessmentData.lesson_date || assessmentData.assessment_date, // 使用 lesson_date 或回退到 assessment_date
+        teacher_id: assessmentData.teacher_id || null,
+        ability_assessments: assessmentData.ability_assessments || {},
+        overall_performance_rating: assessmentData.overall_performance_rating || 3,
+        general_notes: assessmentData.general_notes || '',
+        next_lesson_focus: assessmentData.next_lesson_focus || null,
+        notes: assessmentData.general_notes || '',  // 保持向後兼容
         goals: goals || []
       };
 
@@ -425,8 +430,13 @@ export default function AbilityAssessmentsPage() {
         student_id: assessmentData.student_id,
         tree_id: assessmentData.tree_id,
         assessment_date: assessmentData.assessment_date,
-        notes: assessmentData.general_notes || '',  // 確保 notes 不為 undefined
-        overall_performance_rating: assessmentData.overall_performance_rating || 1, // 添加整體表現評分
+        lesson_date: assessmentData.lesson_date || assessmentData.assessment_date, // 使用 lesson_date 或回退到 assessment_date
+        teacher_id: assessmentData.teacher_id || null,
+        ability_assessments: assessmentData.ability_assessments || {},
+        overall_performance_rating: assessmentData.overall_performance_rating || 3,
+        general_notes: assessmentData.general_notes || '',
+        next_lesson_focus: assessmentData.next_lesson_focus || null,
+        notes: assessmentData.general_notes || '',  // 保持向後兼容
         goals: goals || []
       };
 
@@ -469,7 +479,11 @@ export default function AbilityAssessmentsPage() {
         
         // 重新載入資料
         await loadData();
-        setEditingAssessment(null);
+        
+        // 更新 editingAssessment 為最新的資料，而不是設為 null
+        if (result.data) {
+          setEditingAssessment(result.data);
+        }
         
       } else {
         console.error('❌ API 調用失敗:', result.error);

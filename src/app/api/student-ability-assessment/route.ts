@@ -11,15 +11,21 @@ export async function POST(request: NextRequest) {
       student_id,
       tree_id,
       assessment_date,
+      lesson_date,
+      teacher_id,
+      ability_assessments,
+      overall_performance_rating,
+      general_notes,
+      next_lesson_focus,
       notes,
       goals
     } = body;
 
     // 驗證必要欄位
-    if (!student_id || !tree_id || !assessment_date) {
+    if (!student_id || !tree_id || !assessment_date || !lesson_date) {
       return NextResponse.json({
         success: false,
-        error: '缺少必要欄位: student_id, tree_id, assessment_date'
+        error: '缺少必要欄位: student_id, tree_id, assessment_date, lesson_date'
       }, { status: 400 });
     }
 
@@ -45,7 +51,12 @@ export async function POST(request: NextRequest) {
       student_id,
       tree_id,
       assessment_date,
-      general_notes: notes || null,
+      lesson_date,
+      teacher_id: teacher_id || null,
+      ability_assessments: ability_assessments || {},
+      overall_performance_rating: overall_performance_rating || 3,
+      general_notes: general_notes || notes || null,
+      next_lesson_focus: next_lesson_focus || null,
       updated_at: new Date().toISOString()
     };
 
