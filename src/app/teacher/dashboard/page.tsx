@@ -1531,7 +1531,12 @@ export default function TeacherDashboard() {
                student_id: assessment.student_id,
                tree_id: assessment.tree_id,
                assessment_date: assessment.assessment_date,
-               notes: assessment.general_notes || '',  // 確保 notes 不為 undefined
+               lesson_date: assessment.lesson_date,
+               teacher_id: assessment.teacher_id,
+               ability_assessments: assessment.ability_assessments || {},
+               overall_performance_rating: assessment.overall_performance_rating || 3,
+               general_notes: assessment.general_notes || '',
+               next_lesson_focus: assessment.next_lesson_focus || '',
                goals: assessment.goals || []
              };
 

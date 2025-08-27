@@ -52,6 +52,8 @@ interface AbilityAssessment {
   general_notes: string | null;
   next_lesson_focus: string | null;
   created_at: string;
+  updated_at?: string;
+  selected_goals?: any[];
   student?: Student;
   tree?: GrowthTree;
 }
@@ -234,6 +236,7 @@ export default function AbilityAssessmentsPage() {
     try {
       setLoading(true);
       setError('');
+      console.log('🔄 開始載入評估記錄...');
 
       const { data: assessmentsData, error: assessmentsError } = await supabase
         .from('hanami_ability_assessments')
@@ -244,33 +247,59 @@ export default function AbilityAssessmentsPage() {
         `)
         .order('created_at', { ascending: false });
 
+      console.log('📊 查詢結果:', {
+        data: assessmentsData,
+        error: assessmentsError,
+        count: assessmentsData?.length || 0
+      });
+
       if (assessmentsError) {
-        console.error('載入評估記錄失敗:', assessmentsError);
-        setError('載入評估記錄失敗');
+        console.error('❌ 載入評估記錄失敗:', assessmentsError);
+        setError('載入評估記錄失敗: ' + assessmentsError.message);
         return;
       }
 
-      setAssessments(assessmentsData || []);
+      console.log('✅ 成功載入評估記錄:', assessmentsData?.length || 0, '個記錄');
+      console.log('📋 評估記錄詳細:', assessmentsData);
+      
+      // 確保資料格式正確
+      const normalizedData = (assessmentsData || []).map(assessment => ({
+        ...assessment,
+        updated_at: assessment.updated_at || assessment.created_at,
+        selected_goals: assessment.selected_goals || []
+      }));
+      
+      setAssessments(normalizedData);
     } catch (error) {
-      console.error('載入資料失敗:', error);
-      setError('載入資料失敗');
+      console.error('💥 載入資料失敗:', error);
+      setError('載入資料失敗: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
   const applyFilters = () => {
+    console.log('🔍 開始應用篩選:', {
+      originalCount: assessments.length,
+      searchQuery,
+      selectedGrowthTrees,
+      selectedCourses,
+      dateRange
+    });
+    
     let filtered = [...assessments];
 
     // 搜尋篩選
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
+      const beforeCount = filtered.length;
       filtered = filtered.filter(assessment => 
         assessment.student?.full_name?.toLowerCase().includes(query) ||
         assessment.tree?.tree_name?.toLowerCase().includes(query) ||
         assessment.general_notes?.toLowerCase().includes(query) ||
         assessment.next_lesson_focus?.toLowerCase().includes(query)
       );
+      console.log('📝 搜尋篩選:', { beforeCount, afterCount: filtered.length, query });
     }
 
     // 成長樹篩選
@@ -325,6 +354,17 @@ export default function AbilityAssessmentsPage() {
         assessment.assessment_date <= dateRange.end
       );
     }
+
+    console.log('✅ 篩選完成:', {
+      originalCount: assessments.length,
+      finalCount: filtered.length,
+      filtered: filtered.map(a => ({
+        id: a.id,
+        student: a.student?.full_name,
+        tree: a.tree?.tree_name,
+        date: a.assessment_date
+      }))
+    });
 
     setFilteredAssessments(filtered);
   };

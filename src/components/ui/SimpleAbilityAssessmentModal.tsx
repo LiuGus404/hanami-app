@@ -88,6 +88,12 @@ interface AbilityAssessment {
       rating: number;
     };
   };
+  selected_goals?: Array<{
+    goal_id: string;
+    assessment_mode: 'progress' | 'multi_select';
+    progress_level?: number;
+    selected_levels?: string[];
+  }>;
   goals?: Array<{
     goal_id: string;
     assessment_mode: 'progress' | 'multi_select';
@@ -132,6 +138,9 @@ export default function SimpleAbilityAssessmentModal({
   const [lessonDate, setLessonDate] = useState(
     initialData?.lesson_date || defaultAssessmentDate || new Date().toISOString().split('T')[0]
   );
+  const [assessmentDate, setAssessmentDate] = useState(
+    initialData?.assessment_date || defaultAssessmentDate || new Date().toISOString().split('T')[0]
+  );
   const [overallRating, setOverallRating] = useState(initialData?.overall_performance_rating || 3);
   const [generalNotes, setGeneralNotes] = useState(initialData?.general_notes || '');
   const [nextFocus, setNextFocus] = useState(initialData?.next_lesson_focus || '');
@@ -145,6 +154,9 @@ export default function SimpleAbilityAssessmentModal({
   const [treeSearch, setTreeSearch] = useState('');
   const [studentTrees, setStudentTrees] = useState<GrowthTree[]>([]); // 學生的所有成長樹
   
+  // 評估記錄選擇相關狀態
+  const [showAssessmentDropdown, setShowAssessmentDropdown] = useState(false);
+  
   // 教師選擇相關狀態
   const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -152,6 +164,11 @@ export default function SimpleAbilityAssessmentModal({
   // 能力評估狀態
   const [abilityAssessments, setAbilityAssessments] = useState<{[key: string]: any}>(initialData?.ability_assessments || {});
   const [goalAssessments, setGoalAssessments] = useState<{[key: string]: any}>({});
+  
+  // 評估記錄歷史狀態
+  const [latestAssessment, setLatestAssessment] = useState<any>(null);
+  const [assessmentHistory, setAssessmentHistory] = useState<any[]>([]);
+  const [selectedAssessmentRecord, setSelectedAssessmentRecord] = useState<any>(null);
   
   // 多選模式評估狀態
   const [multiSelectAssessments, setMultiSelectAssessments] = useState<{[goalId: string]: string[]}>({});
@@ -178,10 +195,27 @@ export default function SimpleAbilityAssessmentModal({
 
   // 檢查是否為編輯模式
   const isEditMode = !!initialData;
+  
+  // 編輯模式調試資訊
+  if (isEditMode) {
+    console.log('🔄 編輯模式啟用');
+    console.log('📋 initialData:', initialData);
+    console.log('📅 初始評估日期:', initialData?.assessment_date);
+    console.log('🎯 初始 selected_goals:', initialData?.selected_goals);
+  }
 
   // 檢查學生是否有分配成長樹
   const selectedStudent = students.find(s => s.id === selectedStudentId);
   const selectedTree = studentTrees.find(t => t.id === selectedTreeId);
+  
+  // 調試輸出
+  if (selectedTreeId && studentTrees.length > 0) {
+    console.log('🔍 成長樹選擇調試:');
+    console.log('  - selectedTreeId:', selectedTreeId);
+    console.log('  - studentTrees:', studentTrees);
+    console.log('  - selectedTree:', selectedTree);
+    console.log('  - selectedTree?.tree_name:', selectedTree?.tree_name);
+  }
 
   // 過濾學生列表
   const filteredStudents = students.filter(student =>
@@ -208,19 +242,80 @@ export default function SimpleAbilityAssessmentModal({
   }, []); // 只在組件掛載時執行一次
 
   useEffect(() => {
+    console.log('🔄 useEffect[selectedStudentId] 被觸發');
+    console.log('  - selectedStudentId:', selectedStudentId);
+    console.log('  - isEditMode:', isEditMode);
+    console.log('  - initialData?.tree_id:', initialData?.tree_id);
+    
     if (selectedStudentId) {
-      loadStudentTrees(selectedStudentId);
+      // 編輯模式時傳入目標樹ID
+      const targetTreeId = isEditMode ? initialData?.tree_id : undefined;
+      
+      // 新增模式時，先載入最新評估記錄，再載入成長樹
+      if (!isEditMode) {
+        const loadDataSequentially = async () => {
+          console.log('🔄 新增模式：開始載入學生資料 -', selectedStudentId);
+          
+          try {
+            // 步驟1：載入評估記錄歷史（包含推薦記錄）
+            console.log('📊 即將調用 loadAssessmentHistory，學生ID:', selectedStudentId);
+            const recommendedData = await loadAssessmentHistory(selectedStudentId);
+            console.log('📊 loadAssessmentHistory 完成，推薦記錄:', recommendedData);
+            
+            // 步驟2：載入學生成長樹，傳遞推薦的評估資料
+            console.log('🌳 即將調用 loadStudentTrees');
+            await loadStudentTrees(selectedStudentId, targetTreeId, recommendedData);
+            console.log('🌳 loadStudentTrees 完成');
+          } catch (error) {
+            console.error('❌ loadDataSequentially 發生錯誤:', error);
+          }
+        };
+        
+        loadDataSequentially();
+      } else {
+        // 編輯模式：直接載入成長樹
+        loadStudentTrees(selectedStudentId, targetTreeId);
+      }
     } else {
       setStudentTrees([]);
       setSelectedTreeId('');
+      setLatestAssessment(null);
     }
-  }, [selectedStudentId]);
+  }, [selectedStudentId, isEditMode, initialData?.tree_id]); // 加入編輯模式相關的依賴
 
   useEffect(() => {
     if (selectedTreeId) {
+      console.log('🌳 成長樹變化，載入目標和能力:', selectedTreeId);
       loadTreeGoalsAndAbilities(selectedTreeId);
     }
   }, [selectedTreeId]);
+
+  // 當成長樹選擇變化時，在新增模式下重新載入該成長樹的最新評估
+  useEffect(() => {
+    if (!isEditMode && selectedTreeId && selectedStudentId) {
+      console.log('🔄 新增模式：成長樹變化，重新載入該成長樹的最新評估');
+      console.log('  - selectedTreeId:', selectedTreeId);
+      console.log('  - selectedStudentId:', selectedStudentId);
+      
+      // 重新載入指定成長樹的最新評估記錄
+      const reloadAssessmentData = async () => {
+        await loadLatestAssessment(selectedStudentId, selectedTreeId);
+        // 載入完成後，重新載入目標和能力以應用評估資料
+        setTimeout(() => {
+          console.log('🔄 重新載入目標和能力以應用最新評估資料');
+          loadTreeGoalsAndAbilities(selectedTreeId);
+        }, 100); // 給狀態更新一點時間
+      };
+      
+      reloadAssessmentData();
+    }
+  }, [selectedTreeId, selectedStudentId, isEditMode]);
+
+  // 監聽 goalAssessments 狀態變化
+  useEffect(() => {
+    console.log('📊 goalAssessments 狀態變化:', goalAssessments);
+    console.log('📊 當前 goalAssessments 的鍵:', Object.keys(goalAssessments));
+  }, [goalAssessments]);
 
   // 載入學生活動
   useEffect(() => {
@@ -503,7 +598,7 @@ export default function SimpleAbilityAssessmentModal({
   };
 
   // 載入學生的所有成長樹
-  const loadStudentTrees = async (studentId: string) => {
+  const loadStudentTrees = async (studentId: string, targetTreeId?: string, latestAssessmentData?: any) => {
     try {
       console.log('載入學生的成長樹:', studentId);
       
@@ -541,17 +636,161 @@ export default function SimpleAbilityAssessmentModal({
       console.log('學生的成長樹:', formattedTrees);
       setStudentTrees(formattedTrees);
 
-      // 如果有成長樹，自動選擇第一個
+      // 設置選中的成長樹
       if (formattedTrees.length > 0) {
-        setSelectedTreeId(formattedTrees[0].id);
+        console.log('🔍 成長樹選擇決策開始:');
+        console.log('  - targetTreeId:', targetTreeId);
+        console.log('  - isEditMode:', isEditMode);
+        console.log('  - latestAssessmentData:', latestAssessmentData);
+        console.log('  - latestAssessment (狀態):', latestAssessment);
+        
+        let preferredTreeId = targetTreeId;
+        
+        // 編輯模式：使用 initialData 中的 tree_id
+        if (isEditMode && initialData?.tree_id) {
+          preferredTreeId = initialData.tree_id;
+          console.log('📝 編輯模式：使用 initialData 的成長樹ID:', preferredTreeId);
+        }
+        // 新增模式：優先使用最新評估記錄的成長樹
+        else if (!isEditMode && (latestAssessmentData?.tree_id || latestAssessment?.tree_id)) {
+          preferredTreeId = latestAssessmentData?.tree_id || latestAssessment?.tree_id;
+          console.log('🎯 新增模式：使用最新評估記錄的成長樹ID:', preferredTreeId);
+          
+          // 顯示成長樹名稱
+          const selectedTreeName = formattedTrees.find(tree => tree.id === preferredTreeId)?.tree_name;
+          console.log('🌳 對應的成長樹名稱:', selectedTreeName);
+        }
+        
+        if (preferredTreeId) {
+          const treeExists = formattedTrees.find(tree => tree.id === preferredTreeId);
+          if (treeExists) {
+            setSelectedTreeId(preferredTreeId);
+            console.log('✅ 設置指定的成長樹ID:', preferredTreeId);
+          } else {
+            setSelectedTreeId(formattedTrees[0].id);
+            console.log('⚠️ 找不到指定成長樹，使用第一個:', formattedTrees[0].id);
+          }
+        } else {
+          setSelectedTreeId(formattedTrees[0].id);
+          console.log('📝 設置第一個成長樹ID:', formattedTrees[0].id);
+        }
       } else {
         setSelectedTreeId('');
+        console.log('❌ 沒有可用的成長樹');
       }
 
     } catch (error) {
       console.error('載入學生成長樹失敗:', error);
       setStudentTrees([]);
       setSelectedTreeId('');
+    }
+  };
+
+  // 載入評估記錄歷史
+  const loadAssessmentHistory = async (studentId: string) => {
+    try {
+      console.log('🔍 載入學生評估記錄歷史:', studentId);
+      
+      const response = await fetch(`/api/student-assessment-history?student_id=${studentId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ 成功載入評估記錄歷史:', {
+          total_records: data.total_records,
+          records_with_data: data.records_with_data,
+          recommended_record: data.recommended_record?.id
+        });
+        
+        setAssessmentHistory(data.assessments);
+        
+        // 設置推薦的記錄（有評估資料的最新記錄）
+        if (data.recommended_record) {
+          setSelectedAssessmentRecord(data.recommended_record);
+          setLatestAssessment(data.recommended_record);
+          console.log('📌 設置推薦記錄為預設:', data.recommended_record.assessment_date);
+        }
+        
+        return data.recommended_record;
+      } else {
+        console.error('載入評估記錄歷史失敗:', data.error);
+        setAssessmentHistory([]);
+        return null;
+      }
+    } catch (error) {
+      console.error('載入評估記錄歷史失敗:', error);
+      setAssessmentHistory([]);
+      return null;
+    }
+  };
+
+  // 載入學生最新評估記錄（用於新增模式的預設值）
+  const loadLatestAssessment = async (studentId: string, treeId?: string): Promise<any> => {
+    try {
+      console.log('📋 載入學生最新評估記錄:', { studentId, treeId });
+      
+      // 如果指定了成長樹，只載入該成長樹的最新評估
+      if (treeId) {
+        console.log('🎯 查詢指定成長樹的評估記錄:', treeId);
+        const { data: treeAssessments, error: treeError } = await supabase
+          .from('hanami_ability_assessments')
+          .select('*')
+          .eq('student_id', studentId)
+          .eq('tree_id', treeId)
+          .order('assessment_date', { ascending: false })
+          .limit(1);
+        
+        if (!treeError && treeAssessments && treeAssessments.length > 0) {
+          const latest = treeAssessments[0];
+          console.log('✅ 找到指定成長樹的最新評估記錄:', latest);
+          setLatestAssessment(latest);
+          return latest;
+        } else {
+          console.log('⚠️ 指定成長樹沒有評估記錄');
+          setLatestAssessment(null);
+          return null;
+        }
+      }
+      
+      // 如果沒有指定成長樹，載入該學生的最新評估記錄（任何成長樹）
+      console.log('🔍 查詢學生的任何成長樹評估記錄');
+      const { data: allAssessments, error: allError } = await supabase
+        .from('hanami_ability_assessments')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('assessment_date', { ascending: false })
+        .limit(1);
+      
+      if (allError) {
+        console.error('載入最新評估記錄失敗:', allError);
+        throw allError;
+      }
+      
+      if (allAssessments && allAssessments.length > 0) {
+        const latest = allAssessments[0];
+        console.log('✅ 找到學生的最新評估記錄:', latest);
+        console.log('🎯 最新評估記錄的成長樹ID:', latest.tree_id);
+        
+        // 詳細檢查 selected_goals 和 ability_assessments 資料
+        console.log('🔍 詳細資料結構檢查:');
+        console.log('  - selected_goals 欄位:', latest.selected_goals);
+        console.log('  - selected_goals 類型:', typeof latest.selected_goals);
+        console.log('  - selected_goals 是否為陣列:', Array.isArray(latest.selected_goals));
+        console.log('  - ability_assessments 欄位:', latest.ability_assessments);
+        console.log('  - ability_assessments 類型:', typeof latest.ability_assessments);
+        console.log('  - 完整記錄鍵值:', Object.keys(latest));
+        
+        setLatestAssessment(latest);
+        return latest;
+      } else {
+        console.log('❌ 沒有找到歷史評估記錄');
+        setLatestAssessment(null);
+        return null;
+      }
+      
+    } catch (error) {
+      console.error('載入最新評估記錄失敗:', error);
+      setLatestAssessment(null);
+      return null;
     }
   };
 
@@ -717,51 +956,83 @@ export default function SimpleAbilityAssessmentModal({
           const initialGoalAssessments: {[key: string]: any} = {};
           const initialMultiSelectAssessments: {[key: string]: string[]} = {};
 
-          // 優先從 selected_goals 欄位讀取目標評估資料，如果沒有則從 ability_assessments 欄位讀取
-          if (latestAssessment) {
-            if (latestAssessment.selected_goals && latestAssessment.selected_goals.length > 0) {
-              console.log('從 selected_goals 讀取歷史評估資料:', latestAssessment.selected_goals);
+          // 優先從 initialData（編輯模式）讀取，然後從狀態中的最新評估記錄讀取，最後使用本次查詢的結果
+          const stateLatestAssessment = selectedAssessmentRecord || latestAssessment; // 從狀態獲取用戶選擇的記錄
+          const sourceAssessment = isEditMode && initialData ? initialData : (stateLatestAssessment || assessmentData?.[0]);
+          console.log('🔍 目標初始化資料來源:');
+          console.log('  - isEditMode:', isEditMode);
+          console.log('  - 用戶選擇的記錄 selectedAssessmentRecord:', selectedAssessmentRecord);
+          console.log('  - 狀態中的 latestAssessment:', latestAssessment);
+          console.log('  - 最終狀態記錄 stateLatestAssessment:', stateLatestAssessment);
+          console.log('  - 本次查詢的 assessmentData:', assessmentData?.[0]);
+          console.log('  - 最終使用的 sourceAssessment:', sourceAssessment);
+          console.log('  - sourceAssessment?.selected_goals:', sourceAssessment?.selected_goals);
+          console.log('  - sourceAssessment?.ability_assessments:', sourceAssessment?.ability_assessments);
+          
+          if (sourceAssessment) {
+            // 檢查成長樹是否匹配（編輯模式下總是匹配，新增模式下需要檢查）
+            const treeMatches = isEditMode || sourceAssessment.tree_id === treeId;
+            console.log('🔍 成長樹匹配檢查:', {
+              isEditMode,
+              sourceTreeId: sourceAssessment.tree_id,
+              currentTreeId: treeId,
+              treeMatches
+            });
+
+            if (sourceAssessment.selected_goals && sourceAssessment.selected_goals.length > 0 && treeMatches) {
+              console.log('✅ 成長樹匹配，從 selected_goals 讀取評估資料:', sourceAssessment.selected_goals);
+              console.log('資料來源:', isEditMode && initialData ? 'initialData' : 'latestAssessment');
               
-              latestAssessment.selected_goals.forEach((goalData: any) => {
+              sourceAssessment.selected_goals.forEach((goalData: any) => {
                 const { goal_id, assessment_mode, progress_level, selected_levels } = goalData;
+                console.log(`🎯 處理歷史目標評估: ${goal_id}`, {
+                  assessment_mode,
+                  progress_level,
+                  selected_levels
+                });
                 
                 if (assessment_mode === 'multi_select') {
                   if (selected_levels && selected_levels.length > 0) {
                     initialMultiSelectAssessments[goal_id] = selected_levels;
-                    console.log(`從歷史資料設置目標 ${goal_id} 的多選初始值:`, selected_levels);
+                    console.log(`✅ 設置目標 ${goal_id} 的多選初始值:`, selected_levels);
                   }
                 } else if (assessment_mode === 'progress') {
                   if (progress_level && progress_level > 0) {
                     initialGoalAssessments[goal_id] = { level: progress_level };
-                    console.log(`從歷史資料設置目標 ${goal_id} 的進度初始值:`, progress_level);
+                    console.log(`✅ 設置目標 ${goal_id} 的進度初始值:`, progress_level);
                   }
                 }
               });
-            } else if (latestAssessment.ability_assessments) {
-              console.log('從 ability_assessments 讀取歷史評估資料:', latestAssessment.ability_assessments);
-              
-              Object.entries(latestAssessment.ability_assessments).forEach(([goalId, goalData]: [string, any]) => {
-                const { assessment_mode, selected_levels, level } = goalData;
-                
-                if (assessment_mode === 'multi_select') {
-                  if (selected_levels && selected_levels.length > 0) {
-                    initialMultiSelectAssessments[goalId] = selected_levels;
-                    console.log(`從歷史資料設置目標 ${goalId} 的多選初始值:`, selected_levels);
-                  }
-                } else if (assessment_mode === 'progress') {
-                  if (level && level > 0) {
-                    initialGoalAssessments[goalId] = { level: level };
-                    console.log(`從歷史資料設置目標 ${goalId} 的進度初始值:`, level);
-                  }
-                }
-              });
+            } else if (sourceAssessment.selected_goals && sourceAssessment.selected_goals.length > 0 && !treeMatches) {
+              console.warn('⚠️ 成長樹不匹配，跳過歷史評估資料應用');
+              console.warn('  - 評估記錄成長樹:', sourceAssessment.tree_id);
+              console.warn('  - 當前成長樹:', treeId);
+            } else {
+              console.log('ℹ️ 沒有可用的 selected_goals 資料');
             }
           }
 
+          console.log('📊 開始處理當前成長樹的目標:');
+          console.log('  - 當前成長樹目標數量:', goalsData?.length || 0);
+          console.log('  - 歷史目標評估數量:', Object.keys(initialGoalAssessments).length);
+          console.log('  - 歷史多選評估數量:', Object.keys(initialMultiSelectAssessments).length);
+          
           (goalsData || []).forEach(goal => {
-            console.log(`處理目標 ${goal.id}:`, goal);
+            console.log(`🎯 處理當前目標 ${goal.id}:`, goal.goal_name);
             console.log(`目標評估模式:`, (goal as any).assessment_mode);
             console.log(`目標所需能力:`, goal.required_abilities);
+            
+            // 檢查是否有歷史評估資料
+            const hasHistoryGoal = initialGoalAssessments[goal.id];
+            const hasHistoryMultiSelect = initialMultiSelectAssessments[goal.id];
+            console.log(`歷史進度評估:`, hasHistoryGoal);
+            console.log(`歷史多選評估:`, hasHistoryMultiSelect);
+            
+            // 如果已經有歷史評估資料，跳過重新計算
+            if (hasHistoryGoal || hasHistoryMultiSelect) {
+              console.log(`⏭️ 目標 ${goal.id} 已有歷史評估資料，跳過重新計算`);
+              return;
+            }
             
             if ((goal as any).assessment_mode === 'multi_select') {
               // 多選模式：從進度資料中獲取選中的等級
@@ -834,11 +1105,64 @@ export default function SimpleAbilityAssessmentModal({
             }
           });
 
-          setGoalAssessments(initialGoalAssessments);
-          setMultiSelectAssessments(initialMultiSelectAssessments);
+          console.log('📝 準備設置狀態:');
+          console.log('  - 目標評估初始值:', initialGoalAssessments);
+          console.log('  - 多選評估初始值:', initialMultiSelectAssessments);
           
-          console.log('設置的目標評估初始值:', initialGoalAssessments);
-          console.log('設置的多選評估初始值:', initialMultiSelectAssessments);
+          // 使用函數式更新確保狀態正確設置
+          setGoalAssessments(prev => {
+            console.log('🔄 setGoalAssessments 回調執行:', {
+              previous: prev,
+              new: initialGoalAssessments
+            });
+            return initialGoalAssessments;
+          });
+          
+          setMultiSelectAssessments(prev => {
+            console.log('🔄 setMultiSelectAssessments 回調執行:', {
+              previous: prev,
+              new: initialMultiSelectAssessments
+            });
+            return initialMultiSelectAssessments;
+          });
+
+          // 強制重新渲染 - 延遲設置狀態確保組件重新渲染
+          setTimeout(() => {
+            console.log('🔄 強制重新設置狀態以確保UI更新');
+            setGoalAssessments(initialGoalAssessments);
+            setMultiSelectAssessments(initialMultiSelectAssessments);
+          }, 100);
+          console.log('  - 當前成長樹ID:', treeId);
+          console.log('  - 評估記錄來源成長樹ID:', sourceAssessment?.tree_id);
+          
+          // 檢查成長樹ID是否匹配
+          if (sourceAssessment && sourceAssessment.tree_id !== treeId) {
+            console.warn('⚠️ 警告：評估記錄來自不同的成長樹！');
+            console.warn('  - 當前成長樹:', treeId);
+            console.warn('  - 評估記錄成長樹:', sourceAssessment.tree_id);
+          }
+
+          // 設置能力評估的初始值（從最新評估記錄）
+          if (sourceAssessment && sourceAssessment.ability_assessments) {
+            console.log('🎯 從最新評估記錄初始化能力評估:', sourceAssessment.ability_assessments);
+            setAbilityAssessments(sourceAssessment.ability_assessments);
+            
+            // 同時設置其他表單欄位
+            if (!isEditMode) {
+              if (sourceAssessment.overall_performance_rating) {
+                setOverallRating(sourceAssessment.overall_performance_rating);
+                console.log('📊 設置整體表現評分:', sourceAssessment.overall_performance_rating);
+              }
+              if (sourceAssessment.general_notes) {
+                setGeneralNotes(sourceAssessment.general_notes);
+                console.log('📝 設置一般註記:', sourceAssessment.general_notes);
+              }
+              if (sourceAssessment.next_lesson_focus) {
+                setNextFocus(sourceAssessment.next_lesson_focus);
+                console.log('🎯 設置下次課程重點:', sourceAssessment.next_lesson_focus);
+              }
+            }
+          }
 
           // 計算目標完成度
           const goalsWithProgress = (goalsData || []).map(goal => {
@@ -1362,7 +1686,7 @@ export default function SimpleAbilityAssessmentModal({
       const assessment: AbilityAssessment = {
         student_id: selectedStudent.id,
         tree_id: selectedTreeId,
-        assessment_date: new Date().toISOString().split('T')[0],
+        assessment_date: assessmentDate,
         lesson_date: lessonDate,
         teacher_id: currentTeacherId,
         ability_assessments: abilityAssessments,
@@ -1380,12 +1704,20 @@ export default function SimpleAbilityAssessmentModal({
             selected_levels: multiSelectAssessments[goal.id] || []
           };
         } else {
+          const goalAssessment = goalAssessments[goal.id];
           return {
             goal_id: goal.id,
             assessment_mode: 'progress' as const,
-            progress_level: goalAssessments[goal.id]?.level || 0
+            progress_level: goalAssessment?.level || 0
           };
         }
+      });
+
+      console.log('目標評估資料準備完成:', {
+        goalsCount: goalsData.length,
+        goalAssessments,
+        multiSelectAssessments,
+        goalsData
       });
 
       // 將目標資料添加到評估物件中（用於父組件處理）
@@ -1396,6 +1728,7 @@ export default function SimpleAbilityAssessmentModal({
 
       console.log('準備調用父組件的 onSubmit');
       console.log('assessmentWithGoals:', assessmentWithGoals);
+      console.log('目標評估數量:', assessmentWithGoals.goals?.length || 0);
       console.log('onSubmit 函數:', onSubmit);
       
       try {
@@ -1453,7 +1786,12 @@ export default function SimpleAbilityAssessmentModal({
     return (
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <span className="text-sm font-medium text-[#2B3A3B]">{label}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-[#2B3A3B]">{label}</span>
+            {current > 0 && (
+              <span className="text-blue-600 text-sm">📊 已評估 (等級 {current})</span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-[#A68A64]">
               等級 {current} / {maxLevel}
@@ -1723,6 +2061,98 @@ export default function SimpleAbilityAssessmentModal({
                 <p className="text-hanami-text-secondary">
                   {isEditMode ? '修改學生的能力發展評估' : '記錄學生的能力發展評估'}
                 </p>
+                {/* 新增模式下顯示評估記錄選擇器 */}
+                {!isEditMode && assessmentHistory.length > 0 && (
+                  <div className="mt-2 p-2 bg-[#FFF9F2] rounded border border-[#E8D5C4]">
+                    <label className="block text-xs font-medium text-[#2B3A3B] mb-1">
+                      預設值來源
+                    </label>
+                    <div className="relative">
+                      <button
+                        className="w-full px-3 py-2 border border-[#EADBC8] rounded text-left bg-white hover:bg-[#FFF9F2] transition-colors focus:outline-none focus:ring-1 focus:ring-[#A64B2A] text-sm"
+                        type="button"
+                        onClick={() => setShowAssessmentDropdown(!showAssessmentDropdown)}
+                      >
+                        {selectedAssessmentRecord ? (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-medium text-[#2B3A3B]">
+                                {new Date(selectedAssessmentRecord.assessment_date).toLocaleDateString('zh-TW')}
+                              </span>
+                              {selectedAssessmentRecord.analysis?.has_goal_data && (
+                                <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">目標</span>
+                              )}
+                              {selectedAssessmentRecord.analysis?.has_ability_data && (
+                                <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">能力</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[#A68A64]">選擇記錄...</span>
+                        )}
+                      </button>
+                      
+                      {showAssessmentDropdown && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EADBC8] rounded shadow-lg z-20 max-h-48 overflow-y-auto">
+                          <div className="p-2 border-b border-[#EADBC8]">
+                            <div className="text-xs text-[#87704e]">
+                              選擇評估記錄
+                            </div>
+                          </div>
+                          <div>
+                            {assessmentHistory.map((record) => (
+                              <button
+                                key={record.id}
+                                className="w-full px-3 py-2 text-left hover:bg-[#FFF9F2] border-b border-[#EADBC8] last:border-b-0 transition-colors text-sm"
+                                type="button"
+                                onClick={() => {
+                                  console.log('🔄 用戶選擇新的評估記錄:', record.assessment_date);
+                                  console.log('📊 選中記錄的完整資料:', record);
+                                  console.log('📋 選中記錄的 selected_goals:', record.selected_goals);
+                                  console.log('🎯 選中記錄的 analysis:', record.analysis);
+                                  
+                                  setSelectedAssessmentRecord(record);
+                                  setLatestAssessment(record);
+                                  setShowAssessmentDropdown(false);
+                                  
+                                  // 重新載入目標和能力，使用新選擇的記錄
+                                  if (selectedTreeId) {
+                                    console.log('🌳 重新載入目標和能力，成長樹ID:', selectedTreeId);
+                                    loadTreeGoalsAndAbilities(selectedTreeId);
+                                  } else {
+                                    console.log('⚠️ 沒有選擇成長樹，無法載入目標');
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="font-medium text-[#2B3A3B]">
+                                      {new Date(record.assessment_date).toLocaleDateString('zh-TW')}
+                                    </span>
+                                    <div className="text-xs text-[#A68A64] mt-0.5">
+                                      {record.tree?.tree_name || '未知成長樹'}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {record.analysis?.has_goal_data && (
+                                      <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">目標</span>
+                                    )}
+                                    {record.analysis?.has_ability_data && (
+                                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">能力</span>
+                                    )}
+                                    {!record.analysis?.has_goal_data && !record.analysis?.has_ability_data && (
+                                      <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">空</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <button
@@ -1917,14 +2347,24 @@ export default function SimpleAbilityAssessmentModal({
                 )}
               </div>
 
-              {/* 評估日期顯示 */}
+              {/* 評估日期輸入 */}
               <div>
                 <label className="block text-sm font-medium text-[#2B3A3B] mb-2">
                   <CalendarIcon className="w-4 h-4 inline mr-1" />
                   評估日期
                 </label>
+                <input
+                  type="date"
+                  value={assessmentDate}
+                  onChange={(e) => setAssessmentDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#2B3A3B] focus:outline-none focus:border-[#A64B2A]"
+                />
+              </div>
+
+              {/* 評估日期顯示（備用） */}
+              <div className="hidden">
                 <div className="w-full px-4 py-2 border border-[#EADBC8] rounded-lg bg-[#FFF9F2] text-[#2B3A3B]">
-                  {new Date().toLocaleDateString('zh-TW', {
+                  {new Date(assessmentDate).toLocaleDateString('zh-TW', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
@@ -2276,8 +2716,8 @@ export default function SimpleAbilityAssessmentModal({
                             ) : (
                               /* 進度模式評估 */
                               <div>
-                                {/* 渲染目標 ${goal.id} 的進度項目，當前狀態: ${JSON.stringify(goalAssessments[goal.id])} */}
-                            <LevelProgressBar 
+                                {/* 渲染目標進度項目 */}
+                                <LevelProgressBar 
                               current={goalAssessments[goal.id]?.level || 
                                 (goal.completion_percentage ? Math.ceil(goal.completion_percentage / (100 / (goal.progress_max || 20))) : 0)
                               } 

@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       overall_performance_rating: overall_performance_rating || 3,
       general_notes: general_notes || notes || null,
       next_lesson_focus: next_lesson_focus || null,
+      selected_goals: goals || [],
       updated_at: new Date().toISOString()
     };
 
@@ -104,57 +105,11 @@ export async function POST(request: NextRequest) {
       assessmentId = newAssessment.id;
     }
 
-    // 處理學習目標評估
-    if (goals && Array.isArray(goals)) {
-      for (const goal of goals) {
-        const { goal_id, assessment_mode, selected_levels, progress_level } = goal;
-        
-        if (!goal_id) continue;
-
-        // 檢查是否已存在該目標的評估記錄
-        const { data: existingGoalAssessment, error: checkGoalError } = await (supabase as any)
-          .from('hanami_goal_assessments')
-          .select('id')
-          .eq('assessment_id', assessmentId)
-          .eq('goal_id', goal_id)
-          .single();
-
-        const goalAssessmentData = {
-          assessment_id: assessmentId,
-          goal_id,
-          assessment_mode,
-          selected_levels: selected_levels ? JSON.stringify(selected_levels) : null,
-          progress_level: progress_level || null,
-          updated_at: new Date().toISOString()
-        };
-
-        if (existingGoalAssessment) {
-          // 更新現有目標評估記錄
-          const { error: updateGoalError } = await (supabase as any)
-            .from('hanami_goal_assessments')
-            .update(goalAssessmentData)
-            .eq('id', existingGoalAssessment.id);
-
-          if (updateGoalError) {
-            console.error('更新目標評估記錄時出錯:', updateGoalError);
-            // 繼續處理其他目標，不中斷整個流程
-          }
-        } else {
-          // 創建新目標評估記錄
-          const { error: insertGoalError } = await (supabase as any)
-            .from('hanami_goal_assessments')
-            .insert({
-              ...goalAssessmentData,
-              created_at: new Date().toISOString()
-            });
-
-          if (insertGoalError) {
-            console.error('創建目標評估記錄時出錯:', insertGoalError);
-            // 繼續處理其他目標，不中斷整個流程
-          }
-        }
-      }
-    }
+    // 學習目標評估已經包含在 selected_goals 欄位中
+    console.log('📋 學習目標評估已儲存在 selected_goals 欄位:', {
+      goalCount: goals?.length || 0,
+      goals: goals || []
+    });
 
     // 獲取更新後的完整評估記錄
     const { data: finalAssessment, error: fetchError } = await supabase

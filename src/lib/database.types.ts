@@ -1233,6 +1233,7 @@ export type Database = {
           overall_performance_rating: number;
           general_notes: string | null;
           next_lesson_focus: string | null;
+          selected_goals: any[];
           created_at: string;
           updated_at: string;
         };
@@ -1247,6 +1248,7 @@ export type Database = {
           overall_performance_rating: number;
           general_notes?: string | null;
           next_lesson_focus?: string | null;
+          selected_goals?: any[];
           created_at?: string;
           updated_at?: string;
         };
@@ -1261,6 +1263,7 @@ export type Database = {
           overall_performance_rating?: number;
           general_notes?: string | null;
           next_lesson_focus?: string | null;
+          selected_goals?: any[];
           created_at?: string;
           updated_at?: string;
         };
