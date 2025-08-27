@@ -90,6 +90,12 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
   const [studentGrowthTrees, setStudentGrowthTrees] = useState<any[]>([]);
   const [activityStatusFilter, setActivityStatusFilter] = useState<'all' | 'completed' | 'not_completed'>('not_completed');
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const [savingActivityId, setSavingActivityId] = useState<string | null>(null);
+  
+  // 調試用：記錄狀態變化
+  useEffect(() => {
+    console.log('📝 編輯狀態變化:', { editingActivityId, savingActivityId });
+  }, [editingActivityId, savingActivityId]);
 
   const fetchStudentInfo = useCallback(async () => {
     try {
@@ -380,7 +386,18 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
 
   // 儲存活動進度
   const handleSaveActivityProgress = useCallback(async (activityId: string, progress: number) => {
+    console.log('🔄 開始儲存活動進度:', { activityId, progress });
+    
+    // 防止重複儲存
+    if (savingActivityId === activityId) {
+      console.log('⚠️ 正在儲存中，跳過重複請求');
+      return;
+    }
+    
+    setSavingActivityId(activityId);
+    
     try {
+      console.log('📡 發送 API 請求...');
       const response = await fetch('/api/update-activity-progress', {
         method: 'PUT',
         headers: {
@@ -392,13 +409,18 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         }),
       });
 
+      console.log('📨 API 響應狀態:', response.status);
       const result = await response.json();
+      console.log('📋 API 響應內容:', result);
       
       if (!response.ok) {
+        console.error('❌ API 請求失敗:', result);
         throw new Error(result.error || '儲存活動進度失敗');
       }
 
       if (result.success) {
+        console.log('✅ API 請求成功，開始更新前端狀態');
+        
         // 立即更新前端狀態，包括進度和完成狀態
         const newCompletionStatus = progress === 100 ? 'completed' : progress > 0 ? 'in_progress' : 'not_started';
         
@@ -430,17 +452,39 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
           )
         }));
         
+        console.log('🔄 前端狀態已更新，關閉編輯模式');
         // 關閉編輯模式
         setEditingActivityId(null);
         
         // 顯示成功訊息
         alert('進度儲存成功！');
+        console.log('✅ 儲存活動進度完成');
+        
+        // 重新載入活動資料以確保所有組件都顯示最新進度
+        console.log('🔄 重新載入活動資料...');
+        await fetchStudentActivities();
+        
+        // 發送全局事件通知其他組件更新
+        console.log('📡 發送活動進度更新事件...');
+        window.dispatchEvent(new CustomEvent('activityProgressUpdated', {
+          detail: { activityId, progress, newCompletionStatus }
+        }));
+        
+        // 如果是在同一頁面的不同組件，強制等待一下後再刷新一次
+        setTimeout(async () => {
+          console.log('🔄 延遲重新載入以確保所有組件同步...');
+          await fetchStudentActivities();
+        }, 1000);
       } else {
+        console.error('❌ API 回應 success: false');
         throw new Error(result.error || '儲存活動進度失敗');
       }
     } catch (error) {
-      console.error('儲存活動進度失敗:', error);
+      console.error('❌ 儲存活動進度失敗:', error);
       alert(`儲存活動進度失敗：${error instanceof Error ? error.message : '未知錯誤'}`);
+    } finally {
+      // 清除儲存狀態
+      setSavingActivityId(null);
     }
   }, [fetchStudentActivities]);
 
@@ -681,7 +725,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
             <StarIcon className="w-4 h-4 text-yellow-500" />
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(activity.difficultyLevel)}`}>
             難度 {activity.difficultyLevel}
           </span>
@@ -695,11 +739,18 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
             </div>
           )}
             {/* 操作按鈕 */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-2 flex-shrink-0">
               {/* 編輯按鈕 */}
               <button
-                onClick={() => setEditingActivityId(editingActivityId === activity.id ? null : activity.id)}
-                className="flex items-center gap-1 px-2 py-1 bg-slate-200 text-slate-700 rounded text-xs hover:bg-slate-300 transition-colors"
+                onClick={() => {
+                  console.log('🖊️ 點擊編輯按鈕:', {
+                    activityId: activity.id,
+                    currentEditingId: editingActivityId,
+                    activityName: activity.activityName
+                  });
+                  setEditingActivityId(editingActivityId === activity.id ? null : activity.id);
+                }}
+                className="flex items-center gap-1 px-2 py-1 bg-slate-200 text-slate-700 rounded text-xs hover:bg-slate-300 transition-colors min-w-fit"
                 title="編輯活動進度"
               >
                 <PencilIcon className="w-3 h-3" />
@@ -734,10 +785,14 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
               <span className="text-sm text-stone-600">{activity.tempProgress !== undefined ? activity.tempProgress : (activity.progress || 0)}%</span>
               <button
                 onClick={() => handleSaveActivityProgress(activity.id, activity.tempProgress !== undefined ? activity.tempProgress : (activity.progress || 0))}
-                className="px-3 py-1 text-xs bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors font-medium"
-                disabled={activity.tempProgress === undefined}
+                className={`px-3 py-1 text-xs rounded transition-colors font-medium ${
+                  savingActivityId === activity.id 
+                    ? 'bg-gray-400 text-white cursor-not-allowed' 
+                    : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                }`}
+                disabled={savingActivityId === activity.id}
               >
-                儲存
+                {savingActivityId === activity.id ? '儲存中...' : '儲存'}
               </button>
               <button
                 onClick={() => {

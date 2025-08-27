@@ -16,6 +16,7 @@ import { PopupSelect } from '@/components/ui/PopupSelect';
 import AbilityLevelManager from '@/components/admin/AbilityLevelManager';
 import AbilityCategoryManager from '@/components/admin/AbilityCategoryManager';
 import AbilityEditModal from '@/components/admin/AbilityEditModal';
+import StudentOngoingActivities from '@/components/ui/StudentOngoingActivities';
 
 interface Student {
   id: string;
@@ -2586,7 +2587,13 @@ export default function TeacherDashboard() {
   };
 
   const handleEditActivity = (activity: any) => {
+    console.log('🖊️ 教師dashboard - 點擊編輯活動:', {
+      activityId: activity?.id,
+      activityName: activity?.activity_name,
+      activity: activity
+    });
     setEditingActivity(activity);
+    console.log('✅ 教師dashboard - 已設置編輯活動狀態');
   };
 
   // 打開教學活動詳細視窗
@@ -5821,6 +5828,12 @@ export default function TeacherDashboard() {
                         <span className="text-xs text-gray-500">{student.lesson_time}</span>
                       </div>
                       <p className="text-sm text-[#87704e] mb-3">{student.course_type || '未設定課程'}</p>
+                      
+                      {/* 學習中活動顯示 */}
+                      <div className="mb-3">
+                        <StudentOngoingActivities studentId={student.id} />
+                      </div>
+                      
                       <button
                         onClick={() => {
                           setSelectedStudentForMediaUpload(student);
@@ -5851,6 +5864,12 @@ export default function TeacherDashboard() {
                         <span className="text-xs text-gray-500">{student.lesson_time}</span>
                       </div>
                       <p className="text-sm text-[#87704e] mb-3">{student.course_type || '未設定課程'}</p>
+                      
+                      {/* 學習中活動顯示 */}
+                      <div className="mb-3">
+                        <StudentOngoingActivities studentId={student.id} />
+                      </div>
+                      
                       <button
                         onClick={() => {
                           setSelectedStudentForMediaUpload(student);
@@ -6224,6 +6243,7 @@ export default function TeacherDashboard() {
           } : undefined}
           defaultAssessmentDate={selectedAssessmentDate}
           showOnlyTodayStudents={true} // 老師版面只顯示當日學生
+          lockStudent={!!selectedStudentForAssessment} // 如果是從特定學生點擊進入，則鎖定學生選擇
         />
       )}
 

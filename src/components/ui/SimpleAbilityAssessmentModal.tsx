@@ -112,6 +112,7 @@ interface SimpleAbilityAssessmentModalProps {
   defaultStudent?: { id: string; full_name: string; nick_name?: string }; // 新增：預設學生資料
   defaultAssessmentDate?: string; // 新增：預設評估日期
   showOnlyTodayStudents?: boolean; // 新增：是否只顯示當日學生
+  lockStudent?: boolean; // 新增：是否鎖定學生選擇
 }
 
 export default function SimpleAbilityAssessmentModal({
@@ -120,7 +121,8 @@ export default function SimpleAbilityAssessmentModal({
   initialData,
   defaultStudent,
   defaultAssessmentDate,
-  showOnlyTodayStudents
+  showOnlyTodayStudents,
+  lockStudent = false
 }: SimpleAbilityAssessmentModalProps) {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -494,6 +496,19 @@ export default function SimpleAbilityAssessmentModal({
         
         studentsData = allStudentsData;
         console.log('所有學生資料載入成功:', studentsData);
+      }
+      
+      // 確保 defaultStudent 總是包含在學生列表中（特別是在鎖定模式下）
+      if (defaultStudent && studentsData) {
+        const existingStudent = studentsData.find(s => s.id === defaultStudent.id);
+        if (!existingStudent) {
+          console.log('添加 defaultStudent 到學生列表:', defaultStudent);
+          studentsData.unshift({
+            id: defaultStudent.id,
+            full_name: defaultStudent.full_name,
+            nick_name: defaultStudent.nick_name
+          });
+        }
       }
       
       setStudents(studentsData || []);
@@ -2062,16 +2077,21 @@ export default function SimpleAbilityAssessmentModal({
                   {isEditMode ? '修改學生的能力發展評估' : '記錄學生的能力發展評估'}
                 </p>
                 {/* 新增模式下顯示評估記錄選擇器 */}
-                {!isEditMode && assessmentHistory.length > 0 && (
+                {!isEditMode && (
                   <div className="mt-2 p-2 bg-[#FFF9F2] rounded border border-[#E8D5C4]">
                     <label className="block text-xs font-medium text-[#2B3A3B] mb-1">
                       預設值來源
                     </label>
                     <div className="relative">
                       <button
-                        className="w-full px-3 py-2 border border-[#EADBC8] rounded text-left bg-white hover:bg-[#FFF9F2] transition-colors focus:outline-none focus:ring-1 focus:ring-[#A64B2A] text-sm"
+                        className={`w-full px-3 py-2 border border-[#EADBC8] rounded text-left transition-colors focus:outline-none focus:ring-1 focus:ring-[#A64B2A] text-sm ${
+                          assessmentHistory.length > 0 
+                            ? 'bg-white hover:bg-[#FFF9F2] cursor-pointer' 
+                            : 'bg-gray-50 cursor-not-allowed'
+                        }`}
                         type="button"
-                        onClick={() => setShowAssessmentDropdown(!showAssessmentDropdown)}
+                        onClick={() => assessmentHistory.length > 0 && setShowAssessmentDropdown(!showAssessmentDropdown)}
+                        disabled={assessmentHistory.length === 0}
                       >
                         {selectedAssessmentRecord ? (
                           <div className="flex items-center justify-between">
@@ -2088,11 +2108,13 @@ export default function SimpleAbilityAssessmentModal({
                             </div>
                           </div>
                         ) : (
-                          <span className="text-[#A68A64]">選擇記錄...</span>
+                          <span className="text-[#A68A64]">
+                            {assessmentHistory.length > 0 ? '選擇記錄...' : '無歷史記錄'}
+                          </span>
                         )}
                       </button>
                       
-                      {showAssessmentDropdown && (
+                      {showAssessmentDropdown && assessmentHistory.length > 0 && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EADBC8] rounded shadow-lg z-20 max-h-48 overflow-y-auto">
                           <div className="p-2 border-b border-[#EADBC8]">
                             <div className="text-xs text-[#87704e]">
@@ -2100,53 +2122,59 @@ export default function SimpleAbilityAssessmentModal({
                             </div>
                           </div>
                           <div>
-                            {assessmentHistory.map((record) => (
-                              <button
-                                key={record.id}
-                                className="w-full px-3 py-2 text-left hover:bg-[#FFF9F2] border-b border-[#EADBC8] last:border-b-0 transition-colors text-sm"
-                                type="button"
-                                onClick={() => {
-                                  console.log('🔄 用戶選擇新的評估記錄:', record.assessment_date);
-                                  console.log('📊 選中記錄的完整資料:', record);
-                                  console.log('📋 選中記錄的 selected_goals:', record.selected_goals);
-                                  console.log('🎯 選中記錄的 analysis:', record.analysis);
-                                  
-                                  setSelectedAssessmentRecord(record);
-                                  setLatestAssessment(record);
-                                  setShowAssessmentDropdown(false);
-                                  
-                                  // 重新載入目標和能力，使用新選擇的記錄
-                                  if (selectedTreeId) {
-                                    console.log('🌳 重新載入目標和能力，成長樹ID:', selectedTreeId);
-                                    loadTreeGoalsAndAbilities(selectedTreeId);
-                                  } else {
-                                    console.log('⚠️ 沒有選擇成長樹，無法載入目標');
-                                  }
-                                }}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <span className="font-medium text-[#2B3A3B]">
-                                      {new Date(record.assessment_date).toLocaleDateString('zh-TW')}
-                                    </span>
-                                    <div className="text-xs text-[#A68A64] mt-0.5">
-                                      {record.tree?.tree_name || '未知成長樹'}
+                            {assessmentHistory.length > 0 ? (
+                              assessmentHistory.map((record) => (
+                                <button
+                                  key={record.id}
+                                  className="w-full px-3 py-2 text-left hover:bg-[#FFF9F2] border-b border-[#EADBC8] last:border-b-0 transition-colors text-sm"
+                                  type="button"
+                                  onClick={() => {
+                                    console.log('🔄 用戶選擇新的評估記錄:', record.assessment_date);
+                                    console.log('📊 選中記錄的完整資料:', record);
+                                    console.log('📋 選中記錄的 selected_goals:', record.selected_goals);
+                                    console.log('🎯 選中記錄的 analysis:', record.analysis);
+                                    
+                                    setSelectedAssessmentRecord(record);
+                                    setLatestAssessment(record);
+                                    setShowAssessmentDropdown(false);
+                                    
+                                    // 重新載入目標和能力，使用新選擇的記錄
+                                    if (selectedTreeId) {
+                                      console.log('🌳 重新載入目標和能力，成長樹ID:', selectedTreeId);
+                                      loadTreeGoalsAndAbilities(selectedTreeId);
+                                    } else {
+                                      console.log('⚠️ 沒有選擇成長樹，無法載入目標');
+                                    }
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <span className="font-medium text-[#2B3A3B]">
+                                        {new Date(record.assessment_date).toLocaleDateString('zh-TW')}
+                                      </span>
+                                      <div className="text-xs text-[#A68A64] mt-0.5">
+                                        {record.tree?.tree_name || '未知成長樹'}
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-1">
+                                      {record.analysis?.has_goal_data && (
+                                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">目標</span>
+                                      )}
+                                      {record.analysis?.has_ability_data && (
+                                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">能力</span>
+                                      )}
+                                      {!record.analysis?.has_goal_data && !record.analysis?.has_ability_data && (
+                                        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">空</span>
+                                      )}
                                     </div>
                                   </div>
-                                  <div className="flex gap-1">
-                                    {record.analysis?.has_goal_data && (
-                                      <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">目標</span>
-                                    )}
-                                    {record.analysis?.has_ability_data && (
-                                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">能力</span>
-                                    )}
-                                    {!record.analysis?.has_goal_data && !record.analysis?.has_ability_data && (
-                                      <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">空</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </button>
-                            ))}
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-4 text-center text-sm text-[#A68A64]">
+                                該學生目前沒有評估記錄
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -2178,29 +2206,53 @@ export default function SimpleAbilityAssessmentModal({
                 <label className="block text-sm font-medium text-[#2B3A3B] mb-2">
                   <UserIcon className="w-4 h-4 inline mr-1" />
                   選擇學生
+                  {lockStudent && (
+                    <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      已鎖定
+                    </span>
+                  )}
                 </label>
                 <div className="relative">
                   <button
-                    className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left bg-white hover:bg-[#FFF9F2] transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
+                    className={`w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A] ${
+                      lockStudent 
+                        ? 'bg-gray-100 cursor-not-allowed text-gray-500' 
+                        : 'bg-white hover:bg-[#FFF9F2]'
+                    }`}
                     type="button"
-                    onClick={() => setShowStudentDropdown(!showStudentDropdown)}
+                    onClick={() => !lockStudent && setShowStudentDropdown(!showStudentDropdown)}
+                    disabled={lockStudent}
                   >
                     {selectedStudent ? (
-                      <div>
-                        <div className="font-medium text-[#2B3A3B]">{selectedStudent.full_name}</div>
-                        <div className="text-sm text-[#A68A64]">
-                          {selectedStudent.nick_name && `${selectedStudent.nick_name} • `}
-                          {studentTrees.length > 0 
-                            ? `${studentTrees.length} 個成長樹`
-                            : '未分配成長樹'
-                          }
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-[#2B3A3B] flex items-center gap-2">
+                            {selectedStudent.full_name}
+                            {lockStudent && (
+                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="text-sm text-[#A68A64]">
+                            {selectedStudent.nick_name && `${selectedStudent.nick_name} • `}
+                            {studentTrees.length > 0 
+                              ? `${studentTrees.length} 個成長樹`
+                              : '未分配成長樹'
+                            }
+                          </div>
                         </div>
+                        {!lockStudent && (
+                          <svg className="w-4 h-4 text-[#A68A64]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        )}
                       </div>
                     ) : (
                       <span className="text-[#A68A64]">請選擇學生</span>
                     )}
                   </button>
-                  {showStudentDropdown && (
+                  {showStudentDropdown && !lockStudent && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EADBC8] rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
                       <div className="p-2 border-b border-[#EADBC8]">
                         <input

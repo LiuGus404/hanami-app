@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useState, useEffect, useMemo } from 'react';
+import StudentOngoingActivities from './StudentOngoingActivities';
 
 interface TodayLesson {
   id: string;
@@ -380,6 +381,11 @@ export default function TodayLessonsPanel({ lessons, loading = false }: TodayLes
                                     </div>
                                     <div className="text-sm text-[#87704e] mt-1">
                                       負責老師: {lesson.lesson_teacher || lesson.student_teacher || '未安排'}
+                                    </div>
+                                    
+                                    {/* 學習中活動顯示 */}
+                                    <div className="mt-3">
+                                      <StudentOngoingActivities studentId={lesson.student_id} />
                                     </div>
                                   </div>
                                 </div>

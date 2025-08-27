@@ -41,6 +41,7 @@ interface Lesson {
   notes: string;
   remarks: string;
   full_name: string;
+  assignedActivities?: any[]; // 添加分配的活動
   Hanami_Students?: {
     id: string;
     full_name: string;
@@ -135,15 +136,26 @@ interface TimeSlotGroup {
 export default function ClassActivitiesPage() {
   const router = useRouter();
 
-  const [selectedDate, setSelectedDate] = useState(new Date()); // 新增：選中的日期
+  // 使用香港時區的今天日期
+  const getTodayInHongKong = () => {
+    const today = new Date();
+    const hongKongTime = new Date(today.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+    console.log('🌏 香港時區今天:', hongKongTime.toISOString().split('T')[0]);
+    console.log('🗓️ 今天是星期:', hongKongTime.getDay()); // 0=星期日, 1=星期一...6=星期六
+    return hongKongTime;
+  };
+  
+  const todayHK = getTodayInHongKong();
+  const [selectedDate, setSelectedDate] = useState(todayHK); // 預設選中今天
   const [viewMode, setViewMode] = useState<'day'>('day'); // 只保留單日檢視
-  const [selectedDates, setSelectedDates] = useState<Date[]>([new Date()]); // 多選的日期
+  const [selectedDates, setSelectedDates] = useState<Date[]>([todayHK]); // 預設選中今天
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [trialLessons, setTrialLessons] = useState<TrialLesson[]>([]);
   const [treeActivities, setTreeActivities] = useState<TreeActivity[]>([]);
   const [assignedActivities, setAssignedActivities] = useState<AssignedActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingText, setLoadingText] = useState('載入課堂資料中...');
+  const [hasAutoSwitched, setHasAutoSwitched] = useState(false); // 防止重複自動切換
   
   // 快取機制
   const [dataCache, setDataCache] = useState<Map<string, any>>(new Map());
@@ -195,6 +207,10 @@ export default function ClassActivitiesPage() {
   // 新增：進度編輯狀態
   const [editingProgressActivityId, setEditingProgressActivityId] = useState<string | null>(null);
   
+  // 新增：學生評估狀態追蹤
+  const [studentAssessmentStatus, setStudentAssessmentStatus] = useState<Record<string, boolean>>({});
+  const [loadingAssessmentStatus, setLoadingAssessmentStatus] = useState(false);
+  
   // 新增：能力評估模態框狀態
   const [showAbilityAssessmentModal, setShowAbilityAssessmentModal] = useState(false);
   const [selectedStudentForAssessment, setSelectedStudentForAssessment] = useState<{
@@ -218,12 +234,16 @@ export default function ClassActivitiesPage() {
     const end = new Date(date);
     end.setHours(23, 59, 59, 999);
     
-    // 使用本地時間格式化日期，避免時區問題
+    // 使用香港時區格式化日期，避免時區問題
     const formatLocalDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      // 轉換為香港時區
+      const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+      const year = hongKongTime.getFullYear();
+      const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
+      const day = String(hongKongTime.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
+      console.log(`📅 getDayDates 格式化: ${date.toISOString()} → ${formattedDate}`);
+      return formattedDate;
     };
     
     return {
@@ -253,15 +273,17 @@ export default function ClassActivitiesPage() {
         endDate = new Date(dateRange.end);
       }
       
-      // 使用本地時間格式化日期，避免時區問題
-      const formatLocalDate = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+      // 在loadClassData中定義格式化日期函數
+      const formatLocalDateInLoad = (date: Date) => {
+        // 轉換為香港時區
+        const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+        const year = hongKongTime.getFullYear();
+        const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
+        const day = String(hongKongTime.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
       
-      const cacheKey = `${formatLocalDate(startDate)}-${formatLocalDate(endDate)}`;
+      const cacheKey = `${formatLocalDateInLoad(startDate)}-${formatLocalDateInLoad(endDate)}`;
       
       // 檢查快取
       if (dataCache.has(cacheKey)) {
@@ -271,7 +293,7 @@ export default function ClassActivitiesPage() {
         
         // 如果是多選模式，需要過濾出只屬於選中日期的課程
         if (selectedDates.length > 1) {
-          const selectedDateStrings = selectedDates.map(date => formatLocalDate(date));
+          const selectedDateStrings = selectedDates.map(date => formatLocalDateInLoad(date));
           
           const filteredLessons = (cachedData.lessons || []).filter((lesson: Lesson) => 
             selectedDateStrings.includes(lesson.lesson_date)
@@ -296,7 +318,7 @@ export default function ClassActivitiesPage() {
       
       // 發送 API 請求
       setLoadingText('查詢資料庫中...');
-      const response = await fetch(`/api/class-activities?weekStart=${formatLocalDate(startDate)}&weekEnd=${formatLocalDate(endDate)}`);
+      const response = await fetch(`/api/class-activities?weekStart=${formatLocalDateInLoad(startDate)}&weekEnd=${formatLocalDateInLoad(endDate)}`);
       const result = await response.json();
       
       if (!response.ok) {
@@ -312,7 +334,7 @@ export default function ClassActivitiesPage() {
       
               // 如果是多選模式，需要過濾出只屬於選中日期的課程
         if (selectedDates.length > 1) {
-          const selectedDateStrings = selectedDates.map(date => formatLocalDate(date));
+          const selectedDateStrings = selectedDates.map(date => formatLocalDateInLoad(date));
         
         const filteredLessons = (result.data.lessons || []).filter((lesson: Lesson) => 
           selectedDateStrings.includes(lesson.lesson_date)
@@ -363,8 +385,43 @@ export default function ClassActivitiesPage() {
   };
 
   useEffect(() => {
+    console.log('🔄 useEffect 觸發，載入課堂資料');
+    console.log('📅 當前選中日期:', selectedDate.toISOString().split('T')[0]);
+    console.log('📅 當前選中日期數組:', selectedDates.map(d => d.toISOString().split('T')[0]));
+    console.log('🌏 確認今天日期:', getTodayInHongKong().toISOString().split('T')[0]);
     loadClassData();
   }, [selectedDate, selectedDates]);
+
+  // 新增：自動切換到有課程的日期（僅在課程載入完成後執行一次）
+  useEffect(() => {
+    if (lessons.length === 0 || hasAutoSwitched) return; // 等待課程資料載入或已經自動切換過
+    
+    const todayHK = getTodayInHongKong();
+    const todayStr = todayHK.toISOString().split('T')[0];
+    const selectedDateStr = selectedDate.toISOString().split('T')[0];
+    
+    // 只有當選中的是今天，且今天沒有課程時才自動切換
+    if (selectedDateStr === todayStr) {
+      const lessonDates = lessons.map(lesson => lesson.lesson_date);
+      
+      if (!lessonDates.includes(todayStr) && lessonDates.length > 0) {
+        console.log('🔄 今天沒有課程，自動切換到最近的課程日期');
+        
+        const uniqueDates = [...new Set(lessonDates)];
+        const sortedDates = uniqueDates.sort();
+        const nearestDate = sortedDates[0];
+        
+        console.log('📅 自動切換到:', nearestDate);
+        
+        const [year, month, day] = nearestDate.split('-').map(Number);
+        const newDate = new Date(year, month - 1, day);
+        
+        setSelectedDate(newDate);
+        setSelectedDates([newDate]);
+        setHasAutoSwitched(true); // 標記已經自動切換過
+      }
+    }
+  }, [lessons, hasAutoSwitched]); // 依賴 lessons 和 hasAutoSwitched
 
 
 
@@ -470,6 +527,64 @@ export default function ClassActivitiesPage() {
     }
   }, [lessons]);
 
+  // 檢查學生今天的評估狀態
+  const checkStudentAssessmentStatus = async () => {
+    if (loadingAssessmentStatus || lessons.length === 0) {
+      return;
+    }
+
+    try {
+      setLoadingAssessmentStatus(true);
+      console.log('🔍 檢查學生今天的評估狀態...');
+      
+      // 獲取今天的日期
+      const today = new Date().toISOString().split('T')[0];
+      
+      // 收集所有學生ID
+      const studentIds = lessons.map(lesson => {
+        if ('student_id' in lesson && lesson.student_id) {
+          return lesson.student_id;
+        }
+        return null;
+      }).filter((id): id is string => id !== null);
+      
+      // 批量檢查學生今天的評估記錄
+      const { data: assessments, error } = await supabase
+        .from('hanami_ability_assessments')
+        .select('student_id')
+        .in('student_id', studentIds)
+        .eq('assessment_date', today);
+
+      if (error) {
+        console.error('檢查評估狀態失敗:', error);
+        return;
+      }
+
+      // 建立評估狀態映射
+      const statusMap: Record<string, boolean> = {};
+      
+      // 預設所有學生為未評估
+      studentIds.forEach(studentId => {
+        statusMap[studentId] = false;
+      });
+      
+      // 標記已評估的學生
+      if (assessments) {
+        assessments.forEach(assessment => {
+          statusMap[assessment.student_id] = true;
+        });
+      }
+      
+      console.log('📊 學生評估狀態:', statusMap);
+      setStudentAssessmentStatus(statusMap);
+      
+    } catch (error) {
+      console.error('檢查學生評估狀態失敗:', error);
+    } finally {
+      setLoadingAssessmentStatus(false);
+    }
+  };
+
   // 載入所有學生的剩餘堂數
   const loadRemainingLessons = async () => {
     if (loadingRemainingLessons || lessons.length === 0) {
@@ -495,9 +610,10 @@ export default function ClassActivitiesPage() {
     }
   };
 
-  // 載入剩餘堂數
+  // 載入剩餘堂數和評估狀態
   useEffect(() => {
     loadRemainingLessons();
+    checkStudentAssessmentStatus(); // 檢查評估狀態
   }, [lessons]);
 
   // 根據剩餘堂數獲取背景顏色
@@ -732,6 +848,102 @@ export default function ClassActivitiesPage() {
     }
   };
 
+  // 保存活動進度到資料庫
+  const saveProgressToDatabase = async (activityId: string, progress: number) => {
+    try {
+      console.log(`🔄 開始保存活動進度到資料庫: ${activityId} -> ${progress}%`);
+      
+      const response = await fetch('/api/update-activity-progress', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          activityId,
+          progress
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        console.error('❌ 保存進度失敗:', result);
+        toast.error(`保存進度失敗：${result.error || '未知錯誤'}`);
+        return;
+      }
+
+      if (result.success) {
+        console.log('✅ 進度保存成功:', result.data);
+        toast.success(`進度已保存為 ${progress}%`);
+        
+        // 立即更新前端顯示，不需要重新載入
+        console.log('🔄 立即更新前端顯示...');
+        updateActivityProgressInState(activityId, progress);
+        
+        // 可選：延遲重新載入確保資料完全同步（較低頻率）
+        setTimeout(() => {
+          console.log('🔄 背景重新載入課堂資料以確保完全同步...');
+          loadClassData();
+        }, 2000);
+      } else {
+        console.error('❌ API 回應 success: false');
+        toast.error(`保存進度失敗：${result.error || '未知錯誤'}`);
+      }
+    } catch (error) {
+      console.error('❌ 保存進度時發生錯誤:', error);
+      toast.error(`保存進度失敗：${error instanceof Error ? error.message : '網路錯誤'}`);
+    }
+  };
+
+  // 立即更新活動進度在前端狀態中
+  const updateActivityProgressInState = (activityId: string, newProgress: number) => {
+    console.log(`🔄 更新活動 ${activityId} 的前端狀態進度為 ${newProgress}%`);
+    
+    // 更新 lessons 狀態中的活動進度
+    setLessons(prevLessons => prevLessons.map(lesson => {
+      // 更新學生活動映射
+      if (lesson.assignedActivities) {
+        const updatedActivities = lesson.assignedActivities.map((activity: any) => {
+          if (activity.id === activityId) {
+            const updatedActivity = {
+              ...activity,
+              progress: newProgress,
+              completion_status: newProgress >= 100 ? 'completed' : newProgress > 0 ? 'in_progress' : 'not_started'
+            };
+            console.log(`✅ 更新活動 ${activityId} 狀態:`, updatedActivity);
+            return updatedActivity;
+          }
+          return activity;
+        });
+        
+        return {
+          ...lesson,
+          assignedActivities: updatedActivities
+        };
+      }
+      return lesson;
+    }));
+
+    // 同時更新 studentActivitiesMap 狀態
+    setStudentActivitiesMap(prevMap => {
+      const newMap = new Map(prevMap);
+      for (const [studentId, activities] of newMap.entries()) {
+        const updatedActivities = activities.map((activity: any) => {
+          if (activity.id === activityId) {
+            return {
+              ...activity,
+              progress: newProgress,
+              completion_status: newProgress >= 100 ? 'completed' : newProgress > 0 ? 'in_progress' : 'not_started'
+            };
+          }
+          return activity;
+        });
+        newMap.set(studentId, updatedActivities);
+      }
+      return newMap;
+    });
+  };
+
   // 移除活動分配
   const removeActivityAssignment = async (assignmentId: string) => {
     try {
@@ -774,12 +986,16 @@ export default function ClassActivitiesPage() {
 
   // 獲取當前顯示的日期範圍
   const getCurrentDateRange = () => {
-    // 使用本地時間格式化日期，避免時區問題
+    // 使用香港時區格式化日期，避免時區問題
     const formatLocalDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      // 轉換為香港時區
+      const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+      const year = hongKongTime.getFullYear();
+      const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
+      const day = String(hongKongTime.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
+      console.log(`📅 getDayDates 格式化: ${date.toISOString()} → ${formattedDate}`);
+      return formattedDate;
     };
     
     return {
@@ -882,14 +1098,52 @@ export default function ClassActivitiesPage() {
   const groupLessonsByTimeSlot = (): TimeSlotGroup[] => {
     let allLessons = [...lessons, ...trialLessons];
     
+    // 調試信息
+    console.log('🔍 課程分組調試信息:', {
+      totalLessons: lessons.length,
+      totalTrialLessons: trialLessons.length,
+      selectedDate: selectedDate.toISOString().split('T')[0],
+      selectedDatesCount: selectedDates.length,
+      allLessonsCount: allLessons.length
+    });
+    
     // 如果有多選日期，顯示所有選中日期的課程
     if (selectedDates.length > 1) {
       const selectedDateStrs = selectedDates.map(date => date.toISOString().split('T')[0]);
+      console.log('📅 多選日期模式:', selectedDateStrs);
       allLessons = allLessons.filter(lesson => selectedDateStrs.includes(lesson.lesson_date));
     } else {
       // 單選模式：只顯示選中日期的課程
+      // 使用香港時區計算今天的日期字符串
+      const todayHongKong = new Date().toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"});
+      const todayStr = new Date(todayHongKong).toISOString().split('T')[0];
+      
       const selectedDateStr = selectedDate.toISOString().split('T')[0];
+      console.log('📅 單選日期模式 - 選中日期:', selectedDateStr);
+      console.log('📅 今天的日期（香港時區）:', todayStr);
+      
+      const lessonDates = allLessons.map(lesson => lesson.lesson_date);
+      console.log('📋 所有課程的日期:', lessonDates);
+      console.log('📅 是否包含今天的課程:', lessonDates.includes(todayStr));
+      
+      // 檢查日期是否匹配並自動切換
+      if (selectedDateStr !== todayStr) {
+        console.log('⚠️ 選中日期與今天不匹配，選中:', selectedDateStr, '今天:', todayStr);
+        if (lessonDates.includes(todayStr)) {
+          console.log('📅 今天有課程，但選中的不是今天');
+        }
+      } else {
+        console.log('✅ 選中日期正確匹配今天');
+        // 記錄今天沒有課程的情況，但不在這裡直接更新狀態
+        if (!lessonDates.includes(todayStr) && lessonDates.length > 0) {
+          console.log('📅 今天沒有課程，但有其他日期的課程');
+          const uniqueDates = [...new Set(lessonDates)]; // 去重
+          const sortedDates = uniqueDates.sort();
+          console.log('📅 可用課程日期:', sortedDates);
+        }
+      }
       allLessons = allLessons.filter(lesson => lesson.lesson_date === selectedDateStr);
+      console.log('✅ 過濾後的課程數量:', allLessons.length);
     }
     
     // 按日期和時間排序
@@ -1205,20 +1459,39 @@ export default function ClassActivitiesPage() {
                               }}
                               className="group/assessment relative cursor-pointer"
                             >
-                              {/* 主按鈕 */}
-                              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12">
-                                <AcademicCapIcon className="w-5 h-5 text-white" />
-                              </div>
+                              {/* 主按鈕 - 根據評估狀態改變顏色 */}
+                              {(() => {
+                                const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                const hasAssessment = studentAssessmentStatus[studentId] || false;
+                                
+                                return (
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                    hasAssessment 
+                                      ? 'bg-gradient-to-br from-emerald-400 to-teal-500' // 已評估：綠色
+                                      : 'bg-gradient-to-br from-orange-400 to-amber-500'  // 未評估：橙色
+                                  }`}>
+                                    <AcademicCapIcon className="w-5 h-5 text-white" />
+                                  </div>
+                                );
+                              })()}
                               
                               {/* 動畫裝飾 */}
                               <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full animate-ping opacity-75"></div>
                               <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-cyan-400 rounded-full animate-bounce"></div>
                               
-                              {/* 懸停提示 */}
-                              <div className="absolute top-12 right-0 bg-emerald-600/90 text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/assessment:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20">
-                                能力評估
-                                <div className="absolute -top-1 right-3 w-2 h-2 bg-emerald-600/90 transform rotate-45"></div>
-                              </div>
+                              {/* 懸停提示 - 根據評估狀態改變顏色 */}
+                              {(() => {
+                                const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                const hasAssessment = studentAssessmentStatus[studentId] || false;
+                                const tooltipColor = hasAssessment ? 'bg-emerald-600/90' : 'bg-orange-600/90';
+                                
+                                return (
+                                  <div className={`absolute top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/assessment:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
+                                    {hasAssessment ? '已完成評估' : '待評估'}
+                                    <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipColor} transform rotate-45`}></div>
+                                  </div>
+                                );
+                              })()}
                             </button>
                           </div>
 
@@ -1412,26 +1685,10 @@ export default function ClassActivitiesPage() {
                                                 const percentage = Math.round((x / rect.width) * 100);
                                                 const normalizedPercentage = Math.max(0, Math.min(percentage, 100));
                                                 
-                                                // 更新進度顯示
-                                                const progressText = e.currentTarget.parentElement?.querySelector('.progress-text');
-                                                const progressBarFill = e.currentTarget.querySelector('.progress-bar-fill');
+                                                console.log(`點擊進度條，準備更新活動 ${activity.id} 進度為 ${normalizedPercentage}%`);
                                                 
-                                                if (progressText) {
-                                                  progressText.textContent = `${normalizedPercentage}%`;
-                                                }
-                                                
-                                                if (progressBarFill instanceof HTMLElement) {
-                                                  progressBarFill.style.width = `${normalizedPercentage}%`;
-                                                }
-                                                
-                                                // 更新編輯指示器位置
-                                                const editIndicator = e.currentTarget.parentElement?.querySelector('.edit-indicator');
-                                                if (editIndicator instanceof HTMLElement) {
-                                                  editIndicator.style.left = `${normalizedPercentage}%`;
-                                                }
-                                                
-                                                console.log(`更新活動 ${activity.id} 進度為 ${normalizedPercentage}%`);
-                                                toast.success(`進度已更新為 ${normalizedPercentage}%`);
+                                                // 直接保存進度到資料庫，成功後會自動更新前端顯示
+                                                saveProgressToDatabase(activity.id, normalizedPercentage);
                                               }}
                                             >
                                               <div 
@@ -1732,6 +1989,16 @@ export default function ClassActivitiesPage() {
             onSubmit={(assessment) => {
               console.log('能力評估提交:', assessment);
               toast.success('能力評估已保存');
+              
+              // 更新學生評估狀態為已評估
+              if (selectedStudentForAssessment) {
+                setStudentAssessmentStatus(prev => ({
+                  ...prev,
+                  [selectedStudentForAssessment.id]: true
+                }));
+                console.log(`✅ 學生 ${selectedStudentForAssessment.full_name} 評估狀態已更新為已完成`);
+              }
+              
               setShowAbilityAssessmentModal(false);
               setSelectedStudentForAssessment(null);
               setSelectedTreeForAssessment(null);

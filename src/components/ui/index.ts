@@ -53,6 +53,7 @@ export { default as GrowthTreeActivitiesPanel } from './GrowthTreeActivitiesPane
 export { default as StudentActivitiesPanel } from './StudentActivitiesPanel';
 export { default as ActivitySelectionModal } from './ActivitySelectionModal';
 export { PerformanceMonitor } from './PerformanceMonitor';
+export { default as StudentOngoingActivities } from './StudentOngoingActivities';
 
 // 類型定義
  

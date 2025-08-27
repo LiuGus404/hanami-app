@@ -456,11 +456,55 @@ export default function StudentProgressDashboard() {
 
   // 處理能力評估提交
   const handleAssessmentSubmit = async (assessment: any) => {
+    console.log('=== handleAssessmentSubmit 函數被調用 ===');
+    console.log('傳入的 assessment 參數:', assessment);
+    
     try {
       console.log('提交能力評估:', assessment);
+
+      // 準備 API 調用的資料格式
+      const apiData = {
+        student_id: assessment.student_id,
+        tree_id: assessment.tree_id,
+        assessment_date: assessment.assessment_date,
+        lesson_date: assessment.lesson_date,
+        teacher_id: assessment.teacher_id,
+        ability_assessments: assessment.ability_assessments || {},
+        overall_performance_rating: assessment.overall_performance_rating || 3,
+        general_notes: assessment.general_notes || '',
+        next_lesson_focus: assessment.next_lesson_focus || '',
+        goals: assessment.goals || []
+      };
+
+      console.log('準備的 API 資料:', apiData);
+      console.log('goals 數量:', apiData.goals.length);
+      apiData.goals.forEach((goal: any, index: number) => {
+        console.log(`目標 ${index + 1}:`, {
+          goal_id: goal.goal_id,
+          assessment_mode: goal.assessment_mode,
+          progress_level: goal.progress_level,
+          selected_levels: goal.selected_levels
+        });
+      });
+
+      // 調用 API
+      console.log('調用 API...');
+      const response = await fetch('/api/student-ability-assessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '提交失敗');
+      }
+
+      const result = await response.json();
+      console.log('API 回應成功:', result);
       
-      // 這裡可以添加提交到資料庫的邏輯
-      // 目前先顯示成功訊息
       alert('能力評估已成功提交！');
       
       // 關閉模態視窗
@@ -1155,6 +1199,7 @@ export default function StudentProgressDashboard() {
             nick_name: selectedStudentForAssessment.nick_name ?? undefined
           } : undefined}
           defaultAssessmentDate={selectedAssessmentDate}
+          lockStudent={!!selectedStudentForAssessment} // 如果是從特定學生點擊進入，則鎖定學生選擇
         />
       )}
 

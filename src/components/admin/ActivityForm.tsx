@@ -123,6 +123,13 @@ function getFieldDefaultPlaceholder(field: any) {
 }
 
 export default function ActivityForm({ activity, template, onSubmit, onCancel, mode }: ActivityFormProps) {
+  console.log('📝 ActivityForm 組件載入:', {
+    mode: mode,
+    hasActivity: !!activity,
+    activityId: activity?.id,
+    activityName: activity?.activity_name
+  });
+  
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
