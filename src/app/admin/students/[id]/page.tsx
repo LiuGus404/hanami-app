@@ -9,9 +9,12 @@ import LessonEditorModal from '@/components/ui/LessonEditorModal';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import StudentBasicInfo from '@/components/ui/StudentBasicInfo';
 import StudentLessonPanel from '@/components/ui/StudentLessonPanel';
+import EnhancedStudentAvatarTab from '@/components/ui/EnhancedStudentAvatarTab';
 import { supabase } from '@/lib/supabase';
 import { useUser } from '@/lib/useUser';
 import { Lesson } from '@/types';
+import { motion } from 'framer-motion';
+import { User, BookOpen, UserCircle, Sparkles } from 'lucide-react';
 
 export default function StudentDetailPage() {
   const { id } = useParams();
@@ -31,6 +34,7 @@ export default function StudentDetailPage() {
   const [isInactiveStudent, setIsInactiveStudent] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [courseUpdateTrigger, setCourseUpdateTrigger] = useState(0); // 課程更新觸發器
+  const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar'>('basic'); // 分頁狀態
   
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -359,44 +363,95 @@ export default function StudentDetailPage() {
           </div>
         )}
 
-        <StudentBasicInfo 
-          isInactive={isInactiveStudent} 
-          student={student}
-          onUpdate={(newData) => {
-            setStudent(newData);
-            // 如果是試堂學生且課程有更新，觸發課堂資料重新載入
-            if (newData.student_type === '試堂' && newData.course_type !== student.course_type) {
-              setCourseUpdateTrigger(prev => prev + 1);
-            }
-          }}
-        />
-        {student && (
-          <div className="mt-8">
-            {(() => {
-              const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
-              console.log('🎯 準備載入課堂資料:', {
-                lessonStudentId,
-                isInactiveStudent,
-                studentOriginalId: student.original_id,
-                currentStudentId: student.id,
-                studentType: student.student_type,
-              });
-              return (
-                <StudentLessonPanel 
-                  contactNumber={student.contact_number} 
-                  studentId={lessonStudentId}
-                  studentName={student.full_name}
-                  studentType={student.student_type}
-                  onCourseUpdate={() => {
-                    // 觸發課程更新
-                    setCourseUpdateTrigger(prev => prev + 1);
-                  }}
-                  studentData={student}
-                />
-              );
-            })()}
+        {/* 分頁導航 */}
+        <div className="mb-6">
+          <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1">
+            {[
+              { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
+              { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
+              { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度' }
+            ].map(({ key, label, icon: Icon, description }) => (
+              <motion.button
+                key={key}
+                onClick={() => setActiveTab(key as any)}
+                className={`
+                  flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
+                  ${activeTab === key
+                    ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
+                    : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
+                  }
+                `}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                title={description}
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {label}
+              </motion.button>
+            ))}
           </div>
-        )}
+        </div>
+
+        {/* 分頁內容 */}
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          {/* 基本資料分頁 */}
+          {activeTab === 'basic' && (
+            <StudentBasicInfo 
+              isInactive={isInactiveStudent} 
+              student={student}
+              onUpdate={(newData) => {
+                setStudent(newData);
+                // 如果是試堂學生且課程有更新，觸發課堂資料重新載入
+                if (newData.student_type === '試堂' && newData.course_type !== student.course_type) {
+                  setCourseUpdateTrigger(prev => prev + 1);
+                }
+              }}
+            />
+          )}
+
+          {/* 課程記錄分頁 */}
+          {activeTab === 'lessons' && student && (
+            <div className="mt-4">
+              {(() => {
+                const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
+                console.log('🎯 準備載入課堂資料:', {
+                  lessonStudentId,
+                  isInactiveStudent,
+                  studentOriginalId: student.original_id,
+                  currentStudentId: student.id,
+                  studentType: student.student_type,
+                });
+                return (
+                  <StudentLessonPanel 
+                    contactNumber={student.contact_number} 
+                    studentId={lessonStudentId}
+                    studentName={student.full_name}
+                    studentType={student.student_type}
+                    onCourseUpdate={() => {
+                      // 觸發課程更新
+                      setCourseUpdateTrigger(prev => prev + 1);
+                    }}
+                    studentData={student}
+                  />
+                );
+              })()}
+            </div>
+          )}
+
+          {/* 互動角色分頁 */}
+          {activeTab === 'avatar' && student && (
+            <EnhancedStudentAvatarTab 
+              student={student}
+              className="mt-4"
+            />
+          )}
+        </motion.div>
         <LessonEditorModal
           lesson={editingLesson}
           mode={editingLesson ? 'edit' : 'add'}

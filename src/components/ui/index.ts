@@ -55,5 +55,13 @@ export { default as ActivitySelectionModal } from './ActivitySelectionModal';
 export { PerformanceMonitor } from './PerformanceMonitor';
 export { default as StudentOngoingActivities } from './StudentOngoingActivities';
 
+// 3D 動態角色相關組件
+export { default as StudentAvatarWidget } from './StudentAvatarWidget';
+export { default as GrowthTreeVisualization } from './GrowthTreeVisualization';
+export { default as LearningProgressCards } from './LearningProgressCards';
+export { default as StudentAvatarTab } from './StudentAvatarTab';
+export { default as EnhancedStudentAvatarTab } from './EnhancedStudentAvatarTab';
+export { default as ClassActivityStyleCard } from './ClassActivityStyleCard';
+
 // 類型定義
  
