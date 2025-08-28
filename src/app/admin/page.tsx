@@ -365,6 +365,21 @@ export default function AdminPage() {
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">管理課堂</h3>
               </div>
             </div>
+            {/* 財務狀況按鈕 */}
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/financial-management')}>
+              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                    {/* 錢袋圖案 */}
+                    <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm-1 14H5c-.55 0-1-.45-1-1V8h16v9c0 .55-.45 1-1 1z"/>
+                    {/* 錢幣符號 */}
+                    <path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                    <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-[#2B3A3B]">財務狀況</h3>
+              </div>
+            </div>
           </div>
         </div>
       </div>

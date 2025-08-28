@@ -439,6 +439,7 @@ export type Database = {
           name: string | null;
           status: boolean | null;
           trial_limit: number | null;
+          price_per_lesson: number | null;
         };
         Insert: {
           created_at?: string;
@@ -446,6 +447,7 @@ export type Database = {
           name?: string | null;
           status?: boolean | null;
           trial_limit?: number | null;
+          price_per_lesson?: number | null;
         };
         Update: {
           created_at?: string;
@@ -453,6 +455,7 @@ export type Database = {
           name?: string | null;
           status?: boolean | null;
           trial_limit?: number | null;
+          price_per_lesson?: number | null;
         };
         Relationships: [];
       }
@@ -1846,6 +1849,48 @@ export type Database = {
           can_receive_notifications?: boolean
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      hanami_financial_expenses: {
+        Row: {
+          id: string
+          expense_date: string
+          expense_category: string
+          expense_description: string
+          amount: number
+          payment_method: string | null
+          receipt_url: string | null
+          notes: string | null
+          created_by: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          expense_date: string
+          expense_category: string
+          expense_description: string
+          amount: number
+          payment_method?: string | null
+          receipt_url?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          expense_date?: string
+          expense_category?: string
+          expense_description?: string
+          amount?: number
+          payment_method?: string | null
+          receipt_url?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
