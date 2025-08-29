@@ -331,21 +331,26 @@ export default function SimpleAbilityAssessmentModal({
     if (initialData) {
       console.log('🔄 initialData 變化，重新初始化狀態:', initialData);
       
+      // 修復過往評估記錄的顯示問題
+      const fixedInitialData = fixHistoricalAssessmentData(initialData, goals, abilities);
+      
       // 更新基本表單狀態
-      setSelectedStudentId(initialData.student_id || '');
-      setSelectedTreeId(initialData.tree_id || '');
-      setSelectedTeacherId(initialData.teacher_id || '');
-      setLessonDate(initialData.lesson_date || new Date().toISOString().split('T')[0]);
-      setOverallRating(initialData.overall_performance_rating || 3);
-      setGeneralNotes(initialData.general_notes || '');
-      setNextFocus(initialData.next_lesson_focus || '');
+      setSelectedStudentId(fixedInitialData.student_id || '');
+      setSelectedTreeId(fixedInitialData.tree_id || '');
+      setSelectedTeacherId(fixedInitialData.teacher_id || '');
+      setLessonDate(fixedInitialData.lesson_date || new Date().toISOString().split('T')[0]);
+      setAssessmentDate(fixedInitialData.assessment_date || new Date().toISOString().split('T')[0]);
+      setOverallRating(fixedInitialData.overall_performance_rating || 3);
+      setGeneralNotes(fixedInitialData.general_notes || '');
+      setNextFocus(fixedInitialData.next_lesson_focus || '');
       
       // 更新能力評估狀態
-      setAbilityAssessments(initialData.ability_assessments || {});
+      setAbilityAssessments(fixedInitialData.ability_assessments || {});
+      setSelectedGoals(fixedInitialData.selected_goals || []);
       
       console.log('✅ 狀態重新初始化完成');
     }
-  }, [initialData]);
+  }, [initialData, goals, abilities]);
 
   // 點擊外部關閉下拉選單
   useEffect(() => {
@@ -1260,6 +1265,18 @@ export default function SimpleAbilityAssessmentModal({
         setGoals(goalsWithDefault);
       }
 
+      // 修復過往評估記錄的顯示問題
+      if (initialData && (goalsData || []).length > 0 && (abilitiesData || []).length > 0) {
+        console.log('🔧 在載入目標和能力後修復評估記錄');
+        const fixedInitialData = fixHistoricalAssessmentData(initialData, goalsData || [], abilitiesData);
+        
+        // 更新狀態中的評估資料
+        setAbilityAssessments(fixedInitialData.ability_assessments || {});
+        setSelectedGoals(fixedInitialData.selected_goals || []);
+        
+        console.log('✅ 評估記錄修復完成');
+      }
+
       setAbilities(abilitiesData);
 
     } catch (error) {
@@ -2009,6 +2026,85 @@ export default function SimpleAbilityAssessmentModal({
         </div>
       </div>
     );
+  };
+
+  // 修復過往評估記錄的顯示問題
+  const fixHistoricalAssessmentData = (assessmentData: any, currentGoals: GrowthGoal[], currentAbilities: DevelopmentAbility[]) => {
+    console.log('🔧 開始修復過往評估記錄:', {
+      assessmentData,
+      currentGoalsCount: currentGoals.length,
+      currentAbilitiesCount: currentAbilities.length
+    });
+
+    const fixedData = { ...assessmentData };
+
+    // 修復 ability_assessments
+    if (fixedData.ability_assessments && typeof fixedData.ability_assessments === 'object') {
+      const fixedAbilityAssessments: any = {};
+      const currentAbilityIds = new Set(currentAbilities.map(a => a.id));
+      
+      Object.entries(fixedData.ability_assessments).forEach(([abilityId, assessment]: [string, any]) => {
+        // 如果能力ID不存在，嘗試通過名稱匹配
+        if (!currentAbilityIds.has(abilityId)) {
+          const matchingAbility = currentAbilities.find(ability => 
+            ability.ability_name === assessment.ability_name ||
+            ability.ability_description === assessment.ability_description
+          );
+          
+          if (matchingAbility) {
+            console.log(`🔄 修復能力評估: ${abilityId} -> ${matchingAbility.id}`);
+            fixedAbilityAssessments[matchingAbility.id] = {
+              ...assessment,
+              ability_name: matchingAbility.ability_name,
+              ability_description: matchingAbility.ability_description
+            };
+          } else {
+            console.log(`⚠️ 無法找到匹配的能力: ${abilityId}`);
+          }
+        } else {
+          // 能力ID仍然有效
+          fixedAbilityAssessments[abilityId] = assessment;
+        }
+      });
+      
+      fixedData.ability_assessments = fixedAbilityAssessments;
+    }
+
+    // 修復 selected_goals
+    if (fixedData.selected_goals && Array.isArray(fixedData.selected_goals)) {
+      const fixedSelectedGoals: any[] = [];
+      const currentGoalIds = new Set(currentGoals.map(g => g.id));
+      
+      fixedData.selected_goals.forEach((goalAssessment: any) => {
+        // 如果目標ID不存在，嘗試通過名稱匹配
+        if (!currentGoalIds.has(goalAssessment.goal_id)) {
+          const matchingGoal = currentGoals.find(goal => 
+            goal.goal_name === goalAssessment.goal_name ||
+            goal.goal_description === goalAssessment.goal_description
+          );
+          
+          if (matchingGoal) {
+            console.log(`🔄 修復目標評估: ${goalAssessment.goal_id} -> ${matchingGoal.id}`);
+            fixedSelectedGoals.push({
+              ...goalAssessment,
+              goal_id: matchingGoal.id,
+              goal_name: matchingGoal.goal_name,
+              goal_description: matchingGoal.goal_description
+            });
+          } else {
+            console.log(`⚠️ 無法找到匹配的目標: ${goalAssessment.goal_id}`);
+          }
+        } else {
+          // 目標ID仍然有效
+          fixedSelectedGoals.push(goalAssessment);
+        }
+      });
+      
+      fixedData.selected_goals = fixedSelectedGoals;
+    }
+
+    console.log('✅ 修復完成:', fixedData);
+    return fixedData;
   };
 
   if (loading) {
