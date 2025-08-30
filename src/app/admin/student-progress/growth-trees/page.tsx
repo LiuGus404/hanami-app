@@ -1,7 +1,7 @@
 'use client';
 
 import { PlusIcon, MagnifyingGlassIcon, FunnelIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
-import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
+import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, History } from 'lucide-react';
 import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { useState, useEffect } from 'react';
 
@@ -788,6 +788,12 @@ export default function GrowthTreesPage() {
                 label: "返回學生管理",
                 href: "/admin/students",
                 variant: "accent"
+              },
+              {
+                icon: History,
+                label: "版本管理",
+                href: "/admin/student-progress/growth-tree-versions",
+                variant: "secondary"
               }
             ]}
             currentPage="/admin/student-progress/growth-trees"
@@ -1167,12 +1173,12 @@ export default function GrowthTreesPage() {
             return (
               <HanamiCard key={tree.id} className="p-6 rounded-2xl shadow-lg bg-white hover:shadow-xl transition-shadow cursor-pointer border border-[#EADBC8] relative" onClick={() => openDetailModal(tree)}>
                 <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-hanami-text mb-2 flex items-center gap-2">
-                      <span className="text-2xl">{tree.tree_icon || '🌳'}</span>
-                      {tree.tree_name}
+                  <div className="flex-1 min-w-0 pr-16">
+                    <h3 className="text-lg font-semibold text-hanami-text mb-2 flex items-start gap-2 break-words">
+                      <span className="text-2xl flex-shrink-0">{tree.tree_icon || '🌳'}</span>
+                      <span className="break-words">{tree.tree_name}</span>
                     </h3>
-                    <p className="text-sm text-hanami-text-secondary mb-3">{tree.tree_description}</p>
+                    <p className="text-sm text-hanami-text-secondary mb-3 break-words">{tree.tree_description}</p>
                   </div>
                   <div className="flex space-x-2 absolute top-4 right-4 z-10">
                     <button
@@ -1192,10 +1198,10 @@ export default function GrowthTreesPage() {
                   </div>
                 </div>
                 <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-hanami-text-secondary gap-2">
-                    <span>課程類型: {tree.course_type}</span>
-                    <span>等級: Lv.{tree.tree_level || 1}</span>
-                    <span>狀態: {tree.is_active ? '啟用' : '停用'}</span>
+                  <div className="flex flex-wrap items-center text-sm text-hanami-text-secondary gap-2">
+                    <span className="break-words">課程類型: {tree.course_type}</span>
+                    <span className="flex-shrink-0">等級: Lv.{tree.tree_level || 1}</span>
+                    <span className="flex-shrink-0">狀態: {tree.is_active ? '啟用' : '停用'}</span>
                   </div>
                 </div>
                 <div className="mb-4">
@@ -1214,18 +1220,18 @@ export default function GrowthTreesPage() {
                       {treeGoals.slice(0, 3).map((goal) => (
                         <div 
                           key={goal.id} 
-                          className="flex items-center text-sm gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors"
+                          className="flex items-start text-sm gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors"
                           title={`點擊切換完成狀態: ${goal.is_completed ? '已完成' : '未完成'}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleGoalCompletion(goal.id, goal.is_completed);
                           }}
                         >
-                          <span className={`w-2 h-2 rounded-full mr-2 ${goal.is_completed ? 'bg-green-500' : 'bg-gray-300'}`} />
-                          <span className={`text-xs ${goal.is_completed ? 'text-green-600' : 'text-hanami-text-secondary'}`}>
+                          <span className={`w-2 h-2 rounded-full mr-2 mt-1.5 flex-shrink-0 ${goal.is_completed ? 'bg-green-500' : 'bg-gray-300'}`} />
+                          <span className={`text-xs break-words flex-1 ${goal.is_completed ? 'text-green-600' : 'text-hanami-text-secondary'}`}>
                             {goal.goal_icon || '⭐'} {goal.goal_name}
                           </span>
-                          <span className="text-xs text-gray-400 ml-auto">
+                          <span className="text-xs text-gray-400 ml-2 flex-shrink-0">
                             {goal.is_completed ? '✓' : '○'}
                           </span>
                         </div>
