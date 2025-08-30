@@ -166,6 +166,7 @@ export default function SimpleAbilityAssessmentModal({
   // 能力評估狀態
   const [abilityAssessments, setAbilityAssessments] = useState<{[key: string]: any}>(initialData?.ability_assessments || {});
   const [goalAssessments, setGoalAssessments] = useState<{[key: string]: any}>({});
+  const [selectedGoals, setSelectedGoals] = useState<any[]>(initialData?.selected_goals || []);
   
   // 評估記錄歷史狀態
   const [latestAssessment, setLatestAssessment] = useState<any>(null);
@@ -2036,6 +2037,11 @@ export default function SimpleAbilityAssessmentModal({
       currentAbilitiesCount: currentAbilities.length
     });
 
+    console.log('📋 當前目標列表:', currentGoals.map(g => ({ id: g.id, name: g.goal_name, desc: g.goal_description })));
+    console.log('📋 當前能力列表:', currentAbilities.map(a => ({ id: a.id, name: a.ability_name, desc: a.ability_description })));
+    console.log('📋 評估記錄中的 selected_goals:', assessmentData.selected_goals);
+    console.log('📋 評估記錄中的 ability_assessments:', assessmentData.ability_assessments);
+
     const fixedData = { ...assessmentData };
 
     // 修復 ability_assessments
@@ -2044,12 +2050,23 @@ export default function SimpleAbilityAssessmentModal({
       const currentAbilityIds = new Set(currentAbilities.map(a => a.id));
       
       Object.entries(fixedData.ability_assessments).forEach(([abilityId, assessment]: [string, any]) => {
+        console.log(`🔍 檢查能力評估: ${abilityId}`, assessment);
+        
         // 如果能力ID不存在，嘗試通過名稱匹配
         if (!currentAbilityIds.has(abilityId)) {
-          const matchingAbility = currentAbilities.find(ability => 
-            ability.ability_name === assessment.ability_name ||
-            ability.ability_description === assessment.ability_description
-          );
+          console.log(`❌ 能力ID ${abilityId} 不存在於當前能力列表中`);
+          
+          const matchingAbility = currentAbilities.find(ability => {
+            const nameMatch = ability.ability_name === assessment.ability_name;
+            const descMatch = ability.ability_description === assessment.ability_description;
+            console.log(`🔍 嘗試匹配能力:`, {
+              current: { name: ability.ability_name, desc: ability.ability_description },
+              assessment: { name: assessment.ability_name, desc: assessment.ability_description },
+              nameMatch,
+              descMatch
+            });
+            return nameMatch || descMatch;
+          });
           
           if (matchingAbility) {
             console.log(`🔄 修復能力評估: ${abilityId} -> ${matchingAbility.id}`);
@@ -2062,6 +2079,7 @@ export default function SimpleAbilityAssessmentModal({
             console.log(`⚠️ 無法找到匹配的能力: ${abilityId}`);
           }
         } else {
+          console.log(`✅ 能力ID ${abilityId} 仍然有效`);
           // 能力ID仍然有效
           fixedAbilityAssessments[abilityId] = assessment;
         }
@@ -2076,12 +2094,23 @@ export default function SimpleAbilityAssessmentModal({
       const currentGoalIds = new Set(currentGoals.map(g => g.id));
       
       fixedData.selected_goals.forEach((goalAssessment: any) => {
+        console.log(`🔍 檢查目標評估: ${goalAssessment.goal_id}`, goalAssessment);
+        
         // 如果目標ID不存在，嘗試通過名稱匹配
         if (!currentGoalIds.has(goalAssessment.goal_id)) {
-          const matchingGoal = currentGoals.find(goal => 
-            goal.goal_name === goalAssessment.goal_name ||
-            goal.goal_description === goalAssessment.goal_description
-          );
+          console.log(`❌ 目標ID ${goalAssessment.goal_id} 不存在於當前目標列表中`);
+          
+          const matchingGoal = currentGoals.find(goal => {
+            const nameMatch = goal.goal_name === goalAssessment.goal_name;
+            const descMatch = goal.goal_description === goalAssessment.goal_description;
+            console.log(`🔍 嘗試匹配目標:`, {
+              current: { name: goal.goal_name, desc: goal.goal_description },
+              assessment: { name: goalAssessment.goal_name, desc: goalAssessment.goal_description },
+              nameMatch,
+              descMatch
+            });
+            return nameMatch || descMatch;
+          });
           
           if (matchingGoal) {
             console.log(`🔄 修復目標評估: ${goalAssessment.goal_id} -> ${matchingGoal.id}`);
@@ -2093,8 +2122,11 @@ export default function SimpleAbilityAssessmentModal({
             });
           } else {
             console.log(`⚠️ 無法找到匹配的目標: ${goalAssessment.goal_id}`);
+            // 即使沒有匹配，也保留原始記錄以便調試
+            fixedSelectedGoals.push(goalAssessment);
           }
         } else {
+          console.log(`✅ 目標ID ${goalAssessment.goal_id} 仍然有效`);
           // 目標ID仍然有效
           fixedSelectedGoals.push(goalAssessment);
         }

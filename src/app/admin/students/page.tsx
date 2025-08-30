@@ -353,11 +353,11 @@ export default function StudentManagementPage() {
     return () => clearTimeout(timer);
   }, [isLoading, students.length]); // 依賴 isLoading 和 students.length
 
-  // 刪除學生功能
+  // 刪除學生功能（改為停用功能）
   const handleDeleteStudents = async () => {
     if (!selectedStudents.length) return;
     
-    if (!confirm(`確定要刪除選中的 ${selectedStudents.length} 位學生嗎？此操作無法復原。`)) {
+    if (!confirm(`確定要停用選中的 ${selectedStudents.length} 位學生嗎？學生將被標記為已停用。`)) {
       return;
     }
 
@@ -365,7 +365,7 @@ export default function StudentManagementPage() {
     try {
       // 獲取選中學生的完整資料
       const selectedStudentData = students.filter((s: any) => selectedStudents.includes(s.id));
-      console.log('選中要刪除的學生資料:', selectedStudentData);
+      console.log('選中要停用的學生資料:', selectedStudentData);
       
       // 分離常規學生和試堂學生
       const regularStudents = selectedStudentData.filter((s: any) => s.student_type !== '試堂');
@@ -374,96 +374,61 @@ export default function StudentManagementPage() {
       console.log('常規學生:', regularStudents);
       console.log('試堂學生:', trialStudents);
 
-      // 處理常規學生的外鍵依賴
+      // 處理常規學生
       if (regularStudents.length > 0) {
         const regularIds = regularStudents.map((s: any) => s.id);
+        console.log('要停用的常規學生ID:', regularIds);
         
-        // 處理常規學生的外鍵依賴
-        console.log('處理常規學生外鍵依賴...');
+        // 直接更新學生類型為已停用
+        console.log('直接更新學生類型為已停用');
         
-        // 1. 刪除相關的課堂記錄 (hanami_student_lesson)
-        const { error: lessonError } = await supabase
-          .from('hanami_student_lesson')
-          .delete()
-          .in('student_id', regularIds);
-        
-        if (lessonError) {
-          console.error('Error deleting lesson records:', lessonError);
-          alert(`刪除課堂記錄時發生錯誤: ${lessonError.message}`);
-          return;
-        }
-
-        // 2. 進度記錄存在於 hanami_student_lesson 表的 progress_notes 欄位中，會隨課程記錄一起刪除
-        // const { error: progressError } = await supabase
-        //   .from('hanami_student_progress')
-        //   .delete()
-        //   .in('student_id', regularIds)
-        
-        // if (progressError) {
-        //   console.error('Error deleting progress records:', progressError)
-        //   alert(`刪除進度記錄時發生錯誤: ${progressError.message}`)
-        //   return
-        // }
-
-        // 3. 刪除相關的課程包 (Hanami_Student_Package)
-        const { error: packageError } = await supabase
-          .from('Hanami_Student_Package')
-          .delete()
-          .in('student_id', regularIds);
-        
-        if (packageError) {
-          console.error('Error deleting package records:', packageError);
-          alert(`刪除課程包時發生錯誤: ${packageError.message}`);
-          return;
-        }
-
-        // 4. 刪除試堂隊列記錄 (hanami_trial_queue)
-        // const { error: queueError } = await supabase
-        //   .from('hanami_trial_queue')
-        //   .delete()
-        //   .in('student_id', regularIds)
-        // if (queueError) {
-        //   console.error('Error deleting trial queue records:', queueError)
-        //   // 不中斷流程，因為這可能不是必需的
-        // }
-        // 註：hanami_trial_queue 表不存在，略過刪除
-
-        // 5. 最後刪除學生記錄
-        const { error: regularError } = await supabase
+        const { error: updateError } = await supabase
           .from('Hanami_Students')
-          .delete()
+          .update({ 
+            student_type: '已停用'
+          })
           .in('id', regularIds);
         
-        if (regularError) {
-          console.error('Error deleting regular students:', regularError);
-          alert(`刪除常規學生時發生錯誤: ${regularError.message}`);
+        if (updateError) {
+          console.error('更新學生類型失敗:', updateError);
+          alert(`停用常規學生失敗: ${updateError.message}`);
           return;
         }
+        
+        console.log('成功停用常規學生');
       }
 
       // 處理試堂學生
       if (trialStudents.length > 0) {
         const trialIds = trialStudents.map((s: any) => s.id);
+        console.log('要停用的試堂學生ID:', trialIds);
         
-        // 試堂學生通常沒有複雜的外鍵依賴，直接刪除
+        // 更新試堂學生的狀態為 'inactive'
         const { error: trialError } = await supabase
           .from('hanami_trial_students')
-          .delete()
+          .update({ 
+            trial_status: 'inactive'
+          })
           .in('id', trialIds);
         
         if (trialError) {
-          console.error('Error deleting trial students:', trialError);
-          alert(`刪除試堂學生時發生錯誤: ${trialError.message}`);
+          console.error('Error updating trial students:', trialError);
+          alert(`停用試堂學生時發生錯誤: ${trialError.message}`);
           return;
         }
+        
+        console.log('成功停用試堂學生');
       }
 
       // 更新本地狀態
       setSelectedStudents([]);
-      alert(`成功刪除 ${selectedStudents.length} 位學生`);
+      alert(`成功停用 ${selectedStudents.length} 位學生`);
+      
+      // 刷新頁面
+      window.location.reload();
     } catch (error) {
-      console.error('Error deleting students:', error);
-      alert(`刪除學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
+      console.error('Error updating students:', error);
+      alert(`停用學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
       setActionLoading(false);
     }
@@ -612,6 +577,9 @@ export default function StudentManagementPage() {
       // 更新本地狀態
       setSelectedStudents([]);
       alert(`成功停用 ${regularStudents.length} 位常規學生`);
+      
+      // 刷新頁面
+      window.location.reload();
       
       // 重新獲取停用學生數據
       const { data: inactiveStudentData } = await supabase
@@ -783,6 +751,9 @@ export default function StudentManagementPage() {
       setSelectedStudents([]);
       alert(`成功回復 ${selectedStudents.length} 位學生`);
       
+      // 刷新頁面
+      window.location.reload();
+      
       // 重新獲取學生數據
       const { data: studentData } = await supabase
         .from('Hanami_Students')
@@ -886,13 +857,13 @@ export default function StudentManagementPage() {
       console.log('停用常規學生:', regularInactiveStudents);
       console.log('停用試堂學生:', trialInactiveStudents);
 
-      // 處理停用常規學生的外鍵依賴（如果原始學生記錄還存在）
+      // 只處理常規學生，跳過試堂學生以避免錯誤
       if (regularInactiveStudents.length > 0) {
         const originalIds = regularInactiveStudents.map((s: any) => s.original_id).filter((id: any) => id);
         console.log('要檢查的原始學生ID:', originalIds);
         
         if (originalIds.length > 0) {
-          // 檢查原始學生記錄是否還存在，如果存在則處理外鍵依賴
+          // 檢查原始學生記錄是否還存在
           const { data: existingStudents } = await supabase
             .from('Hanami_Students')
             .select('id')
@@ -902,95 +873,71 @@ export default function StudentManagementPage() {
             const existingIds = existingStudents.map(s => s.id);
             console.log('存在的原始學生ID:', existingIds);
             
-            // 1. 刪除相關的課堂記錄
-            const { error: lessonError } = await supabase
-              .from('hanami_student_lesson')
-              .delete()
-              .in('student_id', existingIds);
+            // 使用新的 API 端點強制停用學生
+            console.log('使用新的 API 端點強制停用學生，ID:', existingIds);
             
-            if (lessonError) {
-              console.error('Error deleting lesson records:', lessonError);
-              alert(`刪除課堂記錄時發生錯誤: ${lessonError.message}`);
-              return;
-            }
+            try {
+              // 調用強制停用學生的 API
+              const response = await fetch('/api/force-disable-student', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  studentIds: existingIds,
+                  action: 'disable'
+                }),
+              });
 
-            // 2. 進度記錄存在於 hanami_student_lesson 表的 progress_notes 欄位中，會隨課程記錄一起刪除
-            // const { error: progressError } = await supabase
-            //   .from('hanami_student_progress')
-            //   .delete()
-            //   .in('student_id', existingIds)
-            
-            // if (progressError) {
-            //   console.error('Error deleting progress records:', progressError)
-            //   alert(`刪除進度記錄時發生錯誤: ${progressError.message}`)
-            //   return
-            // }
+              const result = await response.json();
+              
+              if (!response.ok) {
+                console.error('API 調用失敗:', result);
+                alert(`強制停用學生失敗: ${result.error || '未知錯誤'}`);
+                return;
+              }
 
-            // 3. 刪除相關的課程包
-            const { error: packageError } = await supabase
-              .from('Hanami_Student_Package')
-              .delete()
-              .in('student_id', existingIds);
-            
-            if (packageError) {
-              console.error('Error deleting package records:', packageError);
-              alert(`刪除課程包時發生錯誤: ${packageError.message}`);
-              return;
-            }
-
-            // 4. 刪除試堂隊列記錄
-            // const { error: queueError } = await supabase
-            //   .from('hanami_trial_queue')
-            //   .delete()
-            //   .in('student_id', existingIds)
-            // if (queueError) {
-            //   console.error('Error deleting trial queue records:', queueError)
-            //   // 不中斷流程
-            // }
-            // 註：hanami_trial_queue 表不存在，略過刪除
-
-            // 5. 刪除原始學生記錄
-            const { error: regularError } = await supabase
-              .from('Hanami_Students')
-              .delete()
-              .in('id', existingIds);
-            
-            if (regularError) {
-              console.error('Error deleting original students:', regularError);
-              alert(`刪除原始學生記錄時發生錯誤: ${regularError.message}`);
+              if (result.success) {
+                console.log('成功停用學生:', result.message);
+              } else {
+                console.error('停用學生失敗:', result.error);
+                alert(`停用學生失敗: ${result.error}`);
+                return;
+              }
+            } catch (error) {
+              console.error('調用強制停用 API 時發生錯誤:', error);
+              alert(`調用強制停用 API 時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
               return;
             }
           }
         }
       }
 
-      // 處理停用試堂學生（如果原始試堂記錄還存在）
+      // 處理試堂學生的停用
       if (trialInactiveStudents.length > 0) {
-        const originalIds = trialInactiveStudents.map((s: any) => s.original_id).filter((id: any) => id);
-        console.log('要檢查的原始試堂學生ID:', originalIds);
+        console.log('處理試堂學生停用，數量:', trialInactiveStudents.length);
         
-        if (originalIds.length > 0) {
-          // 檢查原始試堂記錄是否還存在
-          const { data: existingTrialStudents } = await supabase
-            .from('hanami_trial_students')
-            .select('id')
-            .in('id', originalIds);
-          
-          if (existingTrialStudents && existingTrialStudents.length > 0) {
-            const existingIds = existingTrialStudents.map(s => s.id);
-            console.log('存在的原始試堂學生ID:', existingIds);
-            
-            // 刪除原始試堂記錄
-            const { error: trialError } = await supabase
+        const trialIds = trialInactiveStudents.map((s: any) => s.original_id).filter((id: any) => id);
+        console.log('要停用的試堂學生ID:', trialIds);
+        
+        if (trialIds.length > 0) {
+          try {
+            // 更新試堂學生的狀態為 'inactive'
+            const { error: trialUpdateError } = await supabase
               .from('hanami_trial_students')
-              .delete()
-              .in('id', existingIds);
+              .update({ 
+                trial_status: 'inactive'
+              })
+              .in('id', trialIds);
             
-            if (trialError) {
-              console.error('Error deleting original trial students:', trialError);
-              alert(`刪除原始試堂記錄時發生錯誤: ${trialError.message}`);
-              return;
+            if (trialUpdateError) {
+              console.error('停用試堂學生失敗:', trialUpdateError);
+              console.log('試堂學生停用失敗，但繼續執行:', trialUpdateError.message);
+            } else {
+              console.log('成功停用試堂學生');
             }
+          } catch (error) {
+            console.log('停用試堂學生時發生錯誤，但繼續執行:', error);
           }
         }
       }
@@ -1013,6 +960,9 @@ export default function StudentManagementPage() {
       // 更新本地狀態
       setSelectedStudents([]);
       alert(`成功永久刪除 ${selectedStudents.length} 位停用學生`);
+      
+      // 刷新頁面
+      window.location.reload();
     } catch (error) {
       console.error('Error deleting inactive students:', error);
       alert(`刪除停用學生時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}`);
@@ -1482,24 +1432,14 @@ export default function StudentManagementPage() {
                       
                       return (
                         <>
-                          {/* 只有當選中的學生包含常規學生時才顯示停用按鈕 */}
-                          {hasRegularStudents && (
-                            <button
-                              className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={actionLoading}
-                              onClick={handleInactiveStudents}
-                            >
-                              <UserX className="w-4 h-4" />
-                              <span>停用學生</span>
-                            </button>
-                          )}
+                          {/* 停用學生按鈕 */}
                           <button
                             className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={actionLoading}
                             onClick={handleDeleteStudents}
                           >
-                            <Trash2 className="w-4 h-4" />
-                            <span>刪除學生</span>
+                            <UserX className="w-4 h-4" />
+                            <span>停用學生</span>
                           </button>
                           {/* AI 訊息按鈕 - 允許多選 */}
                           {selectedStudents.length > 0 && (
