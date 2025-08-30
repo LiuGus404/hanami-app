@@ -1189,6 +1189,7 @@ export default function AbilityAssessmentsPage() {
                               let completionPercentage = 0;
                               let selectedCount = 0;
                               let totalCount = 0;
+                              let progressLevelOriginal: number | undefined; // 儲存原始的 progress_level
                               
                               if (assessmentMode === 'multi_select') {
                                 let selectedLevels: string[] = [];
@@ -1199,6 +1200,11 @@ export default function AbilityAssessmentsPage() {
                                 } else if (abilityAssessments[goal.id]) {
                                   // 從 ability_assessments 中獲取
                                   selectedLevels = (abilityAssessments[goal.id] as any)?.selected_levels || [];
+                                }
+                                // === 向後相容處理 ===
+                                // 過濾掉已被成長樹刪除的等級
+                                if (goal.multi_select_levels && goal.multi_select_levels.length > 0) {
+                                  selectedLevels = selectedLevels.filter((lvl) => goal.multi_select_levels!.includes(lvl));
                                 }
                                 
                                 const maxLevels = goal.multi_select_levels?.length || 5;
@@ -1211,12 +1217,16 @@ export default function AbilityAssessmentsPage() {
                                   // 從 selected_goals 中獲取
                                   const sg = selectedGoals.find((g: any) => g.goal_id === goal.id);
                                   progressLevel = sg?.progress_level || 0;
+                                  progressLevelOriginal = sg?.progress_level; // 儲存原始的 progress_level
                                 } else if (abilityAssessments[goal.id]) {
                                   // 從 ability_assessments 中獲取
                                   progressLevel = abilityAssessments[goal.id]?.level || 0;
+                                  progressLevelOriginal = abilityAssessments[goal.id]?.level; // 儲存原始的 level
                                 }
-                                
+                                // === 向後相容處理 ===
                                 const maxLevel = goal.progress_max || 5;
+                                // 若舊評估中的等級超出新版本的最大值，則限制在新最大值
+                                progressLevel = Math.min(progressLevel, maxLevel);
                                 selectedCount = progressLevel;
                                 totalCount = maxLevel;
                                 completionPercentage = maxLevel > 0 ? Math.round((progressLevel / maxLevel) * 100) : 0;
@@ -1277,6 +1287,11 @@ export default function AbilityAssessmentsPage() {
                                                   </div>
                                                 );
                                               })}
+                                              {/* 若舊評估包含已被移除的等級，顯示提醒 */}
+                                              {goalAssessment.selected_levels && goal.multi_select_levels &&
+                                                goalAssessment.selected_levels.some((lvl: string) => !goal.multi_select_levels!.includes(lvl)) && (
+                                                  <div className="text-xs text-orange-600 mt-2">⚠️ 此評估包含已被移除的等級，已自動忽略</div>
+                                                )}
                                             </div>
                                             <div className="text-center text-sm text-[#A68A64]">
                                               已選 {selectedCount} / {totalCount} 項 ({completionPercentage}%)
@@ -1354,6 +1369,9 @@ export default function AbilityAssessmentsPage() {
                                                   </div>
                                                 );
                                               })}
+                                              {progressLevelOriginal !== undefined && progressLevelOriginal > maxLevel && (
+                                                <div className="text-xs text-orange-600 mt-2">⚠️ 此評估等級超過目前最大值，已顯示為 {maxLevel}</div>
+                                              )}
                                             </div>
                                             <div className="text-center text-sm text-[#A68A64]">
                                               等級 {selectedCount} / {totalCount} ({completionPercentage}%)
