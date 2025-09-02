@@ -150,7 +150,16 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
 
       const result = await response.json();
       if (result.success) {
-        console.log('學生活動載入成功:', result.data);
+        console.log('=== 學生活動載入成功 ===');
+        console.log('完整響應數據:', result);
+        console.log('當前課堂活動:', result.data.currentLessonActivities);
+        console.log('之前課堂活動:', result.data.previousLessonActivities);
+        console.log('正在學習活動:', result.data.ongoingActivities);
+        console.log('活動總數:', {
+          current: result.data.currentLessonActivities?.length || 0,
+          previous: result.data.previousLessonActivities?.length || 0,
+          ongoing: result.data.ongoingActivities?.length || 0
+        });
         setActivities(result.data);
       } else {
         throw new Error(result.error || '獲取學生活動失敗');
@@ -208,10 +217,18 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
           if (reloadResponse.ok) {
             const reloadResult = await reloadResponse.json();
             console.log('重新載入結果:', reloadResult);
-            if (reloadResult.success) {
-              setActivities(reloadResult.data);
-              console.log('活動資料已更新:', reloadResult.data);
-            }
+                      if (reloadResult.success) {
+            console.log('=== 重新載入活動成功 ===');
+            console.log('重新載入的完整數據:', reloadResult);
+            console.log('重新載入的活動數據:', reloadResult.data);
+            console.log('重新載入後的活動總數:', {
+              current: reloadResult.data.currentLessonActivities?.length || 0,
+              previous: reloadResult.data.previousLessonActivities?.length || 0,
+              ongoing: reloadResult.data.ongoingActivities?.length || 0
+            });
+            setActivities(reloadResult.data);
+            console.log('活動資料已更新:', reloadResult.data);
+          }
           } else {
             console.error('重新載入響應錯誤:', reloadResponse.status);
           }

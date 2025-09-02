@@ -12,6 +12,7 @@ import { PopupSelect } from '@/components/ui/PopupSelect';
 import { supabase } from '@/lib/supabase';
 import { GrowthTree, GrowthGoal } from '@/types/progress';
 import { VideoCameraIcon } from '@heroicons/react/24/outline';
+import { BookOpenIcon } from '@heroicons/react/24/outline';
 
 export default function GrowthTreesPage() {
   const [trees, setTrees] = useState<GrowthTree[]>([]);
@@ -747,56 +748,13 @@ export default function GrowthTreesPage() {
         <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
           <ResponsiveNavigationDropdown
             items={[
-              {
-                icon: BarChart3,
-                label: "進度管理面板",
-                href: "/admin/student-progress",
-                variant: "secondary"
-              },
-              {
-                icon: TreePine,
-                label: "成長樹管理",
-                href: "/admin/student-progress/growth-trees",
-                variant: "primary"
-              },
-              {
-                icon: TrendingUp,
-                label: "發展能力圖卡",
-                href: "/admin/student-progress/abilities",
-                variant: "secondary"
-              },
-              {
-                icon: Gamepad2,
-                label: "教學活動管理",
-                href: "/admin/student-progress/activities",
-                variant: "secondary"
-              },
-              {
-                icon: VideoCameraIcon,
-                label: "學生媒體管理",
-                href: "/admin/student-progress/student-media",
-                variant: "secondary"
-              },
-              {
-                icon: AcademicCapIcon,
-                label: "能力評估管理",
-                href: "/admin/student-progress/ability-assessments",
-                variant: "secondary"
-              },
-              {
-                icon: Users,
-                label: "返回學生管理",
-                href: "/admin/students",
-                variant: "accent"
-              },
-              {
-                icon: History,
-                label: "版本管理",
-                href: "/admin/student-progress/growth-tree-versions",
-                variant: "secondary"
-              }
+              { label: '成長樹管理', href: '/admin/student-progress/growth-trees', icon: TreePine },
+              { label: '學習路線管理', href: '/admin/student-progress/learning-paths', icon: BookOpenIcon },
+              { label: '能力評估', href: '/admin/student-progress/ability-assessments', icon: BarChart3 },
+              { label: '學習活動', href: '/admin/student-progress/activities', icon: Gamepad2 },
+              { label: '學生媒體', href: '/admin/student-progress/student-media', icon: VideoCameraIcon },
+              { label: '版本管理', href: '/admin/student-progress/growth-tree-versions', icon: History },
             ]}
-            currentPage="/admin/student-progress/growth-trees"
           />
         </div>
 

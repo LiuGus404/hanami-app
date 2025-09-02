@@ -63,5 +63,8 @@ export { default as StudentAvatarTab } from './StudentAvatarTab';
 export { default as EnhancedStudentAvatarTab } from './EnhancedStudentAvatarTab';
 export { default as ClassActivityStyleCard } from './ClassActivityStyleCard';
 
+// 學習路線構建器
+export { default as LearningPathBuilder } from './LearningPathBuilder';
+
 // 類型定義
  

@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       queries.push(Promise.resolve({ data: [], error: null }));
     }
     
-    // 正在學習的活動查詢
+    // 正在學習的活動查詢（包含100%完成的活動）
     queries.push(
       supabase
         .from('hanami_student_activities')
@@ -132,30 +132,88 @@ export async function GET(request: NextRequest) {
         `)
         .eq('student_id', studentId)
         .eq('activity_type', 'ongoing')
-        .in('completion_status', ['in_progress', 'not_started'])
+        .order('assigned_at', { ascending: false })
+    );
+    
+    // 100%完成但仍在ongoing分類的活動查詢
+    queries.push(
+      supabase
+        .from('hanami_student_activities')
+        .select(`
+          id,
+          completion_status,
+          assigned_at,
+          time_spent,
+          teacher_notes,
+          student_feedback,
+          progress,
+          activity_id,
+          hanami_teaching_activities (
+            id,
+            activity_name,
+            activity_description,
+            activity_type,
+            difficulty_level,
+            duration_minutes,
+            materials_needed,
+            instructions
+          )
+        `)
+        .eq('student_id', studentId)
+        .eq('activity_type', 'ongoing')
+        .gte('progress', 100)
         .order('assigned_at', { ascending: false })
     );
     
     // 執行並行查詢
-    const [currentResult, previousResult, ongoingResult] = await Promise.all(queries);
+    const [currentResult, previousResult, ongoingResult, completedOngoingResult] = await Promise.all(queries);
     
     const currentLessonActivities = currentResult.data || [];
     const previousLessonActivities = previousResult.data || [];
     const ongoingActivities = ongoingResult.data || [];
+    const completedOngoingActivities = completedOngoingResult.data || [];
     
     console.log('並行查詢完成:', {
       current: currentLessonActivities.length,
       previous: previousLessonActivities.length,
-      ongoing: ongoingActivities.length
+      ongoing: ongoingActivities.length,
+      completedOngoing: completedOngoingActivities.length
     });
 
     // 處理活動資料，統一格式
     const processActivity = (activity: any) => {
       const teachingActivity = activity.hanami_teaching_activities;
-      if (!teachingActivity) return null;
+      // 即使教學活動關聯缺失，也要帶回 student_activity 的基本資訊以利前端偵錯
+      if (!teachingActivity) {
+        return {
+          id: activity.id,
+          // 關鍵：保留原始 student_activities.activity_id，方便檢查是否為空
+          activityId: activity.activity_id || null,
+          teachingActivityId: null,
+          activityName: null,
+          activityDescription: null,
+          activityType: null,
+          difficultyLevel: null,
+          estimatedDuration: null,
+          materialsNeeded: [],
+          instructions: null,
+          completionStatus: activity.completion_status,
+          teacherNotes: activity.teacher_notes,
+          studentFeedback: activity.student_feedback,
+          timeSpent: activity.time_spent || 0,
+          progress: activity.progress || 0,
+          assignedAt: activity.assigned_at,
+          lessonDate: activity.lesson_date,
+          timeslot: activity.timeslot,
+          _raw: activity
+        };
+      }
 
       return {
         id: activity.id,
+        // 關鍵：對外提供可用於比對教學活動的 ID
+        activityId: teachingActivity.id, // 對應 hanami_teaching_activities.id
+        teachingActivityId: teachingActivity.id,
         activityName: teachingActivity.activity_name,
         activityDescription: teachingActivity.activity_description,
         activityType: teachingActivity.activity_type,
@@ -170,16 +228,18 @@ export async function GET(request: NextRequest) {
         progress: activity.progress || 0,
         assignedAt: activity.assigned_at,
         lessonDate: activity.lesson_date,
-        timeslot: activity.timeslot
+        timeslot: activity.timeslot,
+        _raw: activity
       };
     };
 
     return NextResponse.json({
       success: true,
       data: {
-        currentLessonActivities: currentLessonActivities.map(processActivity).filter(Boolean),
-        previousLessonActivities: previousLessonActivities.map(processActivity).filter(Boolean),
-        ongoingActivities: (ongoingActivities || []).map(processActivity).filter(Boolean)
+        currentLessonActivities: (currentLessonActivities || []).map(processActivity),
+        previousLessonActivities: (previousLessonActivities || []).map(processActivity),
+        ongoingActivities: (ongoingActivities || []).map(processActivity),
+        completedOngoingActivities: (completedOngoingActivities || []).map(processActivity)
       }
     });
 

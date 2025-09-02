@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, StarIcon, UserIcon, CalendarIcon, CheckCircleIcon, AcademicCapIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, StarIcon, UserIcon, CalendarIcon, CheckCircleIcon, AcademicCapIcon, PencilIcon, TrashIcon, ArrowPathIcon, BookOpenIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { HanamiButton, HanamiCard, HanamiInput } from './index';
 import { supabase } from '@/lib/supabase';
 import ActivitySelectionModal from './ActivitySelectionModal';
+import GrowthTreePathManager from './GrowthTreePathManager';
+import { toast } from 'react-hot-toast';
 
 interface Student {
   id: string;
@@ -195,6 +197,9 @@ export default function SimpleAbilityAssessmentModal({
   
   // 活動篩選狀態
   const [activityFilter, setActivityFilter] = useState<'all' | 'incomplete' | 'completed'>('incomplete');
+
+  // 成長樹路徑管理器狀態
+  const [showGrowthTreePathManager, setShowGrowthTreePathManager] = useState(false);
 
   // 檢查是否為編輯模式
   const isEditMode = !!initialData;
@@ -835,8 +840,102 @@ export default function SimpleAbilityAssessmentModal({
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          setStudentActivities(result.data);
-          console.log('學生活動載入成功:', result.data);
+          // 實現雙重顯示：將正在學習的活動同時顯示在本次課堂活動中
+          const currentLessonActivities = result.data.currentLessonActivities || [];
+          const ongoingActivities = result.data.ongoingActivities || [];
+          const previousLessonActivities = result.data.previousLessonActivities || [];
+          
+          console.log('原始數據:', {
+            currentLessonActivities: currentLessonActivities.length,
+            ongoingActivities: ongoingActivities.length,
+            previousLessonActivities: previousLessonActivities.length
+          });
+          
+          // 創建一個 Map 來避免重複添加相同的活動
+          const currentActivityMap = new Map();
+          
+          // 首先添加本次課堂的活動
+          currentLessonActivities.forEach((activity: any) => {
+            const key = activity.activityId || activity.id;
+            if (key) {
+              currentActivityMap.set(key, {
+                ...activity,
+                source: 'current_lesson' // 標記來源
+              });
+            }
+          });
+          
+          // 然後添加正在學習的活動（如果不在本次課堂中且未完成）
+          let addedOngoingCount = 0;
+          let filteredCompletedCount = 0;
+          
+          ongoingActivities.forEach((activity: any) => {
+            const key = activity.activityId || activity.id;
+            if (key && !currentActivityMap.has(key)) {
+              // 檢查活動是否已完成（進度 >= 100%）
+              const isCompleted = (activity.progress || 0) >= 100;
+              
+              // 只有未完成的活動才添加到本次課堂活動中
+              if (!isCompleted) {
+                // 轉換為本次課堂活動的格式
+                const convertedActivity = {
+                  ...activity,
+                  lesson_date: lessonDate, // 設置為當前課堂日期
+                  timeslot: '', // 清空時段（因為是正在學習的活動）
+                  source: 'ongoing' // 標記來源
+                };
+                currentActivityMap.set(key, convertedActivity);
+                addedOngoingCount++;
+              } else {
+                filteredCompletedCount++;
+              }
+            }
+          });
+          
+          // 轉換回數組
+          const enhancedCurrentLessonActivities = Array.from(currentActivityMap.values());
+          
+          console.log('雙重顯示處理完成:', {
+            原始本次課堂活動: currentLessonActivities.length,
+            原始正在學習活動: ongoingActivities.length,
+            增強後本次課堂活動: enhancedCurrentLessonActivities.length,
+            正在學習活動: ongoingActivities.length,
+            添加到本次課堂的ongoing活動: addedOngoingCount,
+            過濾掉的已完成活動: filteredCompletedCount
+          });
+          
+          // 設置增強後的活動數據
+          setStudentActivities({
+            currentLessonActivities: enhancedCurrentLessonActivities,
+            previousLessonActivities,
+            ongoingActivities
+          });
+          
+          console.log('學生活動載入成功（已實現雙重顯示）:', {
+            currentLessonActivities: enhancedCurrentLessonActivities,
+            ongoingActivities
+          });
+          
+          // 新增：詳列 ongoingActivities 的每一筆關鍵欄位以偵錯自動安排邏輯的匹配
+          try {
+            const ongoing = result.data?.ongoingActivities || [];
+            console.log('API 原始 ongoingActivities 條數:', ongoing.length);
+            ongoing.forEach((a: any, idx: number) => {
+              console.log(`ongoing[${idx}]`, {
+                id: a?.id,
+                activityId: a?.activityId,
+                teachingActivityId: a?.teachingActivityId,
+                activityName: a?.activityName,
+                completionStatus: a?.completionStatus,
+                progress: a?.progress,
+                assignedAt: a?.assignedAt,
+                raw_activity_id: a?._raw?.activity_id,
+                raw_teaching_activity: a?._raw?.hanami_teaching_activities?.id
+              });
+            });
+          } catch (e) {
+            console.log('ongoingActivities 詳細日誌輸出失敗:', e);
+          }
         } else {
           console.error('載入學生活動失敗:', result.error);
           // 設置空數據
@@ -1336,15 +1435,39 @@ export default function SimpleAbilityAssessmentModal({
   };
 
   // 活動卡片組件
-  const ActivityCard = ({ activity, type }: { activity: any; type: 'current' | 'previous' | 'ongoing' }) => {
-    const isEditing = editingActivityId === activity.id;
-    const currentProgress = isEditing ? (tempProgress[activity.id] || 0) : (activity.progress || 0);
+  const ActivityCard = ({ 
+    activity, 
+    type, 
+    area,
+    onEdit,
+    onSave,
+    onCancel,
+    onReset,
+    onDelete,
+    isEditing,
+    tempProgress,
+    onProgressChange
+  }: { 
+    activity: any; 
+    type: 'current' | 'previous' | 'ongoing'; 
+    area: 'current_lesson' | 'ongoing';
+    onEdit?: (activityId: string, clickedArea: "current_lesson" | "ongoing") => void;
+    onSave?: (activityId: string) => Promise<void>;
+    onCancel?: (activityId: string) => void;
+    onReset?: (activityId: string) => void;
+    onDelete?: (activityId: string) => void;
+    isEditing?: boolean;
+    tempProgress?: number;
+    onProgressChange?: (activityId: string, progress: number) => void;
+  }) => {
+    const isEditingLocal = isEditing || editingActivityId === activity.id;
+    const currentProgress = isEditingLocal ? (tempProgress || 0) : (activity.progress || 0);
     const isNotStarted = activity.completionStatus === 'not_started';
     
     const getStatusText = () => {
-      if (currentProgress >= 100) return '✅ 已完成';
-      if (currentProgress > 0) return '⏳ 進行中';
-      return '|| 未開始';
+      if (currentProgress >= 100) return '已完成';
+      if (currentProgress > 0) return '進行中';
+      return '未開始';
     };
 
     const getDifficultyColor = (level: number) => {
@@ -1358,6 +1481,21 @@ export default function SimpleAbilityAssessmentModal({
       }
     };
 
+    // 決定是否顯示編輯按鈕
+    // 在「正在學習的活動」區域中，所有活動都可以編輯
+    // 在「本次課堂活動」區域中，只有 source !== 'ongoing' 的活動可以編輯
+    const canEdit = area === 'ongoing' || (area === 'current_lesson' && activity.source !== 'ongoing');
+    
+    // 調試日誌
+    console.log('ActivityCard 調試:', {
+      activityId: activity.id,
+      activityName: activity.activityName,
+      area,
+      source: activity.source,
+      canEdit,
+      type
+    });
+
     return (
       <div className="p-4 bg-white border border-[#EADBC8] rounded-lg hover:border-[#D4A5A5] transition-all duration-200">
         {/* 活動標題區域 */}
@@ -1366,6 +1504,26 @@ export default function SimpleAbilityAssessmentModal({
             <div className="font-medium text-sm text-[#2B3A3B] flex items-center gap-2">
               <span>{getStatusText()}</span>
               <span>{activity.activityName}</span>
+              {/* 顯示活動來源標記 */}
+              {activity.source && (
+                <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${
+                  activity.source === 'ongoing' 
+                    ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                    : 'bg-green-100 text-green-800 border border-green-200'
+                }`}>
+                  {activity.source === 'ongoing' ? (
+                    <>
+                      <ArrowPathIcon className="w-3 h-3" />
+                      正在學習
+                    </>
+                  ) : (
+                    <>
+                      <BookOpenIcon className="w-3 h-3" />
+                      本次課堂
+                    </>
+                  )}
+                </span>
+              )}
             </div>
             <div className="text-xs text-[#A68A64] mt-1">{activity.activityDescription}</div>
           </div>
@@ -1376,13 +1534,16 @@ export default function SimpleAbilityAssessmentModal({
             <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
               {activity.activityType}
             </span>
-            <button
-              className="p-1 text-gray-500 hover:text-[#A68A64] transition-colors"
-              onClick={() => handleActivityEdit(activity.id)}
-              title="編輯進度"
-            >
-              <PencilIcon className="w-4 h-4" />
-            </button>
+            {/* 根據區域和來源決定是否顯示編輯按鈕 */}
+            {canEdit && (
+              <button
+                className="p-1 text-gray-500 hover:text-[#A68A64] transition-colors"
+                onClick={() => handleActivityEdit(activity.id, area)}
+                title="編輯進度"
+              >
+                <PencilIcon className="w-4 h-4" />
+              </button>
+            )}
             {type !== 'previous' && (
               <button
                 className="p-1 text-red-500 hover:text-red-700 transition-colors"
@@ -1396,7 +1557,7 @@ export default function SimpleAbilityAssessmentModal({
         </div>
 
         {/* 進度編輯區域 */}
-        {isEditing && (
+        {isEditingLocal && canEdit && (
           <div className="mb-3 p-3 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
             <h6 className="text-xs font-medium text-[#2B3A3B] mb-2">編輯完成進度</h6>
             
@@ -1507,12 +1668,58 @@ export default function SimpleAbilityAssessmentModal({
     setShowActivitySelectionModal(true);
   };
 
+  const handleActivityAssigned = async (newActivity: any) => {
+    console.log('收到活動分配通知:', newActivity);
+    
+    // 立即更新本地狀態，讓用戶立即看到新分配的活動
+    setStudentActivities(prev => ({
+      ...prev,
+      ongoingActivities: [...prev.ongoingActivities, newActivity]
+    }));
+    
+    console.log('本地狀態已更新，新活動立即顯示');
+    
+    // 在背景重新載入數據以確保數據一致性
+    try {
+      console.log('開始在背景重新載入活動數據...');
+      await loadStudentActivities();
+      console.log('活動數據重新載入完成');
+    } catch (error) {
+      console.error('重新載入活動數據失敗:', error);
+      // 如果重新載入失敗，本地狀態已經更新，用戶仍能看到新活動
+    }
+  };
+
   // 處理活動編輯
-  const handleActivityEdit = (activityId: string) => {
-    setEditingActivityId(activityId);
-    // 初始化臨時進度
+  const handleActivityEdit = (activityId: string, clickedArea: 'current_lesson' | 'ongoing') => {
+    console.log('handleActivityEdit 被調用，activityId:', activityId, 'clickedArea:', clickedArea);
+    
+    // 檢查活動是否為正在學習的活動，如果是則不允許編輯
     const activity = [...studentActivities.currentLessonActivities, ...studentActivities.ongoingActivities]
       .find(a => a.id === activityId);
+    
+    console.log('找到的活動:', activity);
+    
+    // 根據點擊的區域來決定是否允許編輯
+    // 如果在「正在學習的活動」區域點擊，則允許編輯
+    // 如果在「本次課堂活動」區域點擊且來源為 ongoing，則不允許編輯
+    const isOngoingSource = activity?.source === 'ongoing';
+    
+    console.log('編輯檢查:', {
+      clickedArea,
+      isOngoingSource,
+      shouldBlock: clickedArea === 'current_lesson' && isOngoingSource
+    });
+    
+    if (clickedArea === 'current_lesson' && isOngoingSource) {
+      console.log('正在學習的活動不能在「本次課堂活動」區域編輯進度:', activity);
+      toast.error('正在學習的活動需要在「正在學習的活動」區域進行進度修改');
+      return;
+    }
+    
+    console.log('允許編輯，設置編輯狀態');
+    setEditingActivityId(activityId);
+    // 初始化臨時進度
     if (activity) {
       setTempProgress(prev => ({
         ...prev,
@@ -1549,9 +1756,42 @@ export default function SimpleAbilityAssessmentModal({
         const result = await response.json();
         if (result.success) {
           console.log('進度更新成功');
-          // 重新載入活動
-          await loadStudentActivities();
+          
+          // 立即更新本地狀態，確保活動正確顯示
+          setStudentActivities(prev => {
+            const updated = {
+              ...prev,
+              currentLessonActivities: prev.currentLessonActivities.map(activity => 
+                activity.id === activityId 
+                  ? { ...activity, progress: progress }
+                  : activity
+              ),
+              ongoingActivities: prev.ongoingActivities.map(activity => 
+                activity.id === activityId 
+                  ? { ...activity, progress: progress }
+                  : activity
+              )
+            };
+            
+            console.log('本地狀態更新調試:', {
+              activityId,
+              newProgress: progress,
+              updatedCurrentLesson: updated.currentLessonActivities.filter(a => a.id === activityId),
+              updatedOngoing: updated.ongoingActivities.filter(a => a.id === activityId)
+            });
+            
+            return updated;
+          });
+          
+          // 清除編輯狀態
           setEditingActivityId(null);
+          
+          // 在背景重新載入數據以確保數據一致性
+          try {
+            await loadStudentActivities();
+          } catch (error) {
+            console.error('重新載入活動數據失敗:', error);
+          }
         } else {
           console.error('進度更新失敗:', result.error);
           alert('進度更新失敗: ' + result.error);
@@ -1587,12 +1827,52 @@ export default function SimpleAbilityAssessmentModal({
 
   // 篩選活動
   const getFilteredActivities = (activities: any[]) => {
+    console.log('篩選活動調試:', {
+      activityFilter,
+      totalActivities: activities.length,
+      activitiesWithProgress: activities.map(a => ({
+        id: a.id,
+        name: a.activityName,
+        progress: a.progress,
+        progressType: typeof a.progress,
+        source: a.source,
+        completionStatus: a.completionStatus
+      }))
+    });
+    
+    let filteredActivities;
     switch (activityFilter) {
       case 'completed':
-        return activities.filter(activity => (activity.progress || 0) >= 100);
+        filteredActivities = activities.filter(activity => (activity.progress || 0) >= 100);
+        console.log('已完成篩選結果:', {
+          filter: 'completed',
+          count: filteredActivities.length,
+          activities: filteredActivities.map(a => ({
+            id: a.id,
+            name: a.activityName,
+            progress: a.progress,
+            completionStatus: a.completionStatus
+          }))
+        });
+        return filteredActivities;
       case 'incomplete':
-        return activities.filter(activity => (activity.progress || 0) < 100);
+        filteredActivities = activities.filter(activity => (activity.progress || 0) < 100);
+        console.log('未完成篩選結果:', {
+          filter: 'incomplete',
+          count: filteredActivities.length,
+          activities: filteredActivities.map(a => ({
+            id: a.id,
+            name: a.activityName,
+            progress: a.progress,
+            completionStatus: a.completionStatus
+          }))
+        });
+        return filteredActivities;
       default:
+        console.log('全部篩選結果:', {
+          filter: 'all',
+          count: activities.length
+        });
         return activities;
     }
   };
@@ -2421,7 +2701,9 @@ export default function SimpleAbilityAssessmentModal({
                 {selectedStudent && studentTrees.length > 0 && (
                   <div className="relative tree-dropdown">
                     <label className="block text-sm font-medium text-[#2B3A3B] mb-2">
-                      <span className="text-xl mr-1">🌳</span>
+                      <span className="text-xl mr-1">
+                        <AcademicCapIcon className="w-6 h-6 text-[#A68A64]" />
+                      </span>
                       選擇成長樹
                     </label>
                     <div className="relative">
@@ -2483,7 +2765,9 @@ export default function SimpleAbilityAssessmentModal({
                 {selectedStudent && studentTrees.length === 0 && (
                   <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <div className="flex items-start gap-2">
-                      <span className="text-yellow-600 text-lg">⚠️</span>
+                      <span className="text-yellow-600 text-lg">
+                        <ExclamationTriangleIcon className="w-5 h-5" />
+                      </span>
                       <div>
                         <h4 className="text-yellow-800 font-medium text-sm">學生未分配成長樹</h4>
                         <p className="text-yellow-700 text-xs mt-1">
@@ -2744,8 +3028,9 @@ export default function SimpleAbilityAssessmentModal({
                   {/* 成長樹資訊 */}
                   {selectedTree && (
                     <div className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-4 rounded-lg border border-[#EADBC8]">
-                      <h4 className="font-medium text-[#2B3A3B] mb-2">
-                        🌳 {selectedTree.tree_name}
+                      <h4 className="font-medium text-[#2B3A3B] mb-2 flex items-center gap-2">
+                        <AcademicCapIcon className="w-5 h-5 text-[#A68A64]" />
+                        {selectedTree.tree_name}
                       </h4>
                       <p className="text-sm text-[#87704e]">
                         {selectedTree.tree_description || '此成長樹的學習目標和能力發展'}
@@ -2770,16 +3055,28 @@ export default function SimpleAbilityAssessmentModal({
                               <div className="font-medium text-[#2B3A3B] flex items-center gap-2">
                                 {goal.goal_name}
                                 {goal.is_completed && (
-                                  <span className="text-green-600 text-sm">✅ 已完成</span>
+                                  <span className="text-green-600 text-sm flex items-center gap-1">
+                                    <CheckCircleIcon className="w-4 h-4" />
+                                    已完成
+                                  </span>
                                 )}
                                 {goalAssessments[goal.id]?.level && (
-                                  <span className="text-blue-600 text-sm">📊 已評估 (等級 {goalAssessments[goal.id].level})</span>
+                                  <span className="text-blue-600 text-sm flex items-center gap-1">
+                                    <StarIcon className="w-4 h-4" />
+                                    已評估 (等級 {goalAssessments[goal.id].level})
+                                  </span>
                                 )}
                                 {(goal as any).assessment_mode === 'multi_select' && (
-                                  <span className="text-purple-600 text-sm">🔗 多選模式</span>
+                                  <span className="text-purple-600 text-sm flex items-center gap-1">
+                                    <AcademicCapIcon className="w-4 h-4" />
+                                    多選模式
+                                  </span>
                                 )}
                                 {(goal as any).assessment_mode === 'multi_select' && multiSelectAssessments[goal.id] && multiSelectAssessments[goal.id].length > 0 && (
-                                  <span className="text-blue-600 text-sm">📊 已評估 ({multiSelectAssessments[goal.id].length} 項)</span>
+                                  <span className="text-blue-600 text-sm flex items-center gap-1">
+                                    <StarIcon className="w-4 h-4" />
+                                    已評估 ({multiSelectAssessments[goal.id].length} 項)
+                                  </span>
                                 )}
                               </div>
                               {goal.goal_description && (
@@ -2977,13 +3274,43 @@ export default function SimpleAbilityAssessmentModal({
                   </h3>
                   
                                  {/* 本次課堂活動 */}
-               <div className="mb-6">
-                 <div className="flex items-center justify-between mb-3">
-                   <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2">
-                     <span className="text-lg">📚</span>
-                     本次課堂活動
-                     <span className="text-xs text-[#A68A64]">（僅限本次課堂）</span>
-                   </h4>
+               <div className="mb-8">
+                 <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                   本次課堂活動
+                 </h3>
+                 
+                 {studentActivities.currentLessonActivities.length > 0 ? (
+                   <div className="grid gap-4">
+                     {getFilteredActivities(studentActivities.currentLessonActivities).map((activity) => (
+                       <ActivityCard
+                         key={activity.id}
+                         activity={activity}
+                         type="current"
+                         area="current_lesson"
+                         onEdit={handleActivityEdit}
+                         onSave={handleProgressSave}
+                         onCancel={handleProgressCancel}
+                         onReset={handleProgressReset}
+                         onDelete={handleActivityDelete}
+                         isEditing={editingActivityId === activity.id}
+                         tempProgress={tempProgress[activity.id] || 0}
+                         onProgressChange={handleProgressChange}
+                       />
+                     ))}
+                   </div>
+                 ) : (
+                   <div className="text-center py-8 text-gray-500">
+                     暫無本次課堂活動
+                   </div>
+                 )}
+               </div>
+
+               {/* 正在學習的活動 */}
+               <div className="mb-8">
+                 <div className="flex items-center justify-between mb-4">
+                   <h3 className="text-lg font-semibold text-gray-800">
+                     正在學習的活動
+                   </h3>
                    <div className="flex items-center gap-2">
                      {/* 篩選按鈕 */}
                      <div className="flex bg-[#F5F0EB] rounded-lg p-1">
@@ -3024,179 +3351,65 @@ export default function SimpleAbilityAssessmentModal({
                      >
                        選擇活動
                      </button>
-                   </div>
-                 </div>
-                    <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
-                      {(() => {
-                        const filteredActivities = getFilteredActivities(studentActivities.currentLessonActivities);
-                        if (filteredActivities.length > 0) {
-                          return (
-                            <div className="space-y-3">
-                              {filteredActivities.map((activity, index) => (
-                                <ActivityCard key={activity.id || index} activity={activity} type="current" />
-                              ))}
-                            </div>
-                          );
-                        } else {
-                          const totalActivities = studentActivities.currentLessonActivities.length;
-                          if (totalActivities === 0) {
-                            return (
-                              <>
-                                <p className="text-[#A68A64] text-sm">暫無活動</p>
-                                <p className="text-[#87704e] text-xs mt-1">點擊上方按鈕選擇活動</p>
-                              </>
-                            );
-                          } else {
-                            return (
-                              <>
-                                <p className="text-[#A68A64] text-sm">
-                                  {activityFilter === 'completed' ? '暫無已完成的活動' : 
-                                   activityFilter === 'incomplete' ? '暫無未完成的活動' : '暫無活動'}
-                                </p>
-                                <p className="text-[#87704e] text-xs mt-1">
-                                  共 {totalActivities} 個活動，請選擇其他篩選條件
-                                </p>
-                              </>
-                            );
-                          }
-                        }
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* 上次課堂活動 */}
-                  <div className="mb-6">
-                    <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2 mb-3">
-                      <span className="text-lg">📖</span>
-                      上次課堂活動
-                      <span className="text-xs text-[#A68A64]">（供參考）</span>
-                    </h4>
-                    <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
-                      {studentActivities.previousLessonActivities.length > 0 ? (
-                        <div className="space-y-3">
-                          {studentActivities.previousLessonActivities.map((activity, index) => (
-                            <ActivityCard key={activity.id || index} activity={activity} type="previous" />
-                          ))}
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-[#A68A64] text-sm">暫無上次課堂活動</p>
-                          <p className="text-[#87704e] text-xs mt-1">這是學生上次課堂的活動記錄</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                                 {/* 正在學習的活動 */}
-               <div className="mb-6">
-                 <div className="flex items-center justify-between mb-3">
-                   <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2">
-                     <span className="text-lg">🎯</span>
-                     正在學習的活動
-                     <span className="text-xs text-[#A68A64]">（跨多個課堂）</span>
-                   </h4>
-                   <div className="flex items-center gap-2">
-                     {/* 篩選按鈕 */}
-                     <div className="flex bg-[#F5F0EB] rounded-lg p-1">
-                       <button
-                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
-                           activityFilter === 'incomplete'
-                             ? 'bg-white text-[#2B3A3B] shadow-sm'
-                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
-                         }`}
-                         onClick={() => setActivityFilter('incomplete')}
-                       >
-                         未完成
-                       </button>
-                       <button
-                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
-                           activityFilter === 'completed'
-                             ? 'bg-white text-[#2B3A3B] shadow-sm'
-                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
-                         }`}
-                         onClick={() => setActivityFilter('completed')}
-                       >
-                         已完成
-                       </button>
-                       <button
-                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
-                           activityFilter === 'all'
-                             ? 'bg-white text-[#2B3A3B] shadow-sm'
-                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
-                         }`}
-                         onClick={() => setActivityFilter('all')}
-                       >
-                         全部
-                       </button>
-                     </div>
-                     {studentTrees.length > 0 ? (
-                       <button
-                         className="px-3 py-1.5 bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] text-white text-xs rounded-lg hover:from-[#D4A5A5] hover:to-[#C89B9B] transition-all duration-200"
-                         onClick={() => handleActivitySelection('ongoing')}
-                       >
-                         選擇活動
-                       </button>
-                     ) : (
+                     {studentTrees.length > 0 && (
                        <button
                          className="px-3 py-1.5 bg-gradient-to-r from-[#A68A64] to-[#8B7355] text-white text-xs rounded-lg hover:from-[#8B7355] hover:to-[#6B5B47] transition-all duration-200"
-                         onClick={() => {/* TODO: 實現分配成長樹功能 */}}
+                         onClick={() => setShowGrowthTreePathManager(true)}
                        >
-                         立即分配成長樹
+                         學習路徑
                        </button>
                      )}
                    </div>
                  </div>
-                    {studentTrees.length > 0 ? (
-                                              <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
-                          {(() => {
-                            const filteredActivities = getFilteredActivities(studentActivities.ongoingActivities);
-                            if (filteredActivities.length > 0) {
-                              return (
-                                <div className="space-y-3">
-                                  {filteredActivities.map((activity, index) => (
-                                    <ActivityCard key={activity.id || index} activity={activity} type="ongoing" />
-                                  ))}
-                                </div>
-                              );
-                            } else {
-                              const totalActivities = studentActivities.ongoingActivities.length;
-                              if (totalActivities === 0) {
-                                return (
-                                  <>
-                                    <p className="text-[#A68A64] text-sm">暫無進行中的活動</p>
-                                    <p className="text-[#87704e] text-xs mt-1">點擊上方按鈕選擇長期活動</p>
-                                  </>
-                                );
-                              } else {
-                                return (
-                                  <>
-                                    <p className="text-[#A68A64] text-sm">
-                                      {activityFilter === 'completed' ? '暫無已完成的活動' : 
-                                       activityFilter === 'incomplete' ? '暫無未完成的活動' : '暫無活動'}
-                                    </p>
-                                    <p className="text-[#87704e] text-xs mt-1">
-                                      共 {totalActivities} 個活動，請選擇其他篩選條件
-                                    </p>
-                                  </>
-                                );
-                              }
-                            }
-                          })()}
-                        </div>
-                    ) : (
-                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <span className="text-yellow-600 text-lg">⚠️</span>
-                          <div>
-                            <h5 className="text-yellow-800 font-medium text-sm">學生尚未分配成長樹</h5>
-                            <p className="text-yellow-700 text-xs mt-1">
-                              需要先為學生分配成長樹才能分配長期活動
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                 
+                 {studentActivities.ongoingActivities.length > 0 ? (
+                   <div className="grid gap-4">
+                     {getFilteredActivities(studentActivities.ongoingActivities).map((activity) => (
+                       <ActivityCard
+                         key={activity.id}
+                         activity={activity}
+                         type="ongoing"
+                         area="ongoing"
+                         onEdit={handleActivityEdit}
+                         onSave={handleProgressSave}
+                         onCancel={handleProgressCancel}
+                         onReset={handleProgressReset}
+                         onDelete={handleActivityDelete}
+                         isEditing={editingActivityId === activity.id}
+                         tempProgress={tempProgress[activity.id] || 0}
+                         onProgressChange={handleProgressChange}
+                       />
+                     ))}
+                   </div>
+                 ) : (
+                   <div className="text-center py-8 text-gray-500">
+                     暫無正在學習的活動
+                   </div>
+                 )}
+               </div>
+
+                                 {/* 上次課堂活動 */}
+               <div className="mb-6">
+                 <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2 mb-3">
+                   <BookOpenIcon className="w-5 h-5 text-[#A68A64]" />
+                   上次課堂活動
+                   <span className="text-xs text-[#A68A64]">（供參考）</span>
+                 </h4>
+                 <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
+                   {studentActivities.previousLessonActivities.length > 0 ? (
+                     <div className="space-y-3">
+                       {studentActivities.previousLessonActivities.map((activity, index) => (
+                         <ActivityCard key={activity.id || index} activity={activity} type="previous" area="current_lesson" />
+                       ))}
+                     </div>
+                   ) : (
+                     <>
+                       <p className="text-[#A68A64] text-sm">暫無上次課堂活動</p>
+                       <p className="text-[#87704e] text-xs mt-1">這是學生上次課堂的活動記錄</p>
+                     </>
+                   )}
+                 </div>
+               </div>
 
                                  {/* 活動統計 */}
                <div className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-4 rounded-lg border border-[#EADBC8]">
@@ -3281,6 +3494,23 @@ export default function SimpleAbilityAssessmentModal({
         activityType={currentActivityType}
         studentId={selectedStudentId}
       />
+
+      {/* 成長樹路徑管理器 */}
+      {showGrowthTreePathManager && (
+        <GrowthTreePathManager
+          studentId={selectedStudentId}
+          treeId={selectedTreeId}
+          studentTrees={studentTrees}
+          currentActivities={studentActivities.ongoingActivities}
+          onActivityAssigned={handleActivityAssigned}
+          onTreeChange={(newTreeId) => {
+            console.log('父組件收到成長樹變化:', newTreeId);
+            // 這裡可以更新 selectedTreeId，但由於它是從父組件傳入的，
+            // 我們可能需要重新打開模態框或者通知父組件
+          }}
+          onClose={() => setShowGrowthTreePathManager(false)}
+        />
+      )}
     </div>
   );
 } 
