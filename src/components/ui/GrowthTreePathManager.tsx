@@ -57,8 +57,8 @@ interface GrowthTreePathManagerProps {
   studentTrees: Array<{
     id: string;
     tree_name: string;
-    status?: string | null;
-    start_date?: string | null;
+    status: string;
+    start_date: string;
   }>;
   currentActivities: StudentActivity[];
   onActivityAssigned: (activity: StudentActivity) => void;
@@ -151,15 +151,296 @@ export default function GrowthTreePathManager({
       console.log('查詢條件 - tree_id:', currentTreeId);
       console.log('查詢條件 - is_active: true');
       
-      // 目前資料庫中沒有學習路徑相關的表
-      // 返回 null 表示沒有學習路徑數據
-      console.log('資料庫中沒有學習路徑表，返回 null');
-      return null;
+      // 首先檢查 hanami_learning_paths 表是否存在
+      console.log('=== 檢查資料庫表狀態 ===');
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('hanami_learning_paths')
+        .select('count')
+        .limit(1);
+      
+      if (tableError) {
+        console.error('檢查 hanami_learning_paths 表失敗:', tableError);
+        console.error('這可能表示表不存在或沒有權限訪問');
+        return null;
+      }
+      
+      console.log('hanami_learning_paths 表存在，可以正常查詢');
+      
+      // 檢查是否有任何學習路徑數據
+      const { data: allPaths, error: allPathsError } = await supabase
+        .from('hanami_learning_paths')
+        .select('id, name, tree_id, is_active')
+        .limit(5);
+      
+      if (allPathsError) {
+        console.error('查詢所有學習路徑失敗:', allPathsError);
+      } else {
+        console.log('資料庫中的學習路徑總覽:', allPaths);
+        console.log('總數量:', allPaths?.length || 0);
+      }
+      
+      // 檢查是否有其他表包含學習路徑數據
+      console.log('=== 檢查其他可能的學習路徑表 ===');
+      
+      // 檢查 hanami_learning_nodes 表
+      const { data: learningNodes, error: learningNodesError } = await supabase
+        .from('hanami_learning_nodes')
+        .select('*')
+        .limit(5);
+      
+      if (learningNodesError) {
+        console.log('hanami_learning_nodes 表不存在或無法訪問');
+      } else {
+        console.log('hanami_learning_nodes 表數據:', learningNodes);
+        console.log('節點數量:', learningNodes?.length || 0);
+      }
+      
+      // 檢查 hanami_student_learning_progress 表
+      const { data: studentProgress, error: studentProgressError } = await supabase
+        .from('hanami_student_learning_progress')
+        .select('*')
+        .eq('student_id', studentId)
+        .limit(5);
+      
+      if (studentProgressError) {
+        console.log('hanami_student_learning_progress 表不存在或無法訪問');
+      } else {
+        console.log('學生學習進度數據:', studentProgress);
+        console.log('進度記錄數量:', studentProgress?.length || 0);
+      }
+      
+      // 從 hanami_learning_paths 表載入學習路徑
+      const { data: pathData, error: pathError } = await supabase
+        .from('hanami_learning_paths')
+        .select('*')
+        .eq('tree_id', currentTreeId)
+        .eq('is_active', true)
+        .single();
+
+      if (pathError) {
+        if (pathError.code === 'PGRST116') {
+          console.log('沒有找到學習路徑數據 (PGRST116)');
+          console.log('這表示 hanami_learning_paths 表中沒有對應的記錄');
+          console.log('需要檢查：');
+          console.log('1. 表是否存在');
+          console.log('2. 是否有 tree_id 為', currentTreeId, '的記錄');
+          console.log('3. 記錄的 is_active 是否為 true');
+          
+          // 嘗試不限制 is_active 來查找記錄
+          console.log('嘗試查找不限制 is_active 的記錄...');
+          const { data: anyPathData, error: anyPathError } = await supabase
+            .from('hanami_learning_paths')
+            .select('*')
+            .eq('tree_id', currentTreeId)
+            .limit(1);
+          
+          if (anyPathError) {
+            console.error('查找任何記錄也失敗:', anyPathError);
+          } else if (anyPathData && anyPathData.length > 0) {
+            console.log('找到記錄，但 is_active 可能不是 true:', anyPathData[0]);
+            console.log('記錄的 is_active 值:', anyPathData[0].is_active);
+          } else {
+            console.log('完全沒有找到 tree_id 為', currentTreeId, '的記錄');
+          }
+        } else {
+          console.error('載入學習路徑失敗:', pathError);
+          console.error('錯誤詳情:', {
+            message: pathError.message,
+            details: pathError.details,
+            hint: pathError.hint,
+            code: pathError.code
+          });
+        }
+        
+        // 不要在這裡 return null，讓函數繼續執行後面的邏輯
+        console.log('將嘗試從 hanami_tree_activities 表載入數據');
+      } else if (pathData) {
+        console.log('找到學習路徑數據:', pathData);
+        console.log('學習路徑名稱:', pathData.name);
+        console.log('學習路徑描述:', pathData.description);
+        console.log('學習路徑節點數量:', pathData.nodes?.length || 0);
+        console.log('學習路徑節點詳情:', pathData.nodes);
+        
+        // 檢查節點結構
+        if (pathData.nodes && pathData.nodes.length > 0) {
+          console.log('=== 節點結構分析 ===');
+          pathData.nodes.forEach((node: any, index: number) => {
+            console.log(`節點 ${index}:`, {
+              id: node.id,
+              node_type: node.node_type,
+              title: node.title,
+              description: node.description,
+              metadata: node.metadata,
+              has_activity_id: !!node.metadata?.activity_id
+            });
+          });
+          
+          // 檢查活動節點
+          const activityNodes = pathData.nodes.filter((node: any) => 
+            node.node_type === 'activity'
+          );
+          console.log('活動節點數量:', activityNodes.length);
+          console.log('活動節點詳情:', activityNodes);
+          
+          // 檢查有 activity_id 的節點
+          const nodesWithActivityId = pathData.nodes.filter((node: any) => 
+            node.node_type === 'activity' && node.metadata?.activity_id
+          );
+          console.log('有 activity_id 的節點數量:', nodesWithActivityId.length);
+          console.log('有 activity_id 的節點詳情:', nodesWithActivityId);
+        } else {
+          console.log('學習路徑數據存在，但 nodes 欄位為空或未定義');
+          console.log('pathData.nodes:', pathData.nodes);
+          console.log('pathData.nodes 類型:', typeof pathData.nodes);
+          console.log('pathData.nodes 是否為陣列:', Array.isArray(pathData.nodes));
+        }
+        
+        setLearningPathData(pathData);
+        return pathData;
+      }
+      
+      // 如果 hanami_learning_paths 表沒有數據，嘗試從 hanami_tree_activities 表載入
+      console.log('=== 嘗試從 hanami_tree_activities 表載入學習路徑數據 ===');
+      
+      try {
+        const { data: treeActivities, error: treeActivitiesError } = await supabase
+          .from('hanami_tree_activities')
+          .select(`
+            id,
+            tree_id,
+            activity_id,
+            activity_source,
+            custom_activity_name,
+            custom_activity_description,
+            activity_type,
+            difficulty_level,
+            estimated_duration,
+            priority_order,
+            activity_order,
+            is_required,
+            is_active,
+            hanami_teaching_activities (
+              id,
+              activity_name,
+              activity_description,
+              activity_type,
+              difficulty_level,
+              duration_minutes,
+              materials_needed,
+              instructions
+            )
+          `)
+          .eq('tree_id', currentTreeId)
+          .eq('is_active', true)
+          .order('activity_order', { ascending: true });
+
+        if (treeActivitiesError) {
+          console.error('載入 hanami_tree_activities 失敗:', treeActivitiesError);
+          return null;
+        }
+
+        if (treeActivities && treeActivities.length > 0) {
+          console.log('從 hanami_tree_activities 表找到數據:', treeActivities);
+          console.log('活動數量:', treeActivities.length);
+          
+          // 驗證活動是否屬於當前成長樹
+          const validActivities = treeActivities.filter(ta => {
+            if (ta.tree_id !== currentTreeId) {
+              console.log('發現不屬於當前成長樹的活動:', ta.id, 'tree_id:', ta.tree_id, 'currentTreeId:', currentTreeId);
+              return false;
+            }
+            return true;
+          });
+          
+          console.log('驗證後的有效活動數量:', validActivities.length);
+          
+          if (validActivities.length === 0) {
+            console.log('當前成長樹沒有有效的活動數據');
+            return null;
+          }
+          
+          // 篩選核心學習活動 - 顯示 0006-貓鬚下的白鍵 和 0002-認識琴鍵兔耳
+          const coreActivities = validActivities.filter(ta => {
+            const activityName = ta.hanami_teaching_activities?.activity_name || ta.custom_activity_name;
+            if (!activityName) return false;
+            
+            // 包含 0006 和 0002 的活動
+            return activityName.includes('0006') || activityName.includes('0002');
+          });
+          
+          // 如果沒有找到 0006 和 0002 的活動，嘗試顯示前幾個活動
+          let finalActivities = coreActivities;
+          if (coreActivities.length === 0) {
+            console.log('沒有找到 0006 和 0002 的活動，將顯示前幾個活動');
+            finalActivities = validActivities.slice(0, 3); // 顯示前3個活動
+          }
+          
+          // 確保活動順序正確：0006 在前，0002 在後
+          const sortedCoreActivities = finalActivities.sort((a, b) => {
+            const nameA = a.hanami_teaching_activities?.activity_name || a.custom_activity_name;
+            const nameB = b.hanami_teaching_activities?.activity_name || b.custom_activity_name;
+            
+            // 0006 應該排在 0002 前面
+            if (nameA.includes('0006') && nameB.includes('0002')) return -1;
+            if (nameA.includes('0002') && nameB.includes('0006')) return 1;
+            
+            // 如果沒有 0006 和 0002，按原始順序排列
+            return 0;
+          });
+          
+          console.log('篩選後的核心活動數量:', sortedCoreActivities.length);
+          console.log('核心活動名稱:', sortedCoreActivities.map(ta => 
+            ta.hanami_teaching_activities?.activity_name || ta.custom_activity_name
+          ));
+          
+          // 如果仍然沒有活動，返回 null
+          if (sortedCoreActivities.length === 0) {
+            console.log('沒有找到任何可用的活動');
+            return null;
+          }
+          
+          // 創建學習路徑數據結構
+          const learningPathData = {
+            id: `tree-${currentTreeId}`,
+            name: `成長樹 ${currentTreeId} 學習路徑`,
+            description: '從 hanami_tree_activities 表生成的核心學習路徑',
+            nodes: sortedCoreActivities.map((ta, index) => ({
+              id: ta.id,
+              node_type: 'activity',
+              title: ta.hanami_teaching_activities?.activity_name || ta.custom_activity_name || `活動 ${index + 1}`,
+              description: ta.hanami_teaching_activities?.activity_description || ta.custom_activity_description || '',
+              duration: ta.estimated_duration || ta.hanami_teaching_activities?.duration_minutes || 30,
+              difficulty: ta.difficulty_level || 1,
+              metadata: {
+                activity_id: ta.activity_id,
+                activity_source: ta.activity_source,
+                activity_type: ta.activity_type
+              }
+            }))
+          };
+          
+          console.log('生成的學習路徑數據:', learningPathData);
+          console.log('生成的節點數量:', learningPathData.nodes.length);
+          console.log('生成的節點詳情:', learningPathData.nodes);
+          setLearningPathData(learningPathData);
+          return learningPathData;
+        } else {
+          console.log('hanami_tree_activities 表中沒有找到數據');
+          return null;
+        }
+      } catch (error) {
+        console.error('從 hanami_tree_activities 表載入數據時發生錯誤:', error);
+        return null;
+      }
     } catch (error) {
-      console.error('載入學習路徑數據失敗:', error);
+      console.error('載入學習路徑數據時發生錯誤:', error);
+      console.error('錯誤詳情:', {
+        message: error instanceof Error ? error.message : '未知錯誤',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return null;
     }
-  }, [currentTreeId]);
+  }, [currentTreeId, studentId]);
 
   const loadLearningPath = useCallback(async () => {
     try {
@@ -172,27 +453,63 @@ export default function GrowthTreePathManager({
       // 先載入學習路徑數據
       const pathData = await loadLearningPathData();
       
-      // 目前沒有學習路徑數據，直接使用備用邏輯
-      console.log('沒有學習路徑數據，使用備用邏輯載入活動');
+      if (pathData) {
+        console.log('成功載入學習路徑數據，將使用學習路徑篩選活動');
+        console.log('學習路徑節點:', pathData.nodes);
+        
+        // 如果有學習路徑數據，直接使用它來創建節點
+        const ordered = getOrderedNodes(pathData);
+        setOrderedNodes(ordered);
+        determineCurrentActivityIndex(ordered);
+        
+        // 設置學習路徑數據
+        setLearningPathData(pathData);
+        
+        // 創建一個預設的 learningPath 對象（為了兼容性）
+        const defaultLearningPath: LearningPath = {
+          id: pathData.id || 'default',
+          name: pathData.name || '預設學習路徑',
+          description: pathData.description || '',
+          nodes: [],
+          startNodeId: 'start',
+          endNodeId: 'end',
+          totalDuration: 0,
+          difficulty: 1,
+          tags: []
+        };
+        setLearningPath(defaultLearningPath);
+        
+        console.log('使用學習路徑數據創建節點完成');
+        return;
+      } else {
+        console.log('沒有學習路徑數據，清空相關狀態');
+        
+        // 清空所有相關狀態，避免顯示舊的數據
+        setLearningPathData(null);
+        setOrderedNodes([]);
+        setLearningPath({
+          id: 'empty',
+          name: '無學習路徑',
+          description: '該成長樹沒有學習路徑數據',
+          nodes: [],
+          startNodeId: 'start',
+          endNodeId: 'end',
+          totalDuration: 0,
+          difficulty: 1,
+          tags: []
+        });
+        
+        // 重置當前活動索引
+        setCurrentActivityIndex(0);
+        
+        // 結束載入狀態
+        setLoading(false);
+        
+        console.log('狀態已清空，載入狀態已結束，將顯示空狀態');
+        return;
+      }
       
-      // 清空所有相關狀態，避免顯示舊的數據
-      setLearningPathData(null);
-      setOrderedNodes([]);
-      setLearningPath({
-        id: 'empty',
-        name: '無學習路徑',
-        description: '該成長樹沒有學習路徑數據',
-        nodes: [],
-        startNodeId: 'start',
-        endNodeId: 'end',
-        totalDuration: 0,
-        difficulty: 1,
-        tags: []
-      });
-      
-      // 重置當前活動索引
-      setCurrentActivityIndex(0);
-      
+      // 如果沒有學習路徑數據，使用原有的邏輯載入所有活動
       // 載入學生在該成長樹的進度信息
       const { data: studentTreeData, error: studentTreeError } = await supabase
         .from('hanami_student_trees')
@@ -210,7 +527,7 @@ export default function GrowthTreePathManager({
           *,
           related_activities
         `)
-        .eq('tree_id', currentTreeId)
+        .eq('tree_id', treeId)
         .order('goal_order');
 
       // 收集所有相關活動ID
@@ -240,35 +557,133 @@ export default function GrowthTreePathManager({
       let activitiesData: any[] = [];
       console.log('開始載入成長樹對應的活動');
       
-      // 使用 hanami_growth_goals 表來載入成長樹對應的活動
+      // 使用 hanami_tree_activities 表來載入成長樹對應的活動
       console.log('=== 開始載入成長樹活動 ===');
       console.log('查詢條件 - tree_id:', currentTreeId);
       console.log('查詢條件 - is_active: true');
       
       try {
-        // 從 hanami_growth_goals 表載入目標和相關活動
-        if (goalsData && goalsData.length > 0) {
-          console.log('找到成長樹目標:', goalsData);
+        const { data: treeActivities, error: treeActivitiesError } = await supabase
+            .from('hanami_tree_activities')
+            .select(`
+              id,
+              tree_id,
+              activity_id,
+              activity_source,
+              custom_activity_name,
+              custom_activity_description,
+              activity_type,
+              difficulty_level,
+              estimated_duration,
+              priority_order,
+              activity_order,
+              is_required,
+              is_active,
+              hanami_teaching_activities (
+                id,
+                activity_name,
+                activity_description,
+                activity_type,
+                difficulty_level,
+                duration_minutes,
+                materials_needed,
+                instructions
+              )
+            `)
+            .eq('tree_id', currentTreeId)
+            .eq('is_active', true)
+            .order('activity_order', { ascending: true });
+
+          if (treeActivitiesError) {
+            console.error('載入成長樹活動失敗:', treeActivitiesError);
+            console.error('錯誤詳情:', {
+              message: treeActivitiesError.message,
+              details: treeActivitiesError.details,
+              hint: treeActivitiesError.hint,
+              code: treeActivitiesError.code
+            });
+            throw treeActivitiesError;
+          }
+
+          console.log('=== 成長樹活動查詢結果 ===');
+          console.log('載入的成長樹活動:', treeActivities);
+          console.log('成長樹活動數量:', treeActivities?.length || 0);
+          console.log('活動詳情:', treeActivities?.map(ta => ({
+            id: ta.id,
+            tree_id: ta.tree_id,
+            activity_id: ta.activity_id,
+            activity_source: ta.activity_source,
+            custom_activity_name: ta.custom_activity_name,
+            has_teaching_activity: !!ta.hanami_teaching_activities
+          })));
+
+          if (treeActivities && treeActivities.length > 0) {
+            // 將成長樹活動轉換為活動數據格式
+            activitiesData = treeActivities.map(treeActivity => {
+              if (treeActivity.activity_source === 'teaching' && treeActivity.hanami_teaching_activities) {
+                // 使用教學活動的數據
+                const teachingActivity = treeActivity.hanami_teaching_activities;
+                return {
+                  id: treeActivity.activity_id || treeActivity.id,
+                  activity_name: teachingActivity.activity_name,
+                  activity_description: teachingActivity.activity_description,
+                  activity_type: teachingActivity.activity_type,
+                  difficulty_level: teachingActivity.difficulty_level,
+                  duration_minutes: teachingActivity.duration_minutes,
+                  estimated_duration: treeActivity.estimated_duration || teachingActivity.duration_minutes || 30,
+                  materials_needed: teachingActivity.materials_needed,
+                  instructions: teachingActivity.instructions,
+                  is_active: true,
+                  // 保留排序相關欄位
+                  activity_order: treeActivity.activity_order,
+                  priority_order: treeActivity.priority_order
+                };
+              } else {
+                // 使用自定義活動的數據
+                return {
+                  id: treeActivity.id,
+                  activity_name: treeActivity.custom_activity_name || '未命名活動',
+                  activity_description: treeActivity.custom_activity_description || '',
+                  activity_type: treeActivity.activity_type || 'custom',
+                  difficulty_level: treeActivity.difficulty_level || 1,
+                  duration_minutes: treeActivity.estimated_duration || 30,
+                  estimated_duration: treeActivity.estimated_duration || 30,
+                  materials_needed: [],
+                  instructions: '',
+                  is_active: true,
+                  // 保留排序相關欄位
+                  activity_order: treeActivity.activity_order,
+                  priority_order: treeActivity.priority_order
+                };
+              }
+            });
+
+            console.log('=== 活動數據轉換結果 ===');
+            console.log('轉換後的活動數據:', activitiesData);
+            console.log('轉換後的活動數量:', activitiesData.length);
+            console.log('轉換後的活動名稱:', activitiesData.map(a => a.activity_name));
+          } else {
+            console.log('沒有找到成長樹活動，嘗試載入所有活動作為備用');
+            
+            // 備用方案：載入所有活動
+            const { data: allActivities, error: activitiesError } = await supabase
+              .from('hanami_teaching_activities')
+              .select('*')
+              .eq('is_active', true)
+              .order('activity_name')
+              .limit(50);
+            
+            if (!activitiesError && allActivities) {
+              activitiesData = allActivities;
+              console.log('載入的備用活動:', allActivities);
+            } else {
+              console.error('載入備用活動失敗:', activitiesError);
+            }
+          }
+        } catch (error) {
+          console.error('載入成長樹活動時發生錯誤:', error);
           
-          // 將目標轉換為活動格式
-          activitiesData = goalsData.map(goal => ({
-            id: goal.id,
-            activity_name: goal.goal_name,
-            activity_description: goal.goal_description || '',
-            activity_type: 'goal',
-            difficulty_level: 1,
-            estimated_duration: 30,
-            materials_needed: [],
-            instructions: '',
-            is_active: true,
-            // 保留排序相關欄位
-            activity_order: goal.goal_order,
-            priority_order: goal.goal_order
-          }));
-        } else {
-          console.log('沒有找到成長樹目標，嘗試載入所有活動作為備用');
-          
-          // 備用方案：載入所有活動
+          // 錯誤處理：載入所有活動作為備用
           const { data: allActivities, error: activitiesError } = await supabase
             .from('hanami_teaching_activities')
             .select('*')
@@ -283,24 +698,6 @@ export default function GrowthTreePathManager({
             console.error('載入備用活動失敗:', activitiesError);
           }
         }
-      } catch (error) {
-        console.error('載入成長樹活動時發生錯誤:', error);
-        
-        // 錯誤處理：載入所有活動作為備用
-        const { data: allActivities, error: activitiesError } = await supabase
-          .from('hanami_teaching_activities')
-          .select('*')
-          .eq('is_active', true)
-          .order('activity_name')
-          .limit(50);
-        
-        if (!activitiesError && allActivities) {
-          activitiesData = allActivities;
-          console.log('載入的備用活動:', allActivities);
-        } else {
-          console.error('載入備用活動失敗:', activitiesError);
-        }
-      }
 
       if (goalsError) {
         console.error('載入成長樹目標失敗:', goalsError);
@@ -372,20 +769,88 @@ export default function GrowthTreePathManager({
         
         let finalActivities = activitiesData;
         
-        // 目前沒有學習路徑數據，直接使用預設排序
-        console.log('沒有學習路徑數據，使用預設排序');
-        
-        // 按照 hanami_growth_goals 表中的 goal_order 欄位排序
-        finalActivities = [...activitiesData].sort((a, b) => {
-          const aOrder = a.activity_order || a.priority_order || 0;
-          const bOrder = b.activity_order || b.priority_order || 0;
+        // 檢查是否有現有的學習路徑數據
+        if (pathData && pathData.nodes && pathData.nodes.length > 0) {
+          console.log('使用學習路徑數據篩選活動...');
+          console.log('學習路徑節點:', pathData.nodes);
           
-          console.log(`排序比較: ${a.activity_name} (${aOrder}) vs ${b.activity_name} (${bOrder})`);
+          // 從學習路徑節點中提取活動節點
+          const pathActivityNodes = pathData.nodes.filter((node: any) => {
+            const isActivity = node.node_type === 'activity';
+            const hasActivityId = !!node.metadata?.activity_id;
+            const hasId = !!node.id;
+            console.log(`篩選節點 ${node.id}:`, {
+              node_type: node.node_type,
+              is_activity: isActivity,
+              has_activity_id: hasActivityId,
+              has_id: hasId,
+              metadata: node.metadata,
+              node: node
+            });
+            // 只要節點類型是 activity 且有 ID，就認為是有效的活動節點
+            return isActivity && hasId;
+          });
           
-          return aOrder - bOrder;
-        });
+          console.log('路徑中的活動節點:', pathActivityNodes);
+          console.log('路徑活動節點數量:', pathActivityNodes.length);
+          
+          if (pathActivityNodes.length > 0) {
+            // 根據學習路徑中定義的活動順序篩選
+            const pathActivityIds = pathActivityNodes.map((node: any) => node.metadata.activity_id);
+            console.log('路徑活動ID列表:', pathActivityIds);
+            
+            finalActivities = activitiesData.filter(activity => 
+              pathActivityIds.includes(activity.id)
+            );
+            
+            console.log('篩選後的活動數量:', finalActivities.length);
+            console.log('篩選後的活動:', finalActivities.map(a => a.activity_name));
+            
+            // 按照學習路徑中的順序排列
+            finalActivities.sort((a, b) => {
+              const aIndex = pathActivityIds.indexOf(a.id);
+              const bIndex = pathActivityIds.indexOf(b.id);
+              console.log(`路徑排序比較: ${a.activity_name} (路徑索引: ${aIndex}) vs ${b.activity_name} (路徑索引: ${bIndex})`);
+              return aIndex - bIndex;
+            });
+            
+            console.log('根據學習路徑篩選後的活動:', finalActivities.map((a, index) => 
+              `${index + 1}. ${a.activity_name} (路徑順序: ${pathActivityIds.indexOf(a.id) + 1})`
+            ));
+          } else {
+            console.log('學習路徑中沒有活動節點，使用預設排序');
+            // 按照 hanami_tree_activities 表中的 activity_order 欄位排序
+            finalActivities = [...activitiesData].sort((a, b) => {
+              const aOrder = a.activity_order || a.priority_order || 0;
+              const bOrder = b.activity_order || b.priority_order || 0;
+              
+              console.log(`排序比較: ${a.activity_name} (${aOrder}) vs ${b.activity_name} (${bOrder})`);
+              
+              return aOrder - bOrder;
+            });
+            
+            console.log('排序後的活動順序:', finalActivities.map((a, index) => 
+              `${index + 1}. ${a.activity_name} (排序值: ${a.activity_order || a.priority_order || 0})`
+            ));
+          }
+        } else {
+          console.log('沒有學習路徑數據，使用預設排序');
+          // 按照 hanami_tree_activities 表中的 activity_order 欄位排序
+          finalActivities = [...activitiesData].sort((a, b) => {
+            const aOrder = a.activity_order || a.priority_order || 0;
+            const bOrder = b.activity_order || b.priority_order || 0;
+            
+            console.log(`排序比較: ${a.activity_name} (${aOrder}) vs ${b.activity_name} (${bOrder})`);
+            
+            return aOrder - bOrder;
+          });
+          
+          console.log('排序後的活動順序:', finalActivities.map((a, index) => 
+            `${index + 1}. ${a.activity_name} (排序值: ${a.activity_order || a.priority_order || 0})`
+          ));
+        }
         
-        console.log('排序後的活動順序:', finalActivities.map((a, index) => 
+        console.log('最終活動順序:', finalActivities.map((a, index) => 
           `${index + 1}. ${a.activity_name} (排序值: ${a.activity_order || a.priority_order || 0})`
         ));
         
@@ -445,8 +910,39 @@ export default function GrowthTreePathManager({
           nodes.push(goalNode);
         });
       } else if (studentProgressData && studentProgressData.length > 0) {
-        console.log('使用學生進度記錄創建節點');
+        console.log('使用直接活動創建節點');
         console.log('活動數據詳情:', activitiesData);
+        // 使用直接活動創建節點
+        activitiesData.forEach((activity, index) => {
+          const activityNode: LearningNode = {
+            id: `activity-${index + 1}`,
+            title: activity.activity_name,
+            description: activity.activity_description || '',
+            type: 'activity',
+            position: { x: 400, y: 300 + (index * 100) },
+            duration: activity.estimated_duration || activity.duration_minutes || 30,
+            reward: `完成活動：${activity.activity_name}`,
+            isCompleted: false,
+            isLocked: false,
+            connections: index < activitiesData.length - 1 ? [`activity-${index + 2}`] : ['end'],
+            order: index + 1,
+            activityId: activity.id
+          };
+          nodes.push(activityNode);
+        });
+        
+        console.log('創建的活動節點:', nodes.filter(n => n.type === 'activity'));
+        
+        // 更新開始節點的連接
+        if (activitiesData.length > 0) {
+          const startNode = nodes.find(n => n.id === 'start');
+          if (startNode) {
+            startNode.connections = ['activity-1'];
+            console.log('更新開始節點連接:', startNode.connections);
+          }
+        }
+      } else if (studentProgressData && studentProgressData.length > 0) {
+        console.log('使用學生進度記錄創建節點');
         // 使用學生進度記錄創建節點
         const uniqueActivities = studentProgressData
           .filter(progress => progress.activity_id)
@@ -478,21 +974,19 @@ export default function GrowthTreePathManager({
         console.log('沒有找到任何數據，將創建示例節點');
       }
 
-      // 最後添加結束節點
-      const endNode: LearningNode = {
+      // 添加結束節點
+      nodes.push({
         id: 'end',
-        type: 'end',
         title: '完成學習',
         description: '恭喜完成學習旅程！',
+        type: 'end',
         position: { x: 600, y: 300 },
         duration: 0,
         reward: '學習成就證書',
-        order: nodes.length,
         isCompleted: false,
         isLocked: false,
         connections: []
-      };
-      nodes.push(endNode);
+      });
 
       // 創建最終學習路徑
       const finalLearningPath: LearningPath = {
@@ -508,14 +1002,12 @@ export default function GrowthTreePathManager({
       };
       
       setLearningPath(finalLearningPath);
-      setOrderedNodes(nodes);
-      determineCurrentActivityIndex(nodes);
     } catch (error) {
       console.error('載入學習路徑失敗:', error);
     } finally {
       setLoading(false);
     }
-  }, [currentTreeId, treeId, studentId, loadLearningPathData]);
+  }, [currentTreeId, treeId, studentId, loadLearningPathData, getOrderedNodes, determineCurrentActivityIndex]);
 
   // 處理學習路徑更新
   useEffect(() => {
@@ -535,7 +1027,7 @@ export default function GrowthTreePathManager({
       setOrderedNodes(ordered);
       determineCurrentActivityIndex(ordered);
     }
-  }, [learningPathData, learningPath]);
+  }, [learningPathData, learningPath, determineCurrentActivityIndex, getOrderedNodes]);
 
   // 載入學習路徑 - 只在 currentTreeId 變化時觸發
   useEffect(() => {
@@ -544,6 +1036,26 @@ export default function GrowthTreePathManager({
       loadLearningPath();
     }
   }, [currentTreeId, loadLearningPath]);
+
+  // 移除可能導致狀態競爭的 useEffect
+  // useEffect(() => {
+  //   // 優先使用 learningPathData，如果沒有則使用 learningPath
+  //   if (learningPathData && learningPathData.nodes && learningPathData.nodes.length > 0) {
+  //     console.log('useEffect - 使用 learningPathData 創建節點');
+  //     console.log('useEffect - learningPathData.nodes:', learningPathData.nodes);
+  //     const ordered = getOrderedNodes(learningPathData);
+  //     console.log('useEffect - ordered nodes (from learningPathData):', ordered);
+  //     setOrderedNodes(ordered);
+  //     determineCurrentActivityIndex(ordered);
+  //   } else if (learningPath) {
+  //     console.log('useEffect - 使用 learningPath 創建節點 (fallback)');
+  //     console.log('useEffect - learningPath.nodes:', learningPath.nodes);
+  //     const ordered = getOrderedNodes(learningPath);
+  //     console.log('useEffect - ordered nodes (from learningPath):', ordered);
+  //     setOrderedNodes(ordered);
+  //     determineCurrentActivityIndex(ordered);
+  //   }
+  // }, [learningPathData, learningPath, determineCurrentActivityIndex, getOrderedNodes]);
 
   const getOrderedNodes = useCallback((pathData: any): LearningNode[] => {
     console.log('getOrderedNodes - 開始處理學習路徑數據:', pathData);
@@ -573,18 +1085,14 @@ export default function GrowthTreePathManager({
       let orderCounter = 1;
 
       // 首先添加開始節點
-      const startNode: LearningNode = {
+      const startNode = {
         id: 'start',
         type: 'start',
         title: '開始學習',
         description: '學習旅程的起點',
-        position: { x: 200, y: 300 },
-        duration: 0,
-        reward: '開始學習的勇氣',
         order: 0,
         isCompleted: false,
-        isLocked: false,
-        connections: []
+        isLocked: false
       };
       ordered.push(startNode);
 
@@ -611,19 +1119,17 @@ export default function GrowthTreePathManager({
       if (pathActivityNodes.length > 0) {
         // 按照學習路徑中的順序添加活動節點
         pathActivityNodes.forEach((pathNode: any) => {
-          const activityNode: LearningNode = {
+          const activityNode = {
             id: pathNode.id || `activity-${orderCounter}`,
             type: 'activity',
             title: pathNode.title || `活動 ${orderCounter}`,
             description: pathNode.description || '',
-            position: { x: 400, y: 300 + (orderCounter * 100) },
-            duration: pathNode.duration || 30,
-            reward: `完成活動：${pathNode.title || `活動 ${orderCounter}`}`,
             order: orderCounter,
             isCompleted: false,
             isLocked: false,
-            connections: orderCounter < pathActivityNodes.length ? [`activity-${orderCounter + 1}`] : ['end'],
-            activityId: pathNode.metadata?.activity_id
+            activityId: pathNode.metadata?.activity_id,
+            duration: pathNode.duration || 30,
+            difficulty: pathNode.difficulty || 1
           };
           console.log('創建活動節點:', activityNode);
           ordered.push(activityNode);
@@ -636,18 +1142,14 @@ export default function GrowthTreePathManager({
       }
 
       // 最後添加結束節點
-      const endNode: LearningNode = {
+      const endNode = {
         id: 'end',
         type: 'end',
         title: '完成學習',
         description: '恭喜完成學習旅程！',
-        position: { x: 600, y: 300 },
-        duration: 0,
-        reward: '學習成就證書',
         order: orderCounter,
         isCompleted: false,
-        isLocked: false,
-        connections: []
+        isLocked: false
       };
       ordered.push(endNode);
 
@@ -746,20 +1248,21 @@ export default function GrowthTreePathManager({
         if (activity) {
           console.log('找到對應活動:', {
             activity_id: activity.activity_id,
-            status: activity.status
+            status: activity.status,
+            completion_status: activity.completion_status
           });
           
-          if (activity.status === 'completed') {
+          if (activity.status === 'completed' || activity.completion_status === 'completed') {
             lastCompletedIndex = i;
             console.log(`節點 ${i} 在活動列表中已完成:`, node.title);
             continue;
           }
-          if (activity.status === 'in_progress') {
+          if (activity.status === 'in_progress' || activity.completion_status === 'in_progress') {
             lastCompletedIndex = i;
             console.log(`節點 ${i} 在活動列表中進行中:`, node.title);
             continue;
           }
-          if (activity.status === 'not_started') {
+          if (activity.status === 'assigned' || activity.completion_status === 'assigned') {
             lastCompletedIndex = i;
             console.log(`節點 ${i} 在活動列表中已分配:`, node.title);
             continue;
@@ -890,28 +1393,26 @@ export default function GrowthTreePathManager({
     });
     
     try {
-      // 分配活動到學生（目前資料庫中沒有學生活動分配表，使用模擬數據）
-      console.log('模擬分配活動到學生:', {
-        student_id: studentId,
-        tree_id: currentTreeId,
-        activity_id: nextNode.activityId,
-        activity_type: 'ongoing',
-        lesson_date: new Date().toISOString().split('T')[0],
-        completion_status: 'not_started',
-        progress: 0
-      });
-      
-      // 創建模擬的活動數據
-      const newActivity = {
-        id: `mock-${Date.now()}`,
-        student_id: studentId,
-        tree_id: currentTreeId,
-        activity_id: nextNode.activityId || '',
-        activity_type: 'ongoing',
-        lesson_date: new Date().toISOString().split('T')[0],
-        completion_status: 'not_started',
-        progress: 0
-      };
+      // 分配活動到學生
+      const { data: newActivity, error: assignError } = await supabase
+        .from('hanami_student_activities')
+        .insert({
+          student_id: studentId,
+          tree_id: currentTreeId,
+          activity_id: nextNode.activityId,
+          activity_type: 'ongoing', // 改為 ongoing 類型
+          lesson_date: new Date().toISOString().split('T')[0],
+          completion_status: 'not_started',
+          progress: 0
+        })
+        .select()
+        .single();
+
+      if (assignError) {
+        console.error('分配活動失敗:', assignError);
+        toast.error('分配活動失敗');
+        return;
+      }
 
       console.log('活動分配成功:', newActivity);
       toast.success(`成功分配活動：${nextNode.title}`);
@@ -921,14 +1422,14 @@ export default function GrowthTreePathManager({
         id: newActivity.id,
         student_id: studentId,
         tree_id: currentTreeId,
-        activity_id: nextNode.activityId || '',
+        activity_id: nextNode.activityId,
         assignment_type: 'ongoing',
         progress: 0,
         status: 'not_started',
         assigned_date: new Date().toISOString(),
         completed_date: undefined,
         activity: {
-          id: nextNode.activityId || '',
+          id: nextNode.activityId,
           activity_name: nextNode.title,
           activity_description: nextNode.description || '',
           estimated_duration: nextNode.duration || 0
@@ -1012,18 +1513,19 @@ export default function GrowthTreePathManager({
         if (activity) {
           console.log('找到對應活動:', {
             activity_id: activity.activity_id,
-            status: activity.status
+            status: activity.status,
+            completion_status: activity.completion_status
           });
           
-          if (activity.status === 'completed') {
+          if (activity.status === 'completed' || activity.completion_status === 'completed') {
             console.log('活動已完成，返回 completed');
             return 'completed';
           }
-          if (activity.status === 'in_progress') {
+          if (activity.status === 'in_progress' || activity.completion_status === 'in_progress') {
             console.log('活動進行中，返回 in_progress');
             return 'in_progress';
           }
-          if (activity.status === 'not_started') {
+          if (activity.status === 'assigned' || activity.completion_status === 'assigned') {
             console.log('活動已分配，返回 assigned');
             return 'assigned';
           }
