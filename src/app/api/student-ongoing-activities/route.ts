@@ -125,11 +125,30 @@ export async function GET(request: NextRequest) {
       previous: previousLessonActivities.length,
       ongoing: ongoingActivities.length
     });
+    
+    // 調試：檢查正在學習的活動詳情
+    if (ongoingActivities.length > 0) {
+      console.log('🔍 正在學習的活動詳情:', ongoingActivities.map((activity: any) => ({
+        id: activity.id,
+        activity_id: activity.activity_id,
+        completion_status: activity.completion_status,
+        activity_type: activity.activity_type,
+        hasTeachingActivity: !!activity.hanami_teaching_activities,
+        teachingActivityName: activity.hanami_teaching_activities?.activity_name
+      })));
+    }
 
     // 處理活動資料，統一格式
     const processActivity = (activity: any) => {
       const teachingActivity = activity.hanami_teaching_activities;
-      if (!teachingActivity) return null;
+      if (!teachingActivity) {
+        console.log('⚠️ 活動缺少 hanami_teaching_activities 關聯:', {
+          activityId: activity.activity_id,
+          completionStatus: activity.completion_status,
+          activityType: activity.activity_type
+        });
+        return null;
+      }
 
       return {
         id: activity.id,

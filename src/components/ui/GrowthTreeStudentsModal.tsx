@@ -109,7 +109,7 @@ export default function GrowthTreeStudentsModal({
       }
       
       // 轉換資料格式
-      const formattedStudents = (studentsData || []).map(item => ({
+      const formattedStudents = (studentsData || []).map((item: any) => ({
         id: item.Hanami_Students.id,
         full_name: item.Hanami_Students.full_name,
         nick_name: item.Hanami_Students.nick_name ?? undefined,

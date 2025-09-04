@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     console.log('Trial students:', trialStudents);
 
     // 處理常規學生資料
-    const processedRegularStudents = (regularStudents || []).map(student => ({
+    const processedRegularStudents = (regularStudents || []).map((student: any) => ({
       id: student.student_id || student.id,
       name: student.Hanami_Students?.full_name || student.full_name || '未知學生',
       isTrial: false,
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // 處理試堂學生資料
-    const processedTrialStudents = (trialStudents || []).map(student => ({
+    const processedTrialStudents = (trialStudents || []).map((student: any) => ({
       id: student.id,
       name: student.full_name || '未知學生',
       isTrial: true,

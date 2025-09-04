@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 分析每個評估記錄
-    const analysis = (assessments || []).map(assessment => {
+    const analysis = (assessments || []).map((assessment: any) => {
       const selectedGoalsCount = Array.isArray(assessment.selected_goals) ? assessment.selected_goals.length : 0;
       const abilityAssessmentsCount = assessment.ability_assessments ? Object.keys(assessment.ability_assessments).length : 0;
       

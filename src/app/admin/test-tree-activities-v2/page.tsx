@@ -134,6 +134,8 @@ export default function TestTreeActivitiesV2Page() {
     try {
       setLoading(true);
       
+      console.log('開始創建活動，表單數據:', formData);
+      
       if (!formData.tree_id) {
         toast.error('請選擇成長樹');
         return;
@@ -144,6 +146,9 @@ export default function TestTreeActivitiesV2Page() {
         return;
       }
 
+      console.log('發送 API 請求到 /api/tree-activities');
+      console.log('請求數據:', JSON.stringify(formData, null, 2));
+      
       const response = await fetch('/api/tree-activities', {
         method: 'POST',
         headers: {
@@ -152,13 +157,26 @@ export default function TestTreeActivitiesV2Page() {
         body: JSON.stringify(formData),
       });
 
+      console.log('API 響應狀態:', response.status, response.statusText);
+      console.log('API 響應頭:', Object.fromEntries(response.headers.entries()));
+
       const result = await response.json();
+      console.log('API 響應內容:', result);
 
       if (!response.ok) {
+        console.error('API 請求失敗:', result);
         throw new Error(result.error || '創建活動失敗');
       }
 
+      console.log('活動創建成功，API 返回數據:', result);
       toast.success('活動創建成功！');
+      
+      // 更新本地狀態
+      if (result.data) {
+        setActivities(prev => [...prev, result.data]);
+        console.log('本地狀態已更新，新增活動:', result.data);
+      }
+      
       setFormData({
         tree_id: selectedTree,
         activity_source: 'custom',
@@ -177,9 +195,10 @@ export default function TestTreeActivitiesV2Page() {
         is_required: false
       });
       
-      // 重新載入活動列表
+      // 重新載入活動列表以確保數據同步
       if (selectedTree) {
-        loadActivities(selectedTree);
+        console.log('重新載入活動列表，樹ID:', selectedTree);
+        await loadActivities(selectedTree);
       }
     } catch (error) {
       console.error('創建活動失敗:', error);

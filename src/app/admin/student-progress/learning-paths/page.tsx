@@ -16,14 +16,18 @@ import {
   TrophyIcon,
   PuzzlePieceIcon
 } from '@heroicons/react/24/outline';
-import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
-import { LearningPathBuilder } from '@/components/ui';
+import { HanamiCard } from '@/components/ui/HanamiCard';
+import { HanamiButton } from '@/components/ui/HanamiButton';
+import HanamiInput from '@/components/ui/HanamiInput';
+import LearningPathBuilder from '@/components/ui/LearningPathBuilder';
 import { supabase } from '@/lib/supabase';
+import { useUser } from '@/hooks/useUser';
 import { toast } from 'react-hot-toast';
 
 interface LearningPath {
   id: string;
   name: string;
+  originalName?: string; // 原始名稱，用於顯示
   description: string;
   tree_id: string;
   nodes: any[];
@@ -41,8 +45,8 @@ interface LearningPath {
 interface GrowthTree {
   id: string;
   tree_name: string;
-  tree_description: string | null;
-  tree_icon: string | null;
+  tree_description?: string;
+  tree_icon?: string;
 }
 
 export default function LearningPathsPage() {
@@ -75,42 +79,82 @@ export default function LearningPathsPage() {
       if (treesError) throw treesError;
       setTrees(treesData || []);
 
-      // 載入學習路線（這裡需要創建對應的資料表）
-      // 暫時使用模擬資料
-      const mockPaths: LearningPath[] = [
-        {
-          id: '1',
-          name: '鋼琴基礎入門路線',
-          description: '適合初學者的鋼琴學習路線，從基本姿勢到簡單曲目',
-          tree_id: treesData?.[0]?.id || '',
-          nodes: [],
-          startNodeId: 'start',
-          endNodeId: 'end',
-          totalDuration: 120,
-          difficulty: 2,
-          tags: ['初學者', '鋼琴', '基礎'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          is_active: true
-        },
-        {
-          id: '2',
-          name: '進階演奏技巧路線',
-          description: '提升演奏技巧和表現力的進階路線',
-          tree_id: treesData?.[0]?.id || '',
-          nodes: [],
-          startNodeId: 'start',
-          endNodeId: 'end',
-          totalDuration: 180,
-          difficulty: 4,
-          tags: ['進階', '技巧', '表現力'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          is_active: true
-        }
-      ];
+      // 載入學習路線
+      console.log('正在嘗試載入學習路線...');
       
-      setPaths(mockPaths);
+      // 先檢查資料表是否存在
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .ilike('table_name', '%learning%');
+      
+      console.log('找到的學習相關資料表:', tableCheck);
+      
+      // 嘗試從 hanami_learning_paths 載入
+      let { data: pathsData, error: pathsError } = await supabase
+        .from('hanami_learning_paths')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      
+      console.log('hanami_learning_paths 查詢結果:', { data: pathsData, error: pathsError });
+      
+      if (pathsError) {
+        console.error('hanami_learning_paths 查詢錯誤:', pathsError);
+        
+        // 如果 hanami_learning_paths 不存在，嘗試其他可能的表名
+        const possibleTableNames = ['learning_paths', 'hanami_learning_paths', 'learning_path'];
+        
+        for (const tableName of possibleTableNames) {
+          try {
+            console.log(`嘗試從 ${tableName} 載入資料...`);
+            const { data: altData, error: altError } = await supabase
+              .from(tableName)
+              .select('*');
+            
+            if (!altError && altData) {
+              console.log(`成功從 ${tableName} 載入資料:`, altData);
+              pathsData = altData;
+              break;
+            }
+          } catch (e) {
+            console.log(`表 ${tableName} 不存在或無法訪問:`, e);
+          }
+        }
+      }
+      
+      // 轉換資料庫格式為組件格式
+      const actualPaths: LearningPath[] = (pathsData || []).map(path => {
+        // 找到對應的成長樹
+        const tree = treesData?.find(t => t.id === path.tree_id);
+        
+        // 如果學習路線名稱是 "新的學習路線" 或空，使用成長樹名稱
+        let displayName = path.name;
+        if (!displayName || displayName === '新的學習路線') {
+          displayName = tree?.tree_name || '未命名路線';
+        }
+        
+        return {
+          id: path.id,
+          name: displayName,
+          originalName: path.name, // 保留原始名稱
+          description: path.description || '',
+          tree_id: path.tree_id || '',
+          nodes: path.nodes || [],
+          startNodeId: path.start_node_id || 'start',
+          endNodeId: path.end_node_id || 'end',
+          totalDuration: path.total_duration || 0,
+          difficulty: path.difficulty || 1,
+          tags: path.tags || [],
+          created_at: path.created_at || new Date().toISOString(),
+          updated_at: path.updated_at || new Date().toISOString(),
+          is_active: path.is_active || true
+        };
+      });
+      
+      console.log('轉換後的學習路線:', actualPaths);
+      setPaths(actualPaths);
     } catch (error) {
       console.error('載入資料失敗:', error);
     } finally {
@@ -128,21 +172,34 @@ export default function LearningPathsPage() {
         const existingIndex = prev.findIndex(p => p.id === path.id);
         if (existingIndex >= 0) {
           const updated = [...prev];
-          updated[existingIndex] = path;
+          updated[existingIndex] = { 
+            ...path, 
+            tree_id: selectedTreeId,
+            updated_at: new Date().toISOString(),
+            created_at: prev[existingIndex].created_at || new Date().toISOString(),
+            is_active: true
+          };
           return updated;
         } else {
-          return [...prev, path];
+          return [...prev, { 
+            ...path, 
+            id: `path-${Date.now()}`, 
+            tree_id: selectedTreeId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            is_active: true
+          }];
         }
       });
       
-      toast.success('學習路線保存成功！');
+      setShowBuilder(false);
+      setSelectedTreeId('');
     } catch (error) {
-      console.error('保存學習路線失敗:', error);
-      toast.error('保存失敗，請重試');
+      console.error('保存失敗:', error);
     }
   };
 
-  const handlePreviewPath = (path: any) => {
+  const handlePreviewPath = (path: LearningPath) => {
     setPreviewPath(path);
     setShowPreview(true);
   };
@@ -181,8 +238,13 @@ export default function LearningPathsPage() {
   };
 
   const filteredPaths = paths.filter(path => {
+    // 找到對應的成長樹
+    const tree = trees.find(t => t.id === path.tree_id);
+    const treeName = tree?.tree_name || '';
+    
     const matchesSearch = path.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         path.description.toLowerCase().includes(searchQuery.toLowerCase());
+                         path.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         treeName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesDifficulty = filterDifficulty === null || path.difficulty === filterDifficulty;
     return matchesSearch && matchesDifficulty;
   });
@@ -191,27 +253,32 @@ export default function LearningPathsPage() {
     return (
       <LearningPathBuilder
         treeId={selectedTreeId}
+        initialPath={selectedPath || undefined}
         onSave={handleSavePath}
-        onPreview={handlePreviewPath}
+        onClose={() => {
+          setShowBuilder(false);
+          setSelectedPath(null);
+          setSelectedTreeId('');
+        }}
       />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] p-6">
       <div className="max-w-7xl mx-auto">
         {/* 頁面標題 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-hanami-text mb-2">
+          <h1 className="text-3xl font-bold text-[#4B4036] mb-2">
             學習路線管理
           </h1>
-          <p className="text-hanami-text-secondary">
+          <p className="text-[#2B3A3B]">
             設計和管理學生的學習旅程，創建有趣的學習路線圖
           </p>
         </div>
 
         {/* 工具欄 */}
-        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-hanami-border">
+        <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-[#EADBC8]">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <HanamiButton
@@ -233,7 +300,7 @@ export default function LearningPathsPage() {
                 <HanamiInput
                   placeholder="搜尋學習路線..."
                   value={searchQuery}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-64"
                 />
               </div>
@@ -243,7 +310,7 @@ export default function LearningPathsPage() {
               <select
                 value={filterDifficulty || ''}
                 onChange={(e) => setFilterDifficulty(e.target.value ? parseInt(e.target.value) : null)}
-                className="px-3 py-2 border border-hanami-border rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
+                className="px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent"
               >
                 <option value="">所有難度</option>
                 <option value={1}>簡單</option>
@@ -259,8 +326,8 @@ export default function LearningPathsPage() {
         {/* 學習路線列表 */}
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-hanami-primary mx-auto"></div>
-            <p className="mt-4 text-hanami-text-secondary">載入中...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto"></div>
+            <p className="mt-4 text-[#2B3A3B]">載入中...</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -277,22 +344,22 @@ export default function LearningPathsPage() {
                     {/* 路線標題和圖標 */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gradient-to-br from-hanami-primary to-hanami-secondary rounded-xl">
+                        <div className="p-2 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-xl">
                           <BookOpenIcon className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-hanami-text group-hover:text-hanami-primary transition-colors">
-                            {path.name}
-                          </h3>
-                          <p className="text-sm text-hanami-text-secondary">
+                          <h3 className="font-semibold text-[#4B4036] group-hover:text-[#FFD59A] transition-colors">
                             {trees.find(t => t.id === path.tree_id)?.tree_name || '未知成長樹'}
+                          </h3>
+                          <p className="text-sm text-[#2B3A3B]">
+                            {path.originalName && path.originalName !== '新的學習路線' ? path.originalName : '學習路線'}
                           </p>
                         </div>
                       </div>
                       
                       <div className="flex gap-1">
                         <button
-                          className="p-1 text-gray-400 hover:text-hanami-primary transition-colors"
+                          className="p-1 text-gray-400 hover:text-[#FFD59A] transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePreviewPath(path);
@@ -301,7 +368,7 @@ export default function LearningPathsPage() {
                           <EyeIcon className="w-4 h-4" />
                         </button>
                         <button
-                          className="p-1 text-gray-400 hover:text-hanami-primary transition-colors"
+                          className="p-1 text-gray-400 hover:text-[#FFD59A] transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedPath(path);
@@ -324,24 +391,24 @@ export default function LearningPathsPage() {
                     </div>
 
                     {/* 路線描述 */}
-                    <p className="text-sm text-hanami-text-secondary mb-4 line-clamp-2">
+                    <p className="text-sm text-[#2B3A3B] mb-4 line-clamp-2">
                       {path.description}
                     </p>
 
                     {/* 路線統計 */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1 text-hanami-text-secondary">
+                        <div className="flex items-center gap-1 text-[#2B3A3B]">
                           <ClockIcon className="w-4 h-4" />
                           <span>總時長</span>
                         </div>
-                        <span className="font-medium text-hanami-text">
+                        <span className="font-medium text-[#4B4036]">
                           {path.totalDuration} 分鐘
                         </span>
                       </div>
                       
                       <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1 text-hanami-text-secondary">
+                        <div className="flex items-center gap-1 text-[#2B3A3B]">
                           <ChartBarIcon className="w-4 h-4" />
                           <span>難度</span>
                         </div>
@@ -351,11 +418,11 @@ export default function LearningPathsPage() {
                       </div>
                       
                       <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1 text-hanami-text-secondary">
+                        <div className="flex items-center gap-1 text-[#2B3A3B]">
                           <UsersIcon className="w-4 h-4" />
                           <span>節點數</span>
                         </div>
-                        <span className="font-medium text-hanami-text">
+                        <span className="font-medium text-[#4B4036]">
                           {path.nodes.length} 個
                         </span>
                       </div>
@@ -363,18 +430,18 @@ export default function LearningPathsPage() {
 
                     {/* 標籤 */}
                     {path.tags.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-hanami-border">
+                      <div className="mt-4 pt-4 border-t border-[#EADBC8]">
                         <div className="flex flex-wrap gap-1">
                           {path.tags.slice(0, 3).map((tag, index) => (
                             <span
                               key={index}
-                              className="px-2 py-1 bg-hanami-surface text-hanami-text-secondary text-xs rounded-full"
+                              className="px-2 py-1 bg-[#FFFDF8] text-[#2B3A3B] text-xs rounded-full"
                             >
                               {tag}
                             </span>
                           ))}
                           {path.tags.length > 3 && (
-                            <span className="px-2 py-1 bg-hanami-surface text-hanami-text-secondary text-xs rounded-full">
+                            <span className="px-2 py-1 bg-[#FFFDF8] text-[#2B3A3B] text-xs rounded-full">
                               +{path.tags.length - 3}
                             </span>
                           )}
@@ -383,7 +450,7 @@ export default function LearningPathsPage() {
                     )}
 
                     {/* 操作按鈕 */}
-                    <div className="mt-4 pt-4 border-t border-hanami-border">
+                    <div className="mt-4 pt-4 border-t border-[#EADBC8]">
                       <div className="flex gap-2">
                         <HanamiButton
                           variant="primary"
@@ -417,13 +484,13 @@ export default function LearningPathsPage() {
         {/* 空狀態 */}
         {!loading && filteredPaths.length === 0 && (
           <div className="text-center py-12">
-            <div className="w-24 h-24 bg-hanami-surface rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookOpenIcon className="w-12 h-12 text-hanami-text-secondary" />
+            <div className="w-24 h-24 bg-[#FFFDF8] rounded-full flex items-center justify-center mx-auto mb-4">
+              <BookOpenIcon className="w-12 h-12 text-[#2B3A3B]" />
             </div>
-            <h3 className="text-lg font-medium text-hanami-text mb-2">
+            <h3 className="text-lg font-medium text-[#4B4036] mb-2">
               {searchQuery || filterDifficulty ? '沒有找到符合條件的學習路線' : '還沒有學習路線'}
             </h3>
-            <p className="text-hanami-text-secondary mb-4">
+            <p className="text-[#2B3A3B] mb-4">
               {searchQuery || filterDifficulty 
                 ? '嘗試調整搜尋條件或篩選器'
                 : '創建您的第一個學習路線，為學生設計有趣的學習旅程'
@@ -458,7 +525,7 @@ export default function LearningPathsPage() {
             className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-hanami-text">學習路線預覽</h2>
+              <h2 className="text-xl font-bold text-[#4B4036]">學習路線預覽</h2>
               <button
                 onClick={() => setShowPreview(false)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -469,22 +536,22 @@ export default function LearningPathsPage() {
             
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-hanami-text mb-2">{previewPath.name}</h3>
-                <p className="text-hanami-text-secondary">{previewPath.description}</p>
+                <h3 className="font-semibold text-[#4B4036] mb-2">{previewPath.name}</h3>
+                <p className="text-[#2B3A3B]">{previewPath.description}</p>
               </div>
               
               <div className="grid grid-cols-3 gap-4 text-sm">
-                <div className="text-center p-3 bg-hanami-surface rounded-lg">
-                  <div className="font-semibold text-hanami-text">{previewPath.totalDuration}</div>
-                  <div className="text-hanami-text-secondary">分鐘</div>
+                <div className="text-center p-3 bg-[#FFFDF8] rounded-lg">
+                  <div className="font-semibold text-[#4B4036]">{previewPath.totalDuration}</div>
+                  <div className="text-[#2B3A3B]">分鐘</div>
                 </div>
-                <div className="text-center p-3 bg-hanami-surface rounded-lg">
-                  <div className="font-semibold text-hanami-text">{getDifficultyLabel(previewPath.difficulty)}</div>
-                  <div className="text-hanami-text-secondary">難度</div>
+                <div className="text-center p-3 bg-[#FFFDF8] rounded-lg">
+                  <div className="font-semibold text-[#4B4036]">{getDifficultyLabel(previewPath.difficulty)}</div>
+                  <div className="text-[#2B3A3B]">難度</div>
                 </div>
-                <div className="text-center p-3 bg-hanami-surface rounded-lg">
-                  <div className="font-semibold text-hanami-text">{previewPath.nodes.length}</div>
-                  <div className="text-hanami-text-secondary">節點</div>
+                <div className="text-center p-3 bg-[#FFFDF8] rounded-lg">
+                  <div className="font-semibold text-[#4B4036]">{previewPath.nodes.length}</div>
+                  <div className="text-[#2B3A3B]">節點</div>
                 </div>
               </div>
               

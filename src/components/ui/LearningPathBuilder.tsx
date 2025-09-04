@@ -19,7 +19,9 @@ import {
   MapIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
-import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
+import { HanamiCard } from '@/components/ui/HanamiCard';
+import { HanamiButton } from '@/components/ui/HanamiButton';
+import HanamiInput from '@/components/ui/HanamiInput';
 import { supabase } from '@/lib/supabase';
 import { TreeActivity } from '@/types/progress';
 import TeachingActivityDetailModal from '@/components/ui/TeachingActivityDetailModal';
@@ -73,14 +75,15 @@ interface LearningPathBuilderProps {
   activities?: any[]; // 成長樹下的活動數據
   onSave?: (path: LearningPath) => void;
   onPreview?: (path: LearningPath) => void;
+  onClose?: () => void; // 添加退出回調
 }
 
 const NODE_TYPES = {
-  start: { icon: TrophyIcon, color: 'bg-green-500', label: '開始' },
+  start: { icon: PlayIcon, color: 'bg-green-500', label: '開始' },
   end: { icon: TrophyIcon, color: 'bg-red-500', label: '結束' },
   activity: { icon: BookOpenIcon, color: 'bg-blue-500', label: '學習活動' },
   assessment: { icon: PuzzlePieceIcon, color: 'bg-green-500', label: '評估' },
-  milestone: { icon: TrophyIcon, color: 'bg-yellow-500', label: '里程碑' },
+  milestone: { icon: StarIcon, color: 'bg-yellow-500', label: '里程碑' },
   break: { icon: PauseIcon, color: 'bg-gray-500', label: '休息' }
 };
 
@@ -92,11 +95,89 @@ const DIFFICULTY_COLORS = {
   5: 'bg-red-100 text-red-800'
 };
 
-export default function LearningPathBuilder({ treeId, initialPath, activities, onSave, onPreview }: LearningPathBuilderProps) {
+// 可愛的活動次序標示組件
+function ActivityOrderBadge({ order, isAnimated = true }: { order: number; isAnimated?: boolean }) {
+  const colors = [
+    'bg-gradient-to-r from-pink-400 to-purple-500',
+    'bg-gradient-to-r from-blue-400 to-cyan-500', 
+    'bg-gradient-to-r from-green-400 to-emerald-500',
+    'bg-gradient-to-r from-yellow-400 to-orange-500',
+    'bg-gradient-to-r from-red-400 to-pink-500',
+    'bg-gradient-to-r from-indigo-400 to-purple-500',
+    'bg-gradient-to-r from-teal-400 to-blue-500',
+    'bg-gradient-to-r from-amber-400 to-yellow-500'
+  ];
+  
+  const colorIndex = (order - 1) % colors.length;
+  const colorClass = colors[colorIndex];
+  
+  const badgeContent = (
+    <div className={`
+      ${colorClass} 
+      text-white 
+      text-xs 
+      font-bold 
+      px-2 
+      py-1 
+      rounded-full 
+      shadow-lg 
+      border-2 
+      border-white/30
+      flex 
+      items-center 
+      justify-center
+      min-w-[24px]
+      h-6
+    `}>
+      {order}
+    </div>
+  );
+  
+  if (!isAnimated) {
+    return badgeContent;
+  }
+  
+  return (
+    <motion.div
+      initial={{ scale: 0, rotate: -180 }}
+      animate={{ scale: 1, rotate: 0 }}
+      transition={{ 
+        type: "spring", 
+        stiffness: 260, 
+        damping: 20,
+        delay: order * 0.1 
+      }}
+      whileHover={{ 
+        scale: 1.1, 
+        rotate: [0, -10, 10, 0],
+        transition: { duration: 0.3 }
+      }}
+      className="relative"
+    >
+      {badgeContent}
+      {/* 可愛的裝飾元素 */}
+      <motion.div
+        className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-300 rounded-full"
+        animate={{ 
+          scale: [1, 1.2, 1],
+          opacity: [0.7, 1, 0.7]
+        }}
+        transition={{ 
+          duration: 2, 
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+      />
+    </motion.div>
+  );
+}
+
+export default function LearningPathBuilder({ treeId, initialPath, activities, onSave, onPreview, onClose }: LearningPathBuilderProps) {
   // 追蹤是否有未儲存的變更
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [originalPath, setOriginalPath] = useState<LearningPath | null>(null);
   const [savedPath, setSavedPath] = useState<LearningPath | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const [path, setPath] = useState<LearningPath>(() => {
     // 優先使用 initialPath，如果沒有則使用默認值
@@ -105,7 +186,124 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       if (process.env.NODE_ENV === 'development') {
         console.log('使用 initialPath 初始化:', initialPath);
       }
-      return initialPath;
+      
+      // 確保數據格式一致，處理資料庫欄位名和前端屬性名的差異
+      const normalizedPath = {
+        ...initialPath,
+        totalDuration: initialPath.totalDuration || (initialPath as any).total_duration || 0,
+        difficulty: initialPath.difficulty || (initialPath as any).difficulty_level || 1,
+        startNodeId: initialPath.startNodeId || (initialPath as any).start_node_id || 'start',
+        endNodeId: initialPath.endNodeId || (initialPath as any).end_node_id || 'end'
+      };
+      
+      // 檢查並處理節點數據
+      if (normalizedPath.nodes && Array.isArray(normalizedPath.nodes)) {
+        // 確保所有節點都有必要的位置信息
+        normalizedPath.nodes = normalizedPath.nodes.map((node, index) => {
+          if (!node.position) {
+            // 為沒有位置的節點分配默認位置
+            let defaultX = 200;
+            let defaultY = 200;
+            
+            if (node.type === 'start') {
+              defaultX = 100;
+              defaultY = 200;
+            } else if (node.type === 'end') {
+              defaultX = 800;
+              defaultY = 200;
+            } else if (node.type === 'activity') {
+              // 活動節點按順序排列
+              defaultX = 200 + (index * 150);
+              defaultY = 200 + ((index % 2) * 100);
+            }
+            
+            node.position = { x: defaultX, y: defaultY };
+          }
+          
+          // 確保節點有正確的類型
+          if (!node.type) {
+            if (node.id === 'start') node.type = 'start';
+            else if (node.id === 'end') node.type = 'end';
+            else node.type = 'activity';
+          }
+          
+          return node;
+        });
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('節點數據已標準化，總節點數:', normalizedPath.nodes.length);
+          console.log('節點類型分佈:', normalizedPath.nodes.map(n => n.type));
+        }
+        
+        // 如果節點數量太少（只有 start/end），且有活動數據，則自動添加活動節點
+        if (normalizedPath.nodes.length <= 2 && activities && activities.length > 0) {
+          console.log('檢測到節點數量不足，自動添加活動節點...');
+          console.log('可用活動數量:', activities.length);
+          
+          // 創建活動節點
+          const activityNodes = activities.map((activity: any, index: number) => {
+            const activityId = activity.id;
+            const activityName = activity.activity_name || `活動 ${index + 1}`;
+            const activityDescription = activity.activity_description || '';
+            
+            return {
+              id: `tree_activity_${activityId}`,
+              type: 'activity' as const,
+              title: activityName,
+              description: activityDescription,
+              duration: activity.estimated_duration || activity.duration_minutes || 30,
+              difficulty: activity.difficulty_level || 1,
+              prerequisites: index === 0 ? ['start'] : [`tree_activity_${activities[index - 1].id}`],
+              reward: `完成 ${activityName}`,
+              position: { 
+                x: 200 + (index + 1) * 150, 
+                y: 200 + (index % 2) * 100 
+              },
+              connections: index === activities.length - 1 ? ['end'] : [`tree_activity_${activities[index + 1].id}`],
+              isCompleted: false,
+              isLocked: false,
+              // 包含完整的活動詳細信息
+              metadata: {
+                activityId: activityId,
+                activityType: 'teaching',
+                materials: activity.materials || [],
+                instructions: activity.instructions || '',
+                learningObjectives: activity.learning_objectives || [],
+                activityDetails: {
+                  category: activity.activity_type || '教學活動',
+                  activity_type: 'teaching',
+                  difficulty_level: activity.difficulty_level || 1,
+                  duration_minutes: activity.estimated_duration || activity.duration_minutes || 30
+                }
+              }
+            };
+          });
+          
+          // 更新 start 節點的連接
+          if (normalizedPath.nodes.length > 0) {
+            const startNode = normalizedPath.nodes.find(n => n.type === 'start');
+            if (startNode && activityNodes.length > 0) {
+              startNode.connections = [activityNodes[0].id];
+            }
+          }
+          
+          // 插入活動節點到 start 和 end 之間
+          const startNodes = normalizedPath.nodes.filter(n => n.type === 'start');
+          const endNodes = normalizedPath.nodes.filter(n => n.type === 'end');
+          const otherNodes = normalizedPath.nodes.filter(n => n.type !== 'start' && n.type !== 'end');
+          
+          normalizedPath.nodes = [
+            ...startNodes,
+            ...activityNodes,
+            ...otherNodes,
+            ...endNodes
+          ];
+          
+          console.log(`已添加 ${activityNodes.length} 個活動節點，總節點數: ${normalizedPath.nodes.length}`);
+        }
+      }
+      
+      return normalizedPath;
     }
     
     // 只在開發環境下輸出日誌
@@ -182,6 +380,42 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showHelp, setShowHelp] = useState(false);
+  
+  // 實時保存草稿到 localStorage 的函數
+  const saveDraftToLocalStorage = useCallback((currentPath: LearningPath) => {
+    if (!treeId) return;
+    
+    try {
+      const storageKey = `learning_path_draft_${treeId}`;
+      const draftData = {
+        ...currentPath,
+        lastModified: new Date().toISOString(),
+        isDraft: true
+      };
+      localStorage.setItem(storageKey, JSON.stringify(draftData));
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('草稿已保存到 localStorage:', draftData);
+      }
+    } catch (error) {
+      console.error('保存草稿到 localStorage 失敗:', error);
+    }
+  }, [treeId]);
+  
+  // 包裝 setPath 函數，自動保存草稿
+  const setPathWithDraftSave = useCallback((newPath: LearningPath | ((prev: LearningPath) => LearningPath)) => {
+    const actualPath = typeof newPath === 'function' ? newPath(path) : newPath;
+    setPath(actualPath);
+    
+    // 延遲保存草稿，避免過於頻繁的 localStorage 操作
+    if (changeCheckTimerRef.current) {
+      clearTimeout(changeCheckTimerRef.current);
+    }
+    changeCheckTimerRef.current = setTimeout(() => {
+      saveDraftToLocalStorage(actualPath);
+    }, 1000); // 增加延遲時間，減少頻繁更新
+  }, [path, saveDraftToLocalStorage]);
+  
   const [nodeDragState, setNodeDragState] = useState<{
     isDragging: boolean;
     nodeId: string | null;
@@ -215,14 +449,54 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
   const lastRenderLogRef = useRef<string>('');
   const lastInitLogRef = useRef<string>('');
   
-  // 載入成長樹活動
-  useEffect(() => {
-    if (currentTreeId) {
-      loadTreeActivities(currentTreeId);
+  // 載入現有學習路線
+  const loadExistingLearningPath = useCallback(async (treeId: string) => {
+    try {
+      const response = await fetch(`/api/learning-paths?treeId=${treeId}`);
+      const result = await response.json();
+      
+      if (result.success && result.data && result.data.length > 0) {
+        // 找到現有的學習路線
+        const existingPath = result.data[0]; // 每個成長樹只有一個學習路線
+        
+        // 轉換資料庫格式為前端格式
+        const normalizedPath: LearningPath = {
+          id: existingPath.id,
+          name: existingPath.name,
+          description: existingPath.description || '',
+          nodes: existingPath.nodes || [],
+          startNodeId: existingPath.start_node_id || 'start',
+          endNodeId: existingPath.end_node_id || 'end',
+          totalDuration: existingPath.total_duration || 0,
+          difficulty: existingPath.difficulty || 1,
+          tags: existingPath.tags || []
+        };
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('載入現有學習路線:', normalizedPath);
+          console.log('載入的節點連接狀態:', normalizedPath.nodes.map(n => ({
+            id: n.id,
+            type: n.type,
+            connections: n.connections
+          })));
+        }
+        
+        setPath(normalizedPath);
+        setSavedPath(normalizedPath);
+        setOriginalPath(normalizedPath);
+        setHasUnsavedChanges(false);
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('該成長樹沒有現有的學習路線，將使用默認值');
+        }
+      }
+    } catch (error) {
+      console.error('載入現有學習路線失敗:', error);
     }
-  }, [currentTreeId]);
+  }, []);
 
-  const loadTreeActivities = async (treeId: string) => {
+  // 載入成長樹活動
+  const loadTreeActivities = useCallback(async (treeId: string) => {
     try {
       setLoadingTreeActivities(true);
       const { data, error } = await (supabase as any)
@@ -263,7 +537,23 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     } finally {
       setLoadingTreeActivities(false);
     }
-  };
+  }, []);
+
+  // 載入現有學習路線
+  useEffect(() => {
+    if (treeId && !initialPath) {
+      loadExistingLearningPath(treeId);
+    }
+  }, [treeId, initialPath, loadExistingLearningPath]);
+
+  // 載入成長樹活動
+  useEffect(() => {
+    if (currentTreeId) {
+      loadTreeActivities(currentTreeId);
+    }
+  }, [currentTreeId, loadTreeActivities]);
+
+
 
   // 將成長樹活動轉換為學習路徑節點
   const convertTreeActivityToNode = (activity: TreeActivity): LearningNode => {
@@ -727,29 +1017,86 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
 
   const deleteConnection = (fromId: string, toId: string) => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('刪除連接被調用:', { fromId, toId });
+      console.log('🎯 === 刪除連接函數開始 ===');
+      console.log('🎯 參數:', { fromId, toId });
+      console.log('🎯 當前路徑狀態:', path);
+    }
+    
+    // 驗證參數
+    if (!fromId || !toId) {
+      console.error('🎯 刪除連接失敗: 參數無效', { fromId, toId });
+      return;
+    }
+    
+    // 檢查路徑是否存在
+    if (!path || !path.nodes) {
+      console.error('🎯 刪除連接失敗: 路徑不存在或無效');
+      return;
+    }
+    
+    // 檢查源節點是否存在
+    const sourceNode = path.nodes.find(n => n.id === fromId);
+    if (!sourceNode) {
+      console.error('🎯 刪除連接失敗: 源節點不存在', { fromId });
+      return;
+    }
+    
+    // 檢查連接是否存在
+    if (!sourceNode.connections.includes(toId)) {
+      console.error('🎯 刪除連接失敗: 連接不存在', { fromId, toId, connections: sourceNode.connections });
+      return;
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎯 刪除前的路徑:', JSON.stringify(path, null, 2));
+      console.log('🎯 要刪除的連接:', { fromId, toId });
+      console.log('🎯 源節點連接列表:', sourceNode.connections);
     }
     
     updatePathWithChangeTracking(prev => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('刪除前的路徑:', prev);
+        console.log('🎯 updatePathWithChangeTracking 回調開始');
+        console.log('🎯 prev 參數:', JSON.stringify(prev, null, 2));
       }
       
       const newPath = {
         ...prev,
-        nodes: prev.nodes.map(node => 
-          node.id === fromId 
-            ? { ...node, connections: node.connections.filter(conn => conn !== toId) }
-            : node
-        )
+        nodes: prev.nodes.map(node => {
+          // 刪除 fromId -> toId 的連接
+          if (node.id === fromId) {
+            const newConnections = node.connections.filter(conn => conn !== toId);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`🎯 節點 ${fromId} 連接更新:`, {
+                old: node.connections,
+                new: newConnections
+              });
+            }
+            return { ...node, connections: newConnections };
+          }
+          // 同時刪除 toId -> fromId 的反向連接
+          if (node.id === toId) {
+            const newConnections = node.connections.filter(conn => conn !== fromId);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`🎯 節點 ${toId} 反向連接更新:`, {
+                old: node.connections,
+                new: newConnections
+              });
+            }
+            return { ...node, connections: newConnections };
+          }
+          return node;
+        })
       };
       
       if (process.env.NODE_ENV === 'development') {
-        console.log('刪除後的路徑:', newPath);
+        console.log('🎯 刪除後的新路徑:', JSON.stringify(newPath, null, 2));
       }
       
       // 刪除連接後，自動計算連線節點狀態
       setTimeout(() => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🎯 調用 updateConnectedNodesStatus');
+        }
         updateConnectedNodesStatus();
       }, 100);
       
@@ -757,7 +1104,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     });
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('連接已刪除');
+      console.log('🎯 === 刪除連接函數完成 ===');
     }
   };
 
@@ -775,6 +1122,15 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     if (e.ctrlKey) {
       handleConnectionStart(node.id);
       return;
+    }
+    
+    // 確保所有節點都可以拖拽（包括 start 和 end 節點）
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎯 節點拖拽開始:', { 
+        nodeId: node.id, 
+        nodeType: node.type, 
+        position: node.position 
+      });
     }
     
     setNodeDragState({
@@ -797,6 +1153,15 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       const clampedX = Math.max(50, Math.min(1950, newX));
       const clampedY = Math.max(50, Math.min(1150, newY));
       
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎯 節點拖拽中:', { 
+          nodeId: nodeDragState.nodeId,
+          delta: { x: deltaX, y: deltaY },
+          newPosition: { x: newX, y: newY },
+          clampedPosition: { x: clampedX, y: clampedY }
+        });
+      }
+      
       updateNode(nodeDragState.nodeId!, {
         position: { x: clampedX, y: clampedY }
       });
@@ -805,6 +1170,13 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
 
   const handleNodeMouseUp = (e: React.MouseEvent) => {
     if (nodeDragState.isDragging) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎯 節點拖拽結束:', { 
+          nodeId: nodeDragState.nodeId,
+          finalPosition: nodeDragState.startPos
+        });
+      }
+      
       setNodeDragState({
         isDragging: false,
         nodeId: null,
@@ -953,11 +1325,11 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       !node.title.startsWith('Activity ')
     );
     
-    const hasActivityNodes = path.nodes.some(node => node.type === 'activity');
+    const pathHasActivityNodes = path.nodes.some(node => node.type === 'activity');
     
     // 只在開發環境下輸出日誌，並避免重複日誌
     if (process.env.NODE_ENV === 'development') {
-      const protectionLogKey = `${hasCustomTitles}-${hasEverHadCustomTitlesRef.current}-${hasActivityNodes}-${hasEverHadActivityNodesRef.current}`;
+      const protectionLogKey = `${hasCustomTitles}-${hasEverHadCustomTitlesRef.current}-${pathHasActivityNodes}-${hasEverHadActivityNodesRef.current}`;
       if (protectionLogKey !== lastProtectionLogRef.current) {
         console.log('檢測到自定義節點，啟用保護機制:', {
           activityNodes: path.nodes
@@ -975,7 +1347,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       hasEverHadCustomTitlesRef.current = true;
     }
     
-    if (hasActivityNodes) {
+    if (pathHasActivityNodes) {
       hasEverHadActivityNodesRef.current = true;
     }
   }, [path.nodes]);
@@ -983,9 +1355,10 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
   const renderNode = (node: LearningNode) => {
     // 調試日誌：檢查節點的所有屬性
     if (process.env.NODE_ENV === 'development') {
-      console.log('渲染節點詳細:', {
+      console.log('🔍 渲染節點詳細:', {
         id: node.id,
         title: node.title,
+        originalTitle: node.title, // 原始標題
         type: node.type,
         order: node.order,
         duration: node.duration,
@@ -998,6 +1371,16 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         description: node.description,
         metadata: node.metadata
       });
+      
+      // 特別檢查標題變化
+      if (node.type === 'activity') {
+        console.log('🔍 活動節點標題檢查:', {
+          nodeId: node.id,
+          displayTitle: node.title,
+          activityName: node.metadata?.activityId || '無ID',
+                     从数据库加载: node.metadata?.activityDetails?.activity_type || '無資料庫名稱'
+        });
+      }
       
       // 檢查所有可能顯示在UI上的值
       console.log('檢查可能顯示為0的值:', {
@@ -1048,12 +1431,18 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       
       switch (node.type) {
         case 'start':
+          return {
+            bg: 'bg-gradient-to-br from-green-400 to-emerald-500',
+            text: 'text-white',
+            border: 'border-green-300',
+            shadow: 'shadow-green-400/30'
+          };
         case 'end':
           return {
-            bg: 'bg-gradient-to-br from-[#F98C53] to-[#FCCEB4]',
+            bg: 'bg-gradient-to-br from-purple-400 to-pink-500',
             text: 'text-white',
-            border: 'border-[#FCCEB4]',
-            shadow: 'shadow-[#F98C53]/20'
+            border: 'border-purple-300',
+            shadow: 'shadow-purple-400/30'
           };
         case 'activity':
           // 如果活動節點已連線（有順序），使用淺藍到淺綠漸變
@@ -1106,7 +1495,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
           left: node.position.x,
           top: node.position.y,
           transform: 'translate(-50%, -50%)',
-          zIndex: isSelected ? 30 : 20
+          zIndex: isSelected ? 30 : 25
         }}
         onMouseDown={(e) => handleNodeMouseDown(e, node)}
         onMouseUp={(e) => {
@@ -1146,14 +1535,22 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       >
         <motion.div
           className={`
-            relative p-6 rounded-2xl shadow-lg border-2
+            relative p-4 shadow-lg border-2
             ${colors.bg} ${colors.text}
             ${colors.border} ${colors.shadow}
             ${isSelected ? 'scale-110 shadow-xl ring-4 ring-yellow-400' : ''}
             ${isConnectionStart ? 'ring-4 ring-yellow-400 animate-pulse' : ''}
             ${isLocked ? 'opacity-60' : ''}
             ${isNodeDragging ? 'shadow-2xl scale-105' : ''}
+            ${node.type === 'start' || node.type === 'end' 
+              ? 'rounded-full w-32 h-32' // 開始和結束節點：圓形，固定尺寸
+              : 'rounded-2xl w-[280px] min-h-[200px]' // 活動節點：矩形，保持原有尺寸
+            }
           `}
+          style={{ 
+            userSelect: 'none',
+            cursor: viewMode === 'edit' ? 'grab' : 'default'
+          }}
         >
           {/* 節點狀態指示器 */}
           <div 
@@ -1263,75 +1660,94 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             </div>
           )}
           
-          {/* 節點內容 */}
-          <div className="flex items-center gap-3 mb-3">
-            <div>
+          {/* 節點內容 - 根據節點類型使用不同布局 */}
+          {node.type === 'start' || node.type === 'end' ? (
+            // 開始和結束節點：圓形設計，內容置中
+            <div className="flex flex-col items-center justify-center text-center h-full">
+              <div className="flex items-center justify-center mb-2">
               <nodeType.icon className="w-6 h-6" />
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-lg">{node.title}</span>
-              {/* 顯示節點順序（僅活動節點） */}
-              {node.type === 'activity' && node.order && node.order > 0 && (
-                <span className="text-xs text-gray-600 bg-white/30 px-2 py-1 rounded-full self-start">
-                  第 {node.order} 個活動
+              <div className="text-center">
+                <h3 className="font-bold text-lg mb-1" title={node.title}>
+                  {node.title}
+                </h3>
+                <p className="text-sm opacity-90 leading-relaxed" title={node.description || ''}>
+                  {node.description || ''}
+                </p>
+              </div>
+            </div>
+          ) : (
+            // 活動節點：保持原有布局
+            <>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex-shrink-0">
+                  <nodeType.icon className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base truncate" title={node.title}>
+                      {node.title}
                 </span>
+                    {/* 可愛的活動次序標示 */}
+                    {node.type === 'activity' && node.order && node.order > 0 && (
+                      <ActivityOrderBadge order={node.order} />
               )}
+                  </div>
+                  {/* 移除自動編號顯示，保持原始標題 */}
             </div>
           </div>
           
-          <div className="text-sm opacity-90 mb-3 leading-relaxed">
+              <div className="text-sm opacity-90 mb-3 leading-relaxed line-clamp-2 max-h-12 overflow-hidden" title={node.description || ''}>
             {node.description || ''}
           </div>
+            </>
+          )}
+          
+
           
           {/* 活動節點詳細信息 */}
-          {node.type === 'activity' && node.metadata?.activityDetails && (
-            <div className="space-y-2 mb-3">
+          {node.type === 'activity' && (
+            <div className="grid grid-cols-2 gap-2 mb-3">
               
               {/* 時間 */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <div className="flex items-center gap-1 text-xs">
+                <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                   </svg>
-                  {node.metadata?.activityDetails?.duration_minutes || node.duration || 30}分鐘
+                  <span className="truncate">{node.metadata?.activityDetails?.duration_minutes || node.duration || 30}分鐘</span>
                 </span>
               </div>
               
-              {/* 分類 */}
-              {node.metadata.activityDetails.category && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+              {/* 分類 - 琴譜 */}
+              <div className="flex items-center gap-1 text-xs">
+                <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {node.metadata.activityDetails.category}
+                  <span className="truncate">琴譜</span>
                   </span>
                 </div>
-              )}
               
               {/* 難度 */}
-              {node.metadata.activityDetails.difficulty_level && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <div className="flex items-center gap-1 text-xs">
+                <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
-                    難度 {node.metadata.activityDetails.difficulty_level}
+                  <span className="truncate">難度 {node.metadata?.activityDetails?.difficulty_level || node.difficulty || 1}</span>
                   </span>
                 </div>
-              )}
               
-              {/* 類型 */}
-              {node.metadata.activityDetails.activity_type && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              {/* 材料類型 - 鋼琴教材 */}
+              <div className="flex items-center gap-1 text-xs">
+                <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
                     </svg>
-                    {node.metadata.activityDetails.activity_type}
+                  <span className="truncate">鋼琴教材</span>
                   </span>
                 </div>
-              )}
             </div>
           )}
           
@@ -1348,16 +1764,67 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
   };
 
   const renderConnections = () => {
-    return path.nodes.map(node => 
-      node.connections.map(connectionId => {
+    // 驗證節點 ID 的唯一性和完整性
+    const nodeIds = new Set();
+    const duplicateIds: string[] = [];
+    const emptyIds: Array<{index: number; node: LearningNode}> = [];
+    
+    path.nodes.forEach((node, index) => {
+      if (!node.id || node.id === '') {
+        emptyIds.push({ index, node });
+        // 為空的 ID 生成一個臨時 ID
+        node.id = `temp-node-${index}-${node.type || 'unknown'}`;
+        console.warn(`節點 ${index} 有空的 ID，已生成臨時 ID: ${node.id}`);
+      } else if (nodeIds.has(node.id)) {
+        duplicateIds.push(node.id);
+        // 為重複的 ID 生成一個新的 ID
+        const newId = `${node.id}-${index}`;
+        node.id = newId;
+        console.warn(`節點 ${index} 有重複的 ID，已生成新 ID: ${newId}`);
+      } else {
+        nodeIds.add(node.id);
+      }
+    });
+    
+    if (duplicateIds.length > 0) {
+      console.warn('發現重複的節點 ID:', duplicateIds);
+    }
+    
+    if (emptyIds.length > 0) {
+      console.warn('發現空的節點 ID:', emptyIds.length, '個');
+    }
+    
+    // 收集所有連接，包括雙向連接
+    const allConnections: Array<{from: string, to: string, fromNode: any, toNode: any}> = [];
+    
+    path.nodes.forEach((node) => {
+      if (node.connections && node.connections.length > 0) {
+        node.connections.forEach((connectionId) => {
         const targetNode = path.nodes.find(n => n.id === connectionId);
-        if (!targetNode) return null;
+          if (targetNode) {
+            allConnections.push({
+              from: node.id,
+              to: connectionId,
+              fromNode: node,
+              toNode: targetNode
+            });
+          }
+        });
+      }
+    });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎯 所有連接:', allConnections.map(c => `${c.from} -> ${c.to}`));
+    }
+    
+    return allConnections.map((connection, index) => {
+      const { from, to, fromNode, toNode } = connection;
         
         // 連接線從節點中心到節點中心
-        const startX = node.position.x;
-        const startY = node.position.y;
-        const endX = targetNode.position.x;
-        const endY = targetNode.position.y;
+      const startX = fromNode.position.x;
+      const startY = fromNode.position.y;
+      const endX = toNode.position.x;
+      const endY = toNode.position.y;
         
         // 計算連接線的中點
         const midX = (startX + endX) / 2;
@@ -1365,63 +1832,102 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         
         // 計算連接線的角度
         const angle = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🎯 渲染連接 ${from} -> ${to}:`, {
+          start: { x: startX, y: startY },
+          end: { x: endX, y: endY },
+          mid: { x: midX, y: midY }
+        });
+      }
         
         return (
-          <g key={`${node.id}-${connectionId}`}>
+        <g key={`${from}-${to}-${index}`}>
             {/* 連接線 - 從節點中心到節點中心 */}
             <motion.line
               x1={startX}
               y1={startY}
               x2={endX}
               y2={endY}
-              stroke={selectedConnection?.from === node.id && selectedConnection?.to === connectionId ? "#EF4444" : "#3B82F6"}
-              strokeWidth={selectedConnection?.from === node.id && selectedConnection?.to === connectionId ? "6" : "4"}
+            stroke={selectedConnection?.from === from && selectedConnection?.to === to ? "#EF4444" : "#3B82F6"}
+            strokeWidth={selectedConnection?.from === from && selectedConnection?.to === to ? "6" : "4"}
               strokeDasharray="8,8"
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
               transition={{ duration: 1.5, ease: "easeInOut" }}
-              className="cursor-pointer hover:stroke-blue-600"
-              style={{ pointerEvents: 'auto' }}
+            className="pointer-events-none"
+            style={{ pointerEvents: 'none' }}
+          />
+          
+          {/* 連接線的點擊區域 - 使用更寬的透明線條，但降低優先級 */}
+          <line
+            x1={startX}
+            y1={startY}
+            x2={endX}
+            y2={endY}
+            stroke="transparent"
+            strokeWidth="15"
+            className="cursor-pointer hover:stroke-blue-200/30"
+            style={{ 
+              pointerEvents: 'auto',
+              zIndex: 10
+            }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 if (process.env.NODE_ENV === 'development') {
-                  console.log('連接線被點擊:', { nodeId: node.id, connectionId });
+                console.log('🎯 連接線點擊區域被點擊:', { from, to, fromNode: fromNode.type, toNode: toNode.type });
                 }
                 // 點擊連接線時選中連接
-                setSelectedConnection({ from: node.id, to: connectionId });
+              setSelectedConnection({ from, to });
               }}
             />
             
             {/* 連接線中點的刪除按鈕 */}
             {viewMode === 'edit' && (
               <g transform={`translate(${midX}, ${midY})`}>
-                {/* 背景圓圈 */}
-                <motion.circle
-                  r="18"
-                  fill="white"
-                  stroke="#EF4444"
-                  strokeWidth="3"
-                  className="cursor-pointer hover:fill-red-50 hover:stroke-red-600 transition-colors"
+              {/* 主要點擊區域 - 使用更大的透明圓圈，確保優先級最高 */}
+              <circle
+                r="35"
+                fill="transparent"
+                stroke="transparent"
+                className="cursor-pointer z-50"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     if (process.env.NODE_ENV === 'development') {
-                      console.log('連接線刪除按鈕被點擊:', { nodeId: node.id, connectionId });
+                    console.log('🎯 連接線刪除按鈕被點擊:', { from, to, fromNode: fromNode.type, toNode: toNode.type });
                     }
-                    deleteConnection(node.id, connectionId);
+                  deleteConnection(from, to);
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                  }}
-                  style={{ pointerEvents: 'auto' }}
-                  whileHover={{ scale: 1.2 }}
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('🎯 連接線刪除按鈕 mousedown:', { from, to });
+                  }
+                }}
+                style={{ 
+                  pointerEvents: 'auto',
+                  zIndex: 1000
+                }}
+              />
+              
+              {/* 視覺刪除按鈕 */}
+              <motion.circle
+                r="22"
+                fill="white"
+                stroke="#EF4444"
+                strokeWidth="3"
+                className="pointer-events-none"
+                style={{ pointerEvents: 'none' }}
+                whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ duration: 0.3, delay: 0.5 }}
                 />
+              
                 {/* 刪除圖標 */}
                 <text
                   x="0"
@@ -1435,22 +1941,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                 >
                   ×
                 </text>
-                {/* 工具提示背景 */}
-                {/* 已移除黑色背景框 */}
-                
-                {/* 工具提示文字 */}
-                <text
-                  x="0"
-                  y="-20"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="11"
-                  fill="white"
-                  className="pointer-events-none font-medium"
-                  style={{ pointerEvents: 'none' }}
-                >
-                  
-                </text>
+              
               </g>
             )}
             
@@ -1463,14 +1954,13 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             >
               <polygon
                 points="0,0 -12,8 -12,-8"
-                fill={selectedConnection?.from === node.id && selectedConnection?.to === connectionId ? "#EF4444" : "#3B82F6"}
+              fill={selectedConnection?.from === from && selectedConnection?.to === to ? "#EF4444" : "#3B82F6"}
                 className="pointer-events-none"
               />
             </motion.g>
           </g>
         );
-      })
-    );
+    });
   };
 
   const playPath = () => {
@@ -1550,6 +2040,11 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     if (process.env.NODE_ENV === 'development') {
       console.log('=== 儲存路徑 ===');
       console.log('儲存前的路徑:', path);
+      console.log('儲存前的節點連接狀態:', path.nodes.map(n => ({
+        id: n.id,
+        type: n.type,
+        connections: n.connections
+      })));
     }
     
     const savedPathData = {
@@ -1561,10 +2056,97 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       console.log('儲存的數據:', savedPathData);
     }
     
-    // 更新儲存狀態
-    setSavedPath(savedPathData);
-    setOriginalPath(savedPathData);
+    try {
+      // 檢查必要參數
+      if (!treeId) {
+        throw new Error('缺少 treeId 參數');
+      }
+      
+      if (!savedPathData || !savedPathData.nodes) {
+        throw new Error('缺少 pathData 或 nodes 參數');
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('準備發送數據到 API:');
+        console.log('- treeId:', treeId);
+        console.log('- pathData:', savedPathData);
+        console.log('- pathData.nodes:', savedPathData.nodes);
+      }
+      
+      // 儲存到 Supabase
+      const response = await fetch('/api/learning-paths', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          treeId: treeId,
+          pathData: savedPathData
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('API 響應錯誤:', response.status, response.statusText);
+        console.error('錯誤詳情:', result);
+        throw new Error(result.error || '儲存學習路徑失敗');
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Supabase 儲存成功:', result);
+      }
+      
+      // 更新本地儲存狀態，包括從資料庫返回的 ID
+      const updatedPathData = {
+        ...savedPathData,
+        id: result.data.id // 使用資料庫返回的 ID
+      };
+      
+      // 立即清除變更標記，防止後續變更檢查干擾
     setHasUnsavedChanges(false);
+      
+      // 清除變更檢查計時器，防止後續變更檢查
+      if (changeCheckTimerRef.current) {
+        clearTimeout(changeCheckTimerRef.current);
+        changeCheckTimerRef.current = null;
+      }
+      
+      // 強制阻止任何後續的變更檢查，確保狀態一致性
+      setTimeout(() => {
+        if (changeCheckTimerRef.current) {
+          clearTimeout(changeCheckTimerRef.current);
+          changeCheckTimerRef.current = null;
+        }
+      }, 100);
+      
+      setSavedPath(updatedPathData);
+      setOriginalPath(updatedPathData);
+      setPath(updatedPathData); // 同時更新當前路徑
+      
+      // 清理草稿並保存正式版本到 localStorage
+      if (treeId) {
+        try {
+          // 清理草稿
+          const draftKey = `learning_path_draft_${treeId}`;
+          localStorage.removeItem(draftKey);
+          
+          // 保存正式版本到 localStorage
+          const storageKey = `learning_path_${treeId}`;
+          const finalData = {
+            ...updatedPathData,
+            lastModified: new Date().toISOString(),
+            isDraft: false
+          };
+          localStorage.setItem(storageKey, JSON.stringify(finalData));
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('草稿已清理，正式版本已保存到 localStorage');
+          }
+        } catch (error) {
+          console.error('清理草稿或保存正式版本失敗:', error);
+        }
+      }
     
     // 檢查儲存時是否有自定義標題
     const hasCustomTitles = path.nodes.some(node => 
@@ -1594,32 +2176,51 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     // 如果有外部儲存回調，調用它
     if (onSave) {
       try {
-        await onSave(savedPathData);
+          await onSave(updatedPathData);
         if (process.env.NODE_ENV === 'development') {
           console.log('學習路徑已儲存');
         }
-        toast.success('學習路徑保存成功！');
+          toast.success(result.isUpdate ? '學習路徑更新成功！' : '學習路徑創建成功！');
       } catch (error) {
-        console.error('儲存失敗:', error);
-        toast.error('儲存失敗，請重試');
+          console.error('外部儲存回調失敗:', error);
+          // 不顯示錯誤，因為 Supabase 儲存已經成功
       }
     } else {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('學習路徑狀態已更新（無外部儲存回調）');
-      }
-      toast.success('學習路徑狀態已更新！');
+        toast.success(result.isUpdate ? '學習路徑更新成功！' : '學習路徑創建成功！');
     }
     
     if (process.env.NODE_ENV === 'development') {
       console.log('=== 儲存完成 ===');
     }
-  }, [path, onSave]);
+      
+    } catch (error) {
+      console.error('Supabase 儲存失敗:', error);
+      toast.error('儲存失敗，請重試');
+      
+      // 即使 Supabase 儲存失敗，也更新本地狀態
+      // 清除變更檢查計時器
+      if (changeCheckTimerRef.current) {
+        clearTimeout(changeCheckTimerRef.current);
+        changeCheckTimerRef.current = null;
+      }
+      
+      setSavedPath(savedPathData);
+      setOriginalPath(savedPathData);
+      setPath(savedPathData);
+      setHasUnsavedChanges(false);
+    }
+  }, [path, onSave, treeId]);
 
   // 檢查變更
   const checkForChanges = useCallback((newPath: LearningPath) => {
     if (originalPath) {
       const hasChanges = JSON.stringify(newPath) !== JSON.stringify(originalPath);
+      
+      // 使用 ref 來避免無限循環
+      if (hasChanges !== hasUnsavedChanges) {
       setHasUnsavedChanges(hasChanges);
+      }
+      
       // 只在開發環境下輸出日誌，並避免重複日誌
       if (process.env.NODE_ENV === 'development') {
         const changeLogKey = `${hasChanges}-${JSON.stringify(originalPath).length}-${JSON.stringify(newPath).length}`;
@@ -1637,37 +2238,278 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         }
       }
     }
-  }, [originalPath]);
+  }, [originalPath, hasUnsavedChanges]);
 
   // 更新路徑時檢查變更
   const updatePathWithChangeTracking = useCallback((updater: (prev: LearningPath) => LearningPath) => {
-    setPath(prev => {
+    setPathWithDraftSave(prev => {
       const newPath = updater(prev);
+      
       // 使用防抖來減少變更檢查的頻率
       if (changeCheckTimerRef.current) {
         clearTimeout(changeCheckTimerRef.current);
       }
       changeCheckTimerRef.current = setTimeout(() => {
+        // 只有在沒有未保存變更時才檢查變更，避免儲存後的干擾
+        if (!hasUnsavedChanges) {
         checkForChanges(newPath);
-      }, 300); // 300ms 防抖
+        }
+      }, 500); // 增加防抖時間，減少頻繁更新
+      
       return newPath;
     });
-  }, [checkForChanges]);
+  }, [checkForChanges, setPathWithDraftSave, hasUnsavedChanges]);
 
-  // 處理 initialPath 變化
+  // 處理 initialPath 變化 - 當 initialPath 更新時同步更新組件狀態
   useEffect(() => {
     if (initialPath) {
       // 只在開發環境下輸出日誌，並避免重複日誌
       if (process.env.NODE_ENV === 'development') {
         const initialPathLogKey = `${initialPath.id}-${initialPath.nodes.length}`;
         if (initialPathLogKey !== lastInitialPathLogRef.current) {
-          console.log('initialPath 變化，更新路徑:', initialPath);
+          console.log('initialPath 初始化，設置路徑:', initialPath);
           lastInitialPathLogRef.current = initialPathLogKey;
         }
       }
-      setPath(initialPath);
-      setSavedPath(initialPath);
+      
+      // 檢查是否有草稿版本
+      if (treeId) {
+        try {
+          const draftKey = `learning_path_draft_${treeId}`;
+          const draftData = localStorage.getItem(draftKey);
+          
+          if (draftData) {
+            const parsedDraft = JSON.parse(draftData);
+            if (parsedDraft.isDraft && parsedDraft.lastModified) {
+              const draftTime = new Date(parsedDraft.lastModified);
+              const now = new Date();
+              const hoursDiff = (now.getTime() - draftTime.getTime()) / (1000 * 60 * 60);
+              
+              // 如果草稿在24小時內，則使用草稿
+              if (hoursDiff < 24) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('發現有效草稿，使用草稿版本:', parsedDraft);
+                }
+                
+                        // 檢查草稿是否包含所有必要的節點
+        const draftHasStartNode = parsedDraft.nodes?.some((n: any) => n.type === 'start');
+        const draftHasEndNode = parsedDraft.nodes?.some((n: any) => n.type === 'end');
+        const draftHasActivityNodes = parsedDraft.nodes?.some((n: any) => n.type === 'activity');
+        
+        console.log('草稿節點檢查:', {
+          hasStartNode: draftHasStartNode,
+          hasEndNode: draftHasEndNode,
+          hasActivityNodes: draftHasActivityNodes,
+          totalNodes: parsedDraft.nodes?.length || 0
+        });
+        
+        // 如果草稿缺少 end 節點，則不使用草稿
+        if (!draftHasEndNode) {
+          console.log('草稿缺少 end 節點，將重新處理 initialPath');
+          localStorage.removeItem(draftKey);
+        } else {
+          setPath(parsedDraft);
+          setSavedPath(initialPath); // 保持原始版本作為對比
       setOriginalPath(initialPath);
+          setHasUnsavedChanges(true); // 標記為有未保存的變更
+          return;
+        }
+              } else {
+                // 草稿過期，清理它
+                localStorage.removeItem(draftKey);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('草稿已過期，已清理');
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('檢查草稿失敗:', error);
+        }
+      }
+      
+      // 處理 initialPath，確保包含活動節點
+      let processedPath = { ...initialPath };
+      
+      // 檢查節點狀態
+      const processedPathHasStartNode = processedPath.nodes.some((n: any) => n.type === 'start');
+      const processedPathHasEndNode = processedPath.nodes.some((n: any) => n.type === 'end');
+      const processedPathHasActivityNodes = processedPath.nodes.some((n: any) => n.type === 'activity');
+      
+      console.log('useEffect 節點檢查結果:', {
+        totalNodes: processedPath.nodes?.length || 0,
+        hasStartNode: processedPathHasStartNode,
+        hasEndNode: processedPathHasEndNode,
+        hasActivityNodes: processedPathHasActivityNodes,
+        activitiesCount: activities?.length || 0,
+        nodeTypes: processedPath.nodes?.map(n => n.type) || []
+      });
+      
+      // 如果有 start 和 end 節點，但沒有活動節點，則從 Supabase 載入活動數據並創建活動節點
+      // 注意：只有在真正需要添加活動節點時才執行，避免重複處理
+      if (processedPathHasStartNode && processedPathHasEndNode && !processedPathHasActivityNodes && !hasEverHadActivityNodesRef.current) {
+        console.log('檢測到節點數量不足，從 Supabase 載入活動數據...');
+        
+        // 使用 setTimeout 來異步處理活動載入，避免在 useEffect 中直接使用 Promise
+        setTimeout(() => {
+          loadTreeActivitiesFromSupabase(treeId).then(supabaseActivities => {
+            if (supabaseActivities && supabaseActivities.length > 0) {
+              console.log('從 Supabase 載入的活動數量:', supabaseActivities.length);
+              
+              // 創建活動節點
+              const activityNodes = supabaseActivities.map((treeActivity: any, index: number) => {
+                const activity = treeActivity.hanami_teaching_activities || treeActivity;
+                const activityId = treeActivity.activity_id || activity.id;
+                const activityName = activity.activity_name || treeActivity.custom_activity_name || `活動 ${index + 1}`;
+                const activityDescription = activity.activity_description || treeActivity.custom_activity_description || '';
+                
+                return {
+                  id: `tree_activity_${activityId}`,
+                  type: 'activity' as const,
+                  title: activityName,
+                  description: activityDescription,
+                  duration: activity.estimated_duration || activity.duration_minutes || treeActivity.duration_minutes || 30,
+                  difficulty: activity.difficulty_level || treeActivity.difficulty_level || 1,
+                  prerequisites: index === 0 ? ['start'] : [`tree_activity_${supabaseActivities[index - 1].activity_id || supabaseActivities[index - 1].id}`],
+                  reward: `完成 ${activityName}`,
+                  position: { 
+                    x: 200 + (index + 1) * 150, 
+                    y: 200 + (index % 2) * 100 
+                  },
+                  connections: index === supabaseActivities.length - 1 ? ['end'] : [`tree_activity_${supabaseActivities[index + 1].activity_id || supabaseActivities[index + 1].id}`],
+                  isCompleted: false,
+                  isLocked: false,
+                  // 包含完整的活動詳細信息
+                  metadata: {
+                    activityId: activityId,
+                    activityType: treeActivity.activity_source || 'teaching',
+                    materials: activity.materials || [],
+                    instructions: activity.instructions || '',
+                    learningObjectives: activity.learning_objectives || [],
+                    activityDetails: {
+                      category: activity.activity_type || treeActivity.activity_type || '教學活動',
+                      activity_type: treeActivity.activity_source || 'teaching',
+                      difficulty_level: activity.difficulty_level || treeActivity.difficulty_level || 1,
+                      duration_minutes: activity.estimated_duration || activity.duration_minutes || treeActivity.duration_minutes || 30
+                    }
+                  }
+                };
+              });
+              
+              // 更新 start 節點的連接
+              if (processedPath.nodes.length > 0) {
+                const startNode = processedPath.nodes.find(n => n.type === 'start');
+                if (startNode && activityNodes.length > 0) {
+                  startNode.connections = [activityNodes[0].id];
+                }
+              }
+              
+              // 插入活動節點到 start 和 end 之間
+              const startNodes = processedPath.nodes.filter(n => n.type === 'start');
+              const endNodes = processedPath.nodes.filter(n => n.type === 'end');
+              const otherNodes = processedPath.nodes.filter(n => n.type !== 'start' && n.type !== 'end');
+              
+              console.log('節點分類結果:', {
+                startNodes: startNodes.length,
+                endNodes: endNodes.length,
+                otherNodes: otherNodes.length,
+                activityNodes: activityNodes.length
+              });
+              
+              // 確保 end 節點存在，如果不存在則創建一個
+              let finalEndNodes = endNodes;
+              if (endNodes.length === 0) {
+                console.log('未找到 end 節點，創建一個新的 end 節點');
+                finalEndNodes = [{
+                  id: 'end',
+                  type: 'end' as const,
+                  title: '完成學習',
+                  description: '恭喜完成學習旅程！',
+                  duration: 0,
+                  difficulty: 1,
+                  prerequisites: [],
+                  reward: '學習成就證書',
+                  position: { 
+                    x: 200 + (activityNodes.length + 1) * 150, 
+                    y: 200 
+                  },
+                  connections: [],
+                  isCompleted: false,
+                  isLocked: false,
+                  metadata: {
+                    materials: [],
+                    instructions: '',
+                    learningObjectives: []
+                  }
+                }];
+              } else {
+                // 重新計算 end 節點的位置，確保它在活動節點之後
+                finalEndNodes = endNodes.map(endNode => ({
+                  ...endNode,
+                  position: { 
+                    x: 200 + (activityNodes.length + 1) * 150, 
+                    y: 200 
+                  }
+                }));
+              }
+              
+              const updatedProcessedPath = {
+                ...processedPath,
+                nodes: [
+                  ...startNodes,
+                  ...activityNodes,
+                  ...otherNodes,
+                  ...finalEndNodes
+                ]
+              };
+              
+              console.log(`已添加 ${activityNodes.length} 個活動節點，總節點數: ${updatedProcessedPath.nodes.length}`);
+              console.log('最終節點類型分佈:', updatedProcessedPath.nodes.map(n => n.type));
+              
+              // 標記已經有過活動節點
+              hasEverHadActivityNodesRef.current = true;
+              
+              // 更新路徑狀態
+              setPath(updatedProcessedPath);
+              setSavedPath(updatedProcessedPath);
+              setOriginalPath(updatedProcessedPath);
+            }
+          }).catch(error => {
+            console.error('載入活動數據失敗:', error);
+          });
+        }, 100);
+      }
+      
+      // 使用處理後的路徑
+      console.log('設置處理後的路徑:', {
+        totalNodes: processedPath.nodes?.length || 0,
+        nodeTypes: processedPath.nodes?.map(n => n.type) || [],
+        hasEndNode: processedPath.nodes?.some(n => n.type === 'end') || false
+      });
+      
+      // 確保路徑包含所有必要的節點
+      if (!processedPath.nodes.some(n => n.type === 'end')) {
+        console.warn('警告：處理後的路徑缺少 end 節點！');
+        console.log('當前節點:', processedPath.nodes);
+      }
+      
+      setPath(processedPath);
+      setSavedPath(processedPath);
+      setOriginalPath(processedPath);
+      
+      // 初始化完成後，從 Supabase 讀取節點次序
+      setTimeout(async () => {
+        const updatedNodes = await calculateConnectedNodes(processedPath.nodes, processedPath.id);
+        if (updatedNodes) {
+          setPath(currentPath => ({
+            ...currentPath,
+            nodes: updatedNodes
+          }));
+          if (process.env.NODE_ENV === 'development') {
+            console.log('已從 Supabase 讀取節點次序並更新');
+          }
+        }
+      }, 200);
       
       // 檢查是否有自定義標題
       const hasCustomTitles = initialPath.nodes.some(node => 
@@ -1689,8 +2531,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       }
       
       // 檢查是否有活動節點
-      const hasActivityNodes = initialPath.nodes.some(node => node.type === 'activity');
-      if (hasActivityNodes) {
+      const initialPathHasActivityNodes = initialPath.nodes.some(node => node.type === 'activity');
+      if (initialPathHasActivityNodes) {
         hasEverHadActivityNodesRef.current = true;
         // 只在開發環境下輸出日誌，並避免重複日誌
         if (process.env.NODE_ENV === 'development') {
@@ -1700,12 +2542,90 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
           }
         }
       }
+      
+      // 檢查是否有 end 節點
+      const hasEndNode = initialPath.nodes.some(node => node.type === 'end');
+      if (!hasEndNode) {
+        console.warn('警告：initialPath 缺少 end 節點！');
+        console.log('initialPath 節點:', initialPath.nodes);
+        
+        // 如果缺少 end 節點，創建一個
+        if (!processedPath.nodes.some(n => n.type === 'end')) {
+          console.log('為 processedPath 添加 end 節點');
+          const endNode = {
+            id: 'end',
+            type: 'end' as const,
+            title: '完成學習',
+            description: '恭喜完成學習旅程！',
+            duration: 0,
+            difficulty: 1 as const,
+            prerequisites: [],
+            reward: '學習成就證書',
+            position: { 
+              x: 800, 
+              y: 200 
+            },
+            connections: [],
+            isCompleted: false,
+            isLocked: false,
+            metadata: {
+              materials: [],
+              instructions: '',
+              learningObjectives: []
+            }
+          };
+          
+          processedPath.nodes.push(endNode);
+          console.log('已添加 end 節點，總節點數:', processedPath.nodes.length);
+        }
+      }
     }
-  }, [initialPath]);
+  }, [initialPath, treeId, activities]);
+
+  // 從 Supabase 載入成長樹下的所有活動
+  const loadTreeActivitiesFromSupabase = useCallback(async (treeId: string) => {
+    try {
+      console.log('正在從 Supabase 載入成長樹活動...', { treeId });
+      
+      // 從 hanami_tree_activities 表載入活動
+      const { data: treeActivities, error: treeError } = await supabase
+        .from('hanami_tree_activities')
+        .select(`
+          *,
+          hanami_teaching_activities (
+            id,
+            activity_name,
+            activity_description,
+            estimated_duration,
+            duration_minutes,
+            difficulty_level,
+            activity_type,
+            category,
+            materials,
+            instructions,
+            learning_objectives
+          )
+        `)
+        .eq('tree_id', treeId)
+        .order('priority_order', { ascending: true })
+        .order('activity_order', { ascending: true });
+      
+      if (treeError) {
+        console.error('載入成長樹活動失敗:', treeError);
+        return [];
+      }
+      
+      console.log('從 Supabase 載入的活動數據:', treeActivities);
+      return treeActivities || [];
+    } catch (error) {
+      console.error('載入成長樹活動時發生錯誤:', error);
+      return [];
+    }
+  }, []);
 
   // 自動加載所有活動節點的詳細信息
   const loadAllActivityDetails = useCallback(async () => {
-    const activityNodes = path.nodes.filter(node => 
+    const activityNodes = path.nodes?.filter(node => 
       node.type === 'activity' && 
       !node.metadata?.activityDetails
     );
@@ -1719,6 +2639,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         
         // 方法1: 如果有activityId，直接查詢
         if (node.metadata?.activityId) {
+          try {
           const result = await supabase
             .from('hanami_teaching_activities')
             .select('*')
@@ -1727,6 +2648,17 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
           
           data = result.data;
           error = result.error;
+            
+            if (error) {
+              console.warn('查詢活動詳細信息失敗:', error);
+              // 如果查詢失敗，跳過這個節點，不影響其他功能
+              continue;
+            }
+          } catch (queryError) {
+            console.warn('查詢 hanami_teaching_activities 表失敗:', queryError);
+            // 如果表不存在或權限不足，跳過查詢
+            continue;
+          }
         }
         
         // 方法2: 如果沒有activityId或查詢失敗，嘗試從標題中提取活動信息
@@ -1736,6 +2668,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
           if (titleMatch) {
             const activityName = titleMatch[1];
             
+            try {
             // 嘗試通過活動名稱查詢
             const result = await supabase
               .from('hanami_teaching_activities')
@@ -1761,6 +2694,11 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                   } : n
                 )
               }));
+              }
+            } catch (nameQueryError) {
+              console.warn('通過名稱查詢活動失敗:', nameQueryError);
+              // 如果查詢失敗，跳過這個節點
+              continue;
             }
           }
         }
@@ -1796,15 +2734,76 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
   // 在頁面加載時自動加載活動詳細信息
   useEffect(() => {
     if (path.nodes.length > 0) {
-      loadAllActivityDetails();
+      // 添加錯誤處理，避免因為數據庫查詢失敗而影響主要功能
+      loadAllActivityDetails().catch(error => {
+        console.warn('自動加載活動詳細信息失敗，但不影響主要功能:', error);
+      });
     }
   }, [loadAllActivityDetails]);
   
+  // 從 Supabase 讀取節點次序
+  const loadNodeOrderFromSupabase = useCallback(async (pathId: string) => {
+    try {
+      // 驗證 pathId 是否為有效的 UUID 格式
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pathId)) {
+        console.log('跳過無效的 UUID 格式 pathId:', pathId);
+        return null;
+      }
+      
+      // 從 hanami_learning_paths 表讀取節點信息
+      const { data: pathData, error: pathError } = await supabase
+        .from('hanami_learning_paths')
+        .select('nodes')
+        .eq('id', pathId)
+        .single();
+      
+      if (pathError) throw pathError;
+      
+      if (pathData?.nodes && Array.isArray(pathData.nodes)) {
+        // 從 JSON 格式的 nodes 欄位中提取節點順序
+        const nodeOrder: Record<string, number> = {};
+        const activityOrder: Record<string, number> = {};
+        
+        pathData.nodes.forEach((node: any, index: number) => {
+          if (node.id && typeof node.order === 'number') {
+            nodeOrder[node.id] = node.order;
+            
+            // 如果是活動節點，記錄活動 ID 的順序
+            if (node.type === 'activity' && node.metadata?.activityId) {
+              activityOrder[node.metadata.activityId] = node.order;
+            }
+            
+            // 如果是樹活動節點，記錄樹活動 ID 的順序
+            if (node.type === 'activity' && node.id.startsWith('tree_activity_')) {
+              const treeActivityId = node.id.replace('tree_activity_', '');
+              activityOrder[treeActivityId] = node.order;
+            }
+          }
+        });
+        
+        return { nodeOrder, activityOrder };
+      }
+      
+      // 如果沒有節點數據，返回 null，讓組件自己計算
+      return null;
+    } catch (error) {
+      console.error('從 Supabase 讀取節點次序失敗:', error);
+      return null;
+    }
+  }, []);
+  
   // 自動計算連線節點的函數
-  const calculateConnectedNodes = useCallback((nodes: LearningNode[]) => {
+  const calculateConnectedNodes = useCallback(async (nodes: LearningNode[], pathId?: string) => {
     const startNode = nodes.find(node => node.type === 'start');
     const endNode = nodes.find(node => node.type === 'end');
     if (!startNode || !endNode) return;
+
+    // 如果有 pathId，嘗試從 Supabase 讀取現有的節點次序
+    let existingOrder: { nodeOrder: Record<string, number>; activityOrder: Record<string, number> } | null = null;
+    // 檢查 pathId 是否為有效的 UUID 格式（不是臨時生成的 ID）
+    if (pathId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pathId)) {
+      existingOrder = await loadNodeOrderFromSupabase(pathId);
+    }
 
     const visited = new Set<string>();
     const completedNodes = new Set<string>();
@@ -1876,29 +2875,43 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     
     // 更新節點的完成狀態和順序
     const updatedNodes = nodes.map(node => {
-      const order = nodeOrder.get(node.id);
+      let order = nodeOrder.get(node.id);
       const isConnected = completedNodes.has(node.id);
       
-      // 為活動節點生成新的標題（包含順序）
-      let newTitle = node.title;
-      if (node.type === 'activity' && order !== undefined && order > 0) {
-        // 如果標題已經是數字格式，則更新數字部分
-        const titleMatch = node.title.match(/^(\d{4})-/);
-        if (titleMatch) {
-          // 保持原有格式，只更新數字部分
-          newTitle = `${String(order).padStart(4, '0')}-${node.title.substring(5)}`;
-        } else {
-          // 如果沒有數字格式，則添加數字前綴
-          newTitle = `${String(order).padStart(4, '0')}-${node.title}`;
+      // 如果有從 Supabase 讀取的現有次序，優先使用它
+      if (existingOrder) {
+        if (node.type === 'activity' && existingOrder.activityOrder[node.id]) {
+          order = existingOrder.activityOrder[node.id];
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`使用 Supabase 中的活動次序: ${node.id} -> ${order}`);
+          }
+        } else if (existingOrder.nodeOrder[node.id]) {
+          order = existingOrder.nodeOrder[node.id];
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`使用 Supabase 中的節點次序: ${node.id} -> ${order}`);
+          }
         }
-      } else if (node.type === 'activity' && order === 0) {
-        // 如果順序為0，保持原有標題，不添加0000-前綴
-        newTitle = node.title;
+      }
+      
+      // 為活動節點生成新的標題（包含順序）
+      // 保持原始標題不變，包括原有的編號
+      const finalTitle = node.title;
+      
+      // 在開發環境下添加調試信息
+      if (process.env.NODE_ENV === 'development' && node.type === 'activity') {
+        console.log('🔧 節點標題處理:', {
+          nodeId: node.id,
+          originalTitle: node.title,
+          finalTitle: finalTitle,
+          order: order,
+          isConnected: isConnected,
+          fromSupabase: existingOrder && (existingOrder.activityOrder[node.id] || existingOrder.nodeOrder[node.id])
+        });
       }
       
       return {
         ...node,
-        title: newTitle,
+        title: finalTitle, // 確保使用最終標題
         isCompleted: isConnected,
         order: order || 0
       };
@@ -1971,9 +2984,10 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
   }, [path.nodes]);
 
   // 自動計算並更新節點狀態
-  const updateConnectedNodesStatus = useCallback(() => {
+    const updateConnectedNodesStatus = useCallback(async () => {
     setPath(prevPath => {
-      const updatedNodes = calculateConnectedNodes(prevPath.nodes);
+        // 使用異步函數計算節點狀態
+        calculateConnectedNodes(prevPath.nodes, prevPath.id).then(updatedNodes => {
       if (updatedNodes) {
         // 只在開發環境下輸出日誌，並避免重複日誌
         if (process.env.NODE_ENV === 'development') {
@@ -1983,12 +2997,16 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             lastUpdateLogRef.current = updateLogKey;
           }
         }
-        return {
-          ...prevPath,
+            
+            // 更新路徑
+            setPath(currentPath => ({
+              ...currentPath,
           nodes: updatedNodes
-        };
+            }));
       }
-      return prevPath;
+        });
+        
+        return prevPath; // 先返回原路徑，異步更新
     });
   }, [calculateConnectedNodes]);
 
@@ -2485,7 +3503,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     }
   };
 
-  // 調試：監控組件渲染
+  // 調試：監控組件渲染 - 暫時關閉以減少日誌
   useEffect(() => {
     // 只在開發環境下輸出日誌，並避免重複日誌
     if (process.env.NODE_ENV === 'development') {
@@ -2508,23 +3526,111 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
 
   useEffect(() => {
     // 節點標題更新後，自動重新加載活動詳細信息
-    setTimeout(() => {
-      loadAllActivityDetails();
+    if (path.nodes && path.nodes.length > 0) {
+      const timer = setTimeout(() => {
+        loadAllActivityDetails().catch(error => {
+          console.warn('節點標題更新後加載活動詳細信息失敗:', error);
+        });
     }, 300);
-  }, [calculateConnectedNodes, updatePathWithChangeTracking]);
+      
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [path.nodes?.length, loadAllActivityDetails]); // 只依賴節點數量變化
 
   // 在節點狀態更新後，自動重新加載活動詳細信息
   useEffect(() => {
-    if (path.nodes.length > 0) {
+    if (path.nodes && path.nodes.length > 0) {
       // 延遲加載，確保節點標題已經更新
       const timer = setTimeout(() => {
-        loadAllActivityDetails();
+        loadAllActivityDetails().catch(error => {
+          console.warn('節點狀態更新後加載活動詳細信息失敗:', error);
+        });
       }, 500);
       
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [path.nodes, loadAllActivityDetails]);
+  }, [path.nodes?.length, loadAllActivityDetails]);
+
+  // 驗證節點數據完整性
+  useEffect(() => {
+    if (path.nodes && path.nodes.length > 0) {
+      console.log('驗證節點數據完整性...');
+      
+      // 檢查是否有空的或無效的節點 ID
+      const invalidNodes = path.nodes.filter(node => !node.id || node.id === '');
+      if (invalidNodes.length > 0) {
+        console.warn('發現無效的節點 ID:', invalidNodes.length, '個節點');
+        console.warn('無效節點詳情:', invalidNodes);
+      }
+      
+      // 檢查節點 ID 的唯一性
+      const nodeIds = path.nodes.map(node => node.id).filter(Boolean);
+      const uniqueIds = new Set(nodeIds);
+      if (nodeIds.length !== uniqueIds.size) {
+        console.warn('發現重複的節點 ID');
+        const duplicates = nodeIds.filter((id, index) => nodeIds.indexOf(id) !== index);
+        console.warn('重複的 ID:', duplicates);
+      }
+    }
+  }, [path.nodes]); // 只依賴節點數量變化
+
+  // 設置初始化完成狀態
+  useEffect(() => {
+    // 在組件首次掛載且有節點數據時標記為已初始化
+    if (path.nodes && path.nodes.length > 0 && !isInitialized) {
+      const timer = setTimeout(() => {
+        setIsInitialized(true);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🎯 組件初始化完成，設置 isInitialized = true');
+        }
+      }, 1000); // 延遲 1 秒確保所有初始化邏輯完成
+      
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [path.nodes.length, isInitialized]);
+
+  // 自動連接 end 節點的邏輯（只在真正需要時執行）
+  useEffect(() => {
+    // 只有在初始化完成後，且 end 節點沒有連接時才執行自動連接
+    if (isInitialized && path.nodes && path.nodes.length > 0) {
+      const endNode = path.nodes.find(n => n.type === 'end');
+      const activityNodes = path.nodes.filter(n => n.type === 'activity');
+      
+      if (endNode && activityNodes.length > 0 && 
+          (!endNode.connections || endNode.connections.length === 0)) {
+        
+        // 檢查是否為新創建的路徑（通過檢查路徑 ID 是否為臨時 ID）
+        const isNewPath = path.id && path.id.startsWith('path-');
+        
+        // 只有在真正新創建的路徑時才自動添加連接
+        if (isNewPath) {
+          const lastActivityNode = activityNodes
+            .sort((a, b) => (a.order || 0) - (b.order || 0))
+            .pop();
+          
+          if (lastActivityNode) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🎯 為新創建的路徑自動添加 end 節點連接:', lastActivityNode.id);
+            }
+            
+            updatePathWithChangeTracking((prevPath) => ({
+              ...prevPath,
+              nodes: prevPath.nodes.map(node => 
+                node.id === 'end' 
+                  ? { ...node, connections: [lastActivityNode.id] }
+                  : node
+              )
+            }));
+          }
+        } else if (process.env.NODE_ENV === 'development') {
+          console.log('🎯 現有路徑的 end 節點沒有連接，但不自動添加（可能是用戶故意刪除的）');
+        }
+      }
+    }
+  }, [isInitialized, path.nodes.length]); // 只在初始化狀態或節點數量變化時執行
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-[#F9F2EF] via-[#D2E0AA] to-[#ABD7FB] overflow-hidden">
@@ -2540,12 +3646,12 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         <div className="flex items-center justify-between relative z-10">
           <div className="text-center">
             <div className="text-2xl font-bold mb-1">學習進度</div>
-            <div className="text-sm opacity-90">{path.nodes.filter(n => n.isCompleted).length}/{path.nodes.length}</div>
+            <div className="text-sm opacity-90">{path.nodes?.filter(n => n.isCompleted)?.length || 0}/{path.nodes?.length || 0}</div>
           </div>
           
           <div className="text-center">
             <div className="text-2xl font-bold mb-1">總時長</div>
-            <div className="text-sm opacity-90">{path.totalDuration}分鐘</div>
+            <div className="text-sm opacity-90">{path.totalDuration || 0}分鐘</div>
           </div>
           
           <div className="text-center">
@@ -2567,6 +3673,33 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             <div className="text-[#F9F2EF] text-sm">難度等級</div>
             <div className="text-xl font-bold">{path.difficulty || 1}</div>
           </div>
+          
+          {/* 退出按鍵 */}
+          <button
+            onClick={() => {
+              if (hasUnsavedChanges) {
+                if (confirm('您有未儲存的變更，確定要退出嗎？')) {
+                  if (onClose) {
+                    onClose();
+                  } else {
+                    window.history.back();
+                  }
+                }
+              } else {
+                if (onClose) {
+                  onClose();
+                } else {
+                  window.history.back();
+                }
+              }
+            }}
+            className="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 backdrop-blur-sm border border-white/30 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            退出
+          </button>
         </div>
       </div>
 
@@ -2732,15 +3865,15 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">已完成</span>
-                  <span className="font-semibold text-green-600">{path.nodes.filter(n => n.isCompleted).length}</span>
+                  <span className="font-semibold text-green-600">{path.nodes?.filter(n => n.isCompleted)?.length || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">進行中</span>
-                  <span className="font-semibold text-blue-600">{path.nodes.filter(n => !n.isCompleted && !n.isLocked).length}</span>
+                  <span className="font-semibold text-blue-600">{path.nodes?.filter(n => !n.isCompleted && !n.isLocked)?.length || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">已鎖定</span>
-                  <span className="font-semibold text-gray-600">{path.nodes.filter(n => n.isLocked).length}</span>
+                  <span className="font-semibold text-gray-600">{path.nodes?.filter(n => n.isLocked)?.length || 0}</span>
                 </div>
                 {hasUnsavedChanges && (
                   <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -2756,7 +3889,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                   <div 
                     className="bg-gradient-to-r from-[#D2E0AA] to-[#ABD7FB] h-2 rounded-full transition-all duration-300"
                     style={{ 
-                      width: `${path.nodes.length > 0 ? (path.nodes.filter(n => n.isCompleted).length / path.nodes.length) * 100 : 0}%` 
+                      width: `${path.nodes?.length > 0 ? (path.nodes.filter(n => n.isCompleted)?.length || 0) / path.nodes.length * 100 : 0}%` 
                     }}
                   ></div>
                 </div>
@@ -3172,15 +4305,153 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
               <svg
                 ref={svgRef}
                 className="absolute inset-0 w-full h-full"
-                style={{ zIndex: 0, pointerEvents: 'auto' }}
+                style={{ zIndex: 10, pointerEvents: 'auto' }}
               >
                 {renderConnections()}
               </svg>
 
               {/* 節點 - 在連接線上方 */}
-              <div style={{ position: 'relative', zIndex: 10 }}>
+              <div style={{ position: 'relative', zIndex: 20 }}>
+                        {process.env.NODE_ENV === 'development' && (
+          <div className="absolute top-0 left-0 bg-black/50 text-white text-xs p-2 rounded z-10">
+            節點數量: {path.nodes?.length || 0}<br/>
+            節點類型: {path.nodes?.map(n => n.type).join(', ') || '無'}<br/>
+            節點詳情: {path.nodes?.map(n => `${n.type}:${n.id}`).join(', ') || '無'}<br/>
+            節點位置: {path.nodes?.map(n => `${n.type}:(${n.position?.x},${n.position?.y})`).join(', ') || '無'}
+          </div>
+        )}
                 <AnimatePresence>
-                  {path.nodes.map(node => renderNode(node))}
+                  {(() => {
+                    // 強制檢查並確保 start 和 end 節點存在
+                    const nodes = path.nodes || [];
+                    const hasStartNode = nodes.some(n => n.type === 'start');
+                    const hasEndNode = nodes.some(n => n.type === 'end');
+                    
+                    if (!hasStartNode) {
+                      console.warn('強制添加缺失的 start 節點');
+                      const startNode = {
+                        id: 'start',
+                        type: 'start' as const,
+                        title: '開始學習',
+                        description: '學習旅程的起點',
+                        duration: 0,
+                        difficulty: 1 as const,
+                        prerequisites: [],
+                        reward: '開始學習的勇氣',
+                        position: { x: 100, y: 200 },
+                        connections: [],
+                        isCompleted: true,
+                        isLocked: false,
+                        metadata: {
+                          materials: [],
+                          instructions: '',
+                          learningObjectives: []
+                        }
+                      };
+                      nodes.unshift(startNode); // 添加到開頭
+                      console.log('已強制添加 start 節點:', startNode);
+                    }
+                    
+                    if (!hasEndNode) {
+                      console.warn('強制添加缺失的 end 節點');
+                      const activityCount = nodes.filter(n => n.type === 'activity').length;
+                      const endNode = {
+                        id: 'end',
+                        type: 'end' as const,
+                        title: '完成學習',
+                        description: '恭喜完成學習旅程！',
+                        duration: 0,
+                        difficulty: 1 as const,
+                        prerequisites: [],
+                        reward: '學習成就證書',
+                        position: { 
+                          x: 200 + (activityCount + 1) * 150, 
+                          y: 200 
+                        },
+                        connections: [],
+                        isCompleted: false,
+                        isLocked: false,
+                        metadata: {
+                          materials: [],
+                          instructions: '',
+                          learningObjectives: []
+                        }
+                      };
+                      nodes.push(endNode);
+                      console.log('已強制添加 end 節點:', endNode);
+                    }
+                    
+                    return nodes.map((node, index) => {
+                    // 確保每個節點都有有效的 key
+                    const nodeKey = node.id && node.id !== '' 
+                      ? node.id 
+                      : `node-${index}-${node.type || 'unknown'}-${Date.now()}`;
+                    
+                    if (!node.id || node.id === '') {
+                      console.warn(`節點 ${index} 有空的 ID，使用備用 key: ${nodeKey}`);
+                    }
+                    
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(`渲染節點 ${index}:`, { id: node.id, type: node.type, title: node.title, position: node.position });
+                    }
+                    
+                    // 檢查節點是否有有效的位置（只在真正無效時重置）
+                    if (!node.position || 
+                        typeof node.position.x !== 'number' || 
+                        typeof node.position.y !== 'number' ||
+                        (node.position.x === 0 && node.position.y === 0)) {
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`節點 ${index} 位置無效或未初始化，設置默認位置:`, node.position);
+                      }
+                      // 為無效位置的節點設置默認位置
+                      node.position = { x: 100 + index * 200, y: 100 + index * 100 };
+                    }
+                    
+                    // 檢查節點類型是否有效
+                    if (!node.type) {
+                      console.warn(`節點 ${index} 類型無效:`, node.type);
+                      // 根據 ID 推斷類型
+                      if (node.id === 'start') node.type = 'start';
+                      else if (node.id === 'end') node.type = 'end';
+                      else node.type = 'activity';
+                    }
+                    
+                    // 檢查 end 節點連接（不強制修改位置）
+                    if (node.type === 'end') {
+                      // 只在開發環境下輸出日誌
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('檢查 end 節點:', {
+                          id: node.id,
+                          position: node.position,
+                          title: node.title,
+                          connections: node.connections
+                        });
+                      }
+                    }
+                    
+                    // 只在初始化時檢查節點位置範圍，避免干擾拖拽操作
+                    if (!node.position || 
+                        (node.position.x === 0 && node.position.y === 0)) {
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log(`節點 ${node.id} 位置未初始化，設置默認位置`);
+                      }
+                      if (node.type === 'start') {
+                        node.position = { x: 100, y: 200 };
+                      } else if (node.type === 'end') {
+                        const activityCount = path.nodes.filter(n => n.type === 'activity').length;
+                        node.position = { x: 200 + (activityCount + 1) * 150, y: 200 };
+                      } else {
+                        node.position = { x: 100 + index * 200, y: 100 + index * 100 };
+                      }
+                    }
+                    
+                    return (
+                      <div key={nodeKey}>
+                        {renderNode(node)}
+                      </div>
+                    );
+                  });
+                  })()}
                 </AnimatePresence>
               </div>
             </div>
@@ -3188,6 +4459,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             {/* 簡潔操作按鈕 */}
             {viewMode === 'edit' && (
               <div className="absolute top-4 left-4 flex gap-3 z-50 pointer-events-auto" style={{ position: 'absolute', zIndex: 50 }}>
+
+                
                 {/* 適應視窗按鈕 */}
                 <motion.button
                   className="w-12 h-12 bg-gradient-to-br from-[#F98C53] to-[#FCCEB4] backdrop-blur-sm rounded-xl shadow-lg border-2 border-white/20 hover:border-white/40 transition-all duration-300 flex items-center justify-center cursor-pointer"
@@ -3400,7 +4673,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-hanami-text">選擇學習活動</h3>
+              <h3 className="text-xl font-bold text-[#4B4036]">選擇學習活動</h3>
               <button
                 onClick={() => setShowActivitySelector(false)}
                 className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -3509,7 +4782,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             className="bg-white rounded-2xl p-4 w-full max-w-md max-h-[85vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-hanami-text">學習路徑列表</h3>
+              <h3 className="text-lg font-bold text-[#4B4036]">學習路徑列表</h3>
               <button
                 onClick={() => setShowPathList(false)}
                 className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -3748,44 +5021,59 @@ function NodeEditor({ node, onSave, onCancel }: NodeEditorProps) {
         animate={{ scale: 1, opacity: 1 }}
         className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto"
       >
-        <h3 className="text-xl font-bold text-hanami-text mb-4">編輯節點</h3>
+        <h3 className="text-xl font-bold text-[#4B4036] mb-4">編輯節點</h3>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-hanami-text mb-1">標題</label>
+            <label className="block text-sm font-medium text-[#4B4036] mb-1">
+              標題 <span className="text-xs text-gray-500">({editedNode.title.length}/30)</span>
+            </label>
             <HanamiInput
               value={editedNode.title}
-              onChange={(e) => setEditedNode(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="輸入節點標題"
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 30) {
+                  setEditedNode(prev => ({ ...prev, title: value }));
+                }
+              }}
+              placeholder="輸入節點標題（最多30字）"
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-hanami-text mb-1">描述</label>
+            <label className="block text-sm font-medium text-[#4B4036] mb-1">
+              描述 <span className="text-xs text-gray-500">({editedNode.description?.length || 0}/100)</span>
+            </label>
             <textarea
               value={editedNode.description}
-              onChange={(e) => setEditedNode(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="輸入節點描述"
-              className="w-full p-2 border border-hanami-border rounded-lg resize-none"
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 100) {
+                  setEditedNode(prev => ({ ...prev, description: value }));
+                }
+              }}
+              placeholder="輸入節點描述（最多100字）"
+              className="w-full p-2 border border-[#EADBC8] rounded-lg resize-none"
               rows={3}
+              maxLength={100}
             />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-hanami-text mb-1">時長</label>
+              <label className="block text-sm font-medium text-[#4B4036] mb-1">時長</label>
               <div className="flex gap-1">
                 <input
                   type="number"
                   value={editedNode.duration}
                   onChange={(e) => setEditedNode(prev => ({ ...prev, duration: parseInt(e.target.value) || 0 }))}
-                  className="flex-1 p-2 border border-hanami-border rounded-lg"
+                  className="flex-1 p-2 border border-[#EADBC8] rounded-lg"
                   min="0"
                 />
                 <select
                   value={editedNode.durationUnit || '分鐘'}
                   onChange={(e) => setEditedNode(prev => ({ ...prev, durationUnit: e.target.value }))}
-                  className="px-2 py-2 border border-hanami-border rounded-lg bg-white"
+                  className="px-2 py-2 border border-[#EADBC8] rounded-lg bg-white"
                 >
                   <option value="分鐘">分鐘</option>
                   <option value="小時">小時</option>
@@ -3797,11 +5085,11 @@ function NodeEditor({ node, onSave, onCancel }: NodeEditorProps) {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-hanami-text mb-1">難度</label>
+              <label className="block text-sm font-medium text-[#4B4036] mb-1">難度</label>
               <select
                 value={editedNode.difficulty}
                 onChange={(e) => setEditedNode(prev => ({ ...prev, difficulty: parseInt(e.target.value) as 1|2|3|4|5 }))}
-                className="w-full p-2 border border-hanami-border rounded-lg"
+                  className="w-full p-2 border border-[#EADBC8] rounded-lg"
               >
                 <option value={1}>1 - 簡單</option>
                 <option value={2}>2 - 基礎</option>
@@ -3813,7 +5101,7 @@ function NodeEditor({ node, onSave, onCancel }: NodeEditorProps) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-hanami-text mb-1">獎勵</label>
+            <label className="block text-sm font-medium text-[#4B4036] mb-1">獎勵</label>
             <input
               type="text"
               value={editedNode.reward || ''}
@@ -3822,7 +5110,7 @@ function NodeEditor({ node, onSave, onCancel }: NodeEditorProps) {
                 reward: e.target.value
               }))}
               placeholder="輸入獎勵"
-              className="w-full p-2 border border-hanami-border rounded-lg"
+              className="w-full p-2 border border-[#EADBC8] rounded-lg"
             />
           </div>
         </div>

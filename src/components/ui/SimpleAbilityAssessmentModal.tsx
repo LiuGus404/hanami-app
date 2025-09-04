@@ -651,7 +651,7 @@ export default function SimpleAbilityAssessmentModal({
       // 轉換資料格式
       const formattedTrees = (studentTreesData || [])
         .filter(item => item.hanami_growth_trees !== null)
-        .map(item => ({
+        .map((item: any) => ({
           id: item.hanami_growth_trees!.id,
           tree_name: item.hanami_growth_trees!.tree_name,
           tree_description: item.hanami_growth_trees!.tree_description,
@@ -1163,7 +1163,7 @@ export default function SimpleAbilityAssessmentModal({
               
               if (goalAbilities.length > 0) {
                 // 有關聯能力的情況
-                goalAbilities.forEach(abilityId => {
+                goalAbilities.forEach((abilityId: any) => {
                   const progress = progressMap.get(abilityId);
                   console.log(`能力 ${abilityId} 的進度資料:`, progress);
                   if (progress && progress.selected_levels) {
@@ -1200,7 +1200,7 @@ export default function SimpleAbilityAssessmentModal({
               
               if (goalAbilities.length > 0) {
                 // 有關聯能力的情況
-                goalAbilities.forEach(abilityId => {
+                goalAbilities.forEach((abilityId: any) => {
                   const progress = progressMap.get(abilityId);
                   if (progress && progress.current_level) {
                     totalLevel += progress.current_level;
@@ -1290,8 +1290,8 @@ export default function SimpleAbilityAssessmentModal({
               return { ...goal, is_completed: false, completion_percentage: 0 };
             }
 
-            const requiredAbilities = goal.required_abilities.map(abilityId => 
-              abilitiesData.find(ability => ability.id === abilityId)
+            const requiredAbilities = goal.required_abilities.map((abilityId: any) => 
+              abilitiesData.find(activity => activity.id === abilityId)
             ).filter(Boolean);
 
             if (requiredAbilities.length === 0) {
@@ -1301,7 +1301,7 @@ export default function SimpleAbilityAssessmentModal({
             // 根據評估模式計算完成度
             if ((goal as any).assessment_mode === 'multi_select') {
               // 多選模式：檢查是否有選中的等級
-              const completedAbilities = requiredAbilities.filter(ability => {
+              const completedAbilities = requiredAbilities.filter((ability: any) => {
                 const progress = progressMap.get(ability.id);
                 return progress && progress.selected_levels && progress.selected_levels.length > 0;
               });
@@ -1315,7 +1315,7 @@ export default function SimpleAbilityAssessmentModal({
               };
             } else {
               // 進度模式：計算平均進度
-            const totalProgress = requiredAbilities.reduce((sum, ability) => {
+            const totalProgress = requiredAbilities.reduce((sum: number, ability: any) => {
                 const progress = progressMap.get(ability.id);
                 return sum + (progress?.progress_percentage || 0);
             }, 0);
@@ -3498,16 +3498,9 @@ export default function SimpleAbilityAssessmentModal({
       {/* 成長樹路徑管理器 */}
       {showGrowthTreePathManager && (
         <GrowthTreePathManager
+          currentTreeId={selectedTreeId}
           studentId={selectedStudentId}
-          treeId={selectedTreeId}
           studentTrees={studentTrees}
-          currentActivities={studentActivities.ongoingActivities}
-          onActivityAssigned={handleActivityAssigned}
-          onTreeChange={(newTreeId) => {
-            console.log('父組件收到成長樹變化:', newTreeId);
-            // 這裡可以更新 selectedTreeId，但由於它是從父組件傳入的，
-            // 我們可能需要重新打開模態框或者通知父組件
-          }}
           onClose={() => setShowGrowthTreePathManager(false)}
         />
       )}

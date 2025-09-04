@@ -118,16 +118,159 @@ export default function GrowthTreeActivitiesPanel({
       console.log('載入成長樹活動成功，數量:', data?.length || 0);
       setActivities(data || []);
       
-      // 載入保存的學習路線數據
+      // 優先從 Supabase 載入學習路線數據
+      try {
+        console.log('嘗試從 Supabase 載入學習路線...');
+        const response = await fetch(`/api/learning-paths?treeId=${treeId}`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data && result.data.length > 0) {
+            // 找到現有的學習路線
+            const existingPath = result.data[0]; // 每個成長樹只有一個學習路線
+            
+            // 轉換資料庫格式為前端格式
+            let normalizedNodes = existingPath.nodes || [];
+            
+            // 如果節點數量太少（只有 start/end），則自動添加活動節點
+            if (normalizedNodes.length <= 2) {
+              console.log('檢測到節點數量不足，自動添加活動節點...');
+              
+              // 獲取成長樹活動
+              const treeActivities = activities.filter(act => act.tree_id === treeId);
+              
+              if (treeActivities.length > 0) {
+                // 創建活動節點
+                const activityNodes = treeActivities.map((activity, index) => {
+                  const activityId = activity.activity_id;
+                  const activityName = getActivityDisplayName(activity);
+                  const activityDescription = getActivityDisplayDescription(activity);
+                  
+                  return {
+                    id: `tree_activity_${activityId}`,
+                    type: 'activity' as const,
+                    title: activityName,
+                    description: activityDescription,
+                    duration: activity.estimated_duration || 30,
+                    difficulty: activity.difficulty_level || 1,
+                    prerequisites: index === 0 ? ['start'] : [`tree_activity_${treeActivities[index - 1].activity_id}`],
+                    reward: `完成 ${activityName}`,
+                    position: { 
+                      x: 200 + (index + 1) * 200, 
+                      y: 200 + (index % 2) * 100 
+                    },
+                    connections: index === treeActivities.length - 1 ? ['end'] : [`tree_activity_${treeActivities[index + 1].activity_id}`],
+                    isCompleted: false,
+                    isLocked: false,
+                    order: index + 1,
+                    metadata: {
+                      activityId: activityId,
+                      activityType: activity.activity_source,
+                      materials: [],
+                      instructions: '',
+                      learningObjectives: [],
+                      activityDetails: {
+                        category: activity.activity_type,
+                        activity_type: activity.activity_source,
+                        difficulty_level: activity.difficulty_level,
+                        duration_minutes: activity.estimated_duration
+                      }
+                    }
+                  };
+                });
+                
+                // 更新 start 節點的連接
+                if (normalizedNodes.length > 0) {
+                  const startNode = normalizedNodes.find((n: any) => n.type === 'start');
+                  if (startNode && activityNodes.length > 0) {
+                    startNode.connections = [activityNodes[0].id];
+                  }
+                }
+                
+                // 插入活動節點到 start 和 end 之間
+                const startNodes = normalizedNodes.filter((n: any) => n.type === 'start');
+                const endNodes = normalizedNodes.filter((n: any) => n.type === 'end');
+                const otherNodes = normalizedNodes.filter((n: any) => n.type !== 'start' && n.type !== 'end');
+                
+                normalizedNodes = [
+                  ...startNodes,
+                  ...activityNodes,
+                  ...otherNodes,
+                  ...endNodes
+                ];
+                
+                console.log(`已添加 ${activityNodes.length} 個活動節點，總節點數: ${normalizedNodes.length}`);
+              }
+            }
+            
+            const normalizedPath = {
+              id: existingPath.id,
+              name: existingPath.name,
+              description: existingPath.description || '',
+              nodes: normalizedNodes,
+              startNodeId: existingPath.start_node_id || 'start',
+              endNodeId: existingPath.end_node_id || 'end',
+              totalDuration: existingPath.total_duration || 0,
+              difficulty: existingPath.difficulty || 1,
+              tags: existingPath.tags || [],
+              created_at: existingPath.created_at,
+              updated_at: existingPath.updated_at,
+              is_active: existingPath.is_active !== false,
+              created_by: existingPath.created_by
+            };
+            
+            console.log('從 Supabase 載入學習路線成功:', normalizedPath);
+            setLearningPathData(normalizedPath);
+            
+            // 同時更新 localStorage 作為備份
+            const storageKey = `learning_path_${treeId}`;
+            localStorage.setItem(storageKey, JSON.stringify(normalizedPath));
+            
+            return; // 已從 Supabase 載入，不需要從 localStorage 載入
+          }
+        }
+      } catch (error) {
+        console.error('從 Supabase 載入學習路線失敗:', error);
+      }
+      
+      // 如果 Supabase 沒有數據，檢查是否有草稿版本
+      try {
+        const draftKey = `learning_path_draft_${treeId}`;
+        const draftData = localStorage.getItem(draftKey);
+        
+        if (draftData) {
+          const parsedDraft = JSON.parse(draftData);
+          if (parsedDraft.isDraft && parsedDraft.lastModified) {
+            const draftTime = new Date(parsedDraft.lastModified);
+            const now = new Date();
+            const hoursDiff = (now.getTime() - draftTime.getTime()) / (1000 * 60 * 60);
+            
+            // 如果草稿在24小時內，則使用草稿
+            if (hoursDiff < 24) {
+              console.log('從 localStorage 載入草稿版本:', parsedDraft);
+              setLearningPathData(parsedDraft);
+              return;
+            } else {
+              // 草稿過期，清理它
+              localStorage.removeItem(draftKey);
+              console.log('草稿已過期，已清理');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('檢查草稿失敗:', error);
+      }
+      
+      // 最後嘗試從 localStorage 載入正式版本作為備份
       const storageKey = `learning_path_${treeId}`;
       const savedPathData = localStorage.getItem(storageKey);
       if (savedPathData) {
         try {
           const parsedPath = JSON.parse(savedPathData);
+          console.log('從 localStorage 載入備份學習路線:', parsedPath);
           setLearningPathData(parsedPath);
-          console.log('載入保存的學習路線:', parsedPath);
         } catch (parseError) {
-          console.error('解析保存的學習路線失敗:', parseError);
+          console.error('解析 localStorage 學習路線失敗:', parseError);
         }
       }
       
@@ -308,24 +451,69 @@ export default function GrowthTreeActivitiesPanel({
     try {
       console.log('保存學習路線:', path);
       
-      // 保存到 localStorage 作為臨時解決方案
+      // 檢查必要參數
+      if (!treeId) {
+        throw new Error('缺少成長樹 ID');
+      }
+      
+      if (!path || !path.nodes || !Array.isArray(path.nodes)) {
+        throw new Error('學習路線數據無效');
+      }
+      
+      // 準備 API 請求數據
+      const apiData = {
+        treeId: treeId,
+        pathData: {
+          name: path.name || `${treeId} 學習路線`,
+          description: path.description || '',
+          nodes: path.nodes,
+          startNodeId: path.startNodeId || 'start',
+          endNodeId: path.endNodeId || 'end',
+          totalDuration: path.totalDuration || 0,
+          difficulty: path.difficulty || 1,
+          tags: path.tags || []
+        }
+      };
+      
+      console.log('發送到 API 的數據:', apiData);
+      
+      // 調用 API 保存到 Supabase
+      const response = await fetch('/api/learning-paths', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '保存失敗');
+      }
+      
+      const result = await response.json();
+      console.log('API 保存成功:', result);
+      
+      // 更新本地狀態，使用從資料庫返回的數據
+      const updatedPath = {
+        ...path,
+        id: result.data.id,
+        created_at: result.data.created_at,
+        updated_at: result.data.updated_at
+      };
+      
+      setLearningPathData(updatedPath);
+      
+      // 同時保存到 localStorage 作為備份
       const storageKey = `learning_path_${treeId}`;
-      localStorage.setItem(storageKey, JSON.stringify(path));
+      localStorage.setItem(storageKey, JSON.stringify(updatedPath));
       
-      // 更新本地狀態
-      setLearningPathData(path);
+      // 顯示成功訊息
+      toast.success(result.isUpdate ? '學習路線更新成功！' : '學習路線創建成功！');
       
-      // 這裡可以保存到資料庫
-      // 暫時顯示成功訊息
-      toast.success('學習路線保存成功！');
-      // 移除自動關閉模態框的行為
-      // setShowLearningPathBuilder(false);
-      
-      // 可以選擇重新載入活動列表
-      // await loadActivities();
     } catch (error) {
       console.error('保存學習路線失敗:', error);
-      toast.error('保存學習路線失敗');
+      toast.error(`保存失敗：${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -590,6 +778,7 @@ export default function GrowthTreeActivitiesPanel({
                 initialPath={learningPathData}
                 onSave={handleLearningPathSave}
                 onPreview={handleLearningPathPreview}
+                onClose={() => setShowLearningPathBuilder(false)}
               />
             </div>
           </div>

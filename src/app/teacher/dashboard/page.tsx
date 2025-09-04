@@ -2083,7 +2083,7 @@ export default function TeacherDashboard() {
       console.log('學生數量:', studentsData?.length || 0);
       
       // 轉換資料格式以符合現有介面
-      const formattedStudents = (studentsData || []).map(item => ({
+      const formattedStudents = (studentsData || []).map((item: any) => ({
         id: item.Hanami_Students.id,
         full_name: item.Hanami_Students.full_name,
         nick_name: item.Hanami_Students.nick_name,

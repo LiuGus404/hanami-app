@@ -1894,9 +1894,274 @@ export type Database = {
         }
         Relationships: []
       }
+      hanami_learning_paths: {
+        Row: {
+          id: string
+          tree_id: string
+          path_name: string
+          path_description: string | null
+          path_type: string
+          difficulty_level: number
+          estimated_total_duration: number
+          is_active: boolean
+          is_default: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tree_id: string
+          path_name: string
+          path_description?: string | null
+          path_type?: string
+          difficulty_level?: number
+          estimated_total_duration?: number
+          is_active?: boolean
+          is_default?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tree_id?: string
+          path_name?: string
+          path_description?: string | null
+          path_type?: string
+          difficulty_level?: number
+          estimated_total_duration?: number
+          is_active?: boolean
+          is_default?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hanami_learning_paths_tree_id_fkey"
+            columns: ["tree_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_growth_trees"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      hanami_learning_path_nodes: {
+        Row: {
+          id: string
+          path_id: string
+          node_order: number
+          node_type: string
+          activity_id: string | null
+          tree_activity_id: string | null
+          title: string
+          description: string | null
+          duration: number
+          difficulty: number
+          is_required: boolean
+          is_prerequisite: boolean
+          prerequisite_nodes: string[] | null
+          reward_description: string | null
+          metadata: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          path_id: string
+          node_order: number
+          node_type: string
+          activity_id?: string | null
+          tree_activity_id?: string | null
+          title: string
+          description?: string | null
+          duration?: number
+          difficulty?: number
+          is_required?: boolean
+          is_prerequisite?: boolean
+          prerequisite_nodes?: string[] | null
+          reward_description?: string | null
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          path_id?: string
+          node_order?: number
+          node_type?: string
+          activity_id?: string | null
+          tree_activity_id?: string | null
+          title?: string
+          description?: string | null
+          duration?: number
+          difficulty?: number
+          is_required?: boolean
+          is_prerequisite?: boolean
+          prerequisite_nodes?: string[] | null
+          reward_description?: string | null
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hanami_learning_path_nodes_path_id_fkey"
+            columns: ["path_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_learning_paths"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hanami_learning_path_nodes_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_teaching_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hanami_learning_path_nodes_tree_activity_id_fkey"
+            columns: ["tree_activity_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_tree_activities"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      hanami_student_learning_progress: {
+        Row: {
+          id: string
+          student_id: string
+          path_id: string
+          node_id: string
+          status: string
+          progress_percentage: number
+          started_at: string | null
+          completed_at: string | null
+          performance_rating: number | null
+          notes: string | null
+          teacher_feedback: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          path_id: string
+          node_id: string
+          status?: string
+          progress_percentage?: number
+          started_at?: string | null
+          completed_at?: string | null
+          performance_rating?: number | null
+          notes?: string | null
+          teacher_feedback?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          path_id?: string
+          node_id?: string
+          status?: string
+          progress_percentage?: number
+          started_at?: string | null
+          completed_at?: string | null
+          performance_rating?: number | null
+          notes?: string | null
+          teacher_feedback?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hanami_student_learning_progress_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "Hanami_Students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hanami_student_learning_progress_path_id_fkey"
+            columns: ["path_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_learning_paths"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hanami_student_learning_progress_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_learning_path_nodes"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      hanami_learning_path_templates: {
+        Row: {
+          id: string
+          template_name: string
+          template_description: string | null
+          template_category: string
+          difficulty_level: number
+          age_group_min: number
+          age_group_max: number
+          template_data: Json
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          template_name: string
+          template_description?: string | null
+          template_category?: string
+          difficulty_level?: number
+          age_group_min?: number
+          age_group_max?: number
+          template_data: Json
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          template_name?: string
+          template_description?: string | null
+          template_category?: string
+          difficulty_level?: number
+          age_group_min?: number
+          age_group_max?: number
+          template_data?: Json
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      v_student_learning_overview: {
+        Row: {
+          student_id: string
+          student_name: string
+          tree_id: string
+          tree_name: string
+          path_id: string
+          path_name: string
+          total_nodes: number
+          completed_nodes: number
+          completion_percentage: number
+        }
+        Insert: never
+        Update: never
+        Delete: never
+      }
     }
     Functions: {
       auto_generate_student_email_password: {
@@ -1910,6 +2175,30 @@ export type Database = {
       generate_simple_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_student_learning_progress: {
+        Args: {
+          p_student_id: string
+          p_path_id?: string
+        }
+        Returns: {
+          path_id: string
+          path_name: string
+          node_id: string
+          node_title: string
+          node_type: string
+          node_order: number
+          status: string
+          progress_percentage: number
+          is_completed: boolean
+        }[]
+      }
+      check_node_unlockable: {
+        Args: {
+          p_student_id: string
+          p_node_id: string
+        }
+        Returns: boolean
       }
     }
     Enums: {

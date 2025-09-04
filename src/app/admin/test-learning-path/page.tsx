@@ -100,6 +100,7 @@ export default function TestLearningPathPage() {
               activities={mockActivities}
               onSave={handleSave}
               onPreview={handlePreview}
+              onClose={() => setShowBuilder(false)}
             />
           </div>
         )}
