@@ -145,7 +145,7 @@ export default function GrowthTreePathManager({
             if (hasActivityNodes) {
               console.log('✅ 預設路徑包含活動節點，使用預設路徑:', defaultPath);
               return defaultPath;
-        } else {
+          } else {
               console.log('⚠️ 預設路徑沒有活動節點，但仍使用當前成長樹的預設路徑:', defaultPath);
               return defaultPath;
             }
@@ -158,8 +158,8 @@ export default function GrowthTreePathManager({
       return null;
       } catch (error) {
       console.error('載入學習路徑數據失敗:', error);
-        return null;
-      }
+          return null;
+        }
   }, [selectedTreeId, studentId]);
 
   // 獲取有序節點
@@ -215,7 +215,7 @@ export default function GrowthTreePathManager({
 
           if (activitiesError) {
             console.error('查詢學生活動失敗:', activitiesError);
-            } else {
+      } else {
             console.log('學生活動記錄:', studentActivities);
             
             // 更新節點的完成狀態
@@ -259,7 +259,7 @@ export default function GrowthTreePathManager({
                   console.log(`節點 ${node.title} (${actualActivityId} -> ${realActivityId}): 完成狀態 = ${isCompleted}, 進行中 = ${isInProgress} (記錄數: ${activityRecords.length})`);
                   
                   return { ...node, isCompleted, isInProgress };
-          } else {
+              } else {
                   // 沒有活動記錄，表示未開始
                   console.log(`節點 ${node.title} (${actualActivityId} -> ${realActivityId}): 沒有活動記錄，標記為未完成`);
                   return { ...node, isCompleted: false, isInProgress: false };
@@ -1055,12 +1055,12 @@ export default function GrowthTreePathManager({
                         </div>
                       </div>
                           ))}
-                      </div>
-                  )}
                 </div>
-                  </>
-                )}
+              )}
                    </div>
+                  </>
+                   )}
+                 </div>
             </HanamiCard>
           </div>
         </div>

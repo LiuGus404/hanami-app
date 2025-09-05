@@ -379,6 +379,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [canvasSize, setCanvasSize] = useState({ width: 2000, height: 1200, minX: 0, minY: 0 });
+  const [minimapVisible, setMinimapVisible] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   
   // 實時保存草稿到 localStorage 的函數
@@ -651,13 +653,11 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         const newX = prev.x + deltaX;
         const newY = prev.y + deltaY;
         
-        // 添加邊界限制
-        const maxOffset = 1000;
-        const minOffset = -1000;
-        
+        // 移除邊界限制，實現真正的無限畫布
+        // 允許畫布自由移動到任何位置
         return {
-          x: Math.max(minOffset, Math.min(maxOffset, newX)),
-          y: Math.max(minOffset, Math.min(maxOffset, newY))
+          x: newX,
+          y: newY
         };
       });
       
@@ -795,8 +795,32 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     if (path.nodes.length === 0) return;
     
     // 使用固定的畫布尺寸，而不是getBoundingClientRect
-    const canvasWidth = 2000;
-    const canvasHeight = 1200;
+    // 動態計算畫布尺寸
+    const calculateCanvasSize = () => {
+      if (path.nodes.length === 0) {
+        return { width: 2000, height: 1200, minX: 0, minY: 0 };
+      }
+
+      const nodePositions = path.nodes.map(node => node.position);
+      const minX = Math.min(...nodePositions.map(p => p.x)) - 200;
+      const maxX = Math.max(...nodePositions.map(p => p.x)) + 200;
+      const minY = Math.min(...nodePositions.map(p => p.y)) - 200;
+      const maxY = Math.max(...nodePositions.map(p => p.y)) + 200;
+
+      return {
+        width: Math.max(2000, Math.abs(maxX - minX) + 400),
+        height: Math.max(1200, Math.abs(maxY - minY) + 400),
+        minX: minX,
+        minY: minY
+      };
+    };
+
+    const newCanvasSize = calculateCanvasSize();
+    const canvasWidth = newCanvasSize.width;
+    const canvasHeight = newCanvasSize.height;
+    
+    // 更新畫布尺寸狀態
+    setCanvasSize(newCanvasSize);
     
     console.log('畫布尺寸:', { canvasWidth, canvasHeight });
     console.log('當前畫布偏移:', canvasOffset);
@@ -1149,31 +1173,37 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       const newX = nodeDragState.startPos.x + deltaX;
       const newY = nodeDragState.startPos.y + deltaY;
       
-      // 確保位置在合理範圍內
-      const clampedX = Math.max(50, Math.min(1950, newX));
-      const clampedY = Math.max(50, Math.min(1150, newY));
+      // 真正的無限畫布：允許節點自由移動到任何位置
+      // 包括負坐標，實現真正的無限畫布體驗
+      const finalX = newX;
+      const finalY = newY;
       
       if (process.env.NODE_ENV === 'development') {
-        console.log('🎯 節點拖拽中:', { 
+        console.log('🎯 節點拖拽中 (無限畫布):', { 
           nodeId: nodeDragState.nodeId,
           delta: { x: deltaX, y: deltaY },
           newPosition: { x: newX, y: newY },
-          clampedPosition: { x: clampedX, y: clampedY }
+          finalPosition: { x: finalX, y: finalY }
         });
       }
       
       updateNode(nodeDragState.nodeId!, {
-        position: { x: clampedX, y: clampedY }
+        position: { x: finalX, y: finalY }
       });
     }
   };
 
   const handleNodeMouseUp = (e: React.MouseEvent) => {
     if (nodeDragState.isDragging) {
+      // 獲取當前節點的最終位置
+      const currentNode = path.nodes.find(n => n.id === nodeDragState.nodeId);
+      const finalPosition = currentNode ? currentNode.position : nodeDragState.startPos;
+      
       if (process.env.NODE_ENV === 'development') {
         console.log('🎯 節點拖拽結束:', { 
           nodeId: nodeDragState.nodeId,
-          finalPosition: nodeDragState.startPos
+          finalPosition: finalPosition,
+          startPosition: nodeDragState.startPos
         });
       }
       
@@ -1254,9 +1284,45 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
     calculatePathMetrics();
   }, [path.nodes]);
 
+  // 動態調整畫布尺寸以適應節點位置
+  useEffect(() => {
+    if (path.nodes.length === 0) return;
+    
+    const calculateCanvasSize = () => {
+      const nodePositions = path.nodes.map(node => node.position);
+      const minX = Math.min(...nodePositions.map(p => p.x)) - 200;
+      const maxX = Math.max(...nodePositions.map(p => p.x)) + 200;
+      const minY = Math.min(...nodePositions.map(p => p.y)) - 200;
+      const maxY = Math.max(...nodePositions.map(p => p.y)) + 200;
+
+      // 確保畫布尺寸能容納所有節點，包括負坐標
+      // 使用絕對值來處理負坐標，確保畫布足夠大
+      const canvasWidth = Math.max(2000, Math.abs(maxX - minX) + 400);
+      const canvasHeight = Math.max(1200, Math.abs(maxY - minY) + 400);
+
+      return {
+        width: canvasWidth,
+        height: canvasHeight,
+        minX: minX,
+        minY: minY
+      };
+    };
+
+    const newCanvasSize = calculateCanvasSize();
+    
+    // 只有當畫布尺寸真正需要改變時才更新
+    if (newCanvasSize.width !== canvasSize.width || 
+        newCanvasSize.height !== canvasSize.height ||
+        newCanvasSize.minX !== canvasSize.minX ||
+        newCanvasSize.minY !== canvasSize.minY) {
+      setCanvasSize(newCanvasSize);
+      console.log('🎨 畫布尺寸已動態調整:', newCanvasSize);
+    }
+  }, [path.nodes.map(node => `${node.position.x},${node.position.y}`).join('|')]);
+
   // 初始化原始路徑
   useEffect(() => {
-    if (!originalPath) {
+    if (!originalPath && !nodeDragState.isDragging) {
       // 優先使用 savedPath，然後是 initialPath，最後是當前的 path
       const pathToSave = savedPath || initialPath || path;
       setOriginalPath(JSON.parse(JSON.stringify(pathToSave)));
@@ -1266,23 +1332,24 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         pathToSaveLength: JSON.stringify(pathToSave).length 
       });
     }
-  }, [initialPath, originalPath, savedPath]); // 添加 savedPath 依賴
+  }, [initialPath, originalPath, savedPath, nodeDragState.isDragging]); // 添加 nodeDragState.isDragging 依賴
 
   // 當 savedPath 更新時，同步更新 path（如果沒有未儲存的變更）
+  // 但避免在拖拽過程中重置節點位置
   useEffect(() => {
-    if (savedPath && !hasUnsavedChanges) {
+    if (savedPath && !hasUnsavedChanges && !nodeDragState.isDragging) {
       setPath(JSON.parse(JSON.stringify(savedPath)));
       console.log('路徑已同步到儲存狀態');
     }
-  }, [savedPath, hasUnsavedChanges]);
+  }, [savedPath, hasUnsavedChanges, nodeDragState.isDragging]);
 
   // 當 savedPath 更新且有未儲存的變更時，更新 originalPath
   useEffect(() => {
-    if (savedPath && hasUnsavedChanges) {
+    if (savedPath && hasUnsavedChanges && !nodeDragState.isDragging) {
       setOriginalPath(JSON.parse(JSON.stringify(savedPath)));
       console.log('原始路徑已更新到儲存狀態');
     }
-  }, [savedPath, hasUnsavedChanges]);
+  }, [savedPath, hasUnsavedChanges, nodeDragState.isDragging]);
 
   // 調試：監控路徑變化
   useEffect(() => {
@@ -1492,8 +1559,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         data-node={node.id}
         className={`absolute select-none ${viewMode === 'edit' ? 'cursor-pointer' : 'cursor-default'}`}
         style={{
-          left: node.position.x,
-          top: node.position.y,
+          left: node.position.x - (canvasSize.minX || 0),
+          top: node.position.y - (canvasSize.minY || 0),
           transform: 'translate(-50%, -50%)',
           zIndex: isSelected ? 30 : 25
         }}
@@ -1821,10 +1888,11 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       const { from, to, fromNode, toNode } = connection;
         
         // 連接線從節點中心到節點中心
-      const startX = fromNode.position.x;
-      const startY = fromNode.position.y;
-      const endX = toNode.position.x;
-      const endY = toNode.position.y;
+        // 調整坐標以匹配畫布的坐標系統
+      const startX = fromNode.position.x - (canvasSize.minX || 0);
+      const startY = fromNode.position.y - (canvasSize.minY || 0);
+      const endX = toNode.position.x - (canvasSize.minX || 0);
+      const endY = toNode.position.y - (canvasSize.minY || 0);
         
         // 計算連接線的中點
         const midX = (startX + endX) / 2;
@@ -3791,6 +3859,15 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
               <div className="text-sm text-gray-600">
                 縮放: {Math.round(zoomLevel * 100)}%
               </div>
+              
+              <button
+                onClick={() => setMinimapVisible(!minimapVisible)}
+                className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors"
+                title="切換小地圖"
+              >
+                <MapIcon className="w-4 h-4 inline mr-1" />
+                小地圖
+              </button>
             
             {/* 儲存按鈕 */}
             {viewMode === 'edit' && (
@@ -4232,8 +4309,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
               isCanvasDragging ? 'cursor-grabbing' : 'cursor-grab'
             }`}
             style={{
-              width: '2000px',
-              height: '1200px'
+              width: `${canvasSize.width}px`,
+              height: `${canvasSize.height}px`
             }}
             onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleCanvasMouseMove}
@@ -4306,6 +4383,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                 ref={svgRef}
                 className="absolute inset-0 w-full h-full"
                 style={{ zIndex: 10, pointerEvents: 'auto' }}
+                viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
+                preserveAspectRatio="none"
               >
                 {renderConnections()}
               </svg>
