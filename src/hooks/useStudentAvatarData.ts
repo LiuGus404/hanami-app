@@ -197,10 +197,11 @@ export function useStudentAvatarData(
     // 學生基本統計
     studentStats: {
       overallProgress: data.summary.totalProgress,
-      totalAbilities: data.abilities.length,
-      activeGrowthTrees: data.growthTrees.length,
+      totalAbilities: data.summary.earnedAchievements, // 使用 API 返回的能力評估記錄數量
+      activeGrowthTrees: data.achievements.length, // 使用成就數量作為成長樹數量
       recentActivityCount: data.recentActivities.length,
-      upcomingLessonCount: data.upcomingLessons.length
+      upcomingLessonCount: data.summary.upcomingLessons,
+      totalActivities: data.summary.completedActivities // 使用 API 返回的完成活動數量
     },
 
     // 最新活動

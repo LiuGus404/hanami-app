@@ -1756,8 +1756,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                       {node.title}
                 </span>
                     {/* 可愛的活動次序標示 */}
-                    {node.type === 'activity' && node.order && node.order > 0 && (
-                      <ActivityOrderBadge order={node.order} />
+                    {node.type === 'activity' && (
+                      <ActivityOrderBadge order={path.nodes.filter(n => n.type === 'activity').findIndex(n => n.id === node.id) + 1} />
               )}
                   </div>
                   {/* 移除自動編號顯示，保持原始標題 */}

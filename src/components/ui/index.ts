@@ -62,6 +62,8 @@ export { default as LearningProgressCards } from './LearningProgressCards';
 export { default as StudentAvatarTab } from './StudentAvatarTab';
 export { default as EnhancedStudentAvatarTab } from './EnhancedStudentAvatarTab';
 export { default as ClassActivityStyleCard } from './ClassActivityStyleCard';
+export { default as LearningPathLevels } from './LearningPathLevels';
+export { default as StudentAbilityAssessments } from './StudentAbilityAssessments';
 
 // 學習路線構建器
 export { default as LearningPathBuilder } from './LearningPathBuilder';

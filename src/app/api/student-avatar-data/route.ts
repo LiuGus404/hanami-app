@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
       studentAbilitiesResult,
       recentActivitiesResult,
       upcomingLessonsResult,
-      achievementsResult
+      achievementsResult,
+      assessmentRecordsResult,
+      studentActivitiesResult
     ] = await Promise.all([
       // 學生基本資料
       supabase
@@ -29,21 +31,29 @@ export async function GET(request: NextRequest) {
         .eq('id', studentId)
         .single(),
 
-      // 成長樹資料
+      // 學生的成長樹資料 - 查詢學生實際參與的成長樹
       supabase
-        .from('hanami_growth_trees')
+        .from('hanami_student_trees')
         .select(`
           *,
-          goals:hanami_growth_goals(
+          tree:hanami_growth_trees(
             id,
-            goal_name,
-            goal_description,
-            required_abilities,
-            goal_order
+            tree_name,
+            tree_description,
+            tree_icon,
+            tree_level,
+            is_active,
+            goals:hanami_growth_goals(
+              id,
+              goal_name,
+              goal_description,
+              required_abilities,
+              goal_order
+            )
           )
         `)
-        .eq('is_active', true)
-        .order('tree_level'),
+        .eq('student_id', studentId)
+        .eq('tree.is_active', true),
 
       // 學生能力資料
       supabase
@@ -74,7 +84,19 @@ export async function GET(request: NextRequest) {
         .limit(5),
 
       // 模擬成就資料（目前沒有對應資料表）
-      Promise.resolve({ data: [], error: null })
+      Promise.resolve({ data: [], error: null }),
+
+      // 學生的能力評估記錄
+      supabase
+        .from('hanami_ability_assessments')
+        .select('id, assessment_date, tree_id')
+        .eq('student_id', studentId),
+
+      // 學生的學習活動記錄
+      supabase
+        .from('hanami_student_activities')
+        .select('id, activity_id, completion_status')
+        .eq('student_id', studentId)
     ]);
 
     // 檢查錯誤
@@ -87,31 +109,36 @@ export async function GET(request: NextRequest) {
     }
 
     // 處理成長樹資料，轉換為前端需要的格式
-    const processedGrowthTrees = (growthTreesResult.data || []).map((tree: any) => {
-      // 模擬節點資料（基於目標創建節點）
-      const nodes = (tree.goals || []).map((goal: any, index: number) => ({
-        id: goal.id,
-        name: goal.goal_name,
-        description: goal.goal_description,
-        level: index % 3, // 簡單的層級分配
-        progress: Math.floor(Math.random() * 100), // 模擬進度
-        maxProgress: 100,
-        isUnlocked: index < 3, // 前三個解鎖
-        isCompleted: index < 1, // 第一個完成
-        prerequisites: index > 0 ? [tree.goals[index - 1]?.id] : [],
-        color: '#FFD59A'
-      }));
+    const processedGrowthTrees = (growthTreesResult.data || [])
+      .map((studentTree: any) => {
+        const tree = studentTree.tree;
+        if (!tree) return null;
+        
+        // 模擬節點資料（基於目標創建節點）
+        const nodes = (tree.goals || []).map((goal: any, index: number) => ({
+          id: goal.id,
+          name: goal.goal_name,
+          description: goal.goal_description,
+          level: index % 3, // 簡單的層級分配
+          progress: Math.floor(Math.random() * 100), // 模擬進度
+          maxProgress: 100,
+          isUnlocked: index < 3, // 前三個解鎖
+          isCompleted: index < 1, // 第一個完成
+          prerequisites: index > 0 ? [tree.goals[index - 1]?.id] : [],
+          color: '#FFD59A'
+        }));
 
-      return {
-        id: tree.id,
-        tree_name: tree.tree_name,
-        tree_description: tree.tree_description,
-        tree_icon: tree.tree_icon,
-        nodes,
-        totalProgress: Math.floor(Math.random() * 100),
-        currentLevel: Math.floor(Math.random() * 5) + 1
-      };
-    });
+        return {
+          id: tree.id,
+          tree_name: tree.tree_name,
+          tree_description: tree.tree_description,
+          tree_icon: tree.tree_icon,
+          nodes,
+          totalProgress: Math.floor(Math.random() * 100),
+          currentLevel: Math.floor(Math.random() * 5) + 1
+        };
+      })
+      .filter(Boolean); // 過濾掉 null 值
 
     // 處理學生能力資料
     const processedAbilities = (studentAbilitiesResult.data || []).map((ability: any) => ({
@@ -178,9 +205,11 @@ export async function GET(request: NextRequest) {
         totalProgress: processedAbilities.length > 0 
           ? Math.round(processedAbilities.reduce((sum, ability) => sum + ability.progress_percentage, 0) / processedAbilities.length)
           : 0,
-        completedActivities: processedActivities.length,
-        upcomingLessons: processedLessons.length,
-        earnedAchievements: mockAchievements.length
+        totalAbilities: (assessmentRecordsResult.data || []).length, // 能力評估記錄數量
+        activeGrowthTrees: processedGrowthTrees.length, // 學生實際參與的成長樹數量
+        recentActivityCount: processedActivities.length,
+        upcomingLessonCount: processedLessons.length,
+        totalActivities: (studentActivitiesResult.data || []).length // 學生的學習活動數量
       }
     };
 

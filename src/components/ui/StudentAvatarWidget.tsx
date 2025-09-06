@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Star, Target, BookOpen, Award, Music, Volume2, VolumeX } from 'lucide-react';
 import { useStudentAvatarData, useStudentInteractionLogger } from '@/hooks/useStudentAvatarData';
@@ -98,6 +98,16 @@ export default function StudentAvatarWidget({
   const [emotionState, setEmotionState] = useState<EmotionState>('happy');
   const [isInteracting, setIsInteracting] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+
+  // 月齡轉歲數的輔助函數
+  const convertMonthsToAge = (months: number | null): string => {
+    if (!months) return '未知';
+    if (months < 12) return `${months}個月`;
+    const years = Math.floor(months / 12);
+    const remainingMonths = months % 12;
+    if (remainingMonths === 0) return `${years}歲`;
+    return `${years}歲${remainingMonths}個月`;
+  };
 
   // 資料和互動管理
   const { 
@@ -219,8 +229,8 @@ export default function StudentAvatarWidget({
 
   return (
     <div className={`${sizeConfig[size].container} ${className}`}>
-      {/* 主容器 */}
-      <div className="bg-gradient-to-br from-hanami-background to-hanami-surface rounded-2xl shadow-lg p-6 border border-hanami-border">
+        {/* 主容器 */}
+        <div className="bg-gradient-to-br from-hanami-background to-hanami-surface rounded-2xl shadow-lg p-6">
         
         {/* 音效控制 */}
         {enableSound && (
@@ -309,107 +319,16 @@ export default function StudentAvatarWidget({
               {student.nick_name || student.full_name}
             </h3>
             <p className="text-hanami-text-secondary text-sm">
-              {student.student_age ? `${student.student_age}歲` : ''} • {student.course_type || '音樂課程'}
+              {student.student_age ? convertMonthsToAge(student.student_age) : ''} • {student.course_type || '音樂課程'}
             </p>
           </div>
         </div>
 
-        {/* 快速統計 */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="text-center p-3 bg-hanami-primary/10 rounded-xl">
-            <div className="flex items-center justify-center mb-1">
-              <Target className="w-4 h-4 text-hanami-text" />
-            </div>
-            <div className="text-lg font-bold text-hanami-text">{calculateOverallProgress()}%</div>
-            <div className="text-xs text-hanami-text-secondary">總進度</div>
-          </div>
-          
-          <div className="text-center p-3 bg-hanami-secondary/10 rounded-xl">
-            <div className="flex items-center justify-center mb-1">
-              <BookOpen className="w-4 h-4 text-hanami-text" />
-            </div>
-            <div className="text-lg font-bold text-hanami-text">{student.ongoing_lessons || 0}</div>
-            <div className="text-xs text-hanami-text-secondary">進行課程</div>
-          </div>
-          
-          <div className="text-center p-3 bg-hanami-accent/10 rounded-xl">
-            <div className="flex items-center justify-center mb-1">
-              <Award className="w-4 h-4 text-hanami-text" />
-            </div>
-            <div className="text-lg font-bold text-hanami-text">{studentStats?.totalAbilities || 0}</div>
-            <div className="text-xs text-hanami-text-secondary">發展能力</div>
-          </div>
-        </div>
+        {/* 快速統計 - 已隱藏 */}
 
-        {/* 展開詳細資訊按鈕 */}
-        <motion.button
-          onClick={() => setShowDetails(!showDetails)}
-          className="w-full p-3 bg-hanami-primary hover:bg-hanami-secondary rounded-xl text-hanami-text font-medium transition-colors"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          {showDetails ? '收起詳細資訊' : '查看詳細資訊'}
-        </motion.button>
+        {/* 展開詳細資訊按鈕 - 已隱藏 */}
 
-        {/* 詳細資訊面板 */}
-        <AnimatePresence>
-          {showDetails && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
-              className="mt-4 space-y-4"
-            >
-              {/* 成長樹進度 */}
-              {data && data.growthTrees.length > 0 && (
-                <div className="p-4 bg-hanami-surface rounded-xl">
-                  <h4 className="font-bold text-hanami-text mb-3 flex items-center">
-                    <Music className="w-4 h-4 mr-2" />
-                    成長樹進度
-                  </h4>
-                  <div className="space-y-2">
-                    {data.growthTrees.slice(0, 3).map((tree) => (
-                      <div key={tree.id} className="flex items-center justify-between">
-                        <span className="text-sm text-hanami-text">{tree.tree_name}</span>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-16 h-2 bg-hanami-border rounded-full overflow-hidden">
-                            <motion.div
-                              className="h-full bg-hanami-primary"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${tree.totalProgress || 0}%` }}
-                              transition={{ duration: 1, delay: 0.2 }}
-                            />
-                          </div>
-                          <span className="text-xs text-hanami-text-secondary">
-                            {tree.totalProgress || 0}%
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 近期學習活動 */}
-              {data && data.recentActivities.length > 0 && (
-                <div className="p-4 bg-hanami-surface rounded-xl">
-                  <h4 className="font-bold text-hanami-text mb-3">近期學習活動</h4>
-                  <div className="space-y-2">
-                    {data.recentActivities.slice(0, 3).map((activity) => (
-                      <div key={activity.id} className="flex items-center justify-between p-2 bg-hanami-background rounded-lg">
-                        <span className="text-sm text-hanami-text truncate">{activity.name}</span>
-                        <span className="text-xs text-hanami-text-secondary px-2 py-1 bg-hanami-primary/20 rounded">
-                          {activity.type}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+         {/* 詳細資訊面板 - 已隱藏 */}
       </div>
     </div>
   );

@@ -163,6 +163,11 @@ export default function ClassActivitiesPage() {
   const [showActivitySelector, setShowActivitySelector] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string>('');
   
+  // 學習路徑相關狀態
+  const [showLearningPathSelector, setShowLearningPathSelector] = useState(false);
+  const [learningPaths, setLearningPaths] = useState<any[]>([]);
+  const [selectedLearningPath, setSelectedLearningPath] = useState<any>(null);
+  
   // 教案編輯相關狀態
   const [showLessonPlanModal, setShowLessonPlanModal] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<{
@@ -656,6 +661,66 @@ export default function ClassActivitiesPage() {
     }
   };
 
+  // 分配學習路徑給學生
+  const assignLearningPathToStudent = async (lessonId: string, studentId: string, learningPathId: string) => {
+    try {
+      // 獲取學習路徑的節點資料
+      const learningPath = learningPaths.find(path => path.id === learningPathId);
+      if (!learningPath) {
+        throw new Error('找不到指定的學習路徑');
+      }
+
+      // 解析學習路徑的節點
+      let nodes = learningPath.nodes;
+      if (typeof nodes === 'string') {
+        nodes = JSON.parse(nodes);
+      }
+
+      // 過濾出活動節點
+      const activityNodes = nodes.filter((node: any) => node.type === 'activity');
+      
+      if (activityNodes.length === 0) {
+        toast.error('該學習路徑沒有包含任何活動');
+        return;
+      }
+
+      // 批量分配活動
+      const activityIds = activityNodes.map((node: any) => node.activity_id).filter(Boolean);
+      
+      if (activityIds.length === 0) {
+        toast.error('該學習路徑的活動節點沒有有效的活動ID');
+        return;
+      }
+
+      const response = await fetch('/api/assign-student-activities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId,
+          activityIds,
+          assignmentType: 'current_lesson',
+          lessonDate: selectedLesson?.lesson_date,
+          timeslot: selectedLesson?.actual_timeslot
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || '分配學習路徑失敗');
+      }
+
+      toast.success(`成功分配學習路徑，共 ${activityIds.length} 個活動！`);
+      loadClassData(); // 重新載入資料
+      setShowLearningPathSelector(false);
+    } catch (error) {
+      console.error('分配學習路徑失敗:', error);
+      toast.error(error instanceof Error ? error.message : '分配學習路徑失敗');
+    }
+  };
+
   // 分配活動給學生
   const assignActivityToStudent = async (lessonId: string, studentId: string, treeActivityId: string) => {
     try {
@@ -695,6 +760,62 @@ export default function ClassActivitiesPage() {
       courseType
     });
     setShowLessonPlanModal(true);
+  };
+
+  // 載入學習路徑資料
+  const loadLearningPaths = async (courseType: string) => {
+    try {
+      // 首先根據課程類型獲取成長樹
+      const { data: courseTypeData, error: courseTypeError } = await supabase
+        .from('Hanami_CourseTypes')
+        .select('id')
+        .eq('name', courseType)
+        .single();
+
+      if (courseTypeError) {
+        console.error('獲取課程類型失敗:', courseTypeError);
+        toast.error('無法獲取課程類型資訊');
+        return;
+      }
+
+      // 根據課程類型ID獲取成長樹
+      const { data: growthTrees, error: treesError } = await supabase
+        .from('hanami_growth_trees')
+        .select('id, tree_name')
+        .eq('course_type_id', courseTypeData.id)
+        .eq('is_active', true)
+        .order('tree_level', { ascending: true });
+
+      if (treesError) {
+        console.error('獲取成長樹失敗:', treesError);
+        toast.error('無法獲取成長樹資訊');
+        return;
+      }
+
+      if (!growthTrees || growthTrees.length === 0) {
+        console.log('該課程類型沒有對應的成長樹');
+        setLearningPaths([]);
+        return;
+      }
+
+      // 獲取第一個成長樹的學習路徑
+      const treeId = growthTrees[0].id;
+      const response = await fetch(`/api/learning-paths?treeId=${treeId}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setLearningPaths(result.data);
+        } else {
+          setLearningPaths([]);
+        }
+      } else {
+        setLearningPaths([]);
+      }
+    } catch (error) {
+      console.error('載入學習路徑失敗:', error);
+      toast.error('載入學習路徑失敗');
+      setLearningPaths([]);
+    }
   };
 
   // 載入學生的成長樹資料
@@ -1816,6 +1937,35 @@ export default function ClassActivitiesPage() {
                 </button>
               </div>
               
+              {/* 選擇方式按鈕 */}
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <button
+                  onClick={() => {
+                    setShowActivitySelector(false);
+                    setShowLearningPathSelector(true);
+                    // 載入學習路徑資料
+                    const courseType = getCourseType(selectedLesson);
+                    if (courseType && courseType !== '未設定') {
+                      loadLearningPaths(courseType);
+                    } else {
+                      toast.error('無法獲取學生的課程類型');
+                    }
+                  }}
+                  className="px-6 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#A855F7] text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 flex items-center space-x-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  <span>學習路徑</span>
+                </button>
+                <button
+                  className="px-6 py-3 bg-gradient-to-r from-[#F59E0B] to-[#F97316] text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 flex items-center space-x-2"
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  <span>選擇活動</span>
+                </button>
+              </div>
+              
               {/* 活動列表 */}
               <div className="overflow-y-auto max-h-[60vh] space-y-4 scrollbar-hide">
                 {treeActivities.length === 0 ? (
@@ -1887,6 +2037,136 @@ export default function ClassActivitiesPage() {
               <div className="mt-6 pt-4 border-t border-hanami-border/30 flex justify-center">
                 <button
                   onClick={() => setShowActivitySelector(false)}
+                  className="px-6 py-2 bg-hanami-surface hover:bg-hanami-border text-hanami-text rounded-xl transition-colors duration-200 font-medium"
+                >
+                  關閉
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 學習路徑選擇器模態視窗 */}
+        {showLearningPathSelector && selectedLesson && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+            <div className="bg-gradient-to-br from-white via-hanami-surface to-hanami-background rounded-2xl p-8 max-w-4xl w-full mx-4 max-h-[85vh] overflow-hidden shadow-2xl border border-hanami-border/30 animate-scale-in">
+              {/* 模態視窗標題 */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-hanami-border/30">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#8B5CF6] to-[#A855F7] rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-hanami-text">
+                      為 {getStudentName(selectedLesson)} 選擇學習路徑
+                    </h3>
+                    <p className="text-sm text-hanami-text-secondary">
+                      選擇完整的學習路徑來系統化地安排課程內容
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowLearningPathSelector(false)}
+                  className="w-10 h-10 bg-red-100 hover:bg-red-200 rounded-xl flex items-center justify-center text-red-600 hover:text-red-700 transition-all duration-200 hover:scale-110"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              {/* 學習路徑列表 */}
+              <div className="overflow-y-auto max-h-[60vh] space-y-4 scrollbar-hide">
+                {learningPaths.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="w-20 h-20 bg-gradient-to-br from-[#8B5CF6]/20 to-[#A855F7]/20 rounded-full mx-auto mb-4 flex items-center justify-center animate-float">
+                      <svg className="w-10 h-10 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                    </div>
+                    <p className="text-hanami-text text-lg font-medium mb-2">暫無可用學習路徑</p>
+                    <p className="text-hanami-text-secondary">學習路徑正在準備中，敬請期待！</p>
+                  </div>
+                ) : (
+                  learningPaths.map((path, index) => {
+                    // 解析節點資料
+                    let nodes = path.nodes;
+                    if (typeof nodes === 'string') {
+                      try {
+                        nodes = JSON.parse(nodes);
+                      } catch (e) {
+                        nodes = [];
+                      }
+                    }
+                    
+                    const activityNodes = nodes.filter((node: any) => node.type === 'activity');
+                    const totalDuration = activityNodes.reduce((sum: number, node: any) => sum + (node.duration || 0), 0);
+                    
+                    return (
+                      <div 
+                        key={`${path.id}-${index}`} 
+                        className="hanami-card-glow bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-hanami-border/40 hover:border-[#8B5CF6]/50 transition-all duration-300 hover:shadow-lg animate-fade-in-up"
+                        style={{ animationDelay: `${index * 50}ms` }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 pr-4">
+                            <div className="flex items-center space-x-3 mb-3">
+                              <div className="w-8 h-8 bg-gradient-to-br from-[#8B5CF6] to-[#A855F7] rounded-lg flex items-center justify-center">
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                </svg>
+                              </div>
+                              <h4 className="font-bold text-hanami-text text-lg">
+                                {path.name || '未命名學習路徑'}
+                              </h4>
+                            </div>
+                            
+                            <p className="text-hanami-text-secondary mb-4 leading-relaxed">
+                              {path.description || '這是一個精心設計的學習路徑，將為學生帶來系統化的學習體驗。'}
+                            </p>
+                            
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-[#8B5CF6] to-[#A855F7] text-white shadow-sm">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                </svg>
+                                學習路徑
+                              </span>
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-400 to-blue-500 text-white shadow-sm">
+                                <AcademicCapIcon className="w-3 h-3 mr-1" />
+                                {activityNodes.length} 個活動
+                              </span>
+                              {totalDuration > 0 && (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-400 to-green-500 text-white shadow-sm">
+                                  <ClockIcon className="w-3 h-3 mr-1" />
+                                  {totalDuration} 分鐘
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => assignLearningPathToStudent(
+                              selectedLesson.id, 
+                              selectedStudent, 
+                              path.id
+                            )}
+                            className="px-6 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#A855F7] text-white rounded-xl font-medium shadow-md hover:shadow-lg flex items-center space-x-2 min-w-[120px] justify-center transition-all duration-200 hover:scale-105"
+                          >
+                            <PlusIcon className="w-5 h-5" />
+                            <span>分配路徑</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              
+              {/* 底部操作區 */}
+              <div className="mt-6 pt-4 border-t border-hanami-border/30 flex justify-center">
+                <button
+                  onClick={() => setShowLearningPathSelector(false)}
                   className="px-6 py-2 bg-hanami-surface hover:bg-hanami-border text-hanami-text rounded-xl transition-colors duration-200 font-medium"
                 >
                   關閉

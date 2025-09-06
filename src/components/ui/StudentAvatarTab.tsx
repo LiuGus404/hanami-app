@@ -12,12 +12,16 @@ import {
   Info,
   PlayCircle,
   Volume2,
-  VolumeX
+  VolumeX,
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
 import { 
   StudentAvatarWidget, 
   GrowthTreeVisualization, 
-  LearningProgressCards 
+  LearningProgressCards,
+  LearningPathLevels,
+  StudentOngoingActivities
 } from '@/components/ui';
 import { useStudentAvatarData, useGrowthTreeInteraction } from '@/hooks/useStudentAvatarData';
 
@@ -30,6 +34,9 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
   const [activeSection, setActiveSection] = useState<'overview' | 'avatar' | 'progress' | 'growth'>('overview');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [layoutMode, setLayoutMode] = useState<'grid' | 'vertical'>('grid');
+  const [selectedActivityStatus, setSelectedActivityStatus] = useState('全部');
+  const [studentActivities, setStudentActivities] = useState<any[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
 
   // 使用自定義Hook載入學生資料
   const {
@@ -51,6 +58,64 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
     handleNodeClick,
     clearSelection
   } = useGrowthTreeInteraction(student?.id);
+
+  // 載入學生活動數據
+  useEffect(() => {
+    const loadStudentActivities = async () => {
+      if (!student?.id) return;
+      
+      try {
+        setLoadingActivities(true);
+        const response = await fetch(`/api/student-activities?studentId=${student.id}&lessonDate=${new Date().toISOString().split('T')[0]}`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            const { currentLessonActivities, ongoingActivities, previousLessonActivities } = result.data;
+            
+            // 合併所有活動並轉換格式
+            const allActivities = [
+              ...currentLessonActivities,
+              ...ongoingActivities,
+              ...previousLessonActivities
+            ].map((activity: any) => {
+              // 根據進度確定狀態
+              let status = activity.status || '未開始';
+              if (activity.progress >= 100) {
+                status = '已完成';
+              } else if (activity.progress > 0) {
+                status = '進行中';
+              }
+              
+              // 檢查是否跨多個課堂（這裡可以根據實際業務邏輯調整）
+              if (activity.lessonCount > 1 || activity.isMultiClass) {
+                status = '跨多個課堂';
+              }
+              
+              return {
+                id: activity.id || activity.activityId,
+                name: activity.activityName,
+                description: activity.activityDescription || `${activity.activityType}活動`,
+                status: status,
+                progress: activity.progress || 0,
+                difficulty: activity.difficultyLevel || 1,
+                type: activity.activityType || '練習',
+                assignedDate: activity.assignedAt || activity.lessonDate || new Date().toISOString().split('T')[0]
+              };
+            });
+            
+            setStudentActivities(allActivities);
+          }
+        }
+      } catch (error) {
+        console.error('載入學生活動失敗:', error);
+      } finally {
+        setLoadingActivities(false);
+      }
+    };
+
+    loadStudentActivities();
+  }, [student?.id]);
 
   // 處理分頁切換
   const handleSectionChange = (section: typeof activeSection) => {
@@ -251,21 +316,21 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
               )}
             </div>
 
-            {/* 學習統計 */}
+            {/* 學習概況 */}
             <div className={layoutMode === 'vertical' ? 'order-2' : ''}>
-              <h3 className="text-lg font-bold text-hanami-text mb-4">學習統計</h3>
+              <h3 className="text-lg font-bold text-hanami-text mb-4">學習概況</h3>
               <div className="space-y-3">
                 <div className="p-4 bg-white rounded-xl border border-[#EADBC8]">
                   <div className="flex items-center justify-between">
-                    <span className="text-hanami-text-secondary">總體進度</span>
+                    <span className="text-hanami-text-secondary">學習路徑（成長樹）數量</span>
                     <span className="text-xl font-bold text-hanami-primary">
-                      {studentStats?.overallProgress || 0}%
+                      {studentStats?.activeGrowthTrees || 0}
                     </span>
                   </div>
                 </div>
                 <div className="p-4 bg-white rounded-xl border border-[#EADBC8]">
                   <div className="flex items-center justify-between">
-                    <span className="text-hanami-text-secondary">發展能力</span>
+                    <span className="text-hanami-text-secondary">能力評估記錄數量</span>
                     <span className="text-xl font-bold text-hanami-text">
                       {studentStats?.totalAbilities || 0}
                     </span>
@@ -273,9 +338,9 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
                 </div>
                 <div className="p-4 bg-white rounded-xl border border-[#EADBC8]">
                   <div className="flex items-center justify-between">
-                    <span className="text-hanami-text-secondary">成長樹數量</span>
+                    <span className="text-hanami-text-secondary">學習的活動數量</span>
                     <span className="text-xl font-bold text-hanami-accent">
-                      {studentStats?.activeGrowthTrees || 0}
+                      {studentStats?.totalActivities || 0}
                     </span>
                   </div>
                 </div>
@@ -319,11 +384,159 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
 
         {/* 學習進度分頁 */}
         {activeSection === 'progress' && !loading && !error && (
-          <LearningProgressCards
-            studentId={student.id}
-            variant="detailed"
-            maxItems={10}
-          />
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            {/* 標題和篩選器 */}
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-2xl font-bold text-gray-800 flex items-center">
+                <motion.div
+                  className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg mr-3"
+                  whileHover={{ rotate: 15 }}
+                >
+                  <TrendingUp className="w-6 h-6 text-blue-500" />
+                </motion.div>
+                學習進度詳細資訊
+              </h3>
+              
+              {/* 狀態篩選器 */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">篩選：</span>
+                {['全部', '未開始', '進行中', '已完成', '跨多個課堂'].map((status, index) => (
+                  <motion.button
+                    key={status}
+                    onClick={() => setSelectedActivityStatus(status)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                      selectedActivityStatus === status
+                        ? 'bg-blue-500 text-white border-blue-500 shadow-md' 
+                        : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                    }`}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 + index * 0.1 }}
+                  >
+                    {status}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+            
+            {/* 活動列表 */}
+            <div className="space-y-4">
+              {(() => {
+                // 使用真實的學生活動數據，如果沒有數據則顯示空狀態
+                const activities = studentActivities || [];
+
+                // 顯示載入狀態
+                if (loadingActivities) {
+                  return (
+                    <motion.div
+                      className="text-center py-12"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
+                      <p className="text-gray-500 text-lg">載入學生活動中...</p>
+                    </motion.div>
+                  );
+                }
+
+                // 篩選活動
+                const filteredActivities = activities.filter(activity => 
+                  selectedActivityStatus === '全部' || activity.status === selectedActivityStatus
+                );
+
+                if (filteredActivities.length === 0) {
+                  return (
+                    <motion.div
+                      className="text-center py-12"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <div className="text-gray-400 mb-4">
+                        <BookOpen className="w-16 h-16 mx-auto" />
+                      </div>
+                      <p className="text-gray-500 text-lg">沒有找到符合「{selectedActivityStatus}」狀態的活動</p>
+                      <p className="text-gray-400 text-sm mt-2">請嘗試選擇其他篩選條件</p>
+                    </motion.div>
+                  );
+                }
+
+                return filteredActivities.map((activity, index) => (
+                  <motion.div
+                    key={activity.id}
+                    className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 border border-gray-200 hover:shadow-md transition-all duration-300"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 + index * 0.1 }}
+                    whileHover={{ y: -2, scale: 1.01 }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-6">
+                        {/* 狀態指示器 */}
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-4 h-4 rounded-full ${
+                            activity.status === '已完成' ? 'bg-green-400' :
+                            activity.status === '進行中' ? 'bg-blue-400' :
+                            activity.status === '未開始' ? 'bg-gray-400' :
+                            activity.status === '跨多個課堂' ? 'bg-orange-400' :
+                            'bg-purple-400'
+                          }`} />
+                          <span className="text-sm text-gray-600 font-medium">
+                            {activity.status}
+                          </span>
+                        </div>
+                        
+                        {/* 活動信息 */}
+                        <div className="flex-1">
+                          <h4 className="text-lg font-semibold text-gray-800 mb-2">{activity.name}</h4>
+                          <p className="text-gray-600 mb-3">{activity.description}</p>
+                          <div className="flex items-center space-x-6">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-500">難度</span>
+                              <span className="text-sm font-medium text-gray-700">{activity.difficulty}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-500">類型</span>
+                              <span className="text-sm font-medium text-gray-700">{activity.type}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-8">
+                        {/* 完成進度 */}
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500 mb-2">完成進度</div>
+                          <div className="w-32 h-3 bg-gray-200 rounded-full overflow-hidden">
+                            <motion.div
+                              className={`h-full bg-gradient-to-r ${
+                                activity.progress >= 80 ? 'from-green-400 to-green-500' :
+                                activity.progress >= 40 ? 'from-blue-400 to-blue-500' :
+                                'from-orange-400 to-orange-500'
+                              } rounded-full`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${activity.progress}%` }}
+                              transition={{ duration: 1.5, delay: 0.5 + index * 0.1 }}
+                            />
+                          </div>
+                          <div className="text-sm font-medium text-gray-700 mt-1">{activity.progress}%</div>
+                        </div>
+                        
+                        {/* 分配時間 */}
+                        <div className="text-center">
+                          <div className="text-sm text-gray-500 mb-2">分配時間</div>
+                          <div className="text-sm font-medium text-gray-700">{activity.assignedDate}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ));
+              })()}
+            </div>
+          </div>
         )}
 
         {/* 成長樹分頁 */}

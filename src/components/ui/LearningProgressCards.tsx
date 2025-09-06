@@ -314,96 +314,63 @@ export default function LearningProgressCards({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'progress' | 'activities' | 'lessons' | 'achievements'>('progress');
 
-  // 模擬資料載入
+  // 載入真實學生活動資料
   useEffect(() => {
     const loadProgressData = async () => {
       try {
         setLoading(true);
         
-        // 這裡應該從 Supabase 載入真實資料
-        // 目前使用模擬資料
-        const mockData: LearningProgress = {
-          id: studentId,
-          subject: '音樂基礎課程',
-          current_lesson: '節奏訓練 - 四拍子練習',
-          progress_percentage: 75,
-          next_target: '八分音符組合練習',
-          recent_activities: [
-            {
-              id: '1',
-              name: '基礎節拍練習',
-              type: 'practice',
-              completion_date: '2024-12-18',
-              score: 85,
-              difficulty_level: 3
-            },
-            {
-              id: '2',
-              name: '音感評估測試',
-              type: 'assessment',
-              completion_date: '2024-12-17',
-              score: 92,
-              difficulty_level: 4
-            },
-            {
-              id: '3',
-              name: '小小演奏會',
-              type: 'performance',
-              completion_date: '2024-12-15',
-              score: 88,
-              difficulty_level: 5
-            }
-          ],
-          upcoming_lessons: [
-            {
-              id: '1',
-              title: '進階節奏訓練',
-              scheduled_date: '2024-12-20',
-              duration: 45,
-              teacher: '李老師',
-              type: 'individual',
-              status: 'confirmed'
-            },
-            {
-              id: '2',
-              title: '合奏練習',
-              scheduled_date: '2024-12-22',
-              duration: 60,
-              teacher: '王老師',
-              type: 'group',
-              status: 'scheduled'
-            }
-          ],
-          achievements: [
-            {
-              id: '1',
-              title: '節奏大師',
-              description: '完成所有基礎節奏練習',
-              earned_date: '2024-12-18',
-              icon: '🎵',
-              rarity: 'rare'
-            },
-            {
-              id: '2',
-              title: '完美音感',
-              description: '音感測試得到滿分',
-              earned_date: '2024-12-17',
-              icon: '🎯',
-              rarity: 'epic'
-            }
-          ],
-          last_updated: '2024-12-19'
-        };
-
-        setProgressData(mockData);
+        // 使用與「正在學習的活動」相同的 API
+        const response = await fetch(`/api/student-activities?studentId=${studentId}&lessonDate=${new Date().toISOString().split('T')[0]}`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            const { currentLessonActivities, ongoingActivities, previousLessonActivities } = result.data;
+            
+            // 合併所有活動
+            const allActivities = [
+              ...currentLessonActivities,
+              ...ongoingActivities,
+              ...previousLessonActivities
+            ];
+            
+            // 轉換為 LearningProgress 格式
+            const progressData: LearningProgress = {
+              id: studentId,
+              subject: '音樂學習進度',
+              current_lesson: ongoingActivities.length > 0 ? ongoingActivities[0].activityName : '待安排課程',
+              progress_percentage: allActivities.length > 0 ? 
+                Math.round(allActivities.reduce((sum, activity) => sum + (activity.progress || 0), 0) / allActivities.length) : 0,
+              next_target: '繼續學習新技能',
+              recent_activities: allActivities.slice(0, 5).map((activity: any) => ({
+                id: activity.id || activity.activityId,
+                name: activity.activityName,
+                type: activity.activityType === '練習' ? 'practice' : 
+                      activity.activityType === '評估' ? 'assessment' : 
+                      activity.activityType === '表演' ? 'performance' : 'creative',
+                completion_date: activity.assignedAt || activity.lessonDate || new Date().toISOString().split('T')[0],
+                score: activity.progress || 0,
+                difficulty_level: activity.difficultyLevel || 1
+              })),
+              upcoming_lessons: [], // 可以從其他 API 獲取
+              achievements: [], // 可以從其他 API 獲取
+              last_updated: new Date().toISOString()
+            };
+            
+            setProgressData(progressData);
+          }
+        }
       } catch (error) {
-        console.error('載入學習進度失敗：', error);
+        console.error('載入學習進度資料失敗:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadProgressData();
+    if (studentId) {
+      loadProgressData();
+    }
   }, [studentId]);
 
   if (loading) {
