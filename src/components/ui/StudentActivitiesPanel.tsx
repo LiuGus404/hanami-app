@@ -1508,8 +1508,8 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
                 編輯
               </button>
               
-              {/* 移除按鈕 - 未開始狀態不顯示 */}
-              {!isNotStarted && (
+              {/* 移除按鈕 - 未開始狀態或進度為0%時顯示 */}
+              {(!isNotStarted || (activity.progress || 0) === 0) && (
                 <button
                   onClick={() => handleRemoveSingleActivity(activity.id)}
                   className="flex items-center gap-1 px-2 py-1 bg-rose-200 text-rose-700 rounded text-xs hover:bg-rose-300 transition-colors"
