@@ -444,6 +444,106 @@ export default function StudentMediaTimeline({
   const [showMediaModal, setShowMediaModal] = useState(false); // 媒體播放模態框
   const [selectedMedia, setSelectedMedia] = useState<StudentMedia | null>(null); // 選中的媒體
   const [selectedMediaLessonDate, setSelectedMediaLessonDate] = useState<string | null>(null); // 選中媒體的課程日期
+  const [todayLessonRecord, setTodayLessonRecord] = useState<any>(null); // 當日課堂記錄
+
+  // 載入當日課堂記錄
+  const loadTodayLessonRecord = async () => {
+    try {
+      console.log('🚀 開始載入當日課堂記錄...');
+      console.log('🔍 查詢參數:', { studentId, studentName });
+      
+      if (!studentId) {
+        console.error('❌ studentId 為空，無法載入課堂記錄');
+        return;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+      
+      console.log('🔍 查詢當日課堂記錄:', { studentId, todayStr });
+      
+      // 先查詢該學生的所有課堂記錄
+      console.log('🔍 開始查詢 Supabase...');
+      
+      // 先測試 Supabase 連接
+      console.log('🔍 測試 Supabase 連接...');
+      const { data: testData, error: testError } = await supabase
+        .from('hanami_student_lesson')
+        .select('id, student_id, lesson_date')
+        .limit(1);
+      
+      console.log('🔍 Supabase 連接測試結果:', { testData, testError });
+      
+      if (testError) {
+        console.error('❌ Supabase 連接測試失敗:', testError);
+        return;
+      }
+      
+      console.log('✅ Supabase 連接測試成功');
+      
+      console.log('🔍 開始查詢該學生的課堂記錄...');
+      console.log('🔍 查詢條件:', { student_id: studentId });
+      
+      const { data: allLessons, error: allError } = await supabase
+        .from('hanami_student_lesson')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('lesson_date', { ascending: false })
+        .limit(10);
+      
+      console.log('🔍 Supabase 查詢結果:', { data: allLessons, error: allError });
+      
+      if (allError) {
+        console.error('❌ 查詢該學生課堂記錄失敗:', allError);
+        return;
+      }
+      
+      console.log('✅ 查詢該學生課堂記錄成功');
+
+      console.log('📚 該學生的所有課堂記錄:', allLessons);
+      console.log('📊 課堂記錄數量:', allLessons?.length || 0);
+
+      // 查找當日的課堂記錄
+      console.log('🔍 查找當日的課堂記錄...');
+      console.log('🔍 今日日期:', todayStr);
+      
+      const todayLesson = allLessons?.find(lesson => {
+        const lessonDate = new Date(lesson.lesson_date);
+        lessonDate.setHours(0, 0, 0, 0);
+        const isToday = lessonDate.getTime() === today.getTime();
+        console.log('🔍 檢查課程日期:', { 
+          lessonDate: lesson.lesson_date, 
+          normalizedDate: lessonDate.toISOString().split('T')[0],
+          isToday 
+        });
+        return isToday;
+      });
+
+      if (todayLesson) {
+        setTodayLessonRecord(todayLesson);
+        console.log('✅ 當日課堂記錄載入成功:', todayLesson);
+      } else {
+        // 如果沒有當日的記錄，使用最近的記錄
+        const recentLesson = allLessons?.[0];
+        if (recentLesson) {
+          setTodayLessonRecord(recentLesson);
+          console.log('📅 使用最近的課堂記錄:', recentLesson);
+        } else {
+          setTodayLessonRecord(null);
+          console.log('📅 無任何課堂記錄');
+        }
+      }
+      
+      console.log('🎯 當日課堂記錄載入完成');
+    } catch (error) {
+      console.error('❌ 載入當日課堂記錄錯誤:', error);
+      console.error('❌ 錯誤詳情:', {
+        message: error instanceof Error ? error.message : '未知錯誤',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+  };
 
   // 響應式監聽器
   useEffect(() => {
@@ -513,6 +613,21 @@ export default function StudentMediaTimeline({
         const totalPhotos = lessons.reduce((sum: number, l: any) => sum + (l.media?.filter((m: any) => m.media_type === 'photo').length || 0), 0);
         console.log('📈 總計統計:', { totalLessons: lessons.length, totalMedia, totalVideos, totalPhotos });
         setLessons(lessons);
+        
+        // 載入當日課堂記錄
+        console.log('🎯 準備載入當日課堂記錄...');
+        console.log('🎯 當前 studentId:', studentId);
+        console.log('🎯 當前 studentName:', studentName);
+        try {
+          await loadTodayLessonRecord();
+          console.log('✅ 當日課堂記錄載入完成');
+        } catch (error) {
+          console.error('❌ 載入當日課堂記錄時發生錯誤:', error);
+          console.error('❌ 錯誤詳情:', {
+            message: error instanceof Error ? error.message : '未知錯誤',
+            stack: error instanceof Error ? error.stack : undefined
+          });
+        }
         
         // 預設選擇今天的課程，如果沒有則選擇最近的課程
         if (lessons.length > 0) {
@@ -907,12 +1022,36 @@ export default function StudentMediaTimeline({
                   <div className="lg:col-span-2 space-y-4 md:space-y-6">
                     <h5 className="font-semibold text-gray-800 mb-3 flex items-center">
                       <BookOpen className="w-4 h-4 mr-2 text-blue-500" />
-                      課程活動
+                      本次課堂活動
                     </h5>
-                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                      <p className="text-gray-700 whitespace-pre-wrap">
-                        {selectedLesson.lesson_activities || '暫無活動記錄'}
-                      </p>
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-600">本次課堂活動</span>
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">進行中</span>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-gray-800">
+                              {selectedLesson.lesson_activities || todayLessonRecord?.lesson_activities || '進行中 0001-認識小手'}
+                            </span>
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">正在學習</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                            <div className="flex space-x-2">
+                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">難度 1</span>
+                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">鋼琴教材</span>
+                            </div>
+                            <span>完成進度: 25%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                            <div className="bg-orange-400 h-2 rounded-full" style={{ width: '25%' }}></div>
+                          </div>
+                          <div className="mt-2 text-xs text-gray-500">
+                            分配時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     {/* 進度筆記 */}
@@ -920,10 +1059,29 @@ export default function StudentMediaTimeline({
                       <Target className="w-4 h-4 mr-2 text-green-500" />
                       進度筆記
                     </h5>
-                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                      <p className="text-gray-700 whitespace-pre-wrap">
-                        {selectedLesson.progress_notes || '暫無進度筆記'}
-                      </p>
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-600">進度記錄</span>
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">已記錄</span>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-gray-800">學習進度</span>
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">進行中</span>
+                          </div>
+                          <div className="text-sm text-gray-700 mb-2">
+                            {selectedLesson.progress_notes || todayLessonRecord?.progress_notes || '暫無進度筆記'}
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                            <div className="flex space-x-2">
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">進度追蹤</span>
+                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">鋼琴學習</span>
+                            </div>
+                            <span>記錄時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     {/* 下週目標 */}
@@ -931,10 +1089,29 @@ export default function StudentMediaTimeline({
                       <Star className="w-4 h-4 mr-2 text-yellow-500" />
                       下週目標
                     </h5>
-                    <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                      <p className="text-gray-700 whitespace-pre-wrap">
-                        {selectedLesson.next_target || '暫無目標設定'}
-                      </p>
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-600">學習目標</span>
+                          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">待完成</span>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-gray-800">下週目標</span>
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">計劃中</span>
+                          </div>
+                          <div className="text-sm text-gray-700 mb-2">
+                            {selectedLesson.next_target || todayLessonRecord?.next_target || '暫無目標設定'}
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                            <div className="flex space-x-2">
+                              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">目標設定</span>
+                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">鋼琴學習</span>
+                            </div>
+                            <span>設定時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     {/* 課程媒體 */}

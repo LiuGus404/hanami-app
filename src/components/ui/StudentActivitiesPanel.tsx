@@ -695,7 +695,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         
         if (isAlreadyInProgress) {
           console.log('建議的活動已經在進行中，跳過此活動');
-          toast(`活動「${targetActivity.title}」已經在進行中，將尋找下一個活動`);
+          toast.success(`活動「${targetActivity.title}」已經在進行中，將尋找下一個活動`);
           
           // 尋找下一個可用的活動
           let nextAvailableActivity = null;
@@ -1464,17 +1464,24 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
               {getStatusIcon(activity.completionStatus, activity.progress)}
               <span className="text-xs text-gray-600">{getStatusText(activity.completionStatus, activity.progress)}</span>
             </div>
-            <h4 className="font-medium text-gray-900">{activity.activityName}</h4>
+            <h4 className="font-medium text-gray-900">
+              {activity.activityName || `活動 ${activity.id.slice(0, 8)}`}
+            </h4>
+            {!activity.activityName && (
+              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                ⚠️ 缺少活動資訊
+              </span>
+            )}
             {activity.isFavorite && (
               <StarIcon className="w-4 h-4 text-yellow-500" />
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(activity.difficultyLevel)}`}>
-              難度 {activity.difficultyLevel}
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(activity.difficultyLevel || 1)}`}>
+              難度 {activity.difficultyLevel || 1}
             </span>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getActivityTypeColor(activity.activityType)}`}>
-              {activity.activityType}
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getActivityTypeColor(activity.activityType || 'unknown')}`}>
+              {activity.activityType || '未知類型'}
             </span>
             {activity.estimatedDuration > 0 && (
               <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -1516,8 +1523,10 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
           </div>
         </div>
 
-      {activity.activityDescription && (
-        <p className="text-sm text-stone-600 mb-2">{activity.activityDescription}</p>
+      {(activity.activityDescription || (activity as any).activityId) && (
+        <p className="text-sm text-stone-600 mb-2">
+          {activity.activityDescription || `活動ID: ${(activity as any).activityId}`}
+        </p>
       )}
 
       {/* 進度設定區域 - 只在編輯模式下顯示 */}
@@ -2418,7 +2427,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
                                 <div className="flex-1">
                                   <div className="flex items-center justify-between">
                                     <h4 className="text-lg font-semibold text-[#2B3A3B]">
-                                      {node.type === 'activity' ? `${index + 1}. ` : ''}
+                                      {node.type === 'activity' && node.order ? `${node.order}. ` : ''}
                                       {node.title}
                                     </h4>
                                     <span className={`text-sm px-3 py-1 rounded-full font-medium shadow-sm ${

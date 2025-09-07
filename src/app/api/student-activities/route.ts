@@ -44,7 +44,9 @@ export async function GET(request: NextRequest) {
           student_feedback,
           progress,
           activity_id,
-          hanami_teaching_activities (
+          lesson_date,
+          timeslot,
+          hanami_teaching_activities!left (
             id,
             activity_name,
             activity_description,
@@ -85,7 +87,7 @@ export async function GET(request: NextRequest) {
             lesson_date,
             timeslot,
             activity_id,
-            hanami_teaching_activities (
+            hanami_teaching_activities!left (
               id,
               activity_name,
               activity_description,
@@ -106,7 +108,8 @@ export async function GET(request: NextRequest) {
       queries.push(Promise.resolve({ data: [], error: null }));
     }
     
-    // 正在學習的活動查詢（包含100%完成的活動）
+    // 正在學習的活動查詢（包含 ongoing 和成長樹相關的 lesson 類型活動）
+    // 修改：查詢 ongoing 類型 + 成長樹相關的 lesson 類型活動
     queries.push(
       supabase
         .from('hanami_student_activities')
@@ -119,7 +122,11 @@ export async function GET(request: NextRequest) {
           student_feedback,
           progress,
           activity_id,
-          hanami_teaching_activities (
+          activity_type,
+          tree_id,
+          lesson_date,
+          timeslot,
+          hanami_teaching_activities!left (
             id,
             activity_name,
             activity_description,
@@ -131,11 +138,12 @@ export async function GET(request: NextRequest) {
           )
         `)
         .eq('student_id', studentId)
-        .eq('activity_type', 'ongoing')
+        .or('activity_type.eq.ongoing,and(activity_type.eq.lesson,tree_id.not.is.null)') // 查詢 ongoing 或 有 tree_id 的 lesson 類型
+        .lt('progress', 100) // 只包含進度小於100%的活動
         .order('assigned_at', { ascending: false })
     );
     
-    // 100%完成但仍在ongoing分類的活動查詢
+    // 100%完成但仍在ongoing分類的活動查詢（包含成長樹相關的 lesson 類型）
     queries.push(
       supabase
         .from('hanami_student_activities')
@@ -148,7 +156,11 @@ export async function GET(request: NextRequest) {
           student_feedback,
           progress,
           activity_id,
-          hanami_teaching_activities (
+          activity_type,
+          tree_id,
+          lesson_date,
+          timeslot,
+          hanami_teaching_activities!left (
             id,
             activity_name,
             activity_description,
@@ -160,7 +172,7 @@ export async function GET(request: NextRequest) {
           )
         `)
         .eq('student_id', studentId)
-        .eq('activity_type', 'ongoing')
+        .or('activity_type.eq.ongoing,and(activity_type.eq.lesson,tree_id.not.is.null)') // 查詢 ongoing 或 有 tree_id 的 lesson 類型
         .gte('progress', 100)
         .order('assigned_at', { ascending: false })
     );
@@ -178,6 +190,25 @@ export async function GET(request: NextRequest) {
       previous: previousLessonActivities.length,
       ongoing: ongoingActivities.length,
       completedOngoing: completedOngoingActivities.length
+    });
+
+    // 調試：檢查正在學習活動的詳細信息
+    console.log('🔍 正在學習活動詳細信息:', ongoingActivities.map((activity: any) => ({
+      id: activity.id,
+      activity_id: activity.activity_id,
+      activity_type: activity.activity_type,
+      tree_id: activity.tree_id,
+      progress: activity.progress,
+      completion_status: activity.completion_status,
+      has_teaching_activity: !!activity.hanami_teaching_activities,
+      teaching_activity_name: activity.hanami_teaching_activities?.activity_name || 'N/A'
+    })));
+    
+    console.log('🔍 修復後的查詢結果:', {
+      totalOngoingActivities: ongoingActivities.length,
+      ongoingTypeCount: ongoingActivities.filter((a: any) => a.activity_type === 'ongoing').length,
+      lessonTypeCount: ongoingActivities.filter((a: any) => a.activity_type === 'lesson').length,
+      withTreeIdCount: ongoingActivities.filter((a: any) => a.tree_id).length
     });
 
     // 處理活動資料，統一格式

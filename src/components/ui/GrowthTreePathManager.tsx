@@ -415,9 +415,21 @@ export default function GrowthTreePathManager({
       // 找到下一個應該安排的活動
       let nextActivity: any = null;
       
-      // 優先選擇第一個未完成且未鎖定的活動
-      if (incompleteNodes.length > 0) {
-        nextActivity = incompleteNodes[0];
+      // 優先選擇第一個未完成且未鎖定的活動節點（排除開始和結束節點）
+      console.log('🔍 所有未完成節點:', incompleteNodes.map(n => ({ id: n.id, type: n.type, title: n.title })));
+      
+      const activityNodes = incompleteNodes.filter(node => 
+        node.type === 'activity' && 
+        node.id !== 'start' && 
+        node.id !== 'end' &&
+        !node.id.startsWith('start') &&
+        !node.id.startsWith('end')
+      );
+      
+      console.log('🔍 過濾後的活動節點:', activityNodes.map(n => ({ id: n.id, type: n.type, title: n.title })));
+      
+      if (activityNodes.length > 0) {
+        nextActivity = activityNodes[0];
         console.log('🎯 找到下一個活動:', nextActivity.title);
         console.log('🎯 活動ID:', nextActivity.id);
         console.log('🎯 活動類型:', nextActivity.type);
@@ -457,9 +469,10 @@ export default function GrowthTreePathManager({
           toast.error('活動ID格式不正確，無法安排活動');
           return;
         }
-        } else {
-        console.log('⚠️ 沒有找到可安排的活動');
-        toast.error('所有活動都已完成或已鎖定，無法安排新的活動');
+      } else {
+        console.log('⚠️ 沒有找到可安排的活動節點');
+        console.log('未完成節點:', incompleteNodes.map(n => ({ id: n.id, type: n.type, title: n.title })));
+        toast.error('沒有找到可安排的活動節點，請檢查學習路徑配置');
         return;
       }
 

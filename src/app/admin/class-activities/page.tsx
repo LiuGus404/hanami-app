@@ -684,8 +684,50 @@ export default function ClassActivitiesPage() {
         return;
       }
 
-      // 批量分配活動
-      const activityIds = activityNodes.map((node: any) => node.activity_id).filter(Boolean);
+      // 批量分配活動 - 正確處理活動ID格式
+      const activityIds = [];
+      
+      for (const node of activityNodes) {
+        let actualActivityId = null;
+        
+        // 檢查節點ID格式
+        if (node.id && node.id.startsWith('tree_activity_')) {
+          // 提取 tree_activity 的ID
+          const treeActivityId = node.id.replace('tree_activity_', '');
+          console.log('提取 tree_activity ID:', { nodeId: node.id, treeActivityId });
+          
+          // 查詢 hanami_tree_activities 表來獲取真正的 activity_id
+          const { data: treeActivity, error: treeActivityError } = await supabase
+            .from('hanami_tree_activities')
+            .select('activity_id')
+            .eq('id', treeActivityId)
+            .single();
+
+          if (treeActivityError) {
+            console.error('查詢 hanami_tree_activities 失敗:', treeActivityError);
+            continue;
+          }
+
+          if (treeActivity && treeActivity.activity_id) {
+            actualActivityId = treeActivity.activity_id;
+            console.log('從 tree_activities 獲取 activity_id:', actualActivityId);
+          }
+        } else if (node.activity_id) {
+          // 直接使用 activity_id
+          actualActivityId = node.activity_id;
+          console.log('使用 activity_id:', actualActivityId);
+        } else if (node.metadata && node.metadata.activityId) {
+          // 使用 metadata 中的 activityId
+          actualActivityId = node.metadata.activityId;
+          console.log('使用 metadata.activityId:', actualActivityId);
+        }
+        
+        if (actualActivityId) {
+          activityIds.push(actualActivityId);
+        }
+      }
+      
+      console.log('最終活動ID列表:', activityIds);
       
       if (activityIds.length === 0) {
         toast.error('該學習路徑的活動節點沒有有效的活動ID');

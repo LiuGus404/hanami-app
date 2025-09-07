@@ -31,6 +31,7 @@ import {
   GrowthTreeVisualization, 
   LearningProgressCards 
 } from '@/components/ui';
+import Student3DCharacter from './Student3DCharacter';
 import LearningPathLevels from '@/components/ui/LearningPathLevels';
 import StudentAbilityAssessments from '@/components/ui/StudentAbilityAssessments';
 import { useStudentAvatarData, useGrowthTreeInteraction } from '@/hooks/useStudentAvatarData';
@@ -115,6 +116,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
   const [currentProgress, setCurrentProgress] = useState<{totalProgress: number, currentLevel: number}>({totalProgress: 53, currentLevel: 2});
   const [chartData, setChartData] = useState<Array<{date: string, progress: number, level: number}>>([]);
   const [hoveredDataPoint, setHoveredDataPoint] = useState<number | null>(null);
+  const [selectedBackground, setSelectedBackground] = useState<string>('classroom');
 
   // 使用自定義Hook載入學生資料
   const {
@@ -799,162 +801,253 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                     </motion.div>
                   </DynamicCard>
 
-                  {/* 學習路徑 */}
-                  <DynamicCard className="p-8" delay={0.5}>
-                    <LearningPathLevels
-                      studentId={student.id}
-                      maxLevels={4}
-                      showProgress={true}
-                      student={student}
-                    />
-                  </DynamicCard>
-
-                  {/* 正在學習的活動 */}
-                  <DynamicCard className="p-8" delay={0.6}>
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-2xl font-bold text-gray-800 flex items-center">
-                        <motion.div
-                          className="p-2 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg mr-3"
-                          whileHover={{ rotate: 15 }}
-                        >
-                          <BookOpen className="w-6 h-6 text-purple-500" />
-                        </motion.div>
-                        正在學習的活動
-                      </h3>
-                      
-                      {/* 狀態篩選器 */}
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">狀態篩選：</span>
-                        {['全部', '未開始', '進行中', '已完成'].map((status, index) => (
+                {/* 3D背景切換元件 */}
+                <DynamicCard className="max-w-5xl mx-auto p-8" delay={0.5}>
+                  <div className="text-center">
+                    
+                    {/* 背景選擇器 */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
+                      {[
+                        { 
+                          id: 'classroom',
+                          name: '教室', 
+                          icon: 'Building', 
+                          color: 'from-blue-400 to-blue-500',
+                          bgColor: 'from-blue-50 to-blue-100',
+                          hoverColor: 'from-blue-100 to-blue-200',
+                          iconColor: 'text-blue-500'
+                        },
+                        { 
+                          id: 'music-room',
+                          name: '音樂室', 
+                          icon: 'Music', 
+                          color: 'from-purple-400 to-purple-500',
+                          bgColor: 'from-purple-50 to-purple-100',
+                          hoverColor: 'from-purple-100 to-purple-200',
+                          iconColor: 'text-purple-500'
+                        },
+                        { 
+                          id: 'outdoor',
+                          name: '戶外', 
+                          icon: 'TreePine', 
+                          color: 'from-green-400 to-green-500',
+                          bgColor: 'from-green-50 to-green-100',
+                          hoverColor: 'from-green-100 to-green-200',
+                          iconColor: 'text-green-500'
+                        },
+                        { 
+                          id: 'home',
+                          name: '家中', 
+                          icon: 'Home', 
+                          color: 'from-orange-400 to-orange-500',
+                          bgColor: 'from-orange-50 to-orange-100',
+                          hoverColor: 'from-orange-100 to-orange-200',
+                          iconColor: 'text-orange-500'
+                        },
+                        { 
+                          id: 'studio',
+                          name: '錄音室', 
+                          icon: 'Mic', 
+                          color: 'from-pink-400 to-pink-500',
+                          bgColor: 'from-pink-50 to-pink-100',
+                          hoverColor: 'from-pink-100 to-pink-200',
+                          iconColor: 'text-pink-500'
+                        },
+                        { 
+                          id: 'playground',
+                          name: '遊樂場', 
+                          icon: 'Gamepad2', 
+                          color: 'from-yellow-400 to-yellow-500',
+                          bgColor: 'from-yellow-50 to-yellow-100',
+                          hoverColor: 'from-yellow-100 to-yellow-200',
+                          iconColor: 'text-yellow-500'
+                        }
+                      ].map((background, index) => {
+                        const IconComponent = background.icon === 'Building' ? User :
+                                            background.icon === 'Music' ? Music :
+                                            background.icon === 'TreePine' ? TreePine :
+                                            background.icon === 'Home' ? User :
+                                            background.icon === 'Mic' ? Volume2 :
+                                            background.icon === 'Gamepad2' ? Sparkles : User;
+                        
+                        const isSelected = selectedBackground === background.id;
+                        
+                        return (
                           <motion.button
-                            key={status}
-                            onClick={() => setSelectedActivityStatus(status)}
-                            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                              selectedActivityStatus === status
-                                ? 'bg-purple-500 text-white border-purple-500 shadow-md' 
-                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
-                            whileHover={{ scale: 1.05 }}
+                            key={background.name}
+                            onClick={() => setSelectedBackground(background.id)}
+                            className={`group relative p-4 rounded-2xl bg-gradient-to-br ${
+                              isSelected ? 'from-[#FFD59A] to-[#EBC9A4]' : background.bgColor
+                            } border-2 ${
+                              isSelected ? 'border-[#FFD59A] shadow-lg' : 'border-transparent hover:border-white/50'
+                            } transition-all duration-300 overflow-hidden`}
+                            whileHover={{ 
+                              scale: 1.05, 
+                              y: -5,
+                              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+                            }}
                             whileTap={{ scale: 0.95 }}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.7 + index * 0.1 }}
+                            initial={{ opacity: 0, y: 30, rotateX: -15 }}
+                            animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                            transition={{ 
+                              delay: 0.6 + index * 0.1,
+                              type: "spring",
+                              stiffness: 100,
+                              damping: 15
+                            }}
                           >
-                            {status}
+                            {/* 背景光效 */}
+                            <motion.div
+                              className={`absolute inset-0 bg-gradient-to-br ${background.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
+                              initial={{ scale: 0.8 }}
+                              whileHover={{ scale: 1.2 }}
+                            />
+                            
+                            {/* 圖標容器 */}
+                            <motion.div
+                              className={`relative w-12 h-12 mx-auto mb-3 bg-gradient-to-br ${
+                                isSelected ? 'from-white to-white/90' : background.color
+                              } rounded-xl flex items-center justify-center shadow-lg`}
+                              whileHover={{ rotate: 360, scale: 1.1 }}
+                              transition={{ duration: 0.6, type: "spring" }}
+                            >
+                              <IconComponent className={`w-6 h-6 ${
+                                isSelected ? 'text-[#2B3A3B]' : 'text-white'
+                              }`} />
+                            </motion.div>
+                            
+                            {/* 標題 */}
+                            <div className="relative text-center">
+                              <h4 className={`font-semibold text-sm ${
+                                isSelected ? 'text-[#2B3A3B]' : 'text-gray-800'
+                              }`}>{background.name}</h4>
+                            </div>
+                            
+                            {/* 選中指示器 */}
+                            {isSelected && (
+                              <motion.div
+                                className="absolute top-2 right-2 w-3 h-3 bg-[#FFB6C1] rounded-full"
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: "spring", stiffness: 300 }}
+                              />
+                            )}
                           </motion.button>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                     
-                    {/* 活動列表 */}
-                    <div className="space-y-4">
-                      {(() => {
-                        // 使用真實的學生活動數據，如果沒有數據則顯示空狀態
-                        const activities = studentActivities || [];
-
-                        // 顯示載入狀態
-                        if (loadingActivities) {
-                          return (
+                    {/* 背景預覽區域 */}
+                    <motion.div
+                      className="w-full max-w-6xl mx-auto h-96"
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: 1, type: "spring", stiffness: 100 }}
+                    >
+                      <motion.div 
+                        className="relative w-full h-full overflow-hidden rounded-2xl border border-[#EADBC8] shadow-lg"
+                        whileHover={{ scale: 1.01 }}
+                        transition={{ type: "spring", stiffness: 200 }}
+                      >
+                        {/* 背景圖片 */}
+                        <div 
+                          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                          style={{
+                            backgroundImage: selectedBackground === 'classroom' 
+                              ? "url('/3d-character-backgrounds/classroom/classroom.png')"
+                              : selectedBackground === 'music-room'
+                              ? "linear-gradient(135deg, #8B5CF6 0%, #A855F7 50%, #C084FC 100%)"
+                              : selectedBackground === 'outdoor'
+                              ? "linear-gradient(135deg, #10B981 0%, #34D399 50%, #6EE7B7 100%)"
+                              : selectedBackground === 'home'
+                              ? "linear-gradient(135deg, #F97316 0%, #FB923C 50%, #FDBA74 100%)"
+                              : selectedBackground === 'studio'
+                              ? "linear-gradient(135deg, #EC4899 0%, #F472B6 50%, #F9A8D4 100%)"
+                              : selectedBackground === 'playground'
+                              ? "linear-gradient(135deg, #EAB308 0%, #FACC15 50%, #FDE047 100%)"
+                              : "linear-gradient(to bottom right, #FFF9F2, #FFFDF8)"
+                          }}
+                        />
+                        
+                        
+                        {/* 3D角色顯示 */}
+                        <div className="relative z-10 h-full flex items-end justify-center">
+                          <div className="text-center">
+                            {formattedStudent && (
+                              <motion.div
+                                className="mb-0"
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: 0.5, duration: 0.8 }}
+                              >
+                                <Student3DCharacter
+                                  student={formattedStudent}
+                                  size="lg"
+                                  enableAnimation={true}
+                                  enableControls={true}
+                                  className="mx-auto"
+                                />
+                              </motion.div>
+                            )}
+                            
+                            {/* 狀態標籤 */}
                             <motion.div
-                              className="text-center py-12"
+                              className="inline-flex items-center px-6 py-3 bg-white/90 backdrop-blur-sm rounded-full shadow-lg"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 1.5 }}
+                            >
+                              <div className="w-3 h-3 bg-green-400 rounded-full mr-3 animate-pulse" />
+                              <p className="text-[#4B4036] font-medium">3D角色已顯示</p>
+                            </motion.div>
+                            
+                            <motion.p 
+                              className="text-white/90 font-medium text-lg mt-4 drop-shadow-lg"
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
-                              transition={{ delay: 0.5 }}
+                              transition={{ delay: 1.7 }}
                             >
-                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
-                              <p className="text-gray-500 text-lg">載入學生活動中...</p>
-                            </motion.div>
-                          );
-                        }
-
-                        // 篩選活動
-                        const filteredActivities = activities.filter(activity => 
-                          selectedActivityStatus === '全部' || activity.status === selectedActivityStatus
-                        );
-
-                        if (filteredActivities.length === 0) {
-                          return (
-                            <motion.div
-                              className="text-center py-12"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ delay: 0.5 }}
-                            >
-                              <div className="text-gray-400 mb-4">
-                                <BookOpen className="w-16 h-16 mx-auto" />
-                              </div>
-                              <p className="text-gray-500 text-lg">沒有找到符合「{selectedActivityStatus}」狀態的活動</p>
-                              <p className="text-gray-400 text-sm mt-2">請嘗試選擇其他篩選條件</p>
-                            </motion.div>
-                          );
-                        }
-
-                        return filteredActivities.map((activity, index) => (
-                          <motion.div
-                            key={activity.id}
-                            className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white/40 hover:bg-white/80 transition-all duration-300"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.8 + index * 0.1 }}
-                            whileHover={{ x: 5, scale: 1.02 }}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-4">
-                                {/* 狀態指示器 */}
-                                <div className="flex items-center space-x-2">
-                                  <div className={`w-3 h-3 rounded-full ${
-                                    activity.status === '已完成' ? 'bg-green-400' :
-                                    activity.status === '進行中' ? 'bg-blue-400' :
-                                    activity.status === '未開始' ? 'bg-gray-400' :
-                                    'bg-orange-400'
-                                  }`} />
-                                  <span className="text-xs text-gray-500 font-medium">
-                                    {activity.status}
-                                  </span>
-                                </div>
-                                
-                                {/* 活動名稱 */}
-                                <div>
-                                  <h4 className="font-medium text-gray-800">{activity.name}</h4>
-                                  <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
-                                  <div className="flex items-center space-x-4 mt-1">
-                                    <span className="text-xs text-gray-500">難度 {activity.difficulty}</span>
-                                    <span className="text-xs text-gray-500">{activity.type}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center space-x-4">
-                                {/* 進度條 */}
-                                <div className="w-24">
-                                  <div className="text-xs text-gray-500 mb-1">完成進度</div>
-                                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <motion.div
-                                      className={`h-full bg-gradient-to-r ${
-                                        activity.progress >= 80 ? 'from-green-400 to-green-500' :
-                                        activity.progress >= 40 ? 'from-blue-400 to-blue-500' :
-                                        'from-orange-400 to-orange-500'
-                                      } rounded-full`}
-                                      initial={{ width: 0 }}
-                                      animate={{ width: `${activity.progress}%` }}
-                                      transition={{ duration: 1, delay: 1 + index * 0.1 }}
-                                    />
-                                  </div>
-                                  <div className="text-xs text-gray-600 mt-1">{activity.progress}%</div>
-                                </div>
-                                
-                                {/* 分配時間 */}
-                                <div className="text-right">
-                                  <div className="text-xs text-gray-500">分配時間</div>
-                                  <div className="text-xs text-gray-700">{activity.assignedDate}</div>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        ));
-                      })()}
-                    </div>
-                  </DynamicCard>
+                              {selectedBackground === 'classroom' ? '教室背景' :
+                               selectedBackground === 'music-room' ? '音樂室背景' :
+                               selectedBackground === 'outdoor' ? '戶外背景' :
+                               selectedBackground === 'home' ? '家中背景' :
+                               selectedBackground === 'studio' ? '錄音室背景' :
+                               selectedBackground === 'playground' ? '遊樂場背景' :
+                               '選擇背景'}
+                            </motion.p>
+                          </div>
+                        </div>
+                        
+                        {/* 裝飾元素 */}
+                        <motion.div
+                          className="absolute top-4 right-4 w-4 h-4 bg-[#FFB6C1]/60 rounded-full"
+                          animate={{ 
+                            y: [0, -8, 0],
+                            opacity: [0.6, 1, 0.6]
+                          }}
+                          transition={{ 
+                            duration: 3, 
+                            repeat: Infinity, 
+                            delay: 0.5 
+                          }}
+                        />
+                        <motion.div
+                          className="absolute bottom-6 left-6 w-3 h-3 bg-[#FFD59A]/60 rounded-full"
+                          animate={{ 
+                            y: [0, 6, 0],
+                            opacity: [0.4, 0.8, 0.4]
+                          }}
+                          transition={{ 
+                            duration: 3.5, 
+                            repeat: Infinity, 
+                            delay: 1 
+                          }}
+                        />
+                      </motion.div>
+                    </motion.div>
+                    
+                  </div>
+                </DynamicCard>
                 </div>
               )}
 

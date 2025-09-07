@@ -456,11 +456,18 @@ export default function StudentDetailPage() {
 
           {/* 媒體庫分頁 */}
           {activeTab === 'media' && student && (
-            <StudentMediaTimeline 
-              studentId={student.id}
-              studentName={student.full_name}
-              className="mt-4"
-            />
+            <>
+              {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', { 
+                studentId: student.id, 
+                studentName: student.full_name,
+                studentObject: student 
+              })}
+              <StudentMediaTimeline 
+                studentId={student.id}
+                studentName={student.full_name}
+                className="mt-4"
+              />
+            </>
           )}
         </motion.div>
         <LessonEditorModal

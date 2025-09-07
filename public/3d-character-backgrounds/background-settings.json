@@ -1,0 +1,162 @@
+{
+  "backgrounds": {
+    "classroom": {
+      "name": "教室",
+      "description": "一般教室場景，適合基礎學習活動",
+      "path": "/3d-character-backgrounds/classroom/",
+      "defaultFile": "classroom_morning_v1.png",
+      "variants": [
+        {
+          "name": "morning",
+          "displayName": "早晨",
+          "file": "classroom_morning_v1.png"
+        },
+        {
+          "name": "afternoon", 
+          "displayName": "下午",
+          "file": "classroom_afternoon_v1.png"
+        },
+        {
+          "name": "evening",
+          "displayName": "傍晚", 
+          "file": "classroom_evening_v1.png"
+        }
+      ],
+      "suitableFor": ["基礎學習", "理論課程", "一般活動"]
+    },
+    "music-room": {
+      "name": "音樂教室",
+      "description": "專業音樂教室，包含鋼琴和樂器",
+      "path": "/3d-character-backgrounds/music-room/",
+      "defaultFile": "music-room_elegant_v1.png",
+      "variants": [
+        {
+          "name": "elegant",
+          "displayName": "優雅風格",
+          "file": "music-room_elegant_v1.png"
+        },
+        {
+          "name": "modern",
+          "displayName": "現代風格",
+          "file": "music-room_modern_v1.png"
+        },
+        {
+          "name": "cozy",
+          "displayName": "溫馨風格",
+          "file": "music-room_cozy_v1.png"
+        }
+      ],
+      "suitableFor": ["鋼琴課程", "音樂學習", "樂器練習"]
+    },
+    "outdoor": {
+      "name": "戶外",
+      "description": "自然戶外環境，充滿陽光和綠意",
+      "path": "/3d-character-backgrounds/outdoor/",
+      "defaultFile": "outdoor_sunny_v1.png",
+      "variants": [
+        {
+          "name": "sunny",
+          "displayName": "晴朗",
+          "file": "outdoor_sunny_v1.png"
+        },
+        {
+          "name": "cloudy",
+          "displayName": "多雲",
+          "file": "outdoor_cloudy_v1.png"
+        },
+        {
+          "name": "sunset",
+          "displayName": "夕陽",
+          "file": "outdoor_sunset_v1.png"
+        }
+      ],
+      "suitableFor": ["戶外活動", "自然學習", "放鬆時間"]
+    },
+    "home": {
+      "name": "家庭",
+      "description": "溫馨的家庭環境，適合親子活動",
+      "path": "/3d-character-backgrounds/home/",
+      "defaultFile": "home_cozy_v1.png",
+      "variants": [
+        {
+          "name": "cozy",
+          "displayName": "溫馨",
+          "file": "home_cozy_v1.png"
+        },
+        {
+          "name": "modern",
+          "displayName": "現代",
+          "file": "home_modern_v1.png"
+        },
+        {
+          "name": "traditional",
+          "displayName": "傳統",
+          "file": "home_traditional_v1.png"
+        }
+      ],
+      "suitableFor": ["家庭作業", "親子活動", "個人學習"]
+    },
+    "studio": {
+      "name": "工作室",
+      "description": "專業錄音室，現代化設備",
+      "path": "/3d-character-backgrounds/studio/",
+      "defaultFile": "studio_modern_v1.png",
+      "variants": [
+        {
+          "name": "modern",
+          "displayName": "現代",
+          "file": "studio_modern_v1.png"
+        },
+        {
+          "name": "professional",
+          "displayName": "專業",
+          "file": "studio_professional_v1.png"
+        },
+        {
+          "name": "creative",
+          "displayName": "創意",
+          "file": "studio_creative_v1.png"
+        }
+      ],
+      "suitableFor": ["錄音活動", "創作課程", "專業學習"]
+    },
+    "playground": {
+      "name": "遊樂場",
+      "description": "色彩豐富的遊樂環境，充滿活力",
+      "path": "/3d-character-backgrounds/playground/",
+      "defaultFile": "playground_colorful_v1.png",
+      "variants": [
+        {
+          "name": "colorful",
+          "displayName": "彩色",
+          "file": "playground_colorful_v1.png"
+        },
+        {
+          "name": "fun",
+          "displayName": "趣味",
+          "file": "playground_fun_v1.png"
+        },
+        {
+          "name": "adventure",
+          "displayName": "冒險",
+          "file": "playground_adventure_v1.png"
+        }
+      ],
+      "suitableFor": ["遊戲活動", "輕鬆學習", "互動遊戲"]
+    }
+  },
+  "defaultBackground": "classroom",
+  "autoSwitch": {
+    "enabled": true,
+    "interval": 30000,
+    "randomize": true
+  },
+  "settings": {
+    "quality": "high",
+    "format": "webp",
+    "fallbackFormat": "png",
+    "lazyLoading": true,
+    "preload": true
+  }
+}
+

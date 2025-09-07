@@ -47,6 +47,8 @@ interface StudentAvatarWidgetProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
   enableSound?: boolean;
+  showBackground?: boolean;
+  showAge?: boolean;
 }
 
 // 角色表情狀態
@@ -92,7 +94,9 @@ export default function StudentAvatarWidget({
   student, 
   className = '', 
   size = 'md',
-  enableSound = true 
+  enableSound = true,
+  showBackground = true,
+  showAge = true
 }: StudentAvatarWidgetProps) {
   // 狀態管理
   const [emotionState, setEmotionState] = useState<EmotionState>('happy');
@@ -246,15 +250,17 @@ export default function StudentAvatarWidget({
 
         {/* 3D 角色區域 */}
         <div className="flex flex-col items-center mb-6 relative">
-          {/* 背景裝飾圓圈 */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-full h-full rounded-full bg-gradient-to-br from-[#FFD59A]/10 to-[#FFB6C1]/10 animate-pulse" 
-                 style={{ 
-                   maxWidth: `calc(${sizeConfig[size].avatar.split(' ')[0]} + 2rem)`,
-                   maxHeight: `calc(${sizeConfig[size].avatar.split(' ')[1]} + 2rem)` 
-                 }} 
-            />
-          </div>
+          {/* 背景裝飾圓圈 - 可選 */}
+          {showBackground && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-full h-full rounded-full bg-gradient-to-br from-[#FFD59A]/10 to-[#FFB6C1]/10 animate-pulse" 
+                   style={{ 
+                     maxWidth: `calc(${sizeConfig[size].avatar.split(' ')[0]} + 2rem)`,
+                     maxHeight: `calc(${sizeConfig[size].avatar.split(' ')[1]} + 2rem)` 
+                   }} 
+              />
+            </div>
+          )}
           <motion.div
             className={`${sizeConfig[size].avatar} relative cursor-pointer overflow-hidden`}
             variants={avatarVariants}
@@ -265,15 +271,18 @@ export default function StudentAvatarWidget({
             style={{
               perspective: '1000px',
               transformStyle: 'preserve-3d',
-              borderRadius: '50%',
-              border: '4px solid transparent',
-              background: 'linear-gradient(145deg, #FFD59A, #EBC9A4) padding-box, linear-gradient(145deg, #FFE4E6, #FFEEF0) border-box',
-              boxShadow: '0 8px 32px rgba(255, 213, 154, 0.3), 0 4px 16px rgba(235, 201, 164, 0.2)'
+              ...(showBackground && {
+                borderRadius: '50%',
+                border: '4px solid transparent',
+                background: 'linear-gradient(145deg, #FFD59A, #EBC9A4) padding-box, linear-gradient(145deg, #FFE4E6, #FFEEF0) border-box',
+                boxShadow: '0 8px 32px rgba(255, 213, 154, 0.3), 0 4px 16px rgba(235, 201, 164, 0.2)'
+              })
             }}
           >
-            {/* 角色背景 */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#FFE4E6] via-[#FFEEF0] to-[#FFF0F1] rounded-full opacity-80" />
-            
+            {/* 角色背景 - 可選 */}
+            {showBackground && (
+              <div className="absolute inset-0 bg-gradient-to-br from-[#FFE4E6] via-[#FFEEF0] to-[#FFF0F1] rounded-full opacity-80" />
+            )}
             {/* 角色圖片 */}
             <motion.img
               src={getCharacterImage()}
@@ -318,9 +327,11 @@ export default function StudentAvatarWidget({
             <h3 className={`font-bold text-hanami-text ${sizeConfig[size].font}`}>
               {student.nick_name || student.full_name}
             </h3>
-            <p className="text-hanami-text-secondary text-sm">
-              {student.student_age ? convertMonthsToAge(student.student_age) : ''} • {student.course_type || '音樂課程'}
-            </p>
+            {showAge && (
+              <p className="text-hanami-text-secondary text-sm">
+                {student.student_age ? convertMonthsToAge(student.student_age) : ''} • {student.course_type || '音樂課程'}
+              </p>
+            )}
           </div>
         </div>
 
