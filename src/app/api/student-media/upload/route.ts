@@ -4,6 +4,9 @@ import { QuotaChecker } from '@/lib/quota-checker';
 
 export async function POST(request: NextRequest) {
   try {
+    // 記錄上傳開始時間
+    const uploadStartTime = Date.now();
+    
     // 檢查環境變數
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

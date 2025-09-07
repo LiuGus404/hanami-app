@@ -6,6 +6,7 @@ import React from 'react';
 import AccountIcon from './AccountIcon';
 
 import { HanamiCard, HanamiButton, HanamiInput } from './index';
+import { FullCaptcha } from './CaptchaComponent';
 
 interface HanamiLoginFormProps {
   onSubmit: (email: string, password: string, captchaAnswer?: string) => void;
@@ -16,6 +17,7 @@ interface HanamiLoginFormProps {
   captchaAnswer?: string;
   onCaptchaAnswerChange?: (value: string) => void;
   onRegenerateCaptcha?: () => void;
+  onCaptchaGenerated?: (captchaText: string, captchaImage: string) => void;
 }
 
 export default function HanamiLoginForm({
@@ -26,7 +28,8 @@ export default function HanamiLoginForm({
   captchaImage,
   captchaAnswer,
   onCaptchaAnswerChange,
-  onRegenerateCaptcha
+  onRegenerateCaptcha,
+  onCaptchaGenerated
 }: HanamiLoginFormProps) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');

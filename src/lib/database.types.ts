@@ -1555,6 +1555,7 @@ export type Database = {
           title: string | null
           description: string | null
           uploaded_by: string | null
+          lesson_id: string | null
           created_at: string
           updated_at: string
           is_favorite: boolean | null
@@ -1571,6 +1572,7 @@ export type Database = {
           title?: string | null
           description?: string | null
           uploaded_by?: string | null
+          lesson_id?: string | null
           created_at?: string
           updated_at?: string
           is_favorite?: boolean | null
@@ -1587,6 +1589,7 @@ export type Database = {
           title?: string | null
           description?: string | null
           uploaded_by?: string | null
+          lesson_id?: string | null
           created_at?: string
           updated_at?: string
           is_favorite?: boolean | null
@@ -1597,6 +1600,13 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "Hanami_Students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hanami_student_media_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_student_lesson"
             referencedColumns: ["id"]
           }
         ]

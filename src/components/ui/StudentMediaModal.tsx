@@ -1054,7 +1054,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     }
   };
 
-  // 新增：檔案壓縮功能
+  // 新增：智能檔案壓縮功能
   const compressFile = async (file: File, maxSizeMB: number): Promise<File> => {
     return new Promise((resolve) => {
       // 如果檔案已經小於配額限制，直接返回
@@ -1063,84 +1063,102 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         return;
       }
 
-      // 對於影片檔案，顯示配額警告但允許上傳
-      if (file.type.startsWith('video/')) {
-        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        const maxSizeMBFormatted = maxSizeMB.toString();
-        
-        // 顯示配額警告，但允許上傳（因為 Supabase Pro 支援更大的檔案）
-        toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制 (${maxSizeMBFormatted}MB)，但將嘗試上傳。`, {
-          icon: '⚠️',
-          duration: 5000
+      // 使用智能壓縮
+      import('@/lib/mediaCompression').then(({ smartCompress }) => {
+        smartCompress(file, maxSizeMB).then(compressedFile => {
+          const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+          const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
+          const compressionRatio = ((file.size - compressedFile.size) / file.size * 100).toFixed(1);
+          
+          toast(`檔案 ${file.name} 已壓縮: ${originalSizeMB}MB → ${compressedSizeMB}MB (節省 ${compressionRatio}%)`, {
+            icon: '🎯',
+            duration: 3000
+          });
+          
+          resolve(compressedFile);
+        }).catch(error => {
+          console.error('壓縮失敗:', error);
+          resolve(file); // 壓縮失敗時使用原始檔案
         });
-        
-        const compressedFile = new File([file], file.name, {
-          type: file.type,
-          lastModified: file.lastModified,
-        });
-        resolve(compressedFile);
-        return;
-      }
+      }).catch(() => {
+        // 如果模組載入失敗，使用原始壓縮邏輯
+        if (file.type.startsWith('video/')) {
+          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+          const maxSizeMBFormatted = maxSizeMB.toString();
+          
+          toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制 (${maxSizeMBFormatted}MB)，但將嘗試上傳。`, {
+            icon: '⚠️',
+            duration: 5000
+          });
+          
+          const compressedFile = new File([file], file.name, {
+            type: file.type,
+            lastModified: file.lastModified,
+          });
+          resolve(compressedFile);
+          return;
+        }
 
-      // 對於圖片檔案，使用更強的壓縮
-      if (file.type.startsWith('image/')) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        
-        img.onload = () => {
-          // 計算壓縮比例 - 更激進的壓縮
-          const maxDimension = 1280; // 降低最大尺寸
-          let { width, height } = img;
+        // 對於圖片檔案，使用更強的壓縮
+        if (file.type.startsWith('image/')) {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const img = new Image();
           
-          if (width > height && width > maxDimension) {
-            height = (height * maxDimension) / width;
-            width = maxDimension;
-          } else if (height > maxDimension) {
-            width = (width * maxDimension) / height;
-            height = maxDimension;
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          // 繪製壓縮後的圖片
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          // 轉換為 Blob，使用更低的品質
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name, {
-                type: file.type,
-                lastModified: file.lastModified,
-              });
-              
-              const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-              const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
-              
-              toast.success(`圖片 ${file.name} 已壓縮: ${originalSizeMB}MB → ${compressedSizeMB}MB`);
-              resolve(compressedFile);
-            } else {
-              resolve(file);
+          img.onload = () => {
+            // 計算壓縮比例 - 更激進的壓縮
+            const maxDimension = 1280; // 降低最大尺寸
+            let { width, height } = img;
+            
+            if (width > height && width > maxDimension) {
+              height = (height * maxDimension) / width;
+              width = maxDimension;
+            } else if (height > maxDimension) {
+              width = (width * maxDimension) / height;
+              height = maxDimension;
             }
-          }, file.type, 0.6); // 降低到 60% 品質
-        };
-        
-        img.onerror = () => {
-          toast.error(`圖片 ${file.name} 壓縮失敗`);
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // 繪製壓縮後的圖片
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            // 轉換為 Blob，使用更低的品質
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: file.type,
+                  lastModified: file.lastModified,
+                });
+                
+                const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+                const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
+                
+                toast.success(`圖片 ${file.name} 已壓縮: ${originalSizeMB}MB → ${compressedSizeMB}MB`);
+                resolve(compressedFile);
+              } else {
+                resolve(file);
+              }
+            }, file.type, 0.6); // 降低到 60% 品質
+          };
+          
+          img.onerror = () => {
+            toast.error(`圖片 ${file.name} 壓縮失敗`);
+            resolve(file);
+          };
+          
+          img.src = URL.createObjectURL(file);
+        } else {
+          // 對於其他檔案類型，顯示配額警告但允許上傳
+          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+          toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制，但將嘗試上傳。`, {
+            icon: '⚠️',
+            duration: 4000
+          });
           resolve(file);
-        };
-        
-        img.src = URL.createObjectURL(file);
-      } else {
-        // 對於其他檔案類型，顯示配額警告但允許上傳
-        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制，但將嘗試上傳。`, {
-          icon: '⚠️',
-          duration: 4000
-        });
-        resolve(file);
-      }
+        }
+      });
     });
   };
 

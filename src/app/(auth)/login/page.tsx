@@ -131,7 +131,8 @@ export default function LoginPage() {
       if (captchaAnswer.toUpperCase() !== captchaText) {
         setError('驗證碼錯誤，請重新輸入');
         setCaptchaAnswer('');
-        generateCaptcha();
+        generateCaptcha(); // 自動更新驗證碼
+        setLoading(false);
         return;
       }
 
@@ -145,9 +146,13 @@ export default function LoginPage() {
       if (registrationRequest) {
         if (registrationRequest.status === 'pending') {
           setError('您的註冊申請正在審核中，請等待管理員審核');
+          generateCaptcha(); // 更新驗證碼
+          setLoading(false);
           return;
         } else if (registrationRequest.status === 'rejected') {
           setError(`您的註冊申請已被拒絕。原因：${registrationRequest.rejection_reason || '未提供'}`);
+          generateCaptcha(); // 更新驗證碼
+          setLoading(false);
           return;
         }
       }
@@ -193,11 +198,15 @@ export default function LoginPage() {
         }
       } else {
         setError(result.error || '登入失敗');
+        generateCaptcha(); // 登入失敗時更新驗證碼
+        setCaptchaAnswer(''); // 清空驗證碼輸入
       }
 
     } catch (err) {
       console.error('登入錯誤:', err);
       setError('登入過程中發生錯誤，請重試');
+      generateCaptcha(); // 發生錯誤時更新驗證碼
+      setCaptchaAnswer(''); // 清空驗證碼輸入
     } finally {
       setLoading(false);
     }

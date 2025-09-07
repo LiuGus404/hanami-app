@@ -306,10 +306,14 @@ export default function TrialRegisterPage() {
       } else {
         console.error('❌ 插入錯誤:', error);
         alert(`提交失敗：${error.message}`);
+        generateCaptcha(); // 提交失敗時更新驗證碼
+        setCaptchaAnswer(''); // 清空驗證碼輸入
       }
     } catch (err) {
       console.error('❌ 提交異常:', err);
       alert('提交時發生錯誤');
+      generateCaptcha(); // 發生錯誤時更新驗證碼
+      setCaptchaAnswer(''); // 清空驗證碼輸入
     }
   };
 

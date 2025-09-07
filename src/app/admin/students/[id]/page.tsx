@@ -10,11 +10,12 @@ import { PopupSelect } from '@/components/ui/PopupSelect';
 import StudentBasicInfo from '@/components/ui/StudentBasicInfo';
 import StudentLessonPanel from '@/components/ui/StudentLessonPanel';
 import EnhancedStudentAvatarTab from '@/components/ui/EnhancedStudentAvatarTab';
+import StudentMediaTimeline from '@/components/ui/StudentMediaTimeline';
 import { supabase } from '@/lib/supabase';
 import { useUser } from '@/lib/useUser';
 import { Lesson } from '@/types';
 import { motion } from 'framer-motion';
-import { User, BookOpen, UserCircle, Sparkles } from 'lucide-react';
+import { User, BookOpen, UserCircle, Sparkles, Camera } from 'lucide-react';
 
 export default function StudentDetailPage() {
   const { id } = useParams();
@@ -34,7 +35,7 @@ export default function StudentDetailPage() {
   const [isInactiveStudent, setIsInactiveStudent] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [courseUpdateTrigger, setCourseUpdateTrigger] = useState(0); // 課程更新觸發器
-  const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar'>('basic'); // 分頁狀態
+  const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media'>('basic'); // 分頁狀態
   
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -369,7 +370,8 @@ export default function StudentDetailPage() {
             {[
               { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
               { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
-              { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度' }
+              { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度' },
+              { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' }
             ].map(({ key, label, icon: Icon, description }) => (
               <motion.button
                 key={key}
@@ -448,6 +450,15 @@ export default function StudentDetailPage() {
           {activeTab === 'avatar' && student && (
             <EnhancedStudentAvatarTab 
               student={student}
+              className="mt-4"
+            />
+          )}
+
+          {/* 媒體庫分頁 */}
+          {activeTab === 'media' && student && (
+            <StudentMediaTimeline 
+              studentId={student.id}
+              studentName={student.full_name}
               className="mt-4"
             />
           )}

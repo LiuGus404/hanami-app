@@ -158,6 +158,8 @@ export default function AdminLoginPage() {
         // 檢查用戶角色
         if (result.user.role !== 'admin') {
           setError('無權限：僅限管理員登入');
+          generateCaptcha(); // 權限錯誤時更新驗證碼
+          setCaptchaAnswer(''); // 清空驗證碼輸入
           setIsLoading(false);
           return;
         }
@@ -171,12 +173,16 @@ export default function AdminLoginPage() {
         }
       } else {
         setError(result.error || '登入失敗');
+        generateCaptcha(); // 登入失敗時更新驗證碼
+        setCaptchaAnswer(''); // 清空驗證碼輸入
         setIsLoading(false);
       }
     } catch (error) {
       console.error('Login error:', error);
       if (mounted.current) {
         setError(error instanceof Error ? error.message : '登入失敗');
+        generateCaptcha(); // 發生錯誤時更新驗證碼
+        setCaptchaAnswer(''); // 清空驗證碼輸入
         setIsLoading(false);
       }
     }
