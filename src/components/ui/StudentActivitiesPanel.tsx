@@ -168,13 +168,21 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         // 實現雙重顯示：將正在學習的活動同時顯示在本次課堂活動中
         const currentLessonActivities = result.data.currentLessonActivities || [];
         const ongoingActivities = result.data.ongoingActivities || [];
+        const completedOngoingActivities = result.data.completedOngoingActivities || [];
         const previousLessonActivities = result.data.previousLessonActivities || [];
         
         console.log('原始數據:', {
           currentLessonActivities: currentLessonActivities.length,
           ongoingActivities: ongoingActivities.length,
+          completedOngoingActivities: completedOngoingActivities.length,
           previousLessonActivities: previousLessonActivities.length
         });
+        
+        // 合併未完成和已完成的正在學習活動
+        const allOngoingActivities = [
+          ...ongoingActivities,
+          ...completedOngoingActivities
+        ];
         
         // 創建一個 Map 來避免重複添加相同的活動
         const currentActivityMap = new Map();
@@ -194,6 +202,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         let addedOngoingCount = 0;
         let filteredCompletedCount = 0;
         
+        // 只將未完成的正在學習活動添加到本次課堂活動中
         ongoingActivities.forEach((activity: any) => {
           const key = activity.id; // 使用 student_activity 的 id 作為唯一標識
           if (key && !currentActivityMap.has(key)) {
@@ -223,14 +232,15 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         console.log('雙重顯示處理完成:', {
           原始本次課堂活動: currentLessonActivities.length,
           原始正在學習活動: ongoingActivities.length,
+          已完成正在學習活動: completedOngoingActivities.length,
           增強後本次課堂活動: enhancedCurrentLessonActivities.length,
-          正在學習活動: ongoingActivities.length,
+          正在學習活動: allOngoingActivities.length,
           添加到本次課堂的ongoing活動: addedOngoingCount,
           過濾掉的已完成活動: filteredCompletedCount
         });
         
-        // 為正在學習的活動添加 source 標記
-        const enhancedOngoingActivities = ongoingActivities.map((activity: any) => ({
+        // 為所有正在學習的活動添加 source 標記
+        const enhancedOngoingActivities = allOngoingActivities.map((activity: any) => ({
           ...activity,
           source: 'ongoing' // 標記為正在學習的活動
         }));
@@ -244,11 +254,11 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         
         console.log('=== 學生活動載入成功（已實現雙重顯示） ===');
         console.log('增強後本次課堂活動:', enhancedCurrentLessonActivities);
-        console.log('正在學習活動:', ongoingActivities);
+        console.log('正在學習活動:', allOngoingActivities);
         console.log('活動總數:', {
           current: enhancedCurrentLessonActivities.length,
           previous: previousLessonActivities.length,
-          ongoing: ongoingActivities.length
+          ongoing: allOngoingActivities.length
         });
       } else {
         throw new Error(result.error || '獲取學生活動失敗');

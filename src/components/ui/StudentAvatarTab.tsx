@@ -71,12 +71,13 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
         if (response.ok) {
           const result = await response.json();
           if (result.success) {
-            const { currentLessonActivities, ongoingActivities, previousLessonActivities } = result.data;
+            const { currentLessonActivities, ongoingActivities, completedOngoingActivities, previousLessonActivities } = result.data;
             
-            // 合併所有活動並轉換格式
+            // 合併所有活動並轉換格式，包括已完成的正在學習活動
             const allActivities = [
               ...currentLessonActivities,
               ...ongoingActivities,
+              ...(completedOngoingActivities || []),
               ...previousLessonActivities
             ].map((activity: any) => {
               // 根據進度確定狀態

@@ -197,6 +197,7 @@ export default function SimpleAbilityAssessmentModal({
   
   // 活動篩選狀態
   const [activityFilter, setActivityFilter] = useState<'all' | 'incomplete' | 'completed'>('incomplete');
+  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
 
   // 成長樹路徑管理器狀態
   const [showGrowthTreePathManager, setShowGrowthTreePathManager] = useState(false);
@@ -843,12 +844,26 @@ export default function SimpleAbilityAssessmentModal({
           // 實現雙重顯示：將正在學習的活動同時顯示在本次課堂活動中
           const currentLessonActivities = result.data.currentLessonActivities || [];
           const ongoingActivities = result.data.ongoingActivities || [];
+          const completedOngoingActivities = result.data.completedOngoingActivities || [];
           const previousLessonActivities = result.data.previousLessonActivities || [];
           
           console.log('原始數據:', {
             currentLessonActivities: currentLessonActivities.length,
             ongoingActivities: ongoingActivities.length,
+            completedOngoingActivities: completedOngoingActivities.length,
             previousLessonActivities: previousLessonActivities.length
+          });
+          
+          // 合併未完成和已完成的正在學習活動，供篩選器使用
+          const allOngoingActivities = [
+            ...ongoingActivities,
+            ...completedOngoingActivities
+          ];
+          
+          console.log('合併後的正在學習活動:', {
+            未完成: ongoingActivities.length,
+            已完成: completedOngoingActivities.length,
+            總計: allOngoingActivities.length
           });
           
           // 創建一個 Map 來避免重複添加相同的活動
@@ -898,22 +913,23 @@ export default function SimpleAbilityAssessmentModal({
           console.log('雙重顯示處理完成:', {
             原始本次課堂活動: currentLessonActivities.length,
             原始正在學習活動: ongoingActivities.length,
+            已完成正在學習活動: completedOngoingActivities.length,
             增強後本次課堂活動: enhancedCurrentLessonActivities.length,
-            正在學習活動: ongoingActivities.length,
+            正在學習活動: allOngoingActivities.length,
             添加到本次課堂的ongoing活動: addedOngoingCount,
             過濾掉的已完成活動: filteredCompletedCount
           });
           
-          // 設置增強後的活動數據
+          // 設置增強後的活動數據，使用合併後的正在學習活動
           setStudentActivities({
             currentLessonActivities: enhancedCurrentLessonActivities,
             previousLessonActivities,
-            ongoingActivities
+            ongoingActivities: allOngoingActivities // 使用合併後的活動列表
           });
           
           console.log('學生活動載入成功（已實現雙重顯示）:', {
             currentLessonActivities: enhancedCurrentLessonActivities,
-            ongoingActivities
+            ongoingActivities: allOngoingActivities
           });
           
           // 新增：詳列 ongoingActivities 的每一筆關鍵欄位以偵錯自動安排邏輯的匹配
@@ -1785,6 +1801,16 @@ export default function SimpleAbilityAssessmentModal({
           
           // 清除編輯狀態
           setEditingActivityId(null);
+          
+          // 如果活動完成（進度 >= 100%），自動切換到「已完成」篩選器
+          if (progress >= 100) {
+            setActivityFilter('completed');
+            setShowCompletionMessage(true);
+            // 3秒後隱藏完成訊息
+            setTimeout(() => {
+              setShowCompletionMessage(false);
+            }, 3000);
+          }
           
           // 在背景重新載入數據以確保數據一致性
           try {
@@ -3356,6 +3382,15 @@ export default function SimpleAbilityAssessmentModal({
                      正在學習的活動
                    </h3>
                    <div className="flex items-center gap-2">
+                     {/* 完成訊息 */}
+                     {showCompletionMessage && (
+                       <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs animate-pulse">
+                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                         </svg>
+                         活動已完成！已切換到「已完成」篩選器
+                       </div>
+                     )}
                      {/* 篩選按鈕 */}
                      <div className="flex bg-[#F5F0EB] rounded-lg p-1">
                        <button

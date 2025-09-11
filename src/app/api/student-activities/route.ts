@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
     }
     
     // 正在學習的活動查詢（包含 ongoing 和成長樹相關的 lesson 類型活動）
-    // 修改：查詢 ongoing 類型 + 成長樹相關的 lesson 類型活動
+    // 修改：查詢所有 ongoing 類型 + 成長樹相關的 lesson 類型活動，不區分完成狀態
     queries.push(
       supabase
         .from('hanami_student_activities')
@@ -139,56 +139,30 @@ export async function GET(request: NextRequest) {
         `)
         .eq('student_id', studentId)
         .or('activity_type.eq.ongoing,and(activity_type.eq.lesson,tree_id.not.is.null)') // 查詢 ongoing 或 有 tree_id 的 lesson 類型
-        .lt('progress', 100) // 只包含進度小於100%的活動
         .order('assigned_at', { ascending: false })
     );
     
-    // 100%完成但仍在ongoing分類的活動查詢（包含成長樹相關的 lesson 類型）
-    queries.push(
-      supabase
-        .from('hanami_student_activities')
-        .select(`
-          id,
-          completion_status,
-          assigned_at,
-          time_spent,
-          teacher_notes,
-          student_feedback,
-          progress,
-          activity_id,
-          activity_type,
-          tree_id,
-          lesson_date,
-          timeslot,
-          hanami_teaching_activities!left (
-            id,
-            activity_name,
-            activity_description,
-            activity_type,
-            difficulty_level,
-            duration_minutes,
-            materials_needed,
-            instructions
-          )
-        `)
-        .eq('student_id', studentId)
-        .or('activity_type.eq.ongoing,and(activity_type.eq.lesson,tree_id.not.is.null)') // 查詢 ongoing 或 有 tree_id 的 lesson 類型
-        .gte('progress', 100)
-        .order('assigned_at', { ascending: false })
-    );
+    // 為了向後兼容，保留一個空的查詢結果
+    queries.push(Promise.resolve({ data: [], error: null }));
     
     // 執行並行查詢
     const [currentResult, previousResult, ongoingResult, completedOngoingResult] = await Promise.all(queries);
     
     const currentLessonActivities = currentResult.data || [];
     const previousLessonActivities = previousResult.data || [];
-    const ongoingActivities = ongoingResult.data || [];
+    const allOngoingActivities = ongoingResult.data || [];
     const completedOngoingActivities = completedOngoingResult.data || [];
+    
+    // 將所有正在學習的活動分為未完成和已完成兩類
+    const ongoingActivities = allOngoingActivities.filter((activity: any) => (activity.progress || 0) < 100);
+    const completedActivities = allOngoingActivities.filter((activity: any) => (activity.progress || 0) >= 100);
     
     console.log('並行查詢完成:', {
       current: currentLessonActivities.length,
       previous: previousLessonActivities.length,
+      allOngoing: allOngoingActivities.length,
       ongoing: ongoingActivities.length,
+      completed: completedActivities.length,
       completedOngoing: completedOngoingActivities.length
     });
 
@@ -270,7 +244,7 @@ export async function GET(request: NextRequest) {
         currentLessonActivities: (currentLessonActivities || []).map(processActivity),
         previousLessonActivities: (previousLessonActivities || []).map(processActivity),
         ongoingActivities: (ongoingActivities || []).map(processActivity),
-        completedOngoingActivities: (completedOngoingActivities || []).map(processActivity)
+        completedOngoingActivities: (completedActivities || []).map(processActivity)
       }
     });
 

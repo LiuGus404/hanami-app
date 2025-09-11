@@ -150,12 +150,13 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
         if (response.ok) {
           const result = await response.json();
           if (result.success) {
-            const { currentLessonActivities, ongoingActivities, previousLessonActivities } = result.data;
+            const { currentLessonActivities, ongoingActivities, completedOngoingActivities, previousLessonActivities } = result.data;
             
-            // 合併所有類型的活動
+            // 合併所有類型的活動，包括已完成的正在學習活動
             const allActivities = [
               ...currentLessonActivities,
               ...ongoingActivities,
+              ...(completedOngoingActivities || []),
               ...previousLessonActivities
             ];
             
