@@ -766,16 +766,24 @@ export default function ClassActivitiesPage() {
   // 分配活動給學生
   const assignActivityToStudent = async (lessonId: string, studentId: string, treeActivityId: string) => {
     try {
-      const response = await fetch('/api/class-activities', {
+      // 獲取課程資訊
+      const lesson = lessons.find(l => l.id === lessonId);
+      if (!lesson) {
+        throw new Error('找不到指定的課程');
+      }
+
+      // 使用 assign-student-activities API
+      const response = await fetch('/api/assign-student-activities', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          lesson_id: lessonId,
-          student_id: studentId,
-          tree_activity_id: treeActivityId,
-          assigned_by: 'admin' // 這裡可以改為實際的用戶ID
+          studentId: studentId,
+          lessonDate: lesson.lesson_date,
+          timeslot: lesson.actual_timeslot,
+          activityIds: [treeActivityId], // 轉換為數組格式
+          assignmentType: 'current_lesson'
         }),
       });
 

@@ -180,7 +180,7 @@ export default function SimpleAbilityAssessmentModal({
 
   // 活動管理相關狀態
   const [showActivitySelectionModal, setShowActivitySelectionModal] = useState(false);
-  const [currentActivityType, setCurrentActivityType] = useState<'current' | 'ongoing'>('current');
+  const [currentActivityType, setCurrentActivityType] = useState<'current' | 'ongoing'>('ongoing');
   const [studentActivities, setStudentActivities] = useState<{
     currentLessonActivities: any[];
     previousLessonActivities: any[];
@@ -1926,33 +1926,77 @@ export default function SimpleAbilityAssessmentModal({
       const activityIds = selectedActivities.map(activity => activity.id);
       const assignmentType = currentActivityType === 'current' ? 'current_lesson' : 'ongoing';
       
-      const response = await fetch('/api/assign-student-activities', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          studentId: selectedStudentId,
-          activityIds: activityIds,
-          assignmentType: assignmentType,
-          lessonDate: lessonDate
-        }),
-      });
+      // 如果分配類型是 current_lesson，同時也分配為 ongoing
+      if (assignmentType === 'current_lesson') {
+        // 先分配為 current_lesson
+        const currentLessonResponse = await fetch('/api/assign-student-activities', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            studentId: selectedStudentId,
+            activityIds: activityIds,
+            assignmentType: 'current_lesson',
+            lessonDate: lessonDate,
+            timeslot: '12:00:00'
+          }),
+        });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          console.log('活動分配成功');
-          // 重新載入活動
-          await loadStudentActivities();
-        } else {
-          console.error('活動分配失敗:', result.error);
-          alert('活動分配失敗: ' + result.error);
+        if (!currentLessonResponse.ok) {
+          const result = await currentLessonResponse.json();
+          throw new Error(result.error || '分配本次課堂活動失敗');
         }
+
+        // 再分配為 ongoing
+        const ongoingResponse = await fetch('/api/assign-student-activities', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            studentId: selectedStudentId,
+            activityIds: activityIds,
+            assignmentType: 'ongoing',
+            lessonDate: lessonDate
+          }),
+        });
+
+        if (!ongoingResponse.ok) {
+          const result = await ongoingResponse.json();
+          throw new Error(result.error || '分配正在學習活動失敗');
+        }
+
+        console.log('活動分配成功：同時分配為本次課堂活動和正在學習活動');
+        await loadStudentActivities();
+        setShowActivitySelectionModal(false);
+        return;
       } else {
-        console.error('活動分配失敗:', response.statusText);
-        alert('活動分配失敗');
+        // 只分配為 ongoing
+        const response = await fetch('/api/assign-student-activities', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            studentId: selectedStudentId,
+            activityIds: activityIds,
+            assignmentType: 'ongoing',
+            lessonDate: lessonDate
+          }),
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || '分配正在學習活動失敗');
+        }
+
+        console.log('活動分配成功：分配為正在學習活動');
+        await loadStudentActivities();
+        setShowActivitySelectionModal(false);
+        return;
       }
+
     } catch (error) {
       console.error('活動分配失敗:', error);
       alert('活動分配失敗: ' + (error as Error).message);
@@ -3506,4 +3550,4 @@ export default function SimpleAbilityAssessmentModal({
       )}
     </div>
   );
-} 
+}

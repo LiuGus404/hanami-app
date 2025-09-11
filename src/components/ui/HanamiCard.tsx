@@ -1,41 +1,59 @@
 'use client';
 
-import React from 'react';
+import { motion } from 'framer-motion';
+import { ReactNode } from 'react';
 
 interface HanamiCardProps {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
+  padding?: 'sm' | 'md' | 'lg';
+  shadow?: 'sm' | 'md' | 'lg';
   onClick?: () => void;
-  variant?: 'default' | 'hover' | 'interactive';
 }
 
-export function HanamiCard({ 
-  children, 
-  className = '', 
-  onClick, 
-  variant = 'default', 
+export function HanamiCard({
+  children,
+  className = '',
+  padding = 'md',
+  shadow = 'md',
+  onClick
 }: HanamiCardProps) {
-  const baseClasses = 'bg-white rounded-2xl border border-[#EADBC8] p-4';
+  const paddingClasses = {
+    sm: 'p-4',
+    md: 'p-6',
+    lg: 'p-8'
+  };
   
-  const variantClasses = {
-    default: 'shadow-sm',
-    hover: 'shadow-sm hover:shadow-md transition-shadow',
-    interactive: 'shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-[1.02]',
+  const shadowClasses = {
+    sm: 'shadow-sm',
+    md: 'shadow-lg',
+    lg: 'shadow-xl'
   };
 
-  const classes = `${baseClasses} ${variantClasses[variant]} ${className}`;
+  const baseClasses = 'bg-[#FFFDF8] border border-[#EADBC8] rounded-2xl transition-all duration-200';
+  const classes = `${baseClasses} ${paddingClasses[padding]} ${shadowClasses[shadow]} ${className}`;
 
   if (onClick) {
     return (
-      <div className={classes} onClick={onClick}>
+      <motion.div
+        onClick={onClick}
+        className={`${classes} cursor-pointer hover:shadow-xl hover:scale-[1.02]`}
+        whileHover={{ y: -2 }}
+        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+      >
         {children}
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className={classes}>
+    <motion.div
+      className={classes}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
       {children}
-    </div>
+    </motion.div>
   );
-} 
+}

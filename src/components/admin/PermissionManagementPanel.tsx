@@ -557,7 +557,7 @@ export default function PermissionManagementPanel() {
               </HanamiCard>
             ) : (
               userPermissions.map((user) => (
-                <HanamiCard key={user.id} variant="hover">
+                <HanamiCard key={user.id}>
                   <div className="flex justify-between items-center">
                     <div>
                       <h4 className="font-medium text-[#2B3A3B]">
@@ -605,7 +605,7 @@ export default function PermissionManagementPanel() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {teachers.map((teacher) => (
-                <HanamiCard key={teacher.id} variant="hover">
+                <HanamiCard key={teacher.id}>
                   <div>
                     <h4 className="font-medium text-[#2B3A3B]">
                       {teacher.teacher_nickname || teacher.teacher_fullname}
@@ -633,7 +633,7 @@ export default function PermissionManagementPanel() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {students.map((student) => (
-                <HanamiCard key={student.id} variant="hover">
+                <HanamiCard key={student.id}>
                   <div>
                     <h4 className="font-medium text-[#2B3A3B]">{student.full_name}</h4>
                     <p className="text-sm text-[#555]">{student.student_email}</p>
