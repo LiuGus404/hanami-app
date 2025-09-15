@@ -4,9 +4,12 @@ import { createSaasAdminClient } from '@/lib/supabase-saas';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, fullName } = body;
+    const { email, password, nickname, phone } = body;
 
-    if (!email || !password || !fullName) {
+    console.log('註冊請求參數:', { email, nickname, phone, passwordLength: password?.length });
+
+    if (!email || !password || !nickname) {
+      console.error('缺少必要參數:', { email: !!email, password: !!password, nickname: !!nickname });
       return NextResponse.json(
         { success: false, error: '缺少必要參數' },
         { status: 400 }
@@ -21,7 +24,8 @@ export async function POST(request: NextRequest) {
       password,
       email_confirm: false, // 需要郵箱驗證
       user_metadata: {
-        full_name: fullName
+        full_name: nickname,
+        phone: phone || null
       }
     });
 
@@ -46,7 +50,8 @@ export async function POST(request: NextRequest) {
       .insert({
         id: authData.user.id,
         email: email,
-        full_name: fullName,
+        full_name: nickname,
+        phone: phone || null,
         subscription_status: 'trial',
         usage_limit: 10,
         is_verified: false,
@@ -64,18 +69,37 @@ export async function POST(request: NextRequest) {
     }
 
     // 發送驗證郵件
-    const { error: emailError } = await supabase.auth.admin.generateLink({
-      type: 'signup',
-      email: email,
-      password: password,
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/aihome/auth/confirm`
-      }
-    });
+    try {
+      const { error: emailError } = await supabase.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/aihome/auth/verification-success`,
+        data: {
+          full_name: nickname,
+          phone: phone || null
+        }
+      });
 
-    if (emailError) {
-      console.error('發送驗證郵件失敗:', emailError);
-      // 不返回錯誤，因為用戶已經創建成功
+      if (emailError) {
+        console.error('發送驗證郵件失敗:', emailError);
+        // 嘗試使用 generateLink 作為備用方案
+        const { error: linkError } = await supabase.auth.admin.generateLink({
+          type: 'signup',
+          email: email,
+          password: password,
+          options: {
+            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/aihome/auth/verification-success`
+          }
+        });
+        
+        if (linkError) {
+          console.error('生成驗證鏈接失敗:', linkError);
+        } else {
+          console.log('驗證鏈接生成成功');
+        }
+      } else {
+        console.log('驗證郵件發送成功');
+      }
+    } catch (emailError) {
+      console.error('發送驗證郵件異常:', emailError);
     }
 
     return NextResponse.json({
@@ -84,7 +108,7 @@ export async function POST(request: NextRequest) {
         user: {
           id: authData.user.id,
           email: authData.user.email,
-          full_name: fullName
+          full_name: nickname
         }
       }
     });

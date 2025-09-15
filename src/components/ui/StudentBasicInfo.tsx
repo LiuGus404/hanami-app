@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 
 import { PopupSelect } from './PopupSelect';
+import StudentIDCard from './StudentIDCard';
 
 import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessons } from '@/lib/utils';
 import { Student, Teacher } from '@/types';
+import { QrCode } from 'lucide-react';
 
 const weekdays = [
   { label: '星期日', value: 0 },
@@ -110,6 +112,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
   const [teacherOptions, setTeacherOptions] = useState<{ label: string, value: string }[]>([]);
   const [calculatedRemainingLessons, setCalculatedRemainingLessons] = useState<number | null>(null);
+  const [showStudentIDCard, setShowStudentIDCard] = useState(false);
   
   // 添加防抖機制
   const courseOptionsFetchedRef = useRef(false);
@@ -458,7 +461,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         <img
           alt="頭像"
           className="w-24 h-24 rounded-full"
-          src={formData.gender === 'female' ? '/girl.png' : '/boy.png'}
+          src={formData.gender === 'female' || formData.gender === '女' ? '/girl.png' : '/boy.png'}
         />
         <div className="text-xl font-semibold">
           {formData.full_name || '未命名'}
@@ -467,14 +470,25 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">基本資料</h2>
-        {!editMode && !isInactive && (
+        <div className="flex items-center gap-2">
+          {/* QR碼按鈕 */}
           <button
-            className="text-sm text-[#A68A64] hover:underline flex items-center gap-1"
-            onClick={() => setEditMode(true)}
+            className="text-sm text-[#A68A64] hover:underline flex items-center gap-1 px-3 py-1 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+            onClick={() => setShowStudentIDCard(true)}
+            title="查看學生證"
           >
-            <img alt="編輯" className="w-4 h-4" src="/icons/edit-pencil.png" /> 編輯
+            <QrCode className="w-4 h-4" />
+            QR碼
           </button>
-        )}
+          {!editMode && !isInactive && (
+            <button
+              className="text-sm text-[#A68A64] hover:underline flex items-center gap-1"
+              onClick={() => setEditMode(true)}
+            >
+              <img alt="編輯" className="w-4 h-4" src="/icons/edit-pencil.png" /> 編輯
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-y-3 text-sm">
@@ -514,14 +528,14 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                     className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
                     onClick={() => setShowGenderSelect(true)}
                   >
-                    {tempGender === 'female' ? '女' : tempGender === 'male' ? '男' : '請選擇'}
+                    {tempGender === 'female' || tempGender === '女' ? '女' : tempGender === 'male' || tempGender === '男' ? '男' : '請選擇'}
                   </button>
                   {showGenderSelect && (
                     <PopupSelect
                       mode="single"
                       options={[
-                        { label: '男', value: 'male' },
-                        { label: '女', value: 'female' },
+                        { label: '男', value: '男' },
+                        { label: '女', value: '女' },
                       ]}
                       selected={tempGender || ''}
                       title="選擇性別"
@@ -538,13 +552,13 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                   )}
                 </>
               ) : (
-                formData.gender === 'female' ? '女' : formData.gender === 'male' ? '男' : '—'
+                formData.gender === 'female' || formData.gender === '女' ? '女' : formData.gender === 'male' || formData.gender === '男' ? '男' : '—'
               )}
             </div>
           </>
         )}
 
-        {isVisible('birthday') && (
+        {isVisible('student_dob') && (
           <>
             <div className="font-medium">年齡：</div>
             <div>
@@ -578,7 +592,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </>
         )}
 
-        {isVisible('birthday') && (
+        {isVisible('student_dob') && (
           <>
             <div className="font-medium">生日：</div>
             <div>
@@ -639,7 +653,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </>
         )}
 
-        {isVisible('type') && (
+        {isVisible('student_type') && (
           <>
             <div className="font-medium">類別：</div>
             <div>{formData.student_type || '—'}</div>
@@ -820,7 +834,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </>
         )}
 
-        {isVisible('remaining_lessons') && (
+        {formData.student_type === '常規' && calculatedRemainingLessons !== null && (
           <>
             <div className="font-medium">剩餘堂數：</div>
             <div>{calculatedRemainingLessons !== null ? `${calculatedRemainingLessons} 堂` : '—'}</div>
@@ -954,6 +968,74 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
             </div>
           </>
         )}
+
+        {isVisible('student_remarks') && (
+          <>
+            <div className="font-medium">備註：</div>
+            <div>
+              {editMode && isEditable('student_remarks') ? (
+                <input
+                  className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  type="text"
+                  value={formData.student_remarks || ''}
+                  onChange={(e) => handleChange('student_remarks', e.target.value)}
+                />
+              ) : (
+                formData.student_remarks || '—'
+              )}
+            </div>
+          </>
+        )}
+
+        {isVisible('student_email') && (
+          <>
+            <div className="font-medium">學生 Email：</div>
+            <div>
+              {editMode && isEditable('student_email') ? (
+                <input
+                  className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  type="email"
+                  value={formData.student_email || ''}
+                  onChange={(e) => handleChange('student_email', e.target.value)}
+                />
+              ) : (
+                formData.student_email || '—'
+              )}
+            </div>
+          </>
+        )}
+
+        {isVisible('student_password') && (
+          <>
+            <div className="font-medium">學生密碼：</div>
+            <div>
+              {editMode && isEditable('student_password') ? (
+                <input
+                  className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  type="password"
+                  value={formData.student_password || ''}
+                  onChange={(e) => handleChange('student_password', e.target.value)}
+                />
+              ) : (
+                formData.student_password ? '••••••••' : '—'
+              )}
+            </div>
+          </>
+        )}
+
+        {isVisible('created_at') && (
+          <>
+            <div className="font-medium">建立時間：</div>
+            <div>{formData.created_at || '—'}</div>
+          </>
+        )}
+
+        {isVisible('updated_at') && (
+          <>
+            <div className="font-medium">更新時間：</div>
+            <div>{formData.updated_at || '—'}</div>
+          </>
+        )}
       </div>
 
       {editMode && (
@@ -978,6 +1060,13 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </button>
         </div>
       )}
+
+      {/* 學生證彈窗 */}
+      <StudentIDCard
+        student={formData}
+        isOpen={showStudentIDCard}
+        onClose={() => setShowStudentIDCard(false)}
+      />
     </div>
   );
 }

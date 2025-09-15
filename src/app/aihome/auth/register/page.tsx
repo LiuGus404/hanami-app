@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import HanamiEchoLogo from '@/components/ui/HanamiEchoLogo';
 import { HanamiButton } from '@/components/ui/HanamiButton';
@@ -14,14 +14,21 @@ export default function RegisterPage() {
   const { register } = useSaasAuth();
   const router = useRouter();
   const [formData, setFormData] = useState({
-    fullName: '',
+    nickname: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [emailCode, setEmailCode] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -31,8 +38,144 @@ export default function RegisterPage() {
     }));
   };
 
+  const sendEmailCode = async () => {
+    if (!formData.email) {
+      toast.error('請先輸入電子郵箱');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/aihome/api/auth/send-verification-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          type: 'email'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(result.message);
+        setEmailCodeSent(true);
+      } else {
+        toast.error(result.error || '發送驗證碼失敗');
+      }
+    } catch (error) {
+      toast.error('發送驗證碼失敗');
+    }
+  };
+
+  const sendPhoneCode = async () => {
+    if (!formData.phone) {
+      toast.error('請先輸入電話號碼');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/aihome/api/auth/send-verification-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: formData.phone,
+          type: 'phone'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(result.message);
+        setPhoneCodeSent(true);
+      } else {
+        toast.error(result.error || '發送驗證碼失敗');
+      }
+    } catch (error) {
+      toast.error('發送驗證碼失敗');
+    }
+  };
+
+  const verifyEmailCode = async () => {
+    if (!emailCode) {
+      toast.error('請輸入驗證碼');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/aihome/api/auth/verify-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          code: emailCode,
+          type: 'email'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(result.message);
+        setEmailVerified(true);
+      } else {
+        toast.error(result.error || '驗證碼錯誤');
+      }
+    } catch (error) {
+      toast.error('驗證失敗');
+    }
+  };
+
+  const verifyPhoneCode = async () => {
+    if (!phoneCode) {
+      toast.error('請輸入驗證碼');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/aihome/api/auth/verify-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: formData.phone,
+          code: phoneCode,
+          type: 'phone'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(result.message);
+        setPhoneVerified(true);
+      } else {
+        toast.error(result.error || '驗證碼錯誤');
+      }
+    } catch (error) {
+      toast.error('驗證失敗');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!emailVerified) {
+      toast.error('請先驗證您的電子郵箱');
+      return;
+    }
+
+    if (!phoneVerified) {
+      toast.error('請先驗證您的電話號碼');
+      return;
+    }
     
     if (formData.password !== formData.confirmPassword) {
       toast.error('密碼確認不匹配');
@@ -47,11 +190,11 @@ export default function RegisterPage() {
     setIsLoading(true);
     
     try {
-      const result = await register(formData.email, formData.password, formData.fullName);
+      const result = await register(formData.email, formData.password, formData.nickname);
       
       if (result.success) {
-        toast.success('註冊成功！請檢查您的郵箱以完成驗證');
-        router.push('/aihome/auth/email-sent');
+        toast.success('註冊成功！歡迎加入 HanamiEcho');
+        router.push('/aihome/dashboard');
       } else {
         toast.error(result.error || '註冊失敗');
       }
@@ -78,44 +221,130 @@ export default function RegisterPage() {
         <HanamiCard className="p-8">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-[#4B4036] mb-2">
-              創建 AIHome 帳戶
+              創建 HanamiEcho 帳戶
             </h1>
             <p className="text-[#2B3A3B]">
-              開始您的智能教育之旅
+              開始建立您的智能伙伴
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-[#4B4036] mb-2">
-                姓名
+              <label htmlFor="nickname" className="block text-sm font-medium text-[#4B4036] mb-2">
+                暱稱
               </label>
               <input
                 type="text"
-                id="fullName"
-                name="fullName"
-                value={formData.fullName}
+                id="nickname"
+                name="nickname"
+                value={formData.nickname}
                 onChange={handleInputChange}
                 required
                 className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-colors"
-                placeholder="請輸入您的姓名"
+                placeholder="請輸入您的暱稱"
               />
             </div>
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-[#4B4036] mb-2">
                 電子郵箱
+                {emailVerified && <CheckCircleIcon className="w-4 h-4 inline ml-2 text-green-500" />}
               </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-                className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-colors"
-                placeholder="請輸入您的郵箱"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  required
+                  disabled={emailVerified}
+                  className="flex-1 px-4 py-3 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-colors disabled:bg-gray-100"
+                  placeholder="請輸入您的郵箱"
+                />
+                {!emailVerified && (
+                  <HanamiButton
+                    type="button"
+                    onClick={sendEmailCode}
+                    variant="secondary"
+                    size="sm"
+                    className="whitespace-nowrap"
+                  >
+                    {emailCodeSent ? '重新發送' : '發送驗證碼'}
+                  </HanamiButton>
+                )}
+              </div>
+              {emailCodeSent && !emailVerified && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={emailCode}
+                    onChange={(e) => setEmailCode(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-colors"
+                    placeholder="請輸入驗證碼"
+                    maxLength={6}
+                  />
+                  <HanamiButton
+                    type="button"
+                    onClick={verifyEmailCode}
+                    variant="primary"
+                    size="sm"
+                  >
+                    驗證
+                  </HanamiButton>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-[#4B4036] mb-2">
+                電話號碼
+                {phoneVerified && <CheckCircleIcon className="w-4 h-4 inline ml-2 text-green-500" />}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  required
+                  disabled={phoneVerified}
+                  className="flex-1 px-4 py-3 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-colors disabled:bg-gray-100"
+                  placeholder="請輸入您的電話號碼"
+                />
+                {!phoneVerified && (
+                  <HanamiButton
+                    type="button"
+                    onClick={sendPhoneCode}
+                    variant="secondary"
+                    size="sm"
+                    className="whitespace-nowrap"
+                  >
+                    {phoneCodeSent ? '重新發送' : '發送驗證碼'}
+                  </HanamiButton>
+                )}
+              </div>
+              {phoneCodeSent && !phoneVerified && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={phoneCode}
+                    onChange={(e) => setPhoneCode(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-colors"
+                    placeholder="請輸入驗證碼"
+                    maxLength={6}
+                  />
+                  <HanamiButton
+                    type="button"
+                    onClick={verifyPhoneCode}
+                    variant="primary"
+                    size="sm"
+                  >
+                    驗證
+                  </HanamiButton>
+                </div>
+              )}
             </div>
 
             <div>
@@ -180,9 +409,11 @@ export default function RegisterPage() {
               type="submit"
               className="w-full"
               size="lg"
-              disabled={isLoading}
+              disabled={isLoading || !emailVerified || !phoneVerified}
             >
-              {isLoading ? '註冊中...' : '創建帳戶'}
+              {isLoading ? '註冊中...' : 
+               !emailVerified ? '請先驗證郵箱' :
+               !phoneVerified ? '請先驗證電話' : '創建帳戶'}
             </HanamiButton>
           </form>
 

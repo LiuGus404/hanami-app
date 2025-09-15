@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 
 import './globals.css';
+import './layout.css';
 import { cookies } from 'next/headers';
 import { Toaster } from 'react-hot-toast';
 

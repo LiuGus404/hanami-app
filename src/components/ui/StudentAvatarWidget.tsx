@@ -208,8 +208,13 @@ export default function StudentAvatarWidget({
 
   // 根據性別選擇角色圖片
   const getCharacterImage = () => {
-    const isMale = student.gender?.toLowerCase() === 'male' || student.gender === '男';
-    return isMale ? '/boy(front).png' : '/girl(front).png';
+    // 如果沒有設定性別，預設為男生
+    if (!student.gender) {
+      return '/boy(front).png';
+    }
+    // 統一性別判斷邏輯：female 或 女 為女生，其他為男生
+    const isFemale = student.gender?.toLowerCase() === 'female' || student.gender === '女';
+    return isFemale ? '/girl(front).png' : '/boy(front).png';
   };
 
   // 計算總體進度

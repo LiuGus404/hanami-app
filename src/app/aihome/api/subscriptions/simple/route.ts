@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
           status: 'cancelled',
           cancelled_at: new Date().toISOString()
         })
-        .eq('id', existingSubscription.id);
+        .eq('id', (existingSubscription as any).id);
       console.log('現有訂閱已取消，創建新訂閱...');
     }
 

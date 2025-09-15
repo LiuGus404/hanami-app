@@ -22,7 +22,6 @@ const animationStyles = `
 
 import LessonEditorModal from '@/components/ui/LessonEditorModal';
 import { PopupSelect } from '@/components/ui/PopupSelect';
-import AIMessageModal from '@/components/ui/AIMessageModal';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Lesson, CourseType } from '@/types';
 
@@ -100,17 +99,13 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
   const [error, setError] = useState<string | null>(null);
   
   // 排序相關狀態
-  const [sortField, setSortField] = useState<string>('');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = useState<string>('lesson_date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
   // 動畫相關狀態
   const [isCountButtonAnimating, setIsCountButtonAnimating] = useState(false);
   const [showSuccessIndicator, setShowSuccessIndicator] = useState(false);
   
-  // AI 訊息相關狀態
-  const [showAIMessageModal, setShowAIMessageModal] = useState(false);
-  const [selectedStudentsForAI, setSelectedStudentsForAI] = useState<any[]>([]);
-  const [selectedLessonForAI, setSelectedLessonForAI] = useState<any>(null);
   
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
@@ -759,100 +754,6 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
               <span className="text-[11px] text-[#4B4036]">複製</span>
             </button>
             <button
-              onClick={() => {
-                // 使用傳入的完整學生資料，如果沒有則使用基本資料
-                const aiStudentData = studentData || {
-                  id: studentId,
-                  full_name: studentName || '學生',
-                  contact_number: contactNumber || '',
-                  course_type: lessons[0]?.course_type || '',
-                  student_type: studentType || '',
-                  // 添加其他必要的學生資料
-                  student_age: null,
-                  student_dob: null,
-                  gender: null,
-                  student_email: null,
-                  parent_email: null,
-                  address: null,
-                  school: null,
-                  student_teacher: lessons[0]?.lesson_teacher || '',
-                  regular_weekday: lessons[0]?.regular_weekday || null,
-                  regular_timeslot: lessons[0]?.regular_timeslot || '',
-                  lesson_date: lessons[0]?.lesson_date || '',
-                  lesson_duration: lessons[0]?.lesson_duration || '',
-                  actual_timeslot: lessons[0]?.actual_timeslot || '',
-                  duration_months: null,
-                  remaining_lessons: null,
-                  ongoing_lessons: null,
-                  upcoming_lessons: null,
-                  health_notes: null,
-                  student_preference: null,
-                  student_remarks: null,
-                  trial_status: null,
-                  trial_remarks: null,
-                  student_oid: lessons[0]?.student_oid || '',
-                  access_role: lessons[0]?.access_role || '',
-                };
-                
-                // 確保學生資料有正確的 ID 用於查詢課堂資料
-                if (studentData && studentData.id) {
-                  aiStudentData.id = studentData.id;
-                }
-                
-                // 處理選中的課堂資料
-                let selectedLessonData = null;
-                
-                if (selected.length > 0) {
-                  // 用戶選中了課堂，獲取所有選中的課堂
-                  const selectedLessons = lessons.filter(lesson => selected.includes(lesson.id));
-                  if (selectedLessons.length > 0) {
-                    selectedLessonData = {
-                      lessons: selectedLessons.map(lesson => ({
-                        lesson_date: lesson.lesson_date,
-                        course_type: lesson.course_type,
-                        actual_timeslot: lesson.actual_timeslot,
-                        lesson_teacher: lesson.lesson_teacher,
-                        lesson_status: lesson.lesson_status,
-                        lesson_duration: lesson.lesson_duration
-                      })),
-                      count: selectedLessons.length
-                    };
-                  }
-                } else {
-                  // 如果沒有選中課堂，自動使用下一堂課
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  const futureLessons = lessons.filter(lesson => new Date(lesson.lesson_date) >= today);
-                  if (futureLessons.length > 0) {
-                    const targetLesson = futureLessons[0]; // 取第一堂未來課堂
-                    selectedLessonData = {
-                      lessons: [{
-                        lesson_date: targetLesson.lesson_date,
-                        course_type: targetLesson.course_type,
-                        actual_timeslot: targetLesson.actual_timeslot,
-                        lesson_teacher: targetLesson.lesson_teacher,
-                        lesson_status: targetLesson.lesson_status,
-                        lesson_duration: targetLesson.lesson_duration
-                      }],
-                      count: 1
-                    };
-                  }
-                }
-                
-                setSelectedStudentsForAI([aiStudentData]);
-                setSelectedLessonForAI(selectedLessonData);
-                setShowAIMessageModal(true);
-              }}
-              className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
-              title="發送AI訊息"
-            >
-              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M8 12h8M12 8v8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="text-[11px] text-[#4B4036]">AI訊息</span>
-            </button>
-            <button
               onClick={fetchLessons}
               className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
               title="刷新"
@@ -1247,19 +1148,6 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
           />
         )}
         
-        {/* AI 訊息模態框 */}
-        {showAIMessageModal && selectedStudentsForAI.length > 0 && (
-          <AIMessageModal
-            isOpen={showAIMessageModal}
-            onClose={() => {
-              setShowAIMessageModal(false);
-              setSelectedStudentsForAI([]);
-              setSelectedLessonForAI(null);
-            }}
-            students={selectedStudentsForAI}
-            selectedLesson={selectedLessonForAI}
-          />
-        )}
       </div>
     </div>
   );

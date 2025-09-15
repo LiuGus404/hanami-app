@@ -24,7 +24,15 @@ export default function SessionProviderWrapper({
   children: React.ReactNode;
   initialSession: Session | any | null;
 }) {
-  const [supabaseClient] = useState(() => getSupabaseClient());
+  // 檢查是否在 aihome 路由中，如果是則不創建 Supabase 客戶端
+  const isAIHomeRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/aihome');
+  
+  const [supabaseClient] = useState(() => {
+    if (isAIHomeRoute) {
+      return null; // 在 aihome 路由中不創建客戶端
+    }
+    return getSupabaseClient();
+  });
 
   // 如果 initialSession 是自定義會話，轉換為 Supabase Session 格式
   const supabaseSession = initialSession && typeof initialSession === 'object' && 'id' in initialSession
@@ -46,6 +54,11 @@ export default function SessionProviderWrapper({
       },
     } as Session
     : initialSession;
+
+  // 如果在 aihome 路由中，直接返回 children，不包裝 SessionContextProvider
+  if (isAIHomeRoute || !supabaseClient) {
+    return <>{children}</>;
+  }
 
   return (
     <SessionContextProvider

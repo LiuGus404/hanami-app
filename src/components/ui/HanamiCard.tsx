@@ -11,7 +11,7 @@ interface HanamiCardProps {
   onClick?: () => void;
 }
 
-export function HanamiCard({
+function HanamiCard({
   children,
   className = '',
   padding = 'md',
@@ -57,3 +57,6 @@ export function HanamiCard({
     </motion.div>
   );
 }
+
+export { HanamiCard };
+export default HanamiCard;

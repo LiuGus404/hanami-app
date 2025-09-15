@@ -1,0 +1,58 @@
+{
+  "rewrites": [
+    {
+      "source": "/image/:fileName",
+      "destination": "https://laowyqplcthwqckyigiy.supabase.co/storage/v1/object/public/ImageGenerator/:fileName"
+    },
+    {
+      "source": "/gemini/:fileName",
+      "destination": "https://laowyqplcthwqckyigiy.supabase.co/storage/v1/object/public/ImageGenerator/Gemini/:fileName"
+    },
+    {
+      "source": "/avatars/:fileName",
+      "destination": "https://laowyqplcthwqckyigiy.supabase.co/storage/v1/object/public/avatars/:fileName"
+    },
+    {
+      "source": "/resources/:fileName",
+      "destination": "https://laowyqplcthwqckyigiy.supabase.co/storage/v1/object/public/resources/:fileName"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/image/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/gemini/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/avatars/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/resources/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800"
+        }
+      ]
+    }
+  ]
+}

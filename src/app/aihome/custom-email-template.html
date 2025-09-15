@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>確認您的 HanamiEcho 帳戶</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #FFF9F2 0%, #FFFDF8 50%, #FFD59A 100%);
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(255, 213, 154, 0.3);
+            border: 2px solid #FFD59A;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #FFD59A 0%, #EBC9A4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2B3A3B;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #FFD59A 0%, #EBC9A4 100%);
+            color: #2B3A3B;
+            padding: 18px 36px;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
+            margin: 20px 0;
+            box-shadow: 0 8px 25px rgba(255, 213, 154, 0.4);
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(255, 213, 154, 0.6);
+        }
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(255, 213, 154, 0.1);
+            border-radius: 15px;
+            border-left: 4px solid #FFD59A;
+        }
+        .icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 15px;
+            border-radius: 50%;
+        }
+        .target-icon { background: #FFD59A; }
+        .book-icon { background: #EBC9A4; }
+        .star-icon { background: #FFB6C1; }
+        .heart-icon { background: #FFB6C1; }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #FFD59A;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">HanamiEcho</div>
+            <div class="title">歡迎加入我們的 AI 學習之旅！</div>
+        </div>
+        
+        <div class="content">
+            <p>親愛的用戶，</p>
+            
+            <p>感謝您註冊 HanamiEcho！我們很高興您選擇加入我們的 AI 學習平台。</p>
+            
+            <div style="text-align: center;">
+                <a href="{{ .ConfirmationURL }}" class="button">確認我的電子郵件</a>
+            </div>
+            
+            <p>確認後，您將能夠：</p>
+            <div class="feature-item">
+                <span class="icon target-icon"></span>
+                <span>與您的專屬 AI 角色互動</span>
+            </div>
+            <div class="feature-item">
+                <span class="icon book-icon"></span>
+                <span>享受個性化的學習體驗</span>
+            </div>
+            <div class="feature-item">
+                <span class="icon star-icon"></span>
+                <span>探索豐富的 AI 功能</span>
+            </div>
+            <div class="feature-item">
+                <span class="icon heart-icon"></span>
+                <span>為您的孩子提供優質的教育內容</span>
+            </div>
+            
+            <p>如果您沒有註冊 HanamiEcho 帳戶，請忽略此郵件。</p>
+        </div>
+        
+        <div class="footer">
+            <p>此郵件由 HanamiEcho 系統自動發送，請勿回覆。</p>
+            <p>如有疑問，請聯繫我們的客服團隊。</p>
+            <p style="margin-top: 15px;">
+                <a href="{{ .SiteURL }}" style="color: #FFD59A; text-decoration: none; font-weight: bold;">訪問 HanamiEcho</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

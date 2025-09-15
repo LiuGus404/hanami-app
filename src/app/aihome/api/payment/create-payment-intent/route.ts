@@ -72,10 +72,10 @@ export async function POST(request: NextRequest) {
     if (paymentMethod === 'stripe') {
       let paymentIntent;
       
-      if (price > 0) {
+      if ((price as number) > 0) {
         try {
           paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(price * 100),
+            amount: Math.round((price as number) * 100),
             currency: 'hkd',
             payment_method_types: ['card'],
             metadata: {
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
                 payment_method: paymentMethod
               }
             })
-            .eq('id', paymentRecord.id);
+            .eq('id', (paymentRecord as any).id);
 
         } catch (stripeError) {
           console.error('創建 Stripe 支付意圖失敗:', stripeError);
@@ -114,8 +114,8 @@ export async function POST(request: NextRequest) {
         data: {
           paymentIntentId: paymentIntent?.id || `pi_${paymentRecord.id}`,
           clientSecret: paymentIntent?.client_secret || `cs_${paymentRecord.id}`,
-          requiresPayment: price > 0,
-          amount: price,
+          requiresPayment: (price as number) > 0,
+          amount: price as number,
           currency: 'HKD',
           paymentRecordId: paymentRecord.id
         }

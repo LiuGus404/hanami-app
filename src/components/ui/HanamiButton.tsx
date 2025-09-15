@@ -9,16 +9,18 @@ interface HanamiButtonProps {
   size?: 'sm' | 'md' | 'lg';
   onClick?: () => void;
   disabled?: boolean;
+  loading?: boolean;
   className?: string;
   type?: 'button' | 'submit' | 'reset';
 }
 
-export function HanamiButton({
+function HanamiButton({
   children,
   variant = 'primary',
   size = 'md',
   onClick,
   disabled = false,
+  loading = false,
   className = '',
   type = 'button'
 }: HanamiButtonProps) {
@@ -40,18 +42,29 @@ export function HanamiButton({
   };
 
   const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
+  const isDisabled = disabled || loading;
 
   return (
     <motion.button
       type={type}
       onClick={onClick}
-      disabled={disabled}
+      disabled={isDisabled}
       className={classes}
-      whileHover={{ scale: disabled ? 1 : 1.05 }}
-      whileTap={{ scale: disabled ? 1 : 0.95 }}
+      whileHover={{ scale: isDisabled ? 1 : 1.05 }}
+      whileTap={{ scale: isDisabled ? 1 : 0.95 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
     >
-      {children}
+      {loading ? (
+        <div className="flex items-center justify-center space-x-2">
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+          <span>載入中...</span>
+        </div>
+      ) : (
+        children
+      )}
     </motion.button>
   );
 }
+
+export { HanamiButton };
+export default HanamiButton;

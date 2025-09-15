@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
             status: 'cancelled',
             cancelled_at: new Date().toISOString()
           })
-          .eq('id', existingSubscription.id);
+          .eq('id', (existingSubscription as any).id);
       }
 
       // 計算訂閱期間

@@ -986,7 +986,7 @@ export default function LearningPathLevels({
                           >
                             {/* 根據學生性別顯示對應角色 */}
                             <motion.img
-                              src={student?.gender === 'male' ? '/boy(front).png' : '/girl(front).png'}
+                              src={student?.gender === 'female' ? '/girl(front).png' : '/boy(front).png'}
                               alt="學習角色"
                               className="w-full h-full object-contain drop-shadow-xl"
                               animate={{ 

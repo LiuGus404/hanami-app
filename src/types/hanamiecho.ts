@@ -1,5 +1,6 @@
-// HanamiEcho 型別定義
+// HanamiEcho 型別定義 - 基於實際 SAAS 表結構
 
+// 核心用戶型別 - 對應 saas_users 表
 export interface SaasUser {
   id: string;
   email: string;
@@ -17,7 +18,7 @@ export interface SaasUser {
   last_login?: string;
   created_at: string;
   updated_at: string;
-  // HanamiEcho 新增欄位
+  // HanamiEcho 擴展欄位
   user_type?: 'child' | 'adult';
   age_group?: string;
   preferences?: UserPreferences;
@@ -58,7 +59,7 @@ export interface PrivacySettings {
   analytics_consent: boolean;
 }
 
-// AI 角色相關型別
+// AI 角色相關型別 - 對應 saas_3d_characters 表
 export interface AICharacter {
   id: string;
   name: string;
@@ -105,6 +106,7 @@ export interface WorkspaceConfig {
   family_environment: boolean;
 }
 
+// 用戶 AI 角色關聯 - 對應 saas_user_characters 表
 export interface UserAICharacter {
   id: string;
   user_id: string;
@@ -114,7 +116,7 @@ export interface UserAICharacter {
   created_at: string;
 }
 
-// 學習相關型別
+// 學習相關型別 - 對應 saas_learning_paths 表
 export interface LearningPath {
   id: string;
   name: string;
@@ -182,6 +184,7 @@ export interface AssessmentQuestion {
   points: number;
 }
 
+// 學習進度 - 對應 saas_user_learning_paths 表
 export interface LearningProgress {
   id: string;
   user_id: string;
@@ -195,7 +198,7 @@ export interface LearningProgress {
   updated_at: string;
 }
 
-// 工作助手相關型別
+// 工作助手相關型別 - 對應 saas_work_tasks 表
 export interface WorkTask {
   id: string;
   user_id: string;
@@ -243,7 +246,7 @@ export interface TeamMember {
   permissions: string[];
 }
 
-// 記憶庫相關型別
+// 記憶庫相關型別 - 對應 saas_personal_memories 表
 export interface Memory {
   id: string;
   user_id: string;
@@ -314,7 +317,7 @@ export interface MemoryTag {
   created_at: string;
 }
 
-// 家庭協作相關型別
+// 家庭協作相關型別 - 對應 saas_family_groups 表
 export interface FamilyGroup {
   id: string;
   name: string;
@@ -377,7 +380,7 @@ export interface ActivityParticipant {
   status: 'invited' | 'accepted' | 'declined' | 'completed';
 }
 
-// 訂閱相關型別
+// 訂閱相關型別 - 對應 saas_subscription_plans 表
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -407,6 +410,7 @@ export interface PlanLimits {
   api_calls: number;
 }
 
+// 用戶訂閱 - 對應 saas_user_subscriptions 表
 export interface UserSubscription {
   id: string;
   user_id: string;
@@ -420,7 +424,7 @@ export interface UserSubscription {
   updated_at: string;
 }
 
-// 互動與分析相關型別
+// 互動與分析相關型別 - 對應 saas_character_interactions 表
 export interface CharacterInteraction {
   id: string;
   character_id: string;
@@ -447,6 +451,7 @@ export interface InteractionContext {
   work_context?: WorkContext;
 }
 
+// 用戶分析 - 對應 saas_user_analytics 表
 export interface UserAnalytics {
   id: string;
   user_id: string;
@@ -576,4 +581,203 @@ export interface SystemStats {
   total_memories: number;
   ai_character_interactions: number;
   system_uptime: number;
+}
+
+// ===== 基於實際 SAAS 表的額外型別定義 =====
+
+// 情感支持系統 - 對應 saas_emotional_support 表
+export interface EmotionalSupport {
+  id: string;
+  user_id: string;
+  character_id: string;
+  support_type: 'encouragement' | 'motivation' | 'comfort' | 'celebration' | 'guidance';
+  content: string;
+  emotional_context: EmotionalState;
+  response_rating?: number;
+  created_at: string;
+}
+
+// 故事系統 - 對應 saas_stories 表
+export interface Story {
+  id: string;
+  title: string;
+  content: string;
+  story_type: 'educational' | 'entertainment' | 'inspirational' | 'interactive';
+  target_audience: 'children' | 'adults' | 'family' | 'all';
+  age_rating: 'all' | '6+' | '12+' | '16+' | '18+';
+  tags: string[];
+  media_files?: MediaFile[];
+  ai_character_narration?: string;
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 故事進度 - 對應 saas_story_progress 表
+export interface StoryProgress {
+  id: string;
+  user_id: string;
+  story_id: string;
+  progress_percentage: number;
+  current_chapter?: string;
+  completed_at?: string;
+  user_rating?: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 使用統計 - 對應 saas_usage_statistics 表
+export interface UsageStatistics {
+  id: string;
+  user_id: string;
+  date: string;
+  learning_time: number; // 分鐘
+  work_time: number; // 分鐘
+  ai_interactions: number;
+  stories_read: number;
+  memories_created: number;
+  tasks_completed: number;
+  productivity_score: number;
+  engagement_score: number;
+  created_at: string;
+}
+
+// 系統配置 - 對應 saas_system_config 表
+export interface SystemConfig {
+  id: string;
+  config_key: string;
+  config_value: string;
+  config_type: 'string' | 'number' | 'boolean' | 'json';
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// 通知系統 - 對應 saas_notifications 表
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  notification_type: 'learning_reminder' | 'work_reminder' | 'achievement' | 'family_update' | 'system';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  is_read: boolean;
+  action_url?: string;
+  metadata?: Record<string, any>;
+  scheduled_at?: string;
+  created_at: string;
+}
+
+// 文件管理 - 對應 saas_documents 表
+export interface Document {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  document_type: 'note' | 'report' | 'template' | 'resource' | 'personal';
+  category?: string;
+  tags: string[];
+  file_path?: string;
+  file_size?: number;
+  mime_type?: string;
+  is_public: boolean;
+  shared_with?: string[];
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 標籤系統 - 對應 saas_tags 表
+export interface Tag {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  category: 'learning' | 'work' | 'personal' | 'family' | 'system';
+  usage_count: number;
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 標籤關聯 - 對應 saas_tag_relations 表
+export interface TagRelation {
+  id: string;
+  tag_id: string;
+  resource_type: 'learning_path' | 'work_task' | 'memory' | 'story' | 'document';
+  resource_id: string;
+  created_at: string;
+}
+
+// 用戶偏好 - 對應 saas_user_preferences 表
+export interface UserPreference {
+  id: string;
+  user_id: string;
+  preference_key: string;
+  preference_value: string;
+  preference_type: 'string' | 'number' | 'boolean' | 'json';
+  category: 'ui' | 'learning' | 'work' | 'notification' | 'privacy';
+  created_at: string;
+  updated_at: string;
+}
+
+// 會話管理 - 對應 saas_user_sessions 表
+export interface UserSession {
+  id: string;
+  user_id: string;
+  session_token: string;
+  device_info?: string;
+  ip_address?: string;
+  user_agent?: string;
+  is_active: boolean;
+  last_activity: string;
+  expires_at: string;
+  created_at: string;
+}
+
+// 審計日誌 - 對應 saas_audit_logs 表
+export interface AuditLog {
+  id: string;
+  user_id?: string;
+  action: string;
+  resource_type: string;
+  resource_id?: string;
+  old_values?: Record<string, any>;
+  new_values?: Record<string, any>;
+  ip_address?: string;
+  user_agent?: string;
+  timestamp: string;
+}
+
+// API 端點配置 - 對應 saas_api_endpoints 表
+export interface APIEndpoint {
+  id: string;
+  endpoint_path: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  description?: string;
+  rate_limit?: number;
+  requires_auth: boolean;
+  required_permissions?: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// 錯誤日誌 - 對應 saas_error_logs 表
+export interface ErrorLog {
+  id: string;
+  user_id?: string;
+  error_type: string;
+  error_message: string;
+  stack_trace?: string;
+  request_data?: Record<string, any>;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  resolved: boolean;
+  resolved_at?: string;
+  resolved_by?: string;
+  created_at: string;
 }
