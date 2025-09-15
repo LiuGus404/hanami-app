@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
     const supabase = createSaasAdminClient();
 
     // 更新支付記錄
-    const { data: paymentRecord, error: paymentError } = await supabase
-      .from('saas_payments')
+    const { data: paymentRecord, error: paymentError } = await (supabase
+      .from('saas_payments') as any)
       .update({
         payment_status: status,
         stripe_payment_intent_id: paymentIntentId,
@@ -62,8 +62,8 @@ export async function POST(request: NextRequest) {
 
       if (existingSubscription) {
         // 取消現有訂閱
-        await supabase
-          .from('saas_user_subscriptions')
+        await (supabase
+          .from('saas_user_subscriptions') as any)
           .update({
             status: 'cancelled',
             cancelled_at: new Date().toISOString()
@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
       }
 
       // 創建新訂閱
-      const { data: newSubscription, error: subscriptionError } = await supabase
-        .from('saas_user_subscriptions')
+      const { data: newSubscription, error: subscriptionError } = await (supabase
+        .from('saas_user_subscriptions') as any)
         .insert({
           user_id: userId,
           plan_id: planId,

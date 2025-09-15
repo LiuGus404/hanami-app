@@ -124,10 +124,10 @@ export async function validateTable(tableName: string): Promise<TableValidationR
     // 獲取表結構資訊
     const { data: columns, error: columnsError } = await supabase.rpc('get_table_columns', {
       table_name: tableName
-    });
+    } as any);
     
     if (!columnsError && columns && Array.isArray(columns)) {
-      result.columns = columns.map((col: any) => ({
+      result.columns = (columns as any[]).map((col: any) => ({
         name: col.column_name,
         exists: true,
         type: col.data_type,

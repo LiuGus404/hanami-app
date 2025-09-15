@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 創建綁定記錄
-    const { data: binding, error: insertError } = await supabase
-      .from('parent_student_bindings')
+    const { data: binding, error: insertError } = await (supabase
+      .from('parent_student_bindings') as any)
       .insert({
         parent_id: parentId,
         student_id: studentId,

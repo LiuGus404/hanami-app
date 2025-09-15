@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 格式化方案數據
-    const formattedPlans = plans.map(plan => ({
+    const formattedPlans = plans.map((plan: any) => ({
       id: plan.id,
       plan_name: plan.plan_name,
       plan_description: plan.plan_description,

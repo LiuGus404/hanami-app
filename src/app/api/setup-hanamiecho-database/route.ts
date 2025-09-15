@@ -267,7 +267,7 @@ export async function POST(request: NextRequest) {
     `;
 
     // 執行遷移
-    const { data, error } = await supabase.rpc('exec_sql', { sql: migrationSQL });
+    const { data, error } = await supabase.rpc('exec_sql', { sql: migrationSQL } as any);
 
     if (error) {
       console.error('資料庫遷移失敗:', error);

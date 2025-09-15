@@ -42,11 +42,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const price = billingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly;
+    const price = billingCycle === 'monthly' ? (plan as any).price_monthly : (plan as any).price_yearly;
 
     // 創建支付記錄
-    const { data: paymentRecord, error: paymentError } = await supabase
-      .from('saas_payments')
+    const { data: paymentRecord, error: paymentError } = await (supabase
+      .from('saas_payments') as any)
       .insert({
         user_id: userId,
         amount: price,
@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
           });
 
           // 更新支付記錄
-          await supabase
-            .from('saas_payments')
+          await (supabase
+            .from('saas_payments') as any)
             .update({
               payment_intent_id: paymentIntent.id,
               stripe_payment_intent_id: paymentIntent.id,

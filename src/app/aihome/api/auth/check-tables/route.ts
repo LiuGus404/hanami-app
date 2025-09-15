@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
       const { error: createError } = await supabase.rpc('exec_sql', {
         sql: createTableSQL
-      });
+      } as any);
 
       if (createError) {
         console.error('創建表失敗:', createError);
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
       const { error: rlsError } = await supabase.rpc('exec_sql', {
         sql: rlsSQL
-      });
+      } as any);
 
       if (rlsError) {
         console.error('設置 RLS 失敗:', rlsError);

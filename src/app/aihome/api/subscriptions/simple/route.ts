@@ -96,8 +96,8 @@ export async function POST(request: NextRequest) {
 
     if (existingSubscription) {
       console.log('用戶已有訂閱，執行升級流程...');
-      await supabase
-        .from('saas_user_subscriptions')
+      await (supabase
+        .from('saas_user_subscriptions') as any)
         .update({
           status: 'cancelled',
           cancelled_at: new Date().toISOString()
@@ -118,8 +118,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 創建新訂閱
-    const { data: newSubscription, error: subscriptionError } = await supabase
-      .from('saas_user_subscriptions')
+    const { data: newSubscription, error: subscriptionError } = await (supabase
+      .from('saas_user_subscriptions') as any)
       .insert({
         user_id: userId,
         plan_id: planId,

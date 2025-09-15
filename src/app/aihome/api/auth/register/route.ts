@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         usage_limit: 10,
         is_verified: false,
         verification_method: 'email'
-      });
+      } as any);
 
     if (saasError) {
       console.error('創建 SAAS 用戶失敗:', saasError);
