@@ -18,6 +18,35 @@ export async function POST(request: NextRequest) {
 
     const supabase = createSaasAdminClient();
 
+    // 檢查電話號碼是否已被使用
+    if (phone) {
+      const { data: existingPhone, error: phoneCheckError } = await supabase
+        .from('saas_users')
+        .select('id, email, full_name')
+        .eq('phone', phone)
+        .maybeSingle(); // 使用 maybeSingle 避免找不到記錄時的錯誤
+
+      if (phoneCheckError) {
+        console.error('檢查電話號碼失敗:', phoneCheckError);
+        return NextResponse.json(
+          { success: false, error: '檢查電話號碼時發生錯誤' },
+          { status: 500 }
+        );
+      }
+
+      if (existingPhone) {
+        console.error('電話號碼已被使用:', { 
+          phone, 
+          existingUser: (existingPhone as any).email,
+          existingName: (existingPhone as any).full_name 
+        });
+        return NextResponse.json(
+          { success: false, error: '該電話號碼已註冊過，如需要請按忘記密碼' },
+          { status: 400 }
+        );
+      }
+    }
+
     // 創建 Supabase Auth 用戶（需要郵箱驗證）
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,

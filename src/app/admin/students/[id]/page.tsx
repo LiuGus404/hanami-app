@@ -440,6 +440,7 @@ export default function StudentDetailPage() {
                       setCourseUpdateTrigger(prev => prev + 1);
                     }}
                     studentData={student}
+                    showAIMessageButton={true}
                   />
                 );
               })()}

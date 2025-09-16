@@ -18,6 +18,31 @@ export async function POST(request: NextRequest) {
 
     console.log('開始處理註冊:', { email, role });
 
+    // 檢查電話號碼是否已被使用
+    const { data: existingPhone, error: phoneCheckError } = await supabase
+      .from('hanami_employee')
+      .select('id, teacher_email, teacher_fullname')
+      .eq('teacher_phone', phone)
+      .maybeSingle();
+
+    if (phoneCheckError) {
+      console.error('檢查電話號碼失敗:', phoneCheckError);
+      return NextResponse.json({
+        error: '檢查電話號碼時發生錯誤'
+      }, { status: 500 });
+    }
+
+    if (existingPhone) {
+      console.error('電話號碼已被使用:', { 
+        phone, 
+        existingUser: existingPhone.teacher_email,
+        existingName: existingPhone.teacher_fullname 
+      });
+      return NextResponse.json({
+        error: '該電話號碼已註冊過，如需要請按忘記密碼'
+      }, { status: 400 });
+    }
+
     // 檢查是否已經存在任何類型的帳戶
     const existingAccounts = [];
 

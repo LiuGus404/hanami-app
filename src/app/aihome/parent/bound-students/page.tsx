@@ -63,28 +63,26 @@ export default function BoundStudentsPage() {
       try {
         setPageLoading(true);
         
-        // 模擬 API 調用 - 實際應該從 API 獲取
-        const mockStudents: BoundStudent[] = [
-          {
-            id: '1',
-            student_id: '38a1f68d-864c-4216-a20a-d053fc4f49bf',
-            student_name: 'Helia',
-            student_oid: 'fd08d847',
-            institution: 'Hanami Music',
-            student_age_months: 20, // 1歲8個月 = 20個月
-            binding_type: 'parent',
-            binding_status: 'active',
-            binding_date: '2024-12-19T10:00:00Z',
-            last_accessed: '2024-12-19T15:30:00Z',
-            access_count: 5,
-            notes: '我的孩子'
-          }
-        ];
-        
-        setBoundStudents(mockStudents);
+        if (!user?.id) {
+          console.error('用戶未登入或缺少用戶 ID');
+          return;
+        }
+
+        // 從 API 獲取真實的綁定學生資料
+        const response = await fetch(`/api/parent/bind-student?parentId=${user.id}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setBoundStudents(data.bindings || []);
+        } else {
+          console.error('獲取綁定學生失敗:', data.error);
+          toast.error(data.error || '載入學生資料失敗');
+          setBoundStudents([]);
+        }
       } catch (error) {
         console.error('載入綁定孩子失敗:', error);
         toast.error('載入學生資料失敗');
+        setBoundStudents([]);
       } finally {
         setPageLoading(false);
       }

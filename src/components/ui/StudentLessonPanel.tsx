@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { useEffect, useState, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
+import { MessageSquare } from 'lucide-react';
 
 // 添加動畫樣式
 const animationStyles = `
@@ -24,6 +25,7 @@ import LessonEditorModal from '@/components/ui/LessonEditorModal';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Lesson, CourseType } from '@/types';
+import AIMessageModal from '@/components/ui/AIMessageModal';
 
 
 interface StudentLessonPanelProps {
@@ -34,6 +36,7 @@ interface StudentLessonPanelProps {
   onCourseUpdate?: () => void; // 課程更新回調
   // 添加更多學生資料參數
   studentData?: any; // 完整的學生資料
+  showAIMessageButton?: boolean; // 是否顯示 AI 訊息按鈕
 }
 
 interface LessonData {
@@ -64,7 +67,7 @@ interface LessonData {
   remarks: string | null;
 }
 
-export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData }: StudentLessonPanelProps) {
+export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData, showAIMessageButton = false }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
   
   // 添加動畫樣式到 head
@@ -105,6 +108,9 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
   // 動畫相關狀態
   const [isCountButtonAnimating, setIsCountButtonAnimating] = useState(false);
   const [showSuccessIndicator, setShowSuccessIndicator] = useState(false);
+  
+  // AI 訊息相關狀態
+  const [showAIMessageModal, setShowAIMessageModal] = useState(false);
   
   
   // 添加防抖機制
@@ -763,6 +769,16 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
               </svg>
               <span className="text-[11px] text-[#4B4036]">刷新</span>
             </button>
+            {showAIMessageButton && (
+              <button
+                onClick={() => setShowAIMessageModal(true)}
+                className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+                title="AI 訊息"
+              >
+                <MessageSquare className="w-6 h-6 mb-0.5 text-[#4B4036]" />
+                <span className="text-[11px] text-[#4B4036]">AI 訊息</span>
+              </button>
+            )}
             <button
               onClick={() => setCategorySelectOpen(true)}
               className={`flex flex-col items-center min-w-[48px] px-2 py-1 rounded-xl shadow transition ${
@@ -1145,6 +1161,19 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
             onConfirm={handleVisibleCountConfirm}
             onCancel={handleVisibleCountCancel}
             mode="single"
+          />
+        )}
+        
+        {/* AI 訊息模態框 */}
+        {showAIMessageModal && (
+          <AIMessageModal
+            isOpen={showAIMessageModal}
+            onClose={() => setShowAIMessageModal(false)}
+            students={studentData ? [studentData] : []}
+            selectedLesson={selected.length > 0 ? {
+              lessons: filteredLessons.filter(lesson => selected.includes(lesson.id)) as any,
+              count: selected.length
+            } : null}
           />
         )}
         

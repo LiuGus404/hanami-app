@@ -37,27 +37,42 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
         console.log('快速會話檢查結果:', session);
         
         if (session?.user) {
-          console.log('找到會話，直接設置用戶數據');
-          const userData: SaasUser = {
-            id: session.user.id,
-            email: session.user.email || 'tqfea12@gmail.com',
-            full_name: 'tqfea12',
-            phone: '+85292570768',
-            avatar_url: undefined,
-            subscription_status: 'trial',
-            subscription_plan_id: undefined,
-            subscription_start_date: undefined,
-            subscription_end_date: undefined,
-            usage_count: 0,
-            usage_limit: 10,
-            is_verified: false,
-            verification_method: 'email',
-            last_login: new Date().toISOString(),
-            created_at: session.user.created_at,
-            updated_at: new Date().toISOString()
-          };
-          console.log('設置用戶數據:', userData);
-          setUser(userData);
+          console.log('找到會話，從資料庫獲取用戶數據');
+          
+          // 從 saas_users 表獲取真實的用戶資料
+          const { data: userData, error: userError } = await supabase
+            .from('saas_users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (userError) {
+            console.error('獲取用戶資料失敗:', userError);
+            // 如果資料庫中沒有用戶資料，使用 session 中的基本資料
+            const fallbackUserData: SaasUser = {
+              id: session.user.id,
+              email: session.user.email || '',
+              full_name: session.user.user_metadata?.full_name || '用戶',
+              phone: session.user.user_metadata?.phone || '',
+              avatar_url: undefined,
+              subscription_status: 'trial',
+              subscription_plan_id: undefined,
+              subscription_start_date: undefined,
+              subscription_end_date: undefined,
+              usage_count: 0,
+              usage_limit: 10,
+              is_verified: false,
+              verification_method: 'email',
+              last_login: new Date().toISOString(),
+              created_at: session.user.created_at,
+              updated_at: new Date().toISOString()
+            };
+            console.log('使用備用用戶數據:', fallbackUserData);
+            setUser(fallbackUserData);
+          } else {
+            console.log('設置真實用戶數據:', userData);
+            setUser(userData as SaasUser);
+          }
         }
       } catch (error) {
         console.log('快速會話檢查失敗，忽略錯誤:', error);
