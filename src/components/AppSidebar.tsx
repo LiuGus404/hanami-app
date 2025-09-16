@@ -9,7 +9,8 @@ import {
   UsersIcon,
   UserIcon,
   Cog6ToothIcon,
-  XMarkIcon
+  XMarkIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 
 interface SidebarItem {
@@ -60,6 +61,12 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       label: '家長連結', 
       href: '/aihome/parent/bound-students', 
       description: '查看孩子的學習' 
+    },
+    { 
+      icon: SparklesIcon, 
+      label: 'AI伙伴', 
+      href: '/aihome/ai-companions', 
+      description: '您的工作和學習伙伴' 
     },
     { 
       icon: UserIcon, 

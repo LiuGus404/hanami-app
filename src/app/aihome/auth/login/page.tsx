@@ -22,29 +22,25 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 暫時完全禁用重定向邏輯，用於調試
-  // useEffect(() => {
-  //   if (!loading && user) {
-  //     const redirectTo = searchParams.get('redirect') || '/aihome/dashboard';
-  //     const currentPath = window.location.pathname;
+  // 監聽用戶登入狀態，自動重定向
+  useEffect(() => {
+    if (!loading && user) {
+      const redirectTo = searchParams.get('redirect') || '/aihome/dashboard';
+      const currentPath = window.location.pathname;
       
-  //     console.log('用戶已登入，當前路徑:', currentPath, '重定向到:', redirectTo);
+      console.log('用戶已登入，當前路徑:', currentPath, '重定向到:', redirectTo);
       
-  //     // 如果當前已經在目標頁面，不要重定向
-  //     if (currentPath === redirectTo) {
-  //       console.log('已經在目標頁面，跳過重定向');
-  //       return;
-  //     }
+      // 如果當前已經在目標頁面，不要重定向
+      if (currentPath === redirectTo) {
+        console.log('已經在目標頁面，跳過重定向');
+        return;
+      }
       
-  //     // 使用 router.push 而不是 window.location.href 來避免頁面重新載入
-  //     const timer = setTimeout(() => {
-  //       console.log('執行重定向到:', redirectTo);
-  //       router.push(redirectTo);
-  //     }, 500); // 減少延遲時間
-      
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [user, loading, searchParams, router]);
+      // 立即重定向，不使用延遲
+      console.log('執行重定向到:', redirectTo);
+      router.push(redirectTo);
+    }
+  }, [user, loading, searchParams, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -73,11 +69,9 @@ export default function LoginPage() {
         const redirectTo = searchParams.get('redirect') || '/aihome/dashboard';
         console.log('登入成功，準備跳轉到:', redirectTo);
         
-        // 使用 window.location.href 強制跳轉，避免中間件阻止
-        setTimeout(() => {
-          console.log('執行跳轉到:', redirectTo);
-          window.location.href = redirectTo;
-        }, 100);
+        // 使用 router.push 進行跳轉
+        console.log('執行跳轉到:', redirectTo);
+        router.push(redirectTo);
       } else {
         toast.error(result.error || '登入失敗');
       }
