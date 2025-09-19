@@ -111,6 +111,199 @@ interface Room {
   createdAt: Date;
 }
 
+// TaskPanelContent 組件 - 可重用的任務面板內容
+const TaskPanelContent = ({ 
+  tasks, 
+  activeRoles, 
+  room, 
+  editingProject, 
+  editProjectName, 
+  setEditProjectName, 
+  editProjectDescription, 
+  setEditProjectDescription, 
+  handleStartEditProject, 
+  handleUpdateProject, 
+  setEditingProject, 
+  picoSettings, 
+  setPicoSettings, 
+  moriSettings, 
+  setMoriSettings 
+}: {
+  tasks: any[];
+  activeRoles: ('hibi' | 'mori' | 'pico')[];
+  room: any;
+  editingProject: boolean;
+  editProjectName: string;
+  setEditProjectName: (name: string) => void;
+  editProjectDescription: string;
+  setEditProjectDescription: (desc: string) => void;
+  handleStartEditProject: () => void;
+  handleUpdateProject: () => void;
+  setEditingProject: (editing: boolean) => void;
+  picoSettings: any;
+  setPicoSettings: (settings: any) => void;
+  moriSettings: any;
+  setMoriSettings: (settings: any) => void;
+}) => (
+  <>
+    {/* 任務統計 */}
+    <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+        <div className="text-lg font-bold text-blue-600">{tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length}</div>
+        <div className="text-xs text-blue-500">進行中</div>
+      </div>
+      <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+        <div className="text-lg font-bold text-green-600">{tasks.filter(t => t.status === 'completed').length}</div>
+        <div className="text-xs text-green-500">已完成</div>
+      </div>
+    </div>
+
+    {/* 專案資訊編輯區域 */}
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-[#4B4036] flex items-center space-x-2">
+          <div className="w-4 h-4 bg-purple-400 rounded-full flex items-center justify-center">
+            <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </div>
+          <span>專案資訊</span>
+        </h3>
+        
+        {!editingProject && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleStartEditProject}
+            className="flex items-center space-x-1 px-2 py-1 bg-[#FFD59A] hover:bg-[#EBC9A4] text-[#4B4036] rounded-lg text-xs font-medium transition-all shadow-sm"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>編輯</span>
+          </motion.button>
+        )}
+      </div>
+      
+      {editingProject ? (
+        /* 編輯模式 */
+        <div className="space-y-3 p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+          <div>
+            <label className="block text-xs font-medium text-[#4B4036] mb-1">專案名稱</label>
+            <input
+              type="text"
+              value={editProjectName}
+              onChange={(e) => setEditProjectName(e.target.value)}
+              className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#FFB6C1] focus:border-transparent transition-all"
+              placeholder="輸入專案名稱..."
+            />
+          </div>
+          
+          <div>
+            <label className="block text-xs font-medium text-[#4B4036] mb-1">專案描述</label>
+            <textarea
+              value={editProjectDescription}
+              onChange={(e) => setEditProjectDescription(e.target.value)}
+              rows={2}
+              className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#FFB6C1] focus:border-transparent transition-all resize-none"
+              placeholder="輸入專案描述..."
+            />
+          </div>
+          
+          <div className="flex space-x-2">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleUpdateProject}
+              className="flex-1 px-3 py-1.5 bg-[#FFB6C1] hover:bg-[#FFB6C1]/80 text-white rounded-md text-xs font-medium transition-all shadow-sm"
+            >
+              保存
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setEditingProject(false)}
+              className="flex-1 px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-[#4B4036] rounded-md text-xs font-medium transition-all"
+            >
+              取消
+            </motion.button>
+          </div>
+        </div>
+      ) : (
+        /* 顯示模式 */
+        <div className="p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+          <div className="mb-2">
+            <div className="text-xs font-medium text-purple-700 mb-0.5">專案名稱</div>
+            <div className="text-sm text-[#4B4036] font-semibold">{room.title}</div>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-purple-700 mb-0.5">專案描述</div>
+            <div className="text-xs text-[#2B3A3B] leading-relaxed">{room.description || '暫無描述'}</div>
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* 皮可創作設定 - 只在皮可在專案中時顯示 */}
+    {activeRoles.includes('pico') && (
+      <div className="mb-6">
+        <PicoSettings 
+          onSettingsChange={setPicoSettings}
+          className="shadow-sm"
+        />
+      </div>
+    )}
+
+    {/* 墨墨研究設定 - 只在墨墨在專案中時顯示 */}
+    {activeRoles.includes('mori') && (
+      <div className="mb-6">
+        <MoriSettings 
+          onSettingsChange={setMoriSettings}
+          className="shadow-sm"
+        />
+      </div>
+    )}
+
+    {/* 任務列表 */}
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-[#4B4036] mb-3">活躍任務</h3>
+      <AnimatePresence>
+        {tasks.map((task) => (
+          <TaskCard key={task.id} task={task} />
+        ))}
+      </AnimatePresence>
+
+      {tasks.length === 0 && (
+        <div className="text-center py-8">
+          <div className="w-16 h-16 bg-[#F8F5EC] rounded-full flex items-center justify-center mx-auto mb-3">
+            <CpuChipIcon className="w-8 h-8 text-[#2B3A3B]" />
+          </div>
+          <p className="text-sm text-[#2B3A3B]">還沒有任務</p>
+          <p className="text-xs text-[#2B3A3B]/70">在對話中提及需求，AI 會自動創建任務</p>
+        </div>
+      )}
+    </div>
+  </>
+);
+
+// 安全的 JSON 解析函數
+const safeJsonParse = async (response: Response, context: string = 'API') => {
+  try {
+    const responseText = await response.text();
+    console.log(`🔍 ${context} 原始響應文本:`, responseText);
+    
+    if (!responseText || responseText.trim() === '') {
+      console.log(`⚠️ ${context} 收到空響應`);
+      return { success: false, error: 'Empty response' };
+    }
+    
+    return JSON.parse(responseText);
+  } catch (jsonError) {
+    console.error(`❌ ${context} JSON 解析失敗:`, jsonError);
+    return { success: false, error: 'Invalid JSON response', details: jsonError instanceof Error ? jsonError.message : String(jsonError) };
+  }
+};
+
 export default function RoomChatPage() {
   const { user } = useSaasAuth();
   const router = useRouter();
@@ -418,7 +611,7 @@ export default function RoomChatPage() {
           roleName: roleId === 'hibi' ? 'Hibi' : roleId === 'mori' ? '墨墨' : '皮可'
         })
       });
-      const result = await response.json();
+      const result = await safeJsonParse(response, '移除角色 API');
       
       if (result.success) {
         console.log('✅ 角色已從資料庫移除:', roleId);
@@ -465,7 +658,7 @@ export default function RoomChatPage() {
           description: editProjectDescription.trim()
         })
       });
-      const result = await response.json();
+      const result = await safeJsonParse(response, '更新專案 API');
       
       if (result.success) {
         console.log('✅ 專案資訊已更新');
@@ -531,7 +724,7 @@ export default function RoomChatPage() {
             action: 'add' // 添加角色而不是替換
           })
         });
-        const result = await response.json();
+        const result = await safeJsonParse(response, '同步角色 API');
         
         if (result.success) {
           console.log('✅ 角色已同步到資料庫:', roleId);
@@ -1074,7 +1267,9 @@ export default function RoomChatPage() {
         body: JSON.stringify(webhookData)
       });
       
-      const out = await res.json();
+      console.log('🔍 Mori API 響應狀態:', res.status, res.statusText);
+      const out = await safeJsonParse(res, 'Mori webhook');
+      
       console.log('✅ Mori webhook 回應:', { status: res.status, data: out });
       
       // 處理 Mori 的回應
@@ -1347,7 +1542,15 @@ export default function RoomChatPage() {
         body: JSON.stringify(webhookData)
       });
       
-      const out = await res.json();
+      console.log('🔍 API 響應狀態:', res.status, res.statusText);
+      
+      // 檢查響應內容類型和長度
+      const contentType = res.headers.get('content-type');
+      const contentLength = res.headers.get('content-length');
+      console.log('🔍 響應標頭:', { contentType, contentLength });
+      
+      const out = await safeJsonParse(res, 'Pico webhook');
+      
       console.log('✅ 聊天室 webhook 回應:', { status: res.status, data: out });
       
       // 處理 n8n 的回應並顯示給用戶
@@ -2639,168 +2842,106 @@ export default function RoomChatPage() {
         {/* 任務面板 */}
         <AnimatePresence>
           {showTaskPanel && (
-            <motion.div
-              initial={{ x: 300, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 300, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="w-80 bg-white/80 backdrop-blur-sm border-l border-[#EADBC8] p-6 overflow-y-auto"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-[#4B4036]">任務面板</h2>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    setShowTaskPanel(false);
-                    setEditingProject(false); // 關閉編輯模式
-                  }}
-                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+            <>
+              {/* 桌面版：側邊面板 */}
+              <motion.div
+                initial={{ x: 300, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 300, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="hidden md:block w-80 bg-white/80 backdrop-blur-sm border-l border-[#EADBC8] p-6 overflow-y-auto"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-[#4B4036]">任務面板</h2>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => {
+                      setShowTaskPanel(false);
+                      setEditingProject(false);
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <XMarkIcon className="w-5 h-5 text-gray-500" />
+                  </motion.button>
+                </div>
+                <TaskPanelContent 
+                  tasks={tasks}
+                  activeRoles={activeRoles}
+                  room={room}
+                  editingProject={editingProject}
+                  editProjectName={editProjectName}
+                  setEditProjectName={setEditProjectName}
+                  editProjectDescription={editProjectDescription}
+                  setEditProjectDescription={setEditProjectDescription}
+                  handleStartEditProject={handleStartEditProject}
+                  handleUpdateProject={handleUpdateProject}
+                  setEditingProject={setEditingProject}
+                  picoSettings={picoSettings}
+                  setPicoSettings={setPicoSettings}
+                  moriSettings={moriSettings}
+                  setMoriSettings={setMoriSettings}
+                />
+              </motion.div>
+
+              {/* 移動端：全屏覆蓋 */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                onClick={() => setShowTaskPanel(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-md max-h-[80vh] bg-white rounded-2xl shadow-2xl overflow-hidden"
                 >
-                  <EllipsisHorizontalIcon className="w-5 h-5 text-[#4B4036]" />
-                </motion.button>
-              </div>
-
-              {/* 任務統計 */}
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-                  <div className="text-lg font-bold text-blue-600">{tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length}</div>
-                  <div className="text-xs text-blue-500">進行中</div>
-                </div>
-                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-                  <div className="text-lg font-bold text-green-600">{tasks.filter(t => t.status === 'completed').length}</div>
-                  <div className="text-xs text-green-500">已完成</div>
-                </div>
-              </div>
-
-              {/* 專案資訊編輯區域 */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-[#4B4036] flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-purple-400 rounded-full flex items-center justify-center">
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </div>
-                    <span>專案資訊</span>
-                  </h3>
-                  
-                  {!editingProject && (
+                  {/* 移動端標題欄 */}
+                  <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] border-b border-[#EADBC8]">
+                    <h2 className="text-lg font-bold text-[#4B4036]">任務面板</h2>
                     <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleStartEditProject}
-                      className="flex items-center space-x-1 px-2 py-1 bg-[#FFD59A] hover:bg-[#EBC9A4] text-[#4B4036] rounded-lg text-xs font-medium transition-all shadow-sm"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        setShowTaskPanel(false);
+                        setEditingProject(false);
+                      }}
+                      className="p-2 hover:bg-white/50 rounded-full transition-colors"
                     >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      <span>編輯</span>
+                      <XMarkIcon className="w-5 h-5 text-gray-500" />
                     </motion.button>
-                  )}
-                </div>
-                
-                {editingProject ? (
-                  /* 編輯模式 */
-                  <div className="space-y-3 p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                    <div>
-                      <label className="block text-xs font-medium text-[#4B4036] mb-1">專案名稱</label>
-                      <input
-                        type="text"
-                        value={editProjectName}
-                        onChange={(e) => setEditProjectName(e.target.value)}
-                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#FFB6C1] focus:border-transparent transition-all"
-                        placeholder="輸入專案名稱..."
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-medium text-[#4B4036] mb-1">專案描述</label>
-                      <textarea
-                        value={editProjectDescription}
-                        onChange={(e) => setEditProjectDescription(e.target.value)}
-                        rows={2}
-                        className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#FFB6C1] focus:border-transparent transition-all resize-none"
-                        placeholder="輸入專案描述..."
-                      />
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleUpdateProject}
-                        className="flex-1 px-3 py-1.5 bg-[#FFB6C1] hover:bg-[#FFB6C1]/80 text-white rounded-md text-xs font-medium transition-all shadow-sm"
-                      >
-                        保存
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setEditingProject(false)}
-                        className="flex-1 px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-[#4B4036] rounded-md text-xs font-medium transition-all"
-                      >
-                        取消
-                      </motion.button>
-                    </div>
                   </div>
-                ) : (
-                  /* 顯示模式 */
-                  <div className="p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                    <div className="mb-2">
-                      <div className="text-xs font-medium text-purple-700 mb-0.5">專案名稱</div>
-                      <div className="text-sm text-[#4B4036] font-semibold">{room.title}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-purple-700 mb-0.5">專案描述</div>
-                      <div className="text-xs text-[#2B3A3B] leading-relaxed">{room.description || '暫無描述'}</div>
-                    </div>
+
+                  {/* 移動端任務面板內容 */}
+                  <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
+                    <TaskPanelContent 
+                      tasks={tasks}
+                      activeRoles={activeRoles}
+                      room={room}
+                      editingProject={editingProject}
+                      editProjectName={editProjectName}
+                      setEditProjectName={setEditProjectName}
+                      editProjectDescription={editProjectDescription}
+                      setEditProjectDescription={setEditProjectDescription}
+                      handleStartEditProject={handleStartEditProject}
+                      handleUpdateProject={handleUpdateProject}
+                      setEditingProject={setEditingProject}
+                      picoSettings={picoSettings}
+                      setPicoSettings={setPicoSettings}
+                      moriSettings={moriSettings}
+                      setMoriSettings={setMoriSettings}
+                    />
                   </div>
-                )}
-              </div>
-
-              {/* 皮可創作設定 - 只在皮可在專案中時顯示 */}
-              {activeRoles.includes('pico') && (
-                <div className="mb-6">
-                  <PicoSettings 
-                    onSettingsChange={setPicoSettings}
-                    className="shadow-sm"
-                  />
-                </div>
-              )}
-
-              {/* 墨墨研究設定 - 只在墨墨在專案中時顯示 */}
-              {activeRoles.includes('mori') && (
-                <div className="mb-6">
-                  <MoriSettings 
-                    onSettingsChange={(settings) => setMoriSettings(settings as any)}
-                    className="shadow-sm"
-                  />
-                </div>
-              )}
-
-              {/* 任務列表 */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-[#4B4036] mb-3">活躍任務</h3>
-                <AnimatePresence>
-                  {tasks.map((task) => (
-                    <TaskCard key={task.id} task={task} />
-                  ))}
-                </AnimatePresence>
-
-                {tasks.length === 0 && (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-[#F8F5EC] rounded-full flex items-center justify-center mx-auto mb-3">
-                      <CpuChipIcon className="w-8 h-8 text-[#2B3A3B]" />
-                    </div>
-                    <p className="text-sm text-[#2B3A3B]">還沒有任務</p>
-                    <p className="text-xs text-[#2B3A3B]/70">在對話中提及需求，AI 會自動創建任務</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
+                </motion.div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
+
 
         {/* 邀請角色模態框 */}
         <AnimatePresence>

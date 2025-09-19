@@ -18,7 +18,8 @@ import {
   PaintBrushIcon,
   HeartIcon,
   ArrowPathIcon,
-  UserIcon
+  UserIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
@@ -53,6 +54,24 @@ interface AICompanion {
   isManager?: boolean;
 }
 
+// 安全的 JSON 解析函數
+const safeJsonParse = async (response: Response, context: string = 'API') => {
+  try {
+    const responseText = await response.text();
+    console.log(`🔍 ${context} 原始響應文本:`, responseText);
+    
+    if (!responseText || responseText.trim() === '') {
+      console.log(`⚠️ ${context} 收到空響應`);
+      return { success: false, error: 'Empty response' };
+    }
+    
+    return JSON.parse(responseText);
+  } catch (jsonError) {
+    console.error(`❌ ${context} JSON 解析失敗:`, jsonError);
+    return { success: false, error: 'Invalid JSON response', details: jsonError instanceof Error ? jsonError.message : String(jsonError) };
+  }
+};
+
 export default function AICompanionsPage() {
   const { user } = useSaasAuth();
   const router = useRouter();
@@ -67,6 +86,7 @@ export default function AICompanionsPage() {
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [creatingChat, setCreatingChat] = useState<string | null>(null); // 正在創建聊天室的 companion ID
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showMobileDropdown, setShowMobileDropdown] = useState(false);
   const [selectedCompanionForProject, setSelectedCompanionForProject] = useState<AICompanion | null>(null);
 
   // 從 Supabase 載入用戶的聊天室
@@ -118,7 +138,7 @@ export default function AICompanionsPage() {
             console.log('🎯 用戶相關聊天室:', userRelatedRooms.length, '個');
             
             // 處理沒有 role_instances 的房間
-            const roomsWithStats = userRelatedRooms.map((room) => {
+            const roomsWithStats = await Promise.all(userRelatedRooms.map(async (room) => {
               // 沒有資料庫角色資料，使用標題/描述推斷
               let activeRoles: string[] = [];
               
@@ -163,18 +183,103 @@ export default function AICompanionsPage() {
               
               console.log('房間最終角色（備用邏輯）:', room.title, '→', activeRoles);
               
+              // 載入該房間的最新訊息（備用邏輯）
+              let lastMessage = '點擊進入對話...';
+              let messageCount = 0;
+              
+              try {
+                console.log('🔍 開始查詢房間訊息（備用）:', room.id, room.title);
+                
+                // 查詢最新訊息，包含 content_json 以檢查訊息類型
+                const { data: latestMessage, error: messageError } = await saasSupabase
+                  .from('ai_messages')
+                  .select('content, content_json, created_at')
+                  .eq('room_id', room.id)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .single();
+                
+                console.log('🔍 查詢結果（備用）:', { latestMessage, messageError });
+                
+                if (!messageError && latestMessage) {
+                  const content = (latestMessage as any).content || '';
+                  
+                  // 檢查訊息類型
+                  let messageType = 'text';
+                  if ((latestMessage as any).content_json) {
+                    try {
+                      const contentJson = typeof (latestMessage as any).content_json === 'string' 
+                        ? JSON.parse((latestMessage as any).content_json) 
+                        : (latestMessage as any).content_json;
+                      messageType = contentJson.type || 'text';
+                    } catch (e) {
+                      // JSON 解析失敗，使用內容分析
+                      messageType = 'text';
+                    }
+                  }
+                  
+                  // 如果 content_json 沒有類型信息，通過內容分析判斷
+                  if (messageType === 'text') {
+                    // 檢查是否為圖片訊息
+                    if (content.includes('image_url') || 
+                        content.includes('🎨') || 
+                        content.includes('創作完成') ||
+                        content.includes('圖片') ||
+                        content.match(/https?:\/\/.*\.(jpg|jpeg|png|gif|webp)/i)) {
+                      messageType = 'image';
+                    }
+                    // 檢查是否為影片訊息
+                    else if (content.includes('video_url') || 
+                             content.includes('🎬') ||
+                             content.includes('影片') ||
+                             content.match(/https?:\/\/.*\.(mp4|avi|mov|wmv|webm)/i)) {
+                      messageType = 'video';
+                    }
+                  }
+                  
+                  // 根據訊息類型設置顯示文字
+                  if (messageType === 'image') {
+                    lastMessage = '（圖片）';
+                  } else if (messageType === 'video') {
+                    lastMessage = '（影片）';
+                  } else {
+                    // 文字訊息：截取內容（最多50個字符）
+                    lastMessage = content.length > 50 
+                      ? content.substring(0, 50) + '...' 
+                      : content;
+                  }
+                  
+                  console.log('✅ 載入最新訊息（備用）:', room.title, '→', lastMessage, `(類型: ${messageType})`);
+                } else {
+                  console.log('⚠️ 未找到該房間的訊息（備用）:', room.title, messageError?.message);
+                }
+
+                // 查詢訊息總數
+                const { count, error: countError } = await saasSupabase
+                  .from('ai_messages')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('room_id', room.id);
+                
+                if (!countError && count !== null) {
+                  messageCount = count;
+                  console.log('✅ 載入訊息數量（備用）:', room.title, '→', messageCount);
+                }
+              } catch (error) {
+                console.log('⚠️ 載入訊息資料時發生錯誤（備用）:', error);
+              }
+              
               return {
                 id: room.id,
                 title: room.title,
                 description: room.description || '',
-                lastMessage: '點擊進入對話...',
+                lastMessage: lastMessage,
                 lastActivity: new Date(room.last_message_at),
                 memberCount: 1,
                 activeRoles,
-                messageCount: 0,
+                messageCount: messageCount,
                 status: 'active' as const
               };
-            });
+            }));
             
             setRooms(roomsWithStats);
             console.log('✅ 載入了', roomsWithStats.length, '個聊天室（使用備用邏輯）');
@@ -300,15 +405,112 @@ export default function AICompanionsPage() {
               // 調試日誌 - 最終角色
               console.log('房間最終角色:', room.title, '→', activeRoles);
 
+              // 載入該房間的最新訊息
+              let lastMessage = '點擊進入對話...';
+              let messageCount = 0;
+              
+              try {
+                console.log('🔍 開始查詢房間訊息:', room.id, room.title);
+                
+                // 先查詢該房間是否有任何訊息
+                const { count: totalMessages } = await saasSupabase
+                  .from('ai_messages')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('room_id', room.id);
+                
+                console.log('🔍 該房間總訊息數:', totalMessages);
+                
+                if (totalMessages && totalMessages > 0) {
+                  // 查詢最新訊息，包含 content_json 以檢查訊息類型
+                  const { data: latestMessage, error: messageError } = await saasSupabase
+                    .from('ai_messages')
+                    .select('content, content_json, created_at')
+                    .eq('room_id', room.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+                  
+                  console.log('🔍 查詢結果:', { latestMessage, messageError });
+                  
+                  if (!messageError && latestMessage) {
+                    const content = (latestMessage as any).content || '';
+                    
+                    // 檢查訊息類型
+                    let messageType = 'text';
+                    if ((latestMessage as any).content_json) {
+                      try {
+                        const contentJson = typeof (latestMessage as any).content_json === 'string' 
+                          ? JSON.parse((latestMessage as any).content_json) 
+                          : (latestMessage as any).content_json;
+                        messageType = contentJson.type || 'text';
+                      } catch (e) {
+                        // JSON 解析失敗，使用內容分析
+                        messageType = 'text';
+                      }
+                    }
+                    
+                    // 如果 content_json 沒有類型信息，通過內容分析判斷
+                    if (messageType === 'text') {
+                      // 檢查是否為圖片訊息
+                      if (content.includes('image_url') || 
+                          content.includes('🎨') || 
+                          content.includes('創作完成') ||
+                          content.includes('圖片') ||
+                          content.match(/https?:\/\/.*\.(jpg|jpeg|png|gif|webp)/i)) {
+                        messageType = 'image';
+                      }
+                      // 檢查是否為影片訊息
+                      else if (content.includes('video_url') || 
+                               content.includes('🎬') ||
+                               content.includes('影片') ||
+                               content.match(/https?:\/\/.*\.(mp4|avi|mov|wmv|webm)/i)) {
+                        messageType = 'video';
+                      }
+                    }
+                    
+                    // 根據訊息類型設置顯示文字
+                    if (messageType === 'image') {
+                      lastMessage = '（圖片）';
+                    } else if (messageType === 'video') {
+                      lastMessage = '（影片）';
+                    } else {
+                      // 文字訊息：截取內容（最多50個字符）
+                      lastMessage = content.length > 50 
+                        ? content.substring(0, 50) + '...' 
+                        : content;
+                    }
+                    
+                    console.log('✅ 載入最新訊息:', room.title, '→', lastMessage, `(類型: ${messageType})`);
+                  } else {
+                    console.log('⚠️ 未找到該房間的訊息:', room.title, messageError?.message);
+                  }
+                } else {
+                  console.log('⚠️ 該房間沒有訊息:', room.title);
+                }
+
+                // 查詢訊息總數
+                const { count, error: countError } = await saasSupabase
+                  .from('ai_messages')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('room_id', room.id);
+                
+                if (!countError && count !== null) {
+                  messageCount = count;
+                  console.log('✅ 載入訊息數量:', room.title, '→', messageCount);
+                }
+              } catch (error) {
+                console.log('⚠️ 載入訊息資料時發生錯誤:', error);
+              }
+
               return {
                 id: room.id,
                 title: room.title,
                 description: room.description || '',
-                lastMessage: '點擊進入對話...',
+                lastMessage: lastMessage,
                 lastActivity: new Date(room.last_message_at),
                 memberCount: 1,
                 activeRoles,
-                messageCount: 0,
+                messageCount: messageCount,
                 status: 'active' as const
               };
             }));
@@ -337,6 +539,23 @@ export default function AICompanionsPage() {
       loadUserRooms();
     }
   }, [user?.id]);
+
+  // 點擊外部關閉移動端下拉菜單
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMobileDropdown) {
+        setShowMobileDropdown(false);
+      }
+    };
+
+    if (showMobileDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showMobileDropdown]);
 
   // 監聽聊天室更新通知
   useEffect(() => {
@@ -718,19 +937,19 @@ export default function AICompanionsPage() {
       <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-1 min-w-0">
               {/* 選單按鈕 */}
               <motion.button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors relative z-40"
+                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors relative z-40 flex-shrink-0"
                 title={sidebarOpen ? "關閉選單" : "開啟選單"}
               >
-                <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
+                <Bars3Icon className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
               </motion.button>
               
-              <div className="w-10 h-10 relative">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 relative flex-shrink-0">
                 <Image
                   src="/@hanami.png"
                   alt="HanamiEcho Logo"
@@ -739,56 +958,161 @@ export default function AICompanionsPage() {
                   className="w-full h-full object-contain"
                 />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho AI 伙伴</h1>
-                <p className="text-sm text-[#2B3A3B]">智能協作工作夥伴</p>
+              
+              <div className="min-w-0 flex-1">
+                {/* 桌面版：顯示完整標題 */}
+                <div className="hidden sm:block">
+                  <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
+                  <p className="text-sm text-[#2B3A3B]">您的AI工作和學習夥伴</p>
+                </div>
+                
+                {/* 移動端：只顯示 "AI 伙伴" */}
+                <div className="block sm:hidden">
+                  <h1 className="text-lg font-bold text-[#4B4036]">
+                    AI 伙伴
+                  </h1>
+                </div>
               </div>
             </div>
 
             <div className="flex items-center space-x-4">
-            {/* 視圖切換 */}
-            <div className="flex items-center space-x-2 bg-white/60 backdrop-blur-sm rounded-xl p-1">
-                {[
-                  { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
-                  { id: 'roles', label: '角色', icon: CpuChipIcon },
-                  { id: 'memory', label: '記憶', icon: SparklesIcon },
-                  { id: 'stats', label: '統計', icon: ChartBarIcon }
-                ].map((tab) => (
-              <motion.button
-                    key={tab.id}
-                    onClick={() => setActiveView(tab.id as any)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all ${
-                      activeView === tab.id 
-                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg' 
-                    : 'text-[#4B4036] hover:bg-[#FFD59A]/20'
-                }`}
-              >
-                    <tab.icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{tab.label}</span>
-              </motion.button>
-                ))}
+              {/* 桌面版：顯示完整的視圖切換和創建按鈕 */}
+              <div className="hidden md:flex items-center space-x-4">
+                {/* 視圖切換 */}
+                <div className="flex items-center space-x-2 bg-white/60 backdrop-blur-sm rounded-xl p-1">
+                  {[
+                    { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
+                    { id: 'roles', label: '角色', icon: CpuChipIcon },
+                    { id: 'memory', label: '記憶', icon: SparklesIcon },
+                    { id: 'stats', label: '統計', icon: ChartBarIcon }
+                  ].map((tab) => (
+                    <motion.button
+                      key={tab.id}
+                      onClick={() => setActiveView(tab.id as any)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all ${
+                        activeView === tab.id 
+                          ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg' 
+                          : 'text-[#4B4036] hover:bg-[#FFD59A]/20'
+                      }`}
+                    >
+                      <tab.icon className="w-4 h-4" />
+                      <span>{tab.label}</span>
+                    </motion.button>
+                  ))}
+                </div>
+
+                {/* 快速創建專案按鈕 */}
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    const quickRoom = {
+                      title: `AI 協作 ${new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`,
+                      description: '與 Hibi、墨墨和皮可的全能協作空間',
+                      selectedRoles: ['Hibi', '墨墨', '皮可']
+                    };
+                    handleCreateProjectRoom(quickRoom);
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                  title="快速開始 AI 協作"
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  <span>開始協作</span>
+                </motion.button>
               </div>
 
-              {/* 快速創建專案按鈕 - 類似 Cursor 的 AI 面板切換 */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  const quickRoom = {
-                    title: `AI 協作 ${new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`,
-                    description: '與 Hibi、墨墨和皮可的全能協作空間',
-                    selectedRoles: ['Hibi', '墨墨', '皮可']
-                  };
-                  handleCreateProjectRoom(quickRoom);
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
-                title="快速開始 AI 協作 (類似 Cursor AI 面板)"
-              >
-                <PlusIcon className="w-5 h-5" />
-                <span className="hidden sm:inline">開始協作</span>
-              </motion.button>
+              {/* 移動端/平板：合併按鈕 + 下拉菜單 */}
+              <div className="flex md:hidden items-center space-x-2 relative">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowMobileDropdown(!showMobileDropdown)}
+                  className="relative flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                >
+                  {/* 圖案 */}
+                  <motion.div
+                    animate={{ 
+                      rotate: showMobileDropdown ? 180 : 0
+                    }}
+                    transition={{ 
+                      duration: 0.3,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <Cog6ToothIcon className="w-5 h-5" />
+                  </motion.div>
+                  
+                  {/* 兩個字的中文名稱 */}
+                  <span className="text-sm font-medium">選單</span>
+                </motion.button>
+
+                {/* 下拉菜單 */}
+                <AnimatePresence>
+                  {showMobileDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                      className="absolute top-12 right-0 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[200px] z-50"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* 視圖切換選項 */}
+                      <div className="space-y-1 mb-2">
+                        <div className="text-xs font-medium text-[#2B3A3B] px-3 py-1">切換視圖</div>
+                        {[
+                          { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
+                          { id: 'roles', label: '角色', icon: CpuChipIcon },
+                          { id: 'memory', label: '記憶', icon: SparklesIcon },
+                          { id: 'stats', label: '統計', icon: ChartBarIcon }
+                        ].map((tab) => (
+                          <motion.button
+                            key={tab.id}
+                            whileHover={{ backgroundColor: "#FFF9F2" }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              setActiveView(tab.id as any);
+                              setShowMobileDropdown(false);
+                            }}
+                            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-all ${
+                              activeView === tab.id 
+                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' 
+                                : 'text-[#4B4036] hover:bg-[#FFD59A]/20'
+                            }`}
+                          >
+                            <tab.icon className="w-4 h-4" />
+                            <span className="text-sm font-medium">{tab.label}</span>
+                          </motion.button>
+                        ))}
+                      </div>
+
+                      {/* 分隔線 */}
+                      <div className="border-t border-[#EADBC8]/30 my-2"></div>
+
+                      {/* 快速創建選項 */}
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FFF9F2" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          const quickRoom = {
+                            title: `AI 協作 ${new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`,
+                            description: '與 Hibi、墨墨和皮可的全能協作空間',
+                            selectedRoles: ['Hibi', '墨墨', '皮可']
+                          };
+                          handleCreateProjectRoom(quickRoom);
+                          setShowMobileDropdown(false);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-all text-[#4B4036] hover:bg-green-50"
+                      >
+                        <PlusIcon className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium">開始協作</span>
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         </div>
@@ -1130,7 +1454,7 @@ export default function AICompanionsPage() {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ roomId: room.id })
                                   });
-                                  const result = await response.json();
+                                  const result = await safeJsonParse(response, '刪除專案 API');
                                   console.log('🗑️ 刪除結果:', result);
                                   
                                   if (result.success) {

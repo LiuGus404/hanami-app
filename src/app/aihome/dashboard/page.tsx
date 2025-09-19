@@ -129,7 +129,7 @@ export default function DashboardPage() {
   // 快速導航
   const quickNav = [
     { icon: HomeIcon, label: '首頁', href: '/aihome' },
-    { icon: CalendarDaysIcon, label: '課程活動', href: '/aihome/course-activities' },
+    { icon: SparklesIcon, label: 'AI夥伴', href: '/aihome/ai-companions' },
     { icon: UsersIcon, label: '家長連結', href: '/aihome/parent/bound-students' },
     { icon: UserIcon, label: '個人資料', href: '/aihome/profile' },
     { icon: CogIcon, label: '設置', href: '/aihome/settings' }
@@ -285,7 +285,7 @@ export default function DashboardPage() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="mb-12"
         >
-          <div className="flex justify-center space-x-4">
+          <div className="flex justify-center space-x-2 sm:space-x-4">
             {quickNav.map((item, index) => (
               <motion.button
                 key={item.label}
@@ -295,10 +295,10 @@ export default function DashboardPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => router.push(item.href)}
-                className="flex items-center space-x-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8] hover:bg-white/80 transition-all duration-200"
+                className="flex items-center space-x-2 px-2 sm:px-4 py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8] hover:bg-white/80 transition-all duration-200"
               >
                 <item.icon className="w-5 h-5 text-[#4B4036]" />
-                <span className="text-[#4B4036] font-medium">{item.label}</span>
+                <span className="hidden sm:inline text-[#4B4036] font-medium">{item.label}</span>
               </motion.button>
             ))}
           </div>
