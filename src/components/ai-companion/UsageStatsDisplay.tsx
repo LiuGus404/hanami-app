@@ -11,7 +11,7 @@ import {
   ArrowPathIcon,
   CalendarIcon
 } from '@heroicons/react/24/outline';
-import { supabase } from '@/lib/supabase';
+import { getSaasSupabaseClient } from '@/lib/supabase';
 
 interface UsageStats {
   id: string;
@@ -56,7 +56,8 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
   const loadUsageStats = async () => {
     setIsLoading(true);
     try {
-      let query = supabase
+      const saasSupabase = getSaasSupabaseClient();
+      let query = saasSupabase
         .from('ai_usage')
         .select('*')
         .order('created_at', { ascending: false });

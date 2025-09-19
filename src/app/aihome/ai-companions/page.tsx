@@ -22,7 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
-import { supabase } from '@/lib/supabase';
+import { getSaasSupabaseClient } from '@/lib/supabase';
 import Image from 'next/image';
 import UsageStatsDisplay from '@/components/ai-companion/UsageStatsDisplay';
 

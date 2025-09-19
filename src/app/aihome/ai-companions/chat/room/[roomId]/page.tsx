@@ -24,7 +24,7 @@ import {
 import { AcademicCapIcon, PaintBrushIcon } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
-import { supabase } from '@/lib/supabase';
+import { getSaasSupabaseClient } from '@/lib/supabase';
 import Image from 'next/image';
 import { PicoSettings, MoriSettings } from '@/components/ai-companion';
 
@@ -117,6 +117,9 @@ export default function RoomChatPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const roomId = params.roomId as string;
+  
+  // 使用 SaaS 系統的 Supabase 客戶端
+  const saasSupabase = getSaasSupabaseClient();
   // 使用更可靠的方法獲取 URL 參數
   const [urlParams, setUrlParams] = useState<{initialRole?: string, companion?: string}>({});
   

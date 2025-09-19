@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabaseClient } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
     const { selectedDates, selectedCourses, selectedWeekdays, searchTerm } = await request.json();
 
     console.log('收到篩選條件:', { selectedDates, selectedCourses, selectedWeekdays, searchTerm });
+
+    // 使用原來的 Supabase 客戶端
+    const supabase = getServerSupabaseClient();
 
     // 查詢常規學生
     let regularStudentQuery = supabase

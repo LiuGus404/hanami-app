@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSaasAdminClient } from '@/lib/supabase-saas';
+import { getSaasServerSupabaseClient, getServerSupabaseClient } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '缺少學生信息' }, { status: 400 });
     }
 
-    const supabase = createSaasAdminClient();
+    const saasSupabase = getSaasServerSupabaseClient();
 
     // 檢查是否已經綁定
-    const { data: existingBinding, error: checkError } = await supabase
+    const { data: existingBinding, error: checkError } = await saasSupabase
       .from('parent_student_bindings')
       .select('id')
       .eq('parent_id', parentId)
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 創建綁定記錄
-    const { data: binding, error: insertError } = await (supabase
+    const { data: binding, error: insertError } = await (saasSupabase
       .from('parent_student_bindings') as any)
       .insert({
         parent_id: parentId,
@@ -84,10 +84,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '缺少家長 ID' }, { status: 400 });
     }
 
-    const supabase = createSaasAdminClient();
+    const saasSupabase = getSaasServerSupabaseClient();
+    const mainSupabase = getServerSupabaseClient();
 
     // 獲取已綁定的孩子列表
-    const { data: bindings, error } = await supabase
+    const { data: bindings, error } = await saasSupabase
       .from('parent_student_bindings')
       .select('*')
       .eq('parent_id', parentId)
@@ -108,6 +109,60 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ 
         error: '獲取綁定孩子失敗' 
       }, { status: 500 });
+    }
+
+    // 如果有綁定資料，從學生表中獲取完整的學生資訊（包括年齡）
+    if (bindings && bindings.length > 0) {
+      const studentIds = bindings.map(binding => binding.student_id);
+      
+      // 從主要學生資料庫獲取學生詳細資訊
+      const { data: studentsData, error: studentsError } = await mainSupabase
+        .from('Hanami_Students')
+        .select('id, full_name, student_age, student_dob, course_type, student_oid')
+        .in('id', studentIds);
+
+      if (studentsError) {
+        console.error('獲取學生詳細資訊錯誤:', studentsError);
+      }
+
+      // 合併綁定資料和學生詳細資訊
+      const enrichedBindings = bindings.map(binding => {
+        const studentInfo = studentsData?.find(s => s.id === binding.student_id);
+        
+        // 計算月齡
+        let ageInMonths = null;
+        if (studentInfo?.student_dob) {
+          const birthDate = new Date(studentInfo.student_dob);
+          const now = new Date();
+          const years = now.getFullYear() - birthDate.getFullYear();
+          const months = now.getMonth() - birthDate.getMonth();
+          const days = now.getDate() - birthDate.getDate();
+          
+          let totalMonths = years * 12 + months;
+          if (days < 0) {
+            totalMonths -= 1;
+          }
+          ageInMonths = Math.max(0, totalMonths);
+        } else if (studentInfo?.student_age) {
+          // 如果有直接的年齡資料，嘗試轉換
+          const age = typeof studentInfo.student_age === 'string' ? parseInt(studentInfo.student_age) : studentInfo.student_age;
+          if (!isNaN(age)) {
+            ageInMonths = age;
+          }
+        }
+        
+        return {
+          ...binding,
+          student_age_months: ageInMonths,
+          student_course_type: studentInfo?.course_type || null,
+          student_full_name: studentInfo?.full_name || binding.student_name
+        };
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        bindings: enrichedBindings 
+      });
     }
 
     return NextResponse.json({ 
@@ -137,10 +192,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '缺少家長 ID' }, { status: 400 });
     }
 
-    const supabase = createSaasAdminClient();
+    const saasSupabase = getSaasServerSupabaseClient();
 
     // 刪除綁定記錄
-    const { error } = await supabase
+    const { error } = await saasSupabase
       .from('parent_student_bindings')
       .delete()
       .eq('id', bindingId)

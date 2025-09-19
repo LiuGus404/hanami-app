@@ -127,12 +127,19 @@ export default function BoundStudentsPage() {
   };
 
   // 月齡換算年齡
-  const convertMonthsToAge = (months: number) => {
-    if (months < 12) {
-      return `${months} 個月`;
+  const convertMonthsToAge = (months: number | null | undefined) => {
+    // 檢查輸入是否有效
+    if (months === null || months === undefined || isNaN(months) || months < 0) {
+      return '年齡未設定';
+    }
+    
+    const validMonths = Math.floor(months);
+    
+    if (validMonths < 12) {
+      return `${validMonths} 個月`;
     } else {
-      const years = Math.floor(months / 12);
-      const remainingMonths = months % 12;
+      const years = Math.floor(validMonths / 12);
+      const remainingMonths = validMonths % 12;
       if (remainingMonths === 0) {
         return `${years} 歲`;
       } else {
