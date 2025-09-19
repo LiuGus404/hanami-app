@@ -462,10 +462,10 @@ export default function AICompanionsPage() {
     }
 
     setCreatingChat(companion.id);
-    console.log('✅ 開始創建個人對話聊天室，專案:', projectData.title);
+    console.log('✅ 開始創建專案聊天室，專案:', projectData.title);
 
     try {
-      // 在 Supabase 中創建團隊專案聊天室（初始只有選中的角色）
+      // 在 Supabase 中創建專案聊天室（初始團隊成員：選中的角色）
       const saasSupabase = getSaasSupabaseClient();
       const { data: newRoom, error: roomError } = await (saasSupabase
         .from('ai_rooms') as any)
@@ -479,7 +479,7 @@ export default function AICompanionsPage() {
         .single();
 
       if (roomError) {
-        console.error('❌ 創建個人聊天室失敗:', roomError);
+        console.error('❌ 創建專案聊天室失敗:', roomError);
         
         // 如果是表格不存在的錯誤，直接跳轉到模擬聊天室
         if (roomError.message?.includes('relation') || roomError.message?.includes('does not exist')) {
@@ -504,6 +504,39 @@ export default function AICompanionsPage() {
         console.error('❌ 添加房間成員失敗:', memberError);
       }
 
+      // 為房間添加指定的 AI 角色
+      try {
+        console.log('🤖 為房間添加 AI 角色:', companion.id);
+        
+        // 首先查詢角色實例表，看看是否有對應的角色實例
+        const { data: roleInstance, error: roleInstanceError } = await saasSupabase
+          .from('role_instances')
+          .select('id')
+          .eq('ai_role_slug', companion.id)
+          .single();
+        
+        if (roleInstanceError) {
+          console.log('⚠️ 未找到角色實例，可能需要先創建:', roleInstanceError);
+        } else if (roleInstance) {
+          // 插入房間角色關聯
+          const { error: roomRoleError } = await (saasSupabase
+            .from('room_roles') as any)
+            .insert({
+              room_id: newRoom.id,
+              role_instance_id: (roleInstance as any).id,
+              is_active: true
+            });
+          
+          if (roomRoleError) {
+            console.error('❌ 添加房間角色失敗:', roomRoleError);
+          } else {
+            console.log('✅ 成功為房間添加角色:', companion.id);
+          }
+        }
+      } catch (error) {
+        console.error('❌ 添加房間角色時發生錯誤:', error);
+      }
+
       // 創建前端顯示的房間物件
       const displayRoom: AIRoom = {
         id: newRoom.id,
@@ -519,14 +552,14 @@ export default function AICompanionsPage() {
       
       setRooms(prev => [displayRoom, ...prev]);
       
-      console.log('✅ 個人聊天室創建成功:', newRoom.id);
+      console.log('✅ 專案聊天室創建成功:', newRoom.id);
       
-      // 直接跳轉到新創建的團隊聊天室（初始只有選中的角色）
+      // 直接跳轉到新創建的專案聊天室（初始團隊成員：選中的角色）
       const chatUrl = `/aihome/ai-companions/chat/room/${newRoom.id}?initialRole=${companion.id}`;
       console.log('🔄 準備跳轉到:', chatUrl);
       router.push(chatUrl);
     } catch (error) {
-      console.error('❌ 創建個人聊天室錯誤:', error);
+      console.error('❌ 創建專案聊天室錯誤:', error);
     } finally {
       setCreatingChat(null);
       setShowProjectModal(false);

@@ -21,7 +21,7 @@ import {
   UserIcon,
   Cog6ToothIcon
 } from '@heroicons/react/24/outline';
-import { AcademicCapIcon, PaintBrushIcon } from '@heroicons/react/24/outline';
+import { AcademicCapIcon, PaintBrushIcon, UsersIcon } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { getSaasSupabaseClient } from '@/lib/supabase';
@@ -145,7 +145,10 @@ export default function RoomChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(false);
-  const [activeRoles, setActiveRoles] = useState<('hibi' | 'mori' | 'pico')[]>(['hibi', 'mori', 'pico']); // 預設全部角色，稍後會被 URL 參數覆蓋
+  const [activeRoles, setActiveRoles] = useState<('hibi' | 'mori' | 'pico')[]>(() => {
+    console.log('🏁 初始化 activeRoles 為空陣列 (將被 URL 參數或資料庫覆蓋)');
+    return []; // 空陣列，稍後會被 URL 參數或資料庫覆蓋
+  });
   const [selectedCompanion, setSelectedCompanion] = useState<'hibi' | 'mori' | 'pico' | 'team'>('team'); // 預設團隊模式，稍後會被 URL 參數覆蓋
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -156,6 +159,7 @@ export default function RoomChatPage() {
   });
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [editingProject, setEditingProject] = useState(false);
   const [editProjectName, setEditProjectName] = useState('');
   const [editProjectDescription, setEditProjectDescription] = useState('');
@@ -222,22 +226,70 @@ export default function RoomChatPage() {
   }>({
     title: '載入中...',
     description: '正在載入專案資訊...',
-    activeCompanions: ['hibi', 'mori', 'pico']
+    activeCompanions: [] // 空陣列，稍後會被實際資料覆蓋
   });
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 載入房間資訊
+  // 載入房間資訊和角色
   const loadRoomInfo = async () => {
     try {
       console.log('🔍 載入房間資訊:', roomId);
       
       const supabase = getSaasSupabaseClient();
+      
+      // 載入房間基本資訊
       const { data: roomData, error: roomError } = await supabase
         .from('ai_rooms')
         .select('id, title, description, room_type, created_at')
         .eq('id', roomId)
         .single() as { data: { id: string; title: string; description?: string; room_type?: string; created_at: string } | null; error: any };
+      
+      // 載入房間角色
+      let roomRoles: string[] = [];
+      try {
+        console.log('🔍 載入房間角色:', roomId);
+        const { data: rolesData, error: rolesError } = await supabase
+          .from('room_roles')
+          .select(`
+            role_instances(
+              ai_roles(
+                slug
+              )
+            )
+          `)
+          .eq('room_id', roomId)
+          .eq('is_active', true);
+        
+        if (rolesError) {
+          console.log('⚠️ 載入房間角色失敗:', rolesError);
+        } else if (rolesData && rolesData.length > 0) {
+          roomRoles = rolesData
+            .map((item: any) => item.role_instances?.ai_roles?.slug)
+            .filter(Boolean);
+          console.log('✅ 從資料庫載入的房間角色:', roomRoles);
+          
+          // 如果從資料庫載入到角色，且沒有 URL 參數，則使用資料庫的角色
+          if (roomRoles.length > 0 && !urlParams.initialRole && !urlParams.companion) {
+            console.log('🔄 使用資料庫中的角色設定:', roomRoles);
+            setActiveRoles(roomRoles as ('hibi' | 'mori' | 'pico')[]);
+            if (roomRoles.length === 1) {
+              setSelectedCompanion(roomRoles[0] as 'hibi' | 'mori' | 'pico');
+            }
+            // 保存到 sessionStorage
+            sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(roomRoles));
+          }
+        } else {
+          console.log('⚠️ 資料庫中沒有角色資料，且沒有 URL 參數，使用預設全部角色');
+          // 如果資料庫中沒有角色資料，且沒有 URL 參數，使用預設全部角色
+          if (!urlParams.initialRole && !urlParams.companion && activeRoles.length === 0) {
+            setActiveRoles(['hibi', 'mori', 'pico']);
+            sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(['hibi', 'mori', 'pico']));
+          }
+        }
+      } catch (error) {
+        console.error('載入房間角色錯誤:', error);
+      }
       
       if (roomError) {
         console.error('❌ 載入房間資訊失敗:', roomError);
@@ -245,14 +297,14 @@ export default function RoomChatPage() {
         setRoom({
           title: '未知專案',
           description: '無法載入專案資訊',
-          activeCompanions: activeRoles
+          activeCompanions: roomRoles.length > 0 ? roomRoles as ('hibi' | 'mori' | 'pico')[] : activeRoles
         });
       } else if (roomData) {
         console.log('✅ 房間資訊載入成功:', roomData.title);
         setRoom({
           title: roomData.title || '未命名專案',
           description: roomData.description || '',
-          activeCompanions: activeRoles
+          activeCompanions: roomRoles.length > 0 ? roomRoles as ('hibi' | 'mori' | 'pico')[] : activeRoles
         });
       }
     } catch (error) {
@@ -267,16 +319,21 @@ export default function RoomChatPage() {
 
   // 根據 URL 參數設置角色狀態
   useEffect(() => {
+    console.log('🔄 角色設置 useEffect 觸發, urlParams:', urlParams);
+    
     if (urlParams.initialRole || urlParams.companion) {
       const targetRole = urlParams.initialRole || urlParams.companion;
       console.log('🔧 根據 URL 參數設置角色為:', targetRole);
+      console.log('🔧 設置前的 activeRoles:', activeRoles);
       
       setActiveRoles([targetRole as 'hibi' | 'mori' | 'pico']);
       setSelectedCompanion(targetRole as 'hibi' | 'mori' | 'pico');
       
       // 將角色信息存儲到 sessionStorage，防止丟失
       sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify([targetRole]));
+      console.log('✅ 已設置 activeRoles 為:', [targetRole]);
     } else {
+      console.log('🔍 沒有 URL 參數，嘗試從 sessionStorage 恢復');
       // 嘗試從 sessionStorage 恢復角色狀態
       const savedRoles = sessionStorage.getItem(`room_${roomId}_roles`);
       if (savedRoles) {
@@ -290,6 +347,10 @@ export default function RoomChatPage() {
         } catch (error) {
           console.error('恢復角色狀態失敗:', error);
         }
+      } else {
+        console.log('⚠️ 沒有找到保存的角色狀態，使用預設的全部角色');
+        // 如果沒有任何角色資料，使用預設的全部角色
+        setActiveRoles(['hibi', 'mori', 'pico']);
       }
     }
   }, [urlParams, roomId]);
@@ -297,7 +358,24 @@ export default function RoomChatPage() {
   // 初始化時載入房間資訊
   useEffect(() => {
     loadRoomInfo();
-  }, [roomId]);
+  }, [roomId, urlParams]); // 依賴 urlParams 確保 URL 參數處理完成後再執行
+
+  // 點擊外部關閉移動端菜單
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMobileMenu) {
+        setShowMobileMenu(false);
+      }
+    };
+
+    if (showMobileMenu) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showMobileMenu]);
 
   // 當 activeRoles 變化時更新 room 的 activeCompanions
   useEffect(() => {
@@ -311,7 +389,7 @@ export default function RoomChatPage() {
   const handleRemoveRole = async (roleId: 'hibi' | 'mori' | 'pico') => {
     // 確保至少保留一個角色
     if (activeRoles.length <= 1) {
-      alert('⚠️ 專案中至少需要保留一個 AI 角色！');
+      alert('⚠️ 專案團隊中至少需要保留一個 AI 成員！');
       return;
     }
 
@@ -641,23 +719,23 @@ export default function RoomChatPage() {
       console.log('🎭 生成歡迎訊息，當前 activeRoles:', activeRoles);
 
       if (activeRoles.length === 1) {
-        // 單角色專案模式 - 只有該角色歡迎
+        // 單成員團隊專案 - 只有一個 AI 團隊成員
         const roleId = activeRoles[0];
         const selectedCompanionData = companions.find(c => c.id === roleId);
         if (selectedCompanionData) {
           welcomeMessages = [
             {
-              id: 'welcome-single-role',
+              id: 'welcome-single-member',
               content: `你好！我是 ${selectedCompanionData.name}，${selectedCompanionData.description}。歡迎來到我們的專案協作空間！有什麼任務需要我協助的嗎？`,
               sender: roleId,
               timestamp: new Date(),
               type: 'text'
             }
           ];
-          console.log(`✅ 生成單角色歡迎訊息: ${selectedCompanionData.name}`);
+          console.log(`✅ 生成單成員團隊歡迎訊息: ${selectedCompanionData.name}`);
         }
       } else {
-      // 多角色團隊模式 - 活躍角色依序歡迎
+      // 多成員團隊專案 - 多個 AI 團隊成員依序歡迎
       const welcomeOrder = activeRoles.includes('hibi') ? ['hibi', 'mori', 'pico'] : activeRoles;
       const validRoles = welcomeOrder.filter(roleId => activeRoles.includes(roleId as any));
       
@@ -1892,9 +1970,10 @@ export default function RoomChatPage() {
               </div>
             </div>
 
-            {/* 活躍 AI 角色顯示 */}
-            <div className="flex items-center space-x-3">
-              <span className="text-sm font-medium text-[#2B3A3B]">AI 角色:</span>
+            {/* 團隊成員顯示 - 響應式設計 */}
+            {/* 桌面版：顯示完整的團隊成員 */}
+            <div className="hidden md:flex items-center space-x-3">
+              <span className="text-sm font-medium text-[#2B3A3B]">團隊成員:</span>
               <div className="flex items-center space-x-2">
                 {activeRoles.map((companionId) => {
                   const companion = companions.find(c => c.id === companionId);
@@ -1960,7 +2039,7 @@ export default function RoomChatPage() {
                   }}
                   onClick={() => setShowInviteModal(true)}
                   className="relative w-10 h-10 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all"
-                  title="邀請更多 AI 角色"
+                  title="邀請更多 AI 成員"
                 >
                   <PlusIcon className="w-5 h-5 text-white" />
                   
@@ -1972,7 +2051,112 @@ export default function RoomChatPage() {
                   />
                 </motion.button>
               )}
-              
+            </div>
+
+            {/* 移動端：緊湊的圖標按鈕 */}
+            <div className="flex md:hidden items-center space-x-2">
+              {/* 團隊成員按鈕 */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowInviteModal(true)}
+                className="relative flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full shadow-lg"
+              >
+                <UsersIcon className="w-4 h-4 text-white" />
+                <span className="text-xs font-medium text-white">{activeRoles.length}</span>
+                
+                {/* 在線指示器 */}
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 border border-white rounded-full"
+                />
+              </motion.button>
+
+              {/* 更多選項按鈕 */}
+              <div className="relative">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowMobileMenu(!showMobileMenu)}
+                  className="flex items-center justify-center w-10 h-10 bg-white/80 backdrop-blur-sm rounded-full shadow-lg border border-[#EADBC8]/20"
+                >
+                  <EllipsisHorizontalIcon className="w-5 h-5 text-[#4B4036]" />
+                </motion.button>
+
+                {/* 移動端下拉菜單 */}
+                <AnimatePresence>
+                  {showMobileMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                      className="absolute top-12 right-0 bg-white rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[180px] z-50"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* 角色設定 */}
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FFF9F2" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setShowSettingsModal(true);
+                          setShowMobileMenu(false);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors"
+                      >
+                        <UserIcon className="w-5 h-5 text-[#4B4036]" />
+                        <span className="text-sm font-medium text-[#4B4036]">角色設定</span>
+                      </motion.button>
+
+                      {/* 清除對話 */}
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FEF2F2" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          handleClearHistory();
+                          setShowMobileMenu(false);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors"
+                      >
+                        <svg
+                          className="w-5 h-5 text-red-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                        <span className="text-sm font-medium text-red-600">清除對話</span>
+                      </motion.button>
+
+                      {/* 任務面板 */}
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FFFBEB" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setShowTaskPanel(!showTaskPanel);
+                          setShowMobileMenu(false);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors"
+                      >
+                        <Cog6ToothIcon className="w-5 h-5 text-[#4B4036]" />
+                        <span className="text-sm font-medium text-[#4B4036]">
+                          {showTaskPanel ? '關閉任務面板' : '打開任務面板'}
+                        </span>
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <div className="hidden md:flex items-center space-x-2">
               {/* 角色設定按鈕 */}
               <motion.button
                 whileHover={{ scale: 1.05, rotate: 15 }}
@@ -2297,7 +2481,7 @@ export default function RoomChatPage() {
                   <SparklesIcon className="w-4 h-4 text-white" />
                 </motion.div>
                 <span className="text-sm font-medium text-[#4B4036]">
-                  {activeRoles.length === 1 ? 'AI 專案角色:' : 'AI 回應模式:'}
+                  {activeRoles.length === 1 ? '團隊成員:' : 'AI 回應模式:'}
                 </span>
               </div>
               
@@ -2337,7 +2521,7 @@ export default function RoomChatPage() {
                       boxShadow: { duration: 2, repeat: Infinity }
                     }}
                     onClick={() => setSelectedCompanion(mode.id as any)}
-                    className={`relative flex items-center space-x-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                    className={`relative flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                       selectedCompanion === mode.id 
                         ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg transform scale-105' 
                         : 'text-[#4B4036] hover:bg-[#FFD59A]/20 hover:shadow-md'
@@ -2349,12 +2533,18 @@ export default function RoomChatPage() {
                     >
                       <mode.icon className="w-4 h-4" />
                     </motion.div>
-                    <div className="text-left">
+                    {/* 桌面版：顯示完整名稱和用途 */}
+                    <div className="hidden sm:block text-left">
                       <div className="leading-tight">
                         {mode.label}
                         <span className="text-xs opacity-75 ml-1">({mode.purpose})</span>
                       </div>
                     </div>
+                    
+                    {/* 移動端：只顯示簡單用途 */}
+                    <span className="block sm:hidden text-xs font-medium">
+                      {mode.purpose}
+                    </span>
                     
                     {/* 選中狀態指示器 */}
                     {selectedCompanion === mode.id && (
@@ -2631,7 +2821,7 @@ export default function RoomChatPage() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-[#4B4036]">邀請 AI 角色</h2>
+                  <h2 className="text-2xl font-bold text-[#4B4036]">團隊成員管理</h2>
                   <motion.button
                     whileHover={{ scale: 1.1, rotate: 90 }}
                     whileTap={{ scale: 0.9 }}
@@ -2642,42 +2832,96 @@ export default function RoomChatPage() {
                   </motion.button>
                 </div>
 
-                <p className="text-[#2B3A3B] mb-6">選擇要邀請加入專案的 AI 角色：</p>
-
-                <div className="space-y-3">
-                  {companions
-                    .filter(companion => !activeRoles.includes(companion.id))
-                    .map((companion) => (
-                      <motion.button
-                        key={companion.id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleInviteRole(companion.id)}
-                        className="w-full flex items-center space-x-4 p-4 bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl hover:from-[#FFD59A]/20 hover:to-[#EBC9A4]/20 transition-all border border-[#EADBC8]"
-                      >
-                        <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
-                          <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                            <Image
-                              src={companion.imagePath}
-                              alt={companion.name}
-                              width={40}
-                              height={40}
-                              className="w-10 h-10 object-cover"
-                            />
+                {/* 現有團隊成員 */}
+                {activeRoles.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center space-x-2">
+                      <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center">
+                        <CheckCircleIcon className="w-3 h-3 text-white" />
+                      </div>
+                      <span>目前團隊成員</span>
+                    </h3>
+                    <div className="space-y-2">
+                      {activeRoles.map((companionId) => {
+                        const companion = companions.find(c => c.id === companionId);
+                        if (!companion) return null;
+                        
+                        return (
+                          <div
+                            key={companionId}
+                            className="flex items-center space-x-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200"
+                          >
+                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
+                              <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                <Image
+                                  src={companion.imagePath}
+                                  alt={companion.name}
+                                  width={32}
+                                  height={32}
+                                  className="w-8 h-8 object-cover"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-medium text-[#4B4036]">{companion.name}</h4>
+                              <p className="text-xs text-[#2B3A3B]">{companion.specialty}</p>
+                            </div>
+                            <div className="flex items-center space-x-1 text-green-600">
+                              <CheckCircleIcon className="w-4 h-4" />
+                              <span className="text-xs font-medium">已加入</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex-1 text-left">
-                          <h3 className="font-semibold text-[#4B4036]">{companion.name}</h3>
-                          <p className="text-sm text-[#2B3A3B]">{companion.specialty}</p>
-                        </div>
-                        <PlusIcon className="w-5 h-5 text-[#FFB6C1]" />
-                      </motion.button>
-                    ))}
-                </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
-                {companions.filter(companion => !activeRoles.includes(companion.id)).length === 0 && (
+                {/* 可邀請的成員 */}
+                {companions.filter(companion => !activeRoles.includes(companion.id)).length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center space-x-2">
+                      <div className="w-5 h-5 bg-[#FFB6C1] rounded-full flex items-center justify-center">
+                        <PlusIcon className="w-3 h-3 text-white" />
+                      </div>
+                      <span>可邀請成員</span>
+                    </h3>
+                    <div className="space-y-3">
+                      {companions
+                        .filter(companion => !activeRoles.includes(companion.id))
+                        .map((companion) => (
+                          <motion.button
+                            key={companion.id}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleInviteRole(companion.id)}
+                            className="w-full flex items-center space-x-4 p-4 bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl hover:from-[#FFD59A]/20 hover:to-[#EBC9A4]/20 transition-all border border-[#EADBC8]"
+                          >
+                            <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
+                              <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                <Image
+                                  src={companion.imagePath}
+                                  alt={companion.name}
+                                  width={40}
+                                  height={40}
+                                  className="w-10 h-10 object-cover"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-1 text-left">
+                              <h3 className="font-semibold text-[#4B4036]">{companion.name}</h3>
+                              <p className="text-sm text-[#2B3A3B]">{companion.specialty}</p>
+                            </div>
+                            <PlusIcon className="w-5 h-5 text-[#FFB6C1]" />
+                          </motion.button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {companions.filter(companion => !activeRoles.includes(companion.id)).length === 0 && activeRoles.length === 3 && (
                   <div className="text-center py-8 text-[#2B3A3B]">
-                    所有 AI 角色都已在專案中！
+                    🎉 所有 AI 成員都已在專案團隊中！
                   </div>
                 )}
               </motion.div>
@@ -2723,7 +2967,7 @@ export default function RoomChatPage() {
                   </motion.button>
                 </div>
 
-                <p className="text-[#2B3A3B] mb-6">管理專案中的 AI 角色，您可以邀請新角色或移除現有角色：</p>
+                <p className="text-[#2B3A3B] mb-6">管理專案團隊中的 AI 成員，您可以邀請新成員或移除現有成員：</p>
 
                 {/* 當前角色列表 */}
                 <div className="mb-8">
@@ -2731,7 +2975,7 @@ export default function RoomChatPage() {
                     <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center">
                       <CheckCircleIcon className="w-3 h-3 text-white" />
                     </div>
-                    <span>專案中的角色</span>
+                    <span>專案團隊成員</span>
                   </h3>
                   
                   <div className="space-y-3">
