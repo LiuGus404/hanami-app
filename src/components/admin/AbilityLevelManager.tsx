@@ -171,17 +171,17 @@ export default function AbilityLevelManager({
                   <HanamiInput
                     label="等級標題"
                     value={editingLevel.level_title}
-                    onChange={e => setEditingLevel({
+                    onChange={value => setEditingLevel({
                       ...editingLevel,
-                      level_title: e.target.value
+                      level_title: value
                     })}
                   />
                   <HanamiInput
                     label="等級描述"
                     value={editingLevel.level_description}
-                    onChange={e => setEditingLevel({
+                    onChange={value => setEditingLevel({
                       ...editingLevel,
-                      level_description: e.target.value
+                      level_description: value
                     })}
                   />
                 </div>
@@ -250,18 +250,18 @@ export default function AbilityLevelManager({
                 label="等級標題"
                 placeholder="例如：基礎掌握"
                 value={newLevel.level_title}
-                onChange={e => setNewLevel({
+                onChange={value => setNewLevel({
                   ...newLevel,
-                  level_title: e.target.value
+                  level_title: value
                 })}
               />
               <HanamiInput
                 label="等級描述"
                 placeholder="描述此等級的具體表現"
                 value={newLevel.level_description}
-                onChange={e => setNewLevel({
+                onChange={value => setNewLevel({
                   ...newLevel,
-                  level_description: e.target.value
+                  level_description: value
                 })}
               />
               <div className="flex gap-3">

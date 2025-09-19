@@ -1770,7 +1770,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                             <div className="space-y-2">
                               <HanamiInput
                                 value={editTitle}
-                                onChange={(e) => setEditTitle(e.target.value)}
+                                onChange={(value) => setEditTitle(value)}
                                 placeholder="輸入新標題"
                                 className="text-sm"
                                 onKeyDown={handleKeyDown}
@@ -1912,7 +1912,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                             <div className="space-y-2">
                               <HanamiInput
                                 value={editTitle}
-                                onChange={(e) => setEditTitle(e.target.value)}
+                                onChange={(value) => setEditTitle(value)}
                                 placeholder="輸入新標題"
                                 className="text-sm"
                                 onKeyDown={handleKeyDown}

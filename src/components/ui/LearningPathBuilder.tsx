@@ -5109,8 +5109,7 @@ function NodeEditor({ node, onSave, onCancel }: NodeEditorProps) {
             </label>
             <HanamiInput
               value={editedNode.title}
-              onChange={(e) => {
-                const value = e.target.value;
+              onChange={(value) => {
                 if (value.length <= 30) {
                   setEditedNode(prev => ({ ...prev, title: value }));
                 }

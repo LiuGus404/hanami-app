@@ -1513,7 +1513,7 @@ function RoleForm({
         </label>
         <HanamiInput
           value={formData.role_name}
-          onChange={(e) => setFormData({ ...formData, role_name: e.target.value })}
+          onChange={(value) => setFormData({ ...formData, role_name: value })}
           placeholder="例如: custom_role_1"
           required
         />
@@ -1525,7 +1525,7 @@ function RoleForm({
         </label>
         <HanamiInput
           value={formData.display_name}
-          onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+          onChange={(value) => setFormData({ ...formData, display_name: value })}
           placeholder="例如: 自訂角色1"
           required
         />
@@ -1989,7 +1989,7 @@ function PermissionForm({
         </label>
         <HanamiInput
           value={formData.user_email}
-          onChange={(e) => setFormData({ ...formData, user_email: e.target.value })}
+          onChange={(value) => setFormData({ ...formData, user_email: value })}
           placeholder="user@example.com"
           type="email"
           required
@@ -2002,7 +2002,7 @@ function PermissionForm({
         </label>
         <HanamiInput
           value={formData.user_phone}
-          onChange={(e) => setFormData({ ...formData, user_phone: e.target.value })}
+          onChange={(value) => setFormData({ ...formData, user_phone: value })}
           placeholder="+886 912 345 678"
         />
       </div>

@@ -1,0 +1,60 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 獲取聊天室對話記錄\nSELECT \n  id,\n  room_id,\n  content as message_content,\n  CASE \n    WHEN sender_type = 'user' THEN 'user'\n    WHEN content_json->>'role_name' = 'hibi' THEN 'hibi'\n    WHEN content_json->>'role_name' = 'mori' THEN 'mori'\n    WHEN content_json->>'role_name' = 'pico' THEN 'pico'\n    WHEN sender_type = 'system' OR content_json->>'role_name' = 'system' THEN 'system'\n    ELSE 'unknown'\n  END as sender,\n  sender_type,\n  content_json,\n  created_at,\n  TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as timestamp\nFROM public.ai_messages\nWHERE \n  room_id = $1\nORDER BY created_at DESC\nLIMIT 10;",
+        "options": {
+          "queryReplacement": "= $1 = {{ $json.room_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        600,
+        200
+      ],
+      "id": "room-conversation-query",
+      "name": "獲取房間對話記錄",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 處理房間對話記錄\nconst roomId = $input.all()[0].json.room_id;\nconst messages = $input.all()[0].json;\n\n// 統計訊息類型\nconst messageStats = {\n  total: messages.length,\n  user_messages: messages.filter(m => m.sender === 'user').length,\n  ai_messages: messages.filter(m => ['hibi', 'mori', 'pico'].includes(m.sender)).length,\n  system_messages: messages.filter(m => m.sender === 'system').length\n};\n\n// 提取最近的對話上下文\nconst recentContext = messages.slice(0, 5).map(msg => ({\n  sender: msg.sender,\n  content: msg.message_content,\n  timestamp: msg.timestamp\n}));\n\n// 分析對話主題\nconst topics = [];\nmessages.forEach(msg => {\n  if (msg.message_content.includes('圖片') || msg.message_content.includes('創作') || msg.message_content.includes('設計')) {\n    topics.push('創作設計');\n  }\n  if (msg.message_content.includes('研究') || msg.message_content.includes('分析') || msg.message_content.includes('學習')) {\n    topics.push('研究學習');\n  }\n  if (msg.message_content.includes('統籌') || msg.message_content.includes('協調') || msg.message_content.includes('管理')) {\n    topics.push('專案管理');\n  }\n});\n\nconst uniqueTopics = [...new Set(topics)];\n\nreturn {\n  room_id: roomId,\n  conversation_stats: messageStats,\n  recent_context: recentContext,\n  conversation_topics: uniqueTopics,\n  last_activity: messages[0]?.timestamp || null,\n  raw_messages: messages\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        200
+      ],
+      "id": "process-conversation",
+      "name": "處理對話數據"
+    }
+  ],
+  "connections": {
+    "獲取房間對話記錄": {
+      "main": [
+        [
+          {
+            "node": "處理對話數據",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "room-conversation-workflow"
+  }
+}
+

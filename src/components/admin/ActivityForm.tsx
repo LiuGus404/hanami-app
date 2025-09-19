@@ -1066,7 +1066,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         label="活動名稱 *"
         placeholder="請輸入活動名稱"
         value={formData.activity_name || ''}
-        onChange={(e) => handleInputChange('activity_name', e.target.value)}
+        onChange={(value) => handleInputChange('activity_name', value)}
       />
       {/* 活動類型多選 */}
       <div>
@@ -1184,7 +1184,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         min={1}
         type="number"
         value={formData.difficulty_level?.toString() || '1'}
-        onChange={(e) => handleInputChange('difficulty_level', parseInt(e.target.value) || 1)}
+        onChange={(value) => handleInputChange('difficulty_level', parseInt(value) || 1)}
       />
 
       <HanamiInput
@@ -1193,7 +1193,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         min={0}
         type="number"
         value={formData.estimated_duration?.toString() || '0'}
-        onChange={(e) => handleInputChange('estimated_duration', parseInt(e.target.value) || 0)}
+        onChange={(value) => handleInputChange('estimated_duration', parseInt(value) || 0)}
       />
     </div>
   );
@@ -2310,7 +2310,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     label="選項名稱 *"
                     placeholder="例如：戶外活動、線上課程、團體活動"
                     value={newOptionName}
-                    onChange={(e) => setNewOptionName(e.target.value)}
+                    onChange={(value) => setNewOptionName(value)}
                   />
                   
                   {/* 預設設定 */}

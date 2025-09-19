@@ -100,7 +100,7 @@ export default function DashboardPage() {
       title: 'AI工作伙伴',
       description: '讓AI解決你工作/日常/教學的問題',
       color: 'bg-orange-500',
-      href: '/aihome/work-assistant'
+      href: '/aihome/ai-companions'
     },
     {
       icon: AcademicCapIcon,
@@ -360,7 +360,7 @@ export default function DashboardPage() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => router.push('/aihome/work-assistant')}
+              onClick={() => router.push('/aihome/ai-companions')}
               className="inline-flex items-center px-8 py-4 bg-orange-500 text-white rounded-xl font-semibold text-lg shadow-lg hover:bg-orange-600 transition-all duration-200"
             >
               開始使用

@@ -271,20 +271,20 @@ export function ActivityTemplateBuilder({
             label="範本名稱"
             placeholder="輸入範本名稱"
             value={template.name}
-            onChange={(e) => setTemplate(prev => ({ ...prev, name: e.target.value }))}
+            onChange={(value) => setTemplate(prev => ({ ...prev, name: value }))}
           />
           <HanamiInput
             label="分類"
             placeholder="輸入分類"
             value={template.category}
-            onChange={(e) => setTemplate(prev => ({ ...prev, category: e.target.value }))}
+            onChange={(value) => setTemplate(prev => ({ ...prev, category: value }))}
           />
           <div className="md:col-span-2">
             <HanamiInput
               label="描述"
               placeholder="輸入範本描述"
               value={template.description}
-              onChange={(e) => setTemplate(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(value) => setTemplate(prev => ({ ...prev, description: value }))}
             />
           </div>
         </div>
@@ -477,9 +477,9 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
                 <HanamiInput
                   placeholder={`選項 ${index + 1}`}
                   value={option}
-                  onChange={(e) => {
+                  onChange={(value) => {
                     const newOptions = [...(fieldData.options || [])];
-                    newOptions[index] = e.target.value;
+                    newOptions[index] = value;
                     setFieldData({ ...fieldData, options: newOptions });
                   }}
                 />
@@ -514,23 +514,23 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
                 label="最小值"
                 type="number"
                 value={fieldData.min_scale || 1}
-                onChange={(e) => setFieldData({ ...fieldData, min_scale: parseInt(e.target.value) })}
+                onChange={(value) => setFieldData({ ...fieldData, min_scale: parseInt(value) })}
               />
               <HanamiInput
                 label="最大值"
                 type="number"
                 value={fieldData.max_scale || 5}
-                onChange={(e) => setFieldData({ ...fieldData, max_scale: parseInt(e.target.value) })}
+                onChange={(value) => setFieldData({ ...fieldData, max_scale: parseInt(value) })}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <HanamiInput
                 label="最小值標籤"
                 value={fieldData.scale_labels?.min || ''}
-                onChange={(e) => setFieldData({
+                onChange={(value) => setFieldData({
                   ...fieldData,
                   scale_labels: { 
-                    min: e.target.value, 
+                    min: value, 
                     max: fieldData.scale_labels?.max ?? '', 
                   },
                 })}
@@ -538,11 +538,11 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
               <HanamiInput
                 label="最大值標籤"
                 value={fieldData.scale_labels?.max || ''}
-                onChange={(e) => setFieldData({
+                onChange={(value) => setFieldData({
                   ...fieldData,
                   scale_labels: { 
                     min: fieldData.scale_labels?.min ?? '', 
-                    max: e.target.value, 
+                    max: value, 
                   },
                 })}
               />
@@ -557,18 +557,18 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
               label="允許的檔案類型"
               placeholder="pdf, jpg, png, mp3"
               value={fieldData.allowed_types?.join(', ') || ''}
-              onChange={(e) => setFieldData({
+              onChange={(value) => setFieldData({
                 ...fieldData,
-                allowed_types: e.target.value.split(',').map(t => t.trim()),
+                allowed_types: value.split(',').map(t => t.trim()),
               })}
             />
             <HanamiInput
               label="最大檔案大小 (MB)"
               type="number"
               value={fieldData.max_size ? fieldData.max_size / 1024 / 1024 : 10}
-              onChange={(e) => setFieldData({
+              onChange={(value) => setFieldData({
                 ...fieldData,
-                max_size: parseInt(e.target.value) * 1024 * 1024,
+                max_size: parseInt(value) * 1024 * 1024,
               })}
             />
             <label className="flex items-center gap-2">
@@ -596,9 +596,9 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
                   <HanamiInput
                     placeholder={`欄標題 ${index + 1}`}
                     value={column}
-                    onChange={(e) => {
+                    onChange={(value) => {
                       const newColumns = [...(fieldData.grid_columns || [])];
-                      newColumns[index] = e.target.value;
+                      newColumns[index] = value;
                       setFieldData({ ...fieldData, grid_columns: newColumns });
                     }}
                   />
@@ -631,9 +631,9 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
                   <HanamiInput
                     placeholder={`問題 ${index + 1}`}
                     value={row}
-                    onChange={(e) => {
+                    onChange={(value) => {
                       const newRows = [...(fieldData.grid_rows || [])];
-                      newRows[index] = e.target.value;
+                      newRows[index] = value;
                       setFieldData({ ...fieldData, grid_rows: newRows });
                     }}
                   />
@@ -673,21 +673,21 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
         label="欄位標題"
         placeholder="輸入欄位標題"
         value={fieldData.title}
-        onChange={(e) => setFieldData(prev => ({ ...prev, title: e.target.value }))}
+        onChange={(value) => setFieldData(prev => ({ ...prev, title: value }))}
       />
 
       <HanamiInput
         label="說明文字"
         placeholder="輸入說明文字"
         value={fieldData.description || ''}
-        onChange={(e) => setFieldData(prev => ({ ...prev, description: e.target.value }))}
+        onChange={(value) => setFieldData(prev => ({ ...prev, description: value }))}
       />
 
       <HanamiInput
         label="預設值"
         placeholder="輸入預設值"
         value={fieldData.placeholder || ''}
-        onChange={(e) => setFieldData(prev => ({ ...prev, placeholder: e.target.value }))}
+        onChange={(value) => setFieldData(prev => ({ ...prev, placeholder: value }))}
       />
 
       <label className="flex items-center gap-2">

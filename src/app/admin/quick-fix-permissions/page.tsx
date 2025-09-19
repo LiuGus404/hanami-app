@@ -210,7 +210,7 @@ export default function QuickFixPermissionsPage() {
               </label>
               <HanamiInput
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(value) => setEmail(value)}
                 placeholder="請輸入需要修復的郵箱地址"
               />
             </div>

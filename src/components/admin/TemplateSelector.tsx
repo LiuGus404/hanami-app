@@ -60,7 +60,7 @@ export function TemplateSelector({
           <HanamiInput
             placeholder="搜尋範本..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(value) => setSearchTerm(value)}
           />
         </div>
         <select

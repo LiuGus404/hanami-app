@@ -292,7 +292,7 @@ export default function StudentSelector({
           </div>
           <HanamiInput
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(value) => setSearchQuery(value)}
             placeholder="搜尋姓名、暱稱、電話或郵箱..."
             type="text"
             className="pl-10"

@@ -548,7 +548,7 @@ export default function StudentMediaPage() {
                 <HanamiInput
                   placeholder="搜尋學生姓名..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(value) => setSearchQuery(value)}
                   className="pl-10"
                 />
               </div>

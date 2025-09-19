@@ -270,7 +270,7 @@ export default function TestTreeActivitiesV2Page() {
             </label>
             <HanamiSelect
               value={selectedTree}
-              onChange={(e) => setSelectedTree(e.target.value)}
+              onChange={(value) => setSelectedTree(value)}
               options={trees.map(tree => ({
                 value: tree.id,
                 label: tree.tree_name
@@ -298,7 +298,7 @@ export default function TestTreeActivitiesV2Page() {
             </label>
             <HanamiSelect
               value={formData.activity_source || 'custom'}
-              onChange={(e) => setFormData({ ...formData, activity_source: e.target.value as 'teaching' | 'custom' | 'template' })}
+              onChange={(value) => setFormData({ ...formData, activity_source: value as 'teaching' | 'custom' | 'template' })}
               options={[
                 { value: 'custom', label: '自訂活動' },
                 { value: 'teaching', label: '教學活動' },
@@ -313,7 +313,7 @@ export default function TestTreeActivitiesV2Page() {
             </label>
             <HanamiSelect
               value={formData.activity_type || 'custom'}
-              onChange={(e) => setFormData({ ...formData, activity_type: e.target.value as 'custom' | 'teaching' | 'assessment' | 'practice' })}
+              onChange={(value) => setFormData({ ...formData, activity_type: value as 'custom' | 'teaching' | 'assessment' | 'practice' })}
               options={ACTIVITY_TYPES.map(type => ({
                 value: type,
                 label: ACTIVITY_TYPE_LABELS[type]
@@ -327,7 +327,7 @@ export default function TestTreeActivitiesV2Page() {
             </label>
             <HanamiInput
               value={formData.activity_name || ''}
-              onChange={(e) => setFormData({ ...formData, activity_name: e.target.value })}
+              onChange={(value) => setFormData({ ...formData, activity_name: value })}
               placeholder="請輸入活動名稱"
             />
           </div>
@@ -338,7 +338,7 @@ export default function TestTreeActivitiesV2Page() {
             </label>
             <HanamiSelect
               value={formData.difficulty_level?.toString() || '1'}
-              onChange={(e) => setFormData({ ...formData, difficulty_level: parseInt(e.target.value) })}
+              onChange={(value) => setFormData({ ...formData, difficulty_level: parseInt(value) })}
               options={DIFFICULTY_LEVELS.map(level => ({
                 value: level.toString(),
                 label: `${DIFFICULTY_LEVEL_LABELS[level]} (等級 ${level})`
@@ -353,7 +353,7 @@ export default function TestTreeActivitiesV2Page() {
             <HanamiInput
               type="number"
               value={formData.estimated_duration?.toString() || ''}
-              onChange={(e) => setFormData({ ...formData, estimated_duration: parseInt(e.target.value) || undefined })}
+              onChange={(value) => setFormData({ ...formData, estimated_duration: parseInt(value) || undefined })}
               placeholder="30"
             />
           </div>
@@ -365,7 +365,7 @@ export default function TestTreeActivitiesV2Page() {
             <HanamiInput
               type="number"
               value={formData.priority_order?.toString() || '1'}
-              onChange={(e) => setFormData({ ...formData, priority_order: parseInt(e.target.value) || 1 })}
+              onChange={(value) => setFormData({ ...formData, priority_order: parseInt(value) || 1 })}
               placeholder="1"
             />
           </div>

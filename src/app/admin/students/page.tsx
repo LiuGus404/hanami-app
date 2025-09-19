@@ -1490,9 +1490,9 @@ export default function StudentManagementPage() {
                 className="pl-10"
                 placeholder="搜尋學生姓名、電話或編號..."
                 value={searchInput}
-                onChange={e => {
-                  setSearchInput(e.target.value);
-                  handleSearchTermChange(e.target.value);
+                onChange={value => {
+                  setSearchInput(value);
+                  handleSearchTermChange(value);
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Enter' || e.code === 'Enter' || e.keyCode === 13) {

@@ -232,7 +232,7 @@ export default function AbilityCategoryManager({
                   <HanamiInput
                     label="類別名稱"
                     value={newCategoryName}
-                    onChange={e => setNewCategoryName(e.target.value)}
+                    onChange={value => setNewCategoryName(value)}
                   />
                 </div>
               ) : (
@@ -283,7 +283,7 @@ export default function AbilityCategoryManager({
                 label="類別名稱"
                 placeholder="例如：身體發展"
                 value={newCategoryName}
-                onChange={e => setNewCategoryName(e.target.value)}
+                onChange={value => setNewCategoryName(value)}
               />
               <div className="flex gap-3">
                 <HanamiButton

@@ -300,7 +300,7 @@ export default function LearningPathsPage() {
                 <HanamiInput
                   placeholder="搜尋學習路線..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(value) => setSearchQuery(value)}
                   className="w-64"
                 />
               </div>

@@ -4947,7 +4947,7 @@ export default function TeacherDashboard() {
                             label="類別名稱"
                             placeholder="請輸入類別名稱"
                             value={newOptionName}
-                            onChange={(e) => setNewOptionName(e.target.value)}
+                            onChange={(value) => setNewOptionName(value)}
                           />
                           
                           {/* 預設類別選擇 */}
@@ -5066,14 +5066,14 @@ export default function TeacherDashboard() {
                     label="能力名稱"
                     placeholder="例如：小肌發展"
                     value={newAbility.ability_name}
-                    onChange={e => setNewAbility({ ...newAbility, ability_name: e.target.value })}
+                    onChange={value => setNewAbility({ ...newAbility, ability_name: value })}
                   />
 
                   <HanamiInput
                     label="能力描述"
                     placeholder="能力的詳細描述"
                     value={newAbility.ability_description}
-                    onChange={e => setNewAbility({ ...newAbility, ability_description: e.target.value })}
+                    onChange={value => setNewAbility({ ...newAbility, ability_description: value })}
                   />
 
                   <div className="grid grid-cols-2 gap-4">
@@ -5084,7 +5084,7 @@ export default function TeacherDashboard() {
                       min={1}
                       max={10}
                       value={newAbility.max_level.toString()}
-                      onChange={e => setNewAbility({ ...newAbility, max_level: parseInt(e.target.value) || 5 })}
+                      onChange={value => setNewAbility({ ...newAbility, max_level: parseInt(value) || 5 })}
                     />
 
                     <div>

@@ -691,7 +691,7 @@ export default function PermissionManagementPanel() {
                 placeholder="搜尋姓名、電子郵件..."
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(value) => setSearchTerm(value)}
               />
               <div className="flex gap-3">
                 <HanamiSelect
@@ -702,7 +702,7 @@ export default function PermissionManagementPanel() {
                     { value: 'inactive', label: '停用' },
                   ]}
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as AccountStatus)}
+                  onChange={(value) => setStatusFilter(value as AccountStatus)}
                 />
                 <HanamiButton
                   className="whitespace-nowrap"

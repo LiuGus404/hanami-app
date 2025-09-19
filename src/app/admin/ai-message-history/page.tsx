@@ -172,7 +172,7 @@ export default function AIMessageHistoryPage() {
                   className="pl-10"
                   placeholder="搜尋學生姓名或模版..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(value) => setSearchTerm(value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       loadMessageLogs();

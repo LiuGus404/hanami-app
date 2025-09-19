@@ -309,7 +309,7 @@ export default function ParentManagementPage() {
                 </label>
                 <HanamiSelect
                   value={selectedParent}
-                  onChange={(e) => setSelectedParent(e.target.value)}
+                  onChange={(value) => setSelectedParent(value)}
                   options={[
                     { value: '', label: '請選擇家長' },
                     ...parents.map((parent) => ({
@@ -326,7 +326,7 @@ export default function ParentManagementPage() {
                 </label>
                 <HanamiSelect
                   value={selectedStudent}
-                  onChange={(e) => setSelectedStudent(e.target.value)}
+                  onChange={(value) => setSelectedStudent(value)}
                   options={[
                     { value: '', label: '請選擇學生' },
                     ...students.map((student) => ({
@@ -345,7 +345,7 @@ export default function ParentManagementPage() {
                 </label>
                 <HanamiSelect
                   value={relationshipType}
-                  onChange={(e) => setRelationshipType(e.target.value)}
+                  onChange={(value) => setRelationshipType(value)}
                   options={[
                     { value: 'parent', label: '家長' },
                     { value: 'guardian', label: '監護人' },

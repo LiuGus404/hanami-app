@@ -3,8 +3,8 @@
 // 基礎組件
 export { HanamiButton } from './HanamiButton';
 export { HanamiCard } from './HanamiCard';
-export { default as HanamiInput } from './HanamiInput';
-export { HanamiSelect } from './HanamiSelect';
+export { HanamiInput, default as HanamiInputDefault } from './HanamiInput';
+export { HanamiSelect, default as HanamiSelectDefault } from './HanamiSelect';
 export { default as HanamiCalendar } from './HanamiCalendar';
 export { default as CuteButton } from './CuteButton';
 export { default as HanamiBadge } from './HanamiBadge';

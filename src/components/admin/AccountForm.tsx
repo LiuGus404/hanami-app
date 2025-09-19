@@ -196,7 +196,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
                   options={field.options || []}
                   required={field.required}
                   value={formData[field.name] || ''}
-                  onChange={(e) => handleInputChange(field.name, e.target.value)}
+                  onChange={(value) => handleInputChange(field.name, value)}
                 />
               ) : (
                 <HanamiInput
@@ -205,7 +205,7 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
                   required={field.required}
                   type={field.type as 'text' | 'email' | 'password' | 'tel' | 'number'}
                   value={formData[field.name] || ''}
-                  onChange={(e) => handleInputChange(field.name, e.target.value)}
+                  onChange={(value) => handleInputChange(field.name, value)}
                 />
               )}
             </div>

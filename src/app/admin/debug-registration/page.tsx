@@ -306,7 +306,7 @@ export default function DebugRegistrationPage() {
               </label>
               <HanamiInput
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(value) => setEmail(value)}
                 placeholder="請輸入要調試的郵箱"
               />
             </div>

@@ -955,7 +955,7 @@ export default function StudentProgressDashboard() {
                   className="pl-10"
                   placeholder="搜尋學生姓名或成長樹..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(value) => setSearchQuery(value)}
                 />
               </div>
             </div>

@@ -606,7 +606,7 @@ export function DynamicActivityForm({
             required={field.required}
             type="number"
             value={value}
-            onChange={(e) => updateField(field.id, parseInt(e.target.value) || 0)}
+            onChange={(value) => updateField(field.id, parseInt(value) || 0)}
           />
         );
 

@@ -611,7 +611,7 @@ export default function AbilityEditModal({
                     label="類別名稱 *"
                     placeholder="例如：身體發展、認知發展"
                     value={newOptionName}
-                    onChange={(e) => setNewOptionName(e.target.value)}
+                    onChange={(value) => setNewOptionName(value)}
                   />
                   
                   {/* 預設類別選擇 */}
@@ -728,9 +728,9 @@ export default function AbilityEditModal({
               label="能力名稱"
               placeholder="例如：小肌發展"
               value={editingAbility.ability_name}
-              onChange={e => setEditingAbility({
+              onChange={value => setEditingAbility({
                 ...editingAbility,
-                ability_name: e.target.value
+                ability_name: value
               })}
             />
 
@@ -738,9 +738,9 @@ export default function AbilityEditModal({
               label="能力描述"
               placeholder="能力的詳細描述"
               value={editingAbility.ability_description || ''}
-              onChange={e => setEditingAbility({
+              onChange={value => setEditingAbility({
                 ...editingAbility,
-                ability_description: e.target.value
+                ability_description: value
               })}
             />
 
@@ -767,9 +767,9 @@ export default function AbilityEditModal({
                 min={1}
                 max={10}
                 value={(editingAbility.max_level || 5).toString()}
-                onChange={e => setEditingAbility({
+                onChange={value => setEditingAbility({
                   ...editingAbility,
-                  max_level: parseInt(e.target.value) || 5
+                  max_level: parseInt(value) || 5
                 })}
               />
             </div>

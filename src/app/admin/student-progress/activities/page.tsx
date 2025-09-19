@@ -820,7 +820,7 @@ export default function TeachingActivitiesPage() {
                   className="pl-10"
                   placeholder="搜尋活動名稱或描述..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(value) => setSearchTerm(value)}
                 />
               </div>
             </div>

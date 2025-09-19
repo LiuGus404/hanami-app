@@ -372,7 +372,7 @@ export function MediaQuotaSettingsModal({
                   </label>
                   <HanamiInput
                     value={newLevel.level_name}
-                    onChange={(e) => setNewLevel(prev => ({ ...prev, level_name: e.target.value }))}
+                    onChange={(value) => setNewLevel(prev => ({ ...prev, level_name: value }))}
                     placeholder="例如：基礎版、進階版"
                   />
                 </div>
@@ -384,7 +384,7 @@ export function MediaQuotaSettingsModal({
                   <HanamiInput
                     type="number"
                     value={newLevel.video_limit}
-                    onChange={(e) => setNewLevel(prev => ({ ...prev, video_limit: parseInt(e.target.value) || 0 }))}
+                    onChange={(value) => setNewLevel(prev => ({ ...prev, video_limit: parseInt(value) || 0 }))}
                     placeholder="影片數量"
                     min={1}
                   />
@@ -397,7 +397,7 @@ export function MediaQuotaSettingsModal({
                   <HanamiInput
                     type="number"
                     value={newLevel.photo_limit}
-                    onChange={(e) => setNewLevel(prev => ({ ...prev, photo_limit: parseInt(e.target.value) || 0 }))}
+                    onChange={(value) => setNewLevel(prev => ({ ...prev, photo_limit: parseInt(value) || 0 }))}
                     placeholder="相片數量"
                     min={1}
                   />
@@ -410,7 +410,7 @@ export function MediaQuotaSettingsModal({
                   <HanamiInput
                     type="number"
                     value={newLevel.storage_limit_mb}
-                    onChange={(e) => setNewLevel(prev => ({ ...prev, storage_limit_mb: parseInt(e.target.value) || 0 }))}
+                    onChange={(value) => setNewLevel(prev => ({ ...prev, storage_limit_mb: parseInt(value) || 0 }))}
                     placeholder="儲存空間"
                     min={1}
                   />
@@ -423,7 +423,7 @@ export function MediaQuotaSettingsModal({
                   <HanamiInput
                     type="number"
                     value={newLevel.video_size_limit_mb}
-                    onChange={(e) => setNewLevel(prev => ({ ...prev, video_size_limit_mb: parseInt(e.target.value) || 0 }))}
+                    onChange={(value) => setNewLevel(prev => ({ ...prev, video_size_limit_mb: parseInt(value) || 0 }))}
                     placeholder="影片大小限制"
                     min={1}
                   />
@@ -436,7 +436,7 @@ export function MediaQuotaSettingsModal({
                   <HanamiInput
                     type="number"
                     value={newLevel.photo_size_limit_mb}
-                    onChange={(e) => setNewLevel(prev => ({ ...prev, photo_size_limit_mb: parseInt(e.target.value) || 0 }))}
+                    onChange={(value) => setNewLevel(prev => ({ ...prev, photo_size_limit_mb: parseInt(value) || 0 }))}
                     placeholder="相片大小限制"
                     min={1}
                   />
@@ -449,7 +449,7 @@ export function MediaQuotaSettingsModal({
                 </label>
                 <HanamiInput
                   value={newLevel.description}
-                  onChange={(e) => setNewLevel(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(value) => setNewLevel(prev => ({ ...prev, description: value }))}
                   placeholder="配額等級的詳細描述"
                 />
               </div>
@@ -505,7 +505,7 @@ export function MediaQuotaSettingsModal({
                           </label>
                           <HanamiInput
                             value={editingLevel.level_name}
-                            onChange={(e) => setEditingLevel(prev => prev ? { ...prev, level_name: e.target.value } : null)}
+                            onChange={(value) => setEditingLevel(prev => prev ? { ...prev, level_name: value } : null)}
                             placeholder="等級名稱"
                           />
                         </div>
@@ -517,7 +517,7 @@ export function MediaQuotaSettingsModal({
                           <HanamiInput
                             type="number"
                             value={editingLevel.video_limit}
-                            onChange={(e) => setEditingLevel(prev => prev ? { ...prev, video_limit: parseInt(e.target.value) || 0 } : null)}
+                            onChange={(value) => setEditingLevel(prev => prev ? { ...prev, video_limit: parseInt(value) || 0 } : null)}
                             placeholder="影片數量"
                             min={1}
                           />
@@ -530,7 +530,7 @@ export function MediaQuotaSettingsModal({
                           <HanamiInput
                             type="number"
                             value={editingLevel.photo_limit}
-                            onChange={(e) => setEditingLevel(prev => prev ? { ...prev, photo_limit: parseInt(e.target.value) || 0 } : null)}
+                            onChange={(value) => setEditingLevel(prev => prev ? { ...prev, photo_limit: parseInt(value) || 0 } : null)}
                             placeholder="相片數量"
                             min={1}
                           />
@@ -543,7 +543,7 @@ export function MediaQuotaSettingsModal({
                           <HanamiInput
                             type="number"
                             value={editingLevel.storage_limit_mb}
-                            onChange={(e) => setEditingLevel(prev => prev ? { ...prev, storage_limit_mb: parseInt(e.target.value) || 0 } : null)}
+                            onChange={(value) => setEditingLevel(prev => prev ? { ...prev, storage_limit_mb: parseInt(value) || 0 } : null)}
                             placeholder="儲存空間"
                             min={1}
                           />
@@ -556,7 +556,7 @@ export function MediaQuotaSettingsModal({
                           <HanamiInput
                             type="number"
                             value={editingLevel.video_size_limit_mb}
-                            onChange={(e) => setEditingLevel(prev => prev ? { ...prev, video_size_limit_mb: parseInt(e.target.value) || 0 } : null)}
+                            onChange={(value) => setEditingLevel(prev => prev ? { ...prev, video_size_limit_mb: parseInt(value) || 0 } : null)}
                             placeholder="影片大小限制"
                             min={1}
                           />
@@ -569,7 +569,7 @@ export function MediaQuotaSettingsModal({
                           <HanamiInput
                             type="number"
                             value={editingLevel.photo_size_limit_mb}
-                            onChange={(e) => setEditingLevel(prev => prev ? { ...prev, photo_size_limit_mb: parseInt(e.target.value) || 0 } : null)}
+                            onChange={(value) => setEditingLevel(prev => prev ? { ...prev, photo_size_limit_mb: parseInt(value) || 0 } : null)}
                             placeholder="相片大小限制"
                             min={1}
                           />
@@ -582,7 +582,7 @@ export function MediaQuotaSettingsModal({
                         </label>
                         <HanamiInput
                           value={editingLevel.description}
-                          onChange={(e) => setEditingLevel(prev => prev ? { ...prev, description: e.target.value } : null)}
+                          onChange={(value) => setEditingLevel(prev => prev ? { ...prev, description: value } : null)}
                           placeholder="配額等級的詳細描述"
                         />
                       </div>

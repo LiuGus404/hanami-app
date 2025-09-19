@@ -157,7 +157,7 @@ export default function QuickApprovePage() {
               </label>
               <HanamiInput
                 value={requestId}
-                onChange={(e) => setRequestId(e.target.value)}
+                onChange={(value) => setRequestId(value)}
                 placeholder="請輸入申請ID"
               />
             </div>

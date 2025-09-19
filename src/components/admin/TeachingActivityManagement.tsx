@@ -999,7 +999,7 @@ export function TeachingActivityManagement() {
               className="pl-10"
               placeholder="搜尋活動..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(value) => setSearchQuery(value)}
             />
           </div>
           
