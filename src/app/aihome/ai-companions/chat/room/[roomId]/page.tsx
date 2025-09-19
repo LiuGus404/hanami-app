@@ -232,11 +232,12 @@ export default function RoomChatPage() {
     try {
       console.log('🔍 載入房間資訊:', roomId);
       
+      const supabase = getSaasSupabaseClient();
       const { data: roomData, error: roomError } = await supabase
         .from('ai_rooms')
         .select('id, title, description, room_type, created_at')
         .eq('id', roomId)
-        .single();
+        .single() as { data: { id: string; title: string; description?: string; room_type?: string; created_at: string } | null; error: any };
       
       if (roomError) {
         console.error('❌ 載入房間資訊失敗:', roomError);
@@ -249,7 +250,7 @@ export default function RoomChatPage() {
       } else if (roomData) {
         console.log('✅ 房間資訊載入成功:', roomData.title);
         setRoom({
-          title: roomData.title,
+          title: roomData.title || '未命名專案',
           description: roomData.description || '',
           activeCompanions: activeRoles
         });
@@ -544,7 +545,7 @@ export default function RoomChatPage() {
         console.log('🔍 載入聊天室歷史訊息:', roomId);
         console.log('🔍 用戶 ID:', user.id);
         
-        const { data: historyMessages, error } = await supabase
+        const { data: historyMessages, error } = await saasSupabase
           .from('ai_messages')
           .select('*')
           .eq('room_id', roomId)
@@ -560,7 +561,7 @@ export default function RoomChatPage() {
 
         if (historyMessages && historyMessages.length > 0) {
           // 轉換 Supabase 訊息格式
-          const convertedMessages: Message[] = historyMessages.map(msg => {
+          const convertedMessages: Message[] = historyMessages.map((msg: any) => {
             let sender: any = 'system';
             
             if (msg.sender_type === 'user') {
@@ -1545,8 +1546,8 @@ export default function RoomChatPage() {
         response_data: tokenData
       };
 
-      const { data, error } = await supabase
-        .from('ai_usage')
+      const { data, error } = await (saasSupabase
+        .from('ai_usage') as any)
         .insert(usageData)
         .select();
 
@@ -1594,8 +1595,8 @@ export default function RoomChatPage() {
 
       console.log('🔍 準備儲存的訊息資料:', messageData);
 
-      const { data, error } = await supabase
-        .from('ai_messages')
+      const { data, error } = await (saasSupabase
+        .from('ai_messages') as any)
         .insert(messageData)
         .select();
 
@@ -1704,7 +1705,7 @@ export default function RoomChatPage() {
       console.log('🗑️ 刪除單個訊息:', messageId);
       
       // 從資料庫刪除該訊息
-      const { error } = await supabase
+      const { error } = await saasSupabase
         .from('ai_messages')
         .delete()
         .eq('id', messageId);
@@ -1735,7 +1736,7 @@ export default function RoomChatPage() {
       console.log('🗑️ 開始清除房間歷史訊息:', roomId);
       
       // 從資料庫刪除該房間的所有訊息
-      const { error } = await supabase
+      const { error } = await saasSupabase
         .from('ai_messages')
         .delete()
         .eq('room_id', roomId);

@@ -73,30 +73,32 @@ export default function AICompanionsPage() {
   const loadUserRooms = async () => {
     if (!user?.id) return;
 
+    const saasSupabase = getSaasSupabaseClient();
+
     try {
       setLoadingRooms(true);
       
       console.log('🔍 開始載入聊天室，用戶 ID:', user.id);
       
       // 方法 1: 先載入基本聊天室資訊，然後單獨查詢角色
-      const { data: allRooms, error: allRoomsError } = await supabase
+      const { data: allRooms, error: allRoomsError } = await saasSupabase
         .from('ai_rooms')
         .select('id, title, description, room_type, last_message_at, created_at, created_by')
         .eq('is_archived', false)
         .order('last_message_at', { ascending: false })
-        .limit(20);
+        .limit(20) as { data: any[] | null; error: any };
 
       if (allRoomsError) {
         console.error('❌ 載入聊天室失敗:', allRoomsError);
         console.log('🔧 嘗試不含角色的基本查詢...');
         
         // 方法 2: 不含角色資料的基本查詢
-        const { data: basicRooms, error: basicError } = await supabase
+        const { data: basicRooms, error: basicError } = await saasSupabase
           .from('ai_rooms')
           .select('id, title, description, room_type, last_message_at, created_at, created_by')
           .eq('is_archived', false)
           .order('last_message_at', { ascending: false })
-          .limit(20);
+          .limit(20) as { data: any[] | null; error: any };
           
         if (basicError) {
           console.error('❌ 基本查詢也失敗:', basicError);
@@ -206,7 +208,7 @@ export default function AICompanionsPage() {
               
               // 查詢該房間的角色資料
               try {
-                const { data: roomRoles, error: rolesError } = await supabase
+                const { data: roomRoles, error: rolesError } = await saasSupabase
                   .from('room_roles')
                   .select(`
                     role_instances(
@@ -464,8 +466,9 @@ export default function AICompanionsPage() {
 
     try {
       // 在 Supabase 中創建團隊專案聊天室（初始只有選中的角色）
-      const { data: newRoom, error: roomError } = await supabase
-        .from('ai_rooms')
+      const saasSupabase = getSaasSupabaseClient();
+      const { data: newRoom, error: roomError } = await (saasSupabase
+        .from('ai_rooms') as any)
         .insert({
           title: projectData.title || `${companion.name} 專案`,
           description: projectData.description || `由 ${companion.name} 開始的專案協作空間`,
@@ -488,8 +491,8 @@ export default function AICompanionsPage() {
       }
 
       // 添加用戶為房間成員
-      const { error: memberError } = await supabase
-        .from('room_members')
+      const { error: memberError } = await (saasSupabase
+        .from('room_members') as any)
         .insert({
           room_id: newRoom.id,
           user_id: user.id,
@@ -542,9 +545,11 @@ export default function AICompanionsPage() {
       setCreatingChat('team');
       console.log('✅ 開始創建團隊協作專案...');
 
+      const saasSupabase = getSaasSupabaseClient();
+      
       // 創建團隊協作聊天室
-      const { data: newRoom, error: roomError } = await supabase
-        .from('ai_rooms')
+      const { data: newRoom, error: roomError } = await (saasSupabase
+        .from('ai_rooms') as any)
         .insert({
           title: '團隊協作專案',
           description: 'Hibi、墨墨、皮可三位 AI 伙伴的協作空間',
@@ -560,8 +565,8 @@ export default function AICompanionsPage() {
       }
 
       // 添加用戶為房間成員
-      const { error: memberError } = await supabase
-        .from('room_members')
+      const { error: memberError } = await (saasSupabase
+        .from('room_members') as any)
         .insert({
           room_id: newRoom.id,
           user_id: user.id,
@@ -608,9 +613,11 @@ export default function AICompanionsPage() {
     }
 
     try {
+      const saasSupabase = getSaasSupabaseClient();
+      
       // 在 Supabase 中創建聊天室
-      const { data: newRoom, error: roomError } = await supabase
-        .from('ai_rooms')
+      const { data: newRoom, error: roomError } = await (saasSupabase
+        .from('ai_rooms') as any)
         .insert({
           title: roomData.title,
           description: roomData.description,
@@ -633,8 +640,8 @@ export default function AICompanionsPage() {
       }
 
       // 添加用戶為房間成員
-      const { error: memberError } = await supabase
-        .from('room_members')
+      const { error: memberError } = await (saasSupabase
+        .from('room_members') as any)
         .insert({
           room_id: newRoom.id,
           user_id: user.id,

@@ -100,18 +100,18 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
       // 計算摘要統計
       if (data && data.length > 0) {
         const totalRequests = data.length;
-        const totalTokens = data.reduce((sum, item) => sum + (item.total_tokens || 0), 0);
-        const totalImages = data.reduce((sum, item) => sum + (item.image_count || 0), 0);
-        const avgLatency = data.reduce((sum, item) => sum + (item.latency_ms || 0), 0) / totalRequests;
+        const totalTokens = data.reduce((sum, item: any) => sum + (item.total_tokens || 0), 0);
+        const totalImages = data.reduce((sum, item: any) => sum + (item.image_count || 0), 0);
+        const avgLatency = data.reduce((sum, item: any) => sum + (item.latency_ms || 0), 0) / totalRequests;
         
         // 找出最常用的模型
         const modelCounts: Record<string, number> = {};
-        data.forEach(item => {
+        data.forEach((item: any) => {
           modelCounts[item.model] = (modelCounts[item.model] || 0) + 1;
         });
         const topModel = Object.entries(modelCounts).sort(([,a], [,b]) => b - a)[0]?.[0] || 'N/A';
         
-        const recentActivity = data[0]?.created_at || '';
+        const recentActivity = (data as any[])[0]?.created_at || '';
 
         setSummary({
           totalRequests,

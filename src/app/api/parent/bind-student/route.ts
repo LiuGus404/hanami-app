@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 
     // 如果有綁定資料，從學生表中獲取完整的學生資訊（包括年齡）
     if (bindings && bindings.length > 0) {
-      const studentIds = bindings.map(binding => binding.student_id);
+      const studentIds = bindings.map((binding: any) => binding.student_id);
       
       // 從主要學生資料庫獲取學生詳細資訊
       const { data: studentsData, error: studentsError } = await mainSupabase
@@ -126,8 +126,8 @@ export async function GET(request: NextRequest) {
       }
 
       // 合併綁定資料和學生詳細資訊
-      const enrichedBindings = bindings.map(binding => {
-        const studentInfo = studentsData?.find(s => s.id === binding.student_id);
+      const enrichedBindings = bindings.map((binding: any) => {
+        const studentInfo: any = studentsData?.find((s: any) => s.id === binding.student_id);
         
         // 計算月齡
         let ageInMonths = null;
