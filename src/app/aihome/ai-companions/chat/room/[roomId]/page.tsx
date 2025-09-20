@@ -353,6 +353,7 @@ export default function RoomChatPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [hasLoadedFromDatabase, setHasLoadedFromDatabase] = useState(false);
   const [editingProject, setEditingProject] = useState(false);
   const [editProjectName, setEditProjectName] = useState('');
   const [editProjectDescription, setEditProjectDescription] = useState('');
@@ -472,13 +473,10 @@ export default function RoomChatPage() {
             // 保存到 sessionStorage
             sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(roomRoles));
           }
+          setHasLoadedFromDatabase(true);
         } else {
-          console.log('⚠️ 資料庫中沒有角色資料，且沒有 URL 參數，使用預設全部角色');
-          // 如果資料庫中沒有角色資料，且沒有 URL 參數，使用預設全部角色
-          if (!urlParams.initialRole && !urlParams.companion && activeRoles.length === 0) {
-            setActiveRoles(['hibi', 'mori', 'pico']);
-            sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(['hibi', 'mori', 'pico']));
-          }
+          console.log('⚠️ 資料庫中沒有角色資料');
+          setHasLoadedFromDatabase(true); // 標記已查詢過資料庫
         }
       } catch (error) {
         console.error('載入房間角色錯誤:', error);
@@ -541,16 +539,27 @@ export default function RoomChatPage() {
           console.error('恢復角色狀態失敗:', error);
         }
       } else {
-        console.log('⚠️ 沒有找到保存的角色狀態，使用預設的全部角色');
-        // 如果沒有任何角色資料，使用預設的全部角色
-        setActiveRoles(['hibi', 'mori', 'pico']);
+        console.log('⚠️ 沒有找到保存的角色狀態，等待資料庫查詢完成');
+        // 不立即設置預設角色，等待資料庫查詢完成
       }
     }
   }, [urlParams, roomId]);
 
-  // 初始化時載入房間資訊
+  // 資料庫查詢完成後的 fallback 邏輯
   useEffect(() => {
-    loadRoomInfo();
+    if (hasLoadedFromDatabase && activeRoles.length === 0 && !urlParams.initialRole && !urlParams.companion) {
+      console.log('⚠️ 資料庫查詢完成但無角色資料，且無 URL 參數，設置為預設全部角色');
+      setActiveRoles(['hibi', 'mori', 'pico']);
+    }
+  }, [hasLoadedFromDatabase, activeRoles.length, urlParams.initialRole, urlParams.companion]);
+
+  // 初始化時載入房間資訊 - 確保 URL 參數處理完成後再執行
+  useEffect(() => {
+    // 只有在 urlParams 已經設置後才執行（避免初始空物件狀態）
+    if (Object.prototype.hasOwnProperty.call(urlParams, 'initialRole') || Object.prototype.hasOwnProperty.call(urlParams, 'companion') || Object.keys(urlParams).length === 0) {
+      console.log('🔄 URL 參數處理完成，開始載入房間資訊');
+      loadRoomInfo();
+    }
   }, [roomId, urlParams]); // 依賴 urlParams 確保 URL 參數處理完成後再執行
 
   // 點擊外部關閉移動端菜單
