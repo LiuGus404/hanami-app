@@ -72,6 +72,29 @@ const safeJsonParse = async (response: Response, context: string = 'API') => {
   }
 };
 
+// 獲取用戶有權訪問的房間 ID 列表（應用層權限檢查）
+const getUserAccessibleRoomIds = async (userId: string): Promise<string> => {
+  try {
+    const saasSupabase = getSaasSupabaseClient();
+    const { data: memberRooms, error } = await saasSupabase
+      .from('room_members')
+      .select('room_id')
+      .eq('user_id', userId);
+    
+    if (error || !memberRooms) {
+      console.log('🔍 用戶沒有額外的房間成員身份');
+      return '';
+    }
+    
+    const roomIds = memberRooms.map((rm: any) => rm.room_id).join(',');
+    console.log('🔍 用戶參與的房間 ID:', roomIds);
+    return roomIds;
+  } catch (error) {
+    console.error('❌ 獲取房間成員身份失敗:', error);
+    return '';
+  }
+};
+
 export default function AICompanionsPage() {
   const { user } = useSaasAuth();
   const router = useRouter();
@@ -100,11 +123,12 @@ export default function AICompanionsPage() {
       
       console.log('🔍 開始載入聊天室，用戶 ID:', user.id);
       
-      // 方法 1: 先載入基本聊天室資訊，然後單獨查詢角色
+      // 方法 1: 載入用戶創建的聊天室（簡化權限檢查）
       const { data: allRooms, error: allRoomsError } = await saasSupabase
         .from('ai_rooms')
         .select('id, title, description, room_type, last_message_at, created_at, created_by')
         .eq('is_archived', false)
+        .eq('created_by', user.id)  // 只載入用戶創建的房間
         .order('last_message_at', { ascending: false })
         .limit(20) as { data: any[] | null; error: any };
 
@@ -154,7 +178,7 @@ export default function AICompanionsPage() {
               if ((room.description?.includes('皮可') || room.description?.includes('Pico')) && !activeRoles.includes('皮可')) activeRoles.push('皮可');
               
               // 如果仍然沒有角色，嘗試從 sessionStorage 獲取
-              if (activeRoles.length === 0) {
+              if (activeRoles.length === 0 && typeof window !== 'undefined') {
                 const sessionKey = `room_${room.id}_roles`;
                 const sessionRoles = sessionStorage.getItem(sessionKey);
                 if (sessionRoles) {
@@ -356,23 +380,25 @@ export default function AICompanionsPage() {
                 console.log('⚠️ 資料庫中沒有角色資料，嘗試從 sessionStorage 獲取');
                 
                 // 先嘗試從 sessionStorage 獲取
-                const sessionKey = `room_${room.id}_roles`;
-                const sessionRoles = sessionStorage.getItem(sessionKey);
-                if (sessionRoles) {
-                  try {
-                    const parsedRoles = JSON.parse(sessionRoles);
-                    if (Array.isArray(parsedRoles) && parsedRoles.length > 0) {
-                      // 將 sessionStorage 中的角色 ID 轉換為顯示名稱
-                      activeRoles = parsedRoles.map(roleId => {
-                        if (roleId === 'hibi') return 'Hibi';
-                        if (roleId === 'mori') return '墨墨';
-                        if (roleId === 'pico') return '皮可';
-                        return roleId;
-                      });
-                      console.log('📱 從 sessionStorage 恢復角色:', activeRoles);
+                if (typeof window !== 'undefined') {
+                  const sessionKey = `room_${room.id}_roles`;
+                  const sessionRoles = sessionStorage.getItem(sessionKey);
+                  if (sessionRoles) {
+                    try {
+                      const parsedRoles = JSON.parse(sessionRoles);
+                      if (Array.isArray(parsedRoles) && parsedRoles.length > 0) {
+                        // 將 sessionStorage 中的角色 ID 轉換為顯示名稱
+                        activeRoles = parsedRoles.map(roleId => {
+                          if (roleId === 'hibi') return 'Hibi';
+                          if (roleId === 'mori') return '墨墨';
+                          if (roleId === 'pico') return '皮可';
+                          return roleId;
+                        });
+                        console.log('📱 從 sessionStorage 恢復角色:', activeRoles);
+                      }
+                    } catch (error) {
+                      console.log('⚠️ sessionStorage 解析失敗:', error);
                     }
-                  } catch (error) {
-                    console.log('⚠️ sessionStorage 解析失敗:', error);
                   }
                 }
                 
@@ -548,12 +574,14 @@ export default function AICompanionsPage() {
       }
     };
 
-    if (showMobileDropdown) {
+    if (showMobileDropdown && typeof document !== 'undefined') {
       document.addEventListener('click', handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('click', handleClickOutside);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('click', handleClickOutside);
+      }
     };
   }, [showMobileDropdown]);
 
@@ -564,13 +592,15 @@ export default function AICompanionsPage() {
         console.log('🔄 檢測到聊天室更新，重新載入...');
         loadUserRooms();
         // 清除標記
-        localStorage.removeItem('rooms_need_refresh');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('rooms_need_refresh');
+        }
       }
     };
 
     const handleFocus = () => {
       // 當頁面重新獲得焦點時，檢查是否需要刷新
-      if (localStorage.getItem('rooms_need_refresh')) {
+      if (typeof window !== 'undefined' && localStorage.getItem('rooms_need_refresh')) {
         console.log('🔄 頁面重新獲得焦點，檢測到更新通知');
         loadUserRooms();
         localStorage.removeItem('rooms_need_refresh');
@@ -579,7 +609,7 @@ export default function AICompanionsPage() {
 
     // 定期檢查 sessionStorage 變化（因為 sessionStorage 不會觸發跨頁面事件）
     const intervalId = setInterval(() => {
-      if (rooms.length > 0) {
+      if (rooms.length > 0 && typeof window !== 'undefined') {
         // 檢查是否有任何房間的 sessionStorage 資料更新了
         let needsRefresh = false;
         rooms.forEach(room => {
@@ -604,12 +634,16 @@ export default function AICompanionsPage() {
       }
     }, 2000); // 每2秒檢查一次
 
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('focus', handleFocus);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorageChange);
+      window.addEventListener('focus', handleFocus);
+    }
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', handleFocus);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('focus', handleFocus);
+      }
       clearInterval(intervalId);
     };
   }, [rooms]);
@@ -1441,7 +1475,7 @@ export default function AICompanionsPage() {
                                 e.stopPropagation();
                                 
                                 // 確認對話框
-                                const isConfirmed = window.confirm(
+                                const isConfirmed = typeof window !== 'undefined' && window.confirm(
                                   `⚠️ 確定要刪除專案嗎？\n\n專案名稱: ${room.title}\n專案描述: ${room.description}\n\n此操作無法復原！`
                                 );
                                 

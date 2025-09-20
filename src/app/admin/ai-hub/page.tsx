@@ -158,7 +158,7 @@ export default function AIHubPage() {
                   />
                 )}
                 {/* 訊息氣泡與複製按鈕包裹 */}
-                <div className="relative">
+                <div className="relative group">
                   <div
                     className={`rounded-xl px-4 py-2 ${
                       msg.sender === 'user' ? 'bg-[#FFF1DB]' : 'bg-[#F5DAB5]'
@@ -167,15 +167,33 @@ export default function AIHubPage() {
                     {msg.text}
                   </div>
                   <button
-                    className="absolute top-1 right-1 text-xs text-gray-500 hover:text-black"
-                    title="複製"
+                    className="absolute -top-2 -right-2 w-7 h-7 sm:w-6 sm:h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center
+                               opacity-0 group-hover:opacity-100 sm:opacity-100 touch-manipulation"
+                    title="複製訊息內容"
                     onClick={() => {
-                      navigator.clipboard.writeText(msg.text).then(() =>
-                        console.log('已複製訊息：', msg.text),
-                      );
+                      navigator.clipboard.writeText(msg.text).then(() => {
+                        console.log('已複製訊息：', msg.text);
+                        // 可以添加 toast 通知
+                      }).catch((error) => {
+                        console.error('複製失敗:', error);
+                        // 備用方案
+                        try {
+                          const textArea = document.createElement('textarea');
+                          textArea.value = msg.text;
+                          document.body.appendChild(textArea);
+                          textArea.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(textArea);
+                          console.log('已複製訊息（備用方案）：', msg.text);
+                        } catch (fallbackError) {
+                          console.error('備用複製方案也失敗:', fallbackError);
+                        }
+                      });
                     }}
                   >
-                    ⧉
+                    <svg className="w-4 h-4 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
                   </button>
                 </div>
               </div>

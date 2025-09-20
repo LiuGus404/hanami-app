@@ -910,6 +910,47 @@ export default function RoomChatPage() {
   ];
 
 
+  // 確保用戶是房間成員
+  const ensureRoomMembership = async (roomId: string, userId: string) => {
+    try {
+      // 檢查用戶是否已經是房間成員
+      const { data: existingMember, error: checkError } = await saasSupabase
+        .from('room_members')
+        .select('*')
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ 檢查房間成員失敗:', checkError);
+        return;
+      }
+
+      // 如果用戶不是房間成員，自動添加
+      if (!existingMember) {
+        console.log('👤 用戶不是房間成員，正在添加...');
+        const { error: insertError } = await (saasSupabase
+          .from('room_members') as any)
+          .insert({
+            room_id: roomId,
+            user_id: userId,
+            role: 'member',
+            user_type: 'hanami_user'
+          });
+
+        if (insertError) {
+          console.error('❌ 添加房間成員失敗:', insertError);
+        } else {
+          console.log('✅ 用戶已添加為房間成員');
+        }
+      } else {
+        console.log('✅ 用戶已是房間成員');
+      }
+    } catch (error) {
+      console.error('❌ 確保房間成員身份時發生錯誤:', error);
+    }
+  };
+
   // 調試日誌（已移除以減少控制台輸出）
   // console.log('🎯 當前房間狀態:', { roomId, initialRoleParam, companionParam, activeRoles, selectedCompanion });
 
@@ -921,6 +962,9 @@ export default function RoomChatPage() {
       try {
         console.log('🔍 載入聊天室歷史訊息:', roomId);
         console.log('🔍 用戶 ID:', user.id);
+        
+        // 確保用戶是房間成員（如果不是，自動添加）
+        await ensureRoomMembership(roomId, user.id);
         
         const { data: historyMessages, error } = await saasSupabase
           .from('ai_messages')
@@ -2842,9 +2886,9 @@ export default function RoomChatPage() {
                 {(() => {
                   // 顯示當前活躍的角色
                   const modes = [
-                    { id: 'hibi', label: 'Hibi', purpose: '統籌', icon: CpuChipIcon },
-                    { id: 'mori', label: '墨墨', purpose: '研究', icon: AcademicCapIcon },
-                    { id: 'pico', label: '皮可', purpose: '繪圖', icon: PaintBrushIcon }
+                    { id: 'hibi', label: 'Hibi', purpose: '統籌', icon: CpuChipIcon, imagePath: '/owlui.png', color: 'from-[#FF8C42] to-[#FFB366]' },
+                    { id: 'mori', label: '墨墨', purpose: '研究', icon: AcademicCapIcon, imagePath: '/3d-character-backgrounds/studio/Mori/Mori.png', color: 'from-[#D4A574] to-[#E6C8A0]' },
+                    { id: 'pico', label: '皮可', purpose: '繪圖', icon: PaintBrushIcon, imagePath: '/3d-character-backgrounds/studio/Pico/Pico.png', color: 'from-[#FFB6C1] to-[#FFCDD6]' }
                   ];
                   
                   // 只顯示活躍的角色
@@ -2885,12 +2929,30 @@ export default function RoomChatPage() {
                         : 'text-[#4B4036] hover:bg-[#FFD59A]/20 hover:shadow-md'
                     }`}
                   >
+                    {/* 桌面版：顯示圖標 */}
                     <motion.div
                       animate={{ rotate: mode.id === 'hibi' && selectedCompanion === mode.id ? 360 : 0 }}
                       transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      className="hidden sm:block"
                     >
                       <mode.icon className="w-4 h-4" />
                     </motion.div>
+                    
+                    {/* 手機版：顯示角色圖像 */}
+                    <div className="block sm:hidden">
+                      <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${(mode as any).color} p-0.5 shadow-sm`}>
+                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                          <Image
+                            src={(mode as any).imagePath}
+                            alt={mode.label}
+                            width={20}
+                            height={20}
+                            className="w-5 h-5 object-cover"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
                     {/* 桌面版：顯示完整名稱和用途 */}
                     <div className="hidden sm:block text-left">
                       <div className="leading-tight">
@@ -3409,29 +3471,76 @@ interface MessageBubbleProps {
 function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
   const isSystem = message.sender === 'system';
+  const [showMobileActions, setShowMobileActions] = useState(false);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
   // 複製訊息內容到剪貼板
   const handleCopyMessage = async () => {
     try {
-      await navigator.clipboard.writeText(message.content);
-      // 這裡可以添加一個 toast 通知
-      console.log('✅ 訊息已複製到剪貼板');
-    } catch (error) {
-      console.error('❌ 複製失敗:', error);
-      // 備用方案：使用舊的 API
-      try {
+      // 檢查是否支援現代 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(message.content);
+        console.log('✅ 訊息已複製到剪貼板（現代 API）');
+      } else {
+        // 使用備用方案
         const textArea = document.createElement('textarea');
         textArea.value = message.content;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
         document.body.appendChild(textArea);
+        textArea.focus();
         textArea.select();
-        document.execCommand('copy');
+        
+        const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
-        console.log('✅ 訊息已複製到剪貼板（備用方案）');
-      } catch (fallbackError) {
-        console.error('❌ 備用複製方案也失敗:', fallbackError);
+        
+        if (successful) {
+          console.log('✅ 訊息已複製到剪貼板（備用方案）');
+        } else {
+          throw new Error('execCommand copy failed');
+        }
       }
+      setShowMobileActions(false); // 複製後隱藏按鈕
+    } catch (error) {
+      console.error('❌ 複製失敗:', error);
+      // 最後的備用方案：提示用戶手動複製
+      alert(`複製失敗，請手動複製以下內容：\n\n${message.content}`);
+      setShowMobileActions(false);
     }
   };
+
+  // 長按開始
+  const handleTouchStart = () => {
+    const timer = setTimeout(() => {
+      setShowMobileActions(true);
+      console.log('📱 長按觸發，顯示操作按鈕');
+    }, 500); // 500ms 長按
+    setLongPressTimer(timer);
+  };
+
+  // 長按結束或取消
+  const handleTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
+  // 點擊其他地方隱藏按鈕
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowMobileActions(false);
+    };
+
+    if (showMobileActions) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+    
+    // 如果 showMobileActions 為 false，返回空的清理函數
+    return () => {};
+  }, [showMobileActions]);
 
   return (
     <motion.div
@@ -3470,6 +3579,9 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
           {/* 訊息氣泡 */}
           <motion.div
             whileHover={{ scale: 1.02 }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
             className={`group relative px-4 py-3 rounded-2xl shadow-sm ${
               isUser
                 ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-br-md'
@@ -3532,17 +3644,22 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
               })}
             </div>
 
-            {/* 操作按鈕 - 浮動在右上角 */}
-            <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 flex space-x-1 z-10">
+            {/* 操作按鈕 - 響應式顯示 */}
+            <div className={`absolute -top-2 -right-2 flex space-x-1 z-10 transition-opacity duration-200
+                            ${showMobileActions ? 'opacity-100' : 'opacity-0'} 
+                            md:opacity-0 md:group-hover:opacity-100`}>
               {/* 複製按鈕 */}
               <motion.button
                 whileHover={{ scale: 1.2 }}
                 whileTap={{ scale: 0.8 }}
-                onClick={handleCopyMessage}
-                className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyMessage();
+                }}
+                className="w-8 h-8 md:w-6 md:h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center touch-manipulation"
                 title="複製訊息內容"
               >
-                <ClipboardDocumentIcon className="w-3 h-3" />
+                <ClipboardDocumentIcon className="w-4 h-4 sm:w-3 sm:h-3" />
               </motion.button>
 
               {/* 刪除按鈕 */}
@@ -3550,11 +3667,15 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
                 <motion.button
                   whileHover={{ scale: 1.2, rotate: [0, -10, 10, 0] }}
                   whileTap={{ scale: 0.8 }}
-                  onClick={() => onDelete(message.id)}
-                  className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all flex items-center justify-center"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(message.id);
+                    setShowMobileActions(false);
+                  }}
+                  className="w-8 h-8 md:w-6 md:h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all flex items-center justify-center touch-manipulation"
                   title="刪除這條訊息"
                 >
-                  <XMarkIcon className="w-3 h-3" />
+                  <XMarkIcon className="w-4 h-4 sm:w-3 sm:h-3" />
                 </motion.button>
               )}
             </div>
