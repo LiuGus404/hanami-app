@@ -6,9 +6,23 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ScheduleOption, PreferTime } from '@/types/schedule';
 
+// 兼容的 UUID 生成函數
+const generateUUID = () => {
+  // 優先使用 crypto.randomUUID（如果支援）
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback：使用 Math.random 生成 UUID v4 格式
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function TrialRegisterPage() {
   const [form, setForm] = useState({
-    id: crypto.randomUUID() || '',
+    id: generateUUID() || '',
     full_name: '',
     student_dob: '',
     student_age: '',
@@ -231,7 +245,7 @@ export default function TrialRegisterPage() {
       range: selectedRanges,
     };
     
-    const id = form.id || crypto.randomUUID();
+    const id = form.id || generateUUID();
     const now = new Date().toISOString();
     
     // 清理資料，將空字串轉換為 null

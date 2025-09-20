@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
       response_preferences,
       research_type,
       analysis_depth,
+      research_data,
+      project_info,
+      has_valid_settings,
       system_prompt
     } = body;
 
@@ -48,6 +51,24 @@ export async function POST(request: NextRequest) {
     // 如果有分析深度，添加到 payload
     if (analysis_depth) {
       (payload as any).analysis_depth = analysis_depth;
+    }
+
+    // 如果有研究資料，添加到 payload
+    if (research_data) {
+      (payload as any).research_data = research_data;
+      console.log('📊 添加研究資料到 payload:', research_data);
+    }
+
+    // 如果有專案資訊，添加到 payload
+    if (project_info) {
+      (payload as any).project_info = project_info;
+      console.log('📋 添加專案資訊到 payload:', project_info);
+    }
+
+    // 如果有設定有效性標記，添加到 payload
+    if (has_valid_settings !== undefined) {
+      (payload as any).has_valid_settings = has_valid_settings;
+      console.log('✅ 設定有效性:', has_valid_settings);
     }
 
     // 如果有系統提示，添加到 payload

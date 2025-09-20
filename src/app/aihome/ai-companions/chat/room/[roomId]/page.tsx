@@ -21,7 +21,7 @@ import {
   UserIcon,
   Cog6ToothIcon
 } from '@heroicons/react/24/outline';
-import { AcademicCapIcon, PaintBrushIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { AcademicCapIcon, PaintBrushIcon, UsersIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { getSaasSupabaseClient } from '@/lib/supabase';
@@ -346,9 +346,23 @@ export default function RoomChatPage() {
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(roomId);
+  // 兼容的 UUID 生成函數
+  const generateUUID = () => {
+    // 優先使用 crypto.randomUUID（如果支援）
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback：使用 Math.random 生成 UUID v4 格式
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   const [currentSessionId] = useState(() => {
-    // 生成真正的 UUID 格式
-    return crypto.randomUUID();
+    // 生成兼容的 UUID 格式
+    return generateUUID();
   });
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -457,7 +471,11 @@ export default function RoomChatPage() {
         
         if (rolesError) {
           console.log('⚠️ 載入房間角色失敗:', rolesError);
-        } else if (rolesData && rolesData.length > 0) {
+        } else {
+          console.log('🔍 房間角色查詢結果:', { rolesData, rolesError, roomId });
+        }
+        
+        if (rolesData && rolesData.length > 0) {
           roomRoles = rolesData
             .map((item: any) => item.role_instances?.ai_roles?.slug)
             .filter(Boolean);
@@ -547,17 +565,96 @@ export default function RoomChatPage() {
 
   // 資料庫查詢完成後的 fallback 邏輯
   useEffect(() => {
-    if (hasLoadedFromDatabase && activeRoles.length === 0 && !urlParams.initialRole && !urlParams.companion) {
-      console.log('⚠️ 資料庫查詢完成但無角色資料，且無 URL 參數，設置為預設全部角色');
-      setActiveRoles(['hibi', 'mori', 'pico']);
+    if (hasLoadedFromDatabase && activeRoles.length === 0) {
+      // 如果有 URL 參數，使用 URL 參數
+      if (urlParams.initialRole || urlParams.companion) {
+        const targetRole = urlParams.initialRole || urlParams.companion;
+        console.log('⚠️ 資料庫查詢完成但無角色資料，使用 URL 參數:', targetRole);
+        setActiveRoles([targetRole as 'hibi' | 'mori' | 'pico']);
+        setSelectedCompanion(targetRole as 'hibi' | 'mori' | 'pico');
+      } else {
+        // 基於房間標題推斷角色
+        const roomTitle = room.title?.toLowerCase() || '';
+        let inferredRole: string | null = null;
+        
+        console.log('🔍 房間標題分析:', roomTitle);
+        
+        // 擴展推斷關鍵字
+        if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') || 
+            roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
+            roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
+          inferredRole = 'pico';
+        } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') || 
+                   roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') || 
+                   roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
+                   roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
+                   roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
+          inferredRole = 'mori';
+        } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') || 
+                   roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
+                   roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
+                   roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
+          inferredRole = 'hibi';
+        }
+        
+        if (inferredRole) {
+          console.log('🔍 基於房間標題推斷角色:', inferredRole, '房間標題:', roomTitle);
+          setActiveRoles([inferredRole as 'hibi' | 'mori' | 'pico']);
+          setSelectedCompanion(inferredRole as 'hibi' | 'mori' | 'pico');
+        } else {
+          console.log('⚠️ 無法推斷角色，使用預設單一角色（hibi）');
+          setActiveRoles(['hibi']);
+          setSelectedCompanion('hibi');
+        }
+      }
     }
-  }, [hasLoadedFromDatabase, activeRoles.length, urlParams.initialRole, urlParams.companion]);
+  }, [hasLoadedFromDatabase, activeRoles.length, urlParams.initialRole, urlParams.companion, room.title]);
+
+  // 最終 fallback：確保至少有一個角色顯示
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (activeRoles.length === 0 && hasLoadedFromDatabase) {
+        console.log('🚨 最終 fallback：沒有任何角色，基於房間標題推斷');
+        const roomTitle = room.title?.toLowerCase() || '';
+        
+        // 使用相同的推斷邏輯
+        if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') || 
+            roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
+            roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
+          console.log('🔍 最終推斷為皮可角色');
+          setActiveRoles(['pico']);
+          setSelectedCompanion('pico');
+        } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') || 
+                   roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') || 
+                   roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
+                   roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
+                   roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
+          console.log('🔍 最終推斷為墨墨角色');
+          setActiveRoles(['mori']);
+          setSelectedCompanion('mori');
+        } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') || 
+                   roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
+                   roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
+                   roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
+          console.log('🔍 最終推斷為 Hibi 角色');
+          setActiveRoles(['hibi']);
+          setSelectedCompanion('hibi');
+        } else {
+          console.log('🚨 無法推斷，設置為預設單一角色（hibi）');
+          setActiveRoles(['hibi']);
+          setSelectedCompanion('hibi');
+        }
+      }
+    }, 2000); // 2秒後的最終檢查
+    
+    return () => clearTimeout(timer);
+  }, [activeRoles.length, hasLoadedFromDatabase, room.title]);
 
   // 初始化時載入房間資訊 - 確保 URL 參數處理完成後再執行
   useEffect(() => {
-    // 只有在 urlParams 已經設置後才執行（避免初始空物件狀態）
-    if (Object.prototype.hasOwnProperty.call(urlParams, 'initialRole') || Object.prototype.hasOwnProperty.call(urlParams, 'companion') || Object.keys(urlParams).length === 0) {
-      console.log('🔄 URL 參數處理完成，開始載入房間資訊');
+    // 簡化條件：只要 urlParams 不是初始空物件就執行
+    if (Object.keys(urlParams).length >= 0) { // 允許空物件（表示沒有 URL 參數）
+      console.log('🔄 URL 參數處理完成，開始載入房間資訊, urlParams:', urlParams);
       loadRoomInfo();
     }
   }, [roomId, urlParams]); // 依賴 urlParams 確保 URL 參數處理完成後再執行
@@ -1244,6 +1341,12 @@ export default function RoomChatPage() {
       },
       research_type: detectedResearchType,
       analysis_depth: detectedAnalysisDepth,
+      // 專案資訊
+      project_info: {
+        project_name: room.title || null, // 專案名稱（房間標題）
+        project_description: room.description || null, // 專案描述（房間描述）
+        project_guidance: (room as any).guidance || null // 專案指引
+      },
       // JSON 格式的研究設定資料
       research_data: {
         "0_user_input": text || null, // 用戶輸入內容
@@ -1286,6 +1389,8 @@ export default function RoomChatPage() {
         let responseContent = '';
         
         // 處理不同格式的回應
+        let tokenStats = null;
+        
         if (typeof out.data === 'string') {
           try {
             const parsedData = JSON.parse(out.data);
@@ -1302,7 +1407,24 @@ export default function RoomChatPage() {
           responseContent = out.data.raw;
         } else if (Array.isArray(out.data) && out.data.length > 0) {
           const firstItem = out.data[0];
-          responseContent = firstItem.output || firstItem.content || '';
+          
+          // 檢查新的 JSON 格式，包含 text 和 token 統計
+          if (firstItem.text && typeof firstItem.text === 'string') {
+            responseContent = firstItem.text;
+            console.log('📝 提取到 text 內容:', responseContent.substring(0, 100) + '...');
+            
+            // 提取 token 統計
+            if (firstItem.prompt_tokens || firstItem.completion_tokens || firstItem.total_tokens) {
+              tokenStats = {
+                prompt_tokens: firstItem.prompt_tokens || 0,
+                completion_tokens: firstItem.completion_tokens || 0,
+                total_tokens: firstItem.total_tokens || 0
+              };
+              console.log('🔢 Token 統計:', tokenStats);
+            }
+          } else {
+            responseContent = firstItem.output || firstItem.content || '';
+          }
         } else if (out.data.output) {
           responseContent = out.data.output;
         } else if (out.data.content) {
@@ -1326,20 +1448,39 @@ export default function RoomChatPage() {
         }
 
         const aiResponse: Message = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           content: responseContent,
           sender: 'mori',
           timestamp: new Date(),
-          type: 'text'
+          type: 'text',
+          metadata: tokenStats ? {
+            token_usage: tokenStats,
+            model_info: out.data && Array.isArray(out.data) && out.data[0]?.raw ? {
+              model: out.data[0].raw.model || 'unknown',
+              provider: out.data[0].raw.provider || 'unknown'
+            } : null
+          } : undefined
         };
         
         await addMessage(aiResponse);
         console.log('✅ 墨墨回應已添加');
+        
+        // 如果有 token 統計，記錄到使用統計中
+        if (tokenStats) {
+          console.log('📊 記錄墨墨 token 使用統計:', tokenStats);
+          await saveTokenUsage(aiResponse.id, {
+            ...tokenStats,
+            companion: 'mori',
+            model: out.data && Array.isArray(out.data) && out.data[0]?.raw ? out.data[0].raw.model : 'unknown',
+            provider: out.data && Array.isArray(out.data) && out.data[0]?.raw ? out.data[0].raw.provider : 'unknown'
+          });
+        }
+        
         return { success: true, data: out };
       } else {
         // 處理錯誤回應
         const errorMessage: Message = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           content: '🦉 墨墨遇到點小困難，可以重新輸入或稍後再試。',
           sender: 'mori',
           timestamp: new Date(),
@@ -1728,7 +1869,7 @@ export default function RoomChatPage() {
         
         // 創建 AI 回應訊息
         const aiResponse: Message = {
-          id: crypto.randomUUID(), // 使用真正的 UUID 格式
+          id: generateUUID(), // 使用兼容的 UUID 格式
           content: responseContent,
           sender: 'pico',
           timestamp: new Date(),
@@ -1748,7 +1889,7 @@ export default function RoomChatPage() {
       } else {
         // 處理錯誤回應
         const errorMessage: Message = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           content: getCompanionErrorMessage('pico'),
           sender: 'pico',
           timestamp: new Date(),
@@ -1770,7 +1911,7 @@ export default function RoomChatPage() {
   const addMessage = async (message: Message | Omit<Message, 'id' | 'timestamp'>) => {
     // 如果沒有 ID 或時間戳，自動生成
     const completeMessage: Message = {
-      id: (message as Message).id || crypto.randomUUID(),
+      id: (message as Message).id || generateUUID(),
       timestamp: (message as Message).timestamp || new Date(),
       ...message
     } as Message;
@@ -1908,7 +2049,7 @@ export default function RoomChatPage() {
     
     const messageContent = inputMessage.trim();
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       content: messageContent,
       sender: 'user',
       timestamp: new Date(),
@@ -1975,7 +2116,7 @@ export default function RoomChatPage() {
     }
     
     const aiResponse: Message = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       content: responseContent,
       sender: sender,
       timestamp: new Date(),
@@ -2061,7 +2202,7 @@ export default function RoomChatPage() {
     if (isTaskRequest && targetCompanion === 'team') {
       // 創建協作任務
       const newTask: Task = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         title: `團隊協作：${userMessage.slice(0, 20)}...`,
         description: userMessage,
         assignedTo: 'team',
@@ -2073,7 +2214,7 @@ export default function RoomChatPage() {
       setTasks(prev => [...prev, newTask]);
       
       return {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         content: `收到任務需求！我會統籌安排：墨墨負責研究分析，皮可負責創意設計，我來協調整體進度。讓我們開始協作吧！`,
         sender: 'hibi',
         timestamp: new Date(),
@@ -2108,7 +2249,7 @@ export default function RoomChatPage() {
     const randomResponse = companionResponses[Math.floor(Math.random() * companionResponses.length)];
 
     return {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       content: randomResponse,
       sender: actualTarget as 'hibi' | 'mori' | 'pico',
       timestamp: new Date(),
@@ -2709,6 +2850,11 @@ export default function RoomChatPage() {
                   // 只顯示活躍的角色
                   const availableModes = modes.filter(mode => activeRoles.includes(mode.id as any));
                   
+                  // 如果沒有任何角色，不顯示任何按鈕（而不是顯示全部角色）
+                  if (availableModes.length === 0) {
+                    return [];
+                  }
+                  
                   // 如果有多個角色，添加團隊模式選項
                   if (activeRoles.length > 1) {
                     return [
@@ -3264,6 +3410,29 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
   const isSystem = message.sender === 'system';
 
+  // 複製訊息內容到剪貼板
+  const handleCopyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      // 這裡可以添加一個 toast 通知
+      console.log('✅ 訊息已複製到剪貼板');
+    } catch (error) {
+      console.error('❌ 複製失敗:', error);
+      // 備用方案：使用舊的 API
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = message.content;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        console.log('✅ 訊息已複製到剪貼板（備用方案）');
+      } catch (fallbackError) {
+        console.error('❌ 備用複製方案也失敗:', fallbackError);
+      }
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -3363,18 +3532,32 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
               })}
             </div>
 
-            {/* 刪除按鈕 - 浮動在右上角 */}
-            {onDelete && (
+            {/* 操作按鈕 - 浮動在右上角 */}
+            <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 flex space-x-1 z-10">
+              {/* 複製按鈕 */}
               <motion.button
-                whileHover={{ scale: 1.2, rotate: [0, -10, 10, 0] }}
+                whileHover={{ scale: 1.2 }}
                 whileTap={{ scale: 0.8 }}
-                onClick={() => onDelete(message.id)}
-                className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all flex items-center justify-center z-10"
-                title="刪除這條訊息"
+                onClick={handleCopyMessage}
+                className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center"
+                title="複製訊息內容"
               >
-                <XMarkIcon className="w-3 h-3" />
+                <ClipboardDocumentIcon className="w-3 h-3" />
               </motion.button>
-            )}
+
+              {/* 刪除按鈕 */}
+              {onDelete && (
+                <motion.button
+                  whileHover={{ scale: 1.2, rotate: [0, -10, 10, 0] }}
+                  whileTap={{ scale: 0.8 }}
+                  onClick={() => onDelete(message.id)}
+                  className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-all flex items-center justify-center"
+                  title="刪除這條訊息"
+                >
+                  <XMarkIcon className="w-3 h-3" />
+                </motion.button>
+              )}
+            </div>
 
             {/* 任務創建指示器 */}
             {message.type === 'task_created' && (

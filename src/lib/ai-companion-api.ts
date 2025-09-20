@@ -449,8 +449,22 @@ export const messageAPI = {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) throw new AICompanionError('用戶未登入');
 
+      // 兼容的 UUID 生成函數
+      const generateUUID = () => {
+        // 優先使用 crypto.randomUUID（如果支援）
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+          return crypto.randomUUID();
+        }
+        // Fallback：使用 Math.random 生成 UUID v4 格式
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+
       // 生成會話 ID（如果沒有提供）
-      const sessionId = request.session_id || crypto.randomUUID();
+      const sessionId = request.session_id || generateUUID();
 
       const { data, error } = await supabase
         .from('ai_messages')

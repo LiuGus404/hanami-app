@@ -201,15 +201,27 @@ export default function BoundStudentsPage() {
                 </div>
                 
                 <div className="flex items-center space-x-4">
+                  {/* 桌面版：完整按鈕 */}
                   <motion.button
                     onClick={() => router.push('/aihome/parent/connect')}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 shadow-lg font-medium"
+                    className="hidden sm:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 shadow-lg font-medium"
                     title="新增綁定孩子"
                   >
                     <Plus className="w-4 h-4" />
                     <span>新增綁定</span>
+                  </motion.button>
+                  
+                  {/* 移動版：只顯示加號 */}
+                  <motion.button
+                    onClick={() => router.push('/aihome/parent/connect')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="sm:hidden flex items-center justify-center w-10 h-10 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 shadow-lg"
+                    title="新增綁定孩子"
+                  >
+                    <Plus className="w-5 h-5" />
                   </motion.button>
                   <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
                     <span className="text-sm font-medium text-[#4B4036]">
@@ -249,14 +261,14 @@ export default function BoundStudentsPage() {
                 </motion.button>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-6">
+              <div className="flex flex-wrap gap-4 sm:gap-6">
                 {/* 學生卡片 */}
                 {boundStudents.map((student) => (
                   <motion.div
                     key={student.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-lg shadow-lg border border-[#EADBC8] p-6 hover:shadow-xl transition-all duration-200 relative w-full md:w-80 lg:w-80"
+                    className="bg-white rounded-lg shadow-lg border border-[#EADBC8] p-4 sm:p-6 hover:shadow-xl transition-all duration-200 relative w-full sm:w-80 lg:w-80"
                   >
                     {/* 取消綁定按鈕 - 右上角 */}
                     <motion.button
@@ -271,8 +283,8 @@ export default function BoundStudentsPage() {
                     
                     {/* 角色圖片和名字區域 */}
                     <div className="text-center mb-4">
-                      {/* 更大的動態孩子圖片 */}
-                      <div className="w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] flex items-center justify-center">
+                      {/* 響應式孩子圖片 */}
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-3 rounded-full overflow-hidden bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] flex items-center justify-center">
                         <img 
                           src="/@girl(front).png" 
                           alt={student.student_name}
@@ -280,39 +292,39 @@ export default function BoundStudentsPage() {
                         />
                       </div>
                       
-                      {/* 名字在角色下方 */}
-                      <h3 className="text-xl font-semibold text-[#4B4036] mb-1">{student.student_name}</h3>
+                      {/* 響應式名字 */}
+                      <h3 className="text-lg sm:text-xl font-semibold text-[#4B4036] mb-1">{student.student_name}</h3>
                       
-                      {/* 學生 ID 格式 */}
+                      {/* 響應式學生 ID */}
                       <p className="text-xs text-[#2B3A3B] font-mono bg-gray-50 px-2 py-1 rounded border border-gray-200">
                         學生id：{student.student_id}
                       </p>
                     </div>
                     
                     {/* 主要信息 */}
-                    <div className="space-y-3 text-sm text-[#2B3A3B] mb-6">
+                    <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-[#2B3A3B] mb-4 sm:mb-6">
                       <div className="flex items-center space-x-2">
-                        <Building className="w-4 h-4 text-[#FFD59A]" />
+                        <Building className="w-3 h-3 sm:w-4 sm:h-4 text-[#FFD59A]" />
                         <span className="font-medium">{student.institution}</span>
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        <User className="w-4 h-4 text-[#FFD59A]" />
+                        <User className="w-3 h-3 sm:w-4 sm:h-4 text-[#FFD59A]" />
                         <span>{convertMonthsToAge(student.student_age_months)}</span>
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        <Heart className="w-4 h-4 text-[#FFD59A]" />
+                        <Heart className="w-3 h-3 sm:w-4 sm:h-4 text-[#FFD59A]" />
                         <span>我的孩子</span>
                       </div>
                     </div>
                     
-                    {/* 查看詳情按鈕 */}
+                    {/* 響應式查看詳情按鈕 */}
                     <motion.button
                       onClick={() => router.push(`/aihome/parent/student-simple/${student.student_id}`)}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 font-medium shadow-md hover:shadow-lg"
+                      className="w-full px-3 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 font-medium shadow-md hover:shadow-lg text-sm sm:text-base"
                     >
                       查看詳情
                     </motion.button>
@@ -323,25 +335,25 @@ export default function BoundStudentsPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="w-full md:w-80 lg:w-80"
+                  className="w-full sm:w-80 lg:w-80"
                 >
                   <motion.button
                     onClick={() => router.push('/aihome/parent/connect')}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="w-full h-full min-h-[400px] bg-white rounded-lg shadow-lg border-2 border-dashed border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-xl transition-all duration-200 flex flex-col items-center justify-center p-6 group"
+                    className="w-full h-full min-h-[300px] sm:min-h-[400px] bg-white rounded-lg shadow-lg border-2 border-dashed border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-xl transition-all duration-200 flex flex-col items-center justify-center p-4 sm:p-6 group"
                   >
-                    <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] flex items-center justify-center group-hover:from-[#EBC9A4] group-hover:to-[#FFD59A] transition-all duration-200">
-                      <Plus className="w-12 h-12 text-[#4B4036]" />
+                    <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-3 sm:mb-4 rounded-full bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] flex items-center justify-center group-hover:from-[#EBC9A4] group-hover:to-[#FFD59A] transition-all duration-200">
+                      <Plus className="w-8 h-8 sm:w-12 sm:h-12 text-[#4B4036]" />
                     </div>
                     
-                    <h3 className="text-xl font-semibold text-[#4B4036] mb-2">新增綁定</h3>
-                    <p className="text-sm text-[#2B3A3B] text-center mb-4">
+                    <h3 className="text-lg sm:text-xl font-semibold text-[#4B4036] mb-2">新增綁定</h3>
+                    <p className="text-xs sm:text-sm text-[#2B3A3B] text-center mb-3 sm:mb-4">
                       綁定更多孩子<br />
                       查看他們的學習進度
                     </p>
                     
-                    <div className="px-6 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg group-hover:from-[#EBC9A4] group-hover:to-[#FFD59A] transition-all duration-200 font-medium shadow-md">
+                    <div className="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg group-hover:from-[#EBC9A4] group-hover:to-[#FFD59A] transition-all duration-200 font-medium shadow-md text-sm sm:text-base">
                       開始綁定
                     </div>
                   </motion.button>

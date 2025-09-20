@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import TimePicker from '@/components/ui/TimePicker';
@@ -9,13 +8,27 @@ import { supabase } from '@/lib/supabase';
 import { CourseType, Teacher } from '@/types';
 import { useSearchParams } from 'next/navigation';
 
+// UUID 生成函數（兼容性版本）
+const generateUUID = () => {
+  // 優先使用 crypto.randomUUID（如果支援）
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback：使用 Math.random 生成 UUID v4 格式
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function AddRegularStudentForm() {
   const searchParams = useSearchParams();
   const typeParam = searchParams.get('type');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    id: uuidv4(),
-    student_oid: uuidv4().slice(0, 8),
+    id: generateUUID(),
+    student_oid: generateUUID().slice(0, 8),
     full_name: '',
     nick_name: '',
     gender: '',
@@ -36,7 +49,7 @@ export default function AddRegularStudentForm() {
     updated_at: new Date().toISOString(),
     access_role: 'admin',
     student_email: '',
-    student_password: uuidv4().slice(0, 8),
+    student_password: generateUUID().slice(0, 8),
     trial_date: '',
     trial_time: '',
     student_remarks: '',
@@ -242,8 +255,8 @@ export default function AddRegularStudentForm() {
         alert(`${formData.student_type === '試堂' ? '試堂學生' : '常規學生'}已成功新增或更新！`);
         window.location.href = '/admin/students';
         setFormData({
-          id: uuidv4(),
-          student_oid: uuidv4().slice(0, 8),
+          id: generateUUID(),
+          student_oid: generateUUID().slice(0, 8),
           full_name: '',
           nick_name: '',
           gender: '',
@@ -264,7 +277,7 @@ export default function AddRegularStudentForm() {
           updated_at: new Date().toISOString(),
           access_role: 'admin',
           student_email: '',
-          student_password: uuidv4().slice(0, 8),
+          student_password: generateUUID().slice(0, 8),
           trial_date: '',
           trial_time: '',
           student_remarks: '',
@@ -622,8 +635,8 @@ export default function AddRegularStudentForm() {
             type="button"
             onClick={() => {
               setFormData({
-                id: uuidv4(),
-                student_oid: uuidv4().slice(0, 8),
+                id: generateUUID(),
+                student_oid: generateUUID().slice(0, 8),
                 full_name: '',
                 nick_name: '',
                 gender: '',
@@ -644,7 +657,7 @@ export default function AddRegularStudentForm() {
                 updated_at: new Date().toISOString(),
                 access_role: 'admin',
                 student_email: '',
-                student_password: uuidv4().slice(0, 8),
+                student_password: generateUUID().slice(0, 8),
                 trial_date: '',
                 trial_time: '',
                 student_remarks: '',

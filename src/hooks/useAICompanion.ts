@@ -439,8 +439,22 @@ export function useUsageStats(roomId?: string, days: number = 7) {
 // 聊天會話 Hook
 // ========================================
 
+// 兼容的 UUID 生成函數
+const generateUUID = () => {
+  // 優先使用 crypto.randomUUID（如果支援）
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback：使用 Math.random 生成 UUID v4 格式
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export function useChatSession(roomId: string) {
-  const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
+  const [sessionId, setSessionId] = useState<string>(() => generateUUID());
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
@@ -480,7 +494,7 @@ export function useChatSession(roomId: string) {
   }, [roomId, sessionId, sendMessage]);
 
   const startNewSession = useCallback(() => {
-    setSessionId(crypto.randomUUID());
+    setSessionId(generateUUID());
   }, []);
 
   return {

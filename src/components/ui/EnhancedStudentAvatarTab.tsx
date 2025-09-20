@@ -346,21 +346,21 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
         />
       </div>
 
-      <div className="relative z-10 p-6 max-w-7xl mx-auto">
+      <div className="relative z-10 p-3 sm:p-6 max-w-7xl mx-auto">
         {/* 頁面標題區域 */}
-        <DynamicCard className="mb-8 p-8" delay={0.1}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+        <DynamicCard className="mb-6 sm:mb-8 p-4 sm:p-8" delay={0.1}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0">
+            <div className="flex items-center space-x-3 sm:space-x-4">
               <motion.div
-                className="w-16 h-16 bg-gradient-to-br from-[#F8EAD8] to-[#F5E6D3] rounded-2xl flex items-center justify-center"
+                className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-[#F8EAD8] to-[#F5E6D3] rounded-2xl flex items-center justify-center"
                 whileHover={{ rotate: 360 }}
                 transition={{ duration: 0.8 }}
               >
-                <User className="w-8 h-8 text-orange-500" />
+                <User className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
               </motion.div>
               <div>
                 <motion.h1 
-                  className="text-3xl font-bold text-gray-800 mb-2"
+                  className="text-xl sm:text-3xl font-bold text-gray-800 mb-1 sm:mb-2"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
@@ -368,22 +368,22 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                   {student.nick_name || student.full_name} 的互動角色
                 </motion.h1>
                 <motion.p 
-                  className="text-gray-600 flex items-center"
+                  className="text-gray-600 flex items-center text-sm sm:text-base"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 }}
                 >
-                  <Sparkles className="w-4 h-4 mr-2 text-purple-500" />
+                  <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-purple-500" />
                   3D動態角色與學習進度互動體驗
                 </motion.p>
               </div>
             </div>
             
             {/* 控制按鈕區域 */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <motion.button
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`p-3 rounded-xl transition-all duration-300 ${
+                className={`p-2 sm:p-3 rounded-xl transition-all duration-300 ${
                   soundEnabled 
                     ? 'bg-gradient-to-br from-green-100 to-green-200 text-green-600 shadow-lg' 
                     : 'bg-gray-100 text-gray-400'
@@ -391,17 +391,17 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
-                {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
               </motion.button>
 
               <motion.button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600 rounded-xl shadow-lg disabled:opacity-50"
+                className="p-2 sm:p-3 bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600 rounded-xl shadow-lg disabled:opacity-50"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
-                <RefreshCw size={20} className={isRefreshing ? 'animate-spin' : ''} />
+                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
               </motion.button>
             </div>
           </div>
@@ -409,13 +409,15 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
           {/* 狀態指示器 */}
           {lastUpdated && (
             <motion.div 
-              className="mt-4 flex items-center text-sm text-gray-500"
+              className="mt-3 sm:mt-4 flex items-center text-xs sm:text-sm text-gray-500"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
             >
-              <Info size={14} className="mr-2" />
-              最後更新：{lastUpdated.toLocaleString('zh-TW')}
+              <Info size={12} className="mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">最後更新：</span>
+              <span className="sm:hidden">更新：</span>
+              {lastUpdated.toLocaleString('zh-TW')}
               {isDataStale && (
                 <motion.span 
                   className="ml-3 px-2 py-1 bg-yellow-100 text-yellow-600 rounded-lg text-xs"
@@ -430,14 +432,14 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
         </DynamicCard>
 
         {/* 分頁導航 */}
-        <DynamicCard className="mb-8 p-2" delay={0.2}>
-          <div className="flex space-x-2 overflow-x-auto">
+        <DynamicCard className="mb-6 sm:mb-8 p-2" delay={0.2}>
+          <div className="flex space-x-1 sm:space-x-2 overflow-x-auto">
             {sections.map(({ key, label, icon: Icon, color, iconColor }, index) => (
               <motion.button
                 key={key}
                 onClick={() => setActiveSection(key)}
                 className={`
-                  flex items-center px-6 py-4 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap min-w-0 flex-1
+                  flex items-center px-3 py-2 sm:px-6 sm:py-4 rounded-xl text-xs sm:text-sm font-medium transition-all duration-300 whitespace-nowrap min-w-0 flex-1
                   ${activeSection === key
                     ? `bg-gradient-to-br ${color} shadow-lg border-2 border-white`
                     : 'hover:bg-gray-50'
@@ -450,14 +452,14 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                 transition={{ delay: 0.3 + index * 0.1 }}
               >
                 <motion.div
-                  className={`p-2 rounded-lg mr-3 ${
+                  className={`p-1.5 sm:p-2 rounded-lg mr-2 sm:mr-3 ${
                     activeSection === key ? 'bg-white shadow-md' : 'bg-gray-100'
                   }`}
                   whileHover={{ rotate: 15 }}
                 >
-                  <Icon className={`w-4 h-4 ${activeSection === key ? iconColor : 'text-gray-400'}`} />
+                  <Icon className={`w-3 h-3 sm:w-4 sm:h-4 ${activeSection === key ? iconColor : 'text-gray-400'}`} />
                 </motion.div>
-                <span className={activeSection === key ? 'text-gray-800' : 'text-gray-600'}>
+                <span className={`hidden sm:inline ${activeSection === key ? 'text-gray-800' : 'text-gray-600'}`}>
                   {label}
                 </span>
                 {activeSection === key && (

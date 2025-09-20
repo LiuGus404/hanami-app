@@ -373,20 +373,20 @@ export default function SimpleStudentDetailPage() {
           {/* 頂部導航欄 */}
           <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
+          <div className="flex justify-between items-center h-14 sm:h-16">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               {/* 選單按鈕 */}
               <motion.button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                className="p-1.5 sm:p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
                 title="開啟選單"
               >
-                <Menu className="w-6 h-6 text-[#4B4036]" />
+                <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
               </motion.button>
               
-              <div className="w-10 h-10 relative">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 relative">
                 <img 
                   src="/@hanami.png" 
                   alt="HanamiEcho Logo" 
@@ -394,32 +394,44 @@ export default function SimpleStudentDetailPage() {
                 />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-                <p className="text-sm text-[#2B3A3B]">家長查看</p>
+                <h1 className="text-lg sm:text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
+                <p className="text-xs sm:text-sm text-[#2B3A3B]">家長查看</p>
               </div>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-[#2B3A3B]">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              {/* 桌面版：顯示時間 */}
+              <div className="hidden sm:block text-sm text-[#2B3A3B]">
                 {currentTime.toLocaleTimeString('zh-TW', { 
                   hour: '2-digit', 
                   minute: '2-digit' 
                 })}
               </div>
-              <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-[#4B4036]">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                <span className="text-xs sm:text-sm font-medium text-[#4B4036]">
                   {user?.full_name?.charAt(0).toUpperCase() || 'U'}
                 </span>
               </div>
+              {/* 桌面版：完整登出按鈕 */}
               <motion.button
                 onClick={handleLogout}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
+                className="hidden sm:flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
                 title="登出"
               >
                 <LogOut className="w-4 h-4" />
                 <span>登出</span>
+              </motion.button>
+              {/* 移動版：只顯示登出圖標 */}
+              <motion.button
+                onClick={handleLogout}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="sm:hidden flex items-center justify-center w-8 h-8 text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
+                title="登出"
+              >
+                <LogOut className="w-4 h-4" />
               </motion.button>
             </div>
           </div>
@@ -427,27 +439,28 @@ export default function SimpleStudentDetailPage() {
       </nav>
 
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* 返回按鈕和機構信息 */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
             <motion.button
               onClick={handleBack}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors"
+              className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors text-sm sm:text-base"
             >
               <span>←</span>
-              <span>返回家長連結</span>
+              <span className="hidden sm:inline">返回家長連結</span>
+              <span className="sm:hidden">返回</span>
             </motion.button>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4">
               {/* 綁定狀態指示器 */}
               <BindingStatusIndicator isBound={isStudentBound} />
               
-              <div className="flex items-center space-x-2 px-3 py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8]">
-                <Building className="w-4 h-4 text-[#4B4036]" />
-                <span className="text-sm font-medium text-[#4B4036]">{institution}</span>
+              <div className="flex items-center space-x-2 px-2 py-1.5 sm:px-3 sm:py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8]">
+                <Building className="w-3 h-3 sm:w-4 sm:h-4 text-[#4B4036]" />
+                <span className="text-xs sm:text-sm font-medium text-[#4B4036]">{institution}</span>
               </div>
             </div>
           </div>
@@ -477,19 +490,19 @@ export default function SimpleStudentDetailPage() {
         )}
 
         {/* 分頁導航 */}
-        <div className="mb-6">
-          <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1">
+        <div className="mb-4 sm:mb-6">
+          <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1 overflow-x-auto">
             {[
-              { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
-              { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
-              { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度' },
-              { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' }
-            ].map(({ key, label, icon: Icon, description }) => (
+              { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理', shortLabel: '基本' },
+              { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄', shortLabel: '課程' },
+              { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度', shortLabel: '角色' },
+              { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片', shortLabel: '媒體' }
+            ].map(({ key, label, icon: Icon, description, shortLabel }) => (
               <motion.button
                 key={key}
                 onClick={() => setActiveTab(key as any)}
                 className={`
-                  flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
+                  flex items-center px-2 py-2 sm:px-4 sm:py-3 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0
                   ${activeTab === key
                     ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
                     : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
@@ -499,8 +512,9 @@ export default function SimpleStudentDetailPage() {
                 whileTap={{ scale: 0.98 }}
                 title={description}
               >
-                <Icon className="w-4 h-4 mr-2" />
-                {label}
+                <Icon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">{label}</span>
+                <span className="sm:hidden">{shortLabel}</span>
               </motion.button>
             ))}
           </div>
@@ -531,7 +545,7 @@ export default function SimpleStudentDetailPage() {
 
           {/* 課程記錄分頁 */}
           {activeTab === 'lessons' && student && (
-            <div className="mt-4">
+            <div className="mt-2 sm:mt-4">
               {(() => {
                 const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
                 console.log('🎯 準備載入課堂資料:', {
@@ -559,7 +573,7 @@ export default function SimpleStudentDetailPage() {
           {activeTab === 'avatar' && student && (
             <EnhancedStudentAvatarTab 
               student={student}
-              className="mt-4"
+              className="mt-2 sm:mt-4"
             />
           )}
 
@@ -574,7 +588,7 @@ export default function SimpleStudentDetailPage() {
               <StudentMediaTimeline 
                 studentId={student.id}
                 studentName={student.full_name}
-                className="mt-4"
+                className="mt-2 sm:mt-4"
               />
             </>
           )}

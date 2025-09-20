@@ -2,7 +2,6 @@ import { format } from 'date-fns';
 import Image from 'next/image';
 import { useEffect, useState, useRef } from 'react';
 import { toast } from 'react-hot-toast';
-import { v4 as uuidv4 } from 'uuid';
 import { MessageSquare } from 'lucide-react';
 
 // 添加動畫樣式
@@ -18,6 +17,20 @@ const animationStyles = `
     }
   }
 `;
+
+// UUID 生成函數（兼容性版本）
+const generateUUID = () => {
+  // 優先使用 crypto.randomUUID（如果支援）
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback：使用 Math.random 生成 UUID v4 格式
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 
 
@@ -518,7 +531,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
       studentData = null;
     }
 
-    const lessonId = editingLesson ? editingLesson.id : uuidv4();
+    const lessonId = editingLesson ? editingLesson.id : generateUUID();
     const resolvedCourseType =
       typeof newLesson.course_type === 'object' && newLesson.course_type
         ? newLesson.course_type.name
@@ -732,86 +745,86 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
   };
 
   return (
-    <div className="w-full px-4">
-      <div className="bg-[#FFFDF8] p-6 rounded-xl shadow-inner max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-[#4B4036]">課堂情況</h2>
-          <div className="flex gap-2 overflow-x-auto flex-nowrap py-2 px-1 scrollbar-hide">
+    <div className="w-full px-2 sm:px-4">
+      <div className="bg-[#FFFDF8] p-3 sm:p-6 rounded-xl shadow-inner max-w-5xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3 sm:gap-0">
+          <h2 className="text-lg sm:text-xl font-bold text-[#4B4036]">課堂情況</h2>
+          <div className="flex gap-1 sm:gap-2 overflow-x-auto flex-nowrap py-2 px-1 scrollbar-hide">
             <button
               onClick={exportToCSV}
-              className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+              className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
               title="匯出CSV"
             >
-              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M12 16v-8m0 8l-3-3m3 3l3-3" strokeLinecap="round" strokeLinejoin="round" />
                 <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
               </svg>
-              <span className="text-[11px] text-[#4B4036]">匯出</span>
+              <span className="text-[10px] sm:text-[11px] text-[#4B4036]">匯出</span>
             </button>
             <button
               onClick={copyToWhatsApp}
-              className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+              className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
               title="複製課堂記錄"
             >
-              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
-              <span className="text-[11px] text-[#4B4036]">複製</span>
+              <span className="text-[10px] sm:text-[11px] text-[#4B4036]">複製</span>
             </button>
             <button
               onClick={fetchLessons}
-              className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+              className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
               title="刷新"
             >
-              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M4 4v5h.582M20 20v-5h-.581M5.635 19A9 9 0 1 1 19 5.635" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="text-[11px] text-[#4B4036]">刷新</span>
+              <span className="text-[10px] sm:text-[11px] text-[#4B4036]">刷新</span>
             </button>
             {showAIMessageButton && (
               <button
                 onClick={() => setShowAIMessageModal(true)}
-                className="flex flex-col items-center min-w-[48px] px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+                className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
                 title="AI 訊息"
               >
-                <MessageSquare className="w-6 h-6 mb-0.5 text-[#4B4036]" />
-                <span className="text-[11px] text-[#4B4036]">AI 訊息</span>
+                <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5 text-[#4B4036]" />
+                <span className="text-[10px] sm:text-[11px] text-[#4B4036]">AI 訊息</span>
               </button>
             )}
             <button
               onClick={() => setCategorySelectOpen(true)}
-              className={`flex flex-col items-center min-w-[48px] px-2 py-1 rounded-xl shadow transition ${
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${
                 categoryFilter.includes('all') 
                   ? 'bg-[#F8F5EC] hover:bg-[#FDE6B8]' 
                   : 'bg-[#FDE6B8] hover:bg-[#FCD58B] border-2 border-[#FCD58B]'
               }`}
               title={`類別${categoryFilter.includes('all') ? '' : ` (${categoryFilter.length} 項)`}`}
             >
-              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M8 12h8M12 8v8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="text-[11px] text-[#4B4036]">
+              <span className="text-[10px] sm:text-[11px] text-[#4B4036]">
                 {categoryFilter.includes('all') ? '類別' : `${categoryFilter.length}項`}
               </span>
             </button>
             <button
               onClick={() => setVisibleCountSelectOpen(true)}
-              className={`flex flex-col items-center min-w-[48px] px-2 py-1 rounded-xl shadow transition relative ${
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition relative ${
                 isCountButtonAnimating ? 'animate-pulse scale-105 bg-[#FDE6B8] border-[#FCD58B] shadow-lg' : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
               } ${showSuccessIndicator ? 'bg-green-50 border-green-300' : ''}`}
               title={`顯示筆數 (${visibleCount >= lessons.length ? '全部' : visibleCount} 筆)`}
             >
-              <svg className="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <rect x="4" y="4" width="16" height="16" rx="4" />
                 <path d="M8 12h8M12 8v8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="text-[11px] text-[#4B4036]">
+              <span className="text-[10px] sm:text-[11px] text-[#4B4036]">
                 {visibleCount >= lessons.length ? '全部' : visibleCount}
               </span>
               {showSuccessIndicator && (
-                <svg className="w-4 h-4 text-green-500 animate-bounce absolute -top-2 -right-2" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 animate-bounce absolute -top-1 -right-1 sm:-top-2 sm:-right-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
             )}
@@ -895,7 +908,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
         {/* 課堂資料表格 */}
         {!loading && !error && lessons.length > 0 && (
         <div className="overflow-x-auto">
-                          <table className="w-full min-w-max text-[#4B4036]">
+                          <table className="w-full min-w-max text-[#4B4036] text-xs sm:text-sm">
             <thead>
               <tr className="border-b border-[#E9E2D6]">
                 <th>
@@ -909,7 +922,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                   />
                 </th>
                 <th 
-                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
                   onClick={() => handleSort('lesson_date')}
                 >
                   <div className="flex items-center gap-1">
@@ -918,7 +931,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                   </div>
                 </th>
                 <th 
-                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
                   onClick={() => handleSort('course_type')}
                 >
                   <div className="flex items-center gap-1">
@@ -927,7 +940,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                   </div>
                 </th>
                 <th 
-                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
                   onClick={() => handleSort('actual_timeslot')}
                 >
                   <div className="flex items-center gap-1">
@@ -936,7 +949,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                   </div>
                 </th>
                 <th 
-                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
                   onClick={() => handleSort('lesson_teacher')}
                 >
                   <div className="flex items-center gap-1">
@@ -945,7 +958,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                   </div>
                 </th>
                 <th 
-                  className="text-[15px] font-medium px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
                   onClick={() => handleSort('lesson_status')}
                 >
                   <div className="flex items-center gap-1">
