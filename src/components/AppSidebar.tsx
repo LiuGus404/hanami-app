@@ -10,8 +10,12 @@ import {
   UserIcon,
   Cog6ToothIcon,
   XMarkIcon,
-  SparklesIcon
+  SparklesIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
+import { useTeacherAccess } from '@/hooks/saas/useTeacherAccess';
+import { useDirectTeacherAccess } from '@/hooks/saas/useDirectTeacherAccess';
 
 interface SidebarItem {
   icon: any;
@@ -30,6 +34,14 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
   const router = useRouter();
   const [isDesktop, setIsDesktop] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const { user } = useSaasAuth();
+  const { hasTeacherAccess, checkTeacherAccess, teacherAccess, forceRefreshState, loading } = useTeacherAccess();
+  const { 
+    hasTeacherAccess: directHasTeacherAccess, 
+    checkTeacherAccess: directCheckTeacherAccess,
+    teacherAccess: directTeacherAccess,
+    loading: directLoading
+  } = useDirectTeacherAccess();
 
 
   useEffect(() => {
@@ -42,6 +54,38 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
     window.addEventListener('resize', checkScreenSize);
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
+
+  // 當用戶登入時，自動檢查教師權限
+  useEffect(() => {
+    if (user?.email) {
+      console.log('AppSidebar: 用戶已登入，檢查權限狀態:', {
+        email: user.email,
+        hasTeacherAccess,
+        loading,
+        teacherAccess: teacherAccess ? '有數據' : '無數據',
+        directHasTeacherAccess,
+        directLoading,
+        directTeacherAccess: directTeacherAccess ? '有數據' : '無數據'
+      });
+      
+      // 如果沒有權限數據，先嘗試直接 Supabase 檢查
+      if ((!teacherAccess || (!hasTeacherAccess && !loading)) && !directTeacherAccess && !directLoading) {
+        console.log('AppSidebar: 開始直接 Supabase 檢查教師權限，用戶:', user.email);
+        directCheckTeacherAccess(user.email).catch((error) => {
+          console.error('AppSidebar: 直接 Supabase 檢查失敗，嘗試 API 檢查:', error);
+          // 如果直接檢查失敗，回退到原來的 API 檢查
+          checkTeacherAccess(user.email, true).then(() => {
+            setTimeout(() => {
+              console.log('AppSidebar: 強制刷新狀態');
+              forceRefreshState();
+            }, 200);
+          }).catch((error) => {
+            console.error('AppSidebar: API 權限檢查也失敗:', error);
+          });
+        });
+      }
+    }
+  }, [user, teacherAccess, hasTeacherAccess, loading, checkTeacherAccess, forceRefreshState, directHasTeacherAccess, directTeacherAccess, directCheckTeacherAccess, directLoading]);
 
   const sidebarMenuItems: SidebarItem[] = [
     { 
@@ -68,6 +112,13 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       href: '/aihome/ai-companions', 
       description: '您的工作和學習伙伴' 
     },
+    // 條件顯示花見老師專區
+    ...(user && (hasTeacherAccess || directHasTeacherAccess) ? [{
+      icon: AcademicCapIcon, 
+      label: '花見老師專區', 
+      href: '/aihome/teacher-zone', 
+      description: '教師專用功能和工具' 
+    }] : []),
     { 
       icon: UserIcon, 
       label: '個人資料', 
@@ -186,6 +237,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
           </motion.div>
         )}
       </AnimatePresence>
+      
     </>
   );
 }

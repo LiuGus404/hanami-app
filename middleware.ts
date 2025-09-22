@@ -92,6 +92,9 @@ export async function middleware(req: NextRequest) {
   // 登入頁面路徑
   const loginPages = ['/admin/login', '/teacher/login', '/parent/login']
   const isLoginPage = loginPages.includes(path)
+  
+  // 音樂教育系統路徑 (保持原有邏輯)
+  const isMusicPath = path.startsWith('/music')
 
   // 檢查自定義會話（通過 cookie）
   const customSession = req.cookies.get('hanami_user_session')?.value
@@ -188,6 +191,7 @@ export const config = {
   matcher: [
     '/admin/:path*',
     '/teacher/:path*',
-    '/parent/:path*'
+    '/parent/:path*',
+    '/music/:path*'
   ],
 }

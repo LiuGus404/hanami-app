@@ -1,23 +1,35 @@
 {
-  "name": "Hanami Music",
-  "short_name": "Hanami",
-  "description": "Hanami Web Application",
+  "name": "HanamiEcho",
+  "short_name": "HanamiEcho",
+  "description": "Hanami ｜您的工作和成長夥伴 ｜為您工作的AI團隊",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#fcf6f2",
+  "theme_color": "#FFD59A",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/hanamiicon.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/hanamiicon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/hanamiicon-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/hanamiicon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 } 

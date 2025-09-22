@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { Toaster } from 'react-hot-toast';
 
 import SessionProviderWrapper from '@/components/SessionProviderWrapper';
+import SaasProviderWrapper from '@/components/SaasProviderWrapper';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -20,44 +21,44 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Hanami 音樂教育 | 專業兒童音樂課程',
-    template: '%s | Hanami 音樂教育',
+    default: 'HanamiEcho | 您的工作和成長夥伴 | 為您工作的AI團隊',
+    template: '%s | HanamiEcho',
   },
-  description: 'Hanami 音樂教育提供專業的兒童音樂課程，包括Pre-K音樂啟蒙、錄音教材等。讓孩子在快樂中學習音樂，培養藝術天賦。',
-  keywords: ['兒童音樂課程', '音樂教育', 'Pre-K音樂', '音樂啟蒙', '兒童音樂班', '音樂錄音教材'],
-  authors: [{ name: 'Hanami 音樂教育' }],
-  creator: 'Hanami 音樂教育',
-  publisher: 'Hanami 音樂教育',
+  description: 'HanamiEcho ｜您的工作和成長夥伴 ｜為您工作的AI團隊｜智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持',
+  keywords: ['AI助手', '智能伙伴', '工作助手', '學習陪伴', '情感支持', '個性化AI', 'HanamiEcho', '兒童AI', '成人AI'],
+  authors: [{ name: 'HanamiEcho' }],
+  creator: 'HanamiEcho',
+  publisher: 'HanamiEcho',
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://hanami-music.com'),
+  metadataBase: new URL('https://hanamiecho.com'),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     type: 'website',
     locale: 'zh_TW',
-    url: 'https://hanami-music.com',
-    title: 'Hanami 音樂教育 | 專業兒童音樂課程',
-    description: 'Hanami 音樂教育提供專業的兒童音樂課程，讓孩子在快樂中學習音樂，培養藝術天賦。',
-    siteName: 'Hanami 音樂教育',
+    url: 'https://hanamiecho.com',
+    title: 'HanamiEcho | 您的工作和成長夥伴 | 為您工作的AI團隊',
+    description: 'HanamiEcho ｜您的工作和成長夥伴 ｜為您工作的AI團隊｜智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持',
+    siteName: 'HanamiEcho',
     images: [
       {
-        url: '/icons/icon-512x512.png',
+        url: '/hanamiicon.png',
         width: 512,
         height: 512,
-        alt: 'Hanami 音樂教育 Logo',
+        alt: 'HanamiEcho Logo',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hanami 音樂教育 | 專業兒童音樂課程',
-    description: 'Hanami 音樂教育提供專業的兒童音樂課程，讓孩子在快樂中學習音樂，培養藝術天賦。',
-    images: ['/icons/icon-512x512.png'],
+    title: 'HanamiEcho | 您的工作和成長夥伴 | 為您工作的AI團隊',
+    description: 'HanamiEcho ｜您的工作和成長夥伴 ｜為您工作的AI團隊｜智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持',
+    images: ['/hanamiicon.png'],
   },
   robots: {
     index: true,
@@ -74,7 +75,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Hanami 音樂教育',
+    title: 'HanamiEcho',
   },
 };
 
@@ -82,7 +83,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#FFF9F2',
+  themeColor: '#fcf6f2',
 };
 
 export default async function RootLayout({
@@ -113,21 +114,21 @@ export default async function RootLayout({
     <html lang="zh-TW">
       <head>
         <link href="/manifest.json" rel="manifest" />
-        <meta content="#FFF9F2" name="theme-color" />
-        <link href="/icons/icon-192x192.png" rel="apple-touch-icon" />
-        <link href="/icons/icon-192x192.png" rel="icon" sizes="32x32" type="image/png" />
-        <link href="/icons/icon-192x192.png" rel="icon" sizes="16x16" type="image/png" />
+        <meta content="#fcf6f2" name="theme-color" />
+        <link href="/hanamiicon.png" rel="apple-touch-icon" />
+        <link href="/hanamiicon.png" rel="icon" sizes="32x32" type="image/png" />
+        <link href="/hanamiicon.png" rel="icon" sizes="16x16" type="image/png" />
         
         {/* 結構化資料 */}
         <script
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
-              '@type': 'EducationalOrganization',
-              'name': 'Hanami 音樂教育',
-              'description': '專業的兒童音樂教育機構，提供Pre-K音樂啟蒙課程',
-              'url': 'https://hanami-music.com',
-              'logo': 'https://hanami-music.com/icons/icon-512x512.png',
+              '@type': 'TechArticle',
+              'name': 'HanamiEcho',
+              'description': 'HanamiEcho ｜您的工作和成長夥伴 ｜為您工作的AI團隊｜智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持',
+              'url': 'https://hanamiecho.com',
+              'logo': 'https://hanamiecho.com/hanamiicon.png',
               'address': {
                 '@type': 'PostalAddress',
                 'addressCountry': 'TW',
@@ -147,18 +148,20 @@ export default async function RootLayout({
         suppressHydrationWarning={true}
       >
         <SessionProviderWrapper initialSession={userSession}>
-          {children}
-          <Toaster 
-            position="top-right"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: '#FFFDF8',
-                color: '#4B4036',
-                border: '1px solid #EADBC8',
-              },
-            }}
-          />
+          <SaasProviderWrapper>
+            {children}
+            <Toaster 
+              position="top-right"
+              toastOptions={{
+                duration: 3000,
+                style: {
+                  background: '#FFFDF8',
+                  color: '#4B4036',
+                  border: '1px solid #EADBC8',
+                },
+              }}
+            />
+          </SaasProviderWrapper>
         </SessionProviderWrapper>
       </body>
     </html>

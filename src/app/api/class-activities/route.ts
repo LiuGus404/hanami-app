@@ -2,12 +2,61 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// 檢查課程是否在教師排程時間內
+function isLessonInTeacherSchedule(lesson: any, teacherSchedule: any[]): boolean {
+  // 如果沒有排程記錄，表示教師沒有被安排工作，不顯示任何課程
+  if (teacherSchedule.length === 0) {
+    console.log('教師沒有排程記錄，過濾掉所有課程');
+    return false;
+  }
+
+  const lessonDate = lesson.lesson_date;
+  const lessonTime = lesson.actual_timeslot;
+
+  if (!lessonDate || !lessonTime) {
+    console.log('課程缺少日期或時間信息，過濾掉:', { lessonDate, lessonTime });
+    return false;
+  }
+
+  // 找到對應日期的排程
+  const daySchedule = teacherSchedule.filter(schedule => schedule.scheduled_date === lessonDate);
+  
+  if (daySchedule.length === 0) {
+    console.log(`教師在 ${lessonDate} 沒有排程，過濾掉課程`);
+    return false;
+  }
+
+  // 檢查課程時間是否在任何一個排程時間段內
+  const isInSchedule = daySchedule.some(schedule => {
+    const startTime = schedule.start_time;
+    const endTime = schedule.end_time;
+    
+    // 簡單的時間比較（假設時間格式為 HH:MM）
+    const lessonTimeStr = lessonTime.toString().padStart(5, '0'); // 確保格式為 HH:MM
+    
+    const isInTimeRange = lessonTimeStr >= startTime && lessonTimeStr <= endTime;
+    
+    if (isInTimeRange) {
+      console.log(`課程時間 ${lessonTimeStr} 在排程時間內 ${startTime}-${endTime}`);
+    }
+    
+    return isInTimeRange;
+  });
+
+  if (!isInSchedule) {
+    console.log(`課程時間 ${lessonTime} 不在任何排程時間段內`);
+  }
+
+  return isInSchedule;
+}
+
 // 獲取本週課堂和學生列表
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const weekStart = searchParams.get('weekStart'); // YYYY-MM-DD 格式
     const weekEnd = searchParams.get('weekEnd'); // YYYY-MM-DD 格式
+    const teacherId = searchParams.get('teacherId'); // 教師ID
 
     if (!weekStart || !weekEnd) {
       return NextResponse.json(
@@ -16,7 +65,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Fetching lessons between:', { weekStart, weekEnd });
+    console.log('Fetching lessons between:', { weekStart, weekEnd, teacherId });
+
+    // 如果提供了教師ID，先查詢教師排程
+    let teacherSchedule: any[] = [];
+    if (teacherId) {
+      console.log('查詢教師排程，教師ID:', teacherId);
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('teacher_schedule')
+        .select('scheduled_date, start_time, end_time, note')
+        .eq('teacher_id', teacherId)
+        .gte('scheduled_date', weekStart)
+        .lte('scheduled_date', weekEnd)
+        .order('scheduled_date', { ascending: true })
+        .order('start_time', { ascending: true });
+
+      if (scheduleError) {
+        console.error('查詢教師排程失敗:', scheduleError);
+        return NextResponse.json(
+          { error: '查詢教師排程失敗', details: scheduleError.message },
+          { status: 500 }
+        );
+      }
+
+      teacherSchedule = scheduleData || [];
+      console.log(`教師排程數據: ${teacherSchedule.length} 條記錄`, teacherSchedule);
+    }
 
     // 並行查詢正式學生和試聽學生課程記錄
     console.log('開始並行查詢課程記錄...');
@@ -83,6 +157,16 @@ export async function GET(request: NextRequest) {
     } else {
       lessons = lessonsResult.data || [];
       console.log(`成功獲取 ${lessons.length} 條正式學生課程記錄`);
+      
+      // 如果提供了教師ID，根據排程過濾課程
+      if (teacherId) {
+        const originalCount = lessons.length;
+        lessons = lessons.filter(lesson => isLessonInTeacherSchedule(lesson, teacherSchedule));
+        console.log(`根據教師排程過濾正式學生課程: ${originalCount} -> ${lessons.length}`);
+        if (teacherSchedule.length === 0) {
+          console.log('教師沒有排程記錄，過濾掉所有正式學生課程');
+        }
+      }
     }
 
     if (trialLessonsResult.error) {
@@ -91,6 +175,16 @@ export async function GET(request: NextRequest) {
     } else {
       trialLessons = trialLessonsResult.data || [];
       console.log(`成功獲取 ${trialLessons.length} 條試聽學生記錄`);
+      
+      // 如果提供了教師ID，根據排程過濾試聽課程
+      if (teacherId) {
+        const originalCount = trialLessons.length;
+        trialLessons = trialLessons.filter(trial => isLessonInTeacherSchedule(trial, teacherSchedule));
+        console.log(`根據教師排程過濾試聽學生課程: ${originalCount} -> ${trialLessons.length}`);
+        if (teacherSchedule.length === 0) {
+          console.log('教師沒有排程記錄，過濾掉所有試聽學生課程');
+        }
+      }
     }
 
     if (lessonsError) {

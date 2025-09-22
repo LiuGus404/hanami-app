@@ -214,6 +214,15 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
       // 使用 Supabase 客戶端登出
       await supabase.auth.signOut();
       setUser(null);
+      
+      // 清除教師權限會話存儲
+      try {
+        sessionStorage.removeItem('hanami_teacher_access');
+        console.log('登出時已清除教師權限會話存儲');
+      } catch (error) {
+        console.error('清除教師權限會話存儲失敗:', error);
+      }
+      
       toast.success('已成功登出');
     } catch (error) {
       console.error('登出錯誤:', error);

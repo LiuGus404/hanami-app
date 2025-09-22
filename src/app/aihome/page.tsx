@@ -56,13 +56,19 @@ export default function AIHomePage() {
           </div>
           
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => router.push('/login')}
+              className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
+            >
+              花見音樂
+            </button>
             {user ? (
               <>
                 <button
                   onClick={() => router.push('/aihome/dashboard')}
                   className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
                 >
-                  儀表板
+                  管理面板
                 </button>
                 <button
                   onClick={() => router.push('/aihome/subscription')}
@@ -119,7 +125,7 @@ export default function AIHomePage() {
                       size="lg"
                       className="text-lg px-8 py-4"
                     >
-                      進入儀表板
+                      開始您的旅程
                       <ArrowRightIcon className="w-6 h-6 ml-2" />
                     </HanamiButton>
                   ) : (

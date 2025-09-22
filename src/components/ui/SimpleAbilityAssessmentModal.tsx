@@ -115,6 +115,8 @@ interface SimpleAbilityAssessmentModalProps {
   defaultAssessmentDate?: string; // 新增：預設評估日期
   showOnlyTodayStudents?: boolean; // 新增：是否只顯示當日學生
   lockStudent?: boolean; // 新增：是否鎖定學生選擇
+  lockTeacher?: boolean; // 新增：是否鎖定教師選擇
+  defaultTeacher?: { id: string; teacher_fullname?: string; teacher_nickname?: string }; // 新增：預設教師資料
 }
 
 export default function SimpleAbilityAssessmentModal({
@@ -124,7 +126,9 @@ export default function SimpleAbilityAssessmentModal({
   defaultStudent,
   defaultAssessmentDate,
   showOnlyTodayStudents,
-  lockStudent = false
+  lockStudent = false,
+  lockTeacher = false,
+  defaultTeacher
 }: SimpleAbilityAssessmentModalProps) {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -138,7 +142,7 @@ export default function SimpleAbilityAssessmentModal({
     initialData?.student_id || defaultStudent?.id || ''
   );
   const [selectedTreeId, setSelectedTreeId] = useState(initialData?.tree_id || ''); // 新增：選擇的成長樹ID
-  const [selectedTeacherId, setSelectedTeacherId] = useState(initialData?.teacher_id || ''); // 新增：選擇的教師ID
+  const [selectedTeacherId, setSelectedTeacherId] = useState(initialData?.teacher_id || defaultTeacher?.id || ''); // 新增：選擇的教師ID
   const [lessonDate, setLessonDate] = useState(
     initialData?.lesson_date || defaultAssessmentDate || new Date().toISOString().split('T')[0]
   );
@@ -2980,9 +2984,14 @@ export default function SimpleAbilityAssessmentModal({
                 </label>
                 <div className="relative">
                   <button
-                    className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left bg-white hover:bg-[#FFF9F2] transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
+                    className={`w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A] ${
+                      lockTeacher 
+                        ? 'bg-gray-100 cursor-not-allowed text-gray-500' 
+                        : 'bg-white hover:bg-[#FFF9F2]'
+                    }`}
                     type="button"
-                    onClick={() => setShowTeacherDropdown(!showTeacherDropdown)}
+                    onClick={() => !lockTeacher && setShowTeacherDropdown(!showTeacherDropdown)}
+                    disabled={lockTeacher}
                   >
                     {selectedTeacherId ? (
                       (() => {
