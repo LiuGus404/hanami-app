@@ -111,6 +111,7 @@ export default function AICompanionsPage() {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showMobileDropdown, setShowMobileDropdown] = useState(false);
   const [selectedCompanionForProject, setSelectedCompanionForProject] = useState<AICompanion | null>(null);
+  const [showRoleSelectionModal, setShowRoleSelectionModal] = useState(false);
 
   // 從 Supabase 載入用戶的聊天室
   const loadUserRooms = async () => {
@@ -335,41 +336,56 @@ export default function AICompanionsPage() {
               // 調試日誌
               console.log('處理房間:', room.title);
               
-              // 查詢該房間的角色資料
+              // 查詢該房間的角色資料（三步查詢避免關聯問題）
               try {
-                const { data: roomRoles, error: rolesError } = await saasSupabase
+                // 第一步：查 room_roles 取得 role_instance_id
+                const { data: roomRoleLinks, error: roomRolesError } = await saasSupabase
                   .from('room_roles')
-                  .select(`
-                    role_instances(
-                      id,
-                      nickname,
-                      ai_roles(
-                        id,
-                        name,
-                        slug
-                      )
-                    )
-                  `)
+                  .select('role_instance_id')
                   .eq('room_id', room.id)
                   .eq('is_active', true);
                 
-                if (rolesError) {
-                  console.log('⚠️ 查詢房間角色失敗:', rolesError.message);
-                } else if (roomRoles && roomRoles.length > 0) {
-                  console.log('✅ 找到角色資料:', roomRoles.length, '個');
-                  activeRoles = roomRoles
-                    .map((roomRole: any) => {
-                      const instance = roomRole.role_instances;
-                      if (!instance) return null;
+                if (roomRolesError) {
+                  console.log('⚠️ 查詢房間角色關聯失敗:', roomRolesError.message);
+                } else if (roomRoleLinks && roomRoleLinks.length > 0) {
+                  const roleInstanceIds = roomRoleLinks.map((r: any) => r.role_instance_id).filter(Boolean);
+                  
+                  // 第二步：查 role_instances 取得 role_id
+                  const { data: roleInstances, error: roleInstancesError } = await saasSupabase
+                    .from('role_instances')
+                    .select('id, role_id, nickname')
+                    .in('id', roleInstanceIds);
+                  
+                  if (roleInstancesError) {
+                    console.log('⚠️ 查詢角色實例失敗:', roleInstancesError.message);
+                  } else if (roleInstances && roleInstances.length > 0) {
+                    const roleIds = roleInstances.map((ri: any) => ri.role_id).filter(Boolean);
+                    
+                    // 第三步：查 ai_roles 取得角色資訊
+                    const { data: aiRoles, error: aiRolesError } = await saasSupabase
+                      .from('ai_roles')
+                      .select('id, name, slug')
+                      .in('id', roleIds);
+                    
+                    if (aiRolesError) {
+                      console.log('⚠️ 查詢 AI 角色失敗:', aiRolesError.message);
+                    } else if (aiRoles && aiRoles.length > 0) {
+                      console.log('✅ 找到角色資料:', aiRoles.length, '個');
+                      activeRoles = roleInstances
+                        .map((instance: any) => {
+                          const aiRole = aiRoles.find((ar: any) => ar.id === instance.role_id);
+                          if (!aiRole) return null;
                       
-                      const roleName = instance.ai_roles?.name || instance.nickname;
-                      // 標準化角色名稱
-                      if (roleName === 'Hibi' || roleName?.includes('Hibi')) return 'Hibi';
-                      if (roleName === 'Mori' || roleName?.includes('墨墨') || roleName?.includes('Mori')) return '墨墨';
-                      if (roleName === 'Pico' || roleName?.includes('皮可') || roleName?.includes('Pico')) return '皮可';
-                      return roleName; // 保持原名稱
-                    })
-                    .filter(Boolean); // 移除空值
+                          const roleName = (aiRole as any).name || instance.nickname;
+                          // 標準化角色名稱
+                          if (roleName === 'Hibi' || roleName?.includes('Hibi')) return 'Hibi';
+                          if (roleName === 'Mori' || roleName?.includes('墨墨') || roleName?.includes('Mori')) return '墨墨';
+                          if (roleName === 'Pico' || roleName?.includes('皮可') || roleName?.includes('Pico')) return '皮可';
+                          return roleName; // 保持原名稱
+                        })
+                        .filter(Boolean); // 移除空值
+                    }
+                  }
                 }
               } catch (error) {
                 console.log('⚠️ 查詢角色資料時發生錯誤:', error);
@@ -406,10 +422,30 @@ export default function AICompanionsPage() {
                 if (activeRoles.length === 0) {
                   console.log('🔍 使用標題/描述推斷角色');
                   
-                  // 檢查標題中的角色
-                  if (room.title.includes('Hibi')) activeRoles.push('Hibi');
-                  if (room.title.includes('墨墨') || room.title.includes('Mori')) activeRoles.push('墨墨');
-                  if (room.title.includes('皮可') || room.title.includes('Pico')) activeRoles.push('皮可');
+                  // 基於房間標題推斷角色（與聊天室頁面保持一致）
+                  const roomTitle = room.title?.toLowerCase() || '';
+                  
+                  if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') || 
+                      roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
+                      roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
+                    activeRoles.push('皮可');
+                  } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') || 
+                             roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') || 
+                             roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
+                             roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
+                             roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
+                    activeRoles.push('墨墨');
+                  } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') || 
+                             roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
+                             roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
+                             roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
+                    activeRoles.push('Hibi');
+                  }
+                  
+                  // 檢查標題中的角色名稱
+                  if (room.title.includes('Hibi') && !activeRoles.includes('Hibi')) activeRoles.push('Hibi');
+                  if ((room.title.includes('墨墨') || room.title.includes('Mori')) && !activeRoles.includes('墨墨')) activeRoles.push('墨墨');
+                  if ((room.title.includes('皮可') || room.title.includes('Pico')) && !activeRoles.includes('皮可')) activeRoles.push('皮可');
                   
                   // 檢查描述中的角色
                   if (room.description?.includes('Hibi') && !activeRoles.includes('Hibi')) activeRoles.push('Hibi');
@@ -656,7 +692,7 @@ export default function AICompanionsPage() {
       description: '系統總管狐狸，智慧的協調者和統籌中樞，負責任務分配和團隊協作',
       specialty: '系統總管',
       icon: CpuChipIcon,
-      imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
+      imagePath: '/3d-character-backgrounds/studio/Hibi/Hibi.png',
       personality: '智慧、領導力、協調能力、友善',
       abilities: ['任務統籌', '團隊協調', '智能分析', '流程優化', '決策支援'],
       color: 'from-orange-400 to-red-500',
@@ -754,7 +790,12 @@ export default function AICompanionsPage() {
         });
 
       if (memberError) {
-        console.error('❌ 添加房間成員失敗:', memberError);
+        // 如果是重複鍵錯誤，表示用戶已經存在，這是正常的
+        if (memberError.code === '23505') {
+          console.log('✅ 用戶已是房間成員（重複鍵錯誤）');
+        } else {
+          console.error('❌ 添加房間成員失敗:', memberError);
+        }
       }
 
       // 為房間添加指定的 AI 角色
@@ -820,8 +861,19 @@ export default function AICompanionsPage() {
     }
   };
 
-  // 快速開始協作 - 創建包含所有三個角色的協作專案
-  const handleQuickCollaborate = async () => {
+  // 快速開始協作 - 顯示角色選擇視窗
+  const handleQuickCollaborate = () => {
+    if (!user?.id) {
+      console.error('❌ 用戶未登入，無法開始協作');
+      return;
+    }
+
+    // 顯示角色選擇視窗
+    setShowRoleSelectionModal(true);
+  };
+
+  // 創建團隊協作專案（從角色選擇視窗調用）
+  const createTeamCollaborationProject = async (selectedRoles: string[]) => {
     if (!user?.id) {
       console.error('❌ 用戶未登入，無法開始協作');
       return;
@@ -829,7 +881,7 @@ export default function AICompanionsPage() {
 
     try {
       setCreatingChat('team');
-      console.log('✅ 開始創建團隊協作專案...');
+      console.log('✅ 開始創建團隊協作專案...', selectedRoles);
 
       const saasSupabase = getSaasSupabaseClient();
       
@@ -838,7 +890,7 @@ export default function AICompanionsPage() {
         .from('ai_rooms') as any)
         .insert({
           title: '團隊協作專案',
-          description: 'Hibi、墨墨、皮可三位 AI 伙伴的協作空間',
+          description: `${selectedRoles.join('、')}的協作空間`,
           room_type: 'project',
           created_by: user.id
         })
@@ -861,18 +913,78 @@ export default function AICompanionsPage() {
         });
 
       if (memberError) {
-        console.error('❌ 添加房間成員失敗:', memberError);
+        // 如果是重複鍵錯誤，表示用戶已經存在，這是正常的
+        if (memberError.code === '23505') {
+          console.log('✅ 用戶已是房間成員（重複鍵錯誤）');
+        } else {
+          console.error('❌ 添加房間成員失敗:', memberError);
+        }
+      }
+
+      // 為每個選中的角色創建 room_roles 和 role_instances
+      for (const roleName of selectedRoles) {
+        // 將角色名稱映射到對應的 slug
+        const roleNameToSlug: { [key: string]: string } = {
+          'Hibi': 'hibi-manager',
+          '墨墨': 'mori-researcher',
+          '皮可': 'pico-artist'
+        };
+        
+        const roleSlug = roleNameToSlug[roleName] || roleName.toLowerCase();
+        
+        // 首先獲取對應的 AI 角色 ID
+        const { data: aiRole, error: aiRoleError } = await (saasSupabase
+          .from('ai_roles') as any)
+          .select('id, slug')
+          .eq('slug', roleSlug)
+          .single();
+
+        if (aiRoleError || !aiRole) {
+          console.error(`❌ 找不到 AI 角色: ${roleName}`, aiRoleError);
+          continue;
+        }
+
+        // 先創建 role_instances 記錄
+        const { data: roleInstance, error: roleInstanceError } = await (saasSupabase
+          .from('role_instances') as any)
+          .insert({
+            room_id: newRoom.id,
+            role_id: aiRole.id,
+            is_active: true
+          })
+          .select()
+          .single();
+
+        if (roleInstanceError) {
+          console.error(`❌ 創建 role_instances 失敗: ${roleName}`, roleInstanceError);
+          continue;
+        }
+
+        // 創建 room_roles 記錄
+        const { error: roomRoleError } = await (saasSupabase
+          .from('room_roles') as any)
+          .insert({
+            room_id: newRoom.id,
+            role_instance_id: roleInstance.id,
+            is_active: true
+          });
+
+        if (roomRoleError) {
+          console.error(`❌ 創建 room_roles 失敗: ${roleName}`, roomRoleError);
+        } else {
+          console.log(`✅ 成功添加角色到房間: ${roleName}`);
+        }
       }
 
       // 創建前端顯示的房間物件
       const displayRoom: AIRoom = {
         id: newRoom.id,
         title: '團隊協作專案',
-        description: 'Hibi、墨墨、皮可三位 AI 伙伴的協作空間',
+        description: `${selectedRoles.join('、')}的協作空間`,
         lastMessage: '團隊協作專案已創建，歡迎開始！',
         lastActivity: new Date(),
         memberCount: 1,
-        activeRoles: ['Hibi', '墨墨', '皮可'],
+        activeRoles: selectedRoles,
         messageCount: 0,
         status: 'active'
       };
@@ -889,6 +1001,7 @@ export default function AICompanionsPage() {
       console.error('❌ 創建團隊協作專案錯誤:', error);
     } finally {
       setCreatingChat(null);
+      setShowRoleSelectionModal(false);
     }
   };
 
@@ -936,7 +1049,12 @@ export default function AICompanionsPage() {
         });
 
       if (memberError) {
-        console.error('❌ 添加房間成員失敗:', memberError);
+        // 如果是重複鍵錯誤，表示用戶已經存在，這是正常的
+        if (memberError.code === '23505') {
+          console.log('✅ 用戶已是房間成員（重複鍵錯誤）');
+        } else {
+          console.error('❌ 添加房間成員失敗:', memberError);
+        }
       }
 
       // 創建前端顯示的房間物件
@@ -2366,6 +2484,171 @@ export default function AICompanionsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 角色選擇視窗 */}
+      <AnimatePresence>
+        {showRoleSelectionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4"
+            onClick={() => setShowRoleSelectionModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-[#4B4036]">選擇 AI 角色</h2>
+                <button
+                  onClick={() => setShowRoleSelectionModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <XMarkIcon className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <p className="text-[#2B3A3B] mb-6">
+                請選擇要加入協作聊天室的 AI 角色：
+              </p>
+
+              <RoleSelectionGrid 
+                companions={companions}
+                onConfirm={(selectedRoles) => {
+                  if (selectedRoles.length > 0) {
+                    createTeamCollaborationProject(selectedRoles);
+                  }
+                }}
+                onCancel={() => setShowRoleSelectionModal(false)}
+              />
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// 角色選擇網格組件
+function RoleSelectionGrid({ 
+  companions, 
+  onConfirm,
+  onCancel
+}: { 
+  companions: AICompanion[]; 
+  onConfirm: (selectedRoles: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+
+  const toggleRole = (roleName: string) => {
+    setSelectedRoles(prev => 
+      prev.includes(roleName) 
+        ? prev.filter(role => role !== roleName)
+        : [...prev, roleName]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedRoles(companions.map(c => c.name));
+  };
+
+  const clearAll = () => {
+    setSelectedRoles([]);
+  };
+
+  const handleConfirm = () => {
+    if (selectedRoles.length > 0) {
+      onConfirm(selectedRoles);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-3">
+        {companions.map((companion) => (
+          <motion.div
+            key={companion.id}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => toggleRole(companion.name)}
+            className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+              selectedRoles.includes(companion.name)
+                ? 'border-[#FFB6C1] bg-pink-50' 
+                : 'border-gray-200 hover:border-gray-300 bg-white'
+            }`}
+          >
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Image
+                  src={companion.imagePath}
+                  alt={companion.name}
+                  width={48}
+                  height={48}
+                  className="rounded-full object-cover"
+                />
+                {selectedRoles.includes(companion.name) && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#FFB6C1] rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-[#4B4036]">{companion.name}</h3>
+                <p className="text-sm text-[#2B3A3B]">{companion.specialty}</p>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="flex space-x-2 mb-4">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={selectAll}
+          className="px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-medium transition-colors"
+        >
+          全選
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={clearAll}
+          className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+        >
+          清空
+        </motion.button>
+      </div>
+
+      <div className="flex space-x-3">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleConfirm}
+          disabled={selectedRoles.length === 0}
+          className={`flex-1 px-4 py-3 rounded-xl font-medium shadow-lg transition-all ${
+            selectedRoles.length > 0
+              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white hover:shadow-xl'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          確認選擇 ({selectedRoles.length})
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onCancel}
+          className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium transition-colors"
+        >
+          取消
+        </motion.button>
+      </div>
     </div>
   );
 }

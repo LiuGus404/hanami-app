@@ -80,7 +80,7 @@ interface Task {
   id: string;
   title: string;
   description: string;
-  assignedTo: 'hibi' | 'mori' | 'pico' | 'team';
+  assignedTo: 'hibi' | 'mori' | 'pico';
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   progress: number;
   createdAt: Date;
@@ -342,7 +342,7 @@ export default function RoomChatPage() {
     console.log('🏁 初始化 activeRoles 為空陣列 (將被 URL 參數或資料庫覆蓋)');
     return []; // 空陣列，稍後會被 URL 參數或資料庫覆蓋
   });
-  const [selectedCompanion, setSelectedCompanion] = useState<'hibi' | 'mori' | 'pico' | 'team'>('team'); // 預設團隊模式，稍後會被 URL 參數覆蓋
+  const [selectedCompanion, setSelectedCompanion] = useState<'hibi' | 'mori' | 'pico'>('hibi'); // 預設 hibi 統籌
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(roomId);
@@ -453,49 +453,88 @@ export default function RoomChatPage() {
         .eq('id', roomId)
         .single() as { data: { id: string; title: string; description?: string; room_type?: string; created_at: string } | null; error: any };
       
-      // 載入房間角色
+      // 載入房間角色（兩段式查詢避免 400/406 並確保完整資料）
       let roomRoles: string[] = [];
       try {
         console.log('🔍 載入房間角色:', roomId);
-        const { data: rolesData, error: rolesError } = await supabase
+        // 第一步：先查 room_roles 取得 role_instance_id 列表
+        const { data: roomRoleLinks, error: roomRolesError } = await supabase
           .from('room_roles')
-          .select(`
-            role_instances(
-              ai_roles(
-                slug
-              )
-            )
-          `)
+          .select('role_instance_id')
           .eq('room_id', roomId)
           .eq('is_active', true);
-        
-        if (rolesError) {
-          console.log('⚠️ 載入房間角色失敗:', rolesError);
-        } else {
-          console.log('🔍 房間角色查詢結果:', { rolesData, rolesError, roomId });
+
+        if (roomRolesError) {
+          console.log('⚠️ 載入房間角色關聯失敗:', roomRolesError);
         }
-        
-        if (rolesData && rolesData.length > 0) {
-          roomRoles = rolesData
-            .map((item: any) => item.role_instances?.ai_roles?.slug)
-            .filter(Boolean);
-          console.log('✅ 從資料庫載入的房間角色:', roomRoles);
-          
-          // 如果從資料庫載入到角色，且沒有 URL 參數，則使用資料庫的角色
-          if (roomRoles.length > 0 && !urlParams.initialRole && !urlParams.companion) {
-            console.log('🔄 使用資料庫中的角色設定:', roomRoles);
-            setActiveRoles(roomRoles as ('hibi' | 'mori' | 'pico')[]);
-            if (roomRoles.length === 1) {
-              setSelectedCompanion(roomRoles[0] as 'hibi' | 'mori' | 'pico');
+
+        const roleInstanceIds = (roomRoleLinks || [])
+          .map((r: any) => r.role_instance_id)
+          .filter(Boolean);
+
+        if (roleInstanceIds.length > 0) {
+          // 第二步：查 role_instances 取得 role_id
+          const { data: roleInstances, error: roleInstancesError } = await supabase
+            .from('role_instances')
+            .select('id, role_id')
+            .in('id', roleInstanceIds);
+
+          if (roleInstancesError) {
+            console.log('⚠️ 載入角色實例失敗:', roleInstancesError);
+          } else {
+            const roleIds = (roleInstances || [])
+              .map((ri: any) => ri?.role_id)
+              .filter(Boolean);
+
+            if (roleIds.length > 0) {
+              // 第三步：查 ai_roles 取得 slug
+              const { data: aiRoles, error: aiRolesError } = await supabase
+                .from('ai_roles')
+                .select('id, slug')
+                .in('id', roleIds);
+
+              if (aiRolesError) {
+                console.log('⚠️ 載入 AI 角色失敗:', aiRolesError);
+              } else {
+                const rawSlugs = (aiRoles || [])
+                  .map((ar: any) => ar?.slug)
+                  .filter(Boolean);
+                
+                // 將資料庫中的 slug 轉換為內部使用的格式
+                roomRoles = rawSlugs.map(slug => {
+                  if (slug.includes('hibi-manager')) return 'hibi';
+                  if (slug.includes('mori-researcher')) return 'mori';
+                  if (slug.includes('pico-artist')) return 'pico';
+                  return slug; // 保持其他格式不變
+                });
+                
+                console.log('✅ 從資料庫載入的房間角色:', roomRoles);
+              }
             }
-            // 保存到 sessionStorage
-            sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(roomRoles));
           }
-          setHasLoadedFromDatabase(true);
         } else {
-          console.log('⚠️ 資料庫中沒有角色資料');
-          setHasLoadedFromDatabase(true); // 標記已查詢過資料庫
+          console.log('⚠️ 此房間沒有任何角色關聯');
         }
+
+        // 如果從資料庫載入到角色，且沒有 URL 參數，則使用資料庫的角色
+        if (roomRoles.length > 0 && !urlParams.initialRole && !urlParams.companion) {
+          console.log('🔄 使用資料庫中的角色設定:', roomRoles);
+          const normalize = (name: any) => {
+            const n = String(name).toLowerCase();
+            if (n.includes('hibi') || n.includes('希希')) return 'hibi';
+            if (n.includes('mori') || n.includes('墨墨')) return 'mori';
+            if (n.includes('pico') || n.includes('皮可')) return 'pico';
+            return null;
+          };
+          const normalized = Array.from(new Set(roomRoles.map(normalize).filter(Boolean))) as ('hibi'|'mori'|'pico')[];
+          setActiveRoles(normalized);
+          if (roomRoles.length === 1) {
+            setSelectedCompanion(normalized[0]);
+          }
+          // 保存到 sessionStorage
+          sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(normalized));
+        }
+        setHasLoadedFromDatabase(true);
       } catch (error) {
         console.error('載入房間角色錯誤:', error);
       }
@@ -526,39 +565,44 @@ export default function RoomChatPage() {
     }
   };
 
-  // 根據 URL 參數設置角色狀態
+  // 根據 URL 參數設置角色狀態（含正規化）
   useEffect(() => {
     console.log('🔄 角色設置 useEffect 觸發, urlParams:', urlParams);
-    
+
+    const normalizeRole = (name: any) => {
+      if (!name) return null as unknown as 'hibi'|'mori'|'pico';
+      const n = String(name).toLowerCase();
+      // 支援新的 slug 格式和舊的格式
+      if (n.includes('hibi') || n.includes('希希') || n.includes('hibi-manager')) return 'hibi';
+      if (n.includes('mori') || n.includes('墨墨') || n.includes('mori-researcher')) return 'mori';
+      if (n.includes('pico') || n.includes('皮可') || n.includes('pico-artist')) return 'pico';
+      return null as unknown as 'hibi'|'mori'|'pico';
+    };
+
     if (urlParams.initialRole || urlParams.companion) {
-      const targetRole = urlParams.initialRole || urlParams.companion;
-      console.log('🔧 根據 URL 參數設置角色為:', targetRole);
+      const targetRoleRaw = urlParams.initialRole || urlParams.companion;
+      const targetRole = normalizeRole(targetRoleRaw) || 'hibi';
+      console.log('🔧 根據 URL 參數設置角色為(正規化):', targetRole);
       console.log('🔧 設置前的 activeRoles:', activeRoles);
-      
-      setActiveRoles([targetRole as 'hibi' | 'mori' | 'pico']);
-      setSelectedCompanion(targetRole as 'hibi' | 'mori' | 'pico');
-      
-      // 將角色信息存儲到 sessionStorage，防止丟失
+      setActiveRoles([targetRole]);
+      setSelectedCompanion(targetRole);
       sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify([targetRole]));
       console.log('✅ 已設置 activeRoles 為:', [targetRole]);
     } else {
       console.log('🔍 沒有 URL 參數，嘗試從 sessionStorage 恢復');
-      // 嘗試從 sessionStorage 恢復角色狀態
       const savedRoles = sessionStorage.getItem(`room_${roomId}_roles`);
       if (savedRoles) {
         try {
-          const parsedRoles = JSON.parse(savedRoles);
-          console.log('🔄 從 sessionStorage 恢復角色:', parsedRoles);
-          setActiveRoles(parsedRoles);
-          if (parsedRoles.length === 1) {
-            setSelectedCompanion(parsedRoles[0]);
-          }
+          const parsedRoles = JSON.parse(savedRoles) as string[];
+          const normalized = Array.from(new Set(parsedRoles.map(r => normalizeRole(r)).filter(Boolean))) as ('hibi'|'mori'|'pico')[];
+          console.log('🔄 從 sessionStorage 恢復角色(正規化):', normalized);
+          setActiveRoles(normalized);
+          if (normalized.length === 1) setSelectedCompanion(normalized[0]);
         } catch (error) {
           console.error('恢復角色狀態失敗:', error);
         }
       } else {
         console.log('⚠️ 沒有找到保存的角色狀態，等待資料庫查詢完成');
-        // 不立即設置預設角色，等待資料庫查詢完成
       }
     }
   }, [urlParams, roomId]);
@@ -678,10 +722,10 @@ export default function RoomChatPage() {
 
   // 當 activeRoles 變化時更新 room 的 activeCompanions
   useEffect(() => {
-    setRoom(prev => ({
-      ...prev,
-      activeCompanions: activeRoles
-    }));
+    if (!['hibi','mori','pico'].includes(selectedCompanion as any) && activeRoles.length > 0) {
+      setSelectedCompanion(activeRoles[0]);
+    }
+    setRoom(prev => ({ ...prev, activeCompanions: activeRoles }));
   }, [activeRoles]);
 
   // 移除角色從專案
@@ -874,7 +918,7 @@ export default function RoomChatPage() {
       description: '系統總管狐狸，智慧的協調者和統籌中樞，負責任務分配和團隊協作',
       specialty: '系統總管',
       icon: CpuChipIcon,
-      imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
+      imagePath: '/3d-character-backgrounds/studio/Hibi/Hibi.png',
       personality: '智慧、領導力、協調能力、友善',
       abilities: ['任務統籌', '團隊協調', '智能分析', '流程優化', '決策支援'],
       color: 'from-orange-400 to-red-500',
@@ -919,9 +963,9 @@ export default function RoomChatPage() {
         .select('*')
         .eq('room_id', roomId)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') {
+      if (checkError) {
         console.error('❌ 檢查房間成員失敗:', checkError);
         return;
       }
@@ -939,7 +983,12 @@ export default function RoomChatPage() {
           });
 
         if (insertError) {
-          console.error('❌ 添加房間成員失敗:', insertError);
+          // 如果是重複鍵錯誤，表示用戶已經存在，這是正常的
+          if (insertError.code === '23505') {
+            console.log('✅ 用戶已是房間成員（重複鍵錯誤）');
+          } else {
+            console.error('❌ 添加房間成員失敗:', insertError);
+          }
         } else {
           console.log('✅ 用戶已添加為房間成員');
         }
@@ -2236,27 +2285,25 @@ export default function RoomChatPage() {
     }
   };
 
-  const generateAIResponse = (userMessage: string, targetCompanion: 'hibi' | 'mori' | 'pico' | 'team'): Message => {
+  const generateAIResponse = (userMessage: string, targetCompanion: 'hibi' | 'mori' | 'pico'): Message => {
     // 如果是個人對話模式，強制使用該角色
     if (companionParam) {
       targetCompanion = companionParam as 'hibi' | 'mori' | 'pico';
     }
     const isTaskRequest = userMessage.includes('任務') || userMessage.includes('幫我') || userMessage.includes('協助');
     
-    if (isTaskRequest && targetCompanion === 'team') {
-      // 創建協作任務
+    if (isTaskRequest && targetCompanion === 'hibi') {
+      // 協作任務交由 hibi 統籌
       const newTask: Task = {
         id: generateUUID(),
-        title: `團隊協作：${userMessage.slice(0, 20)}...`,
+        title: `協作任務：${userMessage.slice(0, 20)}...`,
         description: userMessage,
-        assignedTo: 'team',
+        assignedTo: 'hibi',
         status: 'pending',
         progress: 0,
         createdAt: new Date()
       };
-      
       setTasks(prev => [...prev, newTask]);
-      
       return {
         id: generateUUID(),
         content: `收到任務需求！我會統籌安排：墨墨負責研究分析，皮可負責創意設計，我來協調整體進度。讓我們開始協作吧！`,
@@ -2288,14 +2335,13 @@ export default function RoomChatPage() {
       ]
     };
 
-    const actualTarget = targetCompanion === 'team' ? 'hibi' : targetCompanion;
-    const companionResponses = responses[actualTarget as keyof typeof responses] || responses.hibi;
+    const companionResponses = responses[targetCompanion as keyof typeof responses] || responses.hibi;
     const randomResponse = companionResponses[Math.floor(Math.random() * companionResponses.length)];
 
     return {
       id: generateUUID(),
       content: randomResponse,
-      sender: actualTarget as 'hibi' | 'mori' | 'pico',
+      sender: targetCompanion as 'hibi' | 'mori' | 'pico',
       timestamp: new Date(),
       type: 'text'
     };
@@ -2686,21 +2732,19 @@ export default function RoomChatPage() {
                       }}
                     >
                       <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                        <Image
-                          src={
-                            companionParam === 'pico' || selectedCompanion === 'pico' 
+                        {(() => {
+                          const src =
+                            companionParam === 'pico' || selectedCompanion === 'pico'
                               ? '/3d-character-backgrounds/studio/Pico/Pico.png'
                               : companionParam === 'mori' || selectedCompanion === 'mori'
                                 ? '/3d-character-backgrounds/studio/Mori/Mori.png'
                                 : companionParam === 'hibi' || selectedCompanion === 'hibi'
-                                  ? '/3d-character-backgrounds/studio/lulu(front).png'
-                                  : '/@hanami.png'
-                          }
-                          alt="AI 助手"
-                          width={24}
-                          height={24}
-                          className="w-6 h-6 object-cover"
-                        />
+                                  ? '/3d-character-backgrounds/studio/Hibi/Hibi.png'
+                                  : '/@hanami.png';
+                          return src ? (
+                            <Image src={src} alt="AI 助手" width={24} height={24} className="w-6 h-6 object-cover" />
+                          ) : null;
+                        })()}
                       </div>
                     </motion.div>
                     
@@ -2899,12 +2943,9 @@ export default function RoomChatPage() {
                     return [];
                   }
                   
-                  // 如果有多個角色，添加團隊模式選項
+                  // 多角色時，不再提供獨立的團隊模式，維持直接選角色
                   if (activeRoles.length > 1) {
-                    return [
-                      { id: 'team', label: '團隊模式', purpose: '協作', icon: SparklesIcon },
-                      ...availableModes
-                    ];
+                    return availableModes;
                   }
                   
                   // 單角色模式，只顯示該角色
@@ -2942,13 +2983,12 @@ export default function RoomChatPage() {
                     <div className="block sm:hidden">
                       <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${(mode as any).color} p-0.5 shadow-sm`}>
                         <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                          <Image
-                            src={(mode as any).imagePath}
-                            alt={mode.label}
-                            width={20}
-                            height={20}
-                            className="w-5 h-5 object-cover"
-                          />
+                          {(() => {
+                            const src = (mode as any).imagePath as string | undefined;
+                            return src ? (
+                              <Image src={src} alt={mode.label} width={20} height={20} className="w-5 h-5 object-cover" />
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -2995,9 +3035,7 @@ export default function RoomChatPage() {
                   placeholder={
                     activeRoles.length === 1 
                       ? `與 ${companions.find(c => c.id === activeRoles[0])?.name} 對話...`
-                      : selectedCompanion === 'team' 
-                        ? '輸入您的需求，AI 團隊會協作回應...'
-                        : selectedCompanion === 'hibi'
+                      : selectedCompanion === 'hibi'
                           ? '向 Hibi 總管尋求統籌和協調建議...'
                         : selectedCompanion === 'mori'
                           ? '向墨墨提問研究或學習相關問題...'
@@ -3762,19 +3800,11 @@ function TaskCard({ task }: TaskCardProps) {
       {/* 分配的角色 */}
       <div className="flex items-center space-x-2 mb-3">
         <span className="text-xs text-[#2B3A3B]">分配給:</span>
-        {task.assignedTo === 'team' ? (
-          <div className="flex space-x-1">
-            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-400 to-red-500" />
-            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />
-            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500" />
-          </div>
-        ) : (
-          <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${
-            task.assignedTo === 'hibi' ? 'from-orange-400 to-red-500' :
-            task.assignedTo === 'mori' ? 'from-amber-400 to-orange-500' : 
-            'from-blue-400 to-cyan-500'
-          }`} />
-        )}
+        <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${
+          task.assignedTo === 'hibi' ? 'from-orange-400 to-red-500' :
+          task.assignedTo === 'mori' ? 'from-amber-400 to-orange-500' : 
+          'from-blue-400 to-cyan-500'
+        }`} />
       </div>
 
       {/* 進度條 */}

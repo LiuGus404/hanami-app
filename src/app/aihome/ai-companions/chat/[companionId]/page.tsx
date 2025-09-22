@@ -182,7 +182,7 @@ export default function ChatPage() {
         setCurrentRoomId(targetRoomId);
 
         // 添加用戶為房間成員
-        await supabase
+        const { error: memberError } = await supabase
           .from('room_members')
           .insert({
             room_id: targetRoomId,
@@ -190,6 +190,15 @@ export default function ChatPage() {
             role: 'owner',
             user_type: 'hanami_user'
           });
+
+        if (memberError) {
+          // 如果是重複鍵錯誤，表示用戶已經存在，這是正常的
+          if (memberError.code === '23505') {
+            console.log('✅ 用戶已是房間成員（重複鍵錯誤）');
+          } else {
+            console.error('❌ 添加房間成員失敗:', memberError);
+          }
+        }
 
         console.log('✅ 創建新的對話房間:', targetRoomId);
       }
@@ -707,13 +716,15 @@ export default function ChatPage() {
               <div className="flex items-center space-x-3">
                 <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
                   <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                    <Image
-                      src={companion.imagePath}
-                      alt={companion.name}
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 object-cover"
-                    />
+                    {companion.imagePath ? (
+                      <Image
+                        src={companion.imagePath}
+                        alt={companion.name}
+                        width={32}
+                        height={32}
+                        className="w-8 h-8 object-cover"
+                      />
+                    ) : null}
                   </div>
                 </div>
                 <div>
@@ -775,13 +786,15 @@ export default function ChatPage() {
                     {message.sender === 'companion' && (
                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${companion.color} p-0.5 flex-shrink-0`}>
                         <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                          <Image
-                            src={companion.imagePath}
-                            alt={companion.name}
-                            width={24}
-                            height={24}
-                            className="w-6 h-6 object-cover"
-                          />
+                          {companion.imagePath ? (
+                            <Image
+                              src={companion.imagePath}
+                              alt={companion.name}
+                              width={24}
+                              height={24}
+                              className="w-6 h-6 object-cover"
+                            />
+                          ) : null}
                         </div>
                       </div>
                     )}
