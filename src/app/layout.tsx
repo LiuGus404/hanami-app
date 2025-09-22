@@ -115,7 +115,11 @@ export default async function RootLayout({
       <head>
         <link href="/manifest.json" rel="manifest" />
         <meta content="#fcf6f2" name="theme-color" />
-        <link href="/hanamiicon.png" rel="apple-touch-icon" />
+        <link href="/apple-touch-icon.png" rel="apple-touch-icon-precomposed" />
+        <link href="/apple-touch-icon-180x180.png" rel="apple-touch-icon" sizes="180x180" />
+        <link href="/apple-touch-icon-167x167.png" rel="apple-touch-icon" sizes="167x167" />
+        <link href="/apple-touch-icon-152x152.png" rel="apple-touch-icon" sizes="152x152" />
+        <link href="/apple-touch-icon-120x120.png" rel="apple-touch-icon" sizes="120x120" />
         <link href="/hanamiicon.png" rel="icon" sizes="32x32" type="image/png" />
         <link href="/hanamiicon.png" rel="icon" sizes="16x16" type="image/png" />
         
