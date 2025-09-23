@@ -116,9 +116,15 @@ export default function DirectSupabaseCheckPage() {
         addLog(`保存會話存儲失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
       }
 
-      // 步驟 5: 顯示成功消息並跳轉
+      // 步驟 5: 只在第一次驗證時顯示成功消息並跳轉
       addLog('步驟 5: 教師權限驗證完成');
-      toast.success('✓ 已驗證花見老師身份');
+      const notificationShownKey = 'hanami_teacher_access_notification_shown';
+      const hasShownNotification = sessionStorage.getItem(notificationShownKey);
+      
+      if (!hasShownNotification) {
+        toast.success('✓ 已驗證花見老師身份');
+        sessionStorage.setItem(notificationShownKey, 'true');
+      }
       
       // 延遲跳轉
       setTimeout(() => {

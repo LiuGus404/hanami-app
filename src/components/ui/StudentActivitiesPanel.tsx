@@ -469,8 +469,8 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         const ordered = await getOrderedNodes(pathData);
         setOrderedNodes(ordered);
         
-        // 分析下一個活動
-        const next = analyzeNextActivity(ordered);
+        // 分析下一個活動（先找無紀錄節點，否則續做進行中）
+        const next = await analyzeNextActivity(ordered);
         setNextActivity(next);
         
         return pathData;
@@ -523,10 +523,10 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
 
       console.log('有效節點數量:', validNodes.length);
 
-      // 查詢學生的活動進度
+      // 查詢學生的活動進度（僅取必要欄位）
       const { data: studentActivities, error: activitiesError } = await supabase
         .from('hanami_student_activities')
-        .select('*')
+        .select('activity_id, completion_status, progress, tree_id')
         .eq('student_id', studentId);
 
       if (activitiesError) {
@@ -536,30 +536,37 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
       console.log('學生活動數量:', studentActivities?.length || 0);
 
       // 標記節點狀態
-      const normalizedNodes = validNodes.map((node: any) => {
-        let isCompleted = false;
-        let isInProgress = false;
-
-        if (node.type === 'activity' && studentActivities) {
-          // 檢查是否有對應的活動記錄
-          const activityRecord = studentActivities.find(activity => 
-            activity.activity_id === node.activity_id || 
-            activity.tree_id === selectedTreeId
-          );
-
-          if (activityRecord) {
-            isCompleted = activityRecord.completion_status === 'completed';
-            isInProgress = activityRecord.completion_status === 'in_progress';
+      const normalizedNodes = await Promise.all(validNodes.map(async (node: any) => {
+        if (node.type !== 'activity') {
+          return { ...node, isCompleted: false, isInProgress: false, isLocked: false };
+        }
+        let realActivityId: string | null = null;
+        if (node.id && typeof node.id === 'string' && node.id.startsWith('tree_activity_')) {
+          const actualActivityId = node.id.replace('tree_activity_', '');
+          try {
+            const { data: treeActivity, error: treeActivityError } = await supabase
+              .from('hanami_tree_activities')
+              .select('activity_id')
+              .eq('id', actualActivityId)
+              .single();
+            if (!treeActivityError && treeActivity?.activity_id) {
+              realActivityId = treeActivity.activity_id as string;
+            }
+          } catch (error) {
+            console.error('查詢樹狀活動錯誤:', error);
           }
         }
-
-        return {
-          ...node,
-          isCompleted,
-          isInProgress,
-          isLocked: false // 暫時不實現鎖定邏輯
-        };
-      });
+        // 從學生活動中找對應記錄
+        const activityRecords = (studentActivities || []).filter((a: any) => realActivityId ? a.activity_id === realActivityId : false);
+        let isCompleted = false;
+        let isInProgress = false;
+        if (activityRecords.length > 0) {
+          const anyCompleted = activityRecords.some((r: any) => r.completion_status === 'completed' || (r.progress || 0) >= 100);
+          isCompleted = anyCompleted;
+          isInProgress = !anyCompleted; // 只要有紀錄且未完成，一律視為進行中
+        }
+        return { ...node, isCompleted, isInProgress, isLocked: false };
+      }));
 
       console.log('標準化節點數量:', normalizedNodes.length);
       return normalizedNodes;
@@ -570,28 +577,45 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
   }, [studentId, selectedTreeId]);
 
   // 分析下一個活動 (從 GrowthTreePathManager 搬過來)
-  const analyzeNextActivity = useCallback((nodes: any[]) => {
-    // 只計算實際的學習活動，排除開始和結束節點
+  const analyzeNextActivity = useCallback(async (nodes: any[]) => {
+    // 先挑選最早「無任何紀錄」的節點
     const activityNodes = nodes.filter(node => node.type === 'activity');
     const completedActivities = activityNodes.filter(node => node.isCompleted);
-    const incompleteActivities = activityNodes.filter(node => !node.isCompleted && !node.isLocked);
-    
-    if (incompleteActivities.length === 0) {
-      return null;
+    const candidateNoRecord = activityNodes.find(node => !node.isCompleted && !node.isInProgress && !node.isLocked);
+    if (candidateNoRecord) {
+      return {
+        ...candidateNoRecord,
+        source: 'path_no_record',
+        progress: {
+          completed: completedActivities.length,
+          total: activityNodes.length,
+          percentage: activityNodes.length > 0 ? Math.round((completedActivities.length / activityNodes.length) * 100) : 0
+        }
+      };
     }
-
-    const nextNode = incompleteActivities[0];
-    const progress = {
-      completed: completedActivities.length,
-      total: activityNodes.length,
-      percentage: activityNodes.length > 0 ? Math.round((completedActivities.length / activityNodes.length) * 100) : 0
-    };
-
-    return {
-      ...nextNode,
-      progress
-    };
-  }, []);
+    // 若所有節點都有紀錄，續做「進行中」活動（使用已載入的 ongoing 集合）
+    const inProgress = (activities.ongoingActivities || []).find((a: any) => a.completionStatus === 'in_progress');
+    if (inProgress) {
+      const total = (activities.ongoingActivities || []).length;
+      const completed = (activities.ongoingActivities || []).filter((a: any) => (a.progress || 0) >= 100 || a.completionStatus === 'completed').length;
+      return {
+        id: inProgress.id,
+        type: 'activity',
+        title: inProgress.activityName || '持續中的活動',
+        description: inProgress.activityDescription || '',
+        duration: inProgress.estimatedDuration || 0,
+        difficulty: inProgress.difficultyLevel,
+        realActivityId: (inProgress as any).activityId,
+        source: 'aggregate_existing',
+        progress: {
+          completed,
+          total,
+          percentage: total > 0 ? Math.round((completed / total) * 100) : 0
+        }
+      };
+    }
+    return null;
+  }, [activities]);
 
   // 獲取節點狀態 (從 GrowthTreePathManager 搬過來)
   const getNodeStatus = useCallback((node: any) => {
@@ -2113,7 +2137,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
                             setLearningPathData(pathData);
                             const ordered = await getOrderedNodes(pathData);
                             setOrderedNodes(ordered);
-                            const next = analyzeNextActivity(ordered);
+                    const next = await analyzeNextActivity(ordered);
                             setNextActivity(next);
                           } else {
                             // 如果沒有找到學習路徑，清空數據

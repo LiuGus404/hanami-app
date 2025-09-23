@@ -88,33 +88,48 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('認證狀態變化:', event, session);
-        if (session?.user) {
-          // 直接設置用戶數據，不調用 loadUserData 函數
-          console.log('直接設置用戶數據，避免函數調用');
-          const userData: SaasUser = {
-            id: session.user.id,
-            email: session.user.email || 'tqfea12@gmail.com',
-            full_name: 'tqfea12',
-            phone: '+85292570768',
-            avatar_url: undefined,
-            subscription_status: 'trial',
-            subscription_plan_id: undefined,
-            subscription_start_date: undefined,
-            subscription_end_date: undefined,
-            usage_count: 0,
-            usage_limit: 10,
-            is_verified: false,
-            verification_method: 'email',
-            last_login: new Date().toISOString(),
-            created_at: session.user.created_at,
-            updated_at: new Date().toISOString()
-          };
-          console.log('設置用戶數據:', userData);
-          setUser(userData);
-        } else {
+        try {
+          if (session?.user) {
+            // 從資料庫獲取真實用戶資料
+            const { data: userData, error: userError } = await supabase
+              .from('saas_users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            if (userError) {
+              console.warn('認證事件載入用戶資料失敗，改用精簡 session 資料:', userError);
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                full_name: session.user.user_metadata?.full_name || '用戶',
+                phone: session.user.user_metadata?.phone || '',
+                avatar_url: undefined,
+                subscription_status: 'trial',
+                subscription_plan_id: undefined,
+                subscription_start_date: undefined,
+                subscription_end_date: undefined,
+                usage_count: 0,
+                usage_limit: 10,
+                is_verified: false,
+                verification_method: 'email',
+                last_login: new Date().toISOString(),
+                created_at: session.user.created_at,
+                updated_at: new Date().toISOString()
+              });
+            } else {
+              console.log('認證事件設置真實用戶資料');
+              setUser(userData as SaasUser);
+            }
+          } else {
+            setUser(null);
+          }
+        } catch (e) {
+          console.error('認證狀態處理錯誤:', e);
           setUser(null);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -125,39 +140,21 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
 
   const loadUserData = async (userId: string) => {
     console.log('loadUserData 開始，userId:', userId);
-    
-    // 直接使用硬編碼的用戶數據，避免任何 Supabase 調用
     try {
-      console.log('使用硬編碼用戶數據創建用戶對象');
-      
-      // 使用您提供的用戶數據創建用戶對象
-      const userData: SaasUser = {
-        id: userId,
-        email: 'tqfea12@gmail.com',
-        full_name: 'tqfea12',
-        phone: '+85292570768',
-        avatar_url: undefined,
-        subscription_status: 'trial',
-        subscription_plan_id: undefined,
-        subscription_start_date: undefined,
-        subscription_end_date: undefined,
-        usage_count: 0,
-        usage_limit: 10,
-        is_verified: false,
-        verification_method: 'email',
-        last_login: new Date().toISOString(),
-        created_at: '2025-09-13T08:25:19.026691+00',
-        updated_at: new Date().toISOString()
-      };
-      
+      const { data: userData, error } = await supabase
+        .from('saas_users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
       console.log('設置用戶數據:', userData);
-      setUser(userData);
+      setUser(userData as SaasUser);
       setLoading(false);
       console.log('loadUserData 完成');
     } catch (error) {
       console.error('載入用戶數據錯誤:', error);
+      setUser(null);
       setLoading(false);
-      console.log('loadUserData 錯誤處理完成');
     }
   };
 
@@ -214,16 +211,32 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
       // 使用 Supabase 客戶端登出
       await supabase.auth.signOut();
       setUser(null);
-      
-      // 清除教師權限會話存儲
+
+      // 清除與認證相關的本地儲存，避免殘留
       try {
         sessionStorage.removeItem('hanami_teacher_access');
-        console.log('登出時已清除教師權限會話存儲');
+        sessionStorage.removeItem('ai_companions_active_roles');
+        sessionStorage.removeItem('ai_selected_companion');
+        sessionStorage.removeItem('aihome_active_roles');
+        sessionStorage.removeItem('aihome_selected_companion');
+        // 清除 Supabase 的本地 token 快取
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i) as string;
+          if (key && key.startsWith('sb-')) {
+            localStorage.removeItem(key);
+          }
+        }
+        console.log('登出時已清除本地快取與 Supabase token');
       } catch (error) {
-        console.error('清除教師權限會話存儲失敗:', error);
+        console.error('清除本地儲存失敗:', error);
       }
-      
+
       toast.success('已成功登出');
+
+      // 強制導向登入頁，確保狀態重置
+      if (typeof window !== 'undefined') {
+        window.location.replace('/aihome/auth/login');
+      }
     } catch (error) {
       console.error('登出錯誤:', error);
       toast.error('登出失敗');

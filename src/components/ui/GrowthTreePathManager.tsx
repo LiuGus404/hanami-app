@@ -71,6 +71,8 @@ export default function GrowthTreePathManager({
   const [normalizedCurrentActivities, setNormalizedCurrentActivities] = useState<any[]>([]);
   const [selectedTreeId, setSelectedTreeId] = useState(currentTreeId);
   const [nextActivity, setNextActivity] = useState<any>(null);
+  const [learningAggregate, setLearningAggregate] = useState<any[]>([]);
+  const [overviewStats, setOverviewStats] = useState<{ total: number; completed: number } | null>(null);
 
   // 同步 currentTreeId 和 selectedTreeId
   useEffect(() => {
@@ -210,7 +212,7 @@ export default function GrowthTreePathManager({
           // 查詢所有學生活動記錄（包括 lesson 和 ongoing 類型）
           const { data: studentActivities, error: activitiesError } = await supabase
             .from('hanami_student_activities')
-            .select('activity_id, completion_status, activity_type')
+            .select('activity_id, completion_status, activity_type, progress')
             .eq('student_id', studentId);
 
           if (activitiesError) {
@@ -245,16 +247,15 @@ export default function GrowthTreePathManager({
                 console.log(`節點 ${node.title} (${actualActivityId} -> ${realActivityId}) 的活動記錄:`, activityRecords);
                 
                 if (activityRecords.length > 0) {
-                  // 檢查活動狀態
+                  // 有紀錄：若任何完成或 progress>=100 → 完成；否則 → 進行中
                   const hasInProgress = activityRecords.some(
                     (record: any) => record.completion_status === 'in_progress'
                   );
-                  const allCompleted = activityRecords.every(
-                    (record: any) => record.completion_status === 'completed'
+                  const anyCompleted = activityRecords.some(
+                    (record: any) => record.completion_status === 'completed' || (record.progress || 0) >= 100
                   );
-                  
-                  const isCompleted = allCompleted;
-                  const isInProgress = hasInProgress && !allCompleted;
+                  const isCompleted = anyCompleted;
+                  const isInProgress = !anyCompleted; // 只要未達完成且有紀錄，一律視為進行中
                   
                   console.log(`節點 ${node.title} (${actualActivityId} -> ${realActivityId}): 完成狀態 = ${isCompleted}, 進行中 = ${isInProgress} (記錄數: ${activityRecords.length})`);
                   
@@ -283,32 +284,65 @@ export default function GrowthTreePathManager({
     }
   }, [studentId]);
 
+  // 載入學生正在學習的活動（彙總：ongoing + 具 tree_id 的 lesson）
+  const loadStudentLearningAggregate = useCallback(async () => {
+    if (!studentId) return [] as any[];
+    try {
+      const { data, error } = await supabase
+        .from('hanami_student_activities')
+        .select(`
+          id,
+          completion_status,
+          progress,
+          assigned_at,
+          activity_id,
+          activity_type,
+          tree_id,
+          hanami_teaching_activities!left (
+            id,
+            activity_name,
+            activity_description,
+            difficulty_level,
+            duration_minutes
+          )
+        `)
+        .eq('student_id', studentId as any)
+        .or('activity_type.eq.ongoing,and(activity_type.eq.lesson,tree_id.not.is.null)')
+        .order('assigned_at', { ascending: false });
+
+      if (error) {
+        console.error('載入正在學習活動失敗:', error);
+        setLearningAggregate([]);
+        setOverviewStats(null);
+        return [] as any[];
+      }
+
+      const all = data || [];
+      const completedCount = all.filter((a: any) => (a.progress || 0) >= 100 || a.completion_status === 'completed').length;
+      setLearningAggregate(all);
+      setOverviewStats({ total: all.length, completed: completedCount });
+      return all as any[];
+    } catch (e) {
+      console.error('載入正在學習活動例外:', e);
+      setLearningAggregate([]);
+      setOverviewStats(null);
+      return [] as any[];
+    }
+  }, [studentId]);
+
   // 分析下一個活動
   const analyzeNextActivity = useCallback(async () => {
-    if (orderedNodes.length === 0) {
-      setNextActivity(null);
-      return;
-    }
-
-    const completedNodes = orderedNodes.filter(node => node.isCompleted);
-    const incompleteNodes = orderedNodes.filter(node => !node.isCompleted && !node.isLocked);
-    const lockedNodes = orderedNodes.filter(node => node.isLocked);
-
-    if (incompleteNodes.length > 0) {
-      // 查詢學生正在進行的活動
-      const { data: ongoingActivities, error: ongoingError } = await supabase
-        .from('hanami_student_activities')
-        .select('activity_id')
-        .eq('student_id', studentId)
-        .eq('completion_status', 'in_progress');
-
-      if (ongoingError) {
-        console.error('查詢正在進行的活動失敗:', ongoingError);
-        // 如果查詢失敗，使用第一個未完成的活動
-        const next = incompleteNodes[0];
+    // 先從學習路徑挑選「最早的無任何紀錄」節點
+    if (orderedNodes.length > 0) {
+      const completedNodes = orderedNodes.filter(node => node.isCompleted);
+      const candidateNoRecord = orderedNodes.find(node => 
+        node.type === 'activity' && !node.isLocked && !node.isCompleted && !node.isInProgress
+      );
+      if (candidateNoRecord) {
         setNextActivity({
-          ...next,
-          actualId: next.id.startsWith('tree_activity_') ? next.id.replace('tree_activity_', '') : next.id,
+          ...candidateNoRecord,
+          actualId: candidateNoRecord.id.startsWith('tree_activity_') ? candidateNoRecord.id.replace('tree_activity_', '') : candidateNoRecord.id,
+          source: 'path_no_record',
           progress: {
             completed: completedNodes.length,
             total: orderedNodes.length,
@@ -317,55 +351,35 @@ export default function GrowthTreePathManager({
         });
         return;
       }
-
-      const ongoingActivityIds = ongoingActivities?.map(activity => activity.activity_id) || [];
-      console.log('正在進行的活動ID:', ongoingActivityIds);
-
-      // 尋找第一個不在進行中的未完成活動
-      let nextAvailableActivity = null;
-      for (const node of incompleteNodes) {
-        if (node.id.startsWith('tree_activity_')) {
-          const actualActivityId = node.id.replace('tree_activity_', '');
-          
-          // 查詢 hanami_tree_activities 表來獲取真正的 activity_id
-          const { data: treeActivity, error: treeActivityError } = await supabase
-            .from('hanami_tree_activities')
-            .select('activity_id')
-            .eq('id', actualActivityId)
-            .single();
-
-          if (!treeActivityError && treeActivity && treeActivity.activity_id) {
-            const realActivityId = treeActivity.activity_id;
-            
-            // 檢查這個活動是否已經在進行中
-            if (!ongoingActivityIds.includes(realActivityId)) {
-              nextAvailableActivity = node as any;
-              nextAvailableActivity.actualId = actualActivityId;
-              nextAvailableActivity.realActivityId = realActivityId;
-              break;
-            }
-          }
-        }
-      }
-
-      if (nextAvailableActivity) {
-        console.log('找到下一個可用活動:', nextAvailableActivity.title);
-        setNextActivity({
-          ...nextAvailableActivity,
-          progress: {
-            completed: completedNodes.length,
-            total: orderedNodes.length,
-            percentage: Math.round((completedNodes.length / orderedNodes.length) * 100)
-          }
-        });
-      } else {
-        console.log('沒有找到可用的活動，所有活動都在進行中或已完成');
-        setNextActivity(null);
-      }
-    } else {
-      setNextActivity(null);
     }
-  }, [orderedNodes, studentId]);
+
+    // 若所有節點都有紀錄，再續做「進行中」的既有活動
+    const aggregate = await loadStudentLearningAggregate();
+    const inProgress = aggregate.find((a: any) => a.completion_status === 'in_progress');
+    if (inProgress) {
+      const completed = aggregate.filter((a: any) => (a.progress || 0) >= 100 || a.completion_status === 'completed').length;
+      const total = aggregate.length || 1;
+      setNextActivity({
+        id: inProgress.id,
+        type: 'activity',
+        title: inProgress.hanami_teaching_activities?.activity_name || '持續中的活動',
+        description: inProgress.hanami_teaching_activities?.activity_description || '',
+        duration: inProgress.hanami_teaching_activities?.duration_minutes || 0,
+        difficulty: inProgress.hanami_teaching_activities?.difficulty_level,
+        realActivityId: inProgress.activity_id,
+        source: 'aggregate_existing',
+        progress: {
+          completed,
+          total,
+          percentage: Math.round((completed / total) * 100)
+        }
+      });
+      return;
+    }
+
+    // 否則無可安排
+    setNextActivity(null);
+  }, [orderedNodes, loadStudentLearningAggregate]);
 
   // 當 orderedNodes 變化時，重新分析下一個活動
   useEffect(() => {
@@ -412,8 +426,14 @@ export default function GrowthTreePathManager({
       console.log('未完成節點:', incompleteNodes.length);
       console.log('已鎖定節點:', lockedNodes.length);
 
-      // 找到下一個應該安排的活動
-      let nextActivity: any = null;
+      // 若 nextActivity 來自彙總既有活動，則不重複插入，提示繼續
+      if (nextActivity && nextActivity.source === 'aggregate_existing' && nextActivity.realActivityId) {
+        toast.success(`已有正在學習的活動：${nextActivity.title}，可直接繼續`);
+        return;
+      }
+
+      // 找到下一個應該安排的活動（回退情境）
+      let candidateNextActivity: any = null;
       
       // 優先選擇第一個未完成且未鎖定的活動節點（排除開始和結束節點）
       console.log('🔍 所有未完成節點:', incompleteNodes.map(n => ({ id: n.id, type: n.type, title: n.title })));
@@ -429,17 +449,17 @@ export default function GrowthTreePathManager({
       console.log('🔍 過濾後的活動節點:', activityNodes.map(n => ({ id: n.id, type: n.type, title: n.title })));
       
       if (activityNodes.length > 0) {
-        nextActivity = activityNodes[0];
-        console.log('🎯 找到下一個活動:', nextActivity.title);
-        console.log('🎯 活動ID:', nextActivity.id);
-        console.log('🎯 活動類型:', nextActivity.type);
+        candidateNextActivity = activityNodes[0];
+        console.log('🎯 找到下一個活動:', candidateNextActivity.title);
+        console.log('🎯 活動ID:', candidateNextActivity.id);
+        console.log('🎯 活動類型:', candidateNextActivity.type);
         
         // 檢查活動ID格式
-        if (nextActivity.id.startsWith('tree_activity_')) {
+        if (candidateNextActivity.id.startsWith('tree_activity_')) {
           // 提取實際的活動ID
-          const actualActivityId = nextActivity.id.replace('tree_activity_', '');
+          const actualActivityId = candidateNextActivity.id.replace('tree_activity_', '');
           console.log('🎯 實際活動ID:', actualActivityId);
-          nextActivity.actualId = actualActivityId;
+          candidateNextActivity.actualId = actualActivityId;
           
           // 查詢 hanami_tree_activities 表來獲取真正的 activity_id
           console.log('🔍 查詢 hanami_tree_activities 表...');
@@ -463,9 +483,9 @@ export default function GrowthTreePathManager({
 
           const realActivityId = treeActivity.activity_id;
           console.log('🎯 真正的活動ID (來自 hanami_teaching_activities):', realActivityId);
-          nextActivity.realActivityId = realActivityId;
+          candidateNextActivity.realActivityId = realActivityId;
         } else {
-          console.log('🎯 活動ID格式不正確:', nextActivity.id);
+          console.log('🎯 活動ID格式不正確:', candidateNextActivity.id);
           toast.error('活動ID格式不正確，無法安排活動');
           return;
         }
@@ -494,12 +514,12 @@ export default function GrowthTreePathManager({
       if (ongoingActivities && ongoingActivities.length > 0) {
         // 檢查建議的活動是否已經在進行中
         const isAlreadyInProgress = ongoingActivities.some(activity => 
-          activity.activity_id === nextActivity.realActivityId
+          activity.activity_id === candidateNextActivity.realActivityId
         );
         
         if (isAlreadyInProgress) {
           console.log('建議的活動已經在進行中，跳過此活動');
-          toast(`活動「${nextActivity.title}」已經在進行中，將尋找下一個活動`);
+          toast(`活動「${candidateNextActivity.title}」已經在進行中，將尋找下一個活動`);
           
           // 尋找下一個可用的活動
           let nextAvailableActivity = null;
@@ -535,7 +555,7 @@ export default function GrowthTreePathManager({
           
           if (nextAvailableActivity) {
             console.log('找到下一個可用活動:', nextAvailableActivity.title);
-            nextActivity = nextAvailableActivity;
+            candidateNextActivity = nextAvailableActivity;
           } else {
             console.log('沒有找到其他可用的活動');
             toast('所有活動都已經在進行中或已完成');
@@ -545,7 +565,7 @@ export default function GrowthTreePathManager({
           // 建議的活動不在進行中，詢問是否要替換現有活動
           const shouldReplace = window.confirm(
             `學生目前有 ${ongoingActivities.length} 個正在進行的活動。\n\n` +
-            `建議安排的下一個活動：${nextActivity.title}\n\n` +
+            `建議安排的下一個活動：${candidateNextActivity.title}\n\n` +
             `是否要將正在進行的活動標記為完成，並開始新的活動？`
           );
           
@@ -577,7 +597,7 @@ export default function GrowthTreePathManager({
       // 安排新的活動
       const insertData = {
         student_id: studentId,
-        activity_id: nextActivity.realActivityId || nextActivity.actualId || nextActivity.id,
+        activity_id: candidateNextActivity.realActivityId || candidateNextActivity.actualId || candidateNextActivity.id,
         tree_id: selectedTreeId,
         activity_type: 'ongoing',
         completion_status: 'in_progress',
@@ -619,7 +639,7 @@ export default function GrowthTreePathManager({
       console.log('✅ 成功安排活動:', newActivity);
       
       // 顯示成功消息
-      toast.success(`成功安排活動：${nextActivity.title}！學生現在可以開始這個新的學習活動。`);
+      toast.success(`成功安排活動：${candidateNextActivity.title}！學生現在可以開始這個新的學習活動。`);
       
       // 重新載入學習路徑數據以反映最新狀態
       const newPathData = await loadLearningPathData(selectedTreeId);
@@ -628,6 +648,8 @@ export default function GrowthTreePathManager({
         setOrderedNodes(ordered);
         setLearningPathData(newPathData);
       }
+      // 重新載入彙總集合與統計
+      await loadStudentLearningAggregate();
 
     } catch (error) {
       console.error('安排活動失敗:', error);
@@ -982,10 +1004,20 @@ export default function GrowthTreePathManager({
                       {!showPathList && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-sm text-[#87704e]">
-                            <span>學習路徑包含 {orderedNodes.filter(n => n.type === 'activity').length} 個活動</span>
-                            <span>•</span>
-                            <span>已完成 {orderedNodes.filter(n => n.isCompleted).length} 個</span>
-                    </div>
+                            {overviewStats ? (
+                              <>
+                                <span>正在學習集合共 {overviewStats.total} 個活動</span>
+                                <span>•</span>
+                                <span>已完成 {overviewStats.completed} 個</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>學習路徑包含 {orderedNodes.filter(n => n.type === 'activity').length} 個活動</span>
+                                <span>•</span>
+                                <span>已完成 {orderedNodes.filter(n => n.isCompleted).length} 個</span>
+                              </>
+                            )}
+                          </div>
                           {orderedNodes.filter(n => n.type === 'activity').length === 0 && (
                             <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded">
                               ⚠️ 此成長樹尚未設置學習目標，請先在成長樹管理中添加目標

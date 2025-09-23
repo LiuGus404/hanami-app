@@ -128,16 +128,22 @@ export function useTeacherAccess() {
         setTeacherAccess(data);
       }, 100);
 
-      // 顯示結果通知（只在第一次檢查時顯示）
-      if (data.hasTeacherAccess) {
-        toast.success(data.message, {
-          duration: 3000,
-        });
-      } else {
-        toast(data.message, {
-          icon: 'ℹ️',
-          duration: 2000,
-        });
+      // 只在第一次檢查時顯示通知
+      const notificationShownKey = 'hanami_teacher_access_notification_shown';
+      const hasShownNotification = sessionStorage.getItem(notificationShownKey);
+      
+      if (!hasShownNotification) {
+        if (data.hasTeacherAccess) {
+          toast.success(data.message, {
+            duration: 3000,
+          });
+        } else {
+          toast(data.message, {
+            icon: 'ℹ️',
+            duration: 2000,
+          });
+        }
+        sessionStorage.setItem(notificationShownKey, 'true');
       }
 
     } catch (err: any) {
