@@ -5,7 +5,8 @@ import { useEffect, useState, useRef } from 'react';
 
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
 import { getUserSession, clearUserSession } from '@/lib/authUtils';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSaasSupabaseClient } from '@/lib/supabase';
+import { AnimatePresence, motion } from 'framer-motion';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -16,6 +17,34 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const sessionChecked = useRef(false);
+
+  // AI 專案對話紀錄 - 狀態
+  const [showLogViewer, setShowLogViewer] = useState(false);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'users' | 'rooms' | 'messages' | 'errors'>('rooms');
+
+  const openLogViewer = async () => {
+    setShowLogViewer(true);
+    setLogsLoading(true);
+    try {
+      const saas = getSaasSupabaseClient();
+      const [uRes, rRes, mRes] = await Promise.all([
+        (saas.from('saas_users') as any).select('id,email,full_name,created_at').order('created_at', { ascending: false }).limit(100),
+        (saas.from('ai_rooms') as any).select('id,title,description,created_by,created_at,last_message_at').order('created_at', { ascending: false }).limit(100),
+        (saas.from('ai_messages') as any).select('id,room_id,sender_type,sender_user_id,content,content_json,status,error_message,created_at').order('created_at', { ascending: false }).limit(200)
+      ]);
+      setUsers((uRes as any)?.data || []);
+      setRooms((rRes as any)?.data || []);
+      setMessages((mRes as any)?.data || []);
+    } catch (e) {
+      console.error('載入 AI 記錄失敗:', e);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
 
   useEffect(() => {
     // 防止重複檢查
@@ -338,6 +367,19 @@ export default function AdminPage() {
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">AI 工具</h3>
               </div>
             </div>
+            {/* AI 專案對話紀錄（aihome 專案） */}
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/ai-project-logs')}>
+              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                  <svg className="w-10 h-10 text-[#FF8C42]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+                    <path d="M7 8h10v2H7zM7 12h7v2H7z" fill="#fff"/>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-[#2B3A3B]">AI 專案對話紀錄</h3>
+                <p className="text-xs text-[#777] mt-1">用戶 · 專案 · 對話 · 錯誤</p>
+              </div>
+            </div>
             {/* 課堂空缺按鈕 */}
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/lesson-availability')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
@@ -383,6 +425,100 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+      {/* AI 專案對話紀錄視窗 */}
+      <AnimatePresence>
+        {showLogViewer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm"
+            onClick={() => setShowLogViewer(false)}
+          >
+            <motion.div
+              initial={{ y: 20, scale: 0.98, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 10, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              className="w-full max-w-5xl bg-white rounded-2xl p-4 sm:p-6 shadow-2xl ring-1 ring-[#EADBC8]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#2B3A3B]">AI 專案對話紀錄</h3>
+                <div className="flex items-center gap-2">
+                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='rooms'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('rooms')}>專案</button>
+                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='users'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('users')}>用戶</button>
+                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='messages'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('messages')}>對話</button>
+                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='errors'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('errors')}>錯誤</button>
+                </div>
+              </div>
+
+              {logsLoading ? (
+                <div className="py-10 text-center text-[#2B3A3B]">載入中...</div>
+              ) : (
+                <div className="max-h-[70vh] overflow-auto">
+                  {activeTab === 'rooms' && (
+                    <div className="space-y-2">
+                      {rooms.map((r:any)=> (
+                        <div key={r.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-[#4B4036]">{r.title || '(未命名專案)'} <span className="text-xs text-gray-500 ml-1">{new Date(r.created_at).toLocaleString()}</span></p>
+                              <p className="text-xs text-gray-600">room_id: {r.id}</p>
+                            </div>
+                            <span className="text-xs text-gray-500">最後: {r.last_message_at ? new Date(r.last_message_at).toLocaleString() : '-'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {activeTab === 'users' && (
+                    <div className="space-y-2">
+                      {users.map((u:any)=> (
+                        <div key={u.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
+                          <p className="font-semibold text-[#4B4036]">{u.full_name || u.email}</p>
+                          <p className="text-xs text-gray-600">{u.email} · {new Date(u.created_at).toLocaleString()}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {activeTab === 'messages' && (
+                    <div className="space-y-2">
+                      {messages.map((m:any)=> (
+                        <div key={m.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
+                          <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {new Date(m.created_at).toLocaleString()}</p>
+                          <p className="font-medium text-[#2B3A3B]">[{m.sender_type}] {m.content?.slice(0,200) || m.content_json?.text || '(空白)'}</p>
+                          {m.status && m.status !== 'sent' && (
+                            <p className="text-xs text-rose-600 mt-1">狀態: {m.status}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {activeTab === 'errors' && (
+                    <div className="space-y-2">
+                      {messages.filter((m:any)=> m.status==='error' || m.error_message).map((m:any)=> (
+                        <div key={m.id} className="p-3 rounded-xl border border-rose-200 bg-rose-50">
+                          <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {new Date(m.created_at).toLocaleString()}</p>
+                          <p className="font-medium text-[#B00020]">{m.error_message || '未知錯誤'}</p>
+                          <p className="text-xs text-[#2B3A3B] mt-1">內容: {m.content?.slice(0,180) || m.content_json?.text || '(空白)'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-end">
+                <button className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-[#2B3A3B]" onClick={()=>setShowLogViewer(false)}>關閉</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 } 

@@ -2492,21 +2492,22 @@ export default function AICompanionsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[radial-gradient(ellipse_at_top,rgba(255,214,165,0.25),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(255,182,193,0.25),transparent_60%)] backdrop-blur-sm sm:backdrop-blur-md"
             onClick={() => setShowRoleSelectionModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+              initial={{ scale: 0.9, opacity: 0, y: 8 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+              className="relative bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-[0_10px_40px_rgba(255,182,193,0.35)] ring-1 ring-[#EADBC8]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-[#4B4036]">選擇 AI 角色</h2>
+                <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A]">選擇 AI 角色</h2>
                 <button
                   onClick={() => setShowRoleSelectionModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-2 hover:bg-[#FFF9F2] rounded-full transition-colors"
                 >
                   <XMarkIcon className="w-5 h-5 text-gray-500" />
                 </button>
@@ -2546,6 +2547,26 @@ function RoleSelectionGrid({
 }) {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
+  // 動畫變體：容器與子項目進場漸進
+  const listVariants = {
+    hidden: { opacity: 0, y: 8 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { staggerChildren: 0.06, delayChildren: 0.05 }
+    }
+  } as const;
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 8, scale: 0.98 },
+    show: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { type: 'spring', stiffness: 320, damping: 24 }
+    }
+  } as const;
+
   const toggleRole = (roleName: string) => {
     setSelectedRoles(prev => 
       prev.includes(roleName) 
@@ -2570,32 +2591,39 @@ function RoleSelectionGrid({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
+      <motion.div className="space-y-3" variants={listVariants} initial="hidden" animate="show">
         {companions.map((companion) => (
           <motion.div
+            variants={itemVariants}
             key={companion.id}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.015, translateY: -1 }}
+            whileTap={{ scale: 0.985 }}
             onClick={() => toggleRole(companion.name)}
-            className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+            className={`p-4 rounded-2xl cursor-pointer transition-all duration-300 ${
               selectedRoles.includes(companion.name)
-                ? 'border-[#FFB6C1] bg-pink-50' 
-                : 'border-gray-200 hover:border-gray-300 bg-white'
+                ? 'ring-2 ring-offset-2 ring-[#FFB6C1] bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] shadow-[0_8px_24px_rgba(255,182,193,0.25)]' 
+                : 'border border-gray-200 hover:border-[#EADBC8] bg-white hover:shadow-md'
             }`}
           >
             <div className="flex items-center space-x-4">
               <div className="relative">
-                <Image
-                  src={companion.imagePath}
-                  alt={companion.name}
-                  width={48}
-                  height={48}
-                  className="rounded-full object-cover"
-                />
+                <motion.div animate={{ y: [0, -2, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}>
+                  <Image
+                    src={companion.imagePath}
+                    alt={companion.name}
+                    width={48}
+                    height={48}
+                    className="rounded-full object-cover shadow-sm"
+                  />
+                </motion.div>
                 {selectedRoles.includes(companion.name) && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#FFB6C1] rounded-full flex items-center justify-center">
+                  <motion.div
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-[#FFB6C1] rounded-full flex items-center justify-center shadow"
+                  >
                     <span className="text-white text-xs">✓</span>
-                  </div>
+                  </motion.div>
                 )}
               </div>
               <div className="flex-1">
@@ -2605,14 +2633,14 @@ function RoleSelectionGrid({
             </div>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       <div className="flex space-x-2 mb-4">
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={selectAll}
-          className="px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-medium transition-colors"
+          className="px-3 py-2 text-sm rounded-lg font-medium transition-colors bg-gradient-to-br from-[#DDEBFF] to-[#EAF3FF] text-[#2B3A3B] hover:shadow"
         >
           全選
         </motion.button>
