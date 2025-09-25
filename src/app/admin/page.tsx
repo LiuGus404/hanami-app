@@ -422,6 +422,21 @@ export default function AdminPage() {
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">財務狀況</h3>
               </div>
             </div>
+            {/* 任務管理按鈕 */}
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/task-management')}>
+              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
+                    {/* 任務清單圖案 */}
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                    {/* 勾選標記 */}
+                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" fill="#10B981"/>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-[#2B3A3B]">任務管理</h3>
+                <p className="text-xs text-[#777] mt-1">工作任務 · 進度追蹤 · 時間管理</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -200,13 +200,13 @@ const TaskPanelContent = ({
           </div>
           
           <div>
-            <label className="block text-xs font-medium text-[#4B4036] mb-1">專案描述</label>
+            <label className="block text-xs font-medium text-[#4B4036] mb-1">專案指引</label>
             <textarea
               value={editProjectDescription}
               onChange={(e) => setEditProjectDescription(e.target.value)}
               rows={2}
               className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#FFB6C1] focus:border-transparent transition-all resize-none"
-              placeholder="輸入專案描述..."
+              placeholder="輸入專案指引..."
             />
           </div>
           
@@ -237,8 +237,8 @@ const TaskPanelContent = ({
             <div className="text-sm text-[#4B4036] font-semibold">{room.title}</div>
           </div>
           <div>
-            <div className="text-xs font-medium text-purple-700 mb-0.5">專案描述</div>
-            <div className="text-xs text-[#2B3A3B] leading-relaxed">{room.description || '暫無描述'}</div>
+            <div className="text-xs font-medium text-purple-700 mb-0.5">專案指引</div>
+            <div className="text-xs text-[#2B3A3B] leading-relaxed">{room.description || '暫無指引'}</div>
           </div>
         </div>
       )}
@@ -366,6 +366,7 @@ export default function RoomChatPage() {
   });
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showBlackboard, setShowBlackboard] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [hasLoadedFromDatabase, setHasLoadedFromDatabase] = useState(false);
   const [editingProject, setEditingProject] = useState(false);
@@ -826,7 +827,7 @@ export default function RoomChatPage() {
         // 添加更新訊息
         const updateMessage: Message = {
           id: `update-${Date.now()}`,
-          content: `📝 專案資訊已更新！\n專案名稱: ${editProjectName.trim()}\n專案描述: ${editProjectDescription.trim()}`,
+          content: `📝 專案資訊已更新！\n專案名稱: ${editProjectName.trim()}\n專案指引: ${editProjectDescription.trim()}`,
           sender: 'system',
           timestamp: new Date(),
           type: 'text'
@@ -1437,7 +1438,7 @@ export default function RoomChatPage() {
       // 專案資訊
       project_info: {
         project_name: room.title || null, // 專案名稱（房間標題）
-        project_description: room.description || null, // 專案描述（房間描述）
+        project_description: room.description || null, // 專案指引（房間描述）
         project_guidance: (room as any).guidance || null // 專案指引
       },
       // JSON 格式的研究設定資料
@@ -2153,6 +2154,93 @@ export default function RoomChatPage() {
     setInputMessage('');
     setIsLoading(true);
     setIsTyping(true);
+
+    // 同步送往統一 Ingress（n8n 由後端轉發）
+    try {
+      const { ingressClient } = await import('@/lib/ingress');
+      const roleHint = selectedCompanion || (activeRoles[0] ?? 'auto');
+      // 準備群組成員與當前角色設定、專案資訊
+      const groupRoles = activeRoles.map((rid) => ({ id: rid }));
+      const selectedRoleMeta: any = { id: roleHint };
+      // 從 localStorage 或資料庫取得目前角色的模型/語氣/指引
+      try {
+        const saved = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('ai_role_settings_'+roleHint) || 'null') : null;
+        if (saved) {
+          selectedRoleMeta.model = saved.model;
+          selectedRoleMeta.tone = saved.tone;
+          selectedRoleMeta.guidance = saved.guidance;
+        }
+      } catch (error) {
+        console.error('載入角色設定錯誤:', error);
+      }
+      if (!selectedRoleMeta.model || !selectedRoleMeta.guidance) {
+        try {
+          const { createSaasClient } = await import('@/lib/supabase-saas');
+          const saas = createSaasClient();
+          const slugMap: Record<string, string> = { hibi: 'hibi-manager', mori: 'mori-researcher', pico: 'pico-artist' };
+          const roleSlug = slugMap[roleHint] || roleHint;
+          // 先取使用者覆寫
+          const { data: override } = await saas
+            .from('ai_roles')
+            .select('default_model, system_prompt, tone')
+            .eq('slug', `${roleSlug}_${user?.id}`)
+            .eq('creator_user_id', user?.id || '')
+            .maybeSingle();
+          const { data: base } = await saas
+            .from('ai_roles')
+            .select('default_model, system_prompt, tone')
+            .eq('slug', roleSlug)
+            .maybeSingle();
+          selectedRoleMeta.model = (override as any)?.default_model || (base as any)?.default_model;
+          selectedRoleMeta.guidance = (override as any)?.system_prompt || (base as any)?.system_prompt;
+          selectedRoleMeta.tone = (override as any)?.tone || (base as any)?.tone || selectedRoleMeta.tone;
+          // 嘗試從 system_prompt 簡單抽出語氣片段
+          if (selectedRoleMeta.guidance && !selectedRoleMeta.tone) {
+            const m = String(selectedRoleMeta.guidance).match(/[語|语]氣[^，。]*[，。]?([^。\n]+)/);
+            if (m) selectedRoleMeta.tone = m[1]?.trim();
+          }
+          if (!selectedRoleMeta.tone) {
+            const toneFallback: Record<string, string> = {
+              hibi: '友善、專業且有條理',
+              mori: '專業冷靜，提供準確有根據的資訊',
+              pico: '活潑有創意並具啟發性'
+            };
+            selectedRoleMeta.tone = toneFallback[roleHint] || '中性專業';
+          }
+        } catch (error) {
+          console.error('載入角色資料庫設定錯誤:', error);
+        }
+      }
+      // 從當前房間設定或本地狀態推斷專案資訊（避免未宣告變數）
+      let persistedProject: any = null;
+      try {
+        persistedProject = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('ai_project_'+roomId) || 'null') : null;
+      } catch (error) {
+        console.error('載入專案設定錯誤:', error);
+      }
+      const projectInfo = {
+        title: (persistedProject?.title || room?.title || undefined) as any,
+        guidance: (persistedProject?.guidance || persistedProject?.description || (room as any)?.project_guidance || room?.description || undefined) as any
+      };
+      await ingressClient.sendMessage(roomId, messageContent, {
+        roleHint: roleHint,
+        messageType: 'user_request',
+        priority: 'normal',
+        extra: {
+          room_id: roomId,
+          source: 'aihome_room_chat',
+          companions: activeRoles,
+          session_id: currentSessionId,
+          user_id: user?.id || null
+        },
+        groupRoles,
+        selectedRole: selectedRoleMeta,
+        project: projectInfo
+      });
+      console.log('✅ 已送往統一 Ingress');
+    } catch (e) {
+      console.error('❌ 送往 Ingress 失敗（不中斷本地流程）:', e);
+    }
     
     // 根據選中的角色決定回應方式
     if (selectedCompanion === 'pico' || (activeRoles.length === 1 && activeRoles[0] === 'pico')) {
@@ -2625,6 +2713,26 @@ export default function RoomChatPage() {
                 <UserIcon className="w-6 h-6" />
               </motion.button>
 
+              {/* 顯示黑板按鈕 */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowBlackboard(!showBlackboard)}
+                className={`p-2 rounded-xl transition-all shadow-md ${
+                  showBlackboard
+                    ? 'bg-[#FFD59A] text-[#4B4036] shadow-lg'
+                    : 'hover:bg-[#FFD59A]/30 text-[#4B4036] hover:shadow-lg'
+                }`}
+                title={showBlackboard ? '隱藏黑板' : '顯示黑板'}
+              >
+                {/* Blackboard Icon (simple) */}
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="12" rx="2" ry="2"></rect>
+                  <line x1="3" y1="20" x2="9" y2="20"></line>
+                  <line x1="15" y1="20" x2="21" y2="20"></line>
+                </svg>
+              </motion.button>
+
               {/* 清除對話按鈕 */}
               <motion.button
                 whileHover={{ scale: 1.1, rotate: [0, -5, 5, 0] }}
@@ -2687,8 +2795,16 @@ export default function RoomChatPage() {
       <div className="flex h-[calc(100vh-64px)]">
         {/* 主要聊天區域 */}
         <div className="flex-1 flex flex-col">
-          {/* 訊息區域 */}
+          {/* 訊息區域 或 黑板區域 */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {showBlackboard && (
+              <div className="w-full h-full min-h-[40vh] bg-white/70 backdrop-blur-sm rounded-2xl border border-[#EADBC8] p-6 flex flex-col items-center justify-center text-center">
+                <h3 className="text-xl font-semibold text-[#4B4036] mb-2">專案黑板</h3>
+                <p className="text-sm text-[#2B3A3B]/80 mb-4">黑板視圖已開啟，之後可替換為正式黑板元件。</p>
+                <p className="text-xs text-[#2B3A3B]/60">點擊上方黑板按鈕可返回訊息視圖。</p>
+              </div>
+            )}
+            {!showBlackboard && (
             <AnimatePresence>
               {messages.map((message) => (
                 <MessageBubble
@@ -2699,6 +2815,7 @@ export default function RoomChatPage() {
                 />
               ))}
             </AnimatePresence>
+            )}
 
             {/* 增強版等待指示器 */}
             <AnimatePresence>
