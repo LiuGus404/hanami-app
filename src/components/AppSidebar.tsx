@@ -68,24 +68,15 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         directTeacherAccess: directTeacherAccess ? '有數據' : '無數據'
       });
       
-      // 如果沒有權限數據，先嘗試直接 Supabase 檢查
-      if ((!teacherAccess || (!hasTeacherAccess && !loading)) && !directTeacherAccess && !directLoading) {
+      // 簡化權限檢查邏輯，避免重複查詢
+      if (!directTeacherAccess && !directLoading) {
         console.log('AppSidebar: 開始直接 Supabase 檢查教師權限，用戶:', user.email);
         directCheckTeacherAccess(user.email).catch((error) => {
-          console.error('AppSidebar: 直接 Supabase 檢查失敗，嘗試 API 檢查:', error);
-          // 如果直接檢查失敗，回退到原來的 API 檢查
-          checkTeacherAccess(user.email, true).then(() => {
-            setTimeout(() => {
-              console.log('AppSidebar: 強制刷新狀態');
-              forceRefreshState();
-            }, 200);
-          }).catch((error) => {
-            console.error('AppSidebar: API 權限檢查也失敗:', error);
-          });
+          console.error('AppSidebar: 直接 Supabase 檢查失敗:', error);
         });
       }
     }
-  }, [user, teacherAccess, hasTeacherAccess, loading, checkTeacherAccess, forceRefreshState, directHasTeacherAccess, directTeacherAccess, directCheckTeacherAccess, directLoading]);
+  }, [user?.email]); // 簡化依賴，只在用戶 email 變化時檢查
 
   const sidebarMenuItems: SidebarItem[] = [
     { 

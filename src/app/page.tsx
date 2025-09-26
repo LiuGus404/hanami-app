@@ -15,6 +15,7 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import LuLuCharacterWithBubble from '@/components/3d/LuLuCharacterWithBubble';
+import MobileBottomNavigation from '@/components/ui/MobileBottomNavigation';
 
 export default function Home() {
   const { user, loading } = useSaasAuth();
@@ -37,7 +38,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
       {/* 導航欄 */}
       <nav className="relative z-10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -57,7 +58,7 @@ export default function Home() {
           
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/admin')}
               className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
             >
               花見音樂
@@ -269,6 +270,9 @@ export default function Home() {
           </div>
         </section>
       </main>
+      
+      {/* 響應式底部導航 - 只在手機/平板/窄螢幕時顯示 */}
+      <MobileBottomNavigation />
     </div>
   );
 }

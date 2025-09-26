@@ -8,6 +8,7 @@ import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import { HomeIcon } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
+import TurnstileWidget from '@/components/ui/TurnstileWidget';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -21,6 +22,8 @@ export default function LoginPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState<string | null>(null);
 
   // 監聽用戶登入狀態，自動重定向
   useEffect(() => {
@@ -50,21 +53,81 @@ export default function LoginPage() {
     }));
   };
 
+  // Turnstile 驗證處理
+  const handleTurnstileVerify = (token: string) => {
+    setTurnstileToken(token);
+    setTurnstileError(null);
+    console.log('Turnstile 驗證成功:', token.substring(0, 20) + '...');
+  };
+
+  const handleTurnstileError = () => {
+    setTurnstileToken(null);
+    setTurnstileError('驗證失敗，請重試');
+    toast.error('驗證失敗，請重新驗證');
+  };
+
+  const handleTurnstileExpire = () => {
+    setTurnstileToken(null);
+    setTurnstileError('驗證已過期，請重新驗證');
+    toast.error('驗證已過期，請重新驗證');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // 基本驗證
     if (!formData.email || !formData.password) {
       toast.error('請填寫所有必要欄位');
+      return;
+    }
+
+    // Turnstile 驗證檢查
+    if (!turnstileToken) {
+      setTurnstileError('請完成安全驗證');
+      toast.error('請完成安全驗證後再登入');
       return;
     }
 
     setIsLoading(true);
     
     try {
+      // 可選：後端驗證 Turnstile token
+      if (process.env.NODE_ENV === 'production') {
+        try {
+          const verifyResponse = await fetch('/api/verify-turnstile', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: turnstileToken }),
+          });
+          
+          const verifyResult = await verifyResponse.json();
+          
+          if (!verifyResult.success) {
+            toast.error('安全驗證失敗，請重試');
+            setTurnstileToken(null);
+            return;
+          }
+          
+          console.log('Turnstile 後端驗證成功');
+        } catch (verifyError) {
+          console.error('Turnstile 後端驗證錯誤:', verifyError);
+          // 在開發環境中，如果後端驗證失敗，仍然允許登入
+          if (process.env.NODE_ENV === 'production') {
+            toast.error('安全驗證失敗，請重試');
+            setTurnstileToken(null);
+            return;
+          }
+        }
+      }
+
       const result = await login(formData.email, formData.password);
       
       if (result.success) {
         toast.success('登入成功！');
+        // 清除 Turnstile token
+        setTurnstileToken(null);
         
         const redirectTo = searchParams.get('redirect') || '/aihome/dashboard';
         console.log('登入成功，準備跳轉到:', redirectTo);
@@ -74,11 +137,15 @@ export default function LoginPage() {
         router.push(redirectTo);
       } else {
         toast.error(result.error || '登入失敗');
+        // 登入失敗時清除 Turnstile token，讓用戶重新驗證
+        setTurnstileToken(null);
       }
       
     } catch (error) {
       console.error('登入錯誤:', error);
       toast.error('登入過程中發生錯誤');
+      // 發生錯誤時清除 Turnstile token
+      setTurnstileToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -179,11 +246,27 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Turnstile 安全驗證 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[#4B4036]">
+                安全驗證
+              </label>
+              <TurnstileWidget
+                onVerify={handleTurnstileVerify}
+                onError={handleTurnstileError}
+                onExpire={handleTurnstileExpire}
+                className="flex justify-center"
+              />
+              {turnstileError && (
+                <p className="text-sm text-red-500 text-center">{turnstileError}</p>
+              )}
+            </div>
+
             <HanamiButton
               type="submit"
               className="w-full"
               size="lg"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileToken}
             >
               {isLoading ? '登入中...' : '登入'}
             </HanamiButton>

@@ -90,7 +90,7 @@ export async function middleware(req: NextRequest) {
   const path = url.pathname
 
   // 登入頁面路徑
-  const loginPages = ['/admin/login', '/teacher/login', '/parent/login']
+  const loginPages = ['/admin/login', '/teacher/login', '/parent/login', '/login']
   const isLoginPage = loginPages.includes(path)
   
   // 音樂教育系統路徑 (保持原有邏輯)
@@ -120,6 +120,25 @@ export async function middleware(req: NextRequest) {
       url.pathname = '/teacher/dashboard'
     } else if (path === '/parent/login' && userSession.role === 'parent') {
       url.pathname = '/parent/dashboard'
+    } else if (path === '/login') {
+      // 通用登入頁面，根據用戶角色重定向
+      switch (userSession.role) {
+        case 'admin':
+          url.pathname = '/admin'
+          break
+        case 'teacher':
+          url.pathname = '/teacher/dashboard'
+          break
+        case 'parent':
+          url.pathname = '/parent/dashboard'
+          break
+        case 'student':
+          url.pathname = '/parent/dashboard' // 學生使用家長儀表板
+          break
+        default:
+          // 未知角色，不重定向
+          return NextResponse.next()
+      }
     } else {
       // 角色不匹配，不重定向
       return NextResponse.next()
@@ -192,6 +211,7 @@ export const config = {
     '/admin/:path*',
     '/teacher/:path*',
     '/parent/:path*',
-    '/music/:path*'
+    '/music/:path*',
+    '/login'
   ],
 }

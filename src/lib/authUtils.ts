@@ -2,7 +2,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from './database.types';
 import { checkPermission, PermissionCheck } from './permissionUtils';
 
-export type UserRole = 'admin' | 'teacher' | 'parent';
+export type UserRole = 'admin' | 'teacher' | 'parent' | 'student';
 
 export interface UserProfile {
   id: string;

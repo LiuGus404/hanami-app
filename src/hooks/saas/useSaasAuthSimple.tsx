@@ -84,12 +84,19 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
 
     // 移除備用超時機制，因為我們已經直接設置了 loading: false
 
-    // 監聽認證狀態變化
+    // 監聽認證狀態變化 - 簡化邏輯，避免重複處理
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('認證狀態變化:', event, session);
+        console.log('認證狀態變化:', event, session?.user?.email);
+        
+        // 只在 SIGNED_IN 和 SIGNED_OUT 事件時處理，避免 INITIAL_SESSION 重複處理
+        if (event === 'INITIAL_SESSION' && user) {
+          console.log('跳過 INITIAL_SESSION 事件，用戶已存在');
+          return;
+        }
+        
         try {
-          if (session?.user) {
+          if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
             // 從資料庫獲取真實用戶資料
             const { data: userData, error: userError } = await supabase
               .from('saas_users')
@@ -121,7 +128,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
               console.log('認證事件設置真實用戶資料');
               setUser(userData as SaasUser);
             }
-          } else {
+          } else if (event === 'SIGNED_OUT') {
             setUser(null);
           }
         } catch (e) {

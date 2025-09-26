@@ -231,11 +231,11 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             whileHover={{ scale: 1.05, y: -2 }}
-            className={`rounded-2xl p-4 border text-center cursor-pointer hover:shadow-lg transition-all duration-300 ${
-              priorityFilter.includes(priority.value)
-                ? 'bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] border-[#FF8C42] shadow-lg ring-2 ring-[#FFB6C1]/30'
-                : 'bg-white border-[#EADBC8] hover:border-[#FFB6C1]'
-            }`}
+              className={`rounded-2xl p-4 border text-center cursor-pointer hover:shadow-lg transition-all duration-300 ${
+                priorityFilter.includes(priority.value)
+                  ? 'bg-gradient-to-br from-[#FFF2CC] to-[#FFD9B3] border-[#FFB366] shadow-lg ring-2 ring-[#FFB366]/20'
+                  : 'bg-white border-[#EADBC8] hover:border-[#FFB366]/40'
+              }`}
             onClick={() => {
               if (priorityFilter.includes(priority.value)) {
                 setPriorityFilter(priorityFilter.filter(p => p !== priority.value));
@@ -288,11 +288,11 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             whileHover={{ scale: 1.05, y: -2 }}
-            className={`rounded-2xl p-4 border text-center cursor-pointer hover:shadow-lg transition-all duration-300 ${
-              statusFilter.includes(status.value) || (statusFilter.includes('all' as any) && (status.value as any) !== 'all')
-                ? 'bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] border-[#FF8C42] shadow-lg ring-2 ring-[#FFB6C1]/30'
-                : 'bg-white border-[#EADBC8] hover:border-[#FFB6C1]'
-            }`}
+              className={`rounded-2xl p-4 border text-center cursor-pointer hover:shadow-lg transition-all duration-300 ${
+                statusFilter.includes(status.value) || (statusFilter.includes('all' as any) && (status.value as any) !== 'all')
+                  ? 'bg-gradient-to-br from-[#FFF2CC] to-[#FFD9B3] border-[#FFB366] shadow-lg ring-2 ring-[#FFB366]/20'
+                  : 'bg-white border-[#EADBC8] hover:border-[#FFB366]/40'
+              }`}
             onClick={() => {
               if (statusFilter.includes(status.value)) {
                 setStatusFilter(statusFilter.filter(s => s !== status.value));
@@ -348,7 +348,7 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
         <div className="relative dropdown-menu">
           <button
             onClick={() => setShowStatusMenu(!showStatusMenu)}
-            className="px-2 py-1.5 sm:px-4 sm:py-2 bg-white border border-[#EADBC8] rounded-md sm:rounded-lg text-xs sm:text-sm font-medium text-[#2B3A3B] hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 hover:border-[#FFB6C1] transition-all duration-200 flex items-center gap-1 sm:gap-2"
+            className="px-2 py-1.5 sm:px-4 sm:py-2 bg-white border border-[#EADBC8] rounded-md sm:rounded-lg text-xs sm:text-sm font-medium text-[#2B3A3B] hover:bg-gradient-to-r hover:from-[#FFF2CC]/30 hover:to-[#FFD9B3]/30 hover:border-[#FFB366]/40 transition-all duration-200 flex items-center gap-1 sm:gap-2"
           >
             <span>狀態: {statusFilter.includes('all') ? '全部' : `${statusFilter.length} 項`}</span>
             <svg className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${showStatusMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 24 24">
@@ -367,7 +367,7 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
                   { value: 'cancelled', label: '已取消' },
                   { value: 'blocked', label: '已阻塞' }
                 ].map((status) => (
-                  <label key={status.value} className="flex items-center gap-2 p-2 hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 rounded cursor-pointer transition-all duration-200">
+                  <label key={status.value} className="flex items-center gap-2 p-2 hover:bg-gradient-to-r hover:from-[#FFF2CC]/30 hover:to-[#FFD9B3]/30 rounded cursor-pointer transition-all duration-200">
                     <input
                       type="checkbox"
                       checked={statusFilter.includes(status.value)}
@@ -397,7 +397,7 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
         <div className="relative dropdown-menu">
           <button
             onClick={() => setShowPriorityMenu(!showPriorityMenu)}
-            className="px-2 py-1.5 sm:px-4 sm:py-2 bg-white border border-[#EADBC8] rounded-md sm:rounded-lg text-xs sm:text-sm font-medium text-[#2B3A3B] hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 hover:border-[#FFB6C1] transition-all duration-200 flex items-center gap-1 sm:gap-2"
+            className="px-2 py-1.5 sm:px-4 sm:py-2 bg-white border border-[#EADBC8] rounded-md sm:rounded-lg text-xs sm:text-sm font-medium text-[#2B3A3B] hover:bg-gradient-to-r hover:from-[#FFF2CC]/30 hover:to-[#FFD9B3]/30 hover:border-[#FFB366]/40 transition-all duration-200 flex items-center gap-1 sm:gap-2"
           >
             <span>優先級: {priorityFilter.length === 0 ? '全部' : `${priorityFilter.length} 項`}</span>
             <svg className={`w-4 h-4 transition-transform ${showPriorityMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 24 24">
@@ -414,7 +414,7 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
                   { value: 'urgent_not_important', label: '緊急不重要' },
                   { value: 'not_urgent_not_important', label: '不緊急不重要' }
                 ].map((priority) => (
-                  <label key={priority.value} className="flex items-center gap-2 p-2 hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 rounded cursor-pointer transition-all duration-200">
+                  <label key={priority.value} className="flex items-center gap-2 p-2 hover:bg-gradient-to-r hover:from-[#FFF2CC]/30 hover:to-[#FFD9B3]/30 rounded cursor-pointer transition-all duration-200">
                     <input
                       type="checkbox"
                       checked={priorityFilter.includes(priority.value)}
@@ -439,7 +439,7 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
         <div className="relative dropdown-menu">
           <button
             onClick={() => setShowCategoryMenu(!showCategoryMenu)}
-            className="px-2 py-1.5 sm:px-4 sm:py-2 bg-white border border-[#EADBC8] rounded-md sm:rounded-lg text-xs sm:text-sm font-medium text-[#2B3A3B] hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 hover:border-[#FFB6C1] transition-all duration-200 flex items-center gap-1 sm:gap-2"
+            className="px-2 py-1.5 sm:px-4 sm:py-2 bg-white border border-[#EADBC8] rounded-md sm:rounded-lg text-xs sm:text-sm font-medium text-[#2B3A3B] hover:bg-gradient-to-r hover:from-[#FFF2CC]/30 hover:to-[#FFD9B3]/30 hover:border-[#FFB366]/40 transition-all duration-200 flex items-center gap-1 sm:gap-2"
           >
             <span>類別: {categoryFilter.length === 0 ? '全部' : `${categoryFilter.length} 項`}</span>
             <svg className={`w-4 h-4 transition-transform ${showCategoryMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 24 24">
@@ -465,7 +465,7 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
                   { value: 'complaint_handling', label: '投訴處理' },
                   { value: 'other', label: '其他' }
                 ].map((category) => (
-                  <label key={category.value} className="flex items-center gap-3 p-2 hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 rounded cursor-pointer transition-all duration-200">
+                  <label key={category.value} className="flex items-center gap-3 p-2 hover:bg-gradient-to-r hover:from-[#FFF2CC]/30 hover:to-[#FFD9B3]/30 rounded cursor-pointer transition-all duration-200">
                     <input
                       type="checkbox"
                       checked={categoryFilter.includes(category.value)}
@@ -493,7 +493,7 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
         <div className="relative dropdown-menu">
           <button
             onClick={() => setShowSortMenu(!showSortMenu)}
-            className="px-2 py-1.5 sm:px-4 sm:py-2 bg-white border border-[#EADBC8] rounded-md sm:rounded-lg text-xs sm:text-sm font-medium text-[#2B3A3B] hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 hover:border-[#FFB6C1] transition-all duration-200 flex items-center gap-1 sm:gap-2"
+            className="px-2 py-1.5 sm:px-4 sm:py-2 bg-white border border-[#EADBC8] rounded-md sm:rounded-lg text-xs sm:text-sm font-medium text-[#2B3A3B] hover:bg-gradient-to-r hover:from-[#FFF2CC]/30 hover:to-[#FFD9B3]/30 hover:border-[#FFB366]/40 transition-all duration-200 flex items-center gap-1 sm:gap-2"
           >
             <span>排序: {
               sortBy === 'created_at' ? '創建時間' :
@@ -518,8 +518,8 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
                   <button
                     key={sort.value}
                     onClick={() => setSortBy(sort.value as any)}
-                    className={`w-full text-left p-2 rounded hover:bg-[#FFB6C1]/10 text-sm transition-colors ${
-                      sortBy === sort.value ? 'bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 text-[#FF8C42] font-medium' : 'text-[#2B3A3B]'
+                    className={`w-full text-left p-2 rounded hover:bg-[#FFF2CC]/30 text-sm transition-colors ${
+                      sortBy === sort.value ? 'bg-gradient-to-r from-[#FFF2CC]/40 to-[#FFD9B3]/40 text-[#FFB366] font-medium' : 'text-[#2B3A3B]'
                     }`}
                   >
                     {sort.label}
@@ -534,8 +534,8 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
                   <button
                     key={order.value}
                     onClick={() => setSortOrder(order.value as any)}
-                    className={`w-full text-left p-2 rounded hover:bg-[#FFB6C1]/10 text-sm transition-colors ${
-                      sortOrder === order.value ? 'bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 text-[#FF8C42] font-medium' : 'text-[#2B3A3B]'
+                    className={`w-full text-left p-2 rounded hover:bg-[#FFF2CC]/30 text-sm transition-colors ${
+                      sortOrder === order.value ? 'bg-gradient-to-r from-[#FFF2CC]/40 to-[#FFD9B3]/40 text-[#FFB366] font-medium' : 'text-[#2B3A3B]'
                     }`}
                   >
                     {order.label}
@@ -547,33 +547,65 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
         </div>
       </div>
 
-       {/* 創建任務按鈕 */}
-       <div className="flex justify-end">
-         <motion.button
-           onClick={onTaskCreate}
-           whileHover={{ scale: 1.05, y: -2 }}
-           whileTap={{ scale: 0.95 }}
-           className="relative overflow-hidden px-4 py-2 sm:px-6 sm:py-3 md:px-8 md:py-4 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-xl sm:rounded-2xl hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-300 font-medium sm:font-semibold shadow-lg hover:shadow-xl flex items-center gap-2 sm:gap-3 group text-sm sm:text-base"
-         >
-           {/* 背景裝飾 */}
-           <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-4 h-4 sm:w-6 sm:h-6 md:w-8 md:h-8 rounded-full bg-white/20 blur-sm group-hover:bg-white/30 transition-all duration-300" />
-           <div className="absolute -bottom-0.5 -left-0.5 sm:-bottom-1 sm:-left-1 w-3 h-3 sm:w-4 sm:h-4 md:w-6 md:h-6 rounded-full bg-white/15 blur-sm group-hover:bg-white/25 transition-all duration-300" />
-           
-           {/* 圖標 */}
-           <div className="relative z-10 w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-white/30 rounded sm:rounded-lg flex items-center justify-center group-hover:bg-white/40 transition-all duration-300">
-             <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 24 24">
-               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-             </svg>
-           </div>
-           
-           {/* 文字 */}
-           <span className="relative z-10 hidden sm:inline">創建新任務</span>
-           <span className="relative z-10 sm:hidden">新增</span>
-           
-           {/* 懸停效果 */}
-           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-         </motion.button>
-       </div>
+      {/* 操作按鈕區域 */}
+      <div className="flex justify-end gap-3">
+        {/* 刷新按鈕 */}
+        <motion.button
+          onClick={fetchTasks}
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          disabled={loading}
+          className="relative overflow-hidden px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-br from-[#F0F9F0] via-[#E8F5E8] to-[#D4F1D4] text-[#2B3A3B] rounded-xl sm:rounded-2xl hover:from-[#E8F5E8] hover:via-[#D4F1D4] hover:to-[#C8E6C9] transition-all duration-300 font-medium sm:font-semibold shadow-md hover:shadow-lg flex items-center gap-2 sm:gap-3 group text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed border border-[#E0F2E0]/50"
+        >
+          {/* 背景裝飾 */}
+          <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-4 h-4 sm:w-6 sm:h-6 rounded-full bg-white/30 blur-sm group-hover:bg-white/40 transition-all duration-300" />
+          <div className="absolute -bottom-0.5 -left-0.5 sm:-bottom-1 sm:-left-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-white/20 blur-sm group-hover:bg-white/30 transition-all duration-300" />
+          
+          {/* 圖標 */}
+          <div className="relative z-10 w-4 h-4 sm:w-5 sm:h-5 bg-white/40 rounded-lg flex items-center justify-center group-hover:bg-white/50 transition-all duration-300 shadow-sm">
+            <svg 
+              className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#4A7C59] ${loading ? 'animate-spin' : ''}`} 
+              fill="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            </svg>
+          </div>
+          
+          {/* 文字 */}
+          <span className="relative z-10 hidden sm:inline font-medium">刷新</span>
+          <span className="relative z-10 sm:hidden font-medium">刷新</span>
+          
+          {/* 懸停效果 */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+        </motion.button>
+
+        {/* 創建任務按鈕 */}
+        <motion.button
+          onClick={onTaskCreate}
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          className="relative overflow-hidden px-4 py-2 sm:px-6 sm:py-3 md:px-8 md:py-4 bg-gradient-to-br from-[#FFF4E6] via-[#FFE8CC] to-[#FFD59A] text-[#2B3A3B] rounded-xl sm:rounded-2xl hover:from-[#FFE8CC] hover:via-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-300 font-medium sm:font-semibold shadow-md hover:shadow-lg flex items-center gap-2 sm:gap-3 group text-sm sm:text-base border border-[#FFD59A]/50"
+        >
+          {/* 背景裝飾 */}
+          <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-4 h-4 sm:w-6 sm:h-6 md:w-8 md:h-8 rounded-full bg-white/30 blur-sm group-hover:bg-white/40 transition-all duration-300" />
+          <div className="absolute -bottom-0.5 -left-0.5 sm:-bottom-1 sm:-left-1 w-3 h-3 sm:w-4 sm:h-4 md:w-6 md:h-6 rounded-full bg-white/20 blur-sm group-hover:bg-white/30 transition-all duration-300" />
+          
+          {/* 圖標 */}
+          <div className="relative z-10 w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-white/40 rounded-lg flex items-center justify-center group-hover:bg-white/50 transition-all duration-300 shadow-sm">
+            <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-[#B8860B]" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+            </svg>
+          </div>
+          
+          {/* 文字 */}
+          <span className="relative z-10 hidden sm:inline font-medium">創建新任務</span>
+          <span className="relative z-10 sm:hidden font-medium">新增</span>
+          
+          {/* 懸停效果 */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+        </motion.button>
+      </div>
 
       {/* 任務列表 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

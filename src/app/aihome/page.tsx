@@ -25,6 +25,31 @@ export default function AIHomePage() {
     setIsLoaded(true);
   }, []);
 
+  // 處理登入按鈕點擊
+  const handleLoginClick = async () => {
+    try {
+      // 使用現有的 SaaS 客戶端檢查會話
+      const { createSaasClient } = await import('@/lib/supabase-saas');
+      const supabase = createSaasClient();
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // 用戶已登入，直接跳轉到儀表板
+        console.log('🎯 用戶已登入，直接跳轉到儀表板');
+        router.push('/aihome/dashboard');
+      } else {
+        // 用戶未登入，跳轉到登入頁面
+        console.log('🔐 用戶未登入，跳轉到登入頁面');
+        router.push('/aihome/auth/login');
+      }
+    } catch (error) {
+      console.error('檢查登入狀態失敗:', error);
+      // 發生錯誤時，跳轉到登入頁面
+      router.push('/aihome/auth/login');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] flex items-center justify-center">
@@ -80,7 +105,7 @@ export default function AIHomePage() {
             ) : (
               <>
                 <button
-                  onClick={() => router.push('/aihome/auth/login')}
+                  onClick={handleLoginClick}
                   className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
                 >
                   登入

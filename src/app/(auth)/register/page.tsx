@@ -16,7 +16,7 @@ const registerSchema = z.object({
     .min(8, '密碼至少需要8個字符')
     .regex(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/, '密碼必須包含至少一個英文字母和一個數字'),
   confirmPassword: z.string(),
-  role: z.enum(['admin', 'teacher', 'parent'] as const),
+  role: z.enum(['admin', 'teacher', 'parent', 'student'] as const),
   fullName: z.string().min(2, '請輸入姓名'),
   phone: z.string().min(1, '請輸入電話號碼'),
   // 根據角色添加額外欄位
