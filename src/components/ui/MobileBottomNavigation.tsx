@@ -23,6 +23,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
   const [isVisible, setIsVisible] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [hasTeacherAccess, setHasTeacherAccess] = useState(false);
+  const [hasLegacyAdminAccess, setHasLegacyAdminAccess] = useState(false);
 
   // 檢查是否應該顯示底部導航（手機/平板/窄螢幕）
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       try {
         let hasAdminRole = false;
         let hasTeacherRole = false;
+        let hasLegacyAdminRole = false;
 
         // 檢查新系統（SaaS）的認證狀態
         const saasSession = localStorage.getItem('saas_user_session');
@@ -74,12 +76,28 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
           }
         }
 
+        // 檢查舊系統（Hanami AI system）的管理員權限
+        try {
+          const { getUserSession } = require('@/lib/authUtils');
+          const userSession = getUserSession();
+          if (userSession && 
+              userSession.role === 'admin' && 
+              userSession.id && 
+              userSession.email) {
+            hasLegacyAdminRole = true;
+          }
+        } catch (error) {
+          console.log('❌ 檢查舊系統管理員權限失敗:', error);
+        }
+
         setUserRole(hasAdminRole ? 'admin' : null);
         setHasTeacherAccess(hasTeacherRole);
+        setHasLegacyAdminAccess(hasLegacyAdminRole);
       } catch (error) {
         console.log('❌ 權限檢查失敗:', error);
         setUserRole(null);
         setHasTeacherAccess(false);
+        setHasLegacyAdminAccess(false);
       }
     };
 
@@ -146,6 +164,20 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       baseItems.splice(3, 0, teacherNavItem);
     }
 
+    // 如果有舊系統管理員權限，添加舊系統管理面板按鈕
+    if (hasLegacyAdminAccess) {
+      const legacyAdminItem = {
+        id: 'mobile-nav-legacy-admin',
+        icon: ShieldCheckIcon,
+        href: '/admin',
+        label: '舊系統管理'
+      };
+      
+      // 計算插入位置：如果有教師權限，插入到教師按鈕之後，否則插入到設定之前
+      const insertIndex = hasTeacherAccess ? 4 : 3;
+      baseItems.splice(insertIndex, 0, legacyAdminItem);
+    }
+
     // 如果是管理員，添加管理面板按鈕（額外安全檢查）
     if (userRole === 'admin') {
       // 再次驗證權限，確保安全
@@ -173,13 +205,16 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       };
 
       if (hasValidAdminSession()) {
-        // 如果有教師權限，插入到教師按鈕之後，否則插入到設定之前
-        const insertIndex = hasTeacherAccess ? 4 : 3;
+        // 計算插入位置：考慮教師權限和舊系統管理員權限
+        let insertIndex = 3; // 默認插入到設定之前
+        if (hasTeacherAccess) insertIndex++;
+        if (hasLegacyAdminAccess) insertIndex++;
+        
         baseItems.splice(insertIndex, 0, {
           id: 'mobile-nav-admin',
           icon: ShieldCheckIcon,
           href: '/admin',
-          label: '管理面板'
+          label: '新系統管理'
         });
       }
     }
@@ -283,6 +318,8 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
               const isCenter = index === 1;
               // 檢查是否為教師專區按鈕
               const isTeacherButton = item.id.includes('teacher');
+              // 檢查是否為舊系統管理員按鈕
+              const isLegacyAdminButton = item.id.includes('legacy-admin');
               
               return (
                 <motion.button
@@ -310,10 +347,14 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
                       isActive 
                         ? isTeacherButton
                           ? 'w-10 h-10 bg-gradient-to-br from-[#FF8C42] to-[#FFB366] text-white shadow-lg border-2 border-[#FF8C42]'
-                          : 'w-10 h-10 bg-[#FFD59A] text-white shadow-lg border-2 border-[#EBC9A4]'
+                          : isLegacyAdminButton
+                            ? 'w-10 h-10 bg-gradient-to-br from-[#8B5CF6] to-[#A855F7] text-white shadow-lg border-2 border-[#8B5CF6]'
+                            : 'w-10 h-10 bg-[#FFD59A] text-white shadow-lg border-2 border-[#EBC9A4]'
                         : isTeacherButton
                           ? 'w-8 h-8 bg-gradient-to-br from-[#FF8C42]/20 to-[#FFB366]/20 text-[#FF8C42] border border-[#FF8C42]/30 hover:from-[#FF8C42]/30 hover:to-[#FFB366]/30 hover:border-[#FF8C42]/50'
-                          : 'w-8 h-8 bg-white/90 text-[#4B4036] border border-[#F0E68C] hover:bg-[#FFD59A]/10 hover:border-[#FFD59A]'
+                          : isLegacyAdminButton
+                            ? 'w-8 h-8 bg-gradient-to-br from-[#8B5CF6]/20 to-[#A855F7]/20 text-[#8B5CF6] border border-[#8B5CF6]/30 hover:from-[#8B5CF6]/30 hover:to-[#A855F7]/30 hover:border-[#8B5CF6]/50'
+                            : 'w-8 h-8 bg-white/90 text-[#4B4036] border border-[#F0E68C] hover:bg-[#FFD59A]/10 hover:border-[#FFD59A]'
                     }`}
                     whileHover={{ 
                       scale: 1.1,
@@ -326,7 +367,9 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
                         ? 'text-white' 
                         : isTeacherButton 
                           ? 'text-[#FF8C42]' 
-                          : 'text-[#4B4036]/70'
+                          : isLegacyAdminButton
+                            ? 'text-[#8B5CF6]'
+                            : 'text-[#4B4036]/70'
                     }`} />
                   </motion.div>
                 </motion.button>
