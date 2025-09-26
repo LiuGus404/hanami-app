@@ -19,7 +19,9 @@ import {
   Sparkles,
   CheckCircle,
   XCircle,
-  HelpCircle
+  HelpCircle,
+  Zap,
+  Wand2
 } from 'lucide-react';
 import { HanamiCard } from './HanamiCard';
 import { HanamiButton } from './HanamiButton';
@@ -158,10 +160,10 @@ export default function StudentPhoneProfile({
       <div className={`${className}`}>
         <HanamiCard className="p-6">
           <div className="text-center">
-            <Phone className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-[#2B3A3B] mb-2">尚未建立AI分析檔案</h3>
+            <Sparkles className="w-12 h-12 text-[#FFD59A] mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-[#2B3A3B] mb-2">尚未建立AI分析</h3>
             <p className="text-[#2B3A3B]/70 mb-4">
-              此學生的電話號碼 {studentPhone} 尚未在系統中建立個人AI檔案分析
+              此學生的電話號碼 {studentPhone} 尚未在系統中建立個人AI分析
             </p>
             <HanamiButton 
               variant="secondary" 
@@ -188,11 +190,11 @@ export default function StudentPhoneProfile({
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className="p-3 bg-[#FFD59A] rounded-xl mr-4">
-                <Phone className="w-6 h-6 text-[#2B3A3B]" />
+              <div className="p-3 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-xl mr-4 shadow-sm">
+                <Wand2 className="w-6 h-6 text-[#2B3A3B]" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-[#2B3A3B]">AI檔案分析</h2>
+                <h2 className="text-2xl font-bold text-[#2B3A3B]">AI分析</h2>
                 <p className="text-[#2B3A3B]/70">AI 智能分析與個人化洞察</p>
               </div>
             </div>
@@ -272,87 +274,87 @@ export default function StudentPhoneProfile({
                     </div>
 
                     {/* 右側：家長需關注程度 - 突出顯示 */}
-                    {phoneProfile.analysis_structured?.risk && (
-                      <div className="lg:col-span-1">
-                        <div className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 shadow-sm">
-                          <div className="flex items-center mb-3">
-                            <div className="p-2 bg-red-100 rounded-lg mr-3">
-                              <AlertCircle className="w-5 h-5 text-red-600" />
-                            </div>
-                            <h3 className="text-lg font-bold text-red-800">家長需關注程度</h3>
+                    <div className="lg:col-span-1">
+                      <div className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 shadow-sm">
+                        <div className="flex items-center mb-3">
+                          <div className="p-2 bg-red-100 rounded-lg mr-3">
+                            <AlertCircle className="w-5 h-5 text-red-600" />
                           </div>
-                          
-                          {/* Risk Level */}
-                          {phoneProfile.analysis_structured.risk.level ? (
-                            <div className="mb-3">
-                              <span className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-bold ${
-                                phoneProfile.analysis_structured.risk.level === 'low' ? 'bg-green-100 text-green-800 border-2 border-green-300' :
-                                phoneProfile.analysis_structured.risk.level === 'medium' ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300' :
-                                phoneProfile.analysis_structured.risk.level === 'high' ? 'bg-red-100 text-red-800 border-2 border-red-300' :
-                                'bg-gray-100 text-gray-800 border-2 border-gray-300'
-                              }`}>
-                                {phoneProfile.analysis_structured.risk.level === 'low' ? (
-                                  <>
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    低關注
-                                  </>
-                                ) : phoneProfile.analysis_structured.risk.level === 'medium' ? (
-                                  <>
-                                    <AlertCircle className="w-4 h-4 mr-2" />
-                                    中關注
-                                  </>
-                                ) : phoneProfile.analysis_structured.risk.level === 'high' ? (
-                                  <>
-                                    <XCircle className="w-4 h-4 mr-2" />
-                                    高關注
-                                  </>
-                                ) : (
-                                  <>
-                                    <HelpCircle className="w-4 h-4 mr-2" />
-                                    未評估
-                                  </>
-                                )}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="mb-3">
-                              <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-bold bg-gray-100 text-gray-800 border-2 border-gray-300">
+                          <h3 className="text-lg font-bold text-red-800">家長需關注程度</h3>
+                        </div>
+                        
+                        {/* Level 顯示 */}
+                        <div className="mb-3">
+                          <span className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-bold ${
+                            phoneProfile.level === 'A' ? 'bg-green-100 text-green-800 border-2 border-green-300' :
+                            phoneProfile.level === 'B' ? 'bg-blue-100 text-blue-800 border-2 border-blue-300' :
+                            phoneProfile.level === 'C' ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300' :
+                            phoneProfile.level === 'D' ? 'bg-red-100 text-red-800 border-2 border-red-300' :
+                            'bg-gray-100 text-gray-800 border-2 border-gray-300'
+                          }`}>
+                            {phoneProfile.level === 'A' ? (
+                              <>
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                A級 - 低關注
+                              </>
+                            ) : phoneProfile.level === 'B' ? (
+                              <>
+                                <AlertCircle className="w-4 h-4 mr-2" />
+                                B級 - 一般關注
+                              </>
+                            ) : phoneProfile.level === 'C' ? (
+                              <>
+                                <AlertTriangle className="w-4 h-4 mr-2" />
+                                C級 - 中等關注
+                              </>
+                            ) : phoneProfile.level === 'D' ? (
+                              <>
+                                <XCircle className="w-4 h-4 mr-2" />
+                                D級 - 高關注
+                              </>
+                            ) : (
+                              <>
                                 <HelpCircle className="w-4 h-4 mr-2" />
                                 未評估
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Risk Rationale */}
-                          {phoneProfile.analysis_structured.risk.rationale && (
-                            <div className="mb-3">
-                              <p className="text-sm text-red-700 bg-white/50 rounded-lg p-2 border border-red-200">
-                                <span className="font-medium">評估理由:</span><br/>
-                                {phoneProfile.analysis_structured.risk.rationale}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Risk Items */}
-                          {phoneProfile.analysis_structured.risk.risks && phoneProfile.analysis_structured.risk.risks.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-red-800 mb-2 flex items-center">
-                                <AlertTriangle className="w-4 h-4 mr-1" />
-                                關注項目:
-                              </p>
-                              <div className="space-y-2 max-h-32 overflow-y-auto">
-                                {phoneProfile.analysis_structured.risk.risks.map((risk: string, index: number) => (
-                                  <div key={index} className="text-xs text-red-700 bg-white/70 border border-red-200 rounded-lg px-2 py-1 flex items-start">
-                                    <div className="w-1 h-1 bg-red-500 rounded-full mt-2 mr-2 flex-shrink-0"></div>
-                                    {risk}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                              </>
+                            )}
+                          </span>
                         </div>
+
+                        {/* 顯示風險分析資訊（如果存在） */}
+                        {phoneProfile.analysis_structured?.risk && (
+                          <>
+                            {/* Risk Rationale */}
+                            {phoneProfile.analysis_structured.risk.rationale && (
+                              <div className="mb-3">
+                                <p className="text-sm text-red-700 bg-white/50 rounded-lg p-2 border border-red-200">
+                                  <span className="font-medium">評估理由:</span><br/>
+                                  {phoneProfile.analysis_structured.risk.rationale}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Risk Items */}
+                            {phoneProfile.analysis_structured.risk.risks && phoneProfile.analysis_structured.risk.risks.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium text-red-800 mb-2 flex items-center">
+                                  <AlertTriangle className="w-4 h-4 mr-1" />
+                                  關注項目:
+                                </p>
+                                <div className="space-y-2 max-h-32 overflow-y-auto">
+                                  {phoneProfile.analysis_structured.risk.risks.map((risk: string, index: number) => (
+                                    <div key={index} className="text-xs text-red-700 bg-white/70 border border-red-200 rounded-lg px-2 py-1 flex items-start">
+                                      <div className="w-1 h-1 bg-red-500 rounded-full mt-2 mr-2 flex-shrink-0"></div>
+                                      {risk}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* 從 analysis_structured 提取的詳細資訊 */}

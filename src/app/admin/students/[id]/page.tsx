@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { useUser } from '@/lib/useUser';
 import { Lesson } from '@/types';
 import { motion } from 'framer-motion';
-import { User, BookOpen, UserCircle, Sparkles, Camera, Phone } from 'lucide-react';
+import { User, BookOpen, UserCircle, Sparkles, Camera, Phone, Wand2 } from 'lucide-react';
 
 export default function StudentDetailPage() {
   const { id } = useParams();
@@ -373,7 +373,7 @@ export default function StudentDetailPage() {
               { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
               { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度' },
               { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' },
-              { key: 'phone', label: '電話檔案', icon: Phone, description: 'AI智能分析與個人化洞察' }
+              { key: 'phone', label: 'AI分析', icon: Wand2, description: 'AI智能分析與個人化洞察' }
             ].map(({ key, label, icon: Icon, description }) => (
               <motion.button
                 key={key}
@@ -473,7 +473,7 @@ export default function StudentDetailPage() {
             </>
           )}
 
-          {/* 電話檔案分頁 */}
+          {/* AI分析分頁 */}
           {activeTab === 'phone' && student && (
             <StudentPhoneProfile 
               studentId={student.id}
