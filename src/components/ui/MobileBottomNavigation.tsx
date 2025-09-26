@@ -63,12 +63,16 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
           const { getUserSession } = require('@/lib/authUtils');
           const userSession = getUserSession();
           
+          // 嚴格檢查：只有 role 為 'admin' 的用戶才能看到管理面板按鍵
+          // 排除 'teacher'、'student'、'parent' 等其他角色
           if (userSession && 
               userSession.role === 'admin' && 
               userSession.id && 
               userSession.email) {
             hasAdminRole = true;
             console.log('✅ Hanami 系統檢測到管理員權限:', userSession.email);
+          } else if (userSession && userSession.role) {
+            console.log('ℹ️ Hanami 系統檢測到非管理員角色:', userSession.role, userSession.email);
           }
         }
 
@@ -131,10 +135,13 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
                 }
               }
 
-              // 檢查 Hanami 系統
+              // 檢查 Hanami 系統 - 嚴格檢查只有 admin 角色
               const { getUserSession } = require('@/lib/authUtils');
               const userSession = getUserSession();
-              return userSession && userSession.role === 'admin';
+              return userSession && 
+                     userSession.role === 'admin' && 
+                     userSession.id && 
+                     userSession.email;
             } catch (error) {
               return false;
             }
