@@ -96,7 +96,7 @@ const getUserAccessibleRoomIds = async (userId: string): Promise<string> => {
 };
 
 export default function AICompanionsPage() {
-  const { user } = useSaasAuth();
+  const { user, loading } = useSaasAuth();
   const router = useRouter();
   const supabase = getSaasSupabaseClient(); // 使用 SaaS 專案的 Supabase 客戶端來訪問 ai_roles 表
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -104,6 +104,13 @@ export default function AICompanionsPage() {
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<AIRoom | null>(null);
   const [selectedCompanion, setSelectedCompanion] = useState<AICompanion | null>(null);
+
+  // 認證保護
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/aihome/auth/login');
+    }
+  }, [user, loading, router]);
 
   // 聊天室資料 - 從資料庫載入
   const [rooms, setRooms] = useState<AIRoom[]>([]);
@@ -1455,6 +1462,23 @@ export default function AICompanionsPage() {
       console.error('❌ 創建聊天室錯誤:', error);
     }
   };
+
+  // 顯示載入狀態
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4B4036] mx-auto mb-4"></div>
+          <p className="text-[#4B4036]">載入中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 如果未登入，顯示空內容（會被重定向）
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC]">

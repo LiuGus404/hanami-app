@@ -24,6 +24,11 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  
+  // 檢查是否為開發環境
+  const isDevelopment = process.env.NODE_ENV === 'development' || 
+                       window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1';
 
   // 監聽用戶登入狀態，自動重定向
   useEffect(() => {
@@ -81,8 +86,8 @@ export default function LoginPage() {
       return;
     }
 
-    // Turnstile 驗證檢查
-    if (!turnstileToken) {
+    // Turnstile 驗證檢查 (開發環境跳過)
+    if (!isDevelopment && !turnstileToken) {
       setTurnstileError('請完成安全驗證');
       toast.error('請完成安全驗證後再登入');
       return;
@@ -246,27 +251,40 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Turnstile 安全驗證 */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-[#4B4036]">
-                安全驗證
-              </label>
-              <TurnstileWidget
-                onVerify={handleTurnstileVerify}
-                onError={handleTurnstileError}
-                onExpire={handleTurnstileExpire}
-                className="flex justify-center"
-              />
-              {turnstileError && (
-                <p className="text-sm text-red-500 text-center">{turnstileError}</p>
-              )}
-            </div>
+            {/* Turnstile 安全驗證 (開發環境隱藏) */}
+            {!isDevelopment && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-[#4B4036]">
+                  安全驗證
+                </label>
+                <TurnstileWidget
+                  onVerify={handleTurnstileVerify}
+                  onError={handleTurnstileError}
+                  onExpire={handleTurnstileExpire}
+                  className="flex justify-center"
+                />
+                {turnstileError && (
+                  <p className="text-sm text-red-500 text-center">{turnstileError}</p>
+                )}
+              </div>
+            )}
+            
+            {/* 開發環境提示 */}
+            {isDevelopment && (
+              <div className="space-y-2">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                  <p className="text-sm text-blue-600">
+                    🚀 開發模式：已跳過 Turnstile 驗證
+                  </p>
+                </div>
+              </div>
+            )}
 
             <HanamiButton
               type="submit"
               className="w-full"
               size="lg"
-              disabled={isLoading || !turnstileToken}
+              disabled={isLoading || (!isDevelopment && !turnstileToken)}
             >
               {isLoading ? '登入中...' : '登入'}
             </HanamiButton>

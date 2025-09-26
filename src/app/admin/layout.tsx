@@ -6,6 +6,7 @@ import { useEffect, useState, useRef } from 'react';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { Spinner } from '@/components/ui/spinner';
+import MobileBottomNavigation from '@/components/ui/MobileBottomNavigation';
 import { getUserSession, clearUserSession } from '@/lib/authUtils';
 import '../globals.css';
 
@@ -127,6 +128,9 @@ export default function AdminLayout({
       </main>
       
       <AdminSidebar isLoggedIn={true} />
+      
+      {/* 響應式底部導航 - 只在手機/平板/窄螢幕時顯示 */}
+      <MobileBottomNavigation />
     </div>
   );
 }
