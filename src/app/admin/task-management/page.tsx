@@ -17,6 +17,7 @@ export default function TaskManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [personalTasks, setPersonalTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [taskFilter, setTaskFilter] = useState<'all' | 'personal' | 'shared'>('all');
 
   useEffect(() => {
@@ -92,8 +93,9 @@ export default function TaskManagementPage() {
   };
 
   // 計算共同任務（沒有分配成員的任務）
-  const getSharedTasks = () => {
-    return tasks.filter(task => 
+  const getSharedTasks = (taskList?: Task[]) => {
+    const sourceTasks = taskList || filteredTasks;
+    return sourceTasks.filter(task => 
       !task.assigned_to || 
       task.assigned_to.length === 0
     );
@@ -313,6 +315,7 @@ export default function TaskManagementPage() {
             taskFilter={taskFilter}
             userSession={userSession}
             personalTasks={personalTasks}
+            onFilteredTasksChange={setFilteredTasks}
           />
         </motion.div>
 

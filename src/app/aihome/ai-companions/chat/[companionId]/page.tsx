@@ -1032,8 +1032,8 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* 輸入區域 */}
-        <div className="border-t border-[#EADBC8] bg-white/80 backdrop-blur-sm px-4 py-4">
+        {/* 輸入區域 - 添加底部間距避免被導航遮蓋 */}
+        <div className="border-t border-[#EADBC8] bg-white/80 backdrop-blur-sm px-4 py-4 pb-24 lg:pb-4">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-end space-x-4">
               {/* 附加功能按鈕 */}

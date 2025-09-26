@@ -24,7 +24,7 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end space-y-3">
+    <div className="fixed bottom-32 lg:bottom-6 right-6 z-[60] flex flex-col items-end space-y-3">
       <button
         className="w-14 h-14 rounded-full bg-[#FFEEDB] shadow-md flex items-center justify-center hover:scale-105 transition-transform"
         onClick={() => setOpen(!open)}

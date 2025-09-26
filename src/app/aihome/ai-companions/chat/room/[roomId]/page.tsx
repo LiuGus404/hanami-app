@@ -3137,11 +3137,11 @@ export default function RoomChatPage() {
             </div>
           </div>
 
-          {/* AI 對話輸入區域 */}
+          {/* AI 對話輸入區域 - 添加底部間距避免被導航遮蓋 */}
           <motion.div 
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="p-6 bg-gradient-to-r from-white/80 to-white/70 backdrop-blur-sm border-t border-[#EADBC8]"
+            className="p-6 pb-24 lg:pb-6 bg-gradient-to-r from-white/80 to-white/70 backdrop-blur-sm border-t border-[#EADBC8]"
           >
             <div className="flex items-end space-x-4">
               <div className="flex-1">

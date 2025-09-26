@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     // 權限篩選
     if (phone) {
-      query = query.or(`phone.eq.${phone},assigned_to.eq.${phone},is_public.eq.true`);
+      query = query.or(`phone.eq.${phone},assigned_to.cs.{${phone}},is_public.eq.true`);
     }
 
     const { data: tasks, error, count } = await query;

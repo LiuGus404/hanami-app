@@ -179,9 +179,9 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
 
   return (
     <AnimatePresence>
-      {/* 為內容添加底部間距，避免被導航遮擋 */}
+      {/* 為內容添加底部間距，避免被導航遮擋 - 優化高度 */}
       <div key="mobile-nav-spacer" className="fixed bottom-0 left-0 right-0 pointer-events-none">
-        <div className="h-16 lg:hidden"></div>
+        <div className="h-20 lg:hidden"></div>
       </div>
       
       <motion.div
@@ -207,55 +207,41 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       >
         {/* 弧形背景容器 - 終極無穿透設計 */}
         <div className="absolute inset-0 overflow-hidden">
-          {/* 超大弧形頂部層 - 確保完全覆蓋 */}
-          <div className="absolute -top-20 left-0 right-0 h-40 bg-[#FFF8E7]" 
+          {/* 弧形頂部層 - 減少高度，保持覆蓋 */}
+          <div className="absolute -top-12 left-0 right-0 h-24 bg-[#FFF8E7]" 
                style={{
-                 borderRadius: '50% 50% 0 0 / 95% 95% 0 0',
-                 boxShadow: '0 -16px 24px rgba(0, 0, 0, 0.1)'
+                 borderRadius: '50% 50% 0 0 / 90% 90% 0 0',
+                 boxShadow: '0 -8px 16px rgba(0, 0, 0, 0.08)'
                }}>
           </div>
           
           {/* 第二層弧形覆蓋 */}
-          <div className="absolute -top-16 left-0 right-0 h-36 bg-[#FFF8E7]" 
+          <div className="absolute -top-8 left-0 right-0 h-16 bg-[#FFF8E7]" 
                style={{
-                 borderRadius: '50% 50% 0 0 / 90% 90% 0 0'
+                 borderRadius: '50% 50% 0 0 / 80% 80% 0 0'
                }}>
           </div>
           
           {/* 第三層弧形覆蓋 */}
-          <div className="absolute -top-12 left-0 right-0 h-28 bg-[#FFF8E7]" 
+          <div className="absolute -top-4 left-0 right-0 h-12 bg-[#FFF8E7]" 
                style={{
-                 borderRadius: '50% 50% 0 0 / 85% 85% 0 0'
+                 borderRadius: '50% 50% 0 0 / 70% 70% 0 0'
                }}>
           </div>
           
-          {/* 第四層過渡層 */}
-          <div className="absolute -top-8 left-0 right-0 h-20 bg-[#FFF8E7]"></div>
-          
-          {/* 第五層過渡層 */}
-          <div className="absolute -top-4 left-0 right-0 h-12 bg-[#FFF8E7]"></div>
-          
-          {/* 第六層過渡層 */}
+          {/* 過渡層 - 簡化設計 */}
           <div className="absolute -top-2 left-0 right-0 h-8 bg-[#FFF8E7]"></div>
           
           {/* 主體背景層 */}
           <div className="absolute inset-0 bg-[#FFF8E7]"></div>
           
-          {/* 邊緣保護層 - 超多層保護 */}
-          <div className="absolute -top-3 left-0 right-0 h-6 bg-[#FFF8E7]"></div>
+          {/* 邊緣保護層 */}
           <div className="absolute -top-1 left-0 right-0 h-4 bg-[#FFF8E7]"></div>
-          <div className="absolute top-0 left-0 right-0 h-3 bg-[#FFF8E7]"></div>
-          <div className="absolute top-1 left-0 right-0 h-2 bg-[#FFF8E7]"></div>
-          
-          {/* 額外安全層 - 確保完全覆蓋 */}
-          <div className="absolute inset-0 bg-[#FFF8E7] opacity-100"></div>
-          
-          {/* 終極保護層 */}
-          <div className="absolute -top-24 left-0 right-0 h-48 bg-[#FFF8E7] opacity-100"></div>
+          <div className="absolute top-0 left-0 right-0 h-2 bg-[#FFF8E7]"></div>
         </div>
         
-        {/* 動態導航按鈕 - 弧形佈局 */}
-        <div className="relative px-4 py-4">
+        {/* 動態導航按鈕 - 弧形佈局 - 減少高度 */}
+        <div className="relative px-4 py-2">
           <div className="flex justify-around items-end">
             {navigationItems.map((item, index) => {
               const isActive = pathname.startsWith(item.href);
@@ -279,15 +265,15 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
                   }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handleNavigation(item.href)}
-                  className={`flex items-center justify-center p-2 transition-all duration-200 ${
-                    isCenter ? 'mb-2' : ''
+                  className={`flex items-center justify-center p-1 transition-all duration-200 ${
+                    isCenter ? 'mb-1' : ''
                   }`}
                 >
                   <motion.div
                     className={`flex items-center justify-center rounded-full transition-all duration-200 ${
                       isActive 
-                        ? 'w-12 h-12 bg-[#FFD59A] text-white shadow-lg border-2 border-[#EBC9A4]' 
-                        : 'w-9 h-9 bg-white/90 text-[#4B4036] border border-[#F0E68C] hover:bg-[#FFD59A]/10 hover:border-[#FFD59A]'
+                        ? 'w-10 h-10 bg-[#FFD59A] text-white shadow-lg border-2 border-[#EBC9A4]' 
+                        : 'w-8 h-8 bg-white/90 text-[#4B4036] border border-[#F0E68C] hover:bg-[#FFD59A]/10 hover:border-[#FFD59A]'
                     }`}
                     whileHover={{ 
                       scale: 1.1,
@@ -295,7 +281,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
                     }}
                     transition={{ duration: 0.2 }}
                   >
-                    <item.icon className={`w-4 h-4 stroke-2 ${
+                    <item.icon className={`w-3.5 h-3.5 stroke-2 ${
                       isActive ? 'text-white' : 'text-[#4B4036]/70'
                     }`} />
                   </motion.div>

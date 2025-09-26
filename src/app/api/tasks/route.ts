@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.getAll('status') as any[];
     const priority = searchParams.get('priority')?.split(',') as any[];
     const category = searchParams.getAll('category') as any[];
+    const created_date = searchParams.getAll('created_date') as string[];
     const assigned_to = searchParams.get('assigned_to');
     const project_id = searchParams.get('project_id');
     const due_date_from = searchParams.get('due_date_from');
@@ -42,8 +43,23 @@ export async function GET(request: NextRequest) {
       query = query.overlaps('category', category);
     }
     
+    if (created_date && created_date.length > 0) {
+      console.log('Date filter:', { 
+        selectedDates: created_date, 
+        totalDates: created_date.length 
+      });
+      
+      // 簡化邏輯：先獲取所有任務，然後在應用層篩選
+      // 這樣可以避免複雜的 SQL 查詢問題
+      const dateStrings = created_date.map(date => date);
+      
+      // 暫時移除日期篩選，在獲取數據後再篩選
+      // 這不是最佳實踐，但可以確保功能正常工作
+    }
+    
     if (assigned_to) {
-      query = query.eq('assigned_to', assigned_to);
+      // assigned_to 現在是陣列類型，使用 contains 查詢
+      query = query.contains('assigned_to', [assigned_to]);
     }
     
     if (project_id) {
@@ -90,26 +106,42 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching tasks:', error);
+      console.error('Query parameters:', { status, priority, category, created_date, assigned_to, project_id, phone });
       return NextResponse.json(
-        { error: 'Failed to fetch tasks' },
+        { error: 'Failed to fetch tasks', details: error.message },
         { status: 500 }
       );
+    }
+
+    // 在應用層進行日期篩選
+    let filteredTasks = tasks || [];
+    if (created_date && created_date.length > 0) {
+      filteredTasks = filteredTasks.filter((task: any) => {
+        if (!task.created_at) return false;
+        const taskDate = new Date(task.created_at).toISOString().split('T')[0];
+        return created_date.includes(taskDate);
+      });
+      console.log('Date filter applied:', { 
+        originalCount: tasks?.length || 0, 
+        filteredCount: filteredTasks.length,
+        selectedDates: created_date 
+      });
     }
 
     // 獲取統計資訊
     // 即時計算統計，避免依賴視圖
     const stats = {
-      total_tasks: count || 0,
-      pending_tasks: tasks?.filter((t: any) => t.status === 'pending').length || 0,
-      in_progress_tasks: tasks?.filter((t: any) => t.status === 'in_progress').length || 0,
-      completed_tasks: tasks?.filter((t: any) => t.status === 'completed').length || 0,
-      cancelled_tasks: tasks?.filter((t: any) => t.status === 'cancelled').length || 0,
-      blocked_tasks: tasks?.filter((t: any) => t.status === 'blocked').length || 0,
-      urgent_important_tasks: tasks?.filter((t: any) => t.priority === 'urgent_important').length || 0,
-      important_not_urgent_tasks: tasks?.filter((t: any) => t.priority === 'important_not_urgent').length || 0,
-      urgent_not_important_tasks: tasks?.filter((t: any) => t.priority === 'urgent_not_important').length || 0,
-      not_urgent_not_important_tasks: tasks?.filter((t: any) => t.priority === 'not_urgent_not_important').length || 0,
-      avg_progress: tasks?.length ? Math.round(tasks.reduce((s: number, t: any) => s + (t.progress_percentage || 0), 0) / tasks.length) : 0,
+      total_tasks: filteredTasks.length,
+      pending_tasks: filteredTasks?.filter((t: any) => t.status === 'pending').length || 0,
+      in_progress_tasks: filteredTasks?.filter((t: any) => t.status === 'in_progress').length || 0,
+      completed_tasks: filteredTasks?.filter((t: any) => t.status === 'completed').length || 0,
+      cancelled_tasks: filteredTasks?.filter((t: any) => t.status === 'cancelled').length || 0,
+      blocked_tasks: filteredTasks?.filter((t: any) => t.status === 'blocked').length || 0,
+      urgent_important_tasks: filteredTasks?.filter((t: any) => t.priority === 'urgent_important').length || 0,
+      important_not_urgent_tasks: filteredTasks?.filter((t: any) => t.priority === 'important_not_urgent').length || 0,
+      urgent_not_important_tasks: filteredTasks?.filter((t: any) => t.priority === 'urgent_not_important').length || 0,
+      not_urgent_not_important_tasks: filteredTasks?.filter((t: any) => t.priority === 'not_urgent_not_important').length || 0,
+      avg_progress: filteredTasks?.length ? Math.round(filteredTasks.reduce((s: number, t: any) => s + (t.progress_percentage || 0), 0) / filteredTasks.length) : 0,
       avg_actual_duration: tasks?.length ? Math.round(tasks.reduce((s: number, t: any) => s + (t.actual_duration || 0), 0) / tasks.length) : 0
     };
 
@@ -121,7 +153,7 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json({
-      tasks: tasks || [],
+      tasks: filteredTasks || [],
       pagination,
       stats: stats || {}
     });
