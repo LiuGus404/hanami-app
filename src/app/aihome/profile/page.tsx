@@ -34,7 +34,6 @@ export default function ProfilePage() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-[#FFD59A] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-[#4B4036] text-lg">載入中...</p>
-          <p className="text-[#4B4036] text-sm mt-2">Loading: {loading ? 'true' : 'false'}</p>
         </div>
       </div>
     );

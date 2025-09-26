@@ -105,15 +105,6 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
         setUserRole(hasAdminRole ? 'admin' : null);
         setHasTeacherAccess(hasTeacherRole);
         setHasLegacyAdminAccess(hasLegacyAdminRole);
-        
-        // 調試日誌
-        console.log('底部導航權限檢查結果:', {
-          hasAdminRole,
-          hasTeacherRole,
-          hasLegacyAdminRole,
-          teacherSession: !!teacherSession,
-          saasSession: !!saasSession
-        });
       } catch (error) {
         console.log('❌ 權限檢查失敗:', error);
         setUserRole(null);
@@ -125,6 +116,39 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
     // 延遲檢查，避免與其他認證檢查衝突
     const timeoutId = setTimeout(checkUserRole, 1000);
     return () => clearTimeout(timeoutId);
+  }, []);
+
+  // 監聽會話存儲變化，實時更新教師權限狀態
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const teacherSession = sessionStorage.getItem('hanami_teacher_access');
+      if (teacherSession) {
+        try {
+          const teacherData = JSON.parse(teacherSession);
+          if (teacherData.hasTeacherAccess && teacherData.employeeData) {
+            setHasTeacherAccess(true);
+          } else {
+            setHasTeacherAccess(false);
+          }
+        } catch (error) {
+          console.log('❌ 解析教師會話失敗:', error);
+          setHasTeacherAccess(false);
+        }
+      } else {
+        setHasTeacherAccess(false);
+      }
+    };
+
+    // 監聽 sessionStorage 變化
+    window.addEventListener('storage', handleStorageChange);
+    
+    // 定期檢查教師權限狀態（因為 sessionStorage 變化不會觸發 storage 事件）
+    const intervalId = setInterval(handleStorageChange, 2000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(intervalId);
+    };
   }, []);
 
   // 導航項目配置 - 動態根據用戶角色顯示

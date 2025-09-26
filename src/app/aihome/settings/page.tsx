@@ -34,7 +34,6 @@ export default function SettingsPage() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-[#FFD59A] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-[#4B4036] text-lg">載入中...</p>
-          <p className="text-[#4B4036] text-sm mt-2">Loading: {loading ? 'true' : 'false'}</p>
         </div>
       </div>
     );
@@ -93,18 +92,6 @@ export default function SettingsPage() {
               <div className="text-center">
                 <h2 className="text-3xl font-bold text-[#4B4036] mb-2">系統設置</h2>
                 <p className="text-[#4B4036]/70">管理您的系統偏好和設定</p>
-              </div>
-
-              {/* 調試信息 */}
-              <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-4">
-                <h3 className="font-bold text-yellow-800 mb-2">調試信息</h3>
-                <div className="text-sm text-yellow-700">
-                  <p><strong>Loading:</strong> {loading ? 'true' : 'false'}</p>
-                  <p><strong>User:</strong> {user ? '存在' : 'null'}</p>
-                  <p><strong>User ID:</strong> {user?.id || 'N/A'}</p>
-                  <p><strong>User Email:</strong> {user?.email || 'N/A'}</p>
-                  <p><strong>User Role:</strong> {user?.user_type || 'N/A'}</p>
-                </div>
               </div>
 
               {/* 通知設置 */}

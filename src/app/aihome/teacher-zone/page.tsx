@@ -151,23 +151,11 @@ export default function TeacherZonePage() {
   // 確保教師權限已檢查
   useEffect(() => {
     if (user?.email && !directTeacherAccess && !directLoading) {
-      console.log('教師專區：檢查教師權限:', user.email);
       directCheckTeacherAccess(user.email).catch((error) => {
         console.error('教師專區：教師權限檢查失敗:', error);
       });
     }
   }, [user?.email, directTeacherAccess, directLoading, directCheckTeacherAccess]);
-
-  // 調試：記錄教師權限狀態變化
-  useEffect(() => {
-    console.log('教師專區：教師權限狀態變化:', {
-      userEmail: user?.email,
-      hasTeacherAccess,
-      directLoading,
-      directTeacherAccess: directTeacherAccess ? '有數據' : '無數據',
-      employeeData: directTeacherAccess?.employeeData || '無員工數據'
-    });
-  }, [user?.email, hasTeacherAccess, directLoading, directTeacherAccess]);
 
   // 側邊欄狀態
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -769,7 +757,6 @@ export default function TeacherZonePage() {
   // 權限檢查
   useEffect(() => {
     if (user?.email && !hasTeacherAccess && !directLoading) {
-      console.log('教師專區：檢查教師權限:', user.email);
       directCheckTeacherAccess(user.email).catch((error) => {
         console.error('教師專區：權限檢查失敗:', error);
       });

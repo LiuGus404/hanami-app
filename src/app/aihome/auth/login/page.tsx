@@ -32,31 +32,22 @@ export default function LoginPage() {
 
   // 監聽用戶登入狀態，自動重定向
   useEffect(() => {
-    console.log('登入頁面 useEffect 觸發:', { loading, user: !!user, userEmail: user?.email });
-    
     // 檢查是否正在登出過程中（通過檢查 localStorage 中是否還有會話數據）
     const hasSessionData = localStorage.getItem('saas_user_session');
-    console.log('檢查會話數據:', { hasSessionData: !!hasSessionData });
     
     if (!loading && user && hasSessionData) {
       const redirectTo = searchParams.get('redirect') || '/aihome/dashboard';
       const currentPath = window.location.pathname;
       
-      console.log('用戶已登入，當前路徑:', currentPath, '重定向到:', redirectTo);
-      
       // 如果當前已經在目標頁面，不要重定向
       if (currentPath === redirectTo) {
-        console.log('已經在目標頁面，跳過重定向');
         return;
       }
       
       // 延遲重定向，確保登出過程完成
-      console.log('執行重定向到:', redirectTo);
       setTimeout(() => {
         router.push(redirectTo);
       }, 200);
-    } else if (!loading && user && !hasSessionData) {
-      console.log('用戶狀態存在但沒有會話數據，可能是登出過程中，不執行重定向');
     }
   }, [user, loading, searchParams, router]);
 
@@ -168,7 +159,6 @@ export default function LoginPage() {
 
   // 顯示載入狀態
   if (loading || isLoading) {
-    console.log('登入頁面載入狀態:', { loading, isLoading, user: !!user });
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] flex items-center justify-center">
         <div className="text-center">

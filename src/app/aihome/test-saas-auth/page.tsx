@@ -16,18 +16,6 @@ export default function TestSaasAuthPage() {
           <h2 className="text-xl font-bold text-[#4B4036] mb-4">狀態信息</h2>
           <div className="space-y-4">
             <div>
-              <strong>Loading:</strong> {loading ? 'true' : 'false'}
-            </div>
-            <div>
-              <strong>User:</strong> {user ? '存在' : 'null'}
-            </div>
-            <div>
-              <strong>User ID:</strong> {user?.id || 'N/A'}
-            </div>
-            <div>
-              <strong>User Email:</strong> {user?.email || 'N/A'}
-            </div>
-            <div>
               <strong>User Name:</strong> {user?.full_name || 'N/A'}
             </div>
           </div>

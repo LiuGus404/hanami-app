@@ -4,8 +4,6 @@ import { useEffect } from 'react';
 
 export default function LogoutPage() {
   useEffect(() => {
-    console.log('登出頁面載入，開始清除所有數據...');
-    
     // 清除所有本地存儲
     localStorage.clear();
     sessionStorage.clear();

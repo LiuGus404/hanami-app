@@ -11,11 +11,12 @@ import StudentBasicInfo from '@/components/ui/StudentBasicInfo';
 import StudentLessonPanel from '@/components/ui/StudentLessonPanel';
 import EnhancedStudentAvatarTab from '@/components/ui/EnhancedStudentAvatarTab';
 import StudentMediaTimeline from '@/components/ui/StudentMediaTimeline';
+import StudentPhoneProfile from '@/components/ui/StudentPhoneProfile';
 import { supabase } from '@/lib/supabase';
 import { useUser } from '@/lib/useUser';
 import { Lesson } from '@/types';
 import { motion } from 'framer-motion';
-import { User, BookOpen, UserCircle, Sparkles, Camera } from 'lucide-react';
+import { User, BookOpen, UserCircle, Sparkles, Camera, Phone } from 'lucide-react';
 
 export default function StudentDetailPage() {
   const { id } = useParams();
@@ -35,7 +36,7 @@ export default function StudentDetailPage() {
   const [isInactiveStudent, setIsInactiveStudent] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [courseUpdateTrigger, setCourseUpdateTrigger] = useState(0); // 課程更新觸發器
-  const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media'>('basic'); // 分頁狀態
+  const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media' | 'phone'>('basic'); // 分頁狀態
   
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -371,7 +372,8 @@ export default function StudentDetailPage() {
               { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
               { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
               { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度' },
-              { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' }
+              { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' },
+              { key: 'phone', label: '電話檔案', icon: Phone, description: 'AI智能分析與個人化洞察' }
             ].map(({ key, label, icon: Icon, description }) => (
               <motion.button
                 key={key}
@@ -469,6 +471,16 @@ export default function StudentDetailPage() {
                 className="mt-4"
               />
             </>
+          )}
+
+          {/* 電話檔案分頁 */}
+          {activeTab === 'phone' && student && (
+            <StudentPhoneProfile 
+              studentId={student.id}
+              studentPhone={student.contact_number}
+              studentName={student.full_name}
+              className="mt-4"
+            />
           )}
         </motion.div>
         <LessonEditorModal

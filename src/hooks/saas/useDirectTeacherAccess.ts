@@ -41,6 +41,11 @@ export function useDirectTeacherAccess() {
         .single();
 
       console.log('Supabase 查詢結果:', { employeeData, employeeError });
+      console.log('教師狀態檢查:', { 
+        teacher_status: employeeData?.teacher_status, 
+        validStatuses: ['active', 'full time', 'part time', 'contract'],
+        isValid: employeeData ? ['active', 'full time', 'part time', 'contract'].includes(employeeData.teacher_status) : false
+      });
 
       if (employeeError) {
         if (employeeError.code === 'PGRST116') {
@@ -74,8 +79,9 @@ export function useDirectTeacherAccess() {
         return noAccessData;
       }
 
-      // 檢查教師狀態
-      if (employeeData.teacher_status !== 'active') {
+      // 檢查教師狀態 - 支持多種狀態
+      const validStatuses = ['active', 'full time', 'part time', 'contract'];
+      if (!validStatuses.includes(employeeData.teacher_status)) {
         const inactiveData: TeacherAccessData = {
           success: false,
           email: email,
