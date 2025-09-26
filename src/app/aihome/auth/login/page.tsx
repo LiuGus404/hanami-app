@@ -32,6 +32,7 @@ export default function LoginPage() {
 
   // 監聽用戶登入狀態，自動重定向
   useEffect(() => {
+    console.log('登入頁面 useEffect 觸發:', { loading, user: !!user, userEmail: user?.email });
     if (!loading && user) {
       const redirectTo = searchParams.get('redirect') || '/aihome/dashboard';
       const currentPath = window.location.pathname;
@@ -158,6 +159,7 @@ export default function LoginPage() {
 
   // 顯示載入狀態
   if (loading || isLoading) {
+    console.log('登入頁面載入狀態:', { loading, isLoading, user: !!user });
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] flex items-center justify-center">
         <div className="text-center">

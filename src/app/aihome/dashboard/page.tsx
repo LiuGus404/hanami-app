@@ -53,11 +53,17 @@ export default function DashboardPage() {
 
   // 登出處理
   const handleLogout = async () => {
+    console.log('handleLogout 函數被調用');
+    console.log('當前用戶狀態:', { user: !!user, loading });
+    
     try {
       await logout();
-      router.push('/aihome/auth/login');
+      window.location.href = '/aihome/auth/login';
+      
     } catch (error) {
-      console.error('登出失敗:', error);
+      console.error('登出過程中發生錯誤:', error);
+      // 即使發生錯誤也要強制跳轉
+      window.location.href = '/aihome/auth/login';
     }
   };
 
@@ -189,11 +195,17 @@ export default function DashboardPage() {
                 </span>
               </div>
               <motion.button
-                onClick={handleLogout}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('登出按鈕被點擊，事件:', e);
+                  handleLogout();
+                }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
                 title="登出"
+                type="button"
               >
                 <ArrowRightOnRectangleIcon className="w-4 h-4" />
                 <span>登出</span>

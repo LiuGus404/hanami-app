@@ -211,6 +211,7 @@ export default function TeacherZonePage() {
   const [loading, setLoading] = useState(true);
   const [loadingText, setLoadingText] = useState('載入課堂資料中...');
   const [hasAutoSwitched, setHasAutoSwitched] = useState(false); // 防止重複自動切換
+  const [workStatusChecked, setWorkStatusChecked] = useState(false); // 防止重複檢查工作狀態
   
   // 快取機制
   const [dataCache, setDataCache] = useState<Map<string, any>>(new Map());
@@ -308,11 +309,55 @@ export default function TeacherZonePage() {
     };
   };
 
+  // 檢查老師當日工作狀態
+  const checkTeacherWorkStatus = async () => {
+    if (!directTeacherAccess?.employeeData?.id) {
+      return false;
+    }
+
+    // 如果已經檢查過，直接返回結果
+    if (workStatusChecked) {
+      return true; // 假設已檢查過且要上班
+    }
+
+    try {
+      setLoadingText('檢查教師工作狀態...');
+      
+      // 檢查教師今天是否有排班
+      const todayHK = getTodayInHongKong();
+      const todayStr = todayHK.toISOString().split('T')[0];
+      const todayWeekday = todayHK.getDay(); // 0=星期日, 1=星期一, ..., 6=星期六
+      
+      // 這裡可以添加檢查教師排班的邏輯
+      // 例如：檢查 hanami_schedule 表或其他排班相關表
+      // 暫時返回 true，表示教師今天要上班
+      
+      // 標記已檢查過
+      setWorkStatusChecked(true);
+      return true;
+    } catch (error) {
+      console.error('檢查教師工作狀態失敗:', error);
+      return false;
+    }
+  };
+
   // 載入課堂資料
   const loadClassData = async () => {
     try {
       setLoading(true);
       setLoadingText('載入課堂資料中...');
+      
+      // 先檢查教師工作狀態
+      const isWorkingToday = await checkTeacherWorkStatus();
+      if (!isWorkingToday) {
+        setLoading(false);
+        setLessons([]);
+        setTrialLessons([]);
+        setTreeActivities([]);
+        return;
+      }
+      
+      setLoadingText('載入課程資料中...');
       
       // 計算所有選中日期的日期範圍
       let startDate: Date, endDate: Date;
@@ -451,13 +496,25 @@ export default function TeacherZonePage() {
     }
   };
 
+  // 監聽教師權限狀態變化，重置工作狀態檢查
   useEffect(() => {
-    console.log('🔄 useEffect 觸發，載入課堂資料');
-    console.log('📅 當前選中日期:', selectedDate.toISOString().split('T')[0]);
-    console.log('📅 當前選中日期數組:', selectedDates.map(d => d.toISOString().split('T')[0]));
-    console.log('🌏 確認今天日期:', getTodayInHongKong().toISOString().split('T')[0]);
-    console.log('👨‍🏫 教師權限狀態:', directTeacherAccess?.employeeData?.id || '無教師ID');
-    loadClassData();
+    if (directTeacherAccess?.employeeData?.id) {
+      setWorkStatusChecked(false);
+    }
+  }, [directTeacherAccess?.employeeData?.id]);
+
+  useEffect(() => {
+    // 只有在教師權限確認後才載入資料
+    if (!directTeacherAccess?.employeeData?.id) {
+      return;
+    }
+    
+    // 使用防抖動，避免短時間內重複調用
+    const timeoutId = setTimeout(() => {
+      loadClassData();
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
   }, [selectedDate, selectedDates, directTeacherAccess?.employeeData?.id]);
 
   // 新增：自動切換到有課程的日期（僅在課程載入完成後執行一次）
@@ -508,8 +565,9 @@ export default function TeacherZonePage() {
 
   // 切換到今天
   const goToToday = () => {
-    const today = new Date();
+    const today = getTodayInHongKong();
     setSelectedDate(today);
+    setSelectedDates([today]);
   };
 
   // 一鍵清除多選星期幾
@@ -1589,7 +1647,36 @@ export default function TeacherZonePage() {
             <div className="container mx-auto px-4 py-6 max-w-7xl">
               {/* 頁面標題 */}
               <div className="flex items-center justify-between mb-6">
-                <h1 className="text-3xl font-bold text-[#4B4036]">花見老師專區 - 課堂活動管理</h1>
+                <div className="flex items-center gap-4">
+                  <h1 className="text-3xl font-bold text-[#4B4036]">課堂活動管理</h1>
+                  
+                  {/* 工作提示系統按鈕 */}
+                  <motion.button
+                    onClick={() => router.push('/aihome/task-management')}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="relative overflow-hidden px-4 py-2 bg-gradient-to-br from-[#FFF4E6] via-[#FFE8CC] to-[#FFD59A] text-[#2B3A3B] rounded-xl hover:from-[#FFE8CC] hover:via-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-300 font-medium shadow-md hover:shadow-lg flex items-center gap-2 group border border-[#FFD59A]/50"
+                  >
+                    {/* 背景裝飾 */}
+                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white/30 blur-sm group-hover:bg-white/40 transition-all duration-300" />
+                    <div className="absolute -bottom-0.5 -left-0.5 w-3 h-3 rounded-full bg-white/20 blur-sm group-hover:bg-white/30 transition-all duration-300" />
+                    
+                    {/* 圖標 */}
+                    <div className="relative z-10 w-4 h-4 bg-white/40 rounded-lg flex items-center justify-center group-hover:bg-white/50 transition-all duration-300 shadow-sm">
+                      <svg className="w-3 h-3 text-[#B8860B]" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" fill="#10B981"/>
+                      </svg>
+                    </div>
+                    
+                    {/* 文字 */}
+                    <span className="relative z-10 text-sm font-medium">工作提示系統</span>
+                    
+                    {/* 懸停效果 */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                  </motion.button>
+                </div>
+                
               </div>
 
               {/* 日期導航和選擇器 */}
@@ -1598,7 +1685,8 @@ export default function TeacherZonePage() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={goToPreviousDay}
-                className="flex items-center space-x-2 px-4 py-2 bg-[#FFFDF8] rounded-lg border border-[#EADBC8] hover:bg-[#FFD59A]/20 transition-colors"
+                disabled={true}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-lg border border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
               >
                 <ChevronLeftIcon className="w-5 h-5" />
                 <span>前一天</span>
@@ -1618,7 +1706,8 @@ export default function TeacherZonePage() {
               
               <button
                 onClick={goToNextDay}
-                className="flex items-center space-x-2 px-4 py-2 bg-hanami-surface rounded-lg border border-hanami-border hover:bg-hanami-primary/10 transition-colors"
+                disabled={true}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-lg border border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
               >
                 <span>後一天</span>
                 <ChevronRightIcon className="w-5 h-5" />
@@ -1632,9 +1721,14 @@ export default function TeacherZonePage() {
                 <input
                   type="date"
                   value={formatDateForInput(selectedDate)}
+                  min={formatDateForInput(todayHK)}
+                  max={formatDateForInput(todayHK)}
                   onChange={(e) => {
                     const newDate = new Date(e.target.value);
-                    setSelectedDate(newDate);
+                    // 只允許選擇今天
+                    if (newDate.toDateString() === todayHK.toDateString()) {
+                      setSelectedDate(newDate);
+                    }
                   }}
                   className="px-3 py-2 border border-hanami-border rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
                 />
@@ -1643,12 +1737,13 @@ export default function TeacherZonePage() {
               {/* 今天按鈕 */}
               <button
                 onClick={goToToday}
-                className="px-4 py-2 bg-gradient-to-r from-hanami-primary to-hanami-accent text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 hover:scale-105"
+                className="px-4 py-2 bg-gradient-to-r from-hanami-primary to-hanami-accent text-white rounded-lg font-medium shadow-lg cursor-pointer"
               >
                 今天
               </button>
               
-              {/* 一鍵清除按鈕 - 只在多選時顯示 */}
+              {/* 一鍵清除按鈕 - 隱藏，因為只允許選擇今天 */}
+              {/* 
               {selectedDates.length > 1 && (
                 <button
                   onClick={clearWeekSelection}
@@ -1657,6 +1752,7 @@ export default function TeacherZonePage() {
                   清除選擇 ({selectedDates.length})
                 </button>
               )}
+              */}
             </div>
           </div>
 
@@ -1688,10 +1784,11 @@ export default function TeacherZonePage() {
                 <button
                   key={day}
                   onClick={() => {
+                    // 只允許選擇今天
+                    if (!isToday) return;
+                    
                     const dayDateStr = dayDate.toDateString();
                     const isAlreadySelected = selectedDates.some(date => date.toDateString() === dayDateStr);
-                    
-   
                     
                     if (isAlreadySelected) {
                       // 如果已經選中，則移除
@@ -1704,12 +1801,13 @@ export default function TeacherZonePage() {
                     // 更新主要選中的日期
                     setSelectedDate(dayDate);
                   }}
+                  disabled={!isToday}
                   className={`w-12 h-12 rounded-lg font-medium transition-all duration-200 flex items-center justify-center ${
                     isToday 
-                      ? 'bg-white border-2 border-hanami-primary text-hanami-primary shadow-lg'
-                      : isSelected
-                      ? 'bg-hanami-primary/20 text-hanami-primary border-2 border-hanami-primary'
-                      : 'bg-hanami-surface text-hanami-text hover:bg-hanami-primary/10 hover:text-hanami-primary'
+                      ? isSelected
+                        ? 'bg-hanami-primary/20 text-hanami-primary border-2 border-hanami-primary cursor-pointer'
+                        : 'bg-white border-2 border-hanami-primary text-hanami-primary shadow-lg cursor-pointer hover:bg-hanami-primary/10'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
                   }`}
                 >
                   {day}

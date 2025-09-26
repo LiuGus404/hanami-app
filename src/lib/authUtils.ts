@@ -447,8 +447,24 @@ export function getUserSession(): UserProfile | null {
 
 export function clearUserSession() {
   if (typeof window !== 'undefined') {
+    console.log('開始清除用戶會話');
+    
+    // 清除 localStorage
     localStorage.removeItem('hanami_user_session');
+    console.log('已清除 localStorage 中的會話數據');
+    
+    // 清除所有相關的 cookie
     document.cookie = 'hanami_user_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'hanami_user_session=; path=/admin; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    console.log('已清除 cookie 中的會話數據');
+    
+    // 清除其他可能的會話相關數據
+    localStorage.removeItem('hanami_admin_session');
+    localStorage.removeItem('hanami_teacher_session');
+    localStorage.removeItem('hanami_parent_session');
+    console.log('已清除其他會話相關數據');
+    
+    console.log('用戶會話清除完成');
   }
 }
 

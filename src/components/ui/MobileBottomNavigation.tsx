@@ -8,7 +8,9 @@ import {
   ChatBubbleLeftRightIcon,
   UserGroupIcon,
   Cog6ToothIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  AcademicCapIcon,
+  ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
 
 interface MobileBottomNavigationProps {
@@ -20,6 +22,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
   const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [hasTeacherAccess, setHasTeacherAccess] = useState(false);
 
   // 檢查是否應該顯示底部導航（手機/平板/窄螢幕）
   useEffect(() => {
@@ -34,11 +37,12 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // 檢查用戶角色 - 嚴格檢查新系統（SaaS）和舊系統（Hanami）的認證狀態
+  // 檢查用戶角色和教師權限
   useEffect(() => {
     const checkUserRole = () => {
       try {
         let hasAdminRole = false;
+        let hasTeacherRole = false;
 
         // 檢查新系統（SaaS）的認證狀態
         const saasSession = localStorage.getItem('saas_user_session');
@@ -51,39 +55,31 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
                 saasData.user.id && 
                 saasData.user.email) {
               hasAdminRole = true;
-              console.log('✅ SaaS 系統檢測到管理員權限:', saasData.user.email);
             }
           } catch (error) {
             console.log('❌ 解析 SaaS 會話失敗:', error);
           }
         }
 
-        // 如果 SaaS 系統沒有 admin 權限，檢查舊系統（Hanami）
-        if (!hasAdminRole) {
-          const { getUserSession } = require('@/lib/authUtils');
-          const userSession = getUserSession();
-          
-          // 嚴格檢查：只有 role 為 'admin' 的用戶才能看到管理面板按鍵
-          // 排除 'teacher'、'student'、'parent' 等其他角色
-          if (userSession && 
-              userSession.role === 'admin' && 
-              userSession.id && 
-              userSession.email) {
-            hasAdminRole = true;
-            console.log('✅ Hanami 系統檢測到管理員權限:', userSession.email);
-          } else if (userSession && userSession.role) {
-            console.log('ℹ️ Hanami 系統檢測到非管理員角色:', userSession.role, userSession.email);
+        // 檢查教師權限
+        const teacherSession = sessionStorage.getItem('hanami_teacher_access');
+        if (teacherSession) {
+          try {
+            const teacherData = JSON.parse(teacherSession);
+            if (teacherData.hasTeacherAccess && teacherData.employeeData) {
+              hasTeacherRole = true;
+            }
+          } catch (error) {
+            console.log('❌ 解析教師會話失敗:', error);
           }
         }
 
         setUserRole(hasAdminRole ? 'admin' : null);
-        
-        if (!hasAdminRole) {
-          console.log('ℹ️ 未檢測到管理員權限');
-        }
+        setHasTeacherAccess(hasTeacherRole);
       } catch (error) {
         console.log('❌ 權限檢查失敗:', error);
         setUserRole(null);
+        setHasTeacherAccess(false);
       }
     };
 
@@ -121,41 +117,72 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       }
     ];
 
-        // 如果是管理員，添加管理面板按鈕（額外安全檢查）
-        if (userRole === 'admin') {
-          // 再次驗證權限，確保安全
-          const hasValidAdminSession = () => {
-            try {
-              // 檢查 SaaS 系統
-              const saasSession = localStorage.getItem('saas_user_session');
-              if (saasSession) {
-                const saasData = JSON.parse(saasSession);
-                if (saasData.user && saasData.user.role === 'admin') {
-                  return true;
-                }
-              }
+    // 如果有教師權限，添加教師專區按鈕
+    if (hasTeacherAccess) {
+      // 根據當前頁面決定導航目標
+      const isInTeacherZone = pathname.startsWith('/aihome/teacher-zone');
+      const isInTaskManagement = pathname.startsWith('/aihome/task-management');
+      
+      let teacherNavItem;
+      if (isInTeacherZone) {
+        // 如果在課堂活動管理，導航到工作提示系統
+        teacherNavItem = {
+          id: 'mobile-nav-teacher-task',
+          icon: ClipboardDocumentListIcon,
+          href: '/aihome/task-management',
+          label: '工作提示'
+        };
+      } else {
+        // 在其他頁面，導航到課堂活動管理
+        teacherNavItem = {
+          id: 'mobile-nav-teacher-zone',
+          icon: AcademicCapIcon,
+          href: '/aihome/teacher-zone',
+          label: '課堂活動'
+        };
+      }
+      
+      // 插入到設定按鈕之前
+      baseItems.splice(3, 0, teacherNavItem);
+    }
 
-              // 檢查 Hanami 系統 - 嚴格檢查只有 admin 角色
-              const { getUserSession } = require('@/lib/authUtils');
-              const userSession = getUserSession();
-              return userSession && 
-                     userSession.role === 'admin' && 
-                     userSession.id && 
-                     userSession.email;
-            } catch (error) {
-              return false;
+    // 如果是管理員，添加管理面板按鈕（額外安全檢查）
+    if (userRole === 'admin') {
+      // 再次驗證權限，確保安全
+      const hasValidAdminSession = () => {
+        try {
+          // 檢查 SaaS 系統
+          const saasSession = localStorage.getItem('saas_user_session');
+          if (saasSession) {
+            const saasData = JSON.parse(saasSession);
+            if (saasData.user && saasData.user.role === 'admin') {
+              return true;
             }
-          };
-
-          if (hasValidAdminSession()) {
-            baseItems.splice(3, 0, {
-              id: 'mobile-nav-admin',
-              icon: ShieldCheckIcon,
-              href: '/admin',
-              label: '管理面板'
-            });
           }
+
+          // 檢查 Hanami 系統 - 嚴格檢查只有 admin 角色
+          const { getUserSession } = require('@/lib/authUtils');
+          const userSession = getUserSession();
+          return userSession && 
+                 userSession.role === 'admin' && 
+                 userSession.id && 
+                 userSession.email;
+        } catch (error) {
+          return false;
         }
+      };
+
+      if (hasValidAdminSession()) {
+        // 如果有教師權限，插入到教師按鈕之後，否則插入到設定之前
+        const insertIndex = hasTeacherAccess ? 4 : 3;
+        baseItems.splice(insertIndex, 0, {
+          id: 'mobile-nav-admin',
+          icon: ShieldCheckIcon,
+          href: '/admin',
+          label: '管理面板'
+        });
+      }
+    }
 
     return baseItems;
   };
@@ -254,6 +281,8 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
               const isActive = pathname.startsWith(item.href);
               // 中間的按鈕（AI夥伴）稍微高一些
               const isCenter = index === 1;
+              // 檢查是否為教師專區按鈕
+              const isTeacherButton = item.id.includes('teacher');
               
               return (
                 <motion.button
@@ -279,8 +308,12 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
                   <motion.div
                     className={`flex items-center justify-center rounded-full transition-all duration-200 ${
                       isActive 
-                        ? 'w-10 h-10 bg-[#FFD59A] text-white shadow-lg border-2 border-[#EBC9A4]' 
-                        : 'w-8 h-8 bg-white/90 text-[#4B4036] border border-[#F0E68C] hover:bg-[#FFD59A]/10 hover:border-[#FFD59A]'
+                        ? isTeacherButton
+                          ? 'w-10 h-10 bg-gradient-to-br from-[#FF8C42] to-[#FFB366] text-white shadow-lg border-2 border-[#FF8C42]'
+                          : 'w-10 h-10 bg-[#FFD59A] text-white shadow-lg border-2 border-[#EBC9A4]'
+                        : isTeacherButton
+                          ? 'w-8 h-8 bg-gradient-to-br from-[#FF8C42]/20 to-[#FFB366]/20 text-[#FF8C42] border border-[#FF8C42]/30 hover:from-[#FF8C42]/30 hover:to-[#FFB366]/30 hover:border-[#FF8C42]/50'
+                          : 'w-8 h-8 bg-white/90 text-[#4B4036] border border-[#F0E68C] hover:bg-[#FFD59A]/10 hover:border-[#FFD59A]'
                     }`}
                     whileHover={{ 
                       scale: 1.1,
@@ -289,7 +322,11 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
                     transition={{ duration: 0.2 }}
                   >
                     <item.icon className={`w-3.5 h-3.5 stroke-2 ${
-                      isActive ? 'text-white' : 'text-[#4B4036]/70'
+                      isActive 
+                        ? 'text-white' 
+                        : isTeacherButton 
+                          ? 'text-[#FF8C42]' 
+                          : 'text-[#4B4036]/70'
                     }`} />
                   </motion.div>
                 </motion.button>

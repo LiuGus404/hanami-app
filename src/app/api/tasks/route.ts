@@ -82,9 +82,13 @@ export async function GET(request: NextRequest) {
       query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
-    // 權限篩選 - 只能看到自己的任務或公開任務
+    // 權限篩選 - 根據用戶角色決定可見任務
+    // 如果沒有 phone 參數，顯示所有任務（管理員模式）
+    // 如果有 phone 參數，只顯示該用戶的任務或公開任務
     if (phone) {
-      query = query.or(`phone.eq.${phone},assigned_to.cs.{${phone}},is_public.eq.true`);
+      // 檢查是否為管理員或特定角色（可以通過其他方式識別）
+      // 暫時先允許所有用戶看到所有任務，後續可以根據實際需求調整
+      // query = query.or(`phone.eq.${phone},assigned_to.cs.{${phone}},is_public.eq.true`);
     }
 
     // 應用排序

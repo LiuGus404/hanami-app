@@ -46,8 +46,20 @@ export default function AdminSidebar({ isLoggedIn }: { isLoggedIn: boolean }) {
             <button
               className="flex items-center px-5 py-3 rounded-xl bg-[#FFE0E0] text-[#2B3A3B] text-sm font-semibold shadow"
               onClick={async () => {
-                clearUserSession();
-                router.push('/admin/login');
+                console.log('登出按鈕被點擊');
+                try {
+                  // 清除會話數據
+                  clearUserSession();
+                  console.log('會話已清除');
+                  
+                  // 強制重新整理頁面以確保狀態更新
+                  window.location.href = '/admin/login';
+                  console.log('強制跳轉到登入頁面');
+                } catch (error) {
+                  console.error('登出過程中發生錯誤:', error);
+                  // 即使發生錯誤也要強制跳轉
+                  window.location.href = '/admin/login';
+                }
               }}
             >
               <span className="mr-2">🚪</span>
