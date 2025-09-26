@@ -369,8 +369,6 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
       // 使用 Supabase 客戶端登出
       await supabase.auth.signOut();
       console.log('Supabase 登出完成');
-      setUser(null);
-      setLoading(false);
 
       // 清除與認證相關的本地儲存，避免殘留
       try {
@@ -409,12 +407,20 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
         console.error('清除本地儲存失敗:', error);
       }
 
+      // 先清除狀態，再跳轉
+      setUser(null);
+      setLoading(false);
+      
+      // 等待狀態更新完成
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       toast.success('已成功登出');
 
       // 強制導向登入頁，確保狀態重置
       if (typeof window !== 'undefined') {
         console.log('準備強制跳轉到登入頁面');
-        window.location.replace('/aihome/auth/login');
+        // 使用 href 而不是 replace，確保完全重新載入頁面
+        window.location.href = '/aihome/auth/login';
         console.log('跳轉指令已執行');
       } else {
         console.log('window 對象不存在，無法跳轉');

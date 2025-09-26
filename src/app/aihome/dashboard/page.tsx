@@ -34,7 +34,7 @@ import AppSidebar from '@/components/AppSidebar';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, loading, logout } = useSaasAuth();
+  const { user, loading } = useSaasAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -51,20 +51,13 @@ export default function DashboardPage() {
     setIsLoaded(true);
   }, []);
 
-  // 登出處理
-  const handleLogout = async () => {
-    console.log('handleLogout 函數被調用');
+  // 登出處理 - 使用直接登出邏輯
+  const handleLogout = () => {
+    console.log('登出按鈕被點擊，使用直接登出邏輯...');
     console.log('當前用戶狀態:', { user: !!user, loading });
     
-    try {
-      await logout();
-      window.location.href = '/aihome/auth/login';
-      
-    } catch (error) {
-      console.error('登出過程中發生錯誤:', error);
-      // 即使發生錯誤也要強制跳轉
-      window.location.href = '/aihome/auth/login';
-    }
+    // 直接跳轉到登出頁面，確保完全清除所有狀態
+    window.location.href = '/aihome/logout';
   };
 
   // 認證保護
@@ -210,6 +203,7 @@ export default function DashboardPage() {
                 <ArrowRightOnRectangleIcon className="w-4 h-4" />
                 <span>登出</span>
               </motion.button>
+              
             </div>
           </div>
         </div>

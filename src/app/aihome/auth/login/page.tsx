@@ -33,7 +33,12 @@ export default function LoginPage() {
   // 監聽用戶登入狀態，自動重定向
   useEffect(() => {
     console.log('登入頁面 useEffect 觸發:', { loading, user: !!user, userEmail: user?.email });
-    if (!loading && user) {
+    
+    // 檢查是否正在登出過程中（通過檢查 localStorage 中是否還有會話數據）
+    const hasSessionData = localStorage.getItem('saas_user_session');
+    console.log('檢查會話數據:', { hasSessionData: !!hasSessionData });
+    
+    if (!loading && user && hasSessionData) {
       const redirectTo = searchParams.get('redirect') || '/aihome/dashboard';
       const currentPath = window.location.pathname;
       
@@ -45,9 +50,13 @@ export default function LoginPage() {
         return;
       }
       
-      // 立即重定向，不使用延遲
+      // 延遲重定向，確保登出過程完成
       console.log('執行重定向到:', redirectTo);
-      router.push(redirectTo);
+      setTimeout(() => {
+        router.push(redirectTo);
+      }, 200);
+    } else if (!loading && user && !hasSessionData) {
+      console.log('用戶狀態存在但沒有會話數據，可能是登出過程中，不執行重定向');
     }
   }, [user, loading, searchParams, router]);
 

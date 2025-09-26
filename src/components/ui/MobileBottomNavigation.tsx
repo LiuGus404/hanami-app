@@ -76,6 +76,18 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
           }
         }
 
+        // 額外檢查：如果用戶在 SaaS 系統中有教師角色
+        if (saasSession) {
+          try {
+            const saasData = JSON.parse(saasSession);
+            if (saasData.user && saasData.user.role === 'teacher') {
+              hasTeacherRole = true;
+            }
+          } catch (error) {
+            console.log('❌ 解析 SaaS 教師角色失敗:', error);
+          }
+        }
+
         // 檢查舊系統（Hanami AI system）的管理員權限
         try {
           const { getUserSession } = require('@/lib/authUtils');
@@ -93,6 +105,15 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
         setUserRole(hasAdminRole ? 'admin' : null);
         setHasTeacherAccess(hasTeacherRole);
         setHasLegacyAdminAccess(hasLegacyAdminRole);
+        
+        // 調試日誌
+        console.log('底部導航權限檢查結果:', {
+          hasAdminRole,
+          hasTeacherRole,
+          hasLegacyAdminRole,
+          teacherSession: !!teacherSession,
+          saasSession: !!saasSession
+        });
       } catch (error) {
         console.log('❌ 權限檢查失敗:', error);
         setUserRole(null);
@@ -143,7 +164,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       
       let teacherNavItem;
       if (isInTeacherZone) {
-        // 如果在課堂活動管理，導航到工作提示系統
+        // 如果在老師專區，導航到工作提示系統
         teacherNavItem = {
           id: 'mobile-nav-teacher-task',
           icon: ClipboardDocumentListIcon,
@@ -151,12 +172,12 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
           label: '工作提示'
         };
       } else {
-        // 在其他頁面，導航到課堂活動管理
+        // 在其他頁面，導航到老師專區
         teacherNavItem = {
           id: 'mobile-nav-teacher-zone',
           icon: AcademicCapIcon,
           href: '/aihome/teacher-zone',
-          label: '課堂活動'
+          label: '老師專區'
         };
       }
       
