@@ -81,14 +81,14 @@ export async function POST(request: NextRequest) {
       
       if (incomingRecord) {
         const incomingTime = new Date(incomingRecord.timestamp);
-        if (!lastContactTime || incomingTime > lastContactTime) {
+        if (!lastContactTime || incomingTime > (lastContactTime as Date)) {
           lastContactTime = incomingTime;
         }
       }
 
       if (outgoingRecord) {
         const outgoingTime = new Date(outgoingRecord.sent_at);
-        if (!lastContactTime || outgoingTime > lastContactTime) {
+        if (!lastContactTime || outgoingTime > (lastContactTime as Date)) {
           lastContactTime = outgoingTime;
         }
       }

@@ -303,8 +303,8 @@ const HanamiCalendar = () => {
           console.log('All processed lessons (前3筆):', allLessons.slice(0, 3).map(l => ({
             id: l.id,
             full_name: l.full_name,
-            contact_number: l.Hanami_Students?.contact_number,
-            hasContactNumber: !!l.Hanami_Students?.contact_number
+            contact_number: (l as any).Hanami_Students?.contact_number,
+            hasContactNumber: !!(l as any).Hanami_Students?.contact_number
           })));
           setLessons(allLessons);
           lessonsFetchedRef.current = true;
