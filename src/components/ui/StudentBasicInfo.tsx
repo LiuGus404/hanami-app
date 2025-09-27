@@ -6,7 +6,7 @@ import StudentIDCard from './StudentIDCard';
 import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessons } from '@/lib/utils';
 import { Student, Teacher } from '@/types';
-import { QrCode } from 'lucide-react';
+import { QrCode, MessageCircle, Calendar } from 'lucide-react';
 
 const weekdays = [
   { label: '星期日', value: 0 },
@@ -113,10 +113,38 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   const [teacherOptions, setTeacherOptions] = useState<{ label: string, value: string }[]>([]);
   const [calculatedRemainingLessons, setCalculatedRemainingLessons] = useState<number | null>(null);
   const [showStudentIDCard, setShowStudentIDCard] = useState(false);
+  const [contactDays, setContactDays] = useState<number | null>(null);
+  const [lastContactTime, setLastContactTime] = useState<string | null>(null);
+  const [loadingContactDays, setLoadingContactDays] = useState(true);
   
   // 添加防抖機制
   const courseOptionsFetchedRef = useRef(false);
   const teacherOptionsFetchedRef = useRef(false);
+
+  // 獲取聯繫天數
+  useEffect(() => {
+    const fetchContactDays = async () => {
+      if (!student?.contact_number) {
+        setLoadingContactDays(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/contact-days/${encodeURIComponent(student.contact_number)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setContactDays(data.daysSinceContact);
+          setLastContactTime(data.lastContactTime);
+        }
+      } catch (error) {
+        console.error('獲取聯繫天數失敗:', error);
+      } finally {
+        setLoadingContactDays(false);
+      }
+    };
+
+    fetchContactDays();
+  }, [student?.contact_number]);
 
   useEffect(() => {
     // 如果已經載入過老師選項，直接使用快取
@@ -471,6 +499,29 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold">基本資料</h2>
         <div className="flex items-center gap-2">
+          {/* 聯繫天數顯示 */}
+          {!loadingContactDays && contactDays !== null && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm">
+              <MessageCircle className="w-3 h-3" />
+              <span>
+                {contactDays === 0 ? '今天有聯繫' : 
+                 contactDays === 1 ? '1天未聯繫' : 
+                 `${contactDays}天未聯繫`}
+              </span>
+            </div>
+          )}
+          {!loadingContactDays && contactDays === null && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+              <MessageCircle className="w-3 h-3" />
+              <span>無聯繫記錄</span>
+            </div>
+          )}
+          {loadingContactDays && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
+              <span>載入中</span>
+            </div>
+          )}
           {/* QR碼按鈕 */}
           <button
             className="text-sm text-[#A68A64] hover:underline flex items-center gap-1 px-3 py-1 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"

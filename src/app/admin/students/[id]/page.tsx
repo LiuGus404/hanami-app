@@ -37,6 +37,7 @@ export default function StudentDetailPage() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [courseUpdateTrigger, setCourseUpdateTrigger] = useState(0); // 課程更新觸發器
   const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media' | 'phone'>('basic'); // 分頁狀態
+  const [showTooltip, setShowTooltip] = useState<string | null>(null); // 工具提示狀態
   
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -375,23 +376,44 @@ export default function StudentDetailPage() {
               { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' },
               { key: 'phone', label: 'AI分析', icon: Wand2, description: 'AI智能分析與個人化洞察' }
             ].map(({ key, label, icon: Icon, description }) => (
-              <motion.button
-                key={key}
-                onClick={() => setActiveTab(key as any)}
-                className={`
-                  flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
-                  ${activeTab === key
-                    ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
-                    : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
-                  }
-                `}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                title={description}
-              >
-                <Icon className="w-4 h-4 mr-2" />
-                {label}
-              </motion.button>
+              <div key={key} className="relative">
+                <motion.button
+                  onClick={() => setActiveTab(key as any)}
+                  onMouseEnter={() => setShowTooltip(key)}
+                  onMouseLeave={() => setShowTooltip(null)}
+                  className={`
+                    flex items-center rounded-lg text-sm font-medium transition-colors whitespace-nowrap
+                    ${activeTab === key
+                      ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
+                      : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
+                    }
+                    px-2 py-3 sm:px-4
+                  `}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Icon className="w-4 h-4 sm:mr-2" />
+                  {/* 小螢幕隱藏文字，大螢幕顯示 */}
+                  <span className="hidden sm:inline">{label}</span>
+                </motion.button>
+                
+                {/* 工具提示 - 只在小螢幕顯示 */}
+                {showTooltip === key && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-[#2B3A3B] text-white text-xs rounded-lg shadow-lg z-50 sm:hidden"
+                  >
+                    <div className="text-center">
+                      <div className="font-medium">{label}</div>
+                      <div className="text-[#EADBC8] text-xs mt-1">{description}</div>
+                    </div>
+                    {/* 箭頭 */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-[#2B3A3B]"></div>
+                  </motion.div>
+                )}
+              </div>
             ))}
           </div>
         </div>

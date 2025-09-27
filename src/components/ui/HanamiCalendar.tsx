@@ -5,6 +5,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { getSupabaseClient } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
 import { TrialLesson } from '@/types';
+import { useContactDays } from '@/hooks/useContactDays';
+import { MessageCircle } from 'lucide-react';
 
 // 固定香港時區的 Date 產生器
 const getHongKongDate = (date = new Date()) => {
@@ -74,6 +76,7 @@ interface Lesson {
   Hanami_Students?: {
     full_name: string;
     student_age: number;
+    contact_number: string | null;
   } | null;
 }
 
@@ -145,14 +148,22 @@ const HanamiCalendar = () => {
   const fetchLessons = async (startDate: Date, endDate: Date) => {
     const { data, error } = await supabase
       .from('hanami_student_lesson')
-      .select('*')
+      .select(`
+        *,
+        Hanami_Students!inner (
+          contact_number
+        )
+      `)
       .gte('lesson_date', startDate.toISOString())
       .lte('lesson_date', endDate.toISOString());
     if (error) {
       console.error('Fetch error:', error);
       return;
     }
-    if (data) setLessons(data);
+    if (data) {
+      console.log('fetchLessons 結果:', data.slice(0, 3)); // 只顯示前3條記錄
+      setLessons(data);
+    }
   };
 
   useEffect(() => {
@@ -703,6 +714,49 @@ const HanamiCalendar = () => {
     return date <= today;
   };
 
+  // 聯繫天數圖標組件
+  const ContactDaysIcon = ({ phoneNumber }: { phoneNumber: string | null }) => {
+    const { contactDays, loading } = useContactDays(phoneNumber);
+    
+    // 調試信息
+    console.log('ContactDaysIcon - phoneNumber:', phoneNumber, 'contactDays:', contactDays, 'loading:', loading);
+    
+    if (loading) {
+      return (
+        <div className="ml-1 flex items-center">
+          <div className="animate-spin rounded-full h-3 w-3 border-b border-[#FFD59A]"></div>
+        </div>
+      );
+    }
+    
+    if (!contactDays || contactDays.daysSinceContact === null) {
+      console.log('ContactDaysIcon - 沒有聯繫記錄或數據為空');
+      return null;
+    }
+    
+    const days = contactDays.daysSinceContact;
+    const getDisplayText = () => {
+      if (days === 0) return '今天';
+      if (days === 1) return '1天';
+      if (days <= 7) return `${days}天`;
+      return `${days}天`;
+    };
+    
+    const getBgColor = () => {
+      if (days === 0) return 'from-green-100 to-green-200';
+      if (days <= 3) return 'from-[#FFD59A] to-[#EBC9A4]';
+      if (days <= 7) return 'from-yellow-100 to-yellow-200';
+      return 'from-red-100 to-red-200';
+    };
+    
+    return (
+      <div className={`ml-1 flex items-center px-1.5 py-0.5 bg-gradient-to-r ${getBgColor()} rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm`}>
+        <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
+        <span>{getDisplayText()}</span>
+      </div>
+    );
+  };
+
   // 修改渲染部分，為試堂學生添加特殊標記
   const renderStudentButton = (nameObj: StudentNameObj, lesson?: Lesson) => {
     const lessonIsTodayOrPast = lesson ? isPastOrToday(lesson.lesson_date) : false;
@@ -744,6 +798,8 @@ const HanamiCalendar = () => {
             />
           )}
         </button>
+        {/* 聯繫天數圖標 */}
+        <ContactDaysIcon phoneNumber={lesson?.Hanami_Students?.contact_number || null} />
         {(lessonIsTodayOrPast && lesson?.lesson_status) ? (
           <button
             className={
