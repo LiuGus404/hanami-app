@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessons } from '@/lib/utils';
 import { Student, Teacher } from '@/types';
 import { QrCode, MessageCircle, Calendar } from 'lucide-react';
+import { useBatchContactDays } from '@/hooks/useBatchContactDays';
+import { ContactChatDialog } from './ContactChatDialog';
 
 const weekdays = [
   { label: '星期日', value: 0 },
@@ -113,38 +115,22 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   const [teacherOptions, setTeacherOptions] = useState<{ label: string, value: string }[]>([]);
   const [calculatedRemainingLessons, setCalculatedRemainingLessons] = useState<number | null>(null);
   const [showStudentIDCard, setShowStudentIDCard] = useState(false);
-  const [contactDays, setContactDays] = useState<number | null>(null);
-  const [lastContactTime, setLastContactTime] = useState<string | null>(null);
-  const [loadingContactDays, setLoadingContactDays] = useState(true);
+  // 使用批量載入聯繫天數
+  const phoneNumbers = student?.contact_number ? [student.contact_number] : [];
+  const { results: batchContactResults, loading: loadingContactDays } = useBatchContactDays(phoneNumbers);
+  
+  const contactDaysData = student?.contact_number ? batchContactResults[student.contact_number] : null;
+  const contactDays = contactDaysData?.daysSinceContact ?? null;
+  const lastContactTime = contactDaysData?.lastContactTime ?? null;
+
+  // 對話框狀態
+  const [chatDialogOpen, setChatDialogOpen] = useState(false);
   
   // 添加防抖機制
   const courseOptionsFetchedRef = useRef(false);
   const teacherOptionsFetchedRef = useRef(false);
 
-  // 獲取聯繫天數
-  useEffect(() => {
-    const fetchContactDays = async () => {
-      if (!student?.contact_number) {
-        setLoadingContactDays(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/contact-days/${encodeURIComponent(student.contact_number)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setContactDays(data.daysSinceContact);
-          setLastContactTime(data.lastContactTime);
-        }
-      } catch (error) {
-        console.error('獲取聯繫天數失敗:', error);
-      } finally {
-        setLoadingContactDays(false);
-      }
-    };
-
-    fetchContactDays();
-  }, [student?.contact_number]);
+  // 聯繫天數現在通過 useBatchContactDays Hook 處理
 
   useEffect(() => {
     // 如果已經載入過老師選項，直接使用快取
@@ -501,20 +487,28 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         <div className="flex items-center gap-2">
           {/* 聯繫天數顯示 */}
           {!loadingContactDays && contactDays !== null && (
-            <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm">
+            <button
+              onClick={() => setChatDialogOpen(true)}
+              className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm hover:shadow-md transition-all cursor-pointer"
+              title="點擊聯繫家長"
+            >
               <MessageCircle className="w-3 h-3" />
               <span>
                 {contactDays === 0 ? '今天有聯繫' : 
                  contactDays === 1 ? '1天未聯繫' : 
                  `${contactDays}天未聯繫`}
               </span>
-            </div>
+            </button>
           )}
           {!loadingContactDays && contactDays === null && (
-            <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+            <button
+              onClick={() => setChatDialogOpen(true)}
+              className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer"
+              title="點擊聯繫家長"
+            >
               <MessageCircle className="w-3 h-3" />
               <span>無聯繫記錄</span>
-            </div>
+            </button>
           )}
           {loadingContactDays && (
             <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
@@ -1117,6 +1111,14 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         student={formData}
         isOpen={showStudentIDCard}
         onClose={() => setShowStudentIDCard(false)}
+      />
+
+      {/* 聯繫對話框 */}
+      <ContactChatDialog
+        isOpen={chatDialogOpen}
+        onClose={() => setChatDialogOpen(false)}
+        phoneNumber={student?.contact_number || ''}
+        contactDays={contactDays}
       />
     </div>
   );

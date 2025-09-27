@@ -6,7 +6,9 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
 import { TrialLesson } from '@/types';
 import { useContactDays } from '@/hooks/useContactDays';
+import { useBatchContactDays } from '@/hooks/useBatchContactDays';
 import { MessageCircle } from 'lucide-react';
+import { ContactChatDialog } from './ContactChatDialog';
 
 // 固定香港時區的 Date 產生器
 const getHongKongDate = (date = new Date()) => {
@@ -115,13 +117,26 @@ const HanamiCalendar = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDateTeachers, setSelectedDateTeachers] = useState<{name: string, start: string, end: string}[]>([]);
 
+  // 提取所有有效的電話號碼用於批量載入
+  const allPhoneNumbers = lessons
+    .map(lesson => lesson.Hanami_Students?.contact_number)
+    .filter((phone): phone is string => !!phone && phone.trim() !== '');
+
+  // 使用批量載入聯繫天數
+  const { results: batchContactResults, loading: batchLoading } = useBatchContactDays(allPhoneNumbers);
+
+  // 對話框狀態
+  const [chatDialogOpen, setChatDialogOpen] = useState(false);
+  const [selectedPhoneNumber, setSelectedPhoneNumber] = useState<string | null>(null);
+  const [selectedContactDays, setSelectedContactDays] = useState<number | null>(null);
+
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
   const currentViewRef = useRef<string>('');
   const currentDateRef = useRef<string>('');
   const loadingRef = useRef(false);
 
-  // 抓取節日資料
+  // 抓取節日資料和學生資料
   useEffect(() => {
     const fetchHolidays = async () => {
       const { data, error } = await supabase.from('hanami_holidays').select('date, title');
@@ -136,7 +151,21 @@ const HanamiCalendar = () => {
         setHolidays(validHolidays);
       }
     };
+
+    const fetchStudents = async () => {
+      const { data, error } = await supabase
+        .from('Hanami_Students')
+        .select('id, full_name, student_age, student_dob');
+      if (!error && data) {
+        console.log('載入的學生數據:', data.slice(0, 3)); // 顯示前3個學生
+        setStudents(data);
+      } else {
+        console.error('載入學生數據錯誤:', error);
+      }
+    };
+
     fetchHolidays();
+    fetchStudents();
   }, []);
 
   // 判斷是否為節日
@@ -161,7 +190,7 @@ const HanamiCalendar = () => {
       return;
     }
     if (data) {
-      console.log('fetchLessons 結果:', data.slice(0, 3)); // 只顯示前3條記錄
+      // console.log('fetchLessons 結果:', data.slice(0, 3)); // 只顯示前3條記錄
       setLessons(data);
     }
   };
@@ -197,12 +226,20 @@ const HanamiCalendar = () => {
               *,
               Hanami_Students!hanami_student_lesson_student_id_fkey (
                 full_name,
-                student_age
+                student_age,
+                contact_number
               )
             `)
             .eq('lesson_date', dateStr);
 
           console.log('常規學生課堂:', regularLessonsData);
+          console.log('常規學生課堂詳細:', regularLessonsData?.slice(0, 3).map(l => ({
+            id: l.id,
+            student_id: l.student_id,
+            contact_number: l.Hanami_Students?.contact_number,
+            full_name: l.Hanami_Students?.full_name,
+            hasContactNumber: !!l.Hanami_Students?.contact_number
+          })));
 
           // 獲取試堂學生的課堂
           const { data: trialLessonsData, error: trialLessonsError } = await supabase
@@ -242,6 +279,8 @@ const HanamiCalendar = () => {
             remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
             is_trial: false,
             lesson_duration: lesson.lesson_duration || null,
+            // 保留 Hanami_Students 對象以便後續使用
+            Hanami_Students: lesson.Hanami_Students,
           }));
 
           // 處理試堂學生數據
@@ -261,7 +300,12 @@ const HanamiCalendar = () => {
 
           // 合併常規和試堂學生的課堂
           const allLessons = [...processedRegularLessons, ...processedTrialLessons];
-          console.log('All processed lessons:', allLessons);
+          console.log('All processed lessons (前3筆):', allLessons.slice(0, 3).map(l => ({
+            id: l.id,
+            full_name: l.full_name,
+            contact_number: l.Hanami_Students?.contact_number,
+            hasContactNumber: !!l.Hanami_Students?.contact_number
+          })));
           setLessons(allLessons);
           lessonsFetchedRef.current = true;
         } catch (error) {
@@ -294,7 +338,8 @@ const HanamiCalendar = () => {
               *,
               Hanami_Students!hanami_student_lesson_student_id_fkey (
                 full_name,
-                student_age
+                student_age,
+                contact_number
               )
             `)
             .gte('lesson_date', startDateStr)
@@ -332,6 +377,8 @@ const HanamiCalendar = () => {
             remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
             is_trial: false,
             lesson_duration: lesson.lesson_duration || null,
+            // 保留 Hanami_Students 對象以便後續使用
+            Hanami_Students: lesson.Hanami_Students,
           }));
 
           // 處理試堂學生數據
@@ -381,7 +428,8 @@ const HanamiCalendar = () => {
               *,
               Hanami_Students!hanami_student_lesson_student_id_fkey (
                 full_name,
-                student_age
+                student_age,
+                contact_number
               )
             `)
             .gte('lesson_date', startDateStr)
@@ -419,6 +467,8 @@ const HanamiCalendar = () => {
             remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
             is_trial: false,
             lesson_duration: lesson.lesson_duration || null,
+            // 保留 Hanami_Students 對象以便後續使用
+            Hanami_Students: lesson.Hanami_Students,
           }));
 
           // 處理試堂學生數據
@@ -500,12 +550,30 @@ const HanamiCalendar = () => {
 
   const getStudentAge = (studentId: string) => {
     const student = students.find(s => s.id === studentId);
-    if (!student || student.student_age === null || student.student_age === undefined) return '';
+    if (!student) {
+      console.log(`找不到學生 ID: ${studentId}`);
+      return '';
+    }
+    
+    if (student.student_age === null || student.student_age === undefined) {
+      console.log(`學生 ${student.full_name} 沒有年齡數據`);
+      return '';
+    }
+    
+    // student_age 欄位存儲的是月份數
     const months = typeof student.student_age === 'string' ? parseInt(student.student_age) : student.student_age;
     const years = Math.floor(months / 12);
     const remainingMonths = months % 12;
+    
     if (!years && !remainingMonths) return '';
-    return `${years}`;
+    
+    // 格式：1歲3月
+    let ageText = '';
+    if (years > 0) ageText += `${years}歲`;
+    if (remainingMonths > 0) ageText += `${remainingMonths}月`;
+    
+    console.log(`學生 ${student.full_name} 年齡: ${ageText} (${months}個月)`);
+    return ageText;
   };
 
   const getDateString = (date: Date) => {
@@ -570,7 +638,13 @@ const HanamiCalendar = () => {
         studentAge = typeof trial.student_age === 'string' ? parseInt(trial.student_age) : trial.student_age;
         const years = Math.floor(studentAge / 12);
         const remainingMonths = studentAge % 12;
-        ageDisplay = `${years}Y${remainingMonths}M`;
+        
+        // 格式：1歲3月
+        let ageText = '';
+        if (years > 0) ageText += `${years}歲`;
+        if (remainingMonths > 0) ageText += `${remainingMonths}月`;
+        
+        ageDisplay = ageText;
       }
       return {
         id: trial.id,
@@ -656,7 +730,8 @@ const HanamiCalendar = () => {
           *,
           Hanami_Students!hanami_student_lesson_student_id_fkey (
             full_name,
-            student_age
+            student_age,
+            contact_number
           )
         `)
         .eq('id', lessonId)
@@ -686,7 +761,8 @@ const HanamiCalendar = () => {
               *,
               Hanami_Students!hanami_student_lesson_student_id_fkey (
                 full_name,
-                student_age
+                student_age,
+                contact_number
               )
             `)
             .eq('lesson_date', dateStr);
@@ -714,24 +790,49 @@ const HanamiCalendar = () => {
     return date <= today;
   };
 
-  // 聯繫天數圖標組件
+  // 處理點擊聯繫天數圖標
+  const handleContactIconClick = (phoneNumber: string, contactDays: number | null) => {
+    setSelectedPhoneNumber(phoneNumber);
+    setSelectedContactDays(contactDays);
+    setChatDialogOpen(true);
+  };
+
+  // 聯繫天數圖標組件 - 使用批量載入結果
   const ContactDaysIcon = ({ phoneNumber }: { phoneNumber: string | null }) => {
-    const { contactDays, loading } = useContactDays(phoneNumber);
+    // 如果沒有電話號碼，不顯示任何內容
+    if (!phoneNumber) {
+      return null;
+    }
+
+    // 從批量載入結果中獲取數據
+    const contactDays = batchContactResults[phoneNumber];
+    const loading = batchLoading;
     
-    // 調試信息
-    console.log('ContactDaysIcon - phoneNumber:', phoneNumber, 'contactDays:', contactDays, 'loading:', loading);
+    // 只在開發模式下顯示調試信息
+    if (process.env.NODE_ENV === 'development') {
+      console.log('ContactDaysIcon - phoneNumber:', phoneNumber, 'contactDays:', contactDays, 'loading:', loading);
+    }
     
     if (loading) {
       return (
-        <div className="ml-1 flex items-center">
-          <div className="animate-spin rounded-full h-3 w-3 border-b border-[#FFD59A]"></div>
+        <div className="flex items-center px-1.5 py-0.5 bg-gray-100 rounded-full text-xs font-medium text-gray-600 border border-white">
+          <div className="animate-spin rounded-full h-2.5 w-2.5 border-b border-gray-400 mr-1"></div>
+          <span>載入中</span>
         </div>
       );
     }
     
     if (!contactDays || contactDays.daysSinceContact === null) {
-      console.log('ContactDaysIcon - 沒有聯繫記錄或數據為空');
-      return null;
+      return (
+        <button
+          onClick={() => handleContactIconClick(phoneNumber, null)}
+          className="flex items-center px-1.5 py-0.5 bg-gray-100 rounded-full text-xs font-medium text-gray-600 border border-white hover:bg-gray-200 transition-colors cursor-pointer"
+          title="點擊聯繫家長"
+        >
+          <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
+          <span>無記錄</span>
+        </button>
+      );
     }
     
     const days = contactDays.daysSinceContact;
@@ -750,10 +851,14 @@ const HanamiCalendar = () => {
     };
     
     return (
-      <div className={`ml-1 flex items-center px-1.5 py-0.5 bg-gradient-to-r ${getBgColor()} rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm`}>
+      <button
+        onClick={() => handleContactIconClick(phoneNumber, days)}
+        className={`flex items-center px-1.5 py-0.5 bg-gradient-to-r ${getBgColor()} rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm border border-white hover:shadow-md transition-all cursor-pointer`}
+        title="點擊聯繫家長"
+      >
         <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
         <span>{getDisplayText()}</span>
-      </div>
+      </button>
     );
   };
 
@@ -777,7 +882,7 @@ const HanamiCalendar = () => {
     const unsetBtnClass = 'ml-2 px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-600 border border-gray-300 transition-all duration-200 shadow-sm hover:scale-105 hover:bg-yellow-100 hover:shadow-lg active:scale-95 focus:outline-none';
 
     return (
-      <div className="flex items-center">
+      <div className="flex items-center gap-1 flex-wrap">
         <button
           className={baseBtnClass}
           style={{ 
@@ -788,7 +893,7 @@ const HanamiCalendar = () => {
         >
           {nameObj.name}
           {nameObj.age ? (
-            <span className="ml-1 text-[10px] text-[#87704e]">({nameObj.age}歲)</span>
+            <span className="ml-1 text-[10px] text-[#87704e]">（{nameObj.age}）</span>
           ) : null}
           {nameObj.is_trial && (
             <img
@@ -1026,7 +1131,7 @@ const HanamiCalendar = () => {
                           {g.lessons.map((lesson: Lesson, j: number) => {
                             let age = '';
                             if (lesson.is_trial) {
-                              age = lesson.age_display ? String(parseInt(lesson.age_display)) : '';
+                              age = lesson.age_display || '';
                             } else {
                               age = getStudentAge(lesson.student_id);
                             }
@@ -1124,7 +1229,7 @@ const HanamiCalendar = () => {
                                 names: (g as { time: string; course: string; lessons: any[] }).lessons.map(lesson => ({
                                   name: lesson.full_name,
                                   student_id: lesson.student_id,
-                                  age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
+                                  age: lesson.is_trial ? lesson.age_display || '' : getStudentAge(lesson.student_id),
                                   is_trial: lesson.is_trial,
                                   remaining_lessons: lesson.remaining_lessons,
                                 })),
@@ -1211,7 +1316,7 @@ const HanamiCalendar = () => {
                               names: group.lessons.map(lesson => ({
                                 name: lesson.full_name,
                                 student_id: lesson.student_id,
-                                age: lesson.is_trial ? (lesson.age_display ? String(parseInt(lesson.age_display)) : '') : getStudentAge(lesson.student_id),
+                                age: lesson.is_trial ? lesson.age_display || '' : getStudentAge(lesson.student_id),
                                 is_trial: lesson.is_trial,
                                 remaining_lessons: lesson.remaining_lessons,
                               })),
@@ -1340,6 +1445,14 @@ const HanamiCalendar = () => {
           </div>
         </div>
       )}
+
+      {/* 聯繫對話框 */}
+      <ContactChatDialog
+        isOpen={chatDialogOpen}
+        onClose={() => setChatDialogOpen(false)}
+        phoneNumber={selectedPhoneNumber || ''}
+        contactDays={selectedContactDays}
+      />
     </div>
   );
 };

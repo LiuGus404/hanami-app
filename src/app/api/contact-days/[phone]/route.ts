@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { getSupabaseClient } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -16,12 +11,19 @@ export async function GET(
       return NextResponse.json({ error: '電話號碼是必需的' }, { status: 400 });
     }
 
+    const supabase = getSupabaseClient();
+
     // 查詢 incoming_messages 表（接收到的訊息）
     // 查找 session_id 中包含電話號碼的記錄
+    // 電話號碼格式可能是 90399475，但 session_id 格式是 85290399475@c.us
+    const phoneWithCountryCode = phone.startsWith('852') ? phone : `852${phone}`;
+    
+    console.log(`查詢電話號碼 ${phone} (完整格式: ${phoneWithCountryCode}) 的聯繫記錄`);
+    
     const { data: incomingMessages, error: incomingError } = await supabase
       .from('incoming_messages')
       .select('timestamp')
-      .like('session_id', `%${phone}%`)
+      .like('session_id', `%${phoneWithCountryCode}%`)
       .order('timestamp', { ascending: false })
       .limit(1);
 
@@ -34,7 +36,7 @@ export async function GET(
     const { data: outgoingMessages, error: outgoingError } = await supabase
       .from('outgoing_messages')
       .select('sent_at')
-      .like('session_id', `%${phone}%`)
+      .like('session_id', `%${phoneWithCountryCode}%`)
       .order('sent_at', { ascending: false })
       .limit(1);
 
