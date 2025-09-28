@@ -27,12 +27,12 @@ async function updateActivityProgress(request: NextRequest) {
 
     console.log('✅ 請求驗證通過，準備更新資料庫:', { activityId, progress });
 
-    // 更新活動進度
+    // 更新活動進度 - 使用正確的表名
     console.log('📊 開始更新資料庫...');
     const { data, error } = await supabase
-      .from('hanami_student_activities' as any)
+      .from('hanami_student_lesson_activities' as any)
       .update({
-        progress: progress,
+        performance_rating: Math.round(progress / 20), // 將 0-100 轉換為 1-5 評分
         completion_status: progress >= 100 ? 'completed' : progress > 0 ? 'in_progress' : 'not_started',
         updated_at: new Date().toISOString()
       })

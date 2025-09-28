@@ -61,3 +61,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '內部服務器錯誤' }, { status: 500 });
   }
 }
+

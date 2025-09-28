@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
           time_spent,
           teacher_notes,
           student_feedback,
-          progress,
+          performance_rating,
           activity_id,
           lesson_date,
           timeslot,
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
             time_spent,
             teacher_notes,
             student_feedback,
-            progress,
+            performance_rating,
             lesson_date,
             timeslot,
             activity_id,
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
           time_spent,
           teacher_notes,
           student_feedback,
-          progress,
+          performance_rating,
           activity_id,
           activity_type,
           tree_id,
@@ -154,8 +154,8 @@ export async function GET(request: NextRequest) {
     const completedOngoingActivities = completedOngoingResult.data || [];
     
     // 將所有正在學習的活動分為未完成和已完成兩類
-    const ongoingActivities = allOngoingActivities.filter((activity: any) => (activity.progress || 0) < 100);
-    const completedActivities = allOngoingActivities.filter((activity: any) => (activity.progress || 0) >= 100);
+    const ongoingActivities = allOngoingActivities.filter((activity: any) => (activity.performance_rating || 0) < 5);
+    const completedActivities = allOngoingActivities.filter((activity: any) => (activity.performance_rating || 0) >= 5);
     
     console.log('並行查詢完成:', {
       current: currentLessonActivities.length,
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
       activity_id: activity.activity_id,
       activity_type: activity.activity_type,
       tree_id: activity.tree_id,
-      progress: activity.progress,
+      progress: (activity.performance_rating || 0) * 20, // 將 1-5 分轉換為 0-100%
       completion_status: activity.completion_status,
       has_teaching_activity: !!activity.hanami_teaching_activities,
       teaching_activity_name: activity.hanami_teaching_activities?.activity_name || 'N/A'
@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
           teacherNotes: activity.teacher_notes,
           studentFeedback: activity.student_feedback,
           timeSpent: activity.time_spent || 0,
-          progress: activity.progress || 0,
+          progress: (activity.performance_rating || 0) * 20, // 將 1-5 分轉換為 0-100%
           assignedAt: activity.assigned_at,
           lessonDate: activity.lesson_date,
           timeslot: activity.timeslot,

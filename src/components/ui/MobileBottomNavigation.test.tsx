@@ -50,3 +50,4 @@ describe('MobileBottomNavigation', () => {
     expect(dashboardButton || aiCompanionsButton || parentConnectButton || settingsButton).toBeTruthy();
   });
 });
+

@@ -423,6 +423,7 @@ export default function AbilityAssessmentsPage() {
         error: assessmentsError,
         count: assessmentsData?.length || 0
       });
+      
 
       if (assessmentsError) {
         console.error('❌ 載入評估記錄失敗:', assessmentsError);
@@ -432,6 +433,7 @@ export default function AbilityAssessmentsPage() {
 
       console.log('✅ 成功載入評估記錄:', assessmentsData?.length || 0, '個記錄');
       console.log('📋 評估記錄詳細:', assessmentsData);
+      
       
       // 確保資料格式正確
       const normalizedData = (assessmentsData || []).map(assessment => ({
@@ -1113,7 +1115,7 @@ export default function AbilityAssessmentsPage() {
 
                 {/* 備註和重點 */}
                 <div className="space-y-3">
-                  {assessment.general_notes && (
+                  {assessment.general_notes !== null && assessment.general_notes !== undefined && assessment.general_notes.trim() !== '' && (
                     <div>
                       <h4 className="font-medium text-[#2B3A3B] mb-2 text-sm">一般備註</h4>
                       <p className="text-sm text-[#2B3A3B] bg-gray-50 p-3 rounded-lg">
@@ -1792,10 +1794,10 @@ export default function AbilityAssessmentsPage() {
 
                   {/* 備註和重點 */}
                   <div className="space-y-4">
-                    {viewingAssessment.general_notes && (
+                    {viewingAssessment.general_notes !== null && viewingAssessment.general_notes !== undefined && viewingAssessment.general_notes.trim() !== '' && (
                       <div className="bg-white p-6 rounded-xl border border-[#EADBC8]">
                         <h3 className="text-xl font-semibold text-[#2B3A3B] mb-4">一般備註</h3>
-                        <p className="text-[#2B3A3B] leading-relaxed">
+                        <p className="text-[#2B3A3B] leading-relaxed whitespace-pre-wrap">
                           {viewingAssessment.general_notes}
                         </p>
                       </div>

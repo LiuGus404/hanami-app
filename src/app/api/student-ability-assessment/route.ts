@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       teacher_id: teacher_id || null,
       ability_assessments: ability_assessments || {},
       overall_performance_rating: overall_performance_rating || 3,
-      general_notes: general_notes || notes || null,
+      general_notes: general_notes !== undefined ? general_notes : (notes !== undefined ? notes : null),
       next_lesson_focus: next_lesson_focus || null,
       selected_goals: goals || [],
       updated_at: new Date().toISOString()

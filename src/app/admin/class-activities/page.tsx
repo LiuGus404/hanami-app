@@ -2316,22 +2316,63 @@ export default function ClassActivitiesPage() {
               setSelectedStudentForAssessment(null);
               setSelectedTreeForAssessment(null);
             }}
-            onSubmit={(assessment) => {
+            onSubmit={async (assessment) => {
               console.log('能力評估提交:', assessment);
-              toast.success('能力評估已保存');
               
-              // 更新學生評估狀態為已評估
-              if (selectedStudentForAssessment) {
-                setStudentAssessmentStatus(prev => ({
-                  ...prev,
-                  [selectedStudentForAssessment.id]: true
-                }));
-                console.log(`✅ 學生 ${selectedStudentForAssessment.full_name} 評估狀態已更新為已完成`);
+              try {
+                // 準備 API 調用的資料格式
+                const apiData = {
+                  student_id: assessment.student_id,
+                  tree_id: assessment.tree_id,
+                  assessment_date: assessment.assessment_date,
+                  lesson_date: assessment.lesson_date,
+                  teacher_id: assessment.teacher_id,
+                  ability_assessments: assessment.ability_assessments || {},
+                  overall_performance_rating: assessment.overall_performance_rating || 3,
+                  general_notes: assessment.general_notes || '',
+                  next_lesson_focus: assessment.next_lesson_focus || '',
+                  goals: assessment.goals || []
+                };
+
+                console.log('準備的 API 資料:', apiData);
+                console.log('general_notes 提交值:', apiData.general_notes);
+                console.log('general_notes 類型:', typeof apiData.general_notes);
+
+                // 調用 API
+                const response = await fetch('/api/student-ability-assessment', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(apiData),
+                });
+
+                const result = await response.json();
+                console.log('API 回應:', result);
+
+                if (result.success) {
+                  toast.success('能力評估已保存');
+                  
+                  // 更新學生評估狀態為已評估
+                  if (selectedStudentForAssessment) {
+                    setStudentAssessmentStatus(prev => ({
+                      ...prev,
+                      [selectedStudentForAssessment.id]: true
+                    }));
+                    console.log(`✅ 學生 ${selectedStudentForAssessment.full_name} 評估狀態已更新為已完成`);
+                  }
+                  
+                  setShowAbilityAssessmentModal(false);
+                  setSelectedStudentForAssessment(null);
+                  setSelectedTreeForAssessment(null);
+                } else {
+                  console.error('API 調用失敗:', result.error);
+                  toast.error('儲存失敗: ' + result.error);
+                }
+              } catch (error) {
+                console.error('儲存評估失敗:', error);
+                toast.error('儲存評估失敗: ' + (error as Error).message);
               }
-              
-              setShowAbilityAssessmentModal(false);
-              setSelectedStudentForAssessment(null);
-              setSelectedTreeForAssessment(null);
             }}
           />
         )}

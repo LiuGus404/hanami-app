@@ -134,3 +134,4 @@ export default function ProjectJoinForm({ onSubmit, onCancel, isLoading = false 
     </motion.div>
   );
 }
+

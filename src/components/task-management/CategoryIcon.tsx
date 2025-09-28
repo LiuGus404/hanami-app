@@ -106,3 +106,4 @@ export default function CategoryIcon({ category, className = "w-5 h-5" }: Catego
       );
   }
 }
+
