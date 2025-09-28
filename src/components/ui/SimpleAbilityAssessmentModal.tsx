@@ -150,7 +150,7 @@ export default function SimpleAbilityAssessmentModal({
     initialData?.assessment_date || defaultAssessmentDate || new Date().toISOString().split('T')[0]
   );
   const [overallRating, setOverallRating] = useState(initialData?.overall_performance_rating || 3);
-  const [generalNotes, setGeneralNotes] = useState(initialData?.general_notes ?? '');
+  const [generalNotes, setGeneralNotes] = useState(initialData?.general_notes || '');
   const [nextFocus, setNextFocus] = useState(initialData?.next_lesson_focus || '');
   
   // 學生選擇相關狀態
@@ -352,7 +352,7 @@ export default function SimpleAbilityAssessmentModal({
       setLessonDate(fixedInitialData.lesson_date || new Date().toISOString().split('T')[0]);
       setAssessmentDate(fixedInitialData.assessment_date || new Date().toISOString().split('T')[0]);
       setOverallRating(fixedInitialData.overall_performance_rating || 3);
-      setGeneralNotes(fixedInitialData.general_notes ?? '');
+      setGeneralNotes(fixedInitialData.general_notes || '');
       setNextFocus(fixedInitialData.next_lesson_focus || '');
       
       // 更新能力評估狀態
@@ -1079,7 +1079,7 @@ export default function SimpleAbilityAssessmentModal({
           if (!assessmentError && assessmentData && assessmentData.length > 0) {
             latestAssessment = assessmentData[0];
             setOverallRating(latestAssessment.overall_performance_rating || 1);
-            setGeneralNotes(latestAssessment.general_notes ?? '');
+            setGeneralNotes(latestAssessment.general_notes || '');
             setNextFocus(latestAssessment.next_lesson_focus || '');
           }
 
