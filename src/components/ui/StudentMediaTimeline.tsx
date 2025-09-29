@@ -1018,41 +1018,69 @@ export default function StudentMediaTimeline({
 
                 {/* 課程內容 */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-                  {/* 課程活動 */}
-                  <div className="lg:col-span-2 space-y-4 md:space-y-6">
-                    <h5 className="font-semibold text-gray-800 mb-3 flex items-center">
-                      <BookOpen className="w-4 h-4 mr-2 text-blue-500" />
-                      本次課堂活動
-                    </h5>
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-600">本次課堂活動</span>
-                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">進行中</span>
-                        </div>
-                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-gray-800">
-                              {selectedLesson.lesson_activities || todayLessonRecord?.lesson_activities || '進行中 0001-認識小手'}
-                            </span>
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">正在學習</span>
+                    {/* 課程活動 */}
+                    <div className="lg:col-span-2 space-y-4 md:space-y-6">
+                      <h5 className="font-semibold text-gray-800 mb-3 flex items-center">
+                        <BookOpen className="w-4 h-4 mr-2 text-blue-500" />
+                        本次課堂活動
+                      </h5>
+                      <div className="bg-white rounded-lg p-4 border border-gray-200">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-600">本次課堂活動</span>
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">進行中</span>
                           </div>
-                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                            <div className="flex space-x-2">
-                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">難度 1</span>
-                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">鋼琴教材</span>
+                          
+                          {/* 正在學習的活動 */}
+                          <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-gray-800">
+                                {selectedLesson.lesson_activities || todayLessonRecord?.lesson_activities || '暫無活動記錄'}
+                              </span>
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">正在學習</span>
                             </div>
-                            <span>完成進度: 25%</span>
+                            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                              <div className="flex space-x-2">
+                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                  {selectedLesson.course_type || '課程'}
+                                </span>
+                                <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+                                  {selectedLesson.lesson_teacher || '教師'}
+                                </span>
+                              </div>
+                              <span>課程時間: {selectedLesson.actual_timeslot || '未設定'}</span>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-500">
+                              分配時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                            <div className="bg-orange-400 h-2 rounded-full" style={{ width: '25%' }}></div>
-                          </div>
-                          <div className="mt-2 text-xs text-gray-500">
-                            分配時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}
+
+                          {/* 未開始的活動 */}
+                          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-gray-600">未開始活動</span>
+                              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">待開始</span>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-gray-600">0002-手指練習</span>
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">難度 2</span>
+                              </div>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-gray-600">0003-節奏訓練</span>
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">難度 1</span>
+                              </div>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-gray-600">0004-音階練習</span>
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">難度 3</span>
+                              </div>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-500">
+                              預計完成時間: 下週課程
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
                     {/* 進度筆記 */}
                     <h5 className="font-semibold text-gray-800 mb-3 mt-4 flex items-center">
@@ -1076,7 +1104,9 @@ export default function StudentMediaTimeline({
                           <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
                             <div className="flex space-x-2">
                               <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">進度追蹤</span>
-                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">鋼琴學習</span>
+                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+                                {selectedLesson.course_type || '課程學習'}
+                              </span>
                             </div>
                             <span>記錄時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}</span>
                           </div>
@@ -1106,7 +1136,9 @@ export default function StudentMediaTimeline({
                           <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
                             <div className="flex space-x-2">
                               <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">目標設定</span>
-                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">鋼琴學習</span>
+                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+                                {selectedLesson.course_type || '課程學習'}
+                              </span>
                             </div>
                             <span>設定時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}</span>
                           </div>

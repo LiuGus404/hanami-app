@@ -97,31 +97,22 @@ export async function GET(request: NextRequest) {
         return lessonDate.toDateString() === assessmentDate.toDateString();
       });
 
-      // 如果沒有實際評估資料，生成模擬資料
+      // 使用實際評估資料或返回空資料
       const assessment = lessonAssessment ? {
-        total_progress: lessonAssessment.overall_performance_rating * 20 || 60, // 轉換評分為百分比
-        current_level: Math.floor(lessonAssessment.overall_performance_rating) || 2,
-        abilities: [
-          { name: '專注力時長', level: 2, progress: 75, status: 'completed' },
-          { name: '眼球追視能力', level: 1, progress: 40, status: 'in_progress' },
-          { name: '樂理認知', level: 4, progress: 100, status: 'completed' },
-          { name: '興趣和自主性', level: 2, progress: 50, status: 'in_progress' },
-          { name: '讀譜能力', level: 2, progress: 100, status: 'completed' },
-          { name: '樂曲彈奏進度', level: 3, progress: 75, status: 'in_progress' },
-          { name: '小肌演奏能力', level: 4, progress: 100, status: 'completed' }
-        ]
+        total_progress: lessonAssessment.overall_performance_rating * 20 || 0, // 轉換評分為百分比
+        current_level: Math.floor(lessonAssessment.overall_performance_rating) || 1,
+        abilities: lessonAssessment.ability_assessments ? 
+          Object.entries(lessonAssessment.ability_assessments).map(([abilityId, abilityData]: [string, any]) => ({
+            id: abilityId,
+            name: abilityData.name || '未知能力',
+            level: abilityData.level || 1,
+            progress: abilityData.progress || 0,
+            status: abilityData.status || 'locked'
+          })) : []
       } : {
-        total_progress: Math.floor(Math.random() * 40) + 60, // 60-100%
-        current_level: Math.floor(Math.random() * 2) + 2, // 2-3級
-        abilities: [
-          { name: '專注力時長', level: 2, progress: 75, status: 'completed' },
-          { name: '眼球追視能力', level: 1, progress: 40, status: 'in_progress' },
-          { name: '樂理認知', level: 4, progress: 100, status: 'completed' },
-          { name: '興趣和自主性', level: 2, progress: 50, status: 'in_progress' },
-          { name: '讀譜能力', level: 2, progress: 100, status: 'completed' },
-          { name: '樂曲彈奏進度', level: 3, progress: 75, status: 'in_progress' },
-          { name: '小肌演奏能力', level: 4, progress: 100, status: 'completed' }
-        ]
+        total_progress: 0,
+        current_level: 1,
+        abilities: []
       };
 
       return {

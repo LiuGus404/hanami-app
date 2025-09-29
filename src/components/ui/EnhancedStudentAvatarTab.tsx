@@ -34,6 +34,9 @@ import {
 import Student3DCharacter from './Student3DCharacter';
 import LearningPathLevels from '@/components/ui/LearningPathLevels';
 import StudentAbilityAssessments from '@/components/ui/StudentAbilityAssessments';
+import DetailedAbilityProgress from '@/components/ui/DetailedAbilityProgress';
+import AbilityTrendModal from '@/components/ui/AbilityTrendModal';
+import { HanamiSelect } from '@/components/ui/HanamiSelect';
 import { useStudentAvatarData, useGrowthTreeInteraction } from '@/hooks/useStudentAvatarData';
 
 interface EnhancedStudentAvatarTabProps {
@@ -113,10 +116,29 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [currentProgress, setCurrentProgress] = useState<{totalProgress: number, currentLevel: number}>({totalProgress: 53, currentLevel: 2});
+  const [currentProgress, setCurrentProgress] = useState<{totalProgress: number, currentLevel: number}>({totalProgress: 0, currentLevel: 1});
   const [chartData, setChartData] = useState<Array<{date: string, progress: number, level: number}>>([]);
   const [hoveredDataPoint, setHoveredDataPoint] = useState<number | null>(null);
+  const [abilityProgress, setAbilityProgress] = useState<Array<{
+    id: string;
+    name: string;
+    level: number;
+    maxLevel: number;
+    progress: number;
+    status: 'locked' | 'in_progress' | 'completed';
+    color: string;
+    description?: string;
+    progressMode?: string;
+    progressContents?: Array<{
+      content: string;
+      completed: boolean;
+      level: number;
+    }>;
+    assessmentMode?: string;
+  }>>([]);
   const [selectedBackground, setSelectedBackground] = useState<string>('classroom');
+  const [selectedAbility, setSelectedAbility] = useState<string | null>(null);
+  const [showTrendModal, setShowTrendModal] = useState<boolean>(false);
 
   // 使用自定義Hook載入學生資料
   const {
@@ -196,34 +218,55 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
     const loadAvailableDates = async () => {
       if (!student?.id) return;
       try {
-        // 從實際的學生評估記錄中獲取日期
-        // 根據您提供的信息，目前只有一個記錄：5/9/2025
-        const actualDates = ['2025-05-09']; // 實際存在的記錄日期
+        // 從 API 載入真實的評估日期
+        const response = await fetch(`/api/student-assessment-progress?student_id=${student.id}`);
         
-        // 如果沒有記錄，顯示當前日期作為默認
-        if (actualDates.length === 0) {
-          actualDates.push(new Date().toISOString().split('T')[0]);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            const { availableDates, trendData } = result.data;
+            
+            // 設置可用的評估日期
+            if (availableDates && availableDates.length > 0) {
+              setAvailableDates(availableDates);
+              setSelectedDate(availableDates[0]); // 設置默認選中的日期為最新的記錄
+            } else {
+              // 如果沒有記錄，顯示當前日期作為默認
+              const currentDate = new Date().toISOString().split('T')[0];
+              setAvailableDates([currentDate]);
+              setSelectedDate(currentDate);
+            }
+            
+            // 設置圖表數據
+            if (trendData && trendData.length > 0) {
+              setChartData(trendData);
+            } else {
+              // 如果沒有趨勢資料，設置空陣列
+              setChartData([]);
+            }
+          } else {
+            console.error('載入評估日期失敗:', result.error);
+            // 設置默認資料
+            const currentDate = new Date().toISOString().split('T')[0];
+            setAvailableDates([currentDate]);
+            setSelectedDate(currentDate);
+            setChartData([]);
+          }
+        } else {
+          console.error('API 請求失敗:', response.status);
+          // 設置默認資料
+          const currentDate = new Date().toISOString().split('T')[0];
+          setAvailableDates([currentDate]);
+          setSelectedDate(currentDate);
+          setChartData([]);
         }
-        
-        setAvailableDates(actualDates);
-        
-        // 設置默認選中的日期為最新的記錄
-        if (actualDates.length > 0) {
-          setSelectedDate(actualDates[0]);
-        }
-        
-        // 生成圖表數據（模擬歷史進度數據）
-        const chartDataPoints = [
-          { date: '2025-05-09', progress: 53, level: 2 }, // 實際記錄
-          { date: '2025-05-08', progress: 48, level: 2 }, // 模擬前一天
-          { date: '2025-05-07', progress: 45, level: 2 }, // 模擬前兩天
-          { date: '2025-05-06', progress: 42, level: 1 }, // 模擬前三天
-          { date: '2025-05-05', progress: 38, level: 1 }, // 模擬前四天
-        ];
-        
-        setChartData(chartDataPoints);
       } catch (error) {
         console.error('載入可用日期失敗:', error);
+        // 設置默認資料
+        const currentDate = new Date().toISOString().split('T')[0];
+        setAvailableDates([currentDate]);
+        setSelectedDate(currentDate);
+        setChartData([]);
       }
     };
     loadAvailableDates();
@@ -232,20 +275,45 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
   // 根據選中日期載入評估數據
   useEffect(() => {
     const loadAssessmentData = async () => {
-      if (!student?.id || !selectedDate) return;
+      if (!student?.id) return;
       try {
-        console.log(`載入 ${selectedDate} 的評估數據`);
+        console.log(`載入學生 ${student.id} 的評估數據`);
         
-        // 根據實際記錄數據設置進度
-        // 根據您提供的信息：5/9/2025 的記錄
-        if (selectedDate === '2025-05-09') {
-          // 實際的評估數據 - 根據記錄內容設置
-          setCurrentProgress({
-            totalProgress: 53, // 可以根據實際評估結果調整
-            currentLevel: 2    // 可以根據實際評估結果調整
-          });
+        // 從 API 載入真實的評估資料
+        const response = await fetch(
+          `/api/student-assessment-progress?student_id=${student.id}${selectedDate ? `&assessment_date=${selectedDate}` : ''}`
+        );
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            setCurrentProgress({
+              totalProgress: result.data.totalProgress,
+              currentLevel: result.data.currentLevel
+            });
+            
+            // 更新能力評估資料
+            if (result.data.abilities) {
+              setAbilityProgress(result.data.abilities);
+            }
+            
+            // 更新趨勢資料
+            if (result.data.trendData) {
+              setChartData(result.data.trendData);
+            }
+            
+            console.log('成功載入評估資料:', result.data);
+          } else {
+            console.error('載入評估資料失敗:', result.error);
+            // 設置默認數據
+            setCurrentProgress({
+              totalProgress: 0,
+              currentLevel: 1
+            });
+          }
         } else {
-          // 默認數據
+          console.error('API 請求失敗:', response.status);
+          // 設置默認數據
           setCurrentProgress({
             totalProgress: 0,
             currentLevel: 1
@@ -254,6 +322,11 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
         
       } catch (error) {
         console.error('載入評估數據失敗:', error);
+        // 設置默認數據
+        setCurrentProgress({
+          totalProgress: 0,
+          currentLevel: 1
+        });
       }
     };
     loadAssessmentData();
@@ -1253,56 +1326,38 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
 
                     {/* 日期選擇器 */}
                     <div className="mb-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <span className="text-sm font-medium text-gray-700">選擇記錄日期：</span>
-                          <div className="relative">
-                            <div className="flex items-center bg-gray-50 border border-gray-300 rounded-lg overflow-hidden">
-                              <input
-                                type="text"
-                                value={selectedDate ? new Date(selectedDate).toLocaleDateString('zh-TW', {
-                                  year: 'numeric',
-                                  month: 'numeric',
-                                  day: 'numeric'
-                                }) : ''}
-                                readOnly
-                                className="px-4 py-2 bg-transparent text-sm text-gray-700 focus:outline-none cursor-pointer flex-1"
-                              />
-                              <div className="flex flex-col border-l border-gray-300">
-                                <button
-                                  onClick={() => {
-                                    const currentIndex = availableDates.indexOf(selectedDate);
-                                    if (currentIndex > 0) {
-                                      setSelectedDate(availableDates[currentIndex - 1]);
-                                    }
-                                  }}
-                                  disabled={availableDates.indexOf(selectedDate) <= 0}
-                                  className="px-2 py-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const currentIndex = availableDates.indexOf(selectedDate);
-                                    if (currentIndex < availableDates.length - 1) {
-                                      setSelectedDate(availableDates[currentIndex + 1]);
-                                    }
-                                  }}
-                                  disabled={availableDates.indexOf(selectedDate) >= availableDates.length - 1}
-                                  className="px-2 py-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </button>
+                      <div className="bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] rounded-2xl p-6 border-2 border-[#EADBC8] shadow-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center shadow-md">
+                                <Calendar className="w-5 h-5 text-[#2B3A3B]" />
                               </div>
+                              <span className="text-lg font-semibold text-[#4B4036]">選擇記錄日期</span>
+                            </div>
+                            <div className="w-72">
+                              <HanamiSelect
+                                options={availableDates.map(date => ({
+                                  value: date,
+                                  label: new Date(date).toLocaleDateString('zh-TW', {
+                                    year: 'numeric',
+                                    month: 'numeric',
+                                    day: 'numeric'
+                                  })
+                                }))}
+                                value={selectedDate || ''}
+                                onChange={(value) => setSelectedDate(value)}
+                                placeholder="請選擇日期"
+                                icon={<Calendar size={16} />}
+                                className="text-sm"
+                              />
                             </div>
                           </div>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          共 {availableDates.length} 筆記錄
+                          <div className="bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full px-4 py-2 shadow-md">
+                            <span className="text-sm font-semibold text-[#2B3A3B]">
+                              共 {availableDates.length} 筆記錄
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1321,158 +1376,67 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                     
                     {/* 能力評估點點展示 */}
                     <div className="grid grid-cols-3 gap-8 mb-8">
-                      {/* 專注力時長 */}
-                      <motion.div
-                        className="text-center"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.6 }}
-                      >
-                        <div className="relative">
+                      {abilityProgress.length > 0 ? (
+                        abilityProgress.map((ability, index) => (
                           <motion.div
-                            className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3"
-                            whileHover={{ scale: 1.1 }}
-                            transition={{ type: "spring", stiffness: 300 }}
-                          >
-                            <Check className="w-8 h-8 text-white" />
-                          </motion.div>
-                          <motion.div
-                            className="absolute -bottom-1 -right-1 w-6 h-6 bg-pink-400 rounded-full flex items-center justify-center"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.8, type: "spring" }}
-                          >
-                            <Target className="w-3 h-3 text-white" />
-                          </motion.div>
-                        </div>
-                        <h4 className="font-semibold text-gray-800 mb-1">專注力時長</h4>
-                        <p className="text-sm text-gray-600">等級 2/4 (50%)</p>
-                      </motion.div>
-
-                      {/* 眼球追視能力 */}
-                      <motion.div
-                        className="text-center"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.7 }}
-                      >
-                        <motion.div
-                          className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3"
-                          whileHover={{ scale: 1.05 }}
-                        >
-                          <Lock className="w-8 h-8 text-gray-500" />
-                        </motion.div>
-                        <h4 className="font-semibold text-gray-800 mb-1">眼球追視能力</h4>
-                        <p className="text-sm text-gray-600">等級 1/4 (25%)</p>
-                      </motion.div>
-
-                      {/* 樂理認知 */}
-                      <motion.div
-                        className="text-center"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.8 }}
-                      >
-                        <motion.div
-                          className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3"
-                          whileHover={{ scale: 1.1 }}
-                          transition={{ type: "spring", stiffness: 300 }}
-                        >
-                          <Check className="w-8 h-8 text-white" />
-                        </motion.div>
-                        <h4 className="font-semibold text-gray-800 mb-1">樂理認知</h4>
-                        <p className="text-sm text-gray-600">等級 4/4 (100%)</p>
-                      </motion.div>
-
-                      {/* 興趣和自主性 */}
-                      <motion.div
-                        className="text-center"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.9 }}
-                      >
-                        <div className="relative">
-                          <motion.div
-                            className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3"
+                            key={ability.id}
+                            className="text-center cursor-pointer"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.6 + (index * 0.1) }}
+                            onClick={() => {
+                              setSelectedAbility(ability.id);
+                              setShowTrendModal(true);
+                            }}
                             whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                           >
-                            <Lock className="w-8 h-8 text-gray-500" />
+                            <div className="relative">
+                              <motion.div
+                                className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3 ${
+                                  ability.status === 'completed' 
+                                    ? 'bg-yellow-400' 
+                                    : ability.status === 'in_progress' 
+                                    ? 'bg-blue-400' 
+                                    : 'bg-gray-300'
+                                }`}
+                                whileHover={{ scale: ability.status !== 'locked' ? 1.1 : 1.05 }}
+                                transition={{ type: "spring", stiffness: 300 }}
+                                style={{ backgroundColor: ability.color }}
+                              >
+                                {ability.status === 'completed' ? (
+                                  <Check className="w-8 h-8 text-white" />
+                                ) : ability.status === 'in_progress' ? (
+                                  <Target className="w-8 h-8 text-white" />
+                                ) : (
+                                  <Lock className="w-8 h-8 text-gray-500" />
+                                )}
+                              </motion.div>
+                              {ability.status === 'in_progress' && (
+                                <motion.div
+                                  className="absolute -bottom-1 -right-1 w-6 h-6 bg-pink-400 rounded-full flex items-center justify-center"
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  transition={{ delay: 0.8 + (index * 0.1), type: "spring" }}
+                                >
+                                  <Target className="w-3 h-3 text-white" />
+                                </motion.div>
+                              )}
+                            </div>
+                            <h4 className="font-semibold text-gray-800 mb-1">{ability.name}</h4>
+                            <p className="text-sm text-gray-600">等級 {ability.level}/{ability.maxLevel} ({ability.progress}%)</p>
+                            <p className="text-xs text-gray-500 mt-1">點擊查看趨勢</p>
                           </motion.div>
-                          <motion.div
-                            className="absolute -bottom-1 -right-1 w-6 h-6 bg-pink-400 rounded-full flex items-center justify-center"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 1.1, type: "spring" }}
-                          >
-                            <Target className="w-3 h-3 text-white" />
-                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="col-span-3 text-center py-8">
+                          <div className="text-gray-500 mb-2">
+                            <Target className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                            <p className="text-lg font-medium">尚未有評估記錄</p>
+                            <p className="text-sm">請先進行能力評估以查看學習進度</p>
+                          </div>
                         </div>
-                        <h4 className="font-semibold text-gray-800 mb-1">興趣和自主性</h4>
-                        <p className="text-sm text-gray-600">等級 2/4 (50%)</p>
-                      </motion.div>
-
-                      {/* 讀譜能力 */}
-                      <motion.div
-                        className="text-center"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 1.0 }}
-                      >
-                        <motion.div
-                          className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3"
-                          whileHover={{ scale: 1.1 }}
-                          transition={{ type: "spring", stiffness: 300 }}
-                        >
-                          <Check className="w-8 h-8 text-white" />
-                        </motion.div>
-                        <h4 className="font-semibold text-gray-800 mb-1">讀譜能力</h4>
-                        <p className="text-sm text-gray-600">等級 2/2 (100%)</p>
-                      </motion.div>
-
-                      {/* 樂曲彈奏進度 */}
-                      <motion.div
-                        className="text-center"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 1.1 }}
-                      >
-                        <div className="relative">
-                          <motion.div
-                            className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3"
-                            whileHover={{ scale: 1.05 }}
-                          >
-                            <Lock className="w-8 h-8 text-gray-500" />
-                          </motion.div>
-                          <motion.div
-                            className="absolute -bottom-1 -right-1 w-6 h-6 bg-pink-400 rounded-full flex items-center justify-center"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 1.3, type: "spring" }}
-                          >
-                            <Target className="w-3 h-3 text-white" />
-                          </motion.div>
-                        </div>
-                        <h4 className="font-semibold text-gray-800 mb-1">樂曲彈奏進度</h4>
-                        <p className="text-sm text-gray-600">等級 3/4 (75%)</p>
-                      </motion.div>
-
-                      {/* 小肌演奏能力 */}
-                      <motion.div
-                        className="text-center"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 1.2 }}
-                      >
-                        <motion.div
-                          className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3"
-                          whileHover={{ scale: 1.1 }}
-                          transition={{ type: "spring", stiffness: 300 }}
-                        >
-                          <Check className="w-8 h-8 text-white" />
-                        </motion.div>
-                        <h4 className="font-semibold text-gray-800 mb-1">小肌演奏能力</h4>
-                        <p className="text-sm text-gray-600">等級 4/4 (100%)</p>
-                      </motion.div>
+                      )}
                     </div>
                     
                     {/* 狀態指示器 */}
@@ -1508,151 +1472,6 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                       </motion.div>
                     </div>
 
-                    {/* 互動進度圖表 */}
-                    <div className="mb-6">
-                      <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-lg font-semibold text-gray-800">學習進度趨勢</h4>
-                          <div className="text-sm text-gray-600">
-                            由遠至近 ({chartData.length} 天)
-                          </div>
-                        </div>
-                        
-                        {/* 圖表容器 */}
-                        <div className="relative h-48 bg-white rounded-lg p-4 border border-orange-200">
-                          <svg className="w-full h-full" viewBox="0 0 400 200">
-                            {/* 網格線 */}
-                            <defs>
-                              <pattern id="grid" width="80" height="40" patternUnits="userSpaceOnUse">
-                                <path d="M 80 0 L 0 0 0 40" fill="none" stroke="#f3f4f6" strokeWidth="1"/>
-                              </pattern>
-                            </defs>
-                            <rect width="100%" height="100%" fill="url(#grid)" />
-                            
-                            {/* 連接線 - 修正路徑計算 */}
-                            <motion.path
-                              d={chartData.map((dataPoint, index) => {
-                                const x = 50 + (index * 80);
-                                const y = 180 - ((dataPoint.progress / 100) * 160);
-                                return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-                              }).join(' ')}
-                              fill="none"
-                              stroke="#f97316"
-                              strokeWidth="3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: 1 }}
-                              transition={{ duration: 2, delay: 0.5 }}
-                            />
-                            
-                            {/* 數據點 - 修正位置計算 */}
-                            {chartData.map((dataPoint, index) => {
-                              const isSelected = dataPoint.date === selectedDate;
-                              const isHovered = hoveredDataPoint === index;
-                              const x = 50 + (index * 80);
-                              const y = 180 - ((dataPoint.progress / 100) * 160);
-                              
-                              return (
-                                <g key={dataPoint.date}>
-                                  {/* 數據點圓圈 */}
-                                  <motion.circle
-                                    cx={x}
-                                    cy={y}
-                                    r={isSelected ? 6 : 4}
-                                    fill={isSelected ? "#f97316" : isHovered ? "#fb923c" : "#fed7aa"}
-                                    stroke={isSelected ? "#ea580c" : "#f97316"}
-                                    strokeWidth={isSelected ? 3 : 2}
-                                    className="cursor-pointer"
-                                    onMouseEnter={() => setHoveredDataPoint(index)}
-                                    onMouseLeave={() => setHoveredDataPoint(null)}
-                                    onClick={() => setSelectedDate(dataPoint.date)}
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ delay: index * 0.1 + 0.5 }}
-                                    whileHover={{ scale: 1.3 }}
-                                    whileTap={{ scale: 0.8 }}
-                                  />
-                                  
-                                  {/* 懸停提示 */}
-                                  {isHovered && (
-                                    <motion.g
-                                      initial={{ opacity: 0, scale: 0.8 }}
-                                      animate={{ opacity: 1, scale: 1 }}
-                                    >
-                                      <rect
-                                        x={x - 30}
-                                        y={y - 40}
-                                        width="60"
-                                        height="20"
-                                        rx="4"
-                                        fill="#374151"
-                                      />
-                                      <text
-                                        x={x}
-                                        y={y - 25}
-                                        textAnchor="middle"
-                                        fill="white"
-                                        fontSize="10"
-                                        fontWeight="500"
-                                      >
-                                        {dataPoint.progress}% (Lv.{dataPoint.level})
-                                      </text>
-                                    </motion.g>
-                                  )}
-                                </g>
-                              );
-                            })}
-                          </svg>
-                          
-                          {/* 日期標籤 - 修正對齊 */}
-                          <div className="absolute bottom-0 left-0 right-0 flex justify-between px-4 pb-2">
-                            {chartData.map((dataPoint, index) => {
-                              const x = 50 + (index * 80);
-                              return (
-                                <div key={dataPoint.date} className="text-center" style={{ width: '80px' }}>
-                                  <div className="text-xs text-gray-600">
-                                    {new Date(dataPoint.date).toLocaleDateString('zh-TW', {
-                                      month: 'numeric',
-                                      day: 'numeric'
-                                    })}
-                                  </div>
-                                  <div className="text-xs font-medium text-gray-700 mt-1">
-                                    {dataPoint.progress}%
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          
-                          {/* Y軸標籤 */}
-                          <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500 pl-2">
-                            <span>100%</span>
-                            <span>75%</span>
-                            <span>50%</span>
-                            <span>25%</span>
-                            <span>0%</span>
-                          </div>
-                        </div>
-                        
-                        {/* 圖表說明 */}
-                        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                              <span>已選擇</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 bg-orange-300 rounded-full"></div>
-                              <span>其他記錄</span>
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            點擊數據點查看詳細記錄
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </DynamicCard>
               )}
@@ -1660,6 +1479,17 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
           )}
         </AnimatePresence>
       </div>
+
+      {/* 能力趨勢模態框 */}
+      <AbilityTrendModal
+        isOpen={showTrendModal}
+        onClose={() => {
+          setShowTrendModal(false);
+          setSelectedAbility(null);
+        }}
+        ability={abilityProgress.find(a => a.id === selectedAbility) || null}
+        studentId={student?.id || ''}
+      />
     </div>
   );
 }

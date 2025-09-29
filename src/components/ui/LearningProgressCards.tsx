@@ -320,46 +320,71 @@ export default function LearningProgressCards({
       try {
         setLoading(true);
         
-        // 使用與「正在學習的活動」相同的 API
-        const response = await fetch(`/api/student-activities?studentId=${studentId}&lessonDate=${new Date().toISOString().split('T')[0]}`);
+        // 使用新的評估進度 API
+        const response = await fetch(`/api/student-assessment-progress?student_id=${studentId}`);
         
         if (response.ok) {
           const result = await response.json();
-          if (result.success) {
-            const { currentLessonActivities, ongoingActivities, previousLessonActivities } = result.data;
-            
-            // 合併所有活動
-            const allActivities = [
-              ...currentLessonActivities,
-              ...ongoingActivities,
-              ...previousLessonActivities
-            ];
+          if (result.success && result.data) {
+            const { totalProgress, currentLevel, abilities, latestAssessment } = result.data;
             
             // 轉換為 LearningProgress 格式
             const progressData: LearningProgress = {
               id: studentId,
-              subject: '音樂學習進度',
-              current_lesson: ongoingActivities.length > 0 ? ongoingActivities[0].activityName : '待安排課程',
-              progress_percentage: allActivities.length > 0 ? 
-                Math.round(allActivities.reduce((sum, activity) => sum + (activity.progress || 0), 0) / allActivities.length) : 0,
-              next_target: '繼續學習新技能',
-              recent_activities: allActivities.slice(0, 5).map((activity: any) => ({
-                id: activity.id || activity.activityId,
-                name: activity.activityName,
-                type: activity.activityType === '練習' ? 'practice' : 
-                      activity.activityType === '評估' ? 'assessment' : 
-                      activity.activityType === '表演' ? 'performance' : 'creative',
-                completion_date: activity.assignedAt || activity.lessonDate || new Date().toISOString().split('T')[0],
-                score: activity.progress || 0,
-                difficulty_level: activity.difficultyLevel || 1
+              subject: latestAssessment?.tree_name || '音樂學習進度',
+              current_lesson: latestAssessment?.next_lesson_focus || '待安排課程',
+              progress_percentage: totalProgress,
+              next_target: latestAssessment?.next_lesson_focus || '繼續學習新技能',
+              recent_activities: abilities.slice(0, 5).map((ability: any) => ({
+                id: ability.id,
+                name: ability.name,
+                type: ability.status === 'completed' ? 'assessment' : 
+                      ability.status === 'in_progress' ? 'practice' : 'creative',
+                completion_date: latestAssessment?.assessment_date || new Date().toISOString().split('T')[0],
+                score: ability.progress,
+                difficulty_level: ability.level
               })),
               upcoming_lessons: [], // 可以從其他 API 獲取
-              achievements: [], // 可以從其他 API 獲取
+              achievements: abilities.filter((a: any) => a.status === 'completed').map((a: any) => ({
+                id: a.id,
+                name: a.name,
+                description: `完成 ${a.name} 等級 ${a.level}`,
+                earned_date: latestAssessment?.assessment_date || new Date().toISOString().split('T')[0],
+                icon: '🎯'
+              })),
               last_updated: new Date().toISOString()
             };
             
             setProgressData(progressData);
+          } else {
+            console.error('載入評估進度失敗:', result.error);
+            // 設置默認資料
+            setProgressData({
+              id: studentId,
+              subject: '音樂學習進度',
+              current_lesson: '待安排課程',
+              progress_percentage: 0,
+              next_target: '開始學習',
+              recent_activities: [],
+              upcoming_lessons: [],
+              achievements: [],
+              last_updated: new Date().toISOString()
+            });
           }
+        } else {
+          console.error('API 請求失敗:', response.status);
+          // 設置默認資料
+          setProgressData({
+            id: studentId,
+            subject: '音樂學習進度',
+            current_lesson: '待安排課程',
+            progress_percentage: 0,
+            next_target: '開始學習',
+            recent_activities: [],
+            upcoming_lessons: [],
+            achievements: [],
+            last_updated: new Date().toISOString()
+          });
         }
       } catch (error) {
         console.error('載入學習進度資料失敗:', error);
