@@ -48,241 +48,89 @@ export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCar
       const cardElement = document.getElementById('student-id-card');
       if (!cardElement) return;
 
-      // 創建一個臨時的canvas來繪製學生證
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('無法創建canvas上下文');
-
-      // 設置canvas尺寸
-      const cardWidth = 420;
-      const cardHeight = 600;
-      canvas.width = cardWidth * 2; // 高解析度
-      canvas.height = cardHeight * 2;
-      ctx.scale(2, 2); // 縮放以獲得高解析度
-
-      // 繪製背景漸層
-      const gradient = ctx.createLinearGradient(0, 0, cardWidth, cardHeight);
-      gradient.addColorStop(0, '#FFD59A');
-      gradient.addColorStop(0.5, '#F5C6A0');
-      gradient.addColorStop(1, '#EBC9A4');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, cardWidth, cardHeight);
-
-      // 繪製裝飾性圓形背景
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.beginPath();
-      ctx.arc(cardWidth * 0.8, cardHeight * 0.2, 80, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      ctx.beginPath();
-      ctx.arc(cardWidth * 0.2, cardHeight * 0.8, 60, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // 繪製主要邊框
-      ctx.strokeStyle = '#EADBC8';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(3, 3, cardWidth - 6, cardHeight - 6);
-      
-      // 繪製內邊框
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(8, 8, cardWidth - 16, cardHeight - 16);
-
-      // 繪製標題背景
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.fillRect(20, 20, cardWidth - 40, 60);
-      
-      // 繪製標題
-      ctx.fillStyle = '#4B4036';
-      ctx.font = 'bold 22px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('Hanami 音樂教育', cardWidth / 2, 45);
-      ctx.font = '13px Arial';
-      ctx.fillText('學生證 Student ID Card', cardWidth / 2, 65);
-      
-      // 繪製裝飾線
-      ctx.strokeStyle = '#FFB6C1';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cardWidth * 0.2, 70);
-      ctx.lineTo(cardWidth * 0.8, 70);
-      ctx.stroke();
-
-      // 繪製學生照片區域
-      const photoSize = 80;
-      const photoX = (cardWidth - photoSize) / 2;
-      const photoY = 100;
-      
-      // 繪製照片陰影
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.fillRect(photoX + 3, photoY + 3, photoSize, photoSize);
-      
-      // 繪製照片背景
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(photoX, photoY, photoSize, photoSize);
-      
-      // 繪製照片邊框
-      ctx.strokeStyle = '#FFB6C1';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(photoX, photoY, photoSize, photoSize);
-      
-      // 繪製內邊框
-      ctx.strokeStyle = '#EADBC8';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(photoX + 2, photoY + 2, photoSize - 4, photoSize - 4);
-
-      // 嘗試載入學生照片
-      try {
-        // 如果沒有設定性別，預設為男生
-        const photoUrl = student.gender === 'female' ? '/girl.png' : '/boy.png';
-        const photoImage = new Image();
-        photoImage.crossOrigin = 'anonymous';
-        
-        await new Promise((resolve, reject) => {
-          photoImage.onload = () => {
-            try {
-              // 繪製圓形照片
-              ctx.save();
-              ctx.beginPath();
-              ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 - 2, 0, 2 * Math.PI);
-              ctx.clip();
-              ctx.drawImage(photoImage, photoX + 2, photoY + 2, photoSize - 4, photoSize - 4);
-              ctx.restore();
-              resolve(true);
-            } catch (error) {
-              reject(error);
-            }
-          };
-          photoImage.onerror = () => {
-            // 如果照片載入失敗，繪製默認圖標
-            ctx.fillStyle = '#EADBC8';
-            ctx.font = '24px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('👤', photoX + photoSize / 2, photoY + photoSize / 2 + 8);
-            resolve(true);
-          };
-          photoImage.src = photoUrl;
-        });
-      } catch (error) {
-        console.warn('無法載入學生照片，使用默認圖標:', error);
-        // 繪製默認圖標
-        ctx.fillStyle = '#EADBC8';
-        ctx.font = '24px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('👤', photoX + photoSize / 2, photoY + photoSize / 2 + 8);
+      // 直接使用列印功能，用戶可以選擇「另存為PDF」
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('無法開啟新視窗，請檢查瀏覽器設定');
+        return;
       }
 
-      // 繪製學生姓名背景
-      const nameY = photoY + photoSize + 20;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.fillRect(photoX - 10, nameY - 15, photoSize + 20, 30);
-      
-      // 繪製學生資訊
-      ctx.fillStyle = '#4B4036';
-      ctx.font = 'bold 16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(student.full_name, cardWidth / 2, nameY + 5);
+      // 獲取所有相關的CSS樣式
+      const styles = Array.from(document.styleSheets)
+        .map(styleSheet => {
+          try {
+            return Array.from(styleSheet.cssRules)
+              .map(rule => rule.cssText)
+              .join('\n');
+          } catch (e) {
+            return '';
+          }
+        })
+        .join('\n');
 
-      // 繪製QR碼區域
-      const qrSize = 120;
-      const qrX = (cardWidth - qrSize) / 2;
-      const qrY = nameY + 35;
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>學生證 - ${student.full_name}</title>
+            <style>
+              ${styles}
+              body { 
+                margin: 0; 
+                padding: 20px; 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                background: white;
+              }
+              .card-container {
+                transform: scale(1.5);
+                transform-origin: center;
+              }
+              @media print {
+                body { 
+                  background: white !important;
+                  padding: 0;
+                }
+                .card-container {
+                  transform: scale(1);
+                  transform-origin: top left;
+                }
+                #student-id-card {
+                  background-image: url('/3d-character-backgrounds/studentcard/studentcard.png') !important;
+                  background-size: cover !important;
+                  background-position: center !important;
+                  background-repeat: no-repeat !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                }
+                #student-id-card * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="card-container">
+              ${cardElement.outerHTML}
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(() => {
+                  window.print();
+                }, 1000);
+              };
+            </script>
+          </body>
+        </html>
+      `);
       
-      // 繪製QR碼陰影
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.fillRect(qrX + 3, qrY + 3, qrSize, qrSize);
-      
-      // 繪製QR碼背景
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(qrX, qrY, qrSize, qrSize);
-      
-      // 繪製QR碼邊框
-      ctx.strokeStyle = '#FFB6C1';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(qrX, qrY, qrSize, qrSize);
-      
-      // 繪製內邊框
-      ctx.strokeStyle = '#EADBC8';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(qrX + 2, qrY + 2, qrSize - 4, qrSize - 4);
-
-      // 生成並繪製QR碼
-      try {
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(student.id)}`;
-        
-        // 創建圖片元素來載入QR碼
-        const qrImage = new Image();
-        qrImage.crossOrigin = 'anonymous';
-        
-        await new Promise((resolve, reject) => {
-          qrImage.onload = () => {
-            try {
-              ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
-              resolve(true);
-            } catch (error) {
-              reject(error);
-            }
-          };
-          qrImage.onerror = reject;
-          qrImage.src = qrCodeUrl;
-        });
-      } catch (error) {
-        console.warn('無法載入QR碼，使用文字替代:', error);
-        // 如果QR碼載入失敗，繪製文字替代
-        ctx.fillStyle = '#4B4036';
-        ctx.font = 'bold 12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('QR Code', cardWidth / 2, qrY + qrSize / 2 - 10);
-        ctx.font = '10px Arial';
-        ctx.fillText(student.id.substring(0, 8), cardWidth / 2, qrY + qrSize / 2 + 10);
-      }
-
-      // 繪製詳細資訊背景
-      const infoY = qrY + qrSize + 20;
-      const infoHeight = 100;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.fillRect(20, infoY - 10, cardWidth - 40, infoHeight);
-      
-      // 繪製資訊標題
-      ctx.fillStyle = '#4B4036';
-      ctx.font = 'bold 12px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('學生資訊 Student Information', cardWidth / 2, infoY + 5);
-      
-      // 繪製裝飾線
-      ctx.strokeStyle = '#FFB6C1';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(cardWidth * 0.2, infoY + 10);
-      ctx.lineTo(cardWidth * 0.8, infoY + 10);
-      ctx.stroke();
-      
-      // 繪製詳細資訊
-      const infoStartY = infoY + 25;
-      ctx.font = 'bold 11px Arial';
-      ctx.textAlign = 'left';
-      ctx.fillText('年齡 Age:', 30, infoStartY);
-      ctx.fillText('出生日期 DOB:', 30, infoStartY + 18);
-      ctx.fillText('入學日期 Start:', 30, infoStartY + 36);
-      ctx.fillText('學生編號 ID:', 30, infoStartY + 54);
-
-      ctx.font = '11px Arial';
-      ctx.fillText(formatAge(student.student_age), 120, infoStartY);
-      ctx.fillText(formatDate(student.student_dob), 120, infoStartY + 18);
-      ctx.fillText(formatDate(student.started_date), 120, infoStartY + 36);
-      ctx.fillText(student.student_oid || student.id, 120, infoStartY + 54);
-      
-      // 繪製底部裝飾
-      ctx.fillStyle = '#FFB6C1';
-      ctx.font = '10px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('Hanami Music Education', cardWidth / 2, cardHeight - 20);
-
-      // 創建下載連結
-      const link = document.createElement('a');
-      link.download = `學生證_${student.full_name}_${student.student_oid || student.id}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      printWindow.document.close();
+      alert('已開啟列印視窗，您可以選擇「另存為PDF」來下載學生證');
     } catch (error) {
       console.error('下載失敗:', error);
       alert('下載失敗，請稍後再試');
@@ -299,11 +147,25 @@ export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCar
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    // 獲取所有相關的CSS樣式
+    const styles = Array.from(document.styleSheets)
+      .map(styleSheet => {
+        try {
+          return Array.from(styleSheet.cssRules)
+            .map(rule => rule.cssText)
+            .join('\n');
+        } catch (e) {
+          return '';
+        }
+      })
+      .join('\n');
+
     printWindow.document.write(`
       <html>
         <head>
           <title>學生證 - ${student.full_name}</title>
           <style>
+            ${styles}
             body { 
               margin: 0; 
               padding: 20px; 
@@ -312,11 +174,35 @@ export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCar
               justify-content: center;
               align-items: center;
               min-height: 100vh;
-              background: #f5f5f5;
+              background: white;
             }
             .card-container {
               transform: scale(1.2);
               transform-origin: center;
+            }
+            @media print {
+              body { 
+                background: white !important;
+                padding: 0;
+              }
+              .card-container {
+                transform: scale(1);
+                transform-origin: top left;
+              }
+              #student-id-card {
+                background-image: url('/3d-character-backgrounds/studentcard/studentcard.png') !important;
+                background-size: cover !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+              }
+              #student-id-card * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+              }
             }
           </style>
         </head>
@@ -329,7 +215,13 @@ export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCar
     `);
     
     printWindow.document.close();
-    printWindow.print();
+    
+    // 等待圖片載入完成後再列印
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 1000);
+    };
   };
 
   return (
@@ -381,9 +273,12 @@ export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCar
             {/* 學生證內容 */}
             <div
               id="student-id-card"
-              className="rounded-2xl p-6 shadow-lg border-2 border-[#EADBC8]"
+              className="rounded-2xl p-6 shadow-lg border-2 border-[#EADBC8] relative overflow-hidden"
               style={{
-                background: 'linear-gradient(135deg, #FFD59A 0%, #EBC9A4 100%)'
+                backgroundImage: 'url(/3d-character-backgrounds/studentcard/studentcard.png)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
               }}
             >
               {/* 標題 */}
@@ -434,7 +329,7 @@ export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCar
                 <div className="space-y-4">
                   {/* QR碼 */}
                   <div className="flex justify-center">
-                    <div className="bg-white rounded-lg p-3 shadow-md">
+                    <div className="bg-white/90 rounded-lg p-3 shadow-md">
                       <QRCodeGenerator 
                         text={student.id} 
                         size={120}
