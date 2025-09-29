@@ -50,6 +50,8 @@ interface StudentLessonPanelProps {
   // 添加更多學生資料參數
   studentData?: any; // 完整的學生資料
   showAIMessageButton?: boolean; // 是否顯示 AI 訊息按鈕
+  hideActionButtons?: boolean; // 是否隱藏新增課堂和編輯按鍵
+  hideTeacherColumn?: boolean; // 是否隱藏負責老師欄位
 }
 
 interface LessonData {
@@ -80,7 +82,7 @@ interface LessonData {
   remarks: string | null;
 }
 
-export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData, showAIMessageButton = false }: StudentLessonPanelProps) {
+export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData, showAIMessageButton = false, hideActionButtons = false, hideTeacherColumn = false }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
   
   // 添加動畫樣式到 head
@@ -948,15 +950,17 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                     {getSortIcon('actual_timeslot')}
                   </div>
                 </th>
-                <th 
-                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('lesson_teacher')}
-                >
-                  <div className="flex items-center gap-1">
-                    負責老師
-                    {getSortIcon('lesson_teacher')}
-                  </div>
-                </th>
+                {!hideTeacherColumn && (
+                  <th 
+                    className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                    onClick={() => handleSort('lesson_teacher')}
+                  >
+                    <div className="flex items-center gap-1">
+                      負責老師
+                      {getSortIcon('lesson_teacher')}
+                    </div>
+                  </th>
+                )}
                 <th 
                   className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
                   onClick={() => handleSort('lesson_status')}
@@ -990,7 +994,9 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                   <td className="text-[15px] font-medium px-2 py-2">{format(new Date(lesson.lesson_date), 'yyyy/MM/dd')}</td>
                   <td className="text-[15px] font-medium px-2 py-2">{typeof lesson.course_type === 'string' ? lesson.course_type : ''}</td>
                   <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>
-                  <td className="text-[15px] font-medium px-2 py-2">{lesson.lesson_teacher}</td>
+                  {!hideTeacherColumn && (
+                    <td className="text-[15px] font-medium px-2 py-2">{lesson.lesson_teacher}</td>
+                  )}
                   <td className="text-[15px] font-medium px-2 py-2">
                     {format(new Date(lesson.lesson_date), 'yyyy-MM-dd') === todayStr ? (
                       <>
@@ -1031,12 +1037,14 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                     )}
                   </td>
                   <td className="px-2 py-2">
-                    <button
-                      className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
-                      onClick={() => handleEdit(lesson)}
-                    >
-                      編輯
-                    </button>
+                    {!hideActionButtons && (
+                      <button
+                        className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
+                        onClick={() => handleEdit(lesson)}
+                      >
+                        編輯
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -1056,15 +1064,17 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
         )}
         
         <div className="flex gap-3 mt-4">
-          <button
-            className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
-            onClick={() => {
-              setEditingLesson(null);
-              setIsModalOpen(true);
-            }}
-          >
-            新增課堂
-          </button>
+          {!hideActionButtons && (
+            <button
+              className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
+              onClick={() => {
+                setEditingLesson(null);
+                setIsModalOpen(true);
+              }}
+            >
+              新增課堂
+            </button>
+          )}
           {selected.length > 0 && (
           <>
             <button

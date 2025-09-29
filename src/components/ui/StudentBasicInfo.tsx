@@ -69,9 +69,12 @@ type Props = {
   onUpdate: (newData: Student) => void;
   visibleFields?: string[];
   isInactive?: boolean;
+  hideTeacherInfo?: boolean; // 是否隱藏負責老師資訊
+  hideSensitiveInfo?: boolean; // 是否隱藏敏感資訊（備註、Email、密碼、時間戳）
+  readonlyFields?: string[]; // 只讀欄位列表（即使編輯模式也不可編輯）
 }
 
-export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false }: Props) {
+export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false, hideTeacherInfo = false, hideSensitiveInfo = false, readonlyFields = [] }: Props) {
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState<StudentFormData>({
     id: student?.id || '',
@@ -225,6 +228,11 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   const isEditable = (field: string) => {
     // 停用學生不可編輯
     if (isInactive) {
+      return false;
+    }
+    
+    // 檢查是否在只讀欄位列表中
+    if (readonlyFields.includes(field)) {
       return false;
     }
     
@@ -540,7 +548,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         {isVisible('student_oid') && (
           <>
             <div className="font-medium">學生編號：</div>
-            <div>{student.student_oid || '—'}</div>
+            <div>{student.id || '—'}</div>
           </>
         )}
 
@@ -777,7 +785,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </>
         )}
 
-        {isVisible('student_teacher') && (
+        {isVisible('student_teacher') && !hideTeacherInfo && (
           <>
             <div className="font-medium">負責老師：</div>
             <div>
@@ -1014,7 +1022,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </>
         )}
 
-        {isVisible('student_remarks') && (
+        {isVisible('student_remarks') && !hideSensitiveInfo && (
           <>
             <div className="font-medium">備註：</div>
             <div>
@@ -1032,7 +1040,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </>
         )}
 
-        {isVisible('student_email') && (
+        {isVisible('student_email') && !hideSensitiveInfo && (
           <>
             <div className="font-medium">學生 Email：</div>
             <div>
@@ -1050,7 +1058,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </>
         )}
 
-        {isVisible('student_password') && (
+        {isVisible('student_password') && !hideSensitiveInfo && (
           <>
             <div className="font-medium">學生密碼：</div>
             <div>
@@ -1068,14 +1076,14 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </>
         )}
 
-        {isVisible('created_at') && (
+        {isVisible('created_at') && !hideSensitiveInfo && (
           <>
             <div className="font-medium">建立時間：</div>
             <div>{formData.created_at || '—'}</div>
           </>
         )}
 
-        {isVisible('updated_at') && (
+        {isVisible('updated_at') && !hideSensitiveInfo && (
           <>
             <div className="font-medium">更新時間：</div>
             <div>{formData.updated_at || '—'}</div>

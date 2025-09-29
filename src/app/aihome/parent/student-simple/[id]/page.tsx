@@ -533,6 +533,9 @@ export default function SimpleStudentDetailPage() {
             <StudentBasicInfo 
               isInactive={isInactiveStudent} 
               student={student}
+              hideTeacherInfo={true}
+              hideSensitiveInfo={true}
+              readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
               onUpdate={(newData) => {
                 setStudent(newData);
                 // 如果是試堂學生且課程有更新，觸發課堂資料重新載入
@@ -563,6 +566,8 @@ export default function SimpleStudentDetailPage() {
                     studentType={student.student_type}
                     onCourseUpdate={handleCourseUpdate}
                     studentData={student}
+                    hideActionButtons={true}
+                    hideTeacherColumn={true}
                   />
                 );
               })()}

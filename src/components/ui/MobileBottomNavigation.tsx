@@ -151,13 +151,44 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
     };
   }, []);
 
+  // 智能主頁導航邏輯
+  const getHomeNavigation = () => {
+    // 檢查用戶登入狀態
+    const isLoggedIn = () => {
+      try {
+        const saasSession = localStorage.getItem('saas_user_session');
+        if (saasSession) {
+          const saasData = JSON.parse(saasSession);
+          return saasData.user && saasData.user.id && saasData.user.email;
+        }
+        return false;
+      } catch (error) {
+        return false;
+      }
+    };
+
+    const userLoggedIn = isLoggedIn();
+    
+    // 根據當前頁面和登入狀態決定主頁導航目標
+    if (pathname === '/') {
+      // 在主頁：已登入跳轉到儀表板，未登入跳轉到登入頁
+      return userLoggedIn ? '/aihome/dashboard' : '/aihome/auth/login';
+    } else if (pathname.startsWith('/aihome/auth/login') || pathname.startsWith('/aihome/dashboard')) {
+      // 在登入頁或儀表板：跳轉到主頁
+      return '/';
+    } else {
+      // 其他頁面：根據登入狀態決定
+      return userLoggedIn ? '/aihome/dashboard' : '/';
+    }
+  };
+
   // 導航項目配置 - 動態根據用戶角色顯示
   const getNavigationItems = () => {
     const baseItems = [
       {
         id: 'mobile-nav-dashboard',
         icon: HomeIcon,
-        href: '/aihome/dashboard',
+        href: getHomeNavigation(),
         label: '首頁'
       },
       {
