@@ -113,18 +113,21 @@ export default async function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
-        <link href="/manifest.json" rel="manifest" />
+        <link href="/manifest.json?v=20250101" rel="manifest" />
         <meta content="#fcf6f2" name="theme-color" />
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
         <link href="/apple-touch-icon.png" rel="apple-touch-icon-precomposed" />
         <link href="/apple-touch-icon-180x180.png" rel="apple-touch-icon" sizes="180x180" />
         <link href="/apple-touch-icon-167x167.png" rel="apple-touch-icon" sizes="167x167" />
         <link href="/apple-touch-icon-152x152.png" rel="apple-touch-icon" sizes="152x152" />
         <link href="/apple-touch-icon-120x120.png" rel="apple-touch-icon" sizes="120x120" />
-        <link href="/hanamiicon.png" rel="icon" sizes="any" type="image/png" />
-        <link href="/hanamiicon.png" rel="icon" sizes="32x32" type="image/png" />
-        <link href="/hanamiicon.png" rel="icon" sizes="16x16" type="image/png" />
-        <link href="/hanamiicon.png" rel="shortcut icon" type="image/png" />
-        <link href="/hanamiicon.png" rel="icon" />
+        <link href="/hanamiicon-v2.png?v=20250101" rel="icon" sizes="any" type="image/png" />
+        <link href="/hanamiicon-v2.png?v=20250101" rel="icon" sizes="32x32" type="image/png" />
+        <link href="/hanamiicon-v2.png?v=20250101" rel="icon" sizes="16x16" type="image/png" />
+        <link href="/hanamiicon-v2.png?v=20250101" rel="shortcut icon" type="image/png" />
+        <link href="/hanamiicon-v2.png?v=20250101" rel="icon" />
         
         {/* 結構化資料 */}
         <script
