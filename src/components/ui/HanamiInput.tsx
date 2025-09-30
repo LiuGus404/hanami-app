@@ -47,7 +47,7 @@ export function HanamiInput({
       <input
         type={type}
         placeholder={placeholder}
-        value={value || ''}
+        value={value ?? ''}
         onChange={handleChange}
         onKeyDown={onKeyDown}
         required={required}

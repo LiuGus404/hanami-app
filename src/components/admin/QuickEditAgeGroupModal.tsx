@@ -148,7 +148,7 @@ export function QuickEditAgeGroupModal({
                 <input
                   type="number"
                   value={formData.age_months || ''}
-                  onChange={(e) => setFormData({ ...formData, age_months: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, age_months: parseInt(e.target.value) || 0 })}
                   className="w-full p-3 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]"
                 />
               </div>
@@ -161,7 +161,7 @@ export function QuickEditAgeGroupModal({
                 <input
                   type="number"
                   value={formData.age_range_min || ''}
-                  onChange={(e) => setFormData({ ...formData, age_range_min: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, age_range_min: parseInt(e.target.value) || 0 })}
                   placeholder="最小月齡"
                   className="flex-1 p-3 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]"
                 />
@@ -169,7 +169,7 @@ export function QuickEditAgeGroupModal({
                 <input
                   type="number"
                   value={formData.age_range_max || ''}
-                  onChange={(e) => setFormData({ ...formData, age_range_max: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, age_range_max: parseInt(e.target.value) || 0 })}
                   placeholder="最大月齡"
                   className="flex-1 p-3 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]"
                 />

@@ -4187,7 +4187,7 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                       <div className="flex gap-1">
                         <input
                           type="number"
-                          value={selectedNode.duration}
+                          value={selectedNode.duration || ''}
                           onChange={(e) => updateNode(selectedNode.id, { duration: parseInt(e.target.value) || 0 })}
                           className="flex-1 px-1.5 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F98C53] focus:border-transparent text-sm"
                           min="0"
@@ -5143,7 +5143,7 @@ function NodeEditor({ node, onSave, onCancel }: NodeEditorProps) {
               <div className="flex gap-1">
                 <input
                   type="number"
-                  value={editedNode.duration}
+                  value={editedNode.duration || ''}
                   onChange={(e) => setEditedNode(prev => ({ ...prev, duration: parseInt(e.target.value) || 0 }))}
                   className="flex-1 p-2 border border-[#EADBC8] rounded-lg"
                   min="0"

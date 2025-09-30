@@ -514,13 +514,13 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
                 label="最小值"
                 type="number"
                 value={fieldData.min_scale || 1}
-                onChange={(value) => setFieldData({ ...fieldData, min_scale: parseInt(value) })}
+                onChange={(value) => setFieldData({ ...fieldData, min_scale: parseInt(value) || 1 })}
               />
               <HanamiInput
                 label="最大值"
                 type="number"
                 value={fieldData.max_scale || 5}
-                onChange={(value) => setFieldData({ ...fieldData, max_scale: parseInt(value) })}
+                onChange={(value) => setFieldData({ ...fieldData, max_scale: parseInt(value) || 5 })}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">

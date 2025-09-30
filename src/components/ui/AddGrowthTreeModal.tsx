@@ -400,7 +400,7 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                   placeholder="1-10"
                   type="number"
                   value={treeLevel}
-                  onChange={e => setTreeLevel(Number(e.target.value))}
+                  onChange={e => setTreeLevel(Number(e.target.value) || 1)}
                 />
               </div>
             </div>
@@ -493,7 +493,7 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                         placeholder="1-100"
                         type="number"
                         value={goal.progress_max}
-                        onChange={e => handleGoalChange(idx, 'progress_max', Number(e.target.value))}
+                        onChange={e => handleGoalChange(idx, 'progress_max', Number(e.target.value) || 20)}
                       />
                     </div>
 

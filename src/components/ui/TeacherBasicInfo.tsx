@@ -189,7 +189,7 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
           <input
             className="w-full px-3 py-2 border rounded-lg"
             type="number"
-            value={formData.teacher_hsalary || ''}
+            value={formData.teacher_hsalary ?? ''}
             onChange={(e) => handleChange('teacher_hsalary', e.target.value ? Number(e.target.value) : null)}
           />
         </div>
@@ -199,7 +199,7 @@ export default function TeacherBasicInfo({ teacher, onSave }: TeacherBasicInfoPr
           <input
             className="w-full px-3 py-2 border rounded-lg"
             type="number"
-            value={formData.teacher_msalary || ''}
+            value={formData.teacher_msalary ?? ''}
             onChange={(e) => handleChange('teacher_msalary', e.target.value ? Number(e.target.value) : null)}
           />
         </div>

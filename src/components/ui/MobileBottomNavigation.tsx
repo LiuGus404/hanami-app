@@ -200,7 +200,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       {
         id: 'mobile-nav-parent-connect',
         icon: UserGroupIcon,
-        href: '/aihome/parent/connect',
+        href: '/aihome/parent/bound-students',
         label: '家長連結'
       },
       {

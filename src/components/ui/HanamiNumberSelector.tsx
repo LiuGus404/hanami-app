@@ -62,7 +62,7 @@ export function HanamiNumberSelector({
       <div className="flex items-center gap-1 text-[#2B3A3B]">
         <input
           type="number"
-          value={value}
+          value={value ?? ''}
           onChange={handleInputChange}
           min={min}
           max={max}

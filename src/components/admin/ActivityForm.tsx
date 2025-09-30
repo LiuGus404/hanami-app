@@ -1382,7 +1382,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
                     placeholder={fieldPlaceholder}
                     type="number"
-                      value={fieldValue}
+                      value={fieldValue || ''}
                     onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value) || 0)}
                   />
                     {errors[fieldName] && (

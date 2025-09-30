@@ -353,7 +353,7 @@ export default function TestTreeActivitiesV2Page() {
             <HanamiInput
               type="number"
               value={formData.estimated_duration?.toString() || ''}
-              onChange={(value) => setFormData({ ...formData, estimated_duration: parseInt(value) || undefined })}
+              onChange={(value) => setFormData({ ...formData, estimated_duration: parseInt(value) || 0 })}
               placeholder="30"
             />
           </div>

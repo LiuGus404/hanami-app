@@ -570,7 +570,7 @@ export default function ClassManagementPanel() {
 
       {/* 編輯班別彈窗 */}
       {showEditClass && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl w-96">
             <h3 className="text-lg font-bold mb-4">編輯班別</h3>
             <input
@@ -651,7 +651,7 @@ export default function ClassManagementPanel() {
                   className="w-full p-2 border border-[#EADBC8] rounded bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]" 
                   type="number" 
                   value={newSlot.max_students ?? 10} 
-                  onChange={e => setNewSlot({ ...newSlot, max_students: parseInt(e.target.value) })} 
+                  onChange={e => setNewSlot({ ...newSlot, max_students: parseInt(e.target.value) || 10 })} 
                 />
               </div>
               <div>
@@ -763,7 +763,7 @@ export default function ClassManagementPanel() {
                   className="w-full p-2 border border-[#EADBC8] rounded bg-white text-[#4B4036] focus:ring-2 focus:ring-[#A68A64] focus:border-[#A68A64]" 
                   type="number" 
                   value={editSlot.max_students ?? 10} 
-                  onChange={e => setEditSlot({ ...editSlot, max_students: parseInt(e.target.value) })} 
+                  onChange={e => setEditSlot({ ...editSlot, max_students: parseInt(e.target.value) || 10 })} 
                 />
               </div>
               <div>

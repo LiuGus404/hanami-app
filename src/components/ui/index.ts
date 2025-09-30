@@ -26,6 +26,8 @@ export { default as StudentLessonPanel } from './StudentLessonPanel';
 export { default as ClassManagementPanel } from './ClassManagementPanel';
 export { default as ScheduleManagementPanel } from './ScheduleManagementPanel';
 export { default as LessonAvailabilityDashboard } from './LessonAvailabilityDashboard';
+export { default as MultiCourseAvailabilityDashboard } from './MultiCourseAvailabilityDashboard';
+export { default as MultiCourseScheduleManagementPanel } from './MultiCourseScheduleManagementPanel';
 export { default as LessonCard } from './LessonCard';
 export { default as MiniLessonCard } from './MiniLessonCard';
 export { default as LessonEditorModal } from './LessonEditorModal';
