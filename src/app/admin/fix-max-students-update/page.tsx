@@ -325,3 +325,4 @@ SELECT max_students FROM hanami_course_codes WHERE course_code = 'MUSIC_FOCUS_00
     </div>
   );
 }
+

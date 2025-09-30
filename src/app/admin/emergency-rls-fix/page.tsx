@@ -253,3 +253,4 @@ RETURNING id, course_code, course_name, updated_at;`;
     </div>
   );
 }
+
