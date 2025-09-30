@@ -122,6 +122,7 @@ export default async function RootLayout({
         <link href="/apple-touch-icon-120x120.png" rel="apple-touch-icon" sizes="120x120" />
         <link href="/hanamiicon.png" rel="icon" sizes="32x32" type="image/png" />
         <link href="/hanamiicon.png" rel="icon" sizes="16x16" type="image/png" />
+        <link href="/hanamiicon.png" rel="shortcut icon" type="image/png" />
         
         {/* 結構化資料 */}
         <script
