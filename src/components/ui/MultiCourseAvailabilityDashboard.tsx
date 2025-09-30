@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useBatchConversationDays } from '@/hooks/useBatchConversationDays';
 import { Calendar, Clock, Users, Plus, Trash2, Edit, Settings, Sparkles, Camera, Phone, Wand2 } from 'lucide-react';
 
 import TrialLimitSettingsModal from './TrialLimitSettingsModal';
@@ -154,6 +155,7 @@ export default function MultiCourseAvailabilityDashboard() {
   const [expandedQueue, setExpandedQueue] = useState<{[weekday: number]: boolean}>({});
   const [expandedCourses, setExpandedCourses] = useState<{[weekday: number]: {[courseCode: string]: boolean}}>({});
   const [courseCodes, setCourseCodes] = useState<{[id: string]: CourseCode}>({});
+  const [courseTypes, setCourseTypes] = useState<any[]>([]);
   const [trialLimitSettings, setTrialLimitSettings] = useState<{[courseTypeId: string]: number}>({});
   const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
   const [showSlotDetailModal, setShowSlotDetailModal] = useState(false);
@@ -164,6 +166,263 @@ export default function MultiCourseAvailabilityDashboard() {
   const [showRemoveStudentModal, setShowRemoveStudentModal] = useState(false);
   const [studentsToRemove, setStudentsToRemove] = useState<string[]>([]);
   const [queueStudentsLoading, setQueueStudentsLoading] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({});
+  const [showConversationModal, setShowConversationModal] = useState(false);
+  const [selectedStudentPhone, setSelectedStudentPhone] = useState<string>('');
+  const [conversationMessages, setConversationMessages] = useState<any[]>([]);
+  const [conversationLoading, setConversationLoading] = useState(false);
+
+  // 學生管理相關狀態
+  const [showStudentEditModal, setShowStudentEditModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [editFormData, setEditFormData] = useState<{
+    status: string;
+    notes: string;
+    course_types: string[];
+    prefer_time: { week: number[]; range: string[] };
+  }>({
+    status: '',
+    notes: '',
+    course_types: [],
+    prefer_time: { week: [], range: [] }
+  });
+
+  // 批量載入對話記錄
+  const extractPhoneNumbers = (students: any[]) => {
+    return students
+      .map(student => student.phone_no)
+      .filter((phone): phone is string => !!phone && phone.trim() !== '');
+  };
+
+  // 當等候區學生載入完成後，批量載入對話記錄
+  const allQueueStudents = selectedSlotDetail?.queue_students || [];
+  const phoneNumbers = extractPhoneNumbers(allQueueStudents);
+  const { results: batchConversationResults, loading: batchConversationLoading } = useBatchConversationDays(phoneNumbers);
+
+  // 切換區塊展開/收起狀態
+  const toggleSection = (sectionKey: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
+
+
+  // 打開學生編輯彈窗
+  const openStudentEditModal = (student: any) => {
+    setEditingStudent(student);
+    
+    // 安全地解析 prefer_time
+    let preferTime = { week: [], range: [] };
+    if (student.prefer_time) {
+      try {
+        if (typeof student.prefer_time === 'string') {
+          preferTime = JSON.parse(student.prefer_time);
+        } else {
+          preferTime = student.prefer_time;
+        }
+      } catch (e) {
+        console.warn('無法解析 prefer_time:', student.prefer_time);
+      }
+    }
+    
+    setEditFormData({
+      status: student.status || '',
+      notes: student.notes || '',
+      course_types: Array.isArray(student.course_types) ? student.course_types : [],
+      prefer_time: {
+        week: Array.isArray(preferTime.week) ? preferTime.week : [],
+        range: Array.isArray(preferTime.range) ? preferTime.range : []
+      }
+    });
+    setShowStudentEditModal(true);
+  };
+
+  // 關閉學生編輯彈窗
+  const closeStudentEditModal = () => {
+    setShowStudentEditModal(false);
+    setEditingStudent(null);
+    setEditFormData({
+      status: '',
+      notes: '',
+      course_types: [],
+      prefer_time: { week: [], range: [] }
+    });
+  };
+
+  // 刪除等候區學生
+  const deleteQueueStudent = async (studentId: string) => {
+    if (!confirm('確定要刪除此等候區學生嗎？')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('hanami_trial_queue')
+        .delete()
+        .eq('id', studentId);
+      
+      if (error) throw error;
+      
+      // 重新載入等候區學生
+      if (selectedSlotDetail) {
+        await loadQueueStudentsForSlot(selectedSlotDetail);
+      }
+      
+      alert('等候區學生已刪除');
+    } catch (error) {
+      console.error('刪除等候區學生失敗:', error);
+      alert('刪除失敗，請重試');
+    }
+  };
+
+
+  // 發送WhatsApp訊息
+  const sendWhatsAppMessage = (phoneNumber: string, studentName: string, courseInfo?: { courseName?: string; timeSlot?: string; studentStatus?: string }) => {
+    if (!phoneNumber) {
+      alert('此學生沒有聯絡電話');
+      return;
+    }
+
+    // 處理電話號碼格式（移除所有非數字字符）
+    const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+    
+    // 如果是香港電話號碼（8位數），加上852區號
+    const formattedPhoneNumber = cleanPhoneNumber.length === 8 ? `852${cleanPhoneNumber}` : cleanPhoneNumber;
+    
+    // 根據學生狀態決定訊息內容
+    let defaultMessage;
+    if (studentName === '未知學生' || !studentName) {
+      // 未知試堂學生的預設訊息
+      const today = new Date();
+      
+      // 計算這個星期的同一天（如果今天是星期一，就是下個星期一）
+      const currentWeekday = selectedSlotDetail?.weekday !== undefined ? selectedSlotDetail.weekday : today.getDay();
+      const thisWeekSameDay = new Date(today);
+      const daysUntilTarget = (currentWeekday - today.getDay() + 7) % 7;
+      thisWeekSameDay.setDate(today.getDate() + daysUntilTarget);
+      
+      // 如果今天就是目標星期幾，則選擇下個星期的同一天
+      if (daysUntilTarget === 0) {
+        thisWeekSameDay.setDate(thisWeekSameDay.getDate() + 7);
+      }
+      
+      // 計算再加7天的同一天
+      const nextWeekSameDay = new Date(thisWeekSameDay);
+      nextWeekSameDay.setDate(thisWeekSameDay.getDate() + 7);
+      
+      const formatDate = (date: Date) => {
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return `${month}/${day}`;
+      };
+      
+      // 獲取課程和時段資訊
+      let courseName = courseInfo?.courseName || 'XX';
+      let timeSlot = courseInfo?.timeSlot || 'XX時段';
+      
+      // 移除課程名稱中可能包含的「班」字，避免重複
+      if (courseName.includes('班')) {
+        courseName = courseName.replace('班', '');
+      }
+      
+      // 格式化時段顯示，加入星期幾
+      if (timeSlot && timeSlot !== 'XX時段') {
+        // 如果時段已經包含「時段」字樣，移除它
+        if (timeSlot.includes('時段')) {
+          timeSlot = timeSlot.replace('時段', '');
+        }
+        
+        // 獲取星期幾
+        const weekdayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        const weekday = selectedSlotDetail?.weekday !== undefined ? weekdayNames[selectedSlotDetail.weekday] : '';
+        
+        // 格式化時段為更友好的格式，包含星期幾
+        timeSlot = `${weekday} ${timeSlot}時段`;
+      }
+      
+      // 根據學生姓名決定開頭稱呼
+      const greeting = studentName && studentName !== '未知學生' 
+        ? `${studentName}媽媽你好` 
+        : '媽媽你好';
+      
+      // 根據學生狀態決定使用「上堂」還是「試堂」
+      const isTrialed = courseInfo?.studentStatus === '已試堂';
+      const lessonType = isTrialed ? '上堂' : '試堂';
+      
+      defaultMessage = `${greeting} :)
+
+哩邊係Hanami Music聯絡你
+之前留過資料想排課堂 ^^
+
+好消息
+有學生調左時間，${courseName}班
+${timeSlot}有一個位 ^^
+
+可以睇下想${formatDate(thisWeekSameDay)}/或${formatDate(nextWeekSameDay)}${lessonType} 
+如果時間上ok，可以盡快回覆我地幫小朋友留位先~ ~:)`;
+    } else {
+      // 已知學生的預設訊息
+      defaultMessage = `您好，我是Hanami Music的老師，想與您討論 ${studentName} 的課程安排。`;
+    }
+    
+    const message = encodeURIComponent(defaultMessage);
+    
+    const whatsappUrl = `https://wa.me/${formattedPhoneNumber}?text=${message}`;
+    
+    // 在新視窗中開啟WhatsApp
+    window.open(whatsappUrl, '_blank');
+  };
+
+  // 保存學生編輯
+  const saveStudentEdit = async () => {
+    if (!editingStudent) return;
+    
+    try {
+      const { error } = await supabase
+        .from('hanami_trial_queue')
+        .update({
+          status: editFormData.status,
+          notes: editFormData.notes,
+          course_types: editFormData.course_types,
+          prefer_time: editFormData.prefer_time
+        })
+        .eq('id', editingStudent.id);
+      
+      if (error) throw error;
+      
+      // 重新載入等候區學生
+      if (selectedSlotDetail) {
+        await loadQueueStudentsForSlot(selectedSlotDetail);
+      }
+      
+      closeStudentEditModal();
+      alert('學生資料已更新');
+    } catch (error) {
+      console.error('更新學生資料失敗:', error);
+      alert('更新失敗，請重試');
+    }
+  };
+
+  // 載入對話記錄
+  const loadConversationHistory = async (phoneNo: string, studentName: string) => {
+    setConversationLoading(true);
+    setSelectedStudentPhone(phoneNo);
+    
+    try {
+      const response = await fetch(`/api/messages/${encodeURIComponent(phoneNo)}`);
+      if (!response.ok) {
+        throw new Error('無法載入對話記錄');
+      }
+      
+      const data = await response.json();
+      setConversationMessages(data.messages || []);
+      setShowConversationModal(true);
+    } catch (error) {
+      console.error('載入對話記錄失敗:', error);
+      alert('載入對話記錄失敗');
+    } finally {
+      setConversationLoading(false);
+    }
+  };
 
   // 載入等候區學生
   const loadQueueStudentsForSlot = async (slot: any) => {
@@ -221,13 +480,13 @@ export default function MultiCourseAvailabilityDashboard() {
         created_at: queueStudent.created_at
       })) || [];
 
-      // 更新選中的時段詳情
-      setSelectedSlotDetail((prev: any) => ({
-        ...prev,
-        queue_students: queueStudents
-      }));
+    // 更新選中的時段詳情
+    setSelectedSlotDetail((prev: any) => ({
+      ...prev,
+      queue_students: queueStudents
+    }));
 
-      console.log(`載入等候區學生完成，匹配到 ${queueStudents.length} 名學生`);
+        console.log(`載入等候區學生完成，匹配到 ${queueStudents.length} 名學生`);
 
     } catch (error) {
       console.error('載入等候區學生失敗:', error);
@@ -566,6 +825,9 @@ export default function MultiCourseAvailabilityDashboard() {
       courseTypesData?.forEach(courseType => {
         courseTypesMap[courseType.id] = courseType.name || '未知課程';
       });
+
+      // 設置課程類型狀態
+      setCourseTypes(courseTypesData || []);
 
       // 更新課程代碼中的教師名稱和課程類型名稱
       Object.keys(courseCodesMap).forEach(courseCode => {
@@ -1507,14 +1769,16 @@ export default function MultiCourseAvailabilityDashboard() {
                   </h3>
                 </div>
                 <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] rounded-lg p-4 min-h-[120px]">
-                  {queueStudentsLoading ? (
+                  {(queueStudentsLoading || batchConversationLoading) ? (
                     <div className="text-center py-8">
                       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
                         <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
-                      <p className="text-[#87704e]">載入等候區學生中...</p>
+                      <p className="text-[#87704e]">
+                        {queueStudentsLoading ? '載入等候區學生中...' : '載入對話記錄中...'}
+                      </p>
                     </div>
                   ) : (selectedSlotDetail.queue_students?.length || 0) > 0 ? (
                     <div className="space-y-4">
@@ -1523,15 +1787,31 @@ export default function MultiCourseAvailabilityDashboard() {
                         student.status === '已試堂'
                       ).length > 0 && (
                         <div>
-                          <div className="flex items-center gap-2 mb-3">
+                          <div 
+                            className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                            onClick={() => toggleSection('tried_students')}
+                          >
                             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                             <h4 className="font-semibold text-[#4B4036] text-sm">
                               已試堂學生 ({(selectedSlotDetail.queue_students || []).filter((s: any) => 
                                 s.status === '已試堂'
                               ).length})
                             </h4>
+                            <div className="ml-auto">
+                              <svg 
+                                className={`w-4 h-4 text-[#87704e] transition-transform duration-200 ${
+                                  expandedSections['tried_students'] ? 'rotate-180' : ''
+                                }`}
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {expandedSections['tried_students'] && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {(selectedSlotDetail.queue_students || [])
                               .filter((student: any) => student.status === '已試堂')
                               .map((student: any, index: number) => (
@@ -1584,6 +1864,28 @@ export default function MultiCourseAvailabilityDashboard() {
                                           })}
                                         </div>
                                       )}
+                                      {student.phone_no && (
+                                        <div 
+                                          className="flex items-center gap-1 cursor-pointer hover:bg-gray-100 p-1 rounded transition-colors"
+                                          onClick={() => loadConversationHistory(student.phone_no, student.full_name)}
+                                          title="點擊查看對話記錄"
+                                        >
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                          </svg>
+                                          <span className="text-xs">
+                                            {batchConversationLoading ? (
+                                              '載入中...'
+                                            ) : (
+                                              batchConversationResults[student.phone_no] ? (
+                                                batchConversationResults[student.phone_no].daysSinceLastMessage !== null
+                                                  ? `最近對話: ${batchConversationResults[student.phone_no].daysSinceLastMessage}天前`
+                                                  : '無對話記錄'
+                                              ) : '無對話記錄'
+                                            )}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                     {student.notes && (
                                       <div className="mt-2 text-xs text-[#87704e] bg-green-50 p-2 rounded border">
@@ -1591,10 +1893,43 @@ export default function MultiCourseAvailabilityDashboard() {
                                       </div>
                                     )}
                                   </div>
+                                   {/* 管理按鈕 */}
+                                   <div className="flex gap-1 mt-2">
+                                     <button
+                                       onClick={() => openStudentEditModal(student)}
+                                       className="flex-1 px-2 py-1 text-xs bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-full hover:from-[#FCD58B] hover:to-[#EBC9A4] transition-all duration-300 transform hover:scale-105 hover:shadow-sm border border-[#EADBC8]"
+                                       title="編輯學生"
+                                     >
+                                       編輯
+                                     </button>
+                                     {student.phone_no && (
+                                       <button
+                                         onClick={() => sendWhatsAppMessage(student.phone_no, student.full_name, {
+                                           courseName: selectedSlotDetail?.course_name,
+                                           timeSlot: selectedSlotDetail?.time,
+                                           studentStatus: student.status
+                                         })}
+                                         className="px-2 py-1 text-xs bg-gradient-to-r from-[#4CAF50] to-[#66BB6A] text-white rounded-full hover:from-[#66BB6A] hover:to-[#4CAF50] transition-all duration-300 transform hover:scale-105 hover:shadow-sm flex items-center justify-center"
+                                         title="發送WhatsApp訊息"
+                                       >
+                                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                                         </svg>
+                                       </button>
+                                     )}
+                                     <button
+                                       onClick={() => deleteQueueStudent(student.id)}
+                                       className="flex-1 px-2 py-1 text-xs bg-gradient-to-r from-[#FFE0E0] to-[#FFD59A] text-[#2B3A3B] rounded-full hover:from-[#FFCCCC] hover:to-[#FCD58B] transition-all duration-300 transform hover:scale-105 hover:shadow-sm border border-[#EADBC8]"
+                                       title="刪除學生"
+                                     >
+                                       刪除
+                                     </button>
+                                   </div>
                                 </div>
                               </motion.div>
                             ))}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1603,15 +1938,31 @@ export default function MultiCourseAvailabilityDashboard() {
                         student.status === '未試堂' || student.status === 'pending'
                       ).length > 0 && (
                         <div>
-                          <div className="flex items-center gap-2 mb-3">
+                          <div 
+                            className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                            onClick={() => toggleSection('pending_students')}
+                          >
                             <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                             <h4 className="font-semibold text-[#4B4036] text-sm">
                               未試堂學生 ({(selectedSlotDetail.queue_students || []).filter((s: any) => 
                                 s.status === '未試堂' || s.status === 'pending'
                               ).length})
                             </h4>
+                            <div className="ml-auto">
+                              <svg 
+                                className={`w-4 h-4 text-[#87704e] transition-transform duration-200 ${
+                                  expandedSections['pending_students'] ? 'rotate-180' : ''
+                                }`}
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {expandedSections['pending_students'] && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {(selectedSlotDetail.queue_students || [])
                               .filter((student: any) => 
                                 student.status === '未試堂' || student.status === 'pending'
@@ -1666,6 +2017,28 @@ export default function MultiCourseAvailabilityDashboard() {
                                           })}
                                         </div>
                                       )}
+                                      {student.phone_no && (
+                                        <div 
+                                          className="flex items-center gap-1 cursor-pointer hover:bg-gray-100 p-1 rounded transition-colors"
+                                          onClick={() => loadConversationHistory(student.phone_no, student.full_name)}
+                                          title="點擊查看對話記錄"
+                                        >
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                          </svg>
+                                          <span className="text-xs">
+                                            {batchConversationLoading ? (
+                                              '載入中...'
+                                            ) : (
+                                              batchConversationResults[student.phone_no] ? (
+                                                batchConversationResults[student.phone_no].daysSinceLastMessage !== null
+                                                  ? `最近對話: ${batchConversationResults[student.phone_no].daysSinceLastMessage}天前`
+                                                  : '無對話記錄'
+                                              ) : '無對話記錄'
+                                            )}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                     {student.notes && (
                                       <div className="mt-2 text-xs text-[#87704e] bg-blue-50 p-2 rounded border">
@@ -1673,10 +2046,43 @@ export default function MultiCourseAvailabilityDashboard() {
                                       </div>
                                     )}
                                   </div>
+                                   {/* 管理按鈕 */}
+                                   <div className="flex gap-1 mt-2">
+                                     <button
+                                       onClick={() => openStudentEditModal(student)}
+                                       className="flex-1 px-2 py-1 text-xs bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-full hover:from-[#FCD58B] hover:to-[#EBC9A4] transition-all duration-300 transform hover:scale-105 hover:shadow-sm border border-[#EADBC8]"
+                                       title="編輯學生"
+                                     >
+                                       編輯
+                                     </button>
+                                     {student.phone_no && (
+                                       <button
+                                         onClick={() => sendWhatsAppMessage(student.phone_no, student.full_name, {
+                                           courseName: selectedSlotDetail?.course_name,
+                                           timeSlot: selectedSlotDetail?.time,
+                                           studentStatus: student.status
+                                         })}
+                                         className="px-2 py-1 text-xs bg-gradient-to-r from-[#4CAF50] to-[#66BB6A] text-white rounded-full hover:from-[#66BB6A] hover:to-[#4CAF50] transition-all duration-300 transform hover:scale-105 hover:shadow-sm flex items-center justify-center"
+                                         title="發送WhatsApp訊息"
+                                       >
+                                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                                         </svg>
+                                       </button>
+                                     )}
+                                     <button
+                                       onClick={() => deleteQueueStudent(student.id)}
+                                       className="flex-1 px-2 py-1 text-xs bg-gradient-to-r from-[#FFE0E0] to-[#FFD59A] text-[#2B3A3B] rounded-full hover:from-[#FFCCCC] hover:to-[#FCD58B] transition-all duration-300 transform hover:scale-105 hover:shadow-sm border border-[#EADBC8]"
+                                       title="刪除學生"
+                                     >
+                                       刪除
+                                     </button>
+                                   </div>
                                 </div>
                               </motion.div>
                             ))}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2141,6 +2547,387 @@ export default function MultiCourseAvailabilityDashboard() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 對話記錄彈窗 */}
+      {showConversationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col"
+          >
+            {/* 彈窗標題 */}
+            <div className="p-6 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="p-3 bg-white rounded-xl mr-4 shadow-sm">
+                    <svg className="w-6 h-6 text-[#2B3A3B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-[#2B3A3B]">對話記錄</h3>
+                    <p className="text-[#2B3A3B]/70">電話: {selectedStudentPhone}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowConversationModal(false)}
+                  className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6 text-[#2B3A3B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* 對話內容 */}
+            <div className="flex-1 overflow-y-auto p-6 bg-[#FFF9F2]">
+              {conversationLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FCD58B] mr-3" />
+                  <span className="text-[#2B3A3B]">載入對話記錄中...</span>
+                </div>
+              ) : conversationMessages.length > 0 ? (
+                <div className="space-y-4">
+                  {conversationMessages.map((message, index) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`flex ${message.direction === 'incoming' ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div className={`max-w-[70%] rounded-2xl p-4 ${
+                        message.direction === 'incoming' 
+                          ? 'bg-white border border-[#EADBC8] text-[#2B3A3B]' 
+                          : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B]'
+                      }`}>
+                        <div className="flex items-center mb-2">
+                          <div className={`w-2 h-2 rounded-full mr-2 ${
+                            message.direction === 'incoming' ? 'bg-blue-500' : 'bg-orange-500'
+                          }`}></div>
+                          <span className="text-xs font-medium">
+                            {message.direction === 'incoming' ? '家長' : '機構'}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-auto">
+                            {new Date(message.timestamp).toLocaleString('zh-TW', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-sm leading-relaxed">{message.content}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <p className="text-[#2B3A3B]/70">暫無對話記錄</p>
+                </div>
+              )}
+            </div>
+
+            {/* 彈窗底部 */}
+            <div className="p-6 border-t border-[#EADBC8] bg-[#FFFDF8] rounded-b-2xl">
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setShowConversationModal(false)}
+                  className="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg border border-[#EADBC8] text-[#4B4036] hover:bg-[#F0F0F0]"
+                >
+                  關閉
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 學生編輯彈窗 */}
+      {showStudentEditModal && editingStudent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden"
+          >
+            {/* 彈窗標題 */}
+            <div className="relative p-8 bg-gradient-to-br from-[#FFD59A] via-[#EBC9A4] to-[#FFB6C1] rounded-t-3xl">
+              <div className="absolute inset-0 bg-white/10 rounded-t-3xl"></div>
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="p-4 bg-white/90 backdrop-blur-sm rounded-2xl mr-6 shadow-lg">
+                    <svg className="w-8 h-8 text-[#2B3A3B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-[#2B3A3B] mb-1">編輯等候區學生</h3>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-white/80 rounded-full flex items-center justify-center text-sm font-bold text-[#2B3A3B]">
+                        {editingStudent.full_name?.charAt(0) || '?'}
+                      </div>
+                      <p className="text-[#2B3A3B]/80 font-medium">{editingStudent.full_name}</p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={closeStudentEditModal}
+                  className="p-3 hover:bg-white/30 rounded-2xl transition-all duration-300 hover:scale-110"
+                >
+                  <svg className="w-6 h-6 text-[#2B3A3B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* 編輯表單 */}
+            <div className="flex-1 overflow-y-auto bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8]">
+              <div className="p-8 space-y-8">
+                {/* 狀態選擇 */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-[#EADBC8]/50">
+                  <label className="block text-lg font-semibold text-[#4B4036] mb-4 flex items-center">
+                    <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full mr-3 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    試堂狀態
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full px-4 py-3 bg-white border-2 border-[#EADBC8] rounded-xl focus:ring-4 focus:ring-[#FCD58B]/30 focus:border-[#FCD58B] transition-all duration-300 appearance-none cursor-pointer text-[#4B4036] font-medium"
+                    >
+                      <option value="未試堂">未試堂</option>
+                      <option value="已試堂">已試堂</option>
+                      <option value="pending">pending</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-5 h-5 text-[#87704e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 備註 */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-[#EADBC8]/50">
+                  <label className="block text-lg font-semibold text-[#4B4036] mb-4 flex items-center">
+                    <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full mr-3 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    備註
+                  </label>
+                  <textarea
+                    value={editFormData.notes}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    rows={4}
+                    className="w-full px-4 py-3 bg-white border-2 border-[#EADBC8] rounded-xl focus:ring-4 focus:ring-[#FCD58B]/30 focus:border-[#FCD58B] transition-all duration-300 resize-none text-[#4B4036] placeholder-[#87704e]"
+                    placeholder="輸入學生備註..."
+                  />
+                </div>
+
+                {/* 課程類型 */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-[#EADBC8]/50">
+                  <label className="block text-lg font-semibold text-[#4B4036] mb-4 flex items-center">
+                    <div className="w-6 h-6 bg-gradient-to-br from-[#EBC9A4] to-[#FFD59A] rounded-full mr-3 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    課程類型
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {courseTypes.map((courseType) => (
+                      <label key={courseType.id} className="flex items-center p-3 bg-white/80 rounded-xl hover:bg-white transition-all duration-300 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.course_types.includes(courseType.name)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                course_types: [...prev.course_types, courseType.name]
+                              }));
+                            } else {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                course_types: prev.course_types.filter(type => type !== courseType.name)
+                              }));
+                            }
+                          }}
+                          className="mr-3 w-5 h-5 text-[#FCD58B] focus:ring-[#FCD58B] rounded border-2 border-[#EADBC8]"
+                        />
+                        <span className="text-[#4B4036] font-medium group-hover:text-[#2B3A3B] transition-colors">{courseType.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 偏好時間 */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-[#EADBC8]/50">
+                  <label className="block text-lg font-semibold text-[#4B4036] mb-4 flex items-center">
+                    <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#FFB6C1] rounded-full mr-3 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    偏好星期
+                  </label>
+                  <div className="grid grid-cols-7 gap-3">
+                    {['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'].map((day, index) => (
+                      <label key={day} className="flex flex-col items-center p-3 bg-white/80 rounded-xl hover:bg-white transition-all duration-300 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.prefer_time?.week?.includes(index) || false}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                prefer_time: {
+                                  ...prev.prefer_time,
+                                  week: [...(prev.prefer_time?.week || []), index]
+                                }
+                              }));
+                            } else {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                prefer_time: {
+                                  ...prev.prefer_time,
+                                  week: (prev.prefer_time?.week || []).filter(w => w !== index)
+                                }
+                              }));
+                            }
+                          }}
+                          className="mb-2 w-5 h-5 text-[#FCD58B] focus:ring-[#FCD58B] rounded border-2 border-[#EADBC8]"
+                        />
+                        <span className="text-xs text-[#4B4036] font-medium group-hover:text-[#2B3A3B] transition-colors">{day.slice(-1)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 時間範圍 */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-[#EADBC8]/50">
+                  <label className="block text-lg font-semibold text-[#4B4036] mb-4 flex items-center">
+                    <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#EBC9A4] rounded-full mr-3 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    偏好時段
+                  </label>
+                  <div className="flex gap-4 justify-center">
+                    {/* AM選擇 */}
+                    <label className="flex items-center p-6 bg-white/80 rounded-2xl hover:bg-white transition-all duration-300 cursor-pointer group border-2 border-transparent hover:border-[#FCD58B] min-w-[140px]">
+                      <input
+                        type="radio"
+                        name="time_period"
+                        value="AM"
+                        checked={(() => {
+                          const range = editFormData.prefer_time?.range;
+                          if (!range || range.length < 2) return false;
+                          // 檢查是否包含AM時段（12:00前）
+                          return range[0]?.includes('AM') || range[1]?.includes('AM') || 
+                                 range[0]?.includes('12:00AM') || range[1]?.includes('12:00AM');
+                        })()}
+                        onChange={(e) => {
+                          const newRange = ['09:00AM', '12:00AM']; // 上午：9:00 - 12:00
+                          setEditFormData(prev => ({
+                            ...prev,
+                            prefer_time: {
+                              ...prev.prefer_time,
+                              range: newRange
+                            }
+                          }));
+                        }}
+                        className="mr-4 w-5 h-5 text-[#FCD58B] focus:ring-[#FCD58B]"
+                      />
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center mb-2 mx-auto">
+                          <svg className="w-6 h-6 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <span className="text-[#4B4036] font-semibold text-lg group-hover:text-[#2B3A3B] transition-colors">上午</span>
+                        <p className="text-xs text-[#87704e] mt-1">9:00 - 12:00</p>
+                      </div>
+                    </label>
+
+                    {/* PM選擇 */}
+                    <label className="flex items-center p-6 bg-white/80 rounded-2xl hover:bg-white transition-all duration-300 cursor-pointer group border-2 border-transparent hover:border-[#FCD58B] min-w-[140px]">
+                      <input
+                        type="radio"
+                        name="time_period"
+                        value="PM"
+                        checked={(() => {
+                          const range = editFormData.prefer_time?.range;
+                          if (!range || range.length < 2) return false;
+                          // 檢查是否包含PM時段（12:00後）
+                          return range[0]?.includes('PM') || range[1]?.includes('PM');
+                        })()}
+                        onChange={(e) => {
+                          const newRange = ['12:00PM', '06:00PM']; // 下午：12:00 - 6:00
+                          setEditFormData(prev => ({
+                            ...prev,
+                            prefer_time: {
+                              ...prev.prefer_time,
+                              range: newRange
+                            }
+                          }));
+                        }}
+                        className="mr-4 w-5 h-5 text-[#FCD58B] focus:ring-[#FCD58B]"
+                      />
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#EBC9A4] to-[#FFB6C1] rounded-full flex items-center justify-center mb-2 mx-auto">
+                          <svg className="w-6 h-6 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <span className="text-[#4B4036] font-semibold text-lg group-hover:text-[#2B3A3B] transition-colors">下午</span>
+                        <p className="text-xs text-[#87704e] mt-1">12:00 - 6:00</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 彈窗底部 */}
+            <div className="p-8 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-t border-[#EADBC8]/50">
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={closeStudentEditModal}
+                  className="px-8 py-3 rounded-full text-sm font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg border-2 border-[#EADBC8] text-[#4B4036] hover:bg-[#F0F0F0] hover:border-[#D4C4A8]"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={saveStudentEdit}
+                  className="px-8 py-3 rounded-full text-sm font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] hover:from-[#FCD58B] hover:to-[#EBC9A4] shadow-md"
+                >
+                  保存變更
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>
