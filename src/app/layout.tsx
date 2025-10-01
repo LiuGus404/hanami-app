@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     siteName: 'HanamiEcho',
     images: [
       {
-        url: '/hanamiicon.png',
+        url: '/hanamiicon-v2.png',
         width: 512,
         height: 512,
         alt: 'HanamiEcho Logo',
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'HanamiEcho | 您的工作和成長夥伴 | 為您工作的AI團隊',
     description: 'HanamiEcho ｜您的工作和成長夥伴 ｜為您工作的AI團隊｜智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持',
-    images: ['/hanamiicon.png'],
+    images: ['/hanamiicon-v2.png'],
   },
   robots: {
     index: true,
@@ -113,21 +113,22 @@ export default async function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
-        <link href="/manifest.json?v=20250101" rel="manifest" />
-        <meta content="#fcf6f2" name="theme-color" />
-        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-        <meta httpEquiv="Pragma" content="no-cache" />
-        <meta httpEquiv="Expires" content="0" />
-        <link href="/apple-touch-icon.png" rel="apple-touch-icon-precomposed" />
-        <link href="/apple-touch-icon-180x180.png" rel="apple-touch-icon" sizes="180x180" />
-        <link href="/apple-touch-icon-167x167.png" rel="apple-touch-icon" sizes="167x167" />
-        <link href="/apple-touch-icon-152x152.png" rel="apple-touch-icon" sizes="152x152" />
-        <link href="/apple-touch-icon-120x120.png" rel="apple-touch-icon" sizes="120x120" />
-        <link href="/hanamiicon-v2.png?v=20250101" rel="icon" sizes="any" type="image/png" />
-        <link href="/hanamiicon-v2.png?v=20250101" rel="icon" sizes="32x32" type="image/png" />
-        <link href="/hanamiicon-v2.png?v=20250101" rel="icon" sizes="16x16" type="image/png" />
-        <link href="/hanamiicon-v2.png?v=20250101" rel="shortcut icon" type="image/png" />
-        <link href="/hanamiicon-v2.png?v=20250101" rel="icon" />
+        {/* Favicon - 使用 PNG 格式從 public 目錄 */}
+        <link rel="icon" type="image/png" sizes="192x192" href="/hanamiicon-v2.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/hanamiicon-v2.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/hanamiicon-v2.png" />
+        <link rel="shortcut icon" href="/hanamiicon-v2.png" />
+        
+        {/* Apple Touch Icons */}
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167x167.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
+        <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png" />
+        
+        {/* PWA Manifest */}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#fcf6f2" />
         
         {/* 結構化資料 */}
         <script
@@ -138,7 +139,7 @@ export default async function RootLayout({
               'name': 'HanamiEcho',
               'description': 'HanamiEcho ｜您的工作和成長夥伴 ｜為您工作的AI團隊｜智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持',
               'url': 'https://hanamiecho.com',
-              'logo': 'https://hanamiecho.com/hanamiicon.png',
+              'logo': 'https://hanamiecho.com/hanamiicon-v2.png',
               'address': {
                 '@type': 'PostalAddress',
                 'addressCountry': 'TW',
