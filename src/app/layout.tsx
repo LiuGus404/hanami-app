@@ -47,9 +47,9 @@ export const metadata: Metadata = {
     siteName: 'HanamiEcho',
     images: [
       {
-        url: '/hanamiicon-v2.png',
-        width: 512,
-        height: 512,
+        url: '/favicon-192.png',
+        width: 192,
+        height: 192,
         alt: 'HanamiEcho Logo',
       },
     ],
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'HanamiEcho | 您的工作和成長夥伴 | 為您工作的AI團隊',
     description: 'HanamiEcho ｜您的工作和成長夥伴 ｜為您工作的AI團隊｜智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持',
-    images: ['/hanamiicon-v2.png'],
+    images: ['/favicon-192.png'],
   },
   robots: {
     index: true,
@@ -113,11 +113,11 @@ export default async function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
-        {/* Favicon - 使用 PNG 格式從 public 目錄 */}
-        <link rel="icon" type="image/png" sizes="192x192" href="/hanamiicon-v2.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/hanamiicon-v2.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/hanamiicon-v2.png" />
-        <link rel="shortcut icon" href="/hanamiicon-v2.png" />
+        {/* Favicon - 使用優化過的小尺寸 PNG */}
+        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-32.png" />
+        <link rel="shortcut icon" href="/favicon-32.png" />
         
         {/* Apple Touch Icons */}
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -139,7 +139,7 @@ export default async function RootLayout({
               'name': 'HanamiEcho',
               'description': 'HanamiEcho ｜您的工作和成長夥伴 ｜為您工作的AI團隊｜智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持',
               'url': 'https://hanamiecho.com',
-              'logo': 'https://hanamiecho.com/hanamiicon-v2.png',
+              'logo': 'https://hanamiecho.com/favicon-192.png',
               'address': {
                 '@type': 'PostalAddress',
                 'addressCountry': 'TW',

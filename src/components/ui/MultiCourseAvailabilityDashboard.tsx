@@ -526,6 +526,27 @@ ${timeSlot}有一個位 ^^
       if (studentsError) throw studentsError;
 
       console.log('載入的所有學生數量:', allStudents?.length || 0);
+      
+      // 調試：檢查是否有星期日 09:15:00 的學生
+      const sundayStudents = allStudents?.filter(s => s.regular_weekday === 0 && s.regular_timeslot === '09:15:00');
+      console.log('星期日 09:15:00 的學生:', sundayStudents?.map(s => ({ 
+        name: s.full_name, 
+        weekday: s.regular_weekday, 
+        timeslot: s.regular_timeslot,
+        timeslotType: typeof s.regular_timeslot,
+        student_type: s.student_type 
+      })));
+      
+      // 調試：檢查所有星期日的學生
+      const allSundayStudents = allStudents?.filter(s => s.regular_weekday === 0);
+      console.log('所有星期日學生:', allSundayStudents?.map(s => ({ 
+        name: s.full_name, 
+        weekday: s.regular_weekday, 
+        timeslot: s.regular_timeslot,
+        timeslotType: typeof s.regular_timeslot,
+        isNull: s.regular_timeslot === null,
+        isUndefined: s.regular_timeslot === undefined
+      })));
 
           // 過濾條件：同時段 + 不在當前時段
           const currentStudentIds = new Set([
@@ -541,8 +562,15 @@ ${timeSlot}有一個位 ^^
             }
 
         // 3. 檢查是否同時段
-        if (!student.regular_weekday || student.regular_timeslot === null || student.regular_timeslot === undefined) {
-          console.log(`學生 ${student.full_name} 沒有設定時段`);
+        if (student.regular_weekday === null || student.regular_weekday === undefined || 
+            student.regular_timeslot === null || student.regular_timeslot === undefined) {
+          console.log(`學生 ${student.full_name} 沒有設定時段`, {
+            regular_weekday: student.regular_weekday,
+            regular_timeslot: student.regular_timeslot,
+            timeslotType: typeof student.regular_timeslot,
+            isNull: student.regular_timeslot === null,
+            isUndefined: student.regular_timeslot === undefined
+          });
           return false;
         }
 

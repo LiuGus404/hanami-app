@@ -19,7 +19,7 @@
   ],
   "headers": [
     {
-      "source": "/(favicon.ico|icon.png|apple-icon.png)",
+      "source": "/(favicon-32.png|favicon-192.png|favicon.ico|icon.png|apple-icon.png)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]
