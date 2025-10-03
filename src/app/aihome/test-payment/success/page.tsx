@@ -1,84 +1,142 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { CheckCircleIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
-export default function PaymentSuccessPage() {
-  const router = useRouter();
+export default function TestPaymentSuccessPage() {
   const searchParams = useSearchParams();
+  const [paymentData, setPaymentData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 通知父視窗支付成功
+    const payment_intent_id = searchParams.get('payment_intent_id');
+    const amount = searchParams.get('amount');
+    const currency = searchParams.get('currency');
+
+    if (payment_intent_id && amount && currency) {
+      setPaymentData({
+        payment_intent_id,
+        amount: parseFloat(amount),
+        currency,
+        status: 'succeeded'
+      });
+    }
+    setIsLoading(false);
+  }, [searchParams]);
+
+  const handlePaymentSuccess = () => {
+    // 發送消息給父窗口
     if (window.opener) {
       window.opener.postMessage({
         type: 'PAYMENT_SUCCESS',
-        data: {
-          payment_intent_id: searchParams.get('payment_intent_id'),
-          status: 'succeeded',
-          amount: searchParams.get('amount'),
-          currency: searchParams.get('currency')
-        }
+        payment_intent_id: paymentData?.payment_intent_id,
+        status: 'succeeded',
+        amount: paymentData?.amount,
+        currency: paymentData?.currency,
+        message: '測試支付成功'
       }, window.location.origin);
-      
-      // 3秒後自動關閉視窗
-      setTimeout(() => {
-        window.close();
-      }, 3000);
     }
-  }, [searchParams]);
+    window.close();
+  };
+
+  const handlePaymentCancel = () => {
+    // 發送消息給父窗口
+    if (window.opener) {
+      window.opener.postMessage({
+        type: 'PAYMENT_CANCELLED',
+        message: '支付已取消'
+      }, window.location.origin);
+    }
+    window.close();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4B4036] mx-auto mb-4"></div>
+          <p className="text-[#4B4036]">載入中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl text-center"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full"
       >
-        <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircleIcon className="w-12 h-12 text-white" />
+        <div className="text-center mb-6">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4"
+          >
+            <CheckCircleIcon className="w-8 h-8 text-green-600" />
+          </motion.div>
+          
+          <h1 className="text-2xl font-bold text-[#4B4036] mb-2">
+            測試支付頁面
+          </h1>
+          
+          <p className="text-[#2B3A3B] mb-6">
+            這是 Airwallex 支付的測試模式頁面
+          </p>
         </div>
-        
-        <h1 className="text-2xl font-bold text-[#4B4036] mb-4">
-          支付成功！
-        </h1>
-        
-        <p className="text-[#2B3A3B] mb-6">
-          您的付款已成功處理，感謝您的支付。
-        </p>
 
-        {searchParams.get('payment_intent_id') && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-            <p className="text-sm text-green-800">
-              <span className="font-medium">支付 ID:</span> {searchParams.get('payment_intent_id')}
-            </p>
+        {paymentData && (
+          <div className="bg-[#FFF9F2] rounded-xl p-4 mb-6">
+            <h3 className="font-semibold text-[#4B4036] mb-3">支付詳情</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-[#2B3A3B]">支付 ID:</span>
+                <span className="font-mono text-[#4B4036]">{paymentData.payment_intent_id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#2B3A3B]">金額:</span>
+                <span className="font-semibold text-[#4B4036]">
+                  {paymentData.currency.toUpperCase()} {paymentData.amount}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#2B3A3B]">狀態:</span>
+                <span className="text-green-600 font-semibold">測試模式</span>
+              </div>
+            </div>
           </div>
         )}
 
         <div className="space-y-3">
           <motion.button
-            onClick={() => window.close()}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full py-3 px-6 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition-all duration-200"
+            onClick={handlePaymentSuccess}
+            className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg"
           >
-            關閉視窗
+            模擬支付成功
           </motion.button>
           
           <motion.button
-            onClick={() => router.push('/aihome/dashboard')}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full py-3 px-6 bg-white text-[#4B4036] border-2 border-[#EADBC8] rounded-xl font-bold hover:border-[#FFD59A] transition-all duration-200"
+            onClick={handlePaymentCancel}
+            className="w-full bg-gradient-to-r from-gray-400 to-gray-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-gray-500 hover:to-gray-600 transition-all duration-200 shadow-lg"
           >
-            返回儀表板
+            取消支付
           </motion.button>
         </div>
 
-        <p className="text-xs text-[#2B3A3B]/70 mt-4">
-          視窗將在 3 秒後自動關閉
-        </p>
+        <div className="mt-6 p-3 bg-yellow-50 rounded-lg">
+          <p className="text-xs text-yellow-800 text-center">
+            <strong>注意：</strong>這是測試模式，不會產生真實的支付交易
+          </p>
+        </div>
       </motion.div>
     </div>
   );

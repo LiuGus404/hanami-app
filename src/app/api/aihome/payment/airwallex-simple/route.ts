@@ -37,7 +37,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body: PaymentRequest = await request.json();
+    let body: PaymentRequest;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      console.error('JSON 解析錯誤:', jsonError);
+      return NextResponse.json(
+        { success: false, error: '無效的 JSON 格式' },
+        { status: 400 }
+      );
+    }
+    
     const { amount, currency, description, return_url, cancel_url } = body;
 
     // 驗證輸入
@@ -170,11 +180,20 @@ export async function POST(request: NextRequest) {
           console.error('資料庫記錄錯誤:', dbError);
         }
 
-        // 構建正確的 checkout URL
-        const checkoutUrl = paymentIntentData.next_action?.redirect_to_url?.url || 
-                           `https://checkout.airwallex.com/pay/${paymentIntentData.id}?client_secret=${paymentIntentData.client_secret || ''}`;
+        // 在開發環境中使用測試支付頁面，生產環境使用真實 Airwallex URL
+        const isDevelopment = process.env.NODE_ENV === 'development';
         
-        console.log('構建的 checkout URL:', checkoutUrl);
+        let checkoutUrl;
+        if (isDevelopment) {
+          // 開發環境：使用本地測試支付頁面
+          checkoutUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/aihome/test-payment/success?payment_intent_id=${paymentIntentData.id}&amount=${amount}&currency=${currency}`;
+          console.log('開發環境 - 使用測試支付頁面:', checkoutUrl);
+        } else {
+          // 生產環境：使用真實 Airwallex URL
+          checkoutUrl = paymentIntentData.next_action?.redirect_to_url?.url || 
+                       `https://checkout.airwallex.com/pay/${paymentIntentData.id}?client_secret=${paymentIntentData.client_secret || ''}`;
+          console.log('生產環境 - 使用真實 Airwallex URL:', checkoutUrl);
+        }
         
         return NextResponse.json({
           success: true,
@@ -183,7 +202,8 @@ export async function POST(request: NextRequest) {
           status: paymentIntentData.status,
           amount: paymentIntentData.amount,
           currency: paymentIntentData.currency,
-          message: '真實 Payment Intent 創建成功！'
+          message: isDevelopment ? '開發環境 - 使用測試支付頁面' : '真實 Payment Intent 創建成功！',
+          is_test_mode: isDevelopment
         });
       } else {
         // Payment Intent 創建失敗，使用模擬方式
@@ -225,7 +245,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         payment_intent_id: requestId,
-        checkout_url: `https://checkout.airwallex.com/pay/${requestId}`,
+        checkout_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/aihome/test-payment/success?payment_intent_id=${requestId}&amount=${amount}&currency=${currency}`,
         status: 'requires_payment_method',
         amount: amount,
         currency: currency,

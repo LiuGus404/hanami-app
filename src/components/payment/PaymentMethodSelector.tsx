@@ -71,30 +71,57 @@ export default function PaymentMethodSelector({
             message: '測試支付成功'
           });
         } else {
-          // 生產模式：直接跳轉到 Airwallex 支付頁面
-          console.log('跳轉到 Airwallex 支付頁面:', result.checkout_url);
-          window.location.href = result.checkout_url;
-        }
-
-        // 監聽支付完成消息
-        const handleMessage = (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return;
+          // 生產模式：使用彈窗打開 Airwallex 支付頁面
+          console.log('打開 Airwallex 支付彈窗:', result.checkout_url);
           
-          if (event.data.type === 'PAYMENT_SUCCESS') {
-            onPaymentSuccess?.(event.data);
-            window.removeEventListener('message', handleMessage);
-          } else if (event.data.type === 'PAYMENT_CANCELLED') {
-            onPaymentError?.('支付已取消');
-            window.removeEventListener('message', handleMessage);
+          // 創建彈窗
+          const paymentWindow = window.open(
+            result.checkout_url,
+            'airwallex_payment',
+            'width=800,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+          );
+
+          if (!paymentWindow) {
+            throw new Error('無法打開支付彈窗，請檢查瀏覽器彈窗攔截設置');
           }
-        };
 
-        window.addEventListener('message', handleMessage);
+          // 監聽彈窗關閉
+          const checkClosed = setInterval(() => {
+            if (paymentWindow.closed) {
+              clearInterval(checkClosed);
+              window.removeEventListener('message', handleMessage);
+              onPaymentError?.('支付已取消');
+            }
+          }, 1000);
 
-        // 5分鐘後自動清理
-        setTimeout(() => {
-          window.removeEventListener('message', handleMessage);
-        }, 300000);
+          // 監聽支付完成消息
+          const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            
+            if (event.data.type === 'PAYMENT_SUCCESS') {
+              clearInterval(checkClosed);
+              paymentWindow.close();
+              onPaymentSuccess?.(event.data);
+              window.removeEventListener('message', handleMessage);
+            } else if (event.data.type === 'PAYMENT_CANCELLED') {
+              clearInterval(checkClosed);
+              paymentWindow.close();
+              onPaymentError?.('支付已取消');
+              window.removeEventListener('message', handleMessage);
+            }
+          };
+
+          window.addEventListener('message', handleMessage);
+
+          // 5分鐘後自動清理
+          setTimeout(() => {
+            clearInterval(checkClosed);
+            if (!paymentWindow.closed) {
+              paymentWindow.close();
+            }
+            window.removeEventListener('message', handleMessage);
+          }, 300000);
+        }
 
       } else {
         throw new Error(result.error || '支付創建失敗');

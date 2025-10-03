@@ -68,7 +68,13 @@ export const createAirwallexPayment = async (request: PaymentRequest): Promise<A
       body: JSON.stringify(request),
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('響應 JSON 解析錯誤:', jsonError);
+      throw new Error(`響應格式錯誤: ${response.status} ${response.statusText}`);
+    }
     
     if (!response.ok) {
       throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);

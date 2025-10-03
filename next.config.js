@@ -62,6 +62,33 @@ const nextConfig = {
   // 嚴格模式
   reactStrictMode: true,
   
+  // Content Security Policy 配置 (暫時禁用)
+  // async headers() {
+  //   return [
+  //     {
+  //       source: '/(.*)',
+  //       headers: [
+  //         {
+  //           key: 'Content-Security-Policy',
+  //           value: [
+  //             "default-src 'self'",
+  //             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.airwallex.com https://static.airwallex.com https://js.stripe.com",
+  //             "style-src 'self' 'unsafe-inline' https://checkout.airwallex.com https://static.airwallex.com",
+  //             "img-src 'self' data: https: blob:",
+  //             "font-src 'self' data: https:",
+  //             "connect-src 'self' https://api.airwallex.com https://checkout.airwallex.com https://static.airwallex.com https://o11y.airwallex.com https://laowyqplcthwqckyigiy.supabase.co https://*.supabase.co wss://*.supabase.co",
+  //             "frame-src 'self' https://checkout.airwallex.com https://js.stripe.com",
+  //             "object-src 'none'",
+  //             "base-uri 'self'",
+  //             "form-action 'self'",
+  //             "frame-ancestors 'none'"
+  //           ].join('; ')
+  //         }
+  //       ]
+  //     }
+  //   ]
+  // },
+  
   // 類型檢查
   typescript: {
     ignoreBuildErrors: false,
