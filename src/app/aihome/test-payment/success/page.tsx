@@ -1,166 +1,85 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { 
-  CheckCircleIcon,
-  ArrowLeftIcon,
-  HomeIcon
-} from '@heroicons/react/24/outline';
-import { HanamiButton } from '@/components/ui/HanamiButton';
-import { HanamiCard } from '@/components/ui/HanamiCard';
+import { CheckCircleIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 export default function PaymentSuccessPage() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const [paymentDetails, setPaymentDetails] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    // 從 URL 參數獲取付款資訊
-    const payment_intent_id = searchParams.get('payment_intent_id');
-    const status = searchParams.get('status');
-    const amount = searchParams.get('amount');
-    const currency = searchParams.get('currency');
-
-    if (payment_intent_id) {
-      setPaymentDetails({
-        payment_intent_id,
-        status,
-        amount,
-        currency
-      });
+    // 通知父視窗支付成功
+    if (window.opener) {
+      window.opener.postMessage({
+        type: 'PAYMENT_SUCCESS',
+        data: {
+          payment_intent_id: searchParams.get('payment_intent_id'),
+          status: 'succeeded',
+          amount: searchParams.get('amount'),
+          currency: searchParams.get('currency')
+        }
+      }, window.location.origin);
+      
+      // 3秒後自動關閉視窗
+      setTimeout(() => {
+        window.close();
+      }, 3000);
     }
-    
-    setLoading(false);
   }, [searchParams]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
-          <p className="text-[#4B4036]">載入中...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] py-12">
-      <div className="max-w-2xl mx-auto px-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
-          className="text-center"
-        >
-          {/* 成功圖標 */}
-          <div className="mb-8">
-            <div className="w-24 h-24 bg-[#10B981] rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircleIcon className="w-16 h-16 text-white" />
-            </div>
-            <h1 className="text-4xl font-bold text-[#4B4036] mb-4">
-              付款成功！
-            </h1>
-            <p className="text-lg text-[#2B3A3B]">
-              感謝您的付款，我們已收到您的付款
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl text-center"
+      >
+        <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircleIcon className="w-12 h-12 text-white" />
+        </div>
+        
+        <h1 className="text-2xl font-bold text-[#4B4036] mb-4">
+          支付成功！
+        </h1>
+        
+        <p className="text-[#2B3A3B] mb-6">
+          您的付款已成功處理，感謝您的支付。
+        </p>
+
+        {searchParams.get('payment_intent_id') && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-green-800">
+              <span className="font-medium">支付 ID:</span> {searchParams.get('payment_intent_id')}
             </p>
           </div>
+        )}
 
-          {/* 付款詳情 */}
-          {paymentDetails && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="mb-8"
-            >
-              <HanamiCard className="p-6">
-                <h2 className="text-xl font-semibold text-[#4B4036] mb-4">
-                  付款詳情
-                </h2>
-                <div className="space-y-3 text-left">
-                  <div className="flex justify-between">
-                    <span className="text-[#2B3A3B]">付款 ID:</span>
-                    <span className="font-mono text-sm text-[#4B4036]">
-                      {paymentDetails.payment_intent_id}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#2B3A3B]">狀態:</span>
-                    <span className="text-[#10B981] font-medium">
-                      {paymentDetails.status === 'succeeded' ? '成功' : paymentDetails.status}
-                    </span>
-                  </div>
-                  {paymentDetails.amount && (
-                    <div className="flex justify-between">
-                      <span className="text-[#2B3A3B]">金額:</span>
-                      <span className="font-semibold text-[#4B4036]">
-                        {paymentDetails.currency} {paymentDetails.amount}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-[#2B3A3B]">付款時間:</span>
-                    <span className="text-[#4B4036]">
-                      {new Date().toLocaleString('zh-TW')}
-                    </span>
-                  </div>
-                </div>
-              </HanamiCard>
-            </motion.div>
-          )}
-
-          {/* 後續步驟 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="mb-8"
+        <div className="space-y-3">
+          <motion.button
+            onClick={() => window.close()}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full py-3 px-6 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition-all duration-200"
           >
-            <HanamiCard className="p-6 bg-[#E0F2E0] border border-[#10B981]">
-              <h3 className="text-lg font-semibold text-[#4B4036] mb-3">
-                後續步驟
-              </h3>
-              <ul className="text-left text-[#2B3A3B] space-y-2">
-                <li>• 我們將在 1-2 個工作天內處理您的付款</li>
-                <li>• 您將收到付款確認郵件</li>
-                <li>• 如有任何問題，請聯繫我們的客服</li>
-                <li>• 付款記錄已保存在您的帳戶中</li>
-              </ul>
-            </HanamiCard>
-          </motion.div>
-
-          {/* 操作按鈕 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
+            關閉視窗
+          </motion.button>
+          
+          <motion.button
+            onClick={() => router.push('/aihome/dashboard')}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full py-3 px-6 bg-white text-[#4B4036] border-2 border-[#EADBC8] rounded-xl font-bold hover:border-[#FFD59A] transition-all duration-200"
           >
-            <HanamiButton
-              onClick={() => router.push('/aihome/dashboard')}
-              size="lg"
-              className="flex items-center"
-            >
-              <HomeIcon className="w-5 h-5 mr-2" />
-              返回儀表板
-            </HanamiButton>
-            <HanamiButton
-              onClick={() => router.push('/aihome/test-payment')}
-              variant="secondary"
-              size="lg"
-              className="flex items-center"
-            >
-              <ArrowLeftIcon className="w-5 h-5 mr-2" />
-              再次測試
-            </HanamiButton>
-          </motion.div>
-        </motion.div>
-      </div>
+            返回儀表板
+          </motion.button>
+        </div>
+
+        <p className="text-xs text-[#2B3A3B]/70 mt-4">
+          視窗將在 3 秒後自動關閉
+        </p>
+      </motion.div>
     </div>
   );
 }
-

@@ -82,7 +82,7 @@ export const createAirwallexPayment = async (request: PaymentRequest): Promise<A
 };
 
 // 上傳付款截圖
-export const uploadScreenshot = async (uploadData: ScreenshotUploadData): Promise<{ success: boolean; url?: string; error?: string }> => {
+export const uploadScreenshot = async (uploadData: ScreenshotUploadData & { userId?: string }): Promise<{ success: boolean; url?: string; data?: any; error?: string }> => {
   try {
     // 驗證檔案
     if (!validateFileType(uploadData.file)) {
@@ -98,6 +98,9 @@ export const uploadScreenshot = async (uploadData: ScreenshotUploadData): Promis
     formData.append('file', uploadData.file);
     formData.append('amount', uploadData.amount.toString());
     formData.append('description', uploadData.description);
+    if (uploadData.userId) {
+      formData.append('userId', uploadData.userId);
+    }
     if (uploadData.metadata) {
       formData.append('metadata', JSON.stringify(uploadData.metadata));
     }
@@ -113,7 +116,12 @@ export const uploadScreenshot = async (uploadData: ScreenshotUploadData): Promis
       throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return data;
+    return {
+      success: data.success,
+      url: data.data?.screenshot_url,
+      data: data.data,
+      error: data.error
+    };
   } catch (error) {
     console.error('截圖上傳失敗:', error);
     return {

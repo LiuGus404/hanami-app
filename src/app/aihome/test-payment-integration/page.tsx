@@ -91,6 +91,38 @@ export default function TestPaymentIntegrationPage() {
           showPaymentActions={true}
         />
 
+        {/* 支付流程說明 */}
+        <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-6 border border-[#EADBC8] mt-8">
+          <h3 className="text-lg font-bold text-[#4B4036] mb-4">支付流程說明</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold text-[#4B4036] mb-2">📸 截圖上傳流程：</h4>
+              <ol className="text-sm text-[#2B3A3B] space-y-1 list-decimal list-inside">
+                <li>選擇「上傳付款截圖」</li>
+                <li>點擊上傳區域選擇圖片檔案</li>
+                <li>系統自動驗證檔案類型和大小</li>
+                <li>點擊「上傳付款截圖」按鈕</li>
+                <li>檔案上傳到 Supabase Storage</li>
+                <li>支付記錄創建到資料庫</li>
+                <li>顯示成功訊息</li>
+              </ol>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-[#4B4036] mb-2">💳 Airwallex 支付流程：</h4>
+              <ol className="text-sm text-[#2B3A3B] space-y-1 list-decimal list-inside">
+                <li>選擇「Airwallex 線上支付」</li>
+                <li>點擊「在新視窗中打開 Airwallex 支付」</li>
+                <li>系統創建支付請求並獲取支付 URL</li>
+                <li>新視窗打開 Airwallex 支付頁面</li>
+                <li>用戶在 Airwallex 頁面完成支付</li>
+                <li>支付完成後自動關閉視窗</li>
+                <li>返回原頁面並顯示支付結果</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
         {/* 測試說明 */}
         <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-6 border border-[#EADBC8] mt-8">
           <h3 className="text-lg font-bold text-[#4B4036] mb-4">測試說明</h3>

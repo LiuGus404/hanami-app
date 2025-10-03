@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
     const amount = parseFloat(formData.get('amount') as string);
     const description = formData.get('description') as string;
     const metadataStr = formData.get('metadata') as string;
+    const userId = formData.get('userId') as string;
 
     if (!file) {
       return NextResponse.json(
@@ -81,6 +82,15 @@ export async function POST(request: NextRequest) {
       .from('hanami-saas-system')
       .getPublicUrl(fileName);
 
+    // 同時獲取簽名 URL 作為備用
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from('hanami-saas-system')
+      .createSignedUrl(fileName, 3600); // 1小時有效期
+
+    console.log('公開 URL:', urlData.publicUrl);
+    console.log('簽名 URL:', signedUrlData?.signedUrl);
+    console.log('簽名 URL 錯誤:', signedUrlError);
+
     // 解析元數據
     let metadata = {};
     if (metadataStr) {
@@ -102,6 +112,7 @@ export async function POST(request: NextRequest) {
         screenshot_url: urlData.publicUrl,
         file_name: fileName,
         status: 'pending',
+        user_id: userId, // 添加用戶 ID
         created_at: new Date().toISOString(),
         metadata: {
           ...metadata,
@@ -128,7 +139,9 @@ export async function POST(request: NextRequest) {
       message: '付款截圖上傳成功！我們將盡快確認您的付款。',
       data: {
         record_id: recordData.id,
-        screenshot_url: urlData.publicUrl,
+        screenshot_url: signedUrlData?.signedUrl || urlData.publicUrl,
+        public_url: urlData.publicUrl,
+        signed_url: signedUrlData?.signedUrl,
         file_name: fileName,
         amount: amount,
         description: description

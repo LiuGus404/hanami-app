@@ -598,6 +598,18 @@ export default function HanamiMusicRegisterPage() {
     }
   };
 
+  // 處理支付成功後的跳轉
+  const handlePaymentSuccess = (data: any) => {
+    console.log('支付成功:', data);
+    
+    // 如果是 Airwallex 支付成功，直接跳轉到確認頁面
+    if (formData.paymentMethod === 'airwallex') {
+      setCurrentStep(6); // 跳轉到確認提交步驟
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    // 如果是截圖上傳，保持在當前步驟，顯示上傳成功狀態
+  };
+
   // 上一步
   const handlePrev = () => {
     const prevStep = Math.max(currentStep - 1, 0);
@@ -1702,15 +1714,13 @@ export default function HanamiMusicRegisterPage() {
                       ? `試堂報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班`
                       : `常規課程報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班 - ${coursePlans.find(p => p.id === formData.selectedPlan)?.name}`
                     }
-                    onPaymentSuccess={(data) => {
-                      console.log('支付成功:', data);
-                      // 可以在這裡處理支付成功後的邏輯
-                    }}
+                    onPaymentSuccess={handlePaymentSuccess}
                     onPaymentError={(error) => {
                       console.error('支付錯誤:', error);
                       setErrors(prev => ({ ...prev, paymentMethod: error }));
                     }}
-                    showPaymentActions={false}
+                    showPaymentActions={true}
+                    user={user}
                   />
                 )}
 
@@ -1876,19 +1886,28 @@ export default function HanamiMusicRegisterPage() {
               </motion.button>
             )}
             
-            <motion.button
-              onClick={currentStep === steps.length - 1 ? handleSubmit : handleNext}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-200 flex-1"
-            >
-              <span className="text-sm sm:text-base">
-                {currentStep === steps.length - 1 ? '提交報名' : '下一步'}
-              </span>
-              {currentStep < steps.length - 1 && (
-                <ChevronRightIcon className="w-5 h-5 ml-1 sm:ml-2" />
-              )}
-            </motion.button>
+            {/* 只有不是支付步驟，或者是支付步驟但選擇了截圖上傳時，才顯示下一步按鈕 */}
+            {!(currentStep === 5) || (currentStep === 5 && formData.paymentMethod === 'screenshot') ? (
+              <motion.button
+                onClick={currentStep === steps.length - 1 ? handleSubmit : handleNext}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-200 flex-1"
+              >
+                <span className="text-sm sm:text-base">
+                  {currentStep === steps.length - 1 ? '提交報名' : '下一步'}
+                </span>
+                {currentStep < steps.length - 1 && (
+                  <ChevronRightIcon className="w-5 h-5 ml-1 sm:ml-2" />
+                )}
+              </motion.button>
+            ) : (
+              <div className="flex-1 text-center">
+                <p className="text-sm text-[#2B3A3B]/70">
+                  請完成 Airwallex 支付後，系統將自動跳轉
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
