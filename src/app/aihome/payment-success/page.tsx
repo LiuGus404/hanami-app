@@ -26,6 +26,7 @@ export default function PaymentSuccessPage() {
       
       // 通知父窗口支付成功（如果在彈窗中）
       if (window.opener) {
+        console.log('🔔 通知父視窗支付成功');
         window.opener.postMessage({
           type: 'PAYMENT_SUCCESS',
           success: true,
@@ -35,14 +36,21 @@ export default function PaymentSuccessPage() {
           currency: currency,
           message: '支付成功！'
         }, window.location.origin);
+        
+        // 延遲關閉視窗，確保消息已發送
+        setTimeout(() => {
+          window.close();
+        }, 1000);
       }
     }
   }, [searchParams]);
 
   const handleClose = () => {
     if (window.opener) {
+      // 如果在彈窗中，關閉視窗
       window.close();
     } else {
+      // 如果不在彈窗中，跳轉到定價頁面
       router.push('/aihome/pricing');
     }
   };

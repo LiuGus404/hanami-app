@@ -594,7 +594,7 @@ export default function TeacherZonePage() {
         
         console.log(`🔍 學生活動去重調試 - 學生ID: ${studentId}`);
         console.log(`📊 合併前總數: ${allActivities.length}`);
-        console.log(`📋 活動ID列表:`, allActivities.map(a => ({ id: a.id, name: a.activityName || a.custom_activity_name })));
+        console.log(`📋 活動ID列表:`, allActivities.map(a => ({ id: a.id, name: a.activityName || a.custom_activity_name, progress: a.progress })));
         
         // 更強的去重邏輯（基於活動ID和活動名稱）
         const uniqueActivities = allActivities.filter((activity, index, self) => {
@@ -611,7 +611,7 @@ export default function TeacherZonePage() {
         });
         
         console.log(`📊 去重後總數: ${uniqueActivities.length}`);
-        console.log(`📋 去重後活動:`, uniqueActivities.map(a => ({ id: a.id, name: a.activityName || a.custom_activity_name })));
+        console.log(`📋 去重後活動:`, uniqueActivities.map(a => ({ id: a.id, name: a.activityName || a.custom_activity_name, progress: a.progress })));
         
         // 過濾出未完成的活動
         const incompleteActivities = uniqueActivities.filter(activity => activity.completionStatus !== 'completed');
@@ -2080,7 +2080,13 @@ export default function TeacherZonePage() {
                                      console.log(`📋 渲染學生活動 - 課程ID: ${lesson.id}, 展開狀態: ${isExpanded}, 總活動數: ${studentAssignedActivities.length}, 顯示數量: ${displayCount}`);
                                      return studentAssignedActivities
                                        .slice(0, displayCount)
-                                       .map((activity, activityIndex) => (
+                                       .map((activity, activityIndex) => {
+                                         console.log(`🎯 渲染活動 ${activity.id}:`, { 
+                                           name: activity.activityName, 
+                                           progress: activity.progress, 
+                                           completionStatus: activity.completionStatus 
+                                         });
+                                         return (
                                        <div key={`ongoing-${activity.id}-${activityIndex}`} className="bg-gradient-to-r from-blue-50 to-indigo-50 backdrop-blur-sm rounded-lg p-3 border border-blue-200/30 hover:bg-blue-100/50 transition-colors">
                                          <div className="space-y-2">
                                            {/* 活動狀態和名稱 */}
@@ -2098,24 +2104,6 @@ export default function TeacherZonePage() {
                                                   activity.completionStatus === 'in_progress' ? '進行中' : '學習中'}
                                                </span>
                                              </div>
-                                             <button
-                                               onClick={() => {
-                                                 if (editingProgressActivityId === activity.id) {
-                                                   setEditingProgressActivityId(null);
-                                                   toast('已退出編輯模式');
-                                                 } else {
-                                                   setEditingProgressActivityId(activity.id);
-                                                   toast('已進入編輯模式，可以拖拽調整進度');
-                                                 }
-                                               }}
-                                               className={`p-1 transition-colors hover:scale-110 transform ${
-                                                 editingProgressActivityId === activity.id 
-                                                   ? 'text-green-600 hover:text-green-800' 
-                                                   : 'text-blue-600 hover:text-blue-800'
-                                               }`}
-                                             >
-                                               <PencilIcon className="w-3 h-3" />
-                                             </button>
                                            </div>
                                            
                                            {/* 活動詳細資訊 */}
@@ -2141,8 +2129,8 @@ export default function TeacherZonePage() {
                                                  <span>進度</span>
                                                  <span className="progress-text">{(() => {
                                                    const progress = activity.progress || 0;
-                                                   const normalizedProgress = progress > 1 ? progress / 100 : progress;
-                                                   return Math.round(normalizedProgress * 100);
+                                                   // 確保進度值在 0-100 範圍內
+                                                   return Math.round(Math.max(0, Math.min(100, progress)));
                                                  })()}%</span>
                                                </div>
                                                <div className="relative">
@@ -2163,8 +2151,8 @@ export default function TeacherZonePage() {
                                                      className="progress-bar-fill bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300 ease-out"
                                                      style={{ width: `${(() => {
                                                        const progress = activity.progress || 0;
-                                                       const normalizedProgress = progress > 1 ? progress / 100 : progress;
-                                                       return Math.min(normalizedProgress * 100, 100);
+                                                       // 確保進度值在 0-100 範圍內
+                                                       return Math.max(0, Math.min(100, progress));
                                                      })()}%` }}
                                                    ></div>
                                                  </div>
@@ -2174,13 +2162,12 @@ export default function TeacherZonePage() {
                                                      style={{ 
                                                        left: `${(() => {
                                                          const progress = activity.progress || 0;
-                                                         const normalizedProgress = progress > 1 ? progress / 100 : progress;
-                                                         return Math.min(normalizedProgress * 100, 100);
+                                                         // 確保進度值在 0-100 範圍內
+                                                         return Math.max(0, Math.min(100, progress));
                                                        })()}%`
                                                      }}
                                                    >
                                                      <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                                                       <PencilIcon className="w-2 h-2 text-white" />
                                                      </div>
                                                    </div>
                                                  )}
@@ -2197,7 +2184,8 @@ export default function TeacherZonePage() {
                                            </div>
                                          </div>
                                        </div>
-                                     ));
+                                     );
+                                   });
                                    })()}
                                    
                                    {/* 展開/收起按鈕 - 只有多於一個活動時才顯示 */}

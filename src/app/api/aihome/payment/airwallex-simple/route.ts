@@ -13,6 +13,10 @@ interface PaymentRequest {
   description: string;
   return_url: string;
   cancel_url: string;
+  // 用戶預填信息
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -155,7 +159,16 @@ export async function POST(request: NextRequest) {
           type: 'Hanami Music Lesson Payment'
         },
         return_url: publicReturnUrl,
-        cancel_url: publicCancelUrl
+        cancel_url: publicCancelUrl,
+        // 添加用戶預填信息
+        ...(body.customer_name || body.customer_email ? {
+          customer: {
+            ...(body.customer_name && { first_name: body.customer_name.split(' ')[0] || body.customer_name }),
+            ...(body.customer_name && body.customer_name.split(' ').length > 1 && { last_name: body.customer_name.split(' ').slice(1).join(' ') }),
+            ...(body.customer_email && { email: body.customer_email }),
+            ...(body.customer_phone && { phone_number: body.customer_phone })
+          }
+        } : {})
       };
 
       console.log('嘗試創建 Payment Intent (根據 Postman 集合):', JSON.stringify(paymentIntentRequest, null, 2));
@@ -190,9 +203,13 @@ export async function POST(request: NextRequest) {
         } else {
           // 根據 Airwallex 文檔，使用正確的結帳 URL 格式
           // 注意：Airwallex 結帳頁面可能需要特定的 URL 格式
-          finalCheckoutUrl = `https://checkout.airwallex.com/pay/${paymentIntentData.id}`;
+          // 嘗試不同的 URL 格式
           if (paymentIntentData.client_secret) {
-            finalCheckoutUrl += `?client_secret=${paymentIntentData.client_secret}`;
+            // 格式 1: 使用 client_secret 參數
+            finalCheckoutUrl = `https://checkout.airwallex.com/pay/${paymentIntentData.id}?client_secret=${paymentIntentData.client_secret}`;
+          } else {
+            // 格式 2: 僅使用 Payment Intent ID
+            finalCheckoutUrl = `https://checkout.airwallex.com/pay/${paymentIntentData.id}`;
           }
           console.log('✅ 使用標準結帳 URL 格式:', finalCheckoutUrl);
         }
@@ -208,6 +225,33 @@ export async function POST(request: NextRequest) {
           available_payment_method_types: paymentIntentData.available_payment_method_types
         });
         
+        // 嘗試確認 Payment Intent 以獲取正確的結帳 URL
+        try {
+          console.log('🔄 嘗試確認 Payment Intent...');
+          const confirmResponse = await fetch(`${AIRWALLEX_BASE_URL}/pa/payment_intents/${paymentIntentData.id}/confirm`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+              'x-api-version': '2020-06-30',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              request_id: `hanami_confirm_${Date.now()}_${Math.random().toString(36).substring(2)}`
+            })
+          });
+          
+          const confirmData = await confirmResponse.json();
+          console.log('Payment Intent 確認回應:', JSON.stringify(confirmData, null, 2));
+          
+          if (confirmResponse.ok && confirmData.next_action?.redirect_to_url?.url) {
+            finalCheckoutUrl = confirmData.next_action.redirect_to_url.url;
+            console.log('✅ 使用確認後的 redirect_to_url:', finalCheckoutUrl);
+          }
+        } catch (confirmError) {
+          console.log('❌ Payment Intent 確認失敗:', confirmError);
+        }
+        
         // 嘗試創建 Payment Link 作為備用方案
         let paymentLinkUrl = null;
         try {
@@ -219,13 +263,23 @@ export async function POST(request: NextRequest) {
             currency: currency.toUpperCase(),
             title: description,
             description: description,
+            reusable: false, // 添加缺少的 reusable 參數
             metadata: {
               source: 'hanami_payment_system',
               description: description,
               payment_intent_id: paymentIntentData.id
             },
             return_url: publicReturnUrl,
-            cancel_url: publicCancelUrl
+            cancel_url: publicCancelUrl,
+            // 添加用戶預填信息到 Payment Link
+            ...(body.customer_name || body.customer_email ? {
+              customer: {
+                ...(body.customer_name && { first_name: body.customer_name.split(' ')[0] || body.customer_name }),
+                ...(body.customer_name && body.customer_name.split(' ').length > 1 && { last_name: body.customer_name.split(' ').slice(1).join(' ') }),
+                ...(body.customer_email && { email: body.customer_email }),
+                ...(body.customer_phone && { phone_number: body.customer_phone })
+              }
+            } : {})
           };
           
           const paymentLinkResponse = await fetch(`${AIRWALLEX_BASE_URL}/pa/payment_links/create`, {

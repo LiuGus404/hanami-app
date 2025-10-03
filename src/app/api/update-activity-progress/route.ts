@@ -47,7 +47,7 @@ async function handleUpdate(request: NextRequest) {
 
     if (shouldComplete) {
       updateData.completion_status = 'completed';
-      updateData.completion_date = new Date().toISOString();
+      updateData.completed_at = new Date().toISOString();
     }
 
     const { error: updateErr } = await (supabase as any)

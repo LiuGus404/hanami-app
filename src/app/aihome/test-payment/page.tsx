@@ -431,7 +431,7 @@ export default function TestPaymentPage() {
                     className="w-full"
                     size="lg"
                   >
-                    {airwallexLoading ? '處理中...' : '前往 Airwallex 支付'}
+                    {airwallexLoading ? '處理中...' : '在新視窗中打開 Airwallex 支付'}
                   </HanamiButton>
                 </div>
               )}

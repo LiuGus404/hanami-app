@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { XCircleIcon } from '@heroicons/react/24/outline';
 import { PAYMENT_METHODS, createAirwallexPayment, uploadScreenshot } from '@/lib/paymentUtils';
 import { PaymentMethod as PaymentMethodType, PaymentRequest, ScreenshotUploadData } from '@/types/payment';
+import { getPrimaryPaymeFpsAccount, formatPaymePhone, generatePaymePaymentInstructions } from '@/lib/paymeFpsUtils';
+import { PaymentInfo } from '@/types/payme-fps';
+import { SimpleDiscountInfo } from '@/types/simple-promo-codes';
+import SimplePromoCodeInput from './SimplePromoCodeInput';
 
 interface PaymentMethodSelectorProps {
   selectedMethod: string;
@@ -16,7 +20,12 @@ interface PaymentMethodSelectorProps {
   onPaymentError?: (error: string) => void;
   className?: string;
   showPaymentActions?: boolean;
-  user?: { id: string } | null;
+  user?: { 
+    id: string; 
+    full_name?: string; 
+    email?: string; 
+    phone?: string; 
+  } | null;
 }
 
 export default function PaymentMethodSelector({
@@ -40,6 +49,46 @@ export default function PaymentMethodSelector({
   const [backupImageUrl, setBackupImageUrl] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
+  const [discountInfo, setDiscountInfo] = useState<SimpleDiscountInfo | null>(null);
+
+  // 載入支付資訊
+  useEffect(() => {
+    const loadPaymentInfo = async () => {
+      try {
+        console.log('🔄 開始載入支付資訊...');
+        const info = await getPrimaryPaymeFpsAccount();
+        console.log('📋 載入的支付資訊:', info);
+        setPaymentInfo(info);
+      } catch (error) {
+        console.error('❌ 載入支付資訊失敗:', error);
+        
+        // 如果 API 載入失敗，使用硬編碼的備用資料
+        console.log('🔄 使用備用支付資訊...');
+        const fallbackInfo: PaymentInfo = {
+          payme_phone: '+852-92570768',
+          payme_name: 'HanamiEcho',
+          payme_link: 'https://payme.hsbc/hanamiecho',
+          fps_phone: '+852-98271410',
+          fps_name: 'Hanami Music Ltd',
+          fps_link: undefined,
+          notes: 'HanamiEcho支付帳戶'
+        };
+        console.log('📋 備用支付資訊:', fallbackInfo);
+        setPaymentInfo(fallbackInfo);
+      }
+    };
+
+    loadPaymentInfo();
+  }, []);
+
+  // 處理折扣應用
+  const handleDiscountApplied = (discount: SimpleDiscountInfo | null) => {
+    setDiscountInfo(discount);
+  };
+
+  // 計算最終金額
+  const finalAmount = discountInfo ? discountInfo.final_amount : amount;
 
   // 處理 Airwallex 支付
   const handleAirwallexPayment = async () => {
@@ -48,11 +97,15 @@ export default function PaymentMethodSelector({
     
     try {
       const paymentRequest: PaymentRequest = {
-        amount: amount,
+        amount: finalAmount,
         currency: currency.toUpperCase(),
         description: description,
         return_url: `${window.location.origin}/aihome/test-payment/success`,
-        cancel_url: `${window.location.origin}/aihome/test-payment/cancel`
+        cancel_url: `${window.location.origin}/aihome/test-payment/cancel`,
+        // 添加用戶預填信息
+        ...(user?.full_name && { customer_name: user.full_name }),
+        ...(user?.email && { customer_email: user.email }),
+        ...(user?.phone && { customer_phone: user.phone })
       };
 
       const result = await createAirwallexPayment(paymentRequest);
@@ -78,70 +131,141 @@ export default function PaymentMethodSelector({
             message: '測試支付成功'
           });
         } else {
-          // 生產模式：使用彈窗打開 Airwallex 支付頁面
-          console.log('🚀 真實模式：打開 Airwallex 支付彈窗');
+          // 生產模式：只在新視窗中打開 Airwallex 支付頁面
+          console.log('🚀 真實模式：只在新視窗中打開 Airwallex 支付');
           console.log('📍 支付 URL:', result.checkout_url);
           console.log('🆔 Payment Intent ID:', result.payment_intent_id);
           console.log('🔐 Client Secret 狀態:', result.debug_info?.client_secret);
           
-          // 嘗試在新標籤頁中打開，而不是彈窗
-          console.log('🚀 在新標籤頁中打開 Airwallex 支付頁面');
-          const paymentWindow = window.open(result.checkout_url, '_blank');
+          // 嘗試多種方式打開新視窗，但不進行同頁跳轉
+          let paymentWindow: Window | null = null;
+          let popupOpened = false;
           
-          // 檢查是否成功打開
-          if (!paymentWindow) {
-            console.error('❌ 無法打開新標籤頁，請檢查瀏覽器設置');
-            onPaymentError?.('無法打開支付頁面，請檢查瀏覽器設置');
-            return;
-          }
+          console.log('🔍 開始嘗試打開新視窗，URL:', result.checkout_url);
           
-          console.log('✅ 新標籤頁打開成功');
-          
-          // 添加載入監聽
-          paymentWindow.addEventListener('load', () => {
-            console.log('🔄 Airwallex 頁面載入完成');
-          });
-          
-          paymentWindow.addEventListener('error', (error) => {
-            console.error('❌ Airwallex 頁面載入錯誤:', error);
-          });
-
-          // 監聽彈窗關閉
-          const checkClosed = setInterval(() => {
-            if (paymentWindow.closed) {
-              clearInterval(checkClosed);
-              window.removeEventListener('message', handleMessage);
-              onPaymentError?.('支付已取消');
-            }
-          }, 1000);
-
-          // 監聽支付完成消息
-          const handleMessage = (event: MessageEvent) => {
-            if (event.origin !== window.location.origin) return;
+          try {
+            // 方法 1: 標準 window.open 帶詳細參數
+            console.log('🚀 嘗試方法1：使用詳細參數');
+            paymentWindow = window.open(result.checkout_url, 'airwallex_payment', 'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no,popup=yes');
             
-            if (event.data.type === 'PAYMENT_SUCCESS') {
-              clearInterval(checkClosed);
-              paymentWindow.close();
-              onPaymentSuccess?.(event.data);
-              window.removeEventListener('message', handleMessage);
-            } else if (event.data.type === 'PAYMENT_CANCELLED') {
-              clearInterval(checkClosed);
-              paymentWindow.close();
-              onPaymentError?.('支付已取消');
-              window.removeEventListener('message', handleMessage);
+            console.log('🔍 方法1結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
+            
+            if (paymentWindow && !paymentWindow.closed) {
+              popupOpened = true;
+              console.log('✅ 方法1成功：使用詳細參數打開新視窗');
+            } else {
+              // 方法 2: 使用更寬鬆的參數
+              console.log('🚀 嘗試方法2：使用寬鬆參數');
+              paymentWindow = window.open(result.checkout_url, 'airwallex_payment', 'width=800,height=600,scrollbars=yes,resizable=yes');
+              
+              console.log('🔍 方法2結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
+              
+              if (paymentWindow && !paymentWindow.closed) {
+                popupOpened = true;
+                console.log('✅ 方法2成功：使用寬鬆參數打開新視窗');
+              } else {
+                // 方法 3: 使用 _blank 目標
+                console.log('🚀 嘗試方法3：使用 _blank 目標');
+                paymentWindow = window.open(result.checkout_url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+                
+                console.log('🔍 方法3結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
+                
+                if (paymentWindow && !paymentWindow.closed) {
+                  popupOpened = true;
+                  console.log('✅ 方法3成功：使用 _blank 目標打開新視窗');
+                } else {
+                  // 方法 4: 創建臨時鏈接並點擊（使用 _blank）
+                  console.log('🚀 嘗試方法4：使用臨時鏈接');
+                  const tempLink = document.createElement('a');
+                  tempLink.href = result.checkout_url;
+                  tempLink.target = '_blank';
+                  tempLink.rel = 'noopener noreferrer';
+                  document.body.appendChild(tempLink);
+                  tempLink.click();
+                  document.body.removeChild(tempLink);
+                  
+                  // 檢查是否有新視窗打開
+                  setTimeout(() => {
+                    try {
+                      // 嘗試獲取最後打開的視窗
+                      const windows = Array.from(window.parent.frames || []);
+                      console.log('🔍 檢查是否有新視窗打開，當前視窗數:', windows.length);
+                      popupOpened = true; // 假設成功，因為我們使用了 _blank
+                      console.log('✅ 方法4完成：使用臨時鏈接（_blank）');
+                    } catch (error) {
+                      console.log('❌ 方法4檢查失敗:', error);
+                    }
+                  }, 100);
+                }
+              }
             }
-          };
+            
+            if (popupOpened) {
+              console.log('✅ 新視窗打開成功，設置監聽器');
+              
+              if (paymentWindow) {
+                // 聚焦到新視窗
+                paymentWindow.focus();
+                
+                // 添加載入監聽
+                paymentWindow.addEventListener('load', () => {
+                  console.log('🔄 Airwallex 頁面載入完成');
+                });
 
-          window.addEventListener('message', handleMessage);
+                paymentWindow.addEventListener('error', (error) => {
+                  console.error('❌ Airwallex 頁面載入錯誤:', error);
+                });
 
-          // 5分鐘後自動清理
-          setTimeout(() => {
-            clearInterval(checkClosed);
-            if (!paymentWindow.closed) {
-              paymentWindow.close();
+                // 監聽支付完成消息
+                const handleMessage = (event: MessageEvent) => {
+                  if (event.origin !== window.location.origin) return;
+                  
+                  if (event.data.type === 'PAYMENT_SUCCESS') {
+                    clearInterval(checkClosed);
+                    paymentWindow?.close();
+                    onPaymentSuccess?.(event.data);
+                    window.removeEventListener('message', handleMessage);
+                  } else if (event.data.type === 'PAYMENT_CANCELLED') {
+                    clearInterval(checkClosed);
+                    paymentWindow?.close();
+                    onPaymentError?.('支付已取消');
+                    window.removeEventListener('message', handleMessage);
+                  }
+                };
+
+                window.addEventListener('message', handleMessage);
+
+                // 監聽視窗關閉
+                const checkClosed = setInterval(() => {
+                  if (paymentWindow?.closed) {
+                    clearInterval(checkClosed);
+                    window.removeEventListener('message', handleMessage);
+                    console.log('🔄 支付視窗已關閉');
+                  }
+                }, 1000);
+
+                // 10分鐘後自動清理
+                setTimeout(() => {
+                  clearInterval(checkClosed);
+                  if (paymentWindow && !paymentWindow.closed) {
+                    paymentWindow.close();
+                  }
+                  window.removeEventListener('message', handleMessage);
+                }, 600000);
+              }
+              
+              // 不立即調用 onPaymentSuccess，等待真正的支付完成
+              console.log('✅ 新視窗已打開，等待支付完成...');
+            } else {
+              // 如果所有方法都失敗，顯示錯誤而不是跳轉
+              console.error('❌ 所有打開新視窗的方法都失敗了');
+              onPaymentError?.('無法打開支付視窗，請檢查瀏覽器設置或允許彈窗');
             }
-            window.removeEventListener('message', handleMessage);
-          }, 300000);
+            
+          } catch (error) {
+            console.error('❌ 打開新視窗失敗:', error);
+            onPaymentError?.('打開支付視窗時發生錯誤，請檢查瀏覽器設置');
+          }
         }
 
       } else {
@@ -187,9 +311,10 @@ export default function PaymentMethodSelector({
       if (result.success) {
         onPaymentSuccess?.(result);
         setUploadSuccess(true);
-        setUploadedImageUrl(result.url || null);
+        // 使用真正的 Supabase URL 而不是 result.url
+        setUploadedImageUrl(result.data?.public_url || result.url || null);
         // 設置備用 URL
-        setBackupImageUrl(result.data?.public_url);
+        setBackupImageUrl(result.url || null);
         setUploadProgress(0);
         // 清理本地預覽 URL
         if (uploadedFile) {
@@ -263,6 +388,14 @@ export default function PaymentMethodSelector({
     if (!uploadedImageUrl) return;
     
     try {
+      console.log('🔍 準備刪除圖片，URL:', uploadedImageUrl);
+      console.log('🔍 用戶 ID:', user?.id);
+      
+      // 驗證 URL 格式
+      if (!uploadedImageUrl || typeof uploadedImageUrl !== 'string') {
+        throw new Error('無效的圖片 URL');
+      }
+      
       // 調用刪除 API
       const response = await fetch(`/api/aihome/payment/delete-screenshot?imageUrl=${encodeURIComponent(uploadedImageUrl)}&userId=${user?.id || ''}`, {
         method: 'DELETE',
@@ -272,6 +405,7 @@ export default function PaymentMethodSelector({
       });
 
       const result = await response.json();
+      console.log('🔍 刪除 API 回應:', result);
       
       if (!result.success) {
         throw new Error(result.error || '刪除失敗');
@@ -290,9 +424,20 @@ export default function PaymentMethodSelector({
       if (fileInput) {
         fileInput.value = '';
       }
+      
+      // 通知父組件圖片已刪除，需要重新上傳
+      if (onPaymentSuccess) {
+        onPaymentSuccess({
+          success: true,
+          screenshotDeleted: true,
+          message: '圖片已刪除，請重新上傳'
+        });
+      }
+      
+      console.log('✅ 圖片刪除成功');
     } catch (error) {
-      console.error('刪除圖片失敗:', error);
-      setErrors({ screenshot: '刪除圖片失敗，請稍後再試' });
+      console.error('❌ 刪除圖片失敗:', error);
+      setErrors({ screenshot: error instanceof Error ? error.message : '刪除圖片失敗，請稍後再試' });
     }
   };
 
@@ -329,7 +474,7 @@ export default function PaymentMethodSelector({
                 </div>
                 <div className="text-left">
                   <h3 className="font-bold text-[#4B4036] mb-1">{method.name}</h3>
-                  <p className="text-sm text-[#2B3A3B]/70">{method.description}</p>
+                  <div className="text-sm text-[#2B3A3B]/70 whitespace-pre-line">{method.description}</div>
                 </div>
               </div>
             </motion.button>
@@ -340,12 +485,43 @@ export default function PaymentMethodSelector({
         <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-4 border border-[#EADBC8]">
           <h4 className="font-semibold text-[#4B4036] mb-2">支付說明</h4>
           <ul className="text-sm text-[#2B3A3B]/70 space-y-1">
-            <li>• 確認報名後，我們會提供詳細的支付資訊</li>
-            <li>• 請在收到確認通知後3天內完成付款</li>
-            <li>• 付款完成後，課程安排將正式確認</li>
-            <li>• 如有任何支付問題，請聯絡客服</li>
+            <li>• 確認報名後，我們會在1-2個工作天內與您確認資料</li>
+            <li>• 請保留付款截圖</li>
+            <li>• 一經確認，費用將無法退回</li>
+            <li>• 如有任何支付問題，歡迎與我們聯絡</li>
           </ul>
         </div>
+
+
+        {/* 優惠碼輸入區域 */}
+        {showPaymentActions && (
+          <SimplePromoCodeInput
+            originalAmount={amount}
+            currency={currency}
+            userId={user?.id}
+            userEmail={user?.email}
+            onDiscountApplied={handleDiscountApplied}
+            className="mb-4"
+          />
+        )}
+
+        {/* 支付方法提示 */}
+        {showPaymentActions && !selectedMethod && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-blue-50 border border-blue-200 rounded-lg p-4"
+          >
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-blue-700 text-sm">
+                請選擇上方的支付方法以繼續
+              </p>
+            </div>
+          </motion.div>
+        )}
 
 
         {/* 支付操作區域 */}
@@ -358,14 +534,47 @@ export default function PaymentMethodSelector({
             <div className="text-center mb-4">
               <h3 className="text-lg font-bold text-[#4B4036] mb-2">支付詳情</h3>
               <p className="text-sm text-[#2B3A3B]">{description}</p>
-              <p className="text-xl font-bold text-[#4B4036] mt-2">
-                {new Intl.NumberFormat('zh-HK', {
-                  style: 'currency',
-                  currency: currency,
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0
-                }).format(amount)}
-              </p>
+              
+              {/* 價格顯示 */}
+              <div className="mt-2">
+                {discountInfo ? (
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500 line-through">
+                      {new Intl.NumberFormat('zh-HK', {
+                        style: 'currency',
+                        currency: currency,
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                      }).format(amount)}
+                    </p>
+                    <p className="text-xl font-bold text-[#4B4036]">
+                      {new Intl.NumberFormat('zh-HK', {
+                        style: 'currency',
+                        currency: currency,
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                      }).format(finalAmount)}
+                    </p>
+                    <p className="text-sm text-green-600 font-medium">
+                      已節省 {new Intl.NumberFormat('zh-HK', {
+                        style: 'currency',
+                        currency: currency,
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                      }).format(discountInfo.discount_amount)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xl font-bold text-[#4B4036]">
+                    {new Intl.NumberFormat('zh-HK', {
+                      style: 'currency',
+                      currency: currency,
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    }).format(finalAmount)}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* 截圖上傳區域 */}
@@ -375,6 +584,111 @@ export default function PaymentMethodSelector({
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-4"
               >
+                {/* 支付資訊顯示 */}
+                {paymentInfo && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-xl p-6 border border-[#EADBC8] shadow-sm mb-4"
+                  >
+                    <h3 className="text-lg font-bold text-[#4B4036] mb-4 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      PAYME FPS 支付資訊
+                    </h3>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {/* PAYME 資訊 */}
+                      <div className="bg-green-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-green-800 mb-3">PAYME 帳戶</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">電話號碼:</span>
+                            <span className="font-mono text-sm font-medium">{formatPaymePhone(paymentInfo.payme_phone)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">收款人:</span>
+                            <span className="text-sm font-medium">{paymentInfo.payme_name}</span>
+                          </div>
+                          {paymentInfo.payme_link && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">支付連結:</span>
+                              <a
+                                href={paymentInfo.payme_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline text-sm flex items-center"
+                              >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                開啟
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* FPS 資訊 */}
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-blue-800 mb-3">FPS 轉數快</h4>
+                        {paymentInfo.fps_phone ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">電話號碼:</span>
+                              <span className="font-mono text-sm font-medium">{formatPaymePhone(paymentInfo.fps_phone)}</span>
+                            </div>
+                            {paymentInfo.fps_name && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">收款人:</span>
+                                <span className="text-sm font-medium">{paymentInfo.fps_name}</span>
+                              </div>
+                            )}
+                            {paymentInfo.fps_link && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">支付連結:</span>
+                                <a
+                                  href={paymentInfo.fps_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline text-sm flex items-center"
+                                >
+                                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                  開啟
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">未設置 FPS 帳戶</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {paymentInfo.notes && (
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">備註:</span> {paymentInfo.notes}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 支付說明 */}
+                    <div className="mt-4 p-3 bg-gradient-to-r from-[#FFF9F2] to-[#FFD59A]/20 rounded-lg border border-[#EADBC8]">
+                      <h4 className="font-semibold text-[#4B4036] mb-2">支付說明</h4>
+                      <div className="text-sm text-[#2B3A3B]/70 space-y-1">
+                        <p>• 請使用上述 PAYME 或 FPS 帳戶進行轉帳</p>
+                        <p>• 轉帳完成後請截圖並上傳確認</p>
+                        <p>• 我們將在 1 個工作天內確認您的付款</p>
+                        <p>• 如有任何問題，歡迎與我們聯絡</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-[#4B4036] mb-2">
                     上傳付款截圖
@@ -687,12 +1001,13 @@ export default function PaymentMethodSelector({
                       </svg>
                     </div>
                     <div className="text-sm text-blue-800">
-                      <p className="font-medium mb-1">支付說明：</p>
+                      <p className="font-medium mb-1">新視窗支付說明：</p>
                       <ul className="space-y-1 text-xs">
-                        <li>• 點擊按鈕將在新視窗中打開 Airwallex 支付頁面</li>
-                        <li>• 完成支付後視窗會自動關閉</li>
-                        <li>• 如果視窗被阻擋，請允許彈窗並重試</li>
-                        <li>• 支付完成後會自動返回當前頁面</li>
+                        <li>• 系統會嘗試多種方式在新視窗中打開支付頁面</li>
+                        <li>• 如果新視窗被阻擋，會嘗試其他方式</li>
+                        <li>• 完成支付後會自動關閉新視窗</li>
+                        <li>• 如果瀏覽器阻止彈窗，請允許彈窗後重試</li>
+                        <li>• 支付完成後會在原頁面顯示結果</li>
                       </ul>
                     </div>
                   </div>

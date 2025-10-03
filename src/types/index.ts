@@ -193,3 +193,6 @@ export * from './auth';
 export * from './schedule';
 export * from './hanamiecho';
 export * from './database';
+export * from './payme-fps';
+export * from './promo-codes';
+export * from './simple-promo-codes';

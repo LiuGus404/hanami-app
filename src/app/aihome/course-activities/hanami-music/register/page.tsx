@@ -30,6 +30,9 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import AppSidebar from '@/components/AppSidebar';
 import { supabase } from '@/lib/supabase';
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector';
+import PhoneInput from '@/components/ui/PhoneInput';
+import EmailInput from '@/components/ui/EmailInput';
+import { validatePhoneNumber, validateEmail } from '@/lib/validationUtils';
 
 export default function HanamiMusicRegisterPage() {
   const router = useRouter();
@@ -59,15 +62,18 @@ export default function HanamiMusicRegisterPage() {
     childNickname: '',
     childBirthDate: '',
     childAge: 0,
+    childGender: '', // 性別（必填）
     childPreferences: '', // 喜好物
     childHealthNotes: '', // 健康/過敏情況
     parentName: user?.full_name || '',
     parentPhone: user?.phone || '',
+    parentCountryCode: '+852', // 預設香港區碼
     parentEmail: user?.email || '',
     parentTitle: '', // 您的稱呼
     availableTimes: [] as string[], // 有空時間
     paymentMethod: '', // 支付方法
-    remarks: ''
+    remarks: '',
+    screenshotUploaded: false // 追蹤截圖是否已上傳
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -95,6 +101,31 @@ export default function HanamiMusicRegisterPage() {
   useEffect(() => {
     setIsLoaded(true);
   }, []);
+
+  // 初始化用戶資料，處理已包含國碼的電話號碼
+  useEffect(() => {
+    if (user?.phone) {
+      // 檢查用戶電話是否已包含國碼
+      const countryCodes = ['+852', '+86', '+886', '+65', '+60', '+66', '+84', '+63', '+62', '+1', '+44', '+81', '+82', '+61', '+64'];
+      const foundCountry = countryCodes.find(code => user.phone!.startsWith(code));
+      
+      if (foundCountry) {
+        // 如果包含國碼，分離國碼和電話號碼
+        const phoneOnly = user.phone!.replace(foundCountry, '').trim();
+        setFormData(prev => ({
+          ...prev,
+          parentPhone: phoneOnly,
+          parentCountryCode: foundCountry
+        }));
+      } else {
+        // 如果沒有國碼，保持原樣
+        setFormData(prev => ({
+          ...prev,
+          parentPhone: user.phone!
+        }));
+      }
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -554,6 +585,7 @@ export default function HanamiMusicRegisterPage() {
       case 2:
         if (!formData.childFullName) newErrors.childFullName = '請輸入小朋友全名';
         if (!formData.childBirthDate) newErrors.childBirthDate = '請選擇出生日期';
+        if (!formData.childGender) newErrors.childGender = '請選擇小朋友性別';
         if (!formData.childPreferences) newErrors.childPreferences = '請輸入小朋友喜好物';
         break;
       case 3:
@@ -564,12 +596,34 @@ export default function HanamiMusicRegisterPage() {
         }
         break;
       case 4:
-        if (!formData.parentPhone) newErrors.parentPhone = '請輸入聯絡電話';
-        if (!formData.parentEmail) newErrors.parentEmail = '請輸入電郵地址';
+        // 驗證聯絡電話
+        if (!formData.parentPhone) {
+          newErrors.parentPhone = '請輸入聯絡電話';
+        } else {
+          const phoneValidation = validatePhoneNumber(formData.parentPhone, formData.parentCountryCode);
+          if (!phoneValidation.isValid) {
+            newErrors.parentPhone = phoneValidation.error || '電話號碼格式不正確';
+          }
+        }
+        
+        // 驗證電郵地址
+        if (!formData.parentEmail) {
+          newErrors.parentEmail = '請輸入電郵地址';
+        } else {
+          const emailValidation = validateEmail(formData.parentEmail);
+          if (!emailValidation.isValid) {
+            newErrors.parentEmail = emailValidation.error || '電郵地址格式不正確';
+          }
+        }
+        
         if (!formData.parentTitle) newErrors.parentTitle = '請輸入您的稱呼';
         break;
       case 5:
         if (!formData.paymentMethod) newErrors.paymentMethod = '請選擇支付方法';
+        // 如果選擇了上傳相片支付方式，需要檢查是否已上傳
+        if (formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) {
+          newErrors.screenshotUpload = '請先上傳付款截圖';
+        }
         break;
     }
 
@@ -599,13 +653,28 @@ export default function HanamiMusicRegisterPage() {
   };
 
   // 處理支付成功後的跳轉
-  const handlePaymentSuccess = (data: any) => {
+  const handlePaymentSuccess = async (data: any) => {
     console.log('支付成功:', data);
     
-    // 如果是 Airwallex 支付成功，直接跳轉到確認頁面
+    // 如果是 Airwallex 支付成功，直接自動提交並跳轉到確認頁面
     if (formData.paymentMethod === 'airwallex') {
-      setCurrentStep(6); // 跳轉到確認提交步驟
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      console.log('🚀 Airwallex 支付成功，開始自動提交資料...');
+      
+      try {
+        // 自動執行提交邏輯
+        await handleSubmit();
+        
+        // 跳轉到確認提交步驟
+        setCurrentStep(6);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        console.log('✅ Airwallex 支付成功，資料已自動提交');
+      } catch (error) {
+        console.error('❌ Airwallex 支付成功但自動提交失敗:', error);
+        // 如果自動提交失敗，仍然跳轉到確認頁面讓用戶手動提交
+        setCurrentStep(6);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
     // 如果是截圖上傳，保持在當前步驟，顯示上傳成功狀態
   };
@@ -629,11 +698,138 @@ export default function HanamiMusicRegisterPage() {
     if (!validateStep(currentStep)) return;
     
     console.log('提交表單:', formData);
-    setShowSuccessModal(true);
     
-    setTimeout(() => {
-      router.push('/aihome/course-activities/hanami-music');
-    }, 3000);
+    try {
+      // 生成 student_oid (B840FAF 格式)
+      const generateStudentOid = () => {
+        const chars = '0123456789ABCDEF';
+        let result = '';
+        for (let i = 0; i < 7; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+      };
+
+      // 計算年齡（以月為單位）
+      let ageInMonths = null;
+      if (formData.childBirthDate) {
+        const birth = new Date(formData.childBirthDate);
+        const now = new Date();
+        const nowYear = now.getFullYear();
+        const nowMonth = now.getMonth();
+        let years = nowYear - birth.getFullYear();
+        let months = nowMonth - birth.getMonth();
+        if (now.getDate() < birth.getDate()) {
+          months -= 1;
+        }
+        if (months < 0) {
+          years -= 1;
+          months += 12;
+        }
+        ageInMonths = years * 12 + months;
+      }
+
+      // 時間格式處理函數
+      const formatTimeForDatabase = (timeSlot: string) => {
+        if (!timeSlot) return null;
+        
+        // 取開始時間部分
+        const startTime = timeSlot.split('-')[0].trim();
+        console.log('🔍 處理時間:', { timeSlot, startTime });
+        
+        // 如果已經是 HH:MM:SS 格式，直接返回
+        if (/^\d{2}:\d{2}:\d{2}$/.test(startTime)) {
+          console.log('🔍 時間已經是正確格式:', startTime);
+          return startTime;
+        }
+        
+        // 如果是 HH:MM 格式，添加秒數
+        if (/^\d{2}:\d{2}$/.test(startTime)) {
+          const result = startTime + ':00';
+          console.log('🔍 時間格式轉換:', { from: startTime, to: result });
+          return result;
+        }
+        
+        // 如果是 HH 格式，添加分秒
+        if (/^\d{2}$/.test(startTime)) {
+          const result = startTime + ':00:00';
+          console.log('🔍 時間格式轉換:', { from: startTime, to: result });
+          return result;
+        }
+        
+        console.log('🔍 無法識別的時間格式:', startTime);
+        return null;
+      };
+
+      // 準備插入到 hanami_trial_students 的資料
+      const trialStudentData = {
+        student_oid: generateStudentOid(),
+        full_name: formData.childFullName || null,
+        nick_name: formData.childNickname || null,
+        student_dob: formData.childBirthDate || null,
+        student_age: ageInMonths || null,
+        contact_number: formData.parentCountryCode + formData.parentPhone || null,
+        parent_email: formData.parentEmail || null,
+        student_email: null,
+        student_password: null,
+        gender: formData.childGender || null,
+        address: null,
+        school: null,
+        course_type: formData.courseType ? courseTypes.find(c => c.id === formData.courseType)?.name || null : null,
+        student_type: formData.courseNature === 'trial' ? '試堂' : '常規',
+        student_teacher: null,
+        student_preference: formData.childPreferences || null,
+        health_notes: formData.childHealthNotes || '沒有',
+        weekday: formData.selectedDate ? new Date(formData.selectedDate).getDay().toString() : null,
+        regular_weekday: formData.selectedDate ? new Date(formData.selectedDate).getDay().toString() : null,
+        regular_timeslot: formatTimeForDatabase(formData.selectedTimeSlot),
+        lesson_date: formData.selectedDate || null,
+        lesson_duration: null,
+        trial_status: 'pending',
+        trial_remarks: formData.remarks || null,
+        access_role: 'admin',
+        duration_months: null,
+        remaining_lessons: null,
+        ongoing_lessons: null,
+        upcoming_lessons: null,
+        actual_timeslot: formatTimeForDatabase(formData.selectedTimeSlot)
+      };
+
+      console.log('🔍 準備插入到 hanami_trial_students 的資料:', trialStudentData);
+      console.log('🔍 原始 selectedTimeSlot:', formData.selectedTimeSlot);
+      console.log('🔍 處理後的 regular_timeslot:', trialStudentData.regular_timeslot);
+      console.log('🔍 處理後的 actual_timeslot:', trialStudentData.actual_timeslot);
+
+      // 插入到 hanami_trial_students 表格
+      const { error: trialStudentError } = await supabase
+        .from('hanami_trial_students')
+        .insert([trialStudentData]);
+
+      if (trialStudentError) {
+        console.error('❌ 插入 hanami_trial_students 錯誤:', trialStudentError);
+        console.error('❌ 錯誤詳情:', {
+          message: trialStudentError.message,
+          details: trialStudentError.details,
+          hint: trialStudentError.hint,
+          code: trialStudentError.code
+        });
+        alert('報名提交失敗，請稍後再試');
+        return;
+      } else {
+        console.log('✅ 成功插入到 hanami_trial_students');
+      }
+
+      // 顯示成功訊息
+      setShowSuccessModal(true);
+      
+      setTimeout(() => {
+        router.push('/aihome/course-activities/hanami-music');
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ 提交表單異常:', error);
+      alert('提交時發生錯誤，請稍後再試');
+    }
   };
 
   if (loading) {
@@ -1150,6 +1346,64 @@ export default function HanamiMusicRegisterPage() {
 
                       <div>
                         <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                          性別 <span className="text-red-500">*</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setFormData(prev => ({ ...prev, childGender: '男' }))}
+                            className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                              formData.childGender === '男'
+                                ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
+                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                            }`}
+                          >
+                            <div className="text-center">
+                              <div className="mb-2 flex justify-center">
+                                <img 
+                                  src="/boy.png" 
+                                  alt="男孩" 
+                                  className="w-12 h-12 object-contain"
+                                />
+                              </div>
+                              <span className="font-medium text-[#4B4036]">男孩</span>
+                            </div>
+                          </motion.button>
+                          <motion.button
+                            type="button"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setFormData(prev => ({ ...prev, childGender: '女' }))}
+                            className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                              formData.childGender === '女'
+                                ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
+                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                            }`}
+                          >
+                            <div className="text-center">
+                              <div className="mb-2 flex justify-center">
+                                <img 
+                                  src="/girl.png" 
+                                  alt="女孩" 
+                                  className="w-12 h-12 object-contain"
+                                />
+                              </div>
+                              <span className="font-medium text-[#4B4036]">女孩</span>
+                            </div>
+                          </motion.button>
+                        </div>
+                        {errors.childGender && (
+                          <p className="mt-1 text-sm text-red-600 flex items-center">
+                            <XCircleIcon className="w-4 h-4 mr-1" />
+                            {errors.childGender}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
                           喜好物 <span className="text-red-500">*</span>
                         </label>
                         <textarea
@@ -1179,7 +1433,7 @@ export default function HanamiMusicRegisterPage() {
                           value={formData.childHealthNotes}
                           onChange={(e) => setFormData(prev => ({ ...prev, childHealthNotes: e.target.value }))}
                           className="w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 border-[#EADBC8] focus:border-[#FFD59A] focus:outline-none transition-all duration-200 resize-none"
-                          placeholder="例如：食物過敏、特殊健康狀況、需要特別注意的事項等"
+                          placeholder="例如：過敏、特殊健康狀況、需要特別注意的事項等"
                           rows={3}
                         />
                       </div>
@@ -1239,10 +1493,8 @@ export default function HanamiMusicRegisterPage() {
                           </div>
                           <motion.button
                             onClick={() => {
-                              setIsWaitingList(true);
-                              setWaitingListType('new');
-                              // 跳過日期選擇，直接到聯絡方式步驟
-                              setCurrentStep(4);
+                              // 跳轉到等候區註冊頁面
+                              router.push('/aihome/registration');
                             }}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
@@ -1531,15 +1783,20 @@ export default function HanamiMusicRegisterPage() {
                       <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">聯絡方式</h2>
                       <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫聯絡資料</p>
                       
-                      {/* 等候區狀態顯示 - 只在已收到通知的等候區學生時顯示 */}
-                      {isWaitingList && waitingListType === 'existing' && (
+                      {/* 等候區狀態顯示 */}
+                      {isWaitingList && (
                         <div className="mt-4 bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-4 border border-[#EADBC8]">
                           <div className="flex items-center justify-center gap-2 text-[#4B4036] mb-2">
                             <UserIcon className="w-5 h-5" />
-                            <span className="font-medium">等候區學生</span>
+                            <span className="font-medium">
+                              {waitingListType === 'existing' ? '等候區學生' : '新加入等候區'}
+                            </span>
                           </div>
                           <p className="text-sm text-[#2B3A3B] mb-3">
-                            您已在等候名單中，我們會優先為您安排課程
+                            {waitingListType === 'existing' 
+                              ? '您已在等候名單中，已為您優先安排課程'
+                              : '您已加入等候區，有合適時間時我們會優先通知您'
+                            }
                           </p>
                           <motion.button
                             onClick={() => {
@@ -1590,26 +1847,24 @@ export default function HanamiMusicRegisterPage() {
                           聯絡電話 <span className="text-red-500">*</span>
                           <span className="text-gray-500 text-xs ml-2">(建議填Whatsapp電話)</span>
                         </label>
-                        <div className="relative">
-                          <input
-                            type="tel"
-                            value={formData.parentPhone}
-                            onChange={(e) => setFormData(prev => ({ ...prev, parentPhone: e.target.value }))}
-                            className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                              errors.parentPhone
-                                ? 'border-red-500 focus:border-red-500'
-                                : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                            } focus:outline-none`}
-                            placeholder="請輸入聯絡電話"
-                          />
-                          <PhoneIcon className="absolute right-3 top-3.5 sm:top-4 w-5 h-5 text-[#4B4036] pointer-events-none" />
-                        </div>
-                        {errors.parentPhone && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center">
-                            <XCircleIcon className="w-4 h-4 mr-1" />
-                            {errors.parentPhone}
-                          </p>
-                        )}
+                        <PhoneInput
+                          value={formData.parentPhone}
+                          countryCode={formData.parentCountryCode}
+                          onChange={(phone, countryCode) => {
+                            setFormData(prev => ({ 
+                              ...prev, 
+                              parentPhone: phone,
+                              parentCountryCode: countryCode
+                            }));
+                            // 清除錯誤
+                            if (errors.parentPhone) {
+                              setErrors(prev => ({ ...prev, parentPhone: '' }));
+                            }
+                          }}
+                          placeholder="請輸入電話號碼"
+                          error={errors.parentPhone}
+                          required
+                        />
                       </div>
 
                       {/* 電郵地址 - 必填 */}
@@ -1617,26 +1872,20 @@ export default function HanamiMusicRegisterPage() {
                         <label className="block text-sm font-medium text-[#4B4036] mb-2">
                           電郵地址 <span className="text-red-500">*</span>
                         </label>
-                        <div className="relative">
-                          <input
-                            type="email"
-                            value={formData.parentEmail}
-                            onChange={(e) => setFormData(prev => ({ ...prev, parentEmail: e.target.value }))}
-                            className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                              errors.parentEmail
-                                ? 'border-red-500 focus:border-red-500'
-                                : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                            } focus:outline-none`}
-                            placeholder="請輸入電郵地址"
-                          />
-                          <EnvelopeIcon className="absolute right-3 top-3.5 sm:top-4 w-5 h-5 text-[#4B4036] pointer-events-none" />
-                        </div>
-                        {errors.parentEmail && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center">
-                            <XCircleIcon className="w-4 h-4 mr-1" />
-                            {errors.parentEmail}
-                          </p>
-                        )}
+                        <EmailInput
+                          value={formData.parentEmail}
+                          onChange={(email) => {
+                            setFormData(prev => ({ ...prev, parentEmail: email }));
+                            // 清除錯誤
+                            if (errors.parentEmail) {
+                              setErrors(prev => ({ ...prev, parentEmail: '' }));
+                            }
+                          }}
+                          placeholder="請輸入電郵地址"
+                          error={errors.parentEmail}
+                          required
+                          showValidation
+                        />
                       </div>
 
                       {/* 有空時間 - 只在加入等候區時顯示 */}
@@ -1704,7 +1953,7 @@ export default function HanamiMusicRegisterPage() {
                 {currentStep === 5 && (
                   <PaymentMethodSelector
                     selectedMethod={formData.paymentMethod}
-                    onMethodChange={(methodId) => setFormData(prev => ({ ...prev, paymentMethod: methodId }))}
+                    onMethodChange={(methodId) => setFormData(prev => ({ ...prev, paymentMethod: methodId, screenshotUploaded: false }))}
                     amount={formData.courseNature === 'trial' ? 168 : (() => {
                       const selectedPlan = coursePlans.find(p => p.id === formData.selectedPlan);
                       return selectedPlan ? selectedPlan.promo_price : 0;
@@ -1714,7 +1963,19 @@ export default function HanamiMusicRegisterPage() {
                       ? `試堂報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班`
                       : `常規課程報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班 - ${coursePlans.find(p => p.id === formData.selectedPlan)?.name}`
                     }
-                    onPaymentSuccess={handlePaymentSuccess}
+                    onPaymentSuccess={(data) => {
+                      // 檢查是否為圖片刪除事件
+                      if (data.screenshotDeleted) {
+                        // 圖片被刪除，重置上傳狀態
+                        setFormData(prev => ({ ...prev, screenshotUploaded: false }));
+                        console.log('🔄 圖片已刪除，重置上傳狀態');
+                      } else if (formData.paymentMethod === 'screenshot') {
+                        // 當支付成功時，標記截圖已上傳
+                        setFormData(prev => ({ ...prev, screenshotUploaded: true }));
+                        console.log('✅ 截圖上傳成功，允許繼續');
+                      }
+                      handlePaymentSuccess(data);
+                    }}
                     onPaymentError={(error) => {
                       console.error('支付錯誤:', error);
                       setErrors(prev => ({ ...prev, paymentMethod: error }));
@@ -1804,6 +2065,10 @@ export default function HanamiMusicRegisterPage() {
                             <span className="text-[#2B3A3B]">年齡：</span>
                             <span className="font-medium text-[#4B4036]">{formData.childAge} 歲</span>
                           </p>
+                          <p className="flex justify-between">
+                            <span className="text-[#2B3A3B]">性別：</span>
+                            <span className="font-medium text-[#4B4036]">{formData.childGender}</span>
+                          </p>
                           {formData.childPreferences && (
                             <div className="mt-2">
                               <p className="text-[#2B3A3B] mb-1">喜好物：</p>
@@ -1832,7 +2097,7 @@ export default function HanamiMusicRegisterPage() {
                           </p>
                           <p className="flex justify-between">
                             <span className="text-[#2B3A3B]">聯絡電話：</span>
-                            <span className="font-medium text-[#4B4036]">{formData.parentPhone}</span>
+                            <span className="font-medium text-[#4B4036]">{formData.parentCountryCode} {formData.parentPhone}</span>
                           </p>
                           <p className="flex justify-between">
                             <span className="text-[#2B3A3B]">電郵地址：</span>
@@ -1870,8 +2135,8 @@ export default function HanamiMusicRegisterPage() {
         </div>
       </div>
 
-      {/* 底部固定導航按鈕 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-[#EADBC8] z-40">
+      {/* 底部導航按鈕 - 改為相對定位 */}
+      <div className="bg-white/90 backdrop-blur-sm border-t border-[#EADBC8] mt-8 mb-15"> 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3">
             {currentStep > 0 && (
@@ -1890,9 +2155,14 @@ export default function HanamiMusicRegisterPage() {
             {!(currentStep === 5) || (currentStep === 5 && formData.paymentMethod === 'screenshot') ? (
               <motion.button
                 onClick={currentStep === steps.length - 1 ? handleSubmit : handleNext}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-200 flex-1"
+                disabled={currentStep === 5 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded}
+                whileHover={!(currentStep === 5 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 1.02 } : {}}
+                whileTap={!(currentStep === 5 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 0.98 } : {}}
+                className={`flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold shadow-lg transition-all duration-200 flex-1 ${
+                  currentStep === 5 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded
+                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:shadow-xl'
+                }`}
               >
                 <span className="text-sm sm:text-base">
                   {currentStep === steps.length - 1 ? '提交報名' : '下一步'}

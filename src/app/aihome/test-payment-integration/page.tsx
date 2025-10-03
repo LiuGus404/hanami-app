@@ -5,9 +5,11 @@ import { motion } from 'framer-motion';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 
 export default function TestPaymentIntegrationPage() {
   const router = useRouter();
+  const { user, loading } = useSaasAuth();
   const [selectedMethod, setSelectedMethod] = useState('');
   const [amount, setAmount] = useState(168);
   const [description, setDescription] = useState('測試支付 - 試堂報名');
@@ -89,6 +91,7 @@ export default function TestPaymentIntegrationPage() {
           onPaymentSuccess={handlePaymentSuccess}
           onPaymentError={handlePaymentError}
           showPaymentActions={true}
+          user={user}
         />
 
         {/* 支付流程說明 */}

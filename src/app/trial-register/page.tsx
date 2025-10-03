@@ -284,6 +284,75 @@ export default function TrialRegisterPage() {
         .insert([cleanData]);
       
       if (!error) {
+        // 同時插入到 hanami_trial_students 表
+        try {
+          // 生成 student_oid (B840FAF 格式)
+          const generateStudentOid = () => {
+            const chars = '0123456789ABCDEF';
+            let result = '';
+            for (let i = 0; i < 7; i++) {
+              result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+          };
+
+          // 準備插入到 hanami_trial_students 的資料
+          const trialStudentData = {
+            student_oid: generateStudentOid(),
+            full_name: form.full_name || null,
+            student_dob: form.student_dob || null,
+            lesson_date: null, // 試聽日期需要後續安排
+            lesson_duration: null,
+            course_type: form.course_types && form.course_types.length > 0 ? form.course_types[0] : null,
+            contact_number: form.phone_no || null,
+            parent_email: null, // 試聽註冊表單中沒有此欄位
+            trial_status: 'pending',
+            trial_remarks: form.notes || null,
+            student_age: ageInMonths || null,
+            health_notes: null,
+            student_preference: null,
+            weekday: form.prefer_time && form.prefer_time.length > 0 ? (form.prefer_time[0] as any).weekday : null,
+            address: null,
+            school: null,
+            student_email: null,
+            student_password: null,
+            gender: null,
+            student_type: '試堂',
+            student_teacher: null,
+            regular_weekday: form.prefer_time && form.prefer_time.length > 0 ? (form.prefer_time[0] as any).weekday : null,
+            regular_timeslot: form.prefer_time && form.prefer_time.length > 0 ? (form.prefer_time[0] as any).timeslot : null,
+            access_role: 'trial_student',
+            duration_months: null,
+            nick_name: null,
+            remaining_lessons: 1, // 試聽通常只有1堂課
+            ongoing_lessons: 0,
+            upcoming_lessons: 1,
+            actual_timeslot: null
+          };
+
+          console.log('🔍 準備插入到 hanami_trial_students 的資料:', trialStudentData);
+
+          const { error: trialStudentError } = await supabase
+            .from('hanami_trial_students')
+            .insert([trialStudentData]);
+
+          if (trialStudentError) {
+            console.error('❌ 插入 hanami_trial_students 錯誤:', trialStudentError);
+            console.error('❌ 錯誤詳情:', {
+              message: trialStudentError.message,
+              details: trialStudentError.details,
+              hint: trialStudentError.hint,
+              code: trialStudentError.code
+            });
+            // 不影響主要流程，只記錄錯誤
+          } else {
+            console.log('✅ 成功插入到 hanami_trial_students');
+          }
+        } catch (trialStudentErr) {
+          console.error('❌ 插入 hanami_trial_students 異常:', trialStudentErr);
+          // 不影響主要流程，只記錄錯誤
+        }
+
         // 發送webhook通知
         try {
           const webhookData = {

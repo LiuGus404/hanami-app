@@ -8,7 +8,7 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   {
     id: 'screenshot',
     name: '上傳付款截圖',
-    description: '上傳您的付款截圖，我們將手動確認付款',
+    description: '上傳您的PAYME和FPS付款截圖\n我們將在1工作天內確認付款',
     icon: ScreenshotIcon,
     type: 'screenshot',
     enabled: true
@@ -16,7 +16,7 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   {
     id: 'airwallex',
     name: 'Airwallex 線上支付',
-    description: '使用 Airwallex 安全線上支付',
+    description: '支援信用卡、轉數快、Alipay、WeChat Pay等支付方法\n手續費為1.5%',
     icon: AirwallexIcon,
     type: 'airwallex',
     enabled: true

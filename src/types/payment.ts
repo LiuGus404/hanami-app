@@ -16,6 +16,10 @@ export interface PaymentRequest {
   return_url?: string;
   cancel_url?: string;
   metadata?: Record<string, any>;
+  // 用戶預填信息
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
 }
 
 export interface AirwallexPaymentResponse {
