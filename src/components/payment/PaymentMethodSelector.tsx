@@ -58,10 +58,17 @@ export default function PaymentMethodSelector({
       const result = await createAirwallexPayment(paymentRequest);
       
       if (result.success && result.checkout_url) {
+        // 顯示調試信息
+        if (result.debug_info) {
+          console.log('🔍 Airwallex API 調試信息:', result.debug_info);
+        }
+        
         // 檢查是否為測試模式
+        console.log('🔍 檢查支付模式:', { is_test_mode: result.is_test_mode, checkout_url: result.checkout_url });
+        
         if (result.is_test_mode) {
           // 測試模式：模擬支付成功
-          console.log('測試模式：模擬 Airwallex 支付成功');
+          console.log('🧪 測試模式：模擬 Airwallex 支付成功');
           onPaymentSuccess?.({
             success: true,
             payment_intent_id: result.payment_intent_id,
@@ -72,18 +79,32 @@ export default function PaymentMethodSelector({
           });
         } else {
           // 生產模式：使用彈窗打開 Airwallex 支付頁面
-          console.log('打開 Airwallex 支付彈窗:', result.checkout_url);
+          console.log('🚀 真實模式：打開 Airwallex 支付彈窗');
+          console.log('📍 支付 URL:', result.checkout_url);
+          console.log('🆔 Payment Intent ID:', result.payment_intent_id);
+          console.log('🔐 Client Secret 狀態:', result.debug_info?.client_secret);
           
-          // 創建彈窗
-          const paymentWindow = window.open(
-            result.checkout_url,
-            'airwallex_payment',
-            'width=800,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
-          );
-
+          // 嘗試在新標籤頁中打開，而不是彈窗
+          console.log('🚀 在新標籤頁中打開 Airwallex 支付頁面');
+          const paymentWindow = window.open(result.checkout_url, '_blank');
+          
+          // 檢查是否成功打開
           if (!paymentWindow) {
-            throw new Error('無法打開支付彈窗，請檢查瀏覽器彈窗攔截設置');
+            console.error('❌ 無法打開新標籤頁，請檢查瀏覽器設置');
+            onPaymentError?.('無法打開支付頁面，請檢查瀏覽器設置');
+            return;
           }
+          
+          console.log('✅ 新標籤頁打開成功');
+          
+          // 添加載入監聽
+          paymentWindow.addEventListener('load', () => {
+            console.log('🔄 Airwallex 頁面載入完成');
+          });
+          
+          paymentWindow.addEventListener('error', (error) => {
+            console.error('❌ Airwallex 頁面載入錯誤:', error);
+          });
 
           // 監聽彈窗關閉
           const checkClosed = setInterval(() => {

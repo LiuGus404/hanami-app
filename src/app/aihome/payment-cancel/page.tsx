@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import { XCircleIcon } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 
-export default function PaymentSuccessPage() {
+export default function PaymentCancelPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [paymentData, setPaymentData] = useState<any>(null);
@@ -19,21 +19,21 @@ export default function PaymentSuccessPage() {
     if (paymentIntentId) {
       setPaymentData({
         payment_intent_id: paymentIntentId,
-        status: status || 'succeeded',
+        status: status || 'cancelled',
         amount: amount,
         currency: currency
       });
       
-      // 通知父窗口支付成功（如果在彈窗中）
+      // 通知父窗口支付取消（如果在彈窗中）
       if (window.opener) {
         window.opener.postMessage({
-          type: 'PAYMENT_SUCCESS',
-          success: true,
+          type: 'PAYMENT_CANCELLED',
+          success: false,
           payment_intent_id: paymentIntentId,
-          status: status || 'succeeded',
+          status: status || 'cancelled',
           amount: parseFloat(amount || '0'),
           currency: currency,
-          message: '支付成功！'
+          message: '支付已取消'
         }, window.location.origin);
       }
     }
@@ -48,7 +48,7 @@ export default function PaymentSuccessPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-pink-100 p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -56,11 +56,11 @@ export default function PaymentSuccessPage() {
         className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md w-full"
       >
         <div className="mb-6 flex justify-center">
-          <CheckCircleIcon className="h-24 w-24 text-green-500" />
+          <XCircleIcon className="h-24 w-24 text-red-500" />
         </div>
         
-        <h1 className="text-3xl font-bold text-green-700 mb-4">
-          支付成功！
+        <h1 className="text-3xl font-bold text-red-700 mb-4">
+          支付已取消
         </h1>
         
         {paymentData && (
@@ -74,7 +74,7 @@ export default function PaymentSuccessPage() {
               </p>
             )}
             <p className="text-gray-600">
-              狀態: <span className="font-semibold text-green-600">{paymentData.status}</span>
+              狀態: <span className="font-semibold text-red-600">{paymentData.status}</span>
             </p>
           </div>
         )}
@@ -84,9 +84,9 @@ export default function PaymentSuccessPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleClose}
-            className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors duration-200 shadow-md"
+            className="w-full px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors duration-200 shadow-md"
           >
-            完成
+            關閉
           </motion.button>
           
           <motion.button

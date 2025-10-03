@@ -28,6 +28,15 @@ export interface AirwallexPaymentResponse {
   error?: string;
   message?: string;
   is_test_mode?: boolean;
+  debug_info?: {
+    payment_link_created?: boolean;
+    payment_link_id?: string;
+    payment_link_url?: string;
+    payment_link_status?: string;
+    final_checkout_url?: string;
+    environment?: string;
+    client_secret?: string;
+  };
 }
 
 export interface ScreenshotUploadData {

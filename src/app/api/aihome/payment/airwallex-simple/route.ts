@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSaasSupabaseClient } from '@/lib/supabase';
 
 // 簡化的 Airwallex API 配置
-const AIRWALLEX_BASE_URL = 'https://api.airwallex.com/api/v1';
+// 根據環境選擇正確的 API URL
+// 注意：您的憑證是生產環境的，所以我們使用生產 API
+const AIRWALLEX_BASE_URL = 'https://api.airwallex.com/api/v1';  // Production API
 const AIRWALLEX_AUTH_URL = `${AIRWALLEX_BASE_URL}/authentication/login`;
 
 interface PaymentRequest {
@@ -19,8 +21,14 @@ export async function POST(request: NextRequest) {
     const AIRWALLEX_API_KEY = process.env.AIRWALLEX_API_KEY;
     const AIRWALLEX_CLIENT_ID = process.env.AIRWALLEX_CLIENT_ID;
     
+    // 定義公網可訪問的 URL
+    const publicReturnUrl = 'https://www.hanamiecho.com/aihome/payment-success';
+    const publicCancelUrl = 'https://www.hanamiecho.com/aihome/payment-cancel';
+    
     // 調試環境變數
     console.log('🔍 檢查環境變數:');
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('使用 API URL:', AIRWALLEX_BASE_URL);
     console.log('AIRWALLEX_API_KEY 存在:', !!AIRWALLEX_API_KEY);
     console.log('AIRWALLEX_CLIENT_ID 存在:', !!AIRWALLEX_CLIENT_ID);
     console.log('AIRWALLEX_API_KEY 長度:', AIRWALLEX_API_KEY?.length || 0);
@@ -72,11 +80,23 @@ export async function POST(request: NextRequest) {
     if (!authResponse.ok) {
       const authError = await authResponse.text();
       console.error('認證失敗:', authError);
+      console.error('使用的 API URL:', AIRWALLEX_AUTH_URL);
+      console.error('API Key 前8位:', AIRWALLEX_API_KEY?.substring(0, 8) + '...');
+      console.error('Client ID:', AIRWALLEX_CLIENT_ID);
+      
+      // 暫時禁用回退模式，顯示真實錯誤以便調試
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Airwallex 認證失敗',
-          details: authError
+          error: 'Airwallex 認證失敗 - 請檢查 API Key 和 Client ID',
+          details: authError,
+          debug_info: {
+            api_url: AIRWALLEX_AUTH_URL,
+            api_key_prefix: AIRWALLEX_API_KEY?.substring(0, 8) + '...',
+            client_id: AIRWALLEX_CLIENT_ID,
+            environment: process.env.NODE_ENV,
+            message: '請確認您有有效的 Airwallex 測試憑證。您可以在 Airwallex 開發者門戶獲取新的憑證。'
+          }
         },
         { status: authResponse.status }
       );
@@ -104,16 +124,24 @@ export async function POST(request: NextRequest) {
       console.error('❌ API 連接測試失敗:', testError);
     }
 
-    // 第三步：嘗試創建真實的 Payment Intent
+    // 第三步：創建 Payment Intent（根據 Airwallex Postman 集合）
     const requestId = `hanami_intent_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
     try {
-      // 嘗試創建 Payment Intent - 使用正確的 Airwallex API 格式
+      // 根據 Airwallex Postman 集合創建 Payment Intent
+      // 使用公網可訪問的 URL 作為 return_url
+      
       const paymentIntentRequest = {
         request_id: requestId,
         amount: amount,
         currency: currency.toUpperCase(),
         merchant_order_id: `hanami_order_${Date.now()}`,
+        metadata: {
+          source: 'hanami_payment_system',
+          description: description,
+          request_id: requestId,
+          local_test: true // 標記為本地測試
+        },
         order: {
           products: [
             {
@@ -121,22 +149,16 @@ export async function POST(request: NextRequest) {
               desc: description,
               unit_price: amount,
               quantity: 1,
-              product_sku: 'hanami_test_product'
+              sku: 'hanami_test_product'
             }
-          ]
+          ],
+          type: 'Hanami Music Lesson Payment'
         },
-        return_url: return_url,
-        cancel_url: cancel_url,
-        metadata: {
-          source: 'hanami_test_payment',
-          description: description
-        },
-        // 添加必要的配置
-        capture_method: 'automatic',
-        confirmation_method: 'automatic'
+        return_url: publicReturnUrl,
+        cancel_url: publicCancelUrl
       };
 
-      console.log('嘗試創建 Payment Intent:', JSON.stringify(paymentIntentRequest, null, 2));
+      console.log('嘗試創建 Payment Intent (根據 Postman 集合):', JSON.stringify(paymentIntentRequest, null, 2));
 
       const paymentIntentResponse = await fetch(`${AIRWALLEX_BASE_URL}/pa/payment_intents/create`, {
         method: 'POST',
@@ -153,8 +175,83 @@ export async function POST(request: NextRequest) {
       console.log('Payment Intent 回應:', JSON.stringify(paymentIntentData, null, 2));
 
       if (paymentIntentResponse.ok) {
+        // Payment Intent 創建成功，不需要 confirm，讓用戶在結帳頁面選擇支付方式
+        console.log('✅ Payment Intent 創建成功，狀態:', paymentIntentData.status);
         // 成功創建 Payment Intent
         const supabase = getSaasSupabaseClient();
+        
+        // 根據 Airwallex 文檔，構建正確的結帳 URL
+        // 檢查是否有 next_action 中的 redirect_to_url
+        let finalCheckoutUrl;
+        
+        if (paymentIntentData.next_action?.redirect_to_url?.url) {
+          finalCheckoutUrl = paymentIntentData.next_action.redirect_to_url.url;
+          console.log('✅ 使用 next_action 中的 redirect_to_url:', finalCheckoutUrl);
+        } else {
+          // 根據 Airwallex 文檔，使用正確的結帳 URL 格式
+          // 注意：Airwallex 結帳頁面可能需要特定的 URL 格式
+          finalCheckoutUrl = `https://checkout.airwallex.com/pay/${paymentIntentData.id}`;
+          if (paymentIntentData.client_secret) {
+            finalCheckoutUrl += `?client_secret=${paymentIntentData.client_secret}`;
+          }
+          console.log('✅ 使用標準結帳 URL 格式:', finalCheckoutUrl);
+        }
+        
+        console.log('✅ Payment Intent 創建成功，最終結帳 URL:', finalCheckoutUrl);
+        
+        // 額外檢查：如果結帳 URL 仍然有問題，我們可以嘗試使用 Payment Links API
+        console.log('🔍 Payment Intent 詳細信息:', {
+          id: paymentIntentData.id,
+          status: paymentIntentData.status,
+          client_secret: paymentIntentData.client_secret ? '已提供' : '未提供',
+          next_action: paymentIntentData.next_action,
+          available_payment_method_types: paymentIntentData.available_payment_method_types
+        });
+        
+        // 嘗試創建 Payment Link 作為備用方案
+        let paymentLinkUrl = null;
+        try {
+          console.log('🔄 嘗試創建 Payment Link 作為備用方案...');
+          
+          const paymentLinkRequest = {
+            request_id: `hanami_link_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+            amount: amount,
+            currency: currency.toUpperCase(),
+            title: description,
+            description: description,
+            metadata: {
+              source: 'hanami_payment_system',
+              description: description,
+              payment_intent_id: paymentIntentData.id
+            },
+            return_url: publicReturnUrl,
+            cancel_url: publicCancelUrl
+          };
+          
+          const paymentLinkResponse = await fetch(`${AIRWALLEX_BASE_URL}/pa/payment_links/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+              'x-api-version': '2020-06-30',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(paymentLinkRequest)
+          });
+          
+          const paymentLinkData = await paymentLinkResponse.json();
+          console.log('Payment Link 回應:', JSON.stringify(paymentLinkData, null, 2));
+          
+          if (paymentLinkResponse.ok && paymentLinkData.url) {
+            paymentLinkUrl = paymentLinkData.url;
+            console.log('✅ Payment Link 創建成功:', paymentLinkUrl);
+          } else {
+            console.log('❌ Payment Link 創建失敗:', paymentLinkData);
+          }
+        } catch (linkError) {
+          console.log('❌ Payment Link 創建錯誤:', linkError);
+        }
+
         const { error: dbError } = await supabase
           .from('payment_records')
           .insert({
@@ -165,14 +262,18 @@ export async function POST(request: NextRequest) {
             airwallex_intent_id: paymentIntentData.id,
             airwallex_request_id: requestId,
             status: 'pending',
-            checkout_url: paymentIntentData.next_action?.redirect_to_url?.url || `https://checkout.airwallex.com/pay/${paymentIntentData.id}`,
-            return_url: return_url,
-            cancel_url: cancel_url,
+            checkout_url: finalCheckoutUrl,
+            return_url: publicReturnUrl,
+            cancel_url: publicCancelUrl,
             created_at: new Date().toISOString(),
             metadata: {
-              source: 'hanami_real_payment',
+              source: 'hanami_payment_intent',
               description: description,
-              payment_intent_created: true
+              payment_intent_created: true,
+              payment_intent_id: paymentIntentData.id,
+              payment_intent_status: paymentIntentData.status,
+              client_secret: paymentIntentData.client_secret ? '已提供' : '未提供',
+              local_test: true
             }
           } as any);
 
@@ -180,34 +281,38 @@ export async function POST(request: NextRequest) {
           console.error('資料庫記錄錯誤:', dbError);
         }
 
-        // 在開發環境中使用測試支付頁面，生產環境使用真實 Airwallex URL
-        const isDevelopment = process.env.NODE_ENV === 'development';
-        
-        let checkoutUrl;
-        if (isDevelopment) {
-          // 開發環境：使用本地測試支付頁面
-          checkoutUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/aihome/test-payment/success?payment_intent_id=${paymentIntentData.id}&amount=${amount}&currency=${currency}`;
-          console.log('開發環境 - 使用測試支付頁面:', checkoutUrl);
-        } else {
-          // 生產環境：使用真實 Airwallex URL
-          checkoutUrl = paymentIntentData.next_action?.redirect_to_url?.url || 
-                       `https://checkout.airwallex.com/pay/${paymentIntentData.id}?client_secret=${paymentIntentData.client_secret || ''}`;
-          console.log('生產環境 - 使用真實 Airwallex URL:', checkoutUrl);
-        }
+        // 使用真實的 Airwallex 結帳頁面
+        let checkoutUrl = paymentLinkUrl || finalCheckoutUrl;
+        console.log('🚀 使用真實 Airwallex 結帳頁面:', checkoutUrl);
+        console.log('URL 類型:', paymentLinkUrl ? 'Payment Link' : 'Payment Intent');
         
         return NextResponse.json({
           success: true,
-          payment_intent_id: paymentIntentData.id,
+          payment_intent_id: paymentIntentData.id, // Payment Intent ID
           checkout_url: checkoutUrl,
           status: paymentIntentData.status,
           amount: paymentIntentData.amount,
           currency: paymentIntentData.currency,
-          message: isDevelopment ? '開發環境 - 使用測試支付頁面' : '真實 Payment Intent 創建成功！',
-          is_test_mode: isDevelopment
+          message: '真實 Payment Intent 創建成功！',
+          is_test_mode: false, // 現在使用真實的 Airwallex API
+          debug_info: {
+            payment_intent_created: paymentIntentResponse.ok,
+            payment_intent_id: paymentIntentData.id,
+            payment_intent_status: paymentIntentData.status,
+            client_secret: paymentIntentData.client_secret ? '已提供' : '未提供',
+            final_checkout_url: finalCheckoutUrl,
+            payment_link_created: !!paymentLinkUrl,
+            payment_link_url: paymentLinkUrl,
+            checkout_url_type: paymentLinkUrl ? 'payment_link' : 'payment_intent',
+            environment: process.env.NODE_ENV,
+            real_airwallex: true,
+            local_testing: false
+          }
         });
       } else {
         // Payment Intent 創建失敗，使用模擬方式
         console.log('Payment Intent 創建失敗，使用模擬方式');
+        console.log('Payment Intent 錯誤回應:', paymentIntentData);
         throw new Error('Payment Intent 創建失敗');
       }
     } catch (paymentError) {
@@ -225,9 +330,9 @@ export async function POST(request: NextRequest) {
           airwallex_intent_id: requestId,
           airwallex_request_id: requestId,
           status: 'pending',
-          checkout_url: `https://checkout.airwallex.com/pay/${requestId}`,
-          return_url: return_url,
-          cancel_url: cancel_url,
+          checkout_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/aihome/test-payment/success?payment_intent_id=${requestId}&amount=${amount}&currency=${currency}`,
+          return_url: publicReturnUrl,
+          cancel_url: publicCancelUrl,
           created_at: new Date().toISOString(),
           metadata: {
             source: 'hanami_simple_payment',
@@ -245,7 +350,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         payment_intent_id: requestId,
-        checkout_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/aihome/test-payment/success?payment_intent_id=${requestId}&amount=${amount}&currency=${currency}`,
+        checkout_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/aihome/test-payment/success?payment_intent_id=${requestId}&amount=${amount}&currency=${currency}`,
         status: 'requires_payment_method',
         amount: amount,
         currency: currency,
