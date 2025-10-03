@@ -4,8 +4,6 @@ import { getSaasSupabaseClient } from '@/lib/supabase';
 // 簡化的 Airwallex API 配置
 const AIRWALLEX_BASE_URL = 'https://api.airwallex.com/api/v1';
 const AIRWALLEX_AUTH_URL = `${AIRWALLEX_BASE_URL}/authentication/login`;
-const AIRWALLEX_API_KEY = process.env.AIRWALLEX_API_KEY;
-const AIRWALLEX_CLIENT_ID = process.env.AIRWALLEX_CLIENT_ID;
 
 interface PaymentRequest {
   amount: number;
@@ -17,10 +15,24 @@ interface PaymentRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // 在函數內部讀取環境變數
+    const AIRWALLEX_API_KEY = process.env.AIRWALLEX_API_KEY;
+    const AIRWALLEX_CLIENT_ID = process.env.AIRWALLEX_CLIENT_ID;
+    
+    // 調試環境變數
+    console.log('🔍 檢查環境變數:');
+    console.log('AIRWALLEX_API_KEY 存在:', !!AIRWALLEX_API_KEY);
+    console.log('AIRWALLEX_CLIENT_ID 存在:', !!AIRWALLEX_CLIENT_ID);
+    console.log('AIRWALLEX_API_KEY 長度:', AIRWALLEX_API_KEY?.length || 0);
+    console.log('AIRWALLEX_CLIENT_ID 長度:', AIRWALLEX_CLIENT_ID?.length || 0);
+    
     // 檢查環境變數
     if (!AIRWALLEX_API_KEY || !AIRWALLEX_CLIENT_ID) {
+      console.error('❌ 環境變數缺失:');
+      console.error('AIRWALLEX_API_KEY:', AIRWALLEX_API_KEY ? '已設置' : '未設置');
+      console.error('AIRWALLEX_CLIENT_ID:', AIRWALLEX_CLIENT_ID ? '已設置' : '未設置');
       return NextResponse.json(
-        { success: false, error: 'Airwallex 配置錯誤' },
+        { success: false, error: 'Airwallex 配置錯誤 - 環境變數缺失' },
         { status: 500 }
       );
     }
