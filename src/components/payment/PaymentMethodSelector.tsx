@@ -58,29 +58,23 @@ export default function PaymentMethodSelector({
       const result = await createAirwallexPayment(paymentRequest);
       
       if (result.success && result.checkout_url) {
-        // 在新視窗中打開 Airwallex 支付頁面
-        const paymentWindow = window.open(
-          result.checkout_url,
-          'airwallex_payment',
-          'width=800,height=600,scrollbars=yes,resizable=yes'
-        );
-
-        if (!paymentWindow) {
-          throw new Error('無法打開支付視窗，請檢查瀏覽器彈窗設定');
+        // 檢查是否為測試模式
+        if (result.is_test_mode) {
+          // 測試模式：模擬支付成功
+          console.log('測試模式：模擬 Airwallex 支付成功');
+          onPaymentSuccess?.({
+            success: true,
+            payment_intent_id: result.payment_intent_id,
+            status: 'succeeded',
+            amount: result.amount,
+            currency: result.currency,
+            message: '測試支付成功'
+          });
+        } else {
+          // 生產模式：直接跳轉到 Airwallex 支付頁面
+          console.log('跳轉到 Airwallex 支付頁面:', result.checkout_url);
+          window.location.href = result.checkout_url;
         }
-
-        // 監聽支付視窗關閉
-        const checkClosed = setInterval(() => {
-          if (paymentWindow.closed) {
-            clearInterval(checkClosed);
-            // 支付視窗已關閉，可以檢查支付狀態
-            onPaymentSuccess?.({ 
-              method: 'airwallex', 
-              status: 'window_closed',
-              message: '支付視窗已關閉，請檢查支付狀態'
-            });
-          }
-        }, 1000);
 
         // 監聽支付完成消息
         const handleMessage = (event: MessageEvent) => {

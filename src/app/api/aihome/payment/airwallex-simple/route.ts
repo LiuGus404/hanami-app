@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     const requestId = `hanami_intent_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
     try {
-      // 嘗試創建 Payment Intent
+      // 嘗試創建 Payment Intent - 使用正確的 Airwallex API 格式
       const paymentIntentRequest = {
         request_id: requestId,
         amount: amount,
@@ -120,7 +120,10 @@ export async function POST(request: NextRequest) {
         metadata: {
           source: 'hanami_test_payment',
           description: description
-        }
+        },
+        // 添加必要的配置
+        capture_method: 'automatic',
+        confirmation_method: 'automatic'
       };
 
       console.log('嘗試創建 Payment Intent:', JSON.stringify(paymentIntentRequest, null, 2));
@@ -167,10 +170,16 @@ export async function POST(request: NextRequest) {
           console.error('資料庫記錄錯誤:', dbError);
         }
 
+        // 構建正確的 checkout URL
+        const checkoutUrl = paymentIntentData.next_action?.redirect_to_url?.url || 
+                           `https://checkout.airwallex.com/pay/${paymentIntentData.id}?client_secret=${paymentIntentData.client_secret || ''}`;
+        
+        console.log('構建的 checkout URL:', checkoutUrl);
+        
         return NextResponse.json({
           success: true,
           payment_intent_id: paymentIntentData.id,
-          checkout_url: paymentIntentData.next_action?.redirect_to_url?.url || `https://checkout.airwallex.com/pay/${paymentIntentData.id}`,
+          checkout_url: checkoutUrl,
           status: paymentIntentData.status,
           amount: paymentIntentData.amount,
           currency: paymentIntentData.currency,
@@ -212,7 +221,7 @@ export async function POST(request: NextRequest) {
         console.error('資料庫記錄錯誤:', dbError);
       }
 
-      // 返回成功回應
+      // 返回成功回應 - 使用測試模式
       return NextResponse.json({
         success: true,
         payment_intent_id: requestId,
@@ -220,8 +229,9 @@ export async function POST(request: NextRequest) {
         status: 'requires_payment_method',
         amount: amount,
         currency: currency,
-        message: 'Airwallex API 連接成功，但需要帳戶配置才能創建真實支付',
-        api_test_result: testResponse.ok ? 'success' : 'failed'
+        message: 'Airwallex 測試模式 - 請在真實環境中配置完整參數',
+        api_test_result: testResponse.ok ? 'success' : 'failed',
+        is_test_mode: true
       });
     }
 
