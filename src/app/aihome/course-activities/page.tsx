@@ -89,7 +89,36 @@ export default function CourseActivitiesPage() {
     courses: Course[];
   }
 
-  const courseActivities: Institution[] = [];
+  const courseActivities: Institution[] = [
+    {
+      id: 'hanami-music',
+      name: 'Hanami Music 花見音樂',
+      institution: 'Hanami Music 花見音樂',
+      institutionLogo: '/@hanami.png',
+      description: '專業音樂教育機構，提供創新的音樂教學方法',
+      location: '香港',
+      courses: [
+        {
+          id: 'hanami-main',
+          name: 'Hanami Music 精選課程',
+          description: '2022-2024連續獲得優秀教育機構及導師獎。以最有趣活潑又科學的音樂教學助孩子成長發展。孩子絕對會學上癮的非傳統音樂鋼琴教學法',
+          duration: '15個月起',
+          level: '初級至高級',
+          instructor: '8年資深幼師、一級榮譽特殊幼師、奧福音樂導師專業團隊',
+          schedule: '靈活安排',
+          location: '多個分校',
+          maxStudents: 8,
+          currentStudents: 6,
+          price: 0,
+          rating: 5.0,
+          image: '/@hanami.png',
+          status: '招生中',
+          progress: 0,
+          nextClass: '立即報名開始學習'
+        }
+      ]
+    }
+  ];
 
   // 顯示載入狀態
   if (loading) {
@@ -232,7 +261,12 @@ export default function CourseActivitiesPage() {
                     animate={isLoaded ? { opacity: 1, scale: 1 } : {}}
                     transition={{ duration: 0.5, delay: 0.6 + institutionIndex * 0.1 + courseIndex * 0.1 }}
                     whileHover={{ scale: 1.02 }}
-                    className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-6 border border-[#EADBC8] hover:shadow-lg transition-all duration-300"
+                    onClick={() => {
+                      if (institution.id === 'hanami-music') {
+                        router.push('/aihome/course-activities/hanami-music');
+                      }
+                    }}
+                    className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-6 border border-[#EADBC8] hover:shadow-lg transition-all duration-300 cursor-pointer"
                   >
                     {/* 課程標題和狀態 */}
                     <div className="flex items-start justify-between mb-4">

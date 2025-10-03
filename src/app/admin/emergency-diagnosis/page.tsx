@@ -381,3 +381,5 @@ const EmergencyDiagnosisPage = () => {
 
 export default EmergencyDiagnosisPage;
 
+
+

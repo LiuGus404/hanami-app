@@ -32,6 +32,8 @@ interface MultiCourseSlot {
   max_total_students: number;
   current_total_students: number;
   available_dates?: {date: string, remain: number}[];
+  is_trial_open?: boolean;
+  is_registration_open?: boolean;
 }
 
 interface CourseInfo {
@@ -174,6 +176,10 @@ export default function MultiCourseAvailabilityDashboard() {
 
   // 學生管理相關狀態
   const [showStudentEditModal, setShowStudentEditModal] = useState(false);
+  
+  // 試堂和報名開關狀態
+  const [trialToggleLoading, setTrialToggleLoading] = useState(false);
+  const [registrationToggleLoading, setRegistrationToggleLoading] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [editFormData, setEditFormData] = useState<{
     status: string;
@@ -205,6 +211,78 @@ export default function MultiCourseAvailabilityDashboard() {
       ...prev,
       [sectionKey]: !prev[sectionKey]
     }));
+  };
+
+  // 切換試堂開放狀態
+  const toggleTrialOpen = async () => {
+    if (!selectedSlotDetail || trialToggleLoading) return;
+    
+    setTrialToggleLoading(true);
+    try {
+      const newTrialStatus = !selectedSlotDetail.is_trial_open;
+      
+      // 更新資料庫
+      const { error } = await supabase
+        .from('hanami_schedule')
+        .update({ is_trial_open: newTrialStatus })
+        .eq('weekday', selectedSlotDetail.weekday)
+        .eq('timeslot', selectedSlotDetail.time)
+        .eq('course_code', selectedSlotDetail.course_code);
+      
+      if (error) throw error;
+      
+      // 更新本地狀態
+      setSelectedSlotDetail((prev: any) => ({
+        ...prev,
+        is_trial_open: newTrialStatus
+      }));
+      
+      // 重新載入數據以保持同步
+      await fetchData();
+      
+      alert(`試堂狀態已${newTrialStatus ? '開啟' : '關閉'}`);
+    } catch (error) {
+      console.error('切換試堂狀態失敗:', error);
+      alert('切換試堂狀態失敗，請重試');
+    } finally {
+      setTrialToggleLoading(false);
+    }
+  };
+
+  // 切換報名開放狀態
+  const toggleRegistrationOpen = async () => {
+    if (!selectedSlotDetail || registrationToggleLoading) return;
+    
+    setRegistrationToggleLoading(true);
+    try {
+      const newRegistrationStatus = !selectedSlotDetail.is_registration_open;
+      
+      // 更新資料庫
+      const { error } = await supabase
+        .from('hanami_schedule')
+        .update({ is_registration_open: newRegistrationStatus })
+        .eq('weekday', selectedSlotDetail.weekday)
+        .eq('timeslot', selectedSlotDetail.time)
+        .eq('course_code', selectedSlotDetail.course_code);
+      
+      if (error) throw error;
+      
+      // 更新本地狀態
+      setSelectedSlotDetail((prev: any) => ({
+        ...prev,
+        is_registration_open: newRegistrationStatus
+      }));
+      
+      // 重新載入數據以保持同步
+      await fetchData();
+      
+      alert(`報名狀態已${newRegistrationStatus ? '開啟' : '關閉'}`);
+    } catch (error) {
+      console.error('切換報名狀態失敗:', error);
+      alert('切換報名狀態失敗，請重試');
+    } finally {
+      setRegistrationToggleLoading(false);
+    }
   };
 
 
@@ -881,7 +959,7 @@ ${timeSlot}有一個位 ^^
       // 3. 從 hanami_schedule 表取得多課程時間表
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('hanami_schedule')
-        .select('*')
+        .select('*, is_trial_open, is_registration_open')
         .not('course_code', 'is', null)
         .order('weekday', { ascending: true })
         .order('timeslot', { ascending: true });
@@ -927,7 +1005,9 @@ ${timeSlot}有一個位 ^^
             timeslot: slot.timeslot,
             courses: [],
             max_total_students: 0,
-            current_total_students: 0
+            current_total_students: 0,
+            is_trial_open: slot.is_trial_open ?? true,
+            is_registration_open: slot.is_registration_open ?? true
           };
         }
 
@@ -1202,26 +1282,28 @@ ${timeSlot}有一個位 ^^
     slotsByDay[dayIdx] = [];
   });
 
-  // 將多課程時段轉換為傳統視圖格式
-  slots.forEach(slot => {
-    slot.courses.forEach(course => {
-      slotsByDay[slot.weekday].push({
-        id: `${slot.id}_${course.course_code}`,
-        weekday: slot.weekday,
-        time: slot.timeslot,
-        course: course.course_type,
-        course_code: course.course_code,
-        course_name: course.course_name,
-        max: course.max_students,
-        current: course.current_students,
-        regular_students: course.regular_students,
-        trial_students: course.trial_students,
-        regular_students_ages: course.regular_students_ages,
-        teacher_name: course.teacher_name,
-        room_location: course.room_location
+      // 將多課程時段轉換為傳統視圖格式
+      slots.forEach(slot => {
+        slot.courses.forEach(course => {
+          slotsByDay[slot.weekday].push({
+            id: `${slot.id}_${course.course_code}`,
+            weekday: slot.weekday,
+            time: slot.timeslot,
+            course: course.course_type,
+            course_code: course.course_code,
+            course_name: course.course_name,
+            max: course.max_students,
+            current: course.current_students,
+            regular_students: course.regular_students,
+            trial_students: course.trial_students,
+            regular_students_ages: course.regular_students_ages,
+            teacher_name: course.teacher_name,
+            room_location: course.room_location,
+            is_trial_open: slot.is_trial_open,
+            is_registration_open: slot.is_registration_open
+          });
+        });
       });
-    });
-  });
 
   if (loading) {
     return (
@@ -1328,13 +1410,31 @@ ${timeSlot}有一個位 ^^
           <h2 className="text-lg font-bold text-[#4B4036]">多課程時間表</h2>
           <Image alt="icon" height={24} src="/rabbit.png" width={24} />
         </div>
-        <button
-          className="px-3 py-1.5 bg-[#EADBC8] text-[#4B4036] rounded-lg hover:bg-[#D4C4A8] transition-colors text-sm flex items-center gap-2 transform hover:scale-105"
-          onClick={() => setShowTrialLimitModal(true)}
-        >
-          <Image alt="設定" height={16} src="/edit-pencil.png" width={16} />
-          試堂人數設定
-        </button>
+        <div className="flex items-center gap-3">
+          {/* 狀態指示器圖例 */}
+          <div className="flex items-center gap-2 text-xs text-[#87704e] bg-[#FFF9F2] px-3 py-1.5 rounded-lg border border-[#EADBC8]">
+            <span className="font-medium">狀態指示器:</span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-400 rounded-full" title="試堂開放"></div>
+              <span>試堂</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-blue-400 rounded-full" title="報名開放"></div>
+              <span>報名</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-red-400 rounded-full" title="關閉"></div>
+              <span>關閉</span>
+            </div>
+          </div>
+          <button
+            className="px-3 py-1.5 bg-[#EADBC8] text-[#4B4036] rounded-lg hover:bg-[#D4C4A8] transition-colors text-sm flex items-center gap-2 transform hover:scale-105"
+            onClick={() => setShowTrialLimitModal(true)}
+          >
+            <Image alt="設定" height={16} src="/edit-pencil.png" width={16} />
+            試堂人數設定
+          </button>
+        </div>
       </div>
 
       <div className="w-full overflow-auto">
@@ -1393,6 +1493,17 @@ ${timeSlot}有一個位 ^^
                           {calculateAgeRange(slot.regular_students_ages.map((a: any) => ({ student_age: a })))}
                         </div>
                       )}
+                      {/* 試堂和報名狀態指示器 */}
+                      <div className="flex items-center justify-center gap-1 mt-1">
+                        {/* 試堂狀態指示器 */}
+                        <div className={`w-2 h-2 rounded-full ${
+                          slot.is_trial_open ? 'bg-green-400' : 'bg-red-400'
+                        }`} title={slot.is_trial_open ? '試堂開放' : '試堂關閉'}></div>
+                        {/* 報名狀態指示器 */}
+                        <div className={`w-2 h-2 rounded-full ${
+                          slot.is_registration_open ? 'bg-blue-400' : 'bg-orange-400'
+                        }`} title={slot.is_registration_open ? '報名開放' : '報名關閉'}></div>
+                      </div>
                       {/* 試堂學生展開按鈕 */}
                       {slot.trial_students && slot.trial_students.length > 0 && (
                         <div className="flex items-center justify-center gap-2 mt-1">
@@ -1657,6 +1768,135 @@ ${timeSlot}有一個位 ^^
                   <div className="text-sm text-[#7B1FA2] font-medium">等候區</div>
                 </motion.div>
               </div>
+
+              {/* 時段控制面板 */}
+              <motion.div 
+                className="mb-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.9 }}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#9C27B0] to-[#673AB7] rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-[#4B4036]">時段控制</h3>
+                </div>
+                
+                <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] rounded-lg p-6 border border-[#EADBC8]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* 試堂開放控制 */}
+                    <motion.div 
+                      className="bg-white rounded-xl p-6 border border-[#EADBC8] shadow-sm"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 1.0 }}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            selectedSlotDetail.is_trial_open 
+                              ? 'bg-gradient-to-br from-[#4CAF50] to-[#2E7D32]' 
+                              : 'bg-gradient-to-br from-[#F44336] to-[#C62828]'
+                          }`}>
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-[#4B4036]">試堂開放</h4>
+                            <p className="text-sm text-[#87704e]">
+                              {selectedSlotDetail.is_trial_open ? '目前開放試堂' : '目前關閉試堂'}
+                            </p>
+                          </div>
+                        </div>
+                        <motion.button
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#FCD58B] focus:ring-offset-2 ${
+                            selectedSlotDetail.is_trial_open ? 'bg-[#4CAF50]' : 'bg-gray-200'
+                          } ${trialToggleLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                          onClick={toggleTrialOpen}
+                          disabled={trialToggleLoading}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              selectedSlotDetail.is_trial_open ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                          {trialToggleLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          )}
+                        </motion.button>
+                      </div>
+                      <div className="text-xs text-[#87704e] bg-gray-50 p-3 rounded-lg">
+                        {selectedSlotDetail.is_trial_open 
+                          ? '✓ 學生可以預約此時段的試堂課程' 
+                          : '✗ 學生無法預約此時段的試堂課程'
+                        }
+                      </div>
+                    </motion.div>
+
+                    {/* 報名開放控制 */}
+                    <motion.div 
+                      className="bg-white rounded-xl p-6 border border-[#EADBC8] shadow-sm"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 1.1 }}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            selectedSlotDetail.is_registration_open 
+                              ? 'bg-gradient-to-br from-[#2196F3] to-[#1565C0]' 
+                              : 'bg-gradient-to-br from-[#FF9800] to-[#E65100]'
+                          }`}>
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-[#4B4036]">報名開放</h4>
+                            <p className="text-sm text-[#87704e]">
+                              {selectedSlotDetail.is_registration_open ? '目前開放報名' : '目前關閉報名'}
+                            </p>
+                          </div>
+                        </div>
+                        <motion.button
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#FCD58B] focus:ring-offset-2 ${
+                            selectedSlotDetail.is_registration_open ? 'bg-[#2196F3]' : 'bg-gray-200'
+                          } ${registrationToggleLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                          onClick={toggleRegistrationOpen}
+                          disabled={registrationToggleLoading}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              selectedSlotDetail.is_registration_open ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                          {registrationToggleLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          )}
+                        </motion.button>
+                      </div>
+                      <div className="text-xs text-[#87704e] bg-gray-50 p-3 rounded-lg">
+                        {selectedSlotDetail.is_registration_open 
+                          ? '✓ 學生可以報名此時段的正式課程' 
+                          : '✗ 學生無法報名此時段的正式課程'
+                        }
+                      </div>
+                    </motion.div>
+                  </div>
+                </div>
+              </motion.div>
 
               {/* 常規學生列表 */}
               <motion.div 

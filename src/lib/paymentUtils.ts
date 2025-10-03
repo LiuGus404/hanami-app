@@ -1,0 +1,200 @@
+// 支付相關工具函數
+
+import { PaymentMethod, PaymentRequest, AirwallexPaymentResponse, ScreenshotUploadData } from '@/types/payment';
+import React from 'react';
+
+// 截圖上傳圖標組件
+const ScreenshotIcon = () => (
+  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+// Airwallex 支付圖標組件
+const AirwallexIcon = () => (
+  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+  </svg>
+);
+
+// 支付方法配置
+export const PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    id: 'screenshot',
+    name: '上傳付款截圖',
+    description: '上傳您的付款截圖，我們將手動確認付款',
+    icon: ScreenshotIcon,
+    type: 'screenshot',
+    enabled: true
+  },
+  {
+    id: 'airwallex',
+    name: 'Airwallex 線上支付',
+    description: '使用 Airwallex 安全線上支付',
+    icon: AirwallexIcon,
+    type: 'airwallex',
+    enabled: true
+  }
+];
+
+// 驗證檔案類型
+export const validateFileType = (file: File): boolean => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  return allowedTypes.includes(file.type);
+};
+
+// 驗證檔案大小
+export const validateFileSize = (file: File, maxSizeMB: number = 10): boolean => {
+  return file.size <= maxSizeMB * 1024 * 1024;
+};
+
+// 生成檔案名稱
+export const generateFileName = (file: File): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const dateFolder = `${year}-${month}-${day}`;
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).substring(2);
+  const fileExt = file.name.split('.').pop();
+  return `payment-screenshots/${dateFolder}/${timestamp}-${randomId}.${fileExt}`;
+};
+
+// 格式化金額
+export const formatAmount = (amount: number, currency: string = 'HKD'): string => {
+  return new Intl.NumberFormat('zh-HK', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
+// 創建 Airwallex 支付請求
+export const createAirwallexPayment = async (request: PaymentRequest): Promise<AirwallexPaymentResponse> => {
+  try {
+    const response = await fetch('/api/aihome/payment/airwallex-simple', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Airwallex 支付創建失敗:', error);
+    throw error;
+  }
+};
+
+// 上傳付款截圖
+export const uploadScreenshot = async (uploadData: ScreenshotUploadData): Promise<{ success: boolean; url?: string; error?: string }> => {
+  try {
+    // 驗證檔案
+    if (!validateFileType(uploadData.file)) {
+      throw new Error('請選擇圖片檔案 (JPG, PNG, GIF, WebP)');
+    }
+
+    if (!validateFileSize(uploadData.file)) {
+      throw new Error('檔案大小不能超過 10MB');
+    }
+
+    // 創建 FormData
+    const formData = new FormData();
+    formData.append('file', uploadData.file);
+    formData.append('amount', uploadData.amount.toString());
+    formData.append('description', uploadData.description);
+    if (uploadData.metadata) {
+      formData.append('metadata', JSON.stringify(uploadData.metadata));
+    }
+
+    const response = await fetch('/api/aihome/payment/upload-screenshot', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('截圖上傳失敗:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '上傳失敗，請稍後再試'
+    };
+  }
+};
+
+// 獲取支付記錄
+export const getPaymentRecords = async (params?: {
+  user_id?: string;
+  status?: string;
+  payment_method?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ success: boolean; data?: any[]; error?: string }> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params?.user_id) queryParams.append('user_id', params.user_id);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.payment_method) queryParams.append('payment_method', params.payment_method);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+    const response = await fetch(`/api/aihome/payment/records?${queryParams.toString()}`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('獲取支付記錄失敗:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '獲取支付記錄失敗'
+    };
+  }
+};
+
+// 獲取支付統計
+export const getPaymentStatistics = async (params?: {
+  start_date?: string;
+  end_date?: string;
+  group_by?: 'day' | 'week' | 'month';
+}): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params?.start_date) queryParams.append('start_date', params.start_date);
+    if (params?.end_date) queryParams.append('end_date', params.end_date);
+    if (params?.group_by) queryParams.append('group_by', params.group_by);
+
+    const response = await fetch(`/api/aihome/payment/statistics?${queryParams.toString()}`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('獲取支付統計失敗:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '獲取支付統計失敗'
+    };
+  }
+};

@@ -66,7 +66,7 @@ export default function AIHomePage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-              <p className="text-sm text-[#2B3A3B]">兒童與成人的智能伙伴</p>
+              <p className="text-sm text-[#2B3A3B]">兒童與成人的智能夥伴</p>
             </div>
           </div>
           
@@ -130,7 +130,7 @@ export default function AIHomePage() {
                   <span className="text-[#FFD59A] block">HanamiEcho</span>
                 </h1>
                 <p className="text-xl text-[#2B3A3B] mb-8 max-w-2xl">
-                  您的智能 AI 助手，為兒童和成人提供個性化的協作體驗和情感支持
+                  您的智能 AI 助手，您和孩子專屬的學習和工作夥伴
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
