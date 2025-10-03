@@ -27,6 +27,7 @@ export interface AirwallexPaymentResponse {
   currency?: string;
   error?: string;
   message?: string;
+  is_test_mode?: boolean;
 }
 
 export interface ScreenshotUploadData {

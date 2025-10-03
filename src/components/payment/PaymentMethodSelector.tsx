@@ -81,13 +81,9 @@ export default function PaymentMethodSelector({
           if (event.origin !== window.location.origin) return;
           
           if (event.data.type === 'PAYMENT_SUCCESS') {
-            clearInterval(checkClosed);
-            paymentWindow.close();
             onPaymentSuccess?.(event.data);
             window.removeEventListener('message', handleMessage);
           } else if (event.data.type === 'PAYMENT_CANCELLED') {
-            clearInterval(checkClosed);
-            paymentWindow.close();
             onPaymentError?.('支付已取消');
             window.removeEventListener('message', handleMessage);
           }
@@ -97,7 +93,6 @@ export default function PaymentMethodSelector({
 
         // 5分鐘後自動清理
         setTimeout(() => {
-          clearInterval(checkClosed);
           window.removeEventListener('message', handleMessage);
         }, 300000);
 
