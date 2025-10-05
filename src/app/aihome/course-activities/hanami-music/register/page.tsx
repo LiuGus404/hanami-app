@@ -33,6 +33,13 @@ import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector';
 import PhoneInput from '@/components/ui/PhoneInput';
 import EmailInput from '@/components/ui/EmailInput';
 import { validatePhoneNumber, validateEmail } from '@/lib/validationUtils';
+import { 
+  hanamiAiPricingApi, 
+  type CoursePricingPlan, 
+  type CourseType,
+  type PriceCalculationResult,
+  type CouponValidationResult 
+} from '@/lib/hanami-ai-pricing-api';
 
 export default function HanamiMusicRegisterPage() {
   const router = useRouter();
@@ -48,6 +55,26 @@ export default function HanamiMusicRegisterPage() {
   const [courseTypeInfo, setCourseTypeInfo] = useState<any>(null); // 課程類型資訊
   const [loadingSchedule, setLoadingSchedule] = useState(false); // 排程載入狀態
   const [showSmartFiltering, setShowSmartFiltering] = useState(false); // 顯示智能篩選界面
+  const [isTestMode, setIsTestMode] = useState(true); // 測試模式 - 跳過某些驗證
+  
+  // 測試模式下的預設資料
+  const testData = {
+    childFullName: '測試小朋友',
+    childBirthDate: '2020-01-01',
+    childGender: '男',
+    childPreferences: '喜歡音樂和遊戲',
+    parentPhone: '+85212345678',
+    parentEmail: 'test@example.com',
+    parentTitle: '爸爸',
+    parentCountryCode: '+852'
+  };
+  
+  // 新的價格系統狀態
+  const [courseTypes, setCourseTypes] = useState<CourseType[]>([]); // 課程類型列表
+  const [pricingPlans, setPricingPlans] = useState<CoursePricingPlan[]>([]); // 價格計劃列表
+  const [loadingPricing, setLoadingPricing] = useState(false); // 價格載入狀態
+  const [priceCalculation, setPriceCalculation] = useState<PriceCalculationResult | null>(null); // 價格計算結果
+  const [couponValidation, setCouponValidation] = useState<CouponValidationResult | null>(null); // 優惠券驗證結果
   const [waitingListType, setWaitingListType] = useState<'none' | 'new' | 'existing'>('none'); // 等候區類型
 
   // 表單資料
@@ -77,7 +104,6 @@ export default function HanamiMusicRegisterPage() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [courseTypes, setCourseTypes] = useState<any[]>([]); // 從資料庫讀取的課程類型
   const [loadingCourses, setLoadingCourses] = useState(true); // 課程載入狀態
   const [isWaitingList, setIsWaitingList] = useState(false); // 等候區模式
 
@@ -206,103 +232,158 @@ export default function HanamiMusicRegisterPage() {
     return '適合所有年齡';
   };
 
-  // 從資料庫讀取課程類型 - 使用 useCallback 避免重複創建
-  const fetchCourseTypes = useCallback(async () => {
-      try {
-        setLoadingCourses(true);
-        const { data, error } = await supabase
-          .from('Hanami_CourseTypes')
-          .select('*')
-          .eq('status', true)
-          .order('display_order', { ascending: true });
 
-        if (error) {
-          console.error('讀取課程類型錯誤:', error);
-          return;
-        }
-
-        console.log('📊 從資料庫讀取的原始課程資料:', data);
-
-        // 為每個課程添加顯示屬性
-        const coursesWithDisplay = (data || []).map((course, index) => {
-          console.log(`🔍 處理課程 ${index + 1}:`, {
-            name: course.name,
-            min_age: course.min_age,
-            max_age: course.max_age,
-            age_range: course.age_range
-          });
-          // 圖標對應表
-          const iconMap: Record<string, any> = {
-            'sparkles': SparklesIcon,
-            'musical-note': MusicalNoteIcon,
-            'piano': PianoIcon,  // 使用實心圖標作為鋼琴
-            'guitar': MusicalNoteIcon,
-            'default': SparklesIcon
-          };
-
-          // 預設顏色（如果資料庫沒有設定）
-          const defaultColors = [
-            'from-pink-400 to-rose-400',
-            'from-purple-400 to-indigo-400',
-            'from-blue-400 to-cyan-400',
-            'from-green-400 to-emerald-400',
-            'from-yellow-400 to-orange-400',
-            'from-red-400 to-pink-400'
-          ];
-          
-          const calculatedAge = getAgeRangeText(course.min_age, course.max_age, course.age_range);
-          console.log(`📝 課程 "${course.name}" 最終年齡範圍:`, calculatedAge);
-          
-          return {
-            ...course,
-            // 使用資料庫的顏色，如果沒有則使用預設
-            color: course.color_code || defaultColors[index % defaultColors.length],
-            // 使用資料庫的圖標類型，如果沒有則使用預設
-            icon: iconMap[course.icon_type || 'default'] || SparklesIcon,
-            // 使用計算後的年齡範圍
-            age: calculatedAge,
-          };
-        });
-
-        setCourseTypes(coursesWithDisplay);
-        console.log('✅ 成功載入課程（完整資料）:', coursesWithDisplay);
-        
-        // 自動選擇第一個課程類型 - 只在沒有選擇時才設置
-        if (coursesWithDisplay.length > 0) {
-          setFormData(prev => {
-            if (!prev.courseType) {
-              console.log('🎯 自動選擇第一個課程類型:', coursesWithDisplay[0].id);
-              return { ...prev, courseType: coursesWithDisplay[0].id };
-            }
-            return prev;
-          });
-        }
-      } catch (err) {
-        console.error('❌ 獲取課程類型失敗:', err);
-      } finally {
-        setLoadingCourses(false);
-      }
-    }, []);
-
-  // 從資料庫讀取課程類型
+  // 初始化載入課程類型
   useEffect(() => {
-    fetchCourseTypes();
-  }, [fetchCourseTypes]);
+    loadCourseTypes();
+  }, []); // 移除依賴項，只在組件掛載時執行一次
 
-  // 當課程類型改變時，重新載入日曆資料
+  // 當課程類型改變時，重新載入日曆資料和價格計劃
   useEffect(() => {
     if (formData.courseType) {
-      console.log('🔄 課程類型改變，重新載入日曆資料:', formData.courseType);
+      console.log('🔄 課程類型改變，重新載入日曆資料和價格計劃:', formData.courseType);
       fetchCalendarData();
+      loadPricingPlans(formData.courseType);
+      // 重置選擇的計劃和價格計算
+      setFormData(prev => ({ ...prev, selectedPlan: '' }));
+      setPriceCalculation(null);
+      setCouponValidation(null);
     }
-  }, [formData.courseType]);
+  }, [formData.courseType]); // 移除函數依賴項，避免循環依賴
 
-  // 使用 useMemo 緩存課程計劃
-  const coursePlans = useMemo(() => [
-    { id: 'plan-8', name: '8堂課程', lessons: 8, price: 3600, promo_price: 2880, duration: '2個月' },
-    { id: 'plan-12', name: '12堂課程', lessons: 12, price: 5400, promo_price: 4320, duration: '3個月', badge: '最受歡迎' },
-    { id: 'plan-24', name: '24堂課程', lessons: 24, price: 10800, promo_price: 8640, duration: '6個月', badge: '最優惠' }
-  ], []);
+  // 當選擇價格計劃時，計算價格
+  useEffect(() => {
+    if (formData.selectedPlan && formData.courseType) {
+      calculatePrice(formData.courseType, formData.selectedPlan, formData.promotionCode);
+    }
+  }, [formData.selectedPlan, formData.courseType, formData.promotionCode]); // 移除函數依賴項
+
+  // 載入課程類型
+  const loadCourseTypes = useCallback(async () => {
+    try {
+      setLoadingPricing(true);
+      setLoadingCourses(true);
+      const types = await hanamiAiPricingApi.courseTypeApi.getCourseTypes();
+      
+      // 為每個課程添加顯示屬性
+      const coursesWithDisplay = types.map((course, index) => {
+        console.log(`🔍 處理課程 ${index + 1}:`, {
+          name: course.name,
+          min_age: course.min_age,
+          max_age: course.max_age,
+          age_range: course.age_range
+        });
+        
+        // 圖標對應表
+        const iconMap: Record<string, any> = {
+          'sparkles': SparklesIcon,
+          'musical-note': MusicalNoteIcon,
+          'piano': PianoIcon,
+          'guitar': MusicalNoteIcon,
+          'default': SparklesIcon
+        };
+
+        // 預設顏色（如果資料庫沒有設定）
+        const defaultColors = [
+          'from-pink-400 to-rose-400',
+          'from-purple-400 to-indigo-400',
+          'from-blue-400 to-cyan-400',
+          'from-green-400 to-emerald-400',
+          'from-yellow-400 to-orange-400',
+          'from-red-400 to-pink-400'
+        ];
+        
+        const calculatedAge = getAgeRangeText(course.min_age, course.max_age, course.age_range);
+        console.log(`📝 課程 "${course.name}" 最終年齡範圍:`, calculatedAge);
+        
+        return {
+          ...course,
+          // 使用資料庫的顏色，如果沒有則使用預設
+          color: course.color_code || defaultColors[index % defaultColors.length],
+          // 使用資料庫的圖標類型，如果沒有則使用預設
+          icon: iconMap[course.icon_type || 'default'] || SparklesIcon,
+          // 使用計算後的年齡範圍
+          age: calculatedAge,
+        };
+      });
+      
+      setCourseTypes(coursesWithDisplay);
+      console.log('✅ 載入課程類型成功:', coursesWithDisplay);
+      
+      // 自動選擇第一個課程類型 - 只在沒有選擇時才設置
+      if (coursesWithDisplay.length > 0) {
+        setFormData(prev => {
+          if (!prev.courseType) {
+            console.log('🎯 自動選擇第一個課程類型:', coursesWithDisplay[0].id);
+            return { ...prev, courseType: coursesWithDisplay[0].id };
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error('❌ 載入課程類型失敗:', error);
+    } finally {
+      setLoadingPricing(false);
+      setLoadingCourses(false);
+    }
+  }, []);
+
+  // 載入價格計劃
+  const loadPricingPlans = useCallback(async (courseTypeId: string) => {
+    if (!courseTypeId) return;
+    
+    try {
+      setLoadingPricing(true);
+      const plans = await hanamiAiPricingApi.coursePricingApi.getCoursePackagePlans(courseTypeId);
+      setPricingPlans(plans);
+      console.log('✅ 載入價格計劃成功:', plans);
+    } catch (error) {
+      console.error('❌ 載入價格計劃失敗:', error);
+      setPricingPlans([]);
+    } finally {
+      setLoadingPricing(false);
+    }
+  }, []);
+
+  // 計算價格
+  const calculatePrice = useCallback(async (courseTypeId: string, pricingPlanId: string, couponCode?: string) => {
+    if (!courseTypeId || !pricingPlanId) return;
+    
+    try {
+      const result = await hanamiAiPricingApi.pricingCalculationApi.calculateFinalPrice(
+        courseTypeId,
+        pricingPlanId,
+        couponCode
+      );
+      setPriceCalculation(result);
+      console.log('✅ 價格計算成功:', result);
+    } catch (error) {
+      console.error('❌ 價格計算失敗:', error);
+      setPriceCalculation(null);
+    }
+  }, []);
+
+  // 驗證優惠券
+  const validateCoupon = useCallback(async (couponCode: string) => {
+    if (!couponCode.trim()) {
+      setCouponValidation(null);
+      return;
+    }
+    
+    try {
+      const result = await hanamiAiPricingApi.couponApi.validateCoupon(couponCode);
+      setCouponValidation(result);
+      console.log('✅ 優惠券驗證結果:', result);
+      
+      // 如果優惠券有效且已選擇價格計劃，重新計算價格
+      if (result.isValid && formData.selectedPlan && formData.courseType) {
+        await calculatePrice(formData.courseType, formData.selectedPlan, couponCode);
+      }
+    } catch (error) {
+      console.error('❌ 優惠券驗證失敗:', error);
+      setCouponValidation({ isValid: false, message: '優惠券驗證失敗' });
+    }
+  }, [formData.selectedPlan, formData.courseType, calculatePrice]);
 
   // 使用 useMemo 緩存促銷代碼
   const promotionCodes = useMemo(() => [
@@ -355,23 +436,40 @@ export default function HanamiMusicRegisterPage() {
       
       console.log('📅 準備調用 API，參數:', {
         courseType: selectedCourse.name,
-        isTrial: true,
+        isTrial: formData.courseNature === 'trial',
         startDate,
         endDate
       });
       console.log('🔍 選中的課程詳情:', selectedCourse);
+      console.log('🔍 課程性質:', formData.courseNature);
       
-      const response = await fetch('/api/calendar-data', {
+      // 根據課程性質選擇不同的 API
+      const apiEndpoint = formData.courseNature === 'trial' 
+        ? '/api/calendar-data' 
+        : '/api/regular-course-calendar';
+      
+      const requestBody = formData.courseNature === 'trial' 
+        ? {
+            courseType: selectedCourse.name,
+            isTrial: true,
+            startDate,
+            endDate
+          }
+        : {
+            courseType: selectedCourse.name,
+            startDate,
+            endDate
+          };
+      
+      console.log('📡 使用 API:', apiEndpoint);
+      console.log('📡 請求參數:', requestBody);
+      
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          courseType: selectedCourse.name, // 傳遞課程名稱而不是 ID
-          isTrial: true, // 試堂報名
-          startDate,
-          endDate
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       console.log('📡 API 響應狀態:', response.status, response.statusText);
@@ -388,8 +486,19 @@ export default function HanamiMusicRegisterPage() {
       if (result.success) {
         console.log('📅 日曆資料獲取成功:', result.data.length, '天');
         console.log('📊 統計資訊:', result.stats);
+        // console.log('📅 前3筆日曆資料:', result.data.slice(0, 3));
         setCalendarData(result.data);
         setCourseTypeInfo(result.courseType);
+        
+        // 如果是常規課程且沒有選中日期，自動選擇第一個有排程的日期
+        if (formData.courseNature === 'regular' && !selectedDate && result.data.length > 0) {
+          const firstAvailableDay = result.data.find((day: any) => day.hasSchedule && day.timeSlots && day.timeSlots.length > 0);
+          if (firstAvailableDay) {
+            console.log('🎯 自動選擇第一個有排程的日期:', firstAvailableDay.date);
+            setSelectedDate(firstAvailableDay.date);
+            setFormData(prev => ({ ...prev, selectedDate: firstAvailableDay.date }));
+          }
+        }
       } else {
         throw new Error(result.error || '獲取日曆資料失敗');
       }
@@ -398,14 +507,21 @@ export default function HanamiMusicRegisterPage() {
     } finally {
       setLoadingSchedule(false);
     }
-  }, [formData.courseType, courseTypes]);
+  }, [formData.courseType, formData.courseNature, courseTypes, selectedDate]);
 
 
   // 獲取指定日期的日曆資料 - 使用 useCallback 避免重複創建
   const getCalendarDay = useCallback((dateStr: string) => {
-    return calendarData.find(day => day.date === dateStr);
+    const result = calendarData.find(day => day.date === dateStr);
+    return result;
   }, [calendarData]);
 
+
+  // 獲取星期幾的中文名稱
+  const getWeekdayName = useCallback((weekday: number): string => {
+    const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
+    return weekdayNames[weekday] || '';
+  }, []);
 
   // 將時間格式轉換為顯示格式 - 使用 useCallback 避免重複創建
   const formatTimeSlot = useCallback((timeSlot: string, duration?: string) => {
@@ -443,7 +559,148 @@ export default function HanamiMusicRegisterPage() {
     return `${formatTime(startHour, startMin)}-${formatTime(endHour, endMin)}`;
   }, []);
 
-  // 生成月份日曆的函數 - 使用 useMemo 避免無限循環
+  // 生成周曆的函數 - 使用 useMemo 避免無限循環
+  const generateWeekCalendar = useMemo(() => {
+    console.log('🔍 generateWeekCalendar 執行，formData.courseNature:', formData.courseNature);
+    
+    // 如果是常規課程，直接使用 API 返回的星期幾排程資料
+    if (formData.courseNature === 'regular') {
+      console.log('📅 常規課程：使用星期幾排程模式');
+      
+      const days = [];
+      
+      // 為每個星期幾（0-6）生成資料
+      for (let weekday = 0; weekday <= 6; weekday++) {
+        // 星期一顯示為休息日
+        if (weekday === 1) {
+          days.push({
+            date: null,
+            isPast: false,
+            isToday: false,
+            isCurrentMonth: true,
+            isBeyondTwoMonths: false,
+            hasSchedule: false,
+            availableSlots: 0,
+            totalSlots: 0,
+            isFullyBooked: true, // 休息日設為已滿
+            weekday,
+            weekdayName: '休息',
+            timeSlots: [],
+            isRestDay: true // 標記為休息日
+          });
+          continue;
+        }
+        
+        // 從 API 資料中獲取該星期幾的排程資訊
+        const weekdayData = calendarData.find(day => day.weekday === weekday);
+        
+        if (weekdayData) {
+          // 有排程資料的星期幾
+          days.push({
+            date: null, // 常規課程不需要具體日期
+            isPast: false, // 常規課程沒有過期概念
+            isToday: false, // 常規課程不顯示今天
+            isCurrentMonth: true,
+            isBeyondTwoMonths: false, // 常規課程沒有太遠概念
+            hasSchedule: weekdayData.hasSchedule,
+            availableSlots: weekdayData.availableSlots || 0,
+            totalSlots: weekdayData.totalSlots || 0,
+            isFullyBooked: weekdayData.isFullyBooked || false,
+            weekday: weekdayData.weekday,
+            weekdayName: weekdayData.weekdayName || getWeekdayName(weekday),
+            timeSlots: weekdayData.timeSlots || [],
+            isRestDay: false
+          });
+        } else {
+          // 沒有排程資料的星期幾
+          days.push({
+            date: null,
+            isPast: false,
+            isToday: false,
+            isCurrentMonth: true,
+            isBeyondTwoMonths: false,
+            hasSchedule: false,
+            availableSlots: 0,
+            totalSlots: 0,
+            isFullyBooked: false,
+            weekday,
+            weekdayName: getWeekdayName(weekday),
+            timeSlots: [],
+            isRestDay: false
+          });
+        }
+      }
+      
+      return days;
+    }
+    
+    // 試堂課程：使用原有的日期範圍邏輯
+    console.log('📅 試堂課程：使用日期範圍邏輯');
+    
+    // 使用香港時區獲取當前時間
+    const now = new Date();
+    const hkDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Hong_Kong' }).format(now);
+    const today = new Date(hkDateStr);
+    
+    // 計算當前週的開始日期（星期日，因為0是日）
+    const currentWeekStart = new Date(today);
+    const dayOfWeek = today.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    const daysToSunday = dayOfWeek === 0 ? 0 : -dayOfWeek; // 如果是星期日，不調整；否則往前推到星期日
+    currentWeekStart.setDate(today.getDate() + daysToSunday);
+    
+    console.log('📅 生成周曆 (香港時間): 當前週開始日期:', currentWeekStart.toDateString());
+    console.log('📅 今天是星期:', dayOfWeek, '(0=日, 1=一, ..., 6=六)');
+    
+    const days = [];
+    
+    // 只生成一週的資料（7天，從星期日開始）
+    for (let day = 0; day < 7; day++) {
+      const currentDate = new Date(currentWeekStart);
+      currentDate.setDate(currentWeekStart.getDate() + day);
+      
+      const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+      const weekday = currentDate.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+      
+      // 從 API 資料中獲取該日期的資訊
+      const dayData = getCalendarDay(dateStr);
+      
+      const isToday = currentDate.getTime() === today.getTime();
+      
+      if (dayData) {
+        // 有 API 資料的日期
+        days.push({
+          date: currentDate,
+          isPast: false, // 常規課程沒有過期概念
+          isToday: dayData.isToday,
+          isCurrentMonth: true, // 周曆中所有日期都是有效的
+          isBeyondTwoMonths: false, // 常規課程沒有太遠概念
+          hasSchedule: dayData.hasSchedule,
+          availableSlots: dayData.availableSlots || 0,
+          totalSlots: dayData.totalSlots || 0,
+          isFullyBooked: dayData.isFullyBooked || false,
+          weekday: dayData.weekday
+        });
+      } else {
+        // 沒有 API 資料的日期
+        days.push({
+          date: currentDate,
+          isPast: false, // 常規課程沒有過期概念
+          isToday,
+          isCurrentMonth: true,
+          isBeyondTwoMonths: false, // 常規課程沒有太遠概念
+          hasSchedule: false,
+          availableSlots: 0,
+          totalSlots: 0,
+          isFullyBooked: false,
+          weekday
+        });
+      }
+    }
+    
+    return days;
+  }, [getCalendarDay, formData.courseNature, calendarData]);
+
+  // 生成月份日曆的函數 - 使用 useMemo 避免無限循環（保留給試堂使用）
   const generateCalendarDays = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -516,13 +773,43 @@ export default function HanamiMusicRegisterPage() {
     }
     
     return days;
-  }, [currentMonth, getCalendarDay]);
+  }, [currentMonth, getCalendarDay, formData.courseNature, calendarData]);
 
   // 獲取選中日期的時段資訊 - 使用 useCallback 避免重複計算
   const getTimeSlotsForDate = useCallback((dateStr: string) => {
     if (!dateStr) return [];
     
-    // 從 API 資料中獲取該日期的時段資訊
+    // 常規課程：處理星期幾選擇
+    if (formData.courseNature === 'regular' && dateStr.startsWith('weekday-')) {
+      const weekday = parseInt(dateStr.replace('weekday-', ''));
+      const weekdayData = calendarData.find(day => day.weekday === weekday);
+      
+      if (!weekdayData || !weekdayData.timeSlots) {
+        console.log(`📅 選中星期${weekday}: 沒有時段資料`);
+        return [];
+      }
+      
+      console.log(`📅 選中星期${weekday}: 找到 ${weekdayData.timeSlots.length} 個時段`);
+      
+      // 轉換為前端需要的格式
+      const timeSlots = weekdayData.timeSlots.map((slot: any) => ({
+        id: slot.id,
+        time: slot.time,
+        timeslot: slot.timeslot,
+        duration: slot.duration,
+        maxCapacity: slot.maxStudents,
+        remainingSpots: slot.remainingSpots,
+        isBooked: !slot.isAvailable,
+        available: slot.isAvailable,
+        assignedTeachers: slot.assignedTeachers,
+        status: slot.status
+      }));
+      
+      console.log(`🎯 最終返回的時段:`, timeSlots);
+      return timeSlots;
+    }
+    
+    // 試堂課程：處理具體日期選擇
     const dayData = getCalendarDay(dateStr);
     
     if (!dayData || !dayData.timeSlots) {
@@ -548,7 +835,7 @@ export default function HanamiMusicRegisterPage() {
     
     console.log(`🎯 最終返回的時段:`, timeSlots);
     return timeSlots;
-  }, [getCalendarDay]);
+  }, [getCalendarDay, calendarData, formData.courseNature]);
 
   // 計算年齡 - 使用香港時區
   useEffect(() => {
@@ -571,6 +858,12 @@ export default function HanamiMusicRegisterPage() {
   // 驗證當前步驟
   const validateStep = (step: number) => {
     const newErrors: Record<string, string> = {};
+
+    // 測試模式下跳過大部分驗證
+    if (isTestMode) {
+      console.log('🧪 測試模式：跳過步驟', step, '的驗證');
+      return newErrors;
+    }
 
     switch (step) {
       case 0:
@@ -633,7 +926,7 @@ export default function HanamiMusicRegisterPage() {
 
   // 下一步
   const handleNext = () => {
-    if (validateStep(currentStep)) {
+    if (isTestMode || validateStep(currentStep)) {
       const nextStep = Math.min(currentStep + 1, steps.length - 1);
       
       // 如果下一步是日期時間步驟（步驟3），先顯示智能篩選界面
@@ -871,6 +1164,63 @@ export default function HanamiMusicRegisterPage() {
               >
                 <Bars3Icon className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
               </motion.button>
+              
+              {/* 測試模式切換按鈕 */}
+              <motion.button
+                onClick={() => setIsTestMode(!isTestMode)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                  isTestMode 
+                    ? 'bg-green-100 text-green-700 border border-green-300' 
+                    : 'bg-gray-100 text-gray-700 border border-gray-300'
+                }`}
+                title={isTestMode ? '測試模式：已啟用' : '測試模式：已停用'}
+              >
+                🧪 {isTestMode ? '測試模式' : '正常模式'}
+              </motion.button>
+              
+              {/* 快速填入測試資料按鈕 */}
+              {isTestMode && (
+                <motion.button
+                  onClick={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      ...testData
+                    }));
+                    console.log('🧪 已填入測試資料');
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-3 py-1 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 border border-blue-300 transition-colors"
+                  title="快速填入測試資料"
+                >
+                  📝 填入測試資料
+                </motion.button>
+              )}
+              
+              {/* 測試模式步驟跳轉 */}
+              {isTestMode && (
+                <div className="flex items-center space-x-1">
+                  <span className="text-xs text-gray-600">步驟:</span>
+                  {[0, 1, 2, 3, 4, 5].map((step) => (
+                    <motion.button
+                      key={step}
+                      onClick={() => setCurrentStep(step)}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      className={`w-6 h-6 rounded-full text-xs font-medium transition-colors ${
+                        currentStep === step
+                          ? 'bg-[#FFD59A] text-[#4B4036]'
+                          : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                      }`}
+                      title={`跳轉到步驟 ${step + 1}`}
+                    >
+                      {step + 1}
+                    </motion.button>
+                  ))}
+                </div>
+              )}
               
               <div className="w-8 h-8 sm:w-10 sm:h-10 relative">
                 <img 
@@ -1186,8 +1536,8 @@ export default function HanamiMusicRegisterPage() {
                           )}
                           
                           <div className="flex items-start space-x-3 mb-3">
-                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${course.color} flex items-center justify-center flex-shrink-0`}>
-                              <course.icon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${(course as any).color || 'from-blue-500 to-purple-600'} flex items-center justify-center flex-shrink-0`}>
+                              {(course as any).icon && React.createElement((course as any).icon, { className: "w-6 h-6 sm:w-7 sm:h-7 text-white" })}
                             </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="font-bold text-[#4B4036] mb-2 text-base sm:text-lg">{course.name}班</h3>
@@ -1196,7 +1546,7 @@ export default function HanamiMusicRegisterPage() {
                                 <div className="flex items-center space-x-2">
                                   <UserGroupIcon className="w-4 h-4 text-[#4B4036] flex-shrink-0" />
                                   <span className="text-xs sm:text-sm text-[#2B3A3B]">
-                                    {course.age}
+                                    {(course as any).age || '適合所有年齡'}
                                   </span>
                                 </div>
                                 {/* 課程時長 */}
@@ -1226,35 +1576,100 @@ export default function HanamiMusicRegisterPage() {
                     {!loadingCourses && formData.courseNature === 'regular' && (
                       <div className="mt-6 sm:mt-8">
                         <h3 className="text-lg sm:text-xl font-bold text-[#4B4036] mb-4">選擇課程計劃</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          {coursePlans.map((plan) => (
-                            <motion.button
-                              key={plan.id}
-                              type="button"
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => setFormData(prev => ({ ...prev, selectedPlan: plan.id }))}
-                              className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 relative ${
-                                formData.selectedPlan === plan.id
-                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                              }`}
-                            >
-                              {plan.badge && (
-                                <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                                  {plan.badge}
+                        
+                        {loadingPricing ? (
+                          <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
+                            <p className="text-[#2B3A3B]">載入課程計劃中...</p>
+                          </div>
+                        ) : pricingPlans.length === 0 ? (
+                          <div className="text-center py-8 bg-white rounded-2xl border-2 border-[#EADBC8]">
+                            <MusicalNoteIcon className="w-12 h-12 text-[#2B3A3B]/30 mx-auto mb-4" />
+                            <p className="text-[#2B3A3B]">此課程暫無可用的課程計劃</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {pricingPlans.map((plan) => {
+                              const averagePricePerLesson = plan.package_lessons && plan.package_price 
+                                ? hanamiAiPricingApi.pricingCalculationApi.calculateAveragePricePerLesson(
+                                    plan.package_price, 
+                                    plan.package_lessons
+                                  )
+                                : 0;
+                              
+                              return (
+                                <motion.button
+                                  key={plan.id}
+                                  type="button"
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => setFormData(prev => ({ ...prev, selectedPlan: plan.id }))}
+                                  className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 relative ${
+                                    formData.selectedPlan === plan.id
+                                      ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
+                                      : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                  }`}
+                                >
+                                  {plan.is_featured && (
+                                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                                      最多人選擇
+                                    </div>
+                                  )}
+                                  <h4 className="text-base sm:text-lg font-bold text-[#4B4036] mb-2">{plan.plan_name}</h4>
+                                  {plan.plan_description && (
+                                    <p className="text-xs sm:text-sm text-[#2B3A3B] mb-3">{plan.plan_description}</p>
+                                  )}
+                                  <div className="mb-2 text-center">
+                                    {plan.price_per_lesson && plan.package_lessons && (
+                                      <div className="text-sm text-gray-400 line-through mb-1">
+                                        {hanamiAiPricingApi.formatPrice(plan.price_per_lesson * plan.package_lessons, plan.currency)}
+                                      </div>
+                                    )}
+                                    <div className="text-xl sm:text-2xl font-bold text-[#4B4036]">
+                                      {hanamiAiPricingApi.formatPrice(plan.package_price || 0, plan.currency)}
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-[#2B3A3B]">
+                                    {plan.package_lessons} 堂課程
+                                    {averagePricePerLesson > 0 && (
+                                      <span className="block mt-1 text-green-600">
+                                        平均每堂 {hanamiAiPricingApi.formatPrice(averagePricePerLesson, plan.currency)}
+                                      </span>
+                                    )}
+                                  </p>
+                                </motion.button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+
+                        {/* 價格計算結果 */}
+                        {priceCalculation && formData.selectedPlan && (
+                          <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border border-green-200">
+                            <h4 className="text-sm font-semibold text-green-800 mb-3">價格明細</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-green-700">課程包原價：</span>
+                                <span className="font-medium">{hanamiAiPricingApi.formatPrice(priceCalculation.base_price, priceCalculation.currency)}</span>
+                              </div>
+                              {priceCalculation.discount_amount > 0 && (
+                                <div className="flex justify-between text-green-600">
+                                  <span>優惠折扣：</span>
+                                  <span className="font-medium">-{hanamiAiPricingApi.formatPrice(priceCalculation.discount_amount, priceCalculation.currency)}</span>
                                 </div>
                               )}
-                              <h4 className="text-base sm:text-lg font-bold text-[#4B4036] mb-2">{plan.name}</h4>
-                              <p className="text-xs sm:text-sm text-[#2B3A3B] mb-3">{plan.duration}</p>
-                              <div className="mb-2">
-                                <span className="text-xl sm:text-2xl font-bold text-[#4B4036]">HK${plan.promo_price}</span>
-                                <span className="text-sm text-gray-400 line-through ml-2">HK${plan.price}</span>
+                              <div className="border-t border-green-300 pt-2">
+                                <div className="flex justify-between">
+                                  <span className="font-semibold text-green-800">最終價格：</span>
+                                  <span className="text-lg font-bold text-green-800">
+                                    {hanamiAiPricingApi.formatPrice(priceCalculation.final_price, priceCalculation.currency)}
+                                  </span>
+                                </div>
                               </div>
-                              <p className="text-xs text-[#2B3A3B]">{plan.lessons} 堂課程</p>
-                            </motion.button>
-                          ))}
-                        </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1445,7 +1860,9 @@ export default function HanamiMusicRegisterPage() {
                 {currentStep === 3 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
-                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">選擇日期與時段</h2>
+                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">
+                        {formData.courseNature === 'regular' ? '常規課程日曆（周曆顯示）' : '選擇日期與時段'}
+                      </h2>
                       <p className="text-sm sm:text-base text-[#2B3A3B]">請選擇上課日期和時間</p>
                     </div>
 
@@ -1506,43 +1923,45 @@ export default function HanamiMusicRegisterPage() {
                       </div>
                     </div>
 
-                    {/* 月份導航 */}
-                    <div className="flex items-center justify-between mb-6 bg-white rounded-xl p-4 shadow-sm border border-[#EADBC8]">
-                      <motion.button
-                        onClick={() => setCurrentMonth(prev => {
-                          const newMonth = new Date(prev);
-                          newMonth.setMonth(prev.getMonth() - 1);
-                          return newMonth;
-                        })}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors font-medium"
-                      >
-                        <ChevronLeftIcon className="w-5 h-5" />
-                        <span className="hidden sm:inline">上個月</span>
-                      </motion.button>
-                      
-                      <div className="text-center">
-                        <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036]">
-                          {currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' })}
-                        </h3>
-                        <p className="text-sm text-[#2B3A3B]/70 mt-1">選擇上課日期</p>
+                    {/* 月份導航（僅試堂顯示） */}
+                    {formData.courseNature === 'trial' && (
+                      <div className="flex items-center justify-between mb-6 bg-white rounded-xl p-4 shadow-sm border border-[#EADBC8]">
+                        <motion.button
+                          onClick={() => setCurrentMonth(prev => {
+                            const newMonth = new Date(prev);
+                            newMonth.setMonth(prev.getMonth() - 1);
+                            return newMonth;
+                          })}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors font-medium"
+                        >
+                          <ChevronLeftIcon className="w-5 h-5" />
+                          <span className="hidden sm:inline">上個月</span>
+                        </motion.button>
+                        
+                        <div className="text-center">
+                          <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036]">
+                            {currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' })}
+                          </h3>
+                          <p className="text-sm text-[#2B3A3B]/70 mt-1">選擇上課日期</p>
+                        </div>
+                        
+                        <motion.button
+                          onClick={() => setCurrentMonth(prev => {
+                            const newMonth = new Date(prev);
+                            newMonth.setMonth(prev.getMonth() + 1);
+                            return newMonth;
+                          })}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors font-medium"
+                        >
+                          <span className="hidden sm:inline">下個月</span>
+                          <ChevronRightIcon className="w-5 h-5" />
+                        </motion.button>
                       </div>
-                      
-                      <motion.button
-                        onClick={() => setCurrentMonth(prev => {
-                          const newMonth = new Date(prev);
-                          newMonth.setMonth(prev.getMonth() + 1);
-                          return newMonth;
-                        })}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors font-medium"
-                      >
-                        <span className="hidden sm:inline">下個月</span>
-                        <ChevronRightIcon className="w-5 h-5" />
-                      </motion.button>
-                    </div>
+                    )}
 
                     {/* 日曆 */}
                     <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]">
@@ -1552,118 +1971,229 @@ export default function HanamiMusicRegisterPage() {
                           <p className="text-[#2B3A3B]">載入排程中...</p>
                         </div>
                       ) : (
-                      <>
-                      {/* 星期標題 */}
-                      <div className="grid grid-cols-7 gap-2 mb-6">
-                        {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-                          <div key={day} className="text-center text-sm font-bold text-[#4B4036] py-3 bg-[#FFF9F2] rounded-lg">
-                            {day}
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {/* 日期格子 */}
-                      <div className="grid grid-cols-7 gap-2">
-                        {generateCalendarDays.map((day, index) => {
-                          const dateStr = day.date.toLocaleDateString('en-CA'); // 使用本地日期格式
-                          const isSelected = selectedDate === dateStr;
-                          
-                          return (
-                            <motion.button
-                              key={index}
-                              type="button"
-                              disabled={day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')}
-                              whileHover={!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial') ? { scale: 1.02 } : {}}
-                              whileTap={!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial') ? { scale: 0.98 } : {}}
-                              onClick={() => {
-                                if (!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial')) {
-                                  setSelectedDate(dateStr);
-                                  setFormData(prev => ({ ...prev, selectedDate: dateStr }));
-                                }
-                              }}
-                              className={`relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 min-h-[80px] flex flex-col justify-center items-center ${
-                                isSelected
-                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
-                                  : day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')
-                                  ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                  : day.isFullyBooked
-                                  ? 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
-                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
-                              }`}
-                            >
-                              <div className="text-center w-full">
-                                <p className={`text-sm sm:text-base font-bold mb-1 ${
-                                  day.isToday ? 'text-[#FFD59A]' : ''
-                                }`}>
-                                  {day.date.getDate()}
-                                </p>
+                        <>
+                        {formData.courseNature === 'regular' ? (
+                          /* 周曆顯示 - 只顯示一週 */
+                          <div className="space-y-4">
+                            {/* 週標題 */}
+                            <div className="text-center">
+                              <h3 className="text-lg font-bold text-[#4B4036]">
+                                {formData.courseNature === 'regular' ? '星期課程安排' : '本週課程安排'}
+                              </h3>
+                            </div>
+                            
+                            {/* 星期標題 */}
+                            <div className="grid grid-cols-7 gap-2">
+                              {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+                                <div key={day} className="text-center text-sm font-bold text-[#4B4036] py-2 bg-[#FFF9F2] rounded-lg">
+                                  {day}
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {/* 日期格子 */}
+                            <div className="grid grid-cols-7 gap-2">
+                              {generateWeekCalendar.map((day, dayIndex) => {
+                                const dateStr = day.date ? day.date.toLocaleDateString('en-CA') : `weekday-${day.weekday}`;
+                                const isSelected = selectedDate === dateStr;
                                 
-                                {/* 位置狀態指示 */}
-                                {day.isCurrentMonth && !day.isPast && (
-                                  <div className="mt-2">
-                                    {day.isBeyondTwoMonths ? (
-                                      <div className="flex items-center justify-center">
-                                        <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
-                                          暫不開放
-                                        </span>
-                                      </div>
-                                    ) : !day.hasSchedule ? (
-                                      <div className="flex items-center justify-center">
-                                        <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
-                                          {day.weekday === 1 ? '休息' : '無課程'}
-                                        </span>
-                                      </div>
-                                    ) : day.isFullyBooked ? (
-                                      <div className="flex items-center justify-center">
-                                        <span className="text-xs text-red-500 font-bold bg-red-100 px-2 py-1 rounded-full">
-                                          FULL
-                                        </span>
-                                      </div>
-                                    ) : day.availableSlots > 0 ? (
-                                      <div className="flex items-center justify-center">
-                                        {/* 即日試堂顯示 FULL */}
-                                        {day.isToday && formData.courseNature === 'trial' ? (
-                                          <span className="text-xs text-red-500 font-bold bg-red-100 px-2 py-1 rounded-full">
-                                            FULL
-                                          </span>
+                                return (
+                                  <motion.button
+                                    key={dayIndex}
+                                    type="button"
+                                    disabled={day.isFullyBooked}
+                                    whileHover={!day.isFullyBooked ? { scale: 1.02 } : {}}
+                                    whileTap={!day.isFullyBooked ? { scale: 0.98 } : {}}
+                                    onClick={() => {
+                                      if (!day.isFullyBooked) {
+                                        setSelectedDate(dateStr);
+                                        setFormData(prev => ({ ...prev, selectedDate: dateStr }));
+                                      }
+                                    }}
+                                    className={`relative p-2 rounded-xl border-2 transition-all duration-200 min-h-[60px] flex flex-col justify-center items-center ${
+                                      isSelected
+                                        ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
+                                        : day.isFullyBooked
+                                        ? 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed'
+                                        : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
+                                    }`}
+                                  >
+                                    <div className="text-center w-full">
+                                      <p className={`text-sm font-bold mb-1 ${
+                                        day.isToday ? 'text-[#FFD59A]' : ''
+                                      }`}>
+                                        {formData.courseNature === 'regular' 
+                                          ? (day as any).weekdayName || getWeekdayName((day as any).weekday)
+                                          : day.date?.getDate() || ''
+                                        }
+                                      </p>
+                                      
+                                      {/* 位置狀態指示 */}
+                                      <div className="mt-1">
+                                        {(day as any).isRestDay ? (
+                                          <div className="flex items-center justify-center">
+                                            <span className="text-xs text-gray-500 font-bold bg-gray-100 px-1 py-0.5 rounded-full">
+                                              休息
+                                            </span>
+                                          </div>
+                                        ) : day.isFullyBooked ? (
+                                          <div className="flex items-center justify-center">
+                                            <span className="text-xs text-red-600 font-bold bg-red-100 px-1 py-0.5 rounded-full">
+                                              已滿
+                                            </span>
+                                          </div>
+                                        ) : day.hasSchedule ? (
+                                          <div className="flex items-center justify-center">
+                                            {(() => {
+                                              const availableSlots = day.availableSlots || 0;
+                                              let colorClass = '';
+                                              if (availableSlots <= 3) {
+                                                colorClass = 'text-red-600 bg-red-100'; // 1-3個位置：紅色
+                                              } else if (availableSlots <= 5) {
+                                                colorClass = 'text-orange-600 bg-orange-100'; // 4-5個位置：橙色
+                                              } else {
+                                                colorClass = 'text-green-600 bg-green-100'; // 5個以上：綠色
+                                              }
+                                              return (
+                                                <span className={`text-xs font-bold px-1 py-0.5 rounded-full ${colorClass}`}>
+                                                  {availableSlots}/{day.totalSlots}
+                                                </span>
+                                              );
+                                            })()}
+                                          </div>
                                         ) : (
-                                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                            day.availableSlots <= 3 
-                                              ? 'text-orange-600 bg-orange-100' 
-                                              : day.availableSlots <= 5 
-                                              ? 'text-yellow-600 bg-yellow-100' 
-                                              : 'text-green-600 bg-green-100'
-                                          }`}>
-                                            {day.availableSlots}/{day.totalSlots}
-                                          </span>
+                                          <div className="flex items-center justify-center">
+                                            <span className="text-xs text-gray-500 font-bold bg-gray-100 px-1 py-0.5 rounded-full">
+                                              無課
+                                            </span>
+                                          </div>
                                         )}
                                       </div>
-                                    ) : day.hasSchedule && (day as any).totalBookings === 0 ? (
-                                      <div className="flex items-center justify-center">
-                                        <span className="text-xs text-purple-600 font-bold bg-purple-100 px-2 py-1 rounded-full">
-                                          加開
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center justify-center">
-                                        <span className="text-xs text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded-full">
-                                          可預約
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+                                    </div>
+                                  </motion.button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          /* 月曆顯示（試堂） */
+                          <>
+                            {/* 星期標題 */}
+                            <div className="grid grid-cols-7 gap-2 mb-6">
+                              {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+                                <div key={day} className="text-center text-sm font-bold text-[#4B4036] py-3 bg-[#FFF9F2] rounded-lg">
+                                  {day}
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {/* 日期格子 */}
+                            <div className="grid grid-cols-7 gap-2">
+                              {generateCalendarDays.map((day, index) => {
+                                const dateStr = day.date ? day.date.toLocaleDateString('en-CA') : `weekday-${day.weekday}`; // 使用本地日期格式
+                                const isSelected = selectedDate === dateStr;
                                 
-                                {/* 今天標記 */}
-                                {day.isToday && (
-                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFD59A] rounded-full border-2 border-white"></div>
-                                )}
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                      </>
+                                return (
+                                  <motion.button
+                                    key={index}
+                                    type="button"
+                                    disabled={day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')}
+                                    whileHover={!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial') ? { scale: 1.02 } : {}}
+                                    whileTap={!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial') ? { scale: 0.98 } : {}}
+                                    onClick={() => {
+                                      if (!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial')) {
+                                        setSelectedDate(dateStr);
+                                        setFormData(prev => ({ ...prev, selectedDate: dateStr }));
+                                      }
+                                    }}
+                                    className={`relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 min-h-[80px] flex flex-col justify-center items-center ${
+                                      isSelected
+                                        ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
+                                        : day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')
+                                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                        : day.isFullyBooked
+                                        ? 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
+                                        : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
+                                    }`}
+                                  >
+                                    <div className="text-center w-full">
+                                      <p className={`text-sm sm:text-base font-bold mb-1 ${
+                                        day.isToday ? 'text-[#FFD59A]' : ''
+                                      }`}>
+                                        {formData.courseNature === 'regular' 
+                                          ? (day as any).weekdayName || getWeekdayName((day as any).weekday)
+                                          : day.date?.getDate() || ''
+                                        }
+                                      </p>
+                                      
+                                      {/* 位置狀態指示 */}
+                                      {day.isCurrentMonth && !day.isPast && (
+                                        <div className="mt-2">
+                                          {day.isBeyondTwoMonths ? (
+                                            <div className="flex items-center justify-center">
+                                              <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
+                                                暫不開放
+                                              </span>
+                                            </div>
+                                          ) : !day.hasSchedule ? (
+                                            <div className="flex items-center justify-center">
+                                              <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
+                                                {day.weekday === 1 ? '休息' : '無課程'}
+                                              </span>
+                                            </div>
+                                          ) : day.isFullyBooked ? (
+                                            <div className="flex items-center justify-center">
+                                              <span className="text-xs text-red-500 font-bold bg-red-100 px-2 py-1 rounded-full">
+                                                FULL
+                                              </span>
+                                            </div>
+                                          ) : day.availableSlots > 0 ? (
+                                            <div className="flex items-center justify-center">
+                                              {/* 即日試堂顯示 FULL */}
+                                              {day.isToday && formData.courseNature === 'trial' ? (
+                                                <span className="text-xs text-red-500 font-bold bg-red-100 px-2 py-1 rounded-full">
+                                                  FULL
+                                                </span>
+                                              ) : (
+                                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                                  day.availableSlots <= 3 
+                                                    ? 'text-red-500 bg-red-100' 
+                                                    : day.availableSlots <= 5 
+                                                    ? 'text-orange-500 bg-orange-100' 
+                                                    : 'text-green-500 bg-green-100'
+                                                }`}>
+                                                  {day.availableSlots}/{day.totalSlots}
+                                                </span>
+                                              )}
+                                            </div>
+                                          ) : day.hasSchedule && (day as any).totalBookings === 0 ? (
+                                            <div className="flex items-center justify-center">
+                                              <span className="text-xs text-purple-600 font-bold bg-purple-100 px-2 py-1 rounded-full">
+                                                加開
+                                              </span>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center justify-center">
+                                              <span className="text-xs text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded-full">
+                                                可預約
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      {/* 今天標記 */}
+                                      {day.isToday && (
+                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFD59A] rounded-full border-2 border-white"></div>
+                                      )}
+                                    </div>
+                                  </motion.button>
+                                );
+                              })}
+                            </div>
+                            </>
+                        )}
+                        </>
                       )}
                     </div>
 
@@ -1680,12 +2210,15 @@ export default function HanamiMusicRegisterPage() {
                           </div>
                     <div>
                             <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036]">
-                              {new Date(selectedDate).toLocaleDateString('zh-TW', { 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric',
-                                weekday: 'long'
-                              })}
+                              {formData.courseNature === 'regular' && selectedDate.startsWith('weekday-') 
+                                ? `星期${getWeekdayName(parseInt(selectedDate.replace('weekday-', '')))}`
+                                : new Date(selectedDate).toLocaleDateString('zh-TW', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric',
+                                    weekday: 'long'
+                                  })
+                              }
                             </h3>
                             <p className="text-sm text-[#2B3A3B]/70">選擇上課時段</p>
                           </div>
@@ -1708,16 +2241,16 @@ export default function HanamiMusicRegisterPage() {
                             <motion.button
                                   key={slot.id || index}
                               type="button"
-                              disabled={!slot.available}
-                                  whileHover={slot.available ? { scale: 1.02 } : {}}
-                                  whileTap={slot.available ? { scale: 0.98 } : {}}
-                              onClick={() => slot.available && setFormData(prev => ({ ...prev, selectedTimeSlot: slot.time }))}
+                              disabled={false} // 讓所有時段都可以點擊
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                              onClick={() => setFormData(prev => ({ ...prev, selectedTimeSlot: slot.time }))}
                                   className={`p-4 rounded-xl border-2 transition-all duration-200 ${
                                 isSelected
                                       ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
                                   : slot.available
                                       ? 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
-                                  : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                                      : 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
                               }`}
                             >
                                   <div className="flex flex-col items-center text-center">
@@ -1736,9 +2269,9 @@ export default function HanamiMusicRegisterPage() {
                                     <div className={`text-xs px-3 py-1 rounded-full font-medium ${
                                       slot.available 
                                         ? slot.remainingSpots <= 3 
-                                          ? 'text-orange-600 bg-orange-100' 
+                                          ? 'text-red-600 bg-red-100' 
                                           : slot.remainingSpots <= 5 
-                                          ? 'text-yellow-600 bg-yellow-100' 
+                                          ? 'text-orange-600 bg-orange-100' 
                                           : 'text-green-600 bg-green-100'
                                         : 'text-red-500 bg-red-100'
                                     }`}>
@@ -1955,13 +2488,16 @@ export default function HanamiMusicRegisterPage() {
                     selectedMethod={formData.paymentMethod}
                     onMethodChange={(methodId) => setFormData(prev => ({ ...prev, paymentMethod: methodId, screenshotUploaded: false }))}
                     amount={formData.courseNature === 'trial' ? 168 : (() => {
-                      const selectedPlan = coursePlans.find(p => p.id === formData.selectedPlan);
-                      return selectedPlan ? selectedPlan.promo_price : 0;
+                      if (priceCalculation) {
+                        return priceCalculation.final_price;
+                      }
+                      const selectedPlan = pricingPlans.find(p => p.id === formData.selectedPlan);
+                      return selectedPlan ? selectedPlan.package_price || 0 : 0;
                     })()}
                     currency="HKD"
                     description={formData.courseNature === 'trial' 
                       ? `試堂報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班`
-                      : `常規課程報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班 - ${coursePlans.find(p => p.id === formData.selectedPlan)?.name}`
+                      : `常規課程報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班 - ${pricingPlans.find(p => p.id === formData.selectedPlan)?.plan_name}`
                     }
                     onPaymentSuccess={(data) => {
                       // 檢查是否為圖片刪除事件
@@ -2013,7 +2549,7 @@ export default function HanamiMusicRegisterPage() {
                             <p className="flex justify-between">
                               <span className="text-[#2B3A3B]">課程計劃：</span>
                               <span className="font-medium text-[#4B4036]">
-                                {coursePlans.find(p => p.id === formData.selectedPlan)?.name}
+                                {pricingPlans.find(p => p.id === formData.selectedPlan)?.plan_name}
                               </span>
                             </p>
                           )}
@@ -2022,7 +2558,10 @@ export default function HanamiMusicRegisterPage() {
                           <p className="flex justify-between">
                             <span className="text-[#2B3A3B]">上課日期：</span>
                             <span className="font-medium text-[#4B4036]">
-                              {new Date(formData.selectedDate).toLocaleDateString('zh-TW')}
+                              {formData.courseNature === 'regular' && formData.selectedDate.startsWith('weekday-') 
+                                ? `星期${getWeekdayName(parseInt(formData.selectedDate.replace('weekday-', '')))}`
+                                : new Date(formData.selectedDate).toLocaleDateString('zh-TW')
+                              }
                             </span>
                           </p>
                           <p className="flex justify-between">
