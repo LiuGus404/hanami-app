@@ -6,6 +6,8 @@ const nextConfig = {
       'localhost',
       'hanami-music.com',
       'supabase.co',
+      'laowyqplcthwqckyigiy.supabase.co', // SaaS Supabase 域名
+      'rvdvdfoyemsikuwqexhv.supabase.co', // 主要 Supabase 域名
       'avatars.githubusercontent.com',
       'lh3.googleusercontent.com',
       'platform-lookaside.fbsbx.com',
@@ -47,7 +49,11 @@ const nextConfig = {
   // 環境變數
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
-    // SAAS 專案 Supabase 配置
+    // 主要 Supabase 配置 (hanami-ai-system)
+    NEXT_PUBLIC_SUPABASE_URL: 'https://rvdvdfoyemsikuwqexhv.supabase.co',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2ZHZkZm95ZW1zaWt1d3FleGh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU3NDQyMTIsImV4cCI6MjA2MTMyMDIxMn0.JfWxvb-uOPwg296uYvy7xks3sCzG_TEJoQmrvPofrJ4',
+    SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_uRpGpWYB5Wi6DP02aiFTYA_5aNz5Naq',
+    // SAAS 專案 Supabase 配置 (hanami-saas-system)
     NEXT_PUBLIC_SUPABASE_SAAS_URL: 'https://laowyqplcthwqckyigiy.supabase.co',
     NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxhb3d5cXBsY3Rod3Fja3lpZ2l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMDE0MjYsImV4cCI6MjA3Mjg3NzQyNn0.LU37G9rZSBP5_BoAGQ_1QncFS2wemcI1w2J-wZzC-cI',
     SUPABASE_SAAS_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxhb3d5cXBsY3Rod3Fja3lpZ2l5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzMwMTQyNiwiZXhwIjoyMDcyODc3NDI2fQ.B2z_5vPpMJi8FAwlrsYd-KLLfKD-gt0Qv_9qvpMmQkk'

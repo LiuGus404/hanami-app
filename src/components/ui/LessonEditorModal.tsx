@@ -13,6 +13,7 @@ interface LessonEditorModalProps {
   studentId: string;
   onSaved: () => void;
   mode?: 'edit' | 'add';
+  initialLessonCount?: number; // 新增：初始堂數
 }
 
 interface CourseTypeOption {
@@ -41,6 +42,7 @@ export default function LessonEditorModal({
   studentId,
   onSaved,
   mode = 'add',
+  initialLessonCount,
 }: LessonEditorModalProps) {
   const supabase = getSupabaseClient();
   const [form, setForm] = useState<Partial<Lesson>>({
@@ -54,7 +56,7 @@ export default function LessonEditorModal({
     course_type: lesson?.course_type || '',
     lesson_duration: lesson?.lesson_duration || null,
     regular_weekday: lesson?.regular_weekday || null,
-    lesson_count: lesson?.lesson_count ?? 1,
+    lesson_count: mode === 'add' ? (initialLessonCount || 1) : (lesson?.lesson_count || 1),
     is_trial: lesson?.is_trial || false,
     lesson_teacher: lesson?.lesson_teacher || '',
     package_id: lesson?.package_id || null,
@@ -71,9 +73,31 @@ export default function LessonEditorModal({
     lesson_activities: lesson?.lesson_activities || null,
   });
 
+  // 當 initialLessonCount 改變時，更新相關狀態
+  useEffect(() => {
+    if (mode === 'add' && initialLessonCount && initialLessonCount > 0) {
+      console.log('更新初始堂數:', initialLessonCount);
+      console.log('當前 form.lesson_count:', form.lesson_count);
+      
+      // 確保 form.lesson_count 被正確設置
+      setForm(prev => {
+        console.log('設置前的 form.lesson_count:', prev.lesson_count);
+        const updated = { ...prev, lesson_count: initialLessonCount };
+        console.log('設置後的 form.lesson_count:', updated.lesson_count);
+        return updated;
+      });
+      
+      // 統一設置為自訂模式
+      setPendingLessonCount('custom');
+      setCustomLessonCount(initialLessonCount);
+      console.log('統一設置為自訂模式，堂數:', initialLessonCount);
+      console.log('設置後的 pendingLessonCount:', 'custom');
+    }
+  }, [initialLessonCount, mode]);
+
   const [initialFormState, setInitialFormState] = useState<Lesson | null>(null);
   const [pendingCourseType, setPendingCourseType] = useState('');
-  const [pendingLessonCount, setPendingLessonCount] = useState('');
+  const [pendingLessonCount, setPendingLessonCount] = useState('1');
   const [pendingStatus, setPendingStatus] = useState('');
   const [pendingTeacher, setPendingTeacher] = useState('');
   const [teacherOptions, setTeacherOptions] = useState<{ label: string; value: string; }[]>([]);
@@ -175,7 +199,7 @@ export default function LessonEditorModal({
         lesson_teacher: '',
         progress_notes: '',
         video_url: '',
-        lesson_count: 1,
+        lesson_count: initialLessonCount || 1,
         lesson_duration: null,
         regular_weekday: null,
         is_trial: false,
@@ -463,8 +487,22 @@ export default function LessonEditorModal({
     >
       <div className="flex items-center justify-center min-h-screen px-4">
         <Dialog.Panel className="bg-[#FFFDF8] p-6 rounded-2xl shadow-xl w-full max-w-md border border-[#F3EAD9]">
-          <div className="flex justify-between items-center mb-4">
-            <Dialog.Title className="text-lg font-bold"> {lesson ? '編輯課堂記錄' : '新增課堂記錄'} </Dialog.Title>
+            <div className="flex justify-between items-center mb-4">
+              <Dialog.Title className="text-lg font-bold">
+                {lesson ? '編輯課堂記錄' : (
+                  <div className="flex items-center gap-2">
+                    <span>新增課堂記錄</span>
+                    {mode === 'add' && initialLessonCount && initialLessonCount > 0 && (
+                      <div className="relative">
+                        <div className="bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] px-3 py-1 rounded-full text-sm font-semibold shadow-md border border-[#F3EAD9] animate-pulse">
+                          待安排 {initialLessonCount} 堂
+                        </div>
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFB6C1] rounded-full animate-bounce"></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Dialog.Title>
             {(form.lesson_count ?? 1) > 1 && (
               <button
                 className="text-sm text-[#4B4036] underline hover:text-[#2B3A3B]"
@@ -506,11 +544,14 @@ export default function LessonEditorModal({
                 <button
                   className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] text-left bg-white"
                   onClick={() => {
+                    console.log('點擊堂數選擇器，當前 pendingLessonCount:', pendingLessonCount);
+                    console.log('當前 form.lesson_count:', form.lesson_count);
                     setLessonCountDropdownOpen(true);
-                    setPendingLessonCount(form.lesson_count?.toString() || '1');
+                    // 不要覆蓋 pendingLessonCount，保持當前的值
+                    // setPendingLessonCount(form.lesson_count?.toString() || '1');
                   }}
                 >
-                  新增堂數：{form.lesson_count || 1} 堂
+                  新增堂數：{form.lesson_count || initialLessonCount || 1} 堂
                 </button>
                 {lessonCountDropdownOpen && (
                   <PopupSelect

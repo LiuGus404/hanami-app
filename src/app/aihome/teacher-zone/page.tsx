@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { 
   ChevronLeftIcon, 
   ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
   PlusIcon,
   TrashIcon,
   EyeIcon,
@@ -19,7 +21,10 @@ import {
   UserIcon,
   SparklesIcon,
   TagIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  Bars3Icon,
+  ArrowRightOnRectangleIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
 import { HanamiCard, HanamiButton, LessonPlanModal, GrowthTreeDetailModal, StudentActivitiesPanel } from '@/components/ui';
@@ -30,7 +35,6 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useDirectTeacherAccess } from '@/hooks/saas/useDirectTeacherAccess';
 import AppSidebar from '@/components/AppSidebar';
 import { motion } from 'framer-motion';
-import { Bars3Icon, ArrowRightOnRectangleIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 interface Lesson {
   id: string;
@@ -187,6 +191,301 @@ export default function TeacherZonePage() {
     console.log('🗓️ 今天是星期:', hongKongTime.getDay()); // 0=星期日, 1=星期一...6=星期六
     return hongKongTime;
   };
+
+  // 切換班級展開/收起狀態
+  const toggleClassExpansion = (classId: string) => {
+    setExpandedClasses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(classId)) {
+        newSet.delete(classId);
+      } else {
+        newSet.add(classId);
+      }
+      return newSet;
+    });
+  };
+
+  // 載入所有老師列表
+  const loadAllTeachers = async () => {
+    try {
+      setLoadingTeachers(true);
+      const { data: teachers, error } = await supabase
+        .from('hanami_employee')
+        .select('id, teacher_fullname, teacher_nickname, teacher_role, teacher_status')
+        .eq('teacher_status', 'active')
+        .order('teacher_fullname');
+
+      if (error) throw error;
+      setAllTeachers(teachers || []);
+    } catch (error) {
+      console.error('載入老師列表失敗:', error);
+      toast.error('載入老師列表失敗');
+    } finally {
+      setLoadingTeachers(false);
+    }
+  };
+
+  // 處理老師圖標點擊
+  const handleTeacherClick = (classGroup: any, teacherRole: 'main' | 'assist') => {
+    setSelectedClassForTeacher({
+      classId: classGroup.id,
+      classCode: `${classGroup.course_code}-${classGroup.course_section}`,
+      currentMainTeacher: classGroup.teacher_main_name,
+      currentAssistTeacher: classGroup.teacher_assist_name,
+      teacherRole
+    });
+    setShowTeacherSelectionModal(true);
+    
+    // 如果還沒有載入老師列表，則載入
+    if (allTeachers.length === 0) {
+      loadAllTeachers();
+    }
+  };
+
+  // 更新班級老師
+  const updateClassTeacher = async (teacherId: string | null, teacherName: string) => {
+    if (!selectedClassForTeacher) return;
+
+    try {
+      const { error } = await supabase
+        .from('hanami_schedule_daily')
+        .update({
+          [selectedClassForTeacher.teacherRole === 'main' ? 'teacher_main_id' : 'teacher_assist_id']: teacherId
+        })
+        .eq('schedule_template_id', selectedClassForTeacher.classId)
+        .eq('lesson_date', selectedDate.toISOString().split('T')[0]);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      setClassGroups(prev => prev.map(group => {
+        if (group.id === selectedClassForTeacher.classId) {
+          return {
+            ...group,
+            [selectedClassForTeacher.teacherRole === 'main' ? 'teacher_main_name' : 'teacher_assist_name']: teacherName
+          };
+        }
+        return group;
+      }));
+
+      const actionText = teacherId ? `為 ${teacherName}` : '為空';
+      toast.success(`已更新${selectedClassForTeacher.teacherRole === 'main' ? '主教' : '助教'}${actionText}`);
+      setShowTeacherSelectionModal(false);
+      setSelectedClassForTeacher(null);
+    } catch (error) {
+      console.error('更新老師失敗:', error);
+      toast.error('更新老師失敗');
+    }
+  };
+
+  // 載入班別資料（根據 hanami_schedule）
+  const loadClassGroupData = async () => {
+    try {
+      setLoadingText('載入班別資料中...');
+      
+      // 計算選中日期的星期幾
+      const selectedWeekday = selectedDate.getDay(); // 0=星期日, 1=星期一...6=星期六
+      
+      // 格式化時間為 HH:mm 格式
+      const formatLocalDate = (date: Date) => {
+        const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+        const year = hongKongTime.getFullYear();
+        const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
+        const day = String(hongKongTime.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      const dateStr = formatLocalDate(selectedDate);
+      
+      // 獲取該星期幾的所有班級排程
+      const { data: schedules, error: scheduleError } = await supabase
+        .from('hanami_schedule')
+        .select('*')
+        .eq('weekday', selectedWeekday)
+        .order('timeslot');
+
+      if (scheduleError) throw scheduleError;
+
+      if (!schedules || schedules.length === 0) {
+        setClassGroups([]);
+        setLoadingText('');
+        return;
+      }
+
+      // 建立時段到班級的映射，用於判斷是否為該時段的第一個班級
+      const timeslotToFirstClass = new Map<string, string>();
+      schedules.forEach((schedule: any) => {
+        const timeslot = schedule.timeslot || '';
+        if (!timeslotToFirstClass.has(timeslot)) {
+          timeslotToFirstClass.set(timeslot, schedule.id);
+        }
+      });
+
+      const processedClassGroups: any[] = [];
+
+      for (const schedule of schedules) {
+        // 找到該班級在選中日期的課程記錄
+        const matchedLessons = [
+          ...lessons.filter(lesson => 
+            lesson.lesson_date === dateStr && 
+            lesson.actual_timeslot === schedule.timeslot
+          ),
+          ...trialLessons.filter(lesson => 
+            lesson.lesson_date === dateStr && 
+            lesson.actual_timeslot === schedule.timeslot
+          )
+        ];
+
+        // 獲取該班級在選中日期的老師資訊
+        let teacherMainName = '';
+        let teacherAssistName = '';
+        
+        if (schedule.id) {
+          const { data: dailySchedule, error: dailyError } = await supabase
+            .from('hanami_schedule_daily')
+            .select('teacher_main_id, teacher_assist_id')
+            .eq('schedule_template_id', schedule.id)
+            .eq('lesson_date', dateStr)
+            .single();
+
+          if (!dailyError && dailySchedule) {
+            // 獲取主教資訊
+            if (dailySchedule.teacher_main_id) {
+              const { data: mainTeacher, error: mainError } = await supabase
+                .from('hanami_employee')
+                .select('teacher_fullname, teacher_nickname')
+                .eq('id', dailySchedule.teacher_main_id)
+                .single();
+              
+              if (!mainError && mainTeacher) {
+                teacherMainName = mainTeacher.teacher_fullname || mainTeacher.teacher_nickname || '';
+              }
+            }
+
+            // 獲取助教資訊
+            if (dailySchedule.teacher_assist_id) {
+              const { data: assistTeacher, error: assistError } = await supabase
+                .from('hanami_employee')
+                .select('teacher_fullname, teacher_nickname')
+                .eq('id', dailySchedule.teacher_assist_id)
+                .single();
+              
+              if (!assistError && assistTeacher) {
+                teacherAssistName = assistTeacher.teacher_fullname || assistTeacher.teacher_nickname || '';
+              }
+            }
+          }
+        }
+
+        // 獲取該班級的所有常規學生
+        let assignedStudents: any[] = [];
+        if (schedule.assigned_student_ids && schedule.assigned_student_ids.length > 0) {
+          const { data: studentData, error: studentError } = await supabase
+            .from('Hanami_Students')
+            .select('*')
+            .in('id', schedule.assigned_student_ids);
+
+          if (!studentError && studentData) {
+            assignedStudents = studentData || [];
+          }
+        }
+
+        // 查詢試堂學生（只在該時段的第一個班級顯示）
+        // 試堂學生沒有分配到 assigned_student_ids，所以我們查詢該時段的所有試堂學生
+        const scheduleTimeslot = schedule.timeslot || '';
+        const isFirstClassInTimeslot = timeslotToFirstClass.get(scheduleTimeslot) === schedule.id;
+        
+        let trialStudents: any[] = [];
+        if (isFirstClassInTimeslot) {
+          const trialLessonsForThisSlot = trialLessons.filter(lesson => 
+            lesson.lesson_date === dateStr && 
+            lesson.actual_timeslot === scheduleTimeslot
+          );
+          
+          const trialStudentIds = trialLessonsForThisSlot.map(lesson => lesson.id);
+          
+          if (trialStudentIds.length > 0) {
+            const { data: trialStudentsData, error: trialStudentsError } = await supabase
+              .from('hanami_trial_students')
+              .select('*')
+              .in('id', trialStudentIds);
+            
+            if (!trialStudentsError && trialStudentsData) {
+              trialStudents = trialStudentsData || [];
+            }
+          }
+        }
+        
+        // 合併常規學生和試堂學生，去除重複（根據 ID 和名字）
+        const allStudents: any[] = [];
+        const seenIds = new Set<string>();
+        const seenNames = new Set<string>();
+        
+        // 先添加常規學生
+        assignedStudents.forEach(student => {
+          if (!seenIds.has(student.id) && !seenNames.has(student.full_name)) {
+            allStudents.push(student);
+            seenIds.add(student.id);
+            seenNames.add(student.full_name);
+          }
+        });
+        
+        // 再添加試堂學生（避免重複）
+        trialStudents.forEach(student => {
+          if (!seenIds.has(student.id) && !seenNames.has(student.full_name)) {
+            allStudents.push(student);
+            seenIds.add(student.id);
+            seenNames.add(student.full_name);
+          }
+        });
+
+        // 為每個學生添加出席狀態標記和課程記錄
+        const students = allStudents.map(student => {
+          // 檢查該學生是否有出席記錄
+          const hasAttendance = matchedLessons.some(lesson => {
+            const lessonStudentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+            return lessonStudentId === student.id;
+          });
+          
+          // 獲取該學生的課程記錄
+          const lessonData = matchedLessons.find(lesson => {
+            const lessonStudentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+            return lessonStudentId === student.id;
+          });
+
+          return {
+            ...student,
+            hasAttendance,
+            lessonData
+          };
+        });
+
+        processedClassGroups.push({
+          id: schedule.id,
+          course_code: schedule.course_code || '',
+          course_section: schedule.course_section || 'A',
+          course_type: schedule.course_type || '',
+          weekday: schedule.weekday || 0,
+          timeslot: schedule.timeslot || '',
+          max_students: schedule.max_students || 0,
+          assigned_teachers: schedule.assigned_teachers || '',
+          assigned_student_ids: schedule.assigned_student_ids || [],
+          room_id: schedule.room_id || '',
+          lessons: matchedLessons,
+          students: students,
+          teacher_main_name: teacherMainName,
+          teacher_assist_name: teacherAssistName
+        });
+      }
+
+      setClassGroups(processedClassGroups);
+      setLoadingText('');
+    } catch (error) {
+      console.error('載入班別資料失敗:', error);
+      toast.error('載入班別資料失敗');
+      setLoadingText('');
+    }
+  };
   
   const todayHK = getTodayInHongKong();
   const [selectedDate, setSelectedDate] = useState(todayHK); // 預設選中今天
@@ -200,6 +499,23 @@ export default function TeacherZonePage() {
   const [loadingText, setLoadingText] = useState('載入課堂資料中...');
   const [hasAutoSwitched, setHasAutoSwitched] = useState(false); // 防止重複自動切換
   const [workStatusChecked, setWorkStatusChecked] = useState(false); // 防止重複檢查工作狀態
+  
+  // 新增：顯示模式狀態（按學生 vs 按班別）
+  const [displayMode, setDisplayMode] = useState<'student' | 'class'>('class');
+  const [classGroups, setClassGroups] = useState<any[]>([]);
+  const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set()); // 預設為空 Set，即所有班級都收起
+  
+  // 老師選擇模態框狀態
+  const [showTeacherSelectionModal, setShowTeacherSelectionModal] = useState(false);
+  const [selectedClassForTeacher, setSelectedClassForTeacher] = useState<{
+    classId: string;
+    classCode: string;
+    currentMainTeacher?: string;
+    currentAssistTeacher?: string;
+    teacherRole: 'main' | 'assist';
+  } | null>(null);
+  const [allTeachers, setAllTeachers] = useState<any[]>([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
   
   // 快取機制
   const [dataCache, setDataCache] = useState<Map<string, any>>(new Map());
@@ -259,6 +575,10 @@ export default function TeacherZonePage() {
   // 新增：學生評估狀態追蹤
   const [studentAssessmentStatus, setStudentAssessmentStatus] = useState<Record<string, boolean>>({});
   const [loadingAssessmentStatus, setLoadingAssessmentStatus] = useState(false);
+
+  // 新增：學生關注狀態追蹤
+  const [studentCareAlertStatus, setStudentCareAlertStatus] = useState<Record<string, boolean>>({});
+  const [updatingCareAlert, setUpdatingCareAlert] = useState<Set<string>>(new Set());
   
   // 新增：學習中活動展開狀態
   const [expandedActivitiesMap, setExpandedActivitiesMap] = useState<Record<string, boolean>>({});
@@ -457,6 +777,31 @@ export default function TeacherZonePage() {
       // 成長樹活動延遲載入
       setTreeActivities([]);
       setAssignedActivities(result.data.assignedActivities || []);
+      
+      // 載入學生關注狀態
+      try {
+        const allStudents = [
+          ...(result.data.lessons || []).map((lesson: any) => lesson.student_id),
+          ...(result.data.trialLessons || []).map((lesson: any) => lesson.student_id)
+        ];
+        
+        if (allStudents.length > 0) {
+          const { data: studentsData, error: studentsError } = await supabase
+            .from('Hanami_Students')
+            .select('id, care_alert')
+            .in('id', allStudents);
+          
+          if (!studentsError && studentsData) {
+            const careAlertMap: Record<string, boolean> = {};
+            studentsData.forEach((student: any) => {
+              careAlertMap[student.id] = student.care_alert || false;
+            });
+            setStudentCareAlertStatus(careAlertMap);
+          }
+        }
+      } catch (error) {
+        console.error('載入學生關注狀態失敗:', error);
+      }
       
       // 如果有課程資料，延遲載入成長樹活動
       if ((result.data.lessons && result.data.lessons.length > 0) || 
@@ -754,6 +1099,13 @@ export default function TeacherZonePage() {
     checkStudentAssessmentStatus(); // 檢查評估狀態
   }, [lessons]);
 
+  // 當切換到班別顯示模式時，載入班別資料
+  useEffect(() => {
+    if (displayMode === 'class' && (lessons.length > 0 || trialLessons.length > 0)) {
+      loadClassGroupData();
+    }
+  }, [displayMode, lessons, trialLessons, selectedDate]);
+
   // 權限檢查
   useEffect(() => {
     if (user?.email && !hasTeacherAccess && !directLoading) {
@@ -800,6 +1152,37 @@ export default function TeacherZonePage() {
     } catch (error) {
       console.error('開啟能力評估模態框失敗:', error);
       toast.error('開啟能力評估失敗');
+    }
+  };
+
+  // 切換學生關注狀態
+  const toggleCareAlert = async (studentId: string, currentStatus: boolean) => {
+    try {
+      setUpdatingCareAlert(prev => new Set(prev).add(studentId));
+      
+      const { error } = await supabase
+        .from('Hanami_Students')
+        .update({ care_alert: !currentStatus })
+        .eq('id', studentId);
+
+      if (error) throw error;
+
+      // 更新本地狀態
+      setStudentCareAlertStatus(prev => ({
+        ...prev,
+        [studentId]: !currentStatus
+      }));
+
+      toast.success(!currentStatus ? '已標記為需關注' : '已取消關注標記');
+    } catch (error) {
+      console.error('更新關注狀態失敗:', error);
+      toast.error('更新關注狀態失敗');
+    } finally {
+      setUpdatingCareAlert(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(studentId);
+        return newSet;
+      });
     }
   };
 
@@ -1626,6 +2009,7 @@ export default function TeacherZonePage() {
                   </motion.button>
                 </div>
               </div>
+
             </div>
           </nav>
 
@@ -1664,6 +2048,35 @@ export default function TeacherZonePage() {
                   </motion.button>
                 </div>
                 
+              </div>
+
+              {/* 顯示模式切換 */}
+              <div className="flex items-center justify-end mb-6">
+                {/* 顯示模式切換 */}
+                <div className="flex items-center space-x-3 bg-white rounded-full p-1.5 shadow-md border border-hanami-border">
+                  <button
+                    onClick={() => setDisplayMode('student')}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-300 ${
+                      displayMode === 'student'
+                        ? 'bg-gradient-to-r from-hanami-primary to-hanami-accent text-hanami-text shadow-md'
+                        : 'text-hanami-text-secondary hover:text-hanami-text'
+                    }`}
+                  >
+                    <UserIcon className="w-4 h-4" />
+                    <span className="text-sm">按學生</span>
+                  </button>
+                  <button
+                    onClick={() => setDisplayMode('class')}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-300 ${
+                      displayMode === 'class'
+                        ? 'bg-gradient-to-r from-hanami-primary to-hanami-accent text-hanami-text shadow-md'
+                        : 'text-hanami-text-secondary hover:text-hanami-text'
+                    }`}
+                  >
+                    <UserGroupIcon className="w-4 h-4" />
+                    <span className="text-sm">按班別</span>
+                  </button>
+                </div>
               </div>
 
               {/* 日期導航和選擇器 */}
@@ -1804,7 +2217,525 @@ export default function TeacherZonePage() {
           </div>
         </div>
 
-        {/* 時段分組列表 */}
+        {/* 按班別顯示 */}
+        {displayMode === 'class' ? (
+          <>
+            {classGroups.length === 0 ? (
+              <div className="text-center py-12">
+                <UserGroupIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">今天沒有班級</h3>
+                <p className="text-gray-500">請選擇其他日期或聯繫管理員設定班級排程</p>
+              </div>
+            ) : (
+              classGroups.map((classGroup, groupIndex) => (
+                <div 
+                  key={`${classGroup.id}-${groupIndex}`} 
+                  className="group animate-fade-in-up mb-8"
+                  style={{ animationDelay: `${groupIndex * 100}ms` }}
+                >
+                  {/* 班級標題卡片 */}
+                  <div 
+                    className="time-slot-header hanami-card-glow rounded-2xl p-6 mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+                    onClick={() => toggleClassExpansion(classGroup.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-8">
+                        {/* 班級資訊區塊 */}
+                        <div className="flex items-center space-x-4">
+                          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
+                            <div className="text-center">
+                              <div className="text-sm font-medium text-white/90 mb-1">班別代碼</div>
+                              <div className="text-2xl font-bold text-white">
+                                {classGroup.course_code}-{classGroup.course_section}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <div className="w-8 h-8 bg-hanami-accent rounded-full flex items-center justify-center text-white text-sm font-bold animate-pulse mb-1">
+                              {classGroup.students.length}/{classGroup.max_students}
+                            </div>
+                            <div className="text-xs text-white/70">學生人數</div>
+                          </div>
+                        </div>
+                        
+                        {/* 課程詳細資訊 */}
+                        <div className="text-white">
+                          <h2 className="text-2xl font-bold mb-2">
+                            {classGroup.course_type}
+                          </h2>
+                          <div className="flex items-center space-x-4 text-white/80 text-sm">
+                            <div className="flex items-center space-x-1">
+                              <ClockIcon className="w-4 h-4" />
+                              <span>{classGroup.timeslot}</span>
+                            </div>
+                            
+                            {/* 主教師 */}
+                            <div 
+                              className="flex items-center space-x-2 cursor-default"
+                            >
+                              <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-rose-400 rounded-full flex items-center justify-center shadow-md">
+                                <UserIcon className="w-5 h-5 text-white" />
+                              </div>
+                              <span className="font-semibold text-orange-100">
+                                {classGroup.teacher_main_name || '未設定'}
+                              </span>
+                            </div>
+                            
+                            {/* 助教 */}
+                            <div 
+                              className="flex items-center space-x-2 cursor-default"
+                            >
+                              <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-400 rounded-full flex items-center justify-center shadow-md">
+                                <UserIcon className="w-5 h-5 text-white" />
+                              </div>
+                              <span className="font-semibold text-cyan-100">
+                                {classGroup.teacher_assist_name || '未設定'}
+                              </span>
+                            </div>
+                            
+                            {classGroup.room_id && (
+                              <div className="flex items-center space-x-1">
+                                <span className="font-medium">教室: {classGroup.room_id}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* 右側裝飾 */}
+                      <div className="text-white text-right">
+                        <div className="mb-2">
+                          <UserGroupIcon className="w-10 h-10 text-white/90" />
+                        </div>
+                        <div className="text-sm text-white/70 font-medium">班級管理</div>
+                        <div className="mt-2">
+                          {expandedClasses.has(classGroup.id) ? (
+                            <ChevronUpIcon className="w-6 h-6 text-white/70" />
+                          ) : (
+                            <ChevronDownIcon className="w-6 h-6 text-white/70" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 班級內學生卡片網格 */}
+                  {expandedClasses.has(classGroup.id) && classGroup.students.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in mt-6">
+                      {classGroup.students.map((student: any, studentIndex: number) => {
+                        const studentId = student.id;
+                        const hasAttendance = student.hasAttendance;
+                        const lessonData = student.lessonData;
+                        const isTrial = lessonData && 'trial_status' in lessonData;
+                        const remainingLessons = remainingLessonsMap[studentId] || 0;
+                        
+                        return (
+                          <div 
+                            key={`${studentId}-${studentIndex}`} 
+                            className="group/card relative animate-fade-in-up"
+                            style={{ animationDelay: `${(groupIndex * 100) + (studentIndex * 50)}ms` }}
+                          >
+                            <div className={`student-card rounded-2xl p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden border-2 ${
+                              getStudentBackgroundColor(remainingLessons, isTrial)
+                            }`}>
+                              {/* 背景裝飾 */}
+                              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-hanami-primary/10 to-hanami-accent/10 rounded-full -translate-y-8 translate-x-8 group-hover/card:scale-150 transition-transform duration-500"></div>
+                              <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-hanami-secondary/10 to-hanami-primary/10 rounded-full translate-y-6 -translate-x-6 group-hover/card:scale-125 transition-transform duration-700"></div>
+                              
+                              {/* 試堂徽章 */}
+                              {isTrial && hasAttendance && (
+                                <div className="absolute top-3 right-28 z-10">
+                                  <div className="trial-badge bg-gradient-to-r from-orange-400 to-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 animate-pulse">
+                                    <SparklesIcon className="w-3 h-3" />
+                                    <span>試堂</span>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* 右上角按鈕區域 */}
+                              <div className="absolute top-3 right-3 z-50 flex flex-col space-y-2">
+                                {/* 關注按鈕 */}
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const currentCareAlert = studentCareAlertStatus[studentId] || false;
+                                    toggleCareAlert(studentId, currentCareAlert);
+                                  }}
+                                  className="group/care relative cursor-pointer"
+                                  disabled={updatingCareAlert.has(studentId)}
+                                >
+                                  {/* 主按鈕 - 根據關注狀態改變顏色 */}
+                                  {(() => {
+                                    const isCareAlert = studentCareAlertStatus[studentId] || false;
+                                    const isUpdating = updatingCareAlert.has(studentId);
+                                    
+                                    return (
+                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                        isCareAlert 
+                                          ? 'bg-gradient-to-br from-red-400 to-pink-500' // 需關注：紅色
+                                          : 'bg-gradient-to-br from-gray-400 to-gray-500'  // 正常：灰色
+                                      } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        {isUpdating ? (
+                                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                        ) : (
+                                          <ExclamationTriangleIcon className="w-5 h-5 text-white" />
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+                                  
+                                  {/* 狀態指示器 */}
+                                  {studentCareAlertStatus[studentId] && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+                                      <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* 懸停提示 */}
+                                  <div className="absolute top-12 right-0 opacity-0 group-hover/care:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                    <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                                      {studentCareAlertStatus[studentId] ? '取消關注' : '標記關注'}
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* 能力評估按鈕 */}
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openAbilityAssessmentModal(student);
+                                  }}
+                                  className="group/assessment relative cursor-pointer"
+                                >
+                                  {/* 主按鈕 - 根據評估狀態改變顏色 */}
+                                  {(() => {
+                                    const hasAssessment = studentAssessmentStatus[studentId] || false;
+                                    
+                                    return (
+                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                        hasAssessment 
+                                          ? 'bg-gradient-to-br from-emerald-400 to-teal-500' // 已評估：綠色
+                                          : 'bg-gradient-to-br from-orange-400 to-amber-500'  // 未評估：橙色
+                                      }`}>
+                                        <AcademicCapIcon className="w-5 h-5 text-white" />
+                                      </div>
+                                    );
+                                  })()}
+                                  
+                                  {/* 狀態指示器 */}
+                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center">
+                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                                  </div>
+                                  
+                                  {/* 懸停提示 */}
+                                  <div className="absolute top-12 right-0 opacity-0 group-hover/assessment:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                    <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                                      {studentAssessmentStatus[studentId] ? '已評估' : '新增評估'}
+                                    </div>
+                                  </div>
+                                </button>
+                              </div>
+
+                              {/* 學生頭像和資訊 */}
+                              <div className="relative z-10 mb-4">
+                                <div className="flex items-center space-x-4">
+                                  <div className="relative">
+                                    <div className="avatar-glow w-14 h-14 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg transform group-hover/card:rotate-12 transition-transform duration-300">
+                                      {student.full_name?.charAt(0) || '?'}
+                                    </div>
+                                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white bg-gradient-to-br from-green-400 to-green-500 animate-pulse"></div>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-bold text-lg truncate text-hanami-text">
+                                      {student.full_name || '未知學生'}
+                                    </h3>
+                                    {student.nick_name && (
+                                      <p className="font-medium text-sm truncate text-hanami-text-secondary">
+                                        {student.nick_name}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 學生詳細資訊 */}
+                              <div className="relative z-10 space-y-3 mb-4">
+                                <div className="rounded-xl p-3 bg-hanami-primary/10">
+                                  <div className="flex items-center justify-between text-sm">
+                                    <div className="flex items-center space-x-2">
+                                      <CakeIcon className="w-4 h-4 text-hanami-primary" />
+                                      <span className="font-medium text-hanami-text">
+                                        {convertAgeToYears(student.student_age)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <MusicalNoteIcon className="w-4 h-4 text-hanami-primary" />
+                                      <span className="font-medium text-hanami-text">
+                                        {student.course_type || '未設定'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 學習中活動 */}
+                              <div className="relative z-10 mb-4">
+                                <h4 className="text-sm font-bold text-hanami-text mb-2 flex items-center">
+                                  <AcademicCapIcon className="w-4 h-4 mr-2 text-hanami-primary" />
+                                  學習中活動
+                                </h4>
+                                {(() => {
+                                  const studentAssignedActivities = studentActivitiesMap.get(studentId) || [];
+                                  const isLoadingActivities = loadingStudentActivities.has(studentId);
+                                  
+                                  return (
+                                    <div className="space-y-2">
+                                      {isLoadingActivities ? (
+                                        <div className="bg-gray-50/80 backdrop-blur-sm rounded-lg p-3 border border-gray-200/30">
+                                          <p className="text-xs text-gray-500 text-center">
+                                            載入中...
+                                          </p>
+                                        </div>
+                                      ) : studentAssignedActivities.length === 0 ? (
+                                        <div className="bg-gray-50/80 backdrop-blur-sm rounded-lg p-3 border border-gray-200/30">
+                                          <p className="text-xs text-gray-500 text-center">
+                                            暫無未完成的活動
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          {/* 顯示活動 - 根據展開狀態決定顯示數量 */}
+                                          {(() => {
+                                            const isExpanded = expandedActivitiesMap[`class-${studentId}`];
+                                            const displayCount = isExpanded ? studentAssignedActivities.length : 1;
+                                            return studentAssignedActivities
+                                              .slice(0, displayCount)
+                                              .map((activity, activityIndex) => (
+                                                <div key={`ongoing-${activity.id}-${activityIndex}`} className="bg-gradient-to-r from-blue-50 to-indigo-50 backdrop-blur-sm rounded-lg p-3 border border-blue-200/30 hover:bg-blue-100/50 transition-colors">
+                                                  <div className="space-y-2">
+                                                    {/* 活動狀態和名稱 */}
+                                                    <div className="flex items-center justify-between">
+                                                      <div className="flex items-center space-x-2">
+                                                        {activity.completionStatus === 'not_started' ? (
+                                                          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                        ) : activity.completionStatus === 'in_progress' ? (
+                                                          <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                                                        ) : (
+                                                          <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                                                        )}
+                                                        <span className="text-xs text-gray-600">
+                                                          {activity.completionStatus === 'not_started' ? '未開始' : 
+                                                           activity.completionStatus === 'in_progress' ? '進行中' : '學習中'}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                    
+                                                    {/* 活動詳細資訊 */}
+                                                    <div className="space-y-1">
+                                                      <p className="text-sm font-medium text-blue-800">
+                                                        {activity.activityName || '未知活動'}
+                                                      </p>
+                                                      
+                                                      <div className="flex items-center space-x-3 text-xs text-blue-600">
+                                                        <span className="flex items-center space-x-1">
+                                                          <AcademicCapIcon className="w-3 h-3" />
+                                                          <span>難度 {activity.difficultyLevel || 'N/A'}</span>
+                                                        </span>
+                                                        <span className="flex items-center space-x-1">
+                                                          <MusicalNoteIcon className="w-3 h-3" />
+                                                          <span>{activity.activityType || '未知類型'}</span>
+                                                        </span>
+                                                      </div>
+                                                      
+                                                      {/* 進度條 */}
+                                                      <div className="space-y-1">
+                                                        <div className="flex items-center justify-between text-xs text-blue-600">
+                                                          <span>進度</span>
+                                                          <span className="progress-text">{(() => {
+                                                            const progress = activity.progress || 0;
+                                                            return Math.round(Math.max(0, Math.min(100, progress)));
+                                                          })()}%</span>
+                                                        </div>
+                                                        <div className="relative">
+                                                          <div 
+                                                            className={`w-full bg-blue-200 rounded-full h-2 ${editingProgressActivityId === activity.id ? 'ring-2 ring-blue-400 ring-opacity-50 cursor-pointer' : ''}`}
+                                                            onClick={(e) => {
+                                                              if (editingProgressActivityId !== activity.id) return;
+                                                              
+                                                              const rect = e.currentTarget.getBoundingClientRect();
+                                                              const x = e.clientX - rect.left;
+                                                              const percentage = Math.round((x / rect.width) * 100);
+                                                              const normalizedPercentage = Math.max(0, Math.min(percentage, 100));
+                                                              
+                                                              saveProgressToDatabase(activity.id, normalizedPercentage);
+                                                            }}
+                                                          >
+                                                            <div 
+                                                              className="progress-bar-fill bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300 ease-out"
+                                                              style={{ width: `${(() => {
+                                                                const progress = activity.progress || 0;
+                                                                return Math.max(0, Math.min(100, progress));
+                                                              })()}%` }}
+                                                            ></div>
+                                                          </div>
+                                                          {editingProgressActivityId === activity.id && (
+                                                            <div 
+                                                              className="edit-indicator absolute top-1/2 transform -translate-y-1/2 pointer-events-none"
+                                                              style={{ 
+                                                                left: `${(() => {
+                                                                  const progress = activity.progress || 0;
+                                                                  return Math.max(0, Math.min(100, progress));
+                                                                })()}%`
+                                                              }}
+                                                            >
+                                                              <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                                                              </div>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                      
+                                                      {/* 分配時間 */}
+                                                      {activity.assignedAt && (
+                                                        <div className="flex items-center space-x-1 text-xs text-blue-600">
+                                                          <CalendarIcon className="w-3 h-3" />
+                                                          <span>分配時間: {new Date(activity.assignedAt).toLocaleDateString('zh-TW')}</span>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ));
+                                          })()}
+                                          
+                                          {/* 展開/收起按鈕 - 只有多於一個活動時才顯示 */}
+                                          {studentAssignedActivities.length > 1 && (
+                                            <div className="flex justify-center mt-3">
+                                              <button
+                                                onClick={() => {
+                                                  const key = `class-${studentId}`;
+                                                  setExpandedActivitiesMap(prev => ({
+                                                    ...prev,
+                                                    [key]: !prev[key]
+                                                  }));
+                                                }}
+                                                className="flex items-center space-x-2 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
+                                              >
+                                                <span>
+                                                  {expandedActivitiesMap[`class-${studentId}`] ? '收起' : `展開其餘 ${studentAssignedActivities.length - 1} 個活動`}
+                                                </span>
+                                                <ChevronDownIcon 
+                                                  className={`w-3 h-3 transition-transform duration-200 ${
+                                                    expandedActivitiesMap[`class-${studentId}`] ? 'rotate-180' : ''
+                                                  }`} 
+                                                />
+                                              </button>
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+
+                              {/* 操作按鈕 */}
+                              <div className="relative z-10 flex items-center justify-between pt-3 border-t border-hanami-border/30">
+                                <button
+                                  onClick={() => {
+                                    toast('學生活動分配功能開發中...');
+                                  }}
+                                  className="hanami-action-btn flex items-center space-x-2 px-4 py-2 text-white rounded-xl font-medium shadow-md hover:shadow-lg"
+                                >
+                                  <PlusIcon className="w-4 h-4" />
+                                  <span>分配活動</span>
+                                </button>
+                                
+                                <button
+                                  onClick={() => {
+                                    toast('詳情功能開發中...');
+                                  }}
+                                  className="p-2 text-hanami-text-secondary hover:text-hanami-primary transition-colors hover:scale-110 transform hover:bg-hanami-primary/10 rounded-lg"
+                                >
+                                  <EyeIcon className="w-5 h-5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* 收起狀態下的學生小圖卡 */}
+                  {!expandedClasses.has(classGroup.id) && classGroup.students.length > 0 && (
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 mt-6">
+                      <div className="flex flex-wrap gap-3">
+                        {classGroup.students.map((student: any, studentIndex: number) => {
+                          const hasAttendance = student.hasAttendance;
+                          const isTrial = student.lessonData && 'trial_status' in student.lessonData;
+                          
+                          return (
+                            <div 
+                              key={`mini-${student.id}-${studentIndex}`}
+                              className="flex items-center space-x-3 bg-white rounded-lg p-3 shadow-sm border-2 border-hanami-primary/30 hover:border-hanami-primary/50 transition-all duration-200 hover:shadow-md"
+                            >
+                              {/* 學生頭像 */}
+                              <div className="relative">
+                                <div className="w-8 h-8 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                                  {student.full_name?.charAt(0) || '?'}
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border border-white bg-gradient-to-br from-green-400 to-green-500"></div>
+                                {/* 試堂徽章 */}
+                                {isTrial && hasAttendance && (
+                                  <div className="absolute -top-1 -left-1 w-4 h-4 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center">
+                                    <SparklesIcon className="w-2 h-2 text-white" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* 學生資訊 */}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-sm truncate text-hanami-text">
+                                  {student.full_name || '未知學生'}
+                                </h4>
+                                <p className="text-xs text-hanami-text-secondary">
+                                  {convertAgeToYears(student.student_age)} 歲
+                                </p>
+                              </div>
+                              
+                              {/* 按鍵 */}
+                              <button
+                                onClick={() => {
+                                  toast('學生活動分配功能開發中...');
+                                }}
+                                className="p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-hanami-primary/10 text-hanami-primary hover:bg-hanami-primary/20"
+                              >
+                                <AcademicCapIcon className="w-4 h-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* 沒有學生的提示 */}
+                  {classGroup.students.length === 0 && (
+                    <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200 mt-6">
+                      <UserIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-gray-600 font-medium">此班別今天沒有學生</p>
+                      <p className="text-gray-500 text-sm mt-1">可能是公眾假期或特別安排</p>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </>
+        ) : (
+          /* 按學生顯示 - 原有的時段分組列表 */
         <div className="space-y-8">
           {timeSlotGroups.length === 0 ? (
             <div className="bg-gradient-to-br from-hanami-primary/10 to-hanami-accent/10 backdrop-blur-sm rounded-2xl p-12 text-center border border-hanami-primary/20 shadow-lg">
@@ -1902,7 +2833,7 @@ export default function TeacherZonePage() {
                           
                           {/* 試堂徽章 */}
                           {isTrial && (
-                            <div className="absolute top-3 right-16 z-10">
+                            <div className="absolute top-3 right-28 z-10">
                               <div className="trial-badge bg-gradient-to-r from-orange-400 to-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 animate-pulse">
                                 <SparklesIcon className="w-3 h-3" />
                                 <span>試堂</span>
@@ -1910,8 +2841,63 @@ export default function TeacherZonePage() {
                             </div>
                           )}
 
+                          {/* 右上角按鈕區域 */}
+                          <div className="absolute top-3 right-3 z-50 flex flex-col space-y-2">
+                            {/* 關注按鈕 */}
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                const currentCareAlert = studentCareAlertStatus[studentId] || false;
+                                toggleCareAlert(studentId, currentCareAlert);
+                              }}
+                              className="group/care relative cursor-pointer"
+                              disabled={updatingCareAlert.has('student_id' in lesson ? lesson.student_id : lesson.id)}
+                            >
+                              {/* 主按鈕 - 根據關注狀態改變顏色 */}
+                              {(() => {
+                                const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                const isCareAlert = studentCareAlertStatus[studentId] || false;
+                                const isUpdating = updatingCareAlert.has(studentId);
+                                
+                                return (
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                    isCareAlert 
+                                      ? 'bg-gradient-to-br from-red-400 to-pink-500' // 需關注：紅色
+                                      : 'bg-gradient-to-br from-gray-400 to-gray-500'  // 正常：灰色
+                                  } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    {isUpdating ? (
+                                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                    ) : (
+                                      <ExclamationTriangleIcon className="w-5 h-5 text-white" />
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                              
+                              {/* 狀態指示器 */}
+                              {(() => {
+                                const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                return studentCareAlertStatus[studentId] && (
+                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                                  </div>
+                                );
+                              })()}
+                              
+                              {/* 懸停提示 */}
+                              <div className="absolute top-12 right-0 opacity-0 group-hover/care:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                                  {(() => {
+                                    const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                    return studentCareAlertStatus[studentId] ? '取消關注' : '標記關注';
+                                  })()}
+                                </div>
+                              </div>
+                            </button>
+
                           {/* 能力評估按鈕 */}
-                          <div className="absolute top-3 right-3 z-50">
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
@@ -2263,6 +3249,7 @@ export default function TeacherZonePage() {
             ))
           )}
         </div>
+        )}
 
         {/* 活動選擇器模態視窗 */}
         {showActivitySelector && selectedLesson && (
@@ -2687,6 +3674,109 @@ export default function TeacherZonePage() {
             }}
           />
         )}
+
+        {/* 老師選擇模態框 - 在教師專區中禁用 */}
+        {/* {showTeacherSelectionModal && selectedClassForTeacher && (
+          <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-md w-full mx-4 max-h-[80vh] overflow-hidden">
+              <div className="bg-gradient-to-r from-hanami-primary to-hanami-accent p-6 text-white">
+                <h3 className="text-xl font-bold mb-2">
+                  選擇{selectedClassForTeacher.teacherRole === 'main' ? '主教' : '助教'}
+                </h3>
+                <p className="text-white/80 text-sm">
+                  班別: {selectedClassForTeacher.classCode}
+                </p>
+                <p className="text-white/80 text-sm">
+                  目前: {selectedClassForTeacher.teacherRole === 'main' 
+                    ? selectedClassForTeacher.currentMainTeacher || '未設定'
+                    : selectedClassForTeacher.currentAssistTeacher || '未設定'
+                  }
+                </p>
+              </div>
+              <div className="p-6 max-h-96 overflow-y-auto">
+                {loadingTeachers ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-hanami-primary"></div>
+                    <span className="ml-3 text-gray-600">載入老師列表中...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => updateClassTeacher(null, '未設定')}
+                      className="w-full p-4 text-left border-2 border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                          <span className="text-gray-500 font-medium">空</span>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-700">設為空</h4>
+                          <p className="text-sm text-gray-500">不指派{selectedClassForTeacher.teacherRole === 'main' ? '主教' : '助教'}</p>
+                        </div>
+                      </div>
+                    </button>
+                    {allTeachers.map((teacher) => (
+                      <button
+                        key={teacher.id}
+                        onClick={() => updateClassTeacher(teacher.id, teacher.teacher_fullname || teacher.teacher_nickname)}
+                        className="w-full p-4 text-left border-2 border-gray-200 rounded-xl hover:border-hanami-primary hover:bg-hanami-primary/5 transition-all duration-200"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-full flex items-center justify-center text-white font-bold">
+                            {(teacher.teacher_fullname || teacher.teacher_nickname)?.charAt(0) || 'T'}
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-700">
+                              {teacher.teacher_fullname || teacher.teacher_nickname}
+                            </h4>
+                            <p className="text-sm text-gray-500">
+                              {teacher.teacher_role || '老師'}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowTeacherSelectionModal(false);
+                    setSelectedClassForTeacher(null);
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        )} */}
+
+        {/* 能力評估模態框 */}
+        {showAbilityAssessmentModal && selectedStudentForAssessment && (
+          <SimpleAbilityAssessmentModal
+            onClose={() => {
+              setShowAbilityAssessmentModal(false);
+              setSelectedStudentForAssessment(null);
+            }}
+            defaultStudent={selectedStudentForAssessment}
+            lockStudent={true}
+            onSubmit={async (assessmentData) => {
+              try {
+                // 這裡可以添加保存評估數據的邏輯
+                console.log('保存能力評估:', assessmentData);
+                toast.success('能力評估已保存');
+                setShowAbilityAssessmentModal(false);
+                setSelectedStudentForAssessment(null);
+              } catch (error) {
+                console.error('保存評估失敗:', error);
+                toast.error('保存評估失敗: ' + (error as Error).message);
+              }
+            }}
+          />
+        )}
             </div>
           </main>
         </div>
@@ -2694,6 +3784,7 @@ export default function TeacherZonePage() {
     </div>
   );
 }
+
 
 
 

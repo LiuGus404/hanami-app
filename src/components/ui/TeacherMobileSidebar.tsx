@@ -21,7 +21,7 @@ export default function TeacherMobileSidebar({
 }: TeacherMobileSidebarProps) {
   const tabs = [
     { id: 'dashboard', name: '主頁', icon: '🏠' },
-    { id: 'profile', name: '個人資料', icon: '👤' },
+    { id: 'profile', name: '設定', icon: '👤' },
     { id: 'growth-tree', name: '成長樹管理', icon: '🌳' },
     { id: 'ability-development', name: '發展能力圖卡', icon: '📈' },
     { id: 'teaching-activities', name: '教學活動管理', icon: '🎨' },

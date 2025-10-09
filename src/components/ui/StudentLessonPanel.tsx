@@ -34,9 +34,10 @@ const generateUUID = () => {
 
 
 
-import LessonEditorModal from '@/components/ui/LessonEditorModal';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { getSupabaseClient } from '@/lib/supabase';
+import { calculateRemainingLessons } from '@/lib/utils';
+import LessonEditorModal from './LessonEditorModal';
 import { Lesson, CourseType } from '@/types';
 import AIMessageModal from '@/components/ui/AIMessageModal';
 
@@ -127,6 +128,12 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
   // AI 訊息相關狀態
   const [showAIMessageModal, setShowAIMessageModal] = useState(false);
   
+  // 剩餘堂數計算狀態
+  const [calculatedRemainingLessons, setCalculatedRemainingLessons] = useState<number | null>(null);
+  
+  // 新增課堂相關狀態
+  const [showLessonEditorModal, setShowLessonEditorModal] = useState(false);
+  const [availableLessons, setAvailableLessons] = useState(0);
   
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
@@ -378,6 +385,38 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
       loadingRef.current = false;
     }
   }, [studentId]);
+
+  // 計算剩餘堂數
+  useEffect(() => {
+    const calculateRemaining = async () => {
+      if (studentData && studentData.student_type === '常規') {
+        try {
+          const remaining = await calculateRemainingLessons(studentData.id, new Date());
+          setCalculatedRemainingLessons(remaining);
+        } catch (error) {
+          console.error('Error calculating remaining lessons:', error);
+          setCalculatedRemainingLessons(null);
+        }
+      } else {
+        setCalculatedRemainingLessons(null);
+      }
+    };
+
+    calculateRemaining();
+  }, [studentData]);
+
+  // 處理點擊待安排堂數
+  const handlePendingLessonsClick = () => {
+    console.log('點擊待安排堂數按鈕', studentData?.approved_lesson_nonscheduled);
+    if (studentData && (studentData.approved_lesson_nonscheduled || 0) > 0) {
+      const lessons = studentData.approved_lesson_nonscheduled || 0;
+      setAvailableLessons(lessons);
+      setShowLessonEditorModal(true);
+      console.log('開啟新增課堂記錄模態框，初始堂數:', lessons);
+    } else {
+      console.log('沒有待安排堂數，無法開啟模態框');
+    }
+  };
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -833,6 +872,96 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
             </button>
           </div>
         </div>
+
+        {/* 學生課程資訊卡片 */}
+        {studentData && (
+          <div className="mb-6 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] rounded-xl p-4 shadow-sm border border-[#EADBC8]/50">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {/* 星期 */}
+              <div className="text-center">
+                <div className="text-xs font-medium text-[#4B4036]/70 mb-1">星期</div>
+                <div className="text-[#2B3A3B] font-semibold text-sm">
+                  {studentData.regular_weekday !== null && studentData.regular_weekday !== undefined 
+                    ? `星期${['日', '一', '二', '三', '四', '五', '六'][studentData.regular_weekday]}`
+                    : '—'
+                  }
+                </div>
+              </div>
+
+              {/* 時段 */}
+              <div className="text-center">
+                <div className="text-xs font-medium text-[#4B4036]/70 mb-1">時段</div>
+                <div className="text-[#2B3A3B] font-semibold text-sm">
+                  {studentData.regular_timeslot || '—'}
+                </div>
+              </div>
+
+              {/* 剩餘堂數 */}
+              <div className="text-center">
+                <div className="text-xs font-medium text-[#4B4036]/70 mb-1">剩餘堂數</div>
+                <div className="text-[#2E7D32] font-semibold text-sm">
+                  {calculatedRemainingLessons !== null ? calculatedRemainingLessons : '—'} 堂
+                </div>
+              </div>
+
+              {/* 待確認堂數 */}
+              <div className="text-center">
+                <div className="text-xs font-medium text-[#4B4036]/70 mb-1">待確認堂數</div>
+                {(studentData.non_approved_lesson || 0) > 0 ? (
+                  <button
+                    onClick={() => {
+                      // 跳轉到待審核學生管理頁面
+                      window.location.href = '/admin/pending-students';
+                    }}
+                    className="bg-gradient-to-r from-[#FFB6C1] to-[#EBC9A4] hover:from-[#FF9BB3] hover:to-[#D4B896] text-[#2B3A3B] px-3 py-1 rounded-full text-xs font-medium shadow-md border border-[#F3EAD9] transition-all duration-200 hover:shadow-lg hover:scale-105 flex items-center gap-1 mx-auto"
+                  >
+                    <span className="font-semibold text-sm text-[#E65100]">
+                      {studentData.non_approved_lesson || 0}
+                    </span>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ) : (
+                  <div className="font-semibold text-sm text-[#2B3A3B]">
+                    {studentData.non_approved_lesson || 0}
+                  </div>
+                )}
+              </div>
+
+              {/* 待安排堂數 */}
+              <div className="text-center">
+                <div className="text-xs font-medium text-[#4B4036]/70 mb-1">待安排堂數</div>
+                <button
+                  className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    (studentData.approved_lesson_nonscheduled || 0) > 0 
+                      ? 'bg-gradient-to-r from-[#E3F2FD] to-[#BBDEFB] text-[#1565C0] hover:from-[#BBDEFB] hover:to-[#90CAF9] hover:shadow-md' 
+                      : 'bg-[#F5F5F5] text-[#999999] cursor-not-allowed'
+                  }`}
+                  onClick={handlePendingLessonsClick}
+                  disabled={(studentData.approved_lesson_nonscheduled || 0) === 0}
+                  title={(studentData.approved_lesson_nonscheduled || 0) > 0 ? '點擊新增課堂' : '暫無待安排堂數'}
+                >
+                  {studentData.approved_lesson_nonscheduled || 0} 堂
+                </button>
+              </div>
+
+              {/* 需要特別照顧 */}
+              <div className="text-center">
+                <div className="text-xs font-medium text-[#4B4036]/70 mb-1">特別照顧</div>
+                <div className="flex justify-center">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    studentData.care_alert 
+                      ? 'bg-[#FFE0E0] text-[#C62828]' 
+                      : 'bg-[#F0F0F0] text-[#666666]'
+                  }`}>
+                    {studentData.care_alert ? '需要特別照顧' : '一般照顧'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       
         {/* 載入狀態 */}
         {loading && (
@@ -1197,6 +1326,27 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
               lessons: filteredLessons.filter(lesson => selected.includes(lesson.id)) as any,
               count: selected.length
             } : null}
+          />
+        )}
+
+        {/* 新增課堂記錄模態框 */}
+        {showLessonEditorModal && (
+          <LessonEditorModal
+            open={showLessonEditorModal}
+            onClose={() => setShowLessonEditorModal(false)}
+            lesson={null}
+            studentId={studentId}
+            mode="add"
+            initialLessonCount={availableLessons}
+            onSaved={() => {
+              setShowLessonEditorModal(false);
+              // 重新載入課程記錄
+              fetchLessons();
+              // 如果有課程更新回調，調用它
+              if (onCourseUpdate) {
+                onCourseUpdate();
+              }
+            }}
           />
         )}
         

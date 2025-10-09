@@ -206,7 +206,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       {
         id: 'mobile-nav-settings',
         icon: Cog6ToothIcon,
-        href: '/aihome/settings',
+        href: '/aihome/profile',
         label: '設定'
       }
     ];

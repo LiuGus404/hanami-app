@@ -55,6 +55,9 @@ interface StudentFormData {
   lesson_date: string | null;
   actual_timeslot: string | null;
   weekday: number | null;
+  non_approved_lesson: number | null;
+  approved_lesson_nonscheduled: number | null;
+  care_alert: boolean | null;
 }
 
 interface FormField {
@@ -97,6 +100,9 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     address: student?.address || null,
     duration_months: student?.duration_months || null,
     school: student?.school || null,
+    non_approved_lesson: (student as any)?.non_approved_lesson || 0,
+    approved_lesson_nonscheduled: (student as any)?.approved_lesson_nonscheduled || 0,
+    care_alert: (student as any)?.care_alert || false,
     started_date: student?.started_date || null,
     student_email: student?.student_email || null,
     student_password: student?.student_password || null,
@@ -312,6 +318,9 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       lesson_date: student.lesson_date ?? null,
       actual_timeslot: student.actual_timeslot ?? null,
       weekday: (student as any).weekday ?? null,
+      non_approved_lesson: (student as any)?.non_approved_lesson ?? 0,
+      approved_lesson_nonscheduled: (student as any)?.approved_lesson_nonscheduled ?? 0,
+      care_alert: (student as any)?.care_alert ?? false,
     };
   }
 
@@ -388,6 +397,9 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       lesson_date: '試堂日期',
       actual_timeslot: '試堂時間',
       weekday: '星期',
+      non_approved_lesson: '待確認堂數',
+      approved_lesson_nonscheduled: '待安排堂數',
+      care_alert: '需要特別照顧',
     };
     if (missingFields.length > 0) {
       alert(`請填寫以下欄位：${missingFields.map(f => fieldLabels[f] || f).join(', ')}`);
@@ -449,6 +461,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         'parent_email', 'health_notes', 'student_remarks', 'created_at', 'updated_at', 'address', 'course_type',
         'duration_months', 'regular_timeslot', 'regular_weekday', 'school', 'started_date',
         'student_email', 'student_password', 'student_preference', 'student_teacher', 'student_type',
+        'non_approved_lesson', 'approved_lesson_nonscheduled', 'care_alert',
       ];
       const studentPayload: Record<string, any> = {};
       hanamiStudentFields.forEach((key) => {
@@ -456,6 +469,10 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           studentPayload[key] = formData[key] ?? null;
         } else if (key === 'regular_weekday') {
           studentPayload[key] = formData[key] ?? null;
+        } else if (key === 'non_approved_lesson' || key === 'approved_lesson_nonscheduled') {
+          studentPayload[key] = formData[key] ?? 0;
+        } else if (key === 'care_alert') {
+          studentPayload[key] = formData[key] ?? false;
         } else {
           studentPayload[key] = formData[key] === null ? null : formData[key];
         }
@@ -1087,6 +1104,79 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           <>
             <div className="font-medium">更新時間：</div>
             <div>{formData.updated_at || '—'}</div>
+          </>
+        )}
+
+        {/* 新增的三個欄位 */}
+        {isVisible('non_approved_lesson') && (
+          <>
+            <div className="font-medium">待確認堂數：</div>
+            <div>
+              {editMode && isEditable('non_approved_lesson') ? (
+                <input
+                  className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  type="number"
+                  min="0"
+                  value={formData.non_approved_lesson || 0}
+                  onChange={(e) => handleChange('non_approved_lesson', parseInt(e.target.value) || 0)}
+                />
+              ) : (
+                <span className={`font-semibold ${(formData.non_approved_lesson || 0) > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
+                  {formData.non_approved_lesson || 0}
+                </span>
+              )}
+            </div>
+          </>
+        )}
+
+        {isVisible('approved_lesson_nonscheduled') && (
+          <>
+            <div className="font-medium">待安排堂數：</div>
+            <div>
+              {editMode && isEditable('approved_lesson_nonscheduled') ? (
+                <input
+                  className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                  type="number"
+                  min="0"
+                  value={formData.approved_lesson_nonscheduled || 0}
+                  onChange={(e) => handleChange('approved_lesson_nonscheduled', parseInt(e.target.value) || 0)}
+                />
+              ) : (
+                <span className={`font-semibold ${(formData.approved_lesson_nonscheduled || 0) > 0 ? 'text-blue-600' : 'text-gray-500'}`}>
+                  {formData.approved_lesson_nonscheduled || 0}
+                </span>
+              )}
+            </div>
+          </>
+        )}
+
+        {isVisible('care_alert') && (
+          <>
+            <div className="font-medium">需要特別照顧：</div>
+            <div>
+              {editMode && isEditable('care_alert') ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="care_alert"
+                    checked={formData.care_alert || false}
+                    onChange={(e) => handleChange('care_alert', e.target.checked.toString())}
+                    className="w-4 h-4 text-[#A68A64] bg-[#FFFCF5] border-[#E4D5BC] rounded focus:ring-[#A68A64] focus:ring-2"
+                  />
+                  <label htmlFor="care_alert" className="text-sm text-[#2B3A3B]">
+                    {formData.care_alert ? '是' : '否'}
+                  </label>
+                </div>
+              ) : (
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  formData.care_alert 
+                    ? 'bg-red-100 text-red-800' 
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {formData.care_alert ? '需要特別照顧' : '一般照顧'}
+                </span>
+              )}
+            </div>
           </>
         )}
       </div>

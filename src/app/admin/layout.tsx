@@ -20,6 +20,7 @@ const setPageTitle = (pathname: string) => {
     '/admin/hanami-tc': '課堂管理 - Hanami 教育管理系統',
     '/admin/ai-select': 'AI 助理 - Hanami 教育管理系統',
     '/admin/lesson-availability': '課堂空缺 - Hanami 教育管理系統',
+    '/admin/pending-students': '待審核學生 - Hanami 教育管理系統',
   };
   
   const title = titleMap[pathname] || '管理面板 - Hanami 教育管理系統';

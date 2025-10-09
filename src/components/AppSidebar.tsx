@@ -112,15 +112,9 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
     }] : []),
     { 
       icon: UserIcon, 
-      label: '個人資料', 
+      label: '設定', 
       href: '/aihome/profile', 
-      description: '查看和編輯個人資料' 
-    },
-    { 
-      icon: Cog6ToothIcon, 
-      label: '設置', 
-      href: '/aihome/settings', 
-      description: '系統設置和偏好' 
+      description: '管理您的個人信息和系統設定' 
     }
   ];
 

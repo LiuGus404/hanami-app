@@ -23,7 +23,8 @@ import {
   PhoneIcon,
   EnvelopeIcon,
   UserGroupIcon,
-  StarIcon
+  StarIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { MusicalNoteIcon as PianoIcon } from '@heroicons/react/24/solid';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
@@ -40,6 +41,7 @@ import {
   type PriceCalculationResult,
   type CouponValidationResult 
 } from '@/lib/hanami-ai-pricing-api';
+import ChildSelectionModal from '@/components/children/ChildSelectionModal';
 
 export default function HanamiMusicRegisterPage() {
   const router = useRouter();
@@ -59,7 +61,7 @@ export default function HanamiMusicRegisterPage() {
   
   // 測試模式下的預設資料
   const testData = {
-    childFullName: '測試小朋友',
+    childFullName: '測試您孩子',
     childBirthDate: '2020-01-01',
     childGender: '男',
     childPreferences: '喜歡音樂和遊戲',
@@ -76,6 +78,11 @@ export default function HanamiMusicRegisterPage() {
   const [priceCalculation, setPriceCalculation] = useState<PriceCalculationResult | null>(null); // 價格計算結果
   const [couponValidation, setCouponValidation] = useState<CouponValidationResult | null>(null); // 優惠券驗證結果
   const [waitingListType, setWaitingListType] = useState<'none' | 'new' | 'existing'>('none'); // 等候區類型
+  
+  // 您孩子資料載入相關狀態
+  const [showChildSelection, setShowChildSelection] = useState(false);
+  const [availableChildren, setAvailableChildren] = useState<any[]>([]);
+  const [loadingChildren, setLoadingChildren] = useState(false);
 
   // 表單資料
   const [formData, setFormData] = useState({
@@ -111,7 +118,7 @@ export default function HanamiMusicRegisterPage() {
   const steps = [
     { id: 0, title: '課程性質', icon: MusicalNoteIcon, shortTitle: '性質' },
     { id: 1, title: '選擇課程', icon: SparklesIcon, shortTitle: '課程' },
-    { id: 2, title: '小朋友資料', icon: UserIcon, shortTitle: '資料' },
+    { id: 2, title: '您孩子資料', icon: UserIcon, shortTitle: '資料' },
     { id: 3, title: '日期時間', icon: CalendarDaysIcon, shortTitle: '時間' },
     { id: 4, title: '聯絡方式', icon: PhoneIcon, shortTitle: '聯絡' },
     { id: 5, title: '支付方法', icon: GiftIcon, shortTitle: '支付' },
@@ -159,6 +166,95 @@ export default function HanamiMusicRegisterPage() {
       router.push('/aihome/auth/login');
     } catch (error) {
       console.error('登出失敗:', error);
+    }
+  };
+
+  // 載入現有您孩子資料
+  const loadExistingChildren = async () => {
+    setLoadingChildren(true);
+    try {
+      // 獲取用戶信息
+      const userResponse = await fetch('/api/children/get-user-by-email?email=tqfea12@gmail.com');
+      const userResult = await userResponse.json();
+      
+      if (!userResult.success || !userResult.user) {
+        alert('無法獲取用戶信息');
+        return;
+      }
+      
+      const userId = userResult.user.id;
+      
+      // 獲取您孩子資料
+      const response = await fetch(`/api/children?userId=${userId}`);
+      const data = await response.json();
+      
+      if (response.ok && data.children) {
+        if (data.children.length === 0) {
+          alert('還沒有添加任何您孩子資料，請先在設定頁面添加');
+        } else if (data.children.length === 1) {
+          // 只有一個您孩子，直接載入
+          const child = data.children[0];
+          loadChildData(child);
+        } else {
+          // 多個您孩子，顯示選擇模態框
+          setAvailableChildren(data.children);
+          setShowChildSelection(true);
+        }
+      } else {
+        alert('載入您孩子資料失敗');
+      }
+    } catch (error) {
+      console.error('載入您孩子資料失敗:', error);
+      alert('載入失敗，請稍後再試');
+    } finally {
+      setLoadingChildren(false);
+    }
+  };
+
+  // 載入選中的您孩子資料到表單
+  const loadChildData = (child: any) => {
+    const birthDate = child.birth_date || child.date_of_birth;
+    const age = child.age_in_months ? Math.floor(child.age_in_months / 12) : 0;
+    
+    setFormData(prev => ({
+      ...prev,
+      childFullName: child.full_name || '',
+      childNickname: child.nick_name || '',
+      childBirthDate: birthDate || '',
+      childGender: child.gender === '男孩' ? '男' : child.gender === '女孩' ? '女' : child.gender || '',
+      childPreferences: child.preferences || '',
+      childHealthNotes: child.health_notes || ''
+    }));
+    
+    setShowChildSelection(false);
+  };
+
+  // 處理您孩子選擇
+  const handleChildSelection = (child: any) => {
+    loadChildData(child);
+  };
+
+  // 載入當前用戶資料
+  const loadCurrentUserData = async () => {
+    if (!user) {
+      alert('無法獲取用戶信息');
+      return;
+    }
+
+    try {
+      // 直接使用當前用戶的資料
+      setFormData(prev => ({
+        ...prev,
+        parentName: user.full_name || '',
+        parentPhone: user.phone || '',
+        parentEmail: user.email || '',
+        parentTitle: user.full_name || '' // 載入用戶的暱稱作為稱呼
+      }));
+      
+      alert('已載入您的聯絡資料');
+    } catch (error) {
+      console.error('載入用戶資料失敗:', error);
+      alert('載入失敗，請稍後再試');
     }
   };
 
@@ -250,6 +346,14 @@ export default function HanamiMusicRegisterPage() {
       setCouponValidation(null);
     }
   }, [formData.courseType]); // 移除函數依賴項，避免循環依賴
+
+  // 當課程性質改變時，重新載入日曆資料
+  useEffect(() => {
+    if (formData.courseType) {
+      console.log('🔄 課程性質改變，重新載入日曆資料:', formData.courseNature);
+      fetchCalendarData();
+    }
+  }, [formData.courseNature]); // 監聽課程性質變化
 
   // 當選擇價格計劃時，計算價格
   useEffect(() => {
@@ -442,6 +546,7 @@ export default function HanamiMusicRegisterPage() {
       });
       console.log('🔍 選中的課程詳情:', selectedCourse);
       console.log('🔍 課程性質:', formData.courseNature);
+      console.log('🔍 當前 formData:', formData);
       
       // 根據課程性質選擇不同的 API
       const apiEndpoint = formData.courseNature === 'trial' 
@@ -789,8 +894,6 @@ export default function HanamiMusicRegisterPage() {
         return [];
       }
       
-      console.log(`📅 選中星期${weekday}: 找到 ${weekdayData.timeSlots.length} 個時段`);
-      
       // 轉換為前端需要的格式
       const timeSlots = weekdayData.timeSlots.map((slot: any) => ({
         id: slot.id,
@@ -805,7 +908,6 @@ export default function HanamiMusicRegisterPage() {
         status: slot.status
       }));
       
-      console.log(`🎯 最終返回的時段:`, timeSlots);
       return timeSlots;
     }
     
@@ -835,7 +937,7 @@ export default function HanamiMusicRegisterPage() {
     
     console.log(`🎯 最終返回的時段:`, timeSlots);
     return timeSlots;
-  }, [getCalendarDay, calendarData, formData.courseNature]);
+  }, [getCalendarDay, formData.courseNature]);
 
   // 計算年齡 - 使用香港時區
   useEffect(() => {
@@ -876,10 +978,10 @@ export default function HanamiMusicRegisterPage() {
         }
         break;
       case 2:
-        if (!formData.childFullName) newErrors.childFullName = '請輸入小朋友全名';
+        if (!formData.childFullName) newErrors.childFullName = '請輸入您孩子全名';
         if (!formData.childBirthDate) newErrors.childBirthDate = '請選擇出生日期';
-        if (!formData.childGender) newErrors.childGender = '請選擇小朋友性別';
-        if (!formData.childPreferences) newErrors.childPreferences = '請輸入小朋友喜好物';
+        if (!formData.childGender) newErrors.childGender = '請選擇您孩子性別';
+        if (!formData.childPreferences) newErrors.childPreferences = '請輸入您孩子喜好物';
         break;
       case 3:
         // 等候區學生不需要選擇日期和時段
@@ -924,9 +1026,68 @@ export default function HanamiMusicRegisterPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // 自動保存孩子資料到 hanami_children 表
+  const autoSaveChildData = async () => {
+    try {
+      // 獲取用戶信息
+      const userResponse = await fetch('/api/children/get-user-by-email?email=tqfea12@gmail.com');
+      const userResult = await userResponse.json();
+      
+      if (!userResult.success || !userResult.user) {
+        console.log('無法獲取用戶信息，跳過自動保存');
+        return;
+      }
+      
+      const userId = userResult.user.id;
+      
+      // 檢查用戶是否已有孩子資料
+      const checkResponse = await fetch(`/api/children?userId=${userId}`);
+      const checkData = await checkResponse.json();
+      
+      if (checkResponse.ok && checkData.children && checkData.children.length > 0) {
+        console.log('用戶已有孩子資料，跳過自動保存');
+        return;
+      }
+      
+      // 準備孩子資料
+      const childData = {
+        parent_id: userId,
+        full_name: formData.childFullName,
+        nick_name: formData.childNickname || null,
+        birth_date: formData.childBirthDate,
+        gender: formData.childGender === '男' ? '男孩' : '女孩',
+        preferences: formData.childPreferences || null,
+        health_notes: formData.childHealthNotes || null,
+        allergies: null // 目前表單沒有過敏欄位
+      };
+      
+      // 保存到 hanami_children 表
+      const saveResponse = await fetch('/api/children', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(childData),
+      });
+      
+      if (saveResponse.ok) {
+        console.log('✅ 孩子資料已自動保存到個人資料');
+      } else {
+        console.log('⚠️ 自動保存孩子資料失敗，但不影響報名流程');
+      }
+    } catch (error) {
+      console.log('⚠️ 自動保存孩子資料時發生錯誤，但不影響報名流程:', error);
+    }
+  };
+
   // 下一步
-  const handleNext = () => {
+  const handleNext = async () => {
     if (isTestMode || validateStep(currentStep)) {
+      // 如果當前是步驟2（孩子資料），自動保存孩子資料
+      if (currentStep === 2) {
+        await autoSaveChildData();
+      }
+      
       const nextStep = Math.min(currentStep + 1, steps.length - 1);
       
       // 如果下一步是日期時間步驟（步驟3），先顯示智能篩選界面
@@ -1054,62 +1215,123 @@ export default function HanamiMusicRegisterPage() {
         return null;
       };
 
-      // 準備插入到 hanami_trial_students 的資料
-      const trialStudentData = {
-        student_oid: generateStudentOid(),
-        full_name: formData.childFullName || null,
-        nick_name: formData.childNickname || null,
-        student_dob: formData.childBirthDate || null,
-        student_age: ageInMonths || null,
-        contact_number: formData.parentCountryCode + formData.parentPhone || null,
-        parent_email: formData.parentEmail || null,
-        student_email: null,
-        student_password: null,
-        gender: formData.childGender || null,
-        address: null,
-        school: null,
-        course_type: formData.courseType ? courseTypes.find(c => c.id === formData.courseType)?.name || null : null,
-        student_type: formData.courseNature === 'trial' ? '試堂' : '常規',
-        student_teacher: null,
-        student_preference: formData.childPreferences || null,
-        health_notes: formData.childHealthNotes || '沒有',
-        weekday: formData.selectedDate ? new Date(formData.selectedDate).getDay().toString() : null,
-        regular_weekday: formData.selectedDate ? new Date(formData.selectedDate).getDay().toString() : null,
-        regular_timeslot: formatTimeForDatabase(formData.selectedTimeSlot),
-        lesson_date: formData.selectedDate || null,
-        lesson_duration: null,
-        trial_status: 'pending',
-        trial_remarks: formData.remarks || null,
-        access_role: 'admin',
-        duration_months: null,
-        remaining_lessons: null,
-        ongoing_lessons: null,
-        upcoming_lessons: null,
-        actual_timeslot: formatTimeForDatabase(formData.selectedTimeSlot)
-      };
+      // 根據課程性質決定插入到哪個表格
+      if (formData.courseNature === 'trial') {
+        // 試堂課程 - 插入到 hanami_trial_students
+        const trialStudentData = {
+          student_oid: generateStudentOid(),
+          full_name: formData.childFullName || null,
+          nick_name: formData.childNickname || null,
+          student_dob: formData.childBirthDate || null,
+          student_age: ageInMonths || null,
+          contact_number: formData.parentCountryCode + formData.parentPhone || null,
+          parent_email: formData.parentEmail || null,
+          student_email: null,
+          student_password: null,
+          gender: formData.childGender || null,
+          address: null,
+          school: null,
+          course_type: formData.courseType ? courseTypes.find(c => c.id === formData.courseType)?.name || null : null,
+          student_type: '試堂',
+          student_teacher: null,
+          student_preference: formData.childPreferences || null,
+          health_notes: formData.childHealthNotes || '沒有',
+          weekday: formData.selectedDate ? new Date(formData.selectedDate).getDay().toString() : null,
+          regular_weekday: formData.selectedDate ? new Date(formData.selectedDate).getDay().toString() : null,
+          regular_timeslot: formatTimeForDatabase(formData.selectedTimeSlot),
+          lesson_date: formData.selectedDate || null,
+          lesson_duration: null,
+          trial_status: 'pending',
+          trial_remarks: formData.remarks || null,
+          access_role: 'admin',
+          duration_months: null,
+          remaining_lessons: null,
+          ongoing_lessons: null,
+          upcoming_lessons: null,
+          actual_timeslot: formatTimeForDatabase(formData.selectedTimeSlot)
+        };
 
-      console.log('🔍 準備插入到 hanami_trial_students 的資料:', trialStudentData);
-      console.log('🔍 原始 selectedTimeSlot:', formData.selectedTimeSlot);
-      console.log('🔍 處理後的 regular_timeslot:', trialStudentData.regular_timeslot);
-      console.log('🔍 處理後的 actual_timeslot:', trialStudentData.actual_timeslot);
+        console.log('🔍 準備插入到 hanami_trial_students 的資料:', trialStudentData);
 
-      // 插入到 hanami_trial_students 表格
-      const { error: trialStudentError } = await supabase
-        .from('hanami_trial_students')
-        .insert([trialStudentData]);
+        const { error: trialStudentError } = await supabase
+          .from('hanami_trial_students')
+          .insert([trialStudentData]);
 
-      if (trialStudentError) {
-        console.error('❌ 插入 hanami_trial_students 錯誤:', trialStudentError);
-        console.error('❌ 錯誤詳情:', {
-          message: trialStudentError.message,
-          details: trialStudentError.details,
-          hint: trialStudentError.hint,
-          code: trialStudentError.code
-        });
-        alert('報名提交失敗，請稍後再試');
-        return;
+        if (trialStudentError) {
+          console.error('❌ 插入 hanami_trial_students 錯誤:', trialStudentError);
+          alert('報名提交失敗，請稍後再試');
+          return;
+        } else {
+          console.log('✅ 成功插入到 hanami_trial_students');
+        }
       } else {
-        console.log('✅ 成功插入到 hanami_trial_students');
+        // 常規課程 - 插入到 hanami_pending_students 待審核
+        const selectedPlan = pricingPlans.find(p => p.id === formData.selectedPlan);
+        const courseTypeName = courseTypes.find(c => c.id === formData.courseType)?.name || null;
+        
+        // 處理星期幾選擇（常規課程）
+        let weekday = null;
+        if (formData.selectedDate && formData.selectedDate.startsWith('weekday-')) {
+          weekday = parseInt(formData.selectedDate.replace('weekday-', ''));
+        }
+
+        const pendingStudentData = {
+          student_oid: generateStudentOid(),
+          full_name: formData.childFullName || null,
+          nick_name: formData.childNickname || null,
+          student_dob: formData.childBirthDate || null,
+          student_age: ageInMonths || null,
+          contact_number: formData.parentCountryCode + formData.parentPhone || null,
+          parent_email: formData.parentEmail || null,
+          student_email: null,
+          student_password: null,
+          gender: formData.childGender || null,
+          address: null,
+          school: null,
+          course_type: courseTypeName,
+          student_type: '常規',
+          student_teacher: null,
+          student_preference: formData.childPreferences || null,
+          student_remarks: formData.remarks || null,
+          health_notes: formData.childHealthNotes || '沒有',
+          regular_weekday: weekday,
+          regular_timeslot: formatTimeForDatabase(formData.selectedTimeSlot),
+          started_date: new Date().toISOString().split('T')[0],
+          duration_months: selectedPlan?.package_lessons || null,
+          ongoing_lessons: 0,
+          upcoming_lessons: selectedPlan?.package_lessons || 0,
+          access_role: 'admin',
+          
+          // 付款資訊
+          payment_status: 'paid',
+          payment_method: formData.paymentMethod || 'unknown',
+          payment_amount: priceCalculation?.final_price || selectedPlan?.package_price || 0,
+          payment_currency: 'HKD',
+          payment_reference: `PAY_${Date.now()}`,
+          
+          // 課程計劃資訊
+          selected_plan_id: formData.selectedPlan || null,
+          selected_plan_name: selectedPlan?.plan_name || null,
+          package_lessons: selectedPlan?.package_lessons || null,
+          package_price: selectedPlan?.package_price || null,
+          
+          // 審核狀態
+          review_status: 'pending'
+        };
+
+        console.log('🔍 準備插入到 hanami_pending_students 的資料:', pendingStudentData);
+
+        const { error: pendingStudentError } = await supabase
+          .from('hanami_pending_students')
+          .insert([pendingStudentData]);
+
+        if (pendingStudentError) {
+          console.error('❌ 插入 hanami_pending_students 錯誤:', pendingStudentError);
+          alert('報名提交失敗，請稍後再試');
+          return;
+        } else {
+          console.log('✅ 成功插入到 hanami_pending_students');
+        }
       }
 
       // 顯示成功訊息
@@ -1343,7 +1565,7 @@ export default function HanamiMusicRegisterPage() {
                 >
                   <div className="text-center mb-6 sm:mb-8">
                     <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">選擇日期與時段</h2>
-                    <p className="text-sm sm:text-base text-[#2B3A3B]">根據孩子的需要和歲數，正在篩選最合適的時間</p>
+                    <p className="text-sm sm:text-base text-[#2B3A3B]">根據您孩子的需要和歲數，正在篩選最合適的時間</p>
                   </div>
 
                   {/* 智能篩選動畫 */}
@@ -1363,7 +1585,7 @@ export default function HanamiMusicRegisterPage() {
                       </div>
                       <div>
                         <h4 className="font-semibold text-[#4B4036] text-lg">智能篩選中</h4>
-                        <p className="text-sm text-[#2B3A3B]/70">正在為 {formData.childFullName || '小朋友'} 尋找最適合的課程時間</p>
+                        <p className="text-sm text-[#2B3A3B]/70">正在為 {formData.childFullName || '您孩子'} 尋找最適合的課程時間</p>
                       </div>
                     </div>
                     
@@ -1477,7 +1699,10 @@ export default function HanamiMusicRegisterPage() {
                         type="button"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => setFormData(prev => ({ ...prev, courseNature: 'regular' }))}
+                        onClick={() => {
+                          console.log('🎯 用戶選擇常規課程');
+                          setFormData(prev => ({ ...prev, courseNature: 'regular' }));
+                        }}
                         className={`p-6 sm:p-8 rounded-2xl border-2 transition-all duration-200 ${
                           formData.courseNature === 'regular'
                             ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
@@ -1486,7 +1711,7 @@ export default function HanamiMusicRegisterPage() {
                       >
                         <CheckCircleIcon className="w-12 h-12 sm:w-16 sm:h-16 text-[#4B4036] mx-auto mb-4" />
                         <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036] mb-2">常規課程</h3>
-                        <p className="text-sm sm:text-base text-[#2B3A3B] mb-2">以優惠價惠價格，展開孩子的學習之旅</p>
+                        <p className="text-sm sm:text-base text-[#2B3A3B] mb-2">以優惠價惠價格，展開您孩子的學習之旅</p>
                         <p className="text-lg sm:text-xl font-bold text-[#F89090]">立即開始</p>
                       </motion.button>
                     </div>
@@ -1682,12 +1907,31 @@ export default function HanamiMusicRegisterPage() {
                   </div>
                 )}
 
-                {/* 步驟 2: 小朋友資料 */}
+                {/* 步驟 2: 您孩子資料 */}
                 {currentStep === 2 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
-                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">小朋友資料</h2>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫小朋友的基本資料</p>
+                      <div className="flex items-center justify-center gap-4 mb-4">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">您孩子資料</h2>
+                        <button
+                          onClick={loadExistingChildren}
+                          disabled={loadingChildren}
+                          className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-xl hover:bg-[#EBC9A4] transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loadingChildren ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-[#4B4036] border-t-transparent rounded-full animate-spin"></div>
+                              <span className="text-sm font-medium">載入中...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ArrowPathIcon className="w-4 h-4" />
+                              <span className="text-sm font-medium">載入現有資料</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫您孩子的基本資料</p>
                     </div>
 
                     <div className="space-y-4">
@@ -1704,7 +1948,7 @@ export default function HanamiMusicRegisterPage() {
                               ? 'border-red-500 focus:border-red-500'
                               : 'border-[#EADBC8] focus:border-[#FFD59A]'
                           } focus:outline-none`}
-                          placeholder="請輸入小朋友全名"
+                          placeholder="請輸入您孩子全名"
                         />
                         {errors.childFullName && (
                           <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -2239,12 +2483,16 @@ export default function HanamiMusicRegisterPage() {
                               
                           return (
                             <motion.button
-                                  key={slot.id || index}
+                              key={slot.id || index}
                               type="button"
-                              disabled={false} // 讓所有時段都可以點擊
-                                  whileHover={{ scale: 1.02 }}
-                                  whileTap={{ scale: 0.98 }}
-                              onClick={() => setFormData(prev => ({ ...prev, selectedTimeSlot: slot.time }))}
+                              disabled={!slot.available} // 已滿員的時段無法點擊
+                              whileHover={{ scale: slot.available ? 1.02 : 1 }}
+                              whileTap={{ scale: slot.available ? 0.98 : 1 }}
+                              onClick={() => {
+                                if (slot.available) {
+                                  setFormData(prev => ({ ...prev, selectedTimeSlot: slot.time }));
+                                }
+                              }}
                                   className={`p-4 rounded-xl border-2 transition-all duration-200 ${
                                 isSelected
                                       ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
@@ -2313,7 +2561,16 @@ export default function HanamiMusicRegisterPage() {
                 {currentStep === 4 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
-                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">聯絡方式</h2>
+                      <div className="flex items-center justify-center gap-4 mb-4">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">聯絡方式</h2>
+                        <button
+                          onClick={loadCurrentUserData}
+                          className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-xl hover:bg-[#EBC9A4] transition-colors shadow-lg hover:shadow-xl"
+                        >
+                          <ArrowPathIcon className="w-4 h-4" />
+                          <span className="text-sm font-medium">載入我的資料</span>
+                        </button>
+                      </div>
                       <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫聯絡資料</p>
                       
                       {/* 等候區狀態顯示 */}
@@ -2582,7 +2839,7 @@ export default function HanamiMusicRegisterPage() {
                       </div>
 
                       <div className="pb-4 border-b border-[#EADBC8]">
-                        <h3 className="text-base sm:text-lg font-bold text-[#4B4036] mb-3">小朋友資料</h3>
+                        <h3 className="text-base sm:text-lg font-bold text-[#4B4036] mb-3">您孩子資料</h3>
                         <div className="space-y-2 text-sm sm:text-base">
                           <p className="flex justify-between">
                             <span className="text-[#2B3A3B]">全名：</span>
@@ -2750,6 +3007,15 @@ export default function HanamiMusicRegisterPage() {
           </motion.div>
         </motion.div>
       )}
+
+      {/* 您孩子選擇模態框 */}
+      <ChildSelectionModal
+        isOpen={showChildSelection}
+        onClose={() => setShowChildSelection(false)}
+        children={availableChildren}
+        onSelectChild={handleChildSelection}
+        loading={loadingChildren}
+      />
     </div>
   );
 }

@@ -398,6 +398,16 @@ export default function AdminPage() {
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">學生進度</h3>
               </div>
             </div>
+            {/* 待審核學生按鈕 */}
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/pending-students')}>
+              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                  <span className="text-3xl">⏳</span>
+                </div>
+                <h3 className="text-lg font-semibold text-[#2B3A3B]">待審核學生</h3>
+                <p className="text-xs text-[#777] mt-1">常規課程報名審核</p>
+              </div>
+            </div>
             {/* 管理課堂按鈕 */}
             <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/schedule-management')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">

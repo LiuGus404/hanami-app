@@ -130,8 +130,7 @@ export default function DashboardPage() {
     { icon: HomeIcon, label: '首頁', href: '/aihome' },
     { icon: SparklesIcon, label: 'AI夥伴', href: '/aihome/ai-companions' },
     { icon: UsersIcon, label: '家長連結', href: '/aihome/parent/bound-students' },
-    { icon: UserIcon, label: '個人資料', href: '/aihome/profile' },
-    { icon: CogIcon, label: '設置', href: '/aihome/settings' }
+    { icon: UserIcon, label: '設定', href: '/aihome/profile' }
   ];
 
   return (
