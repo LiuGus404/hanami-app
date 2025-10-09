@@ -77,6 +77,12 @@ export default function AIHomePage() {
             >
               花見音樂
             </button>
+            <button
+              onClick={() => router.push('/aihome/course-activities')}
+              className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
+            >
+              探索課程
+            </button>
             {user ? (
               <>
                 <button

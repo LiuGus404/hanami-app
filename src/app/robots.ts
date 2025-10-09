@@ -16,6 +16,6 @@ export default function robots(): MetadataRoute.Robots {
         '/admin/test-permissions/',
       ],
     },
-    sitemap: 'https://hanami-music.com/sitemap.xml',
+    sitemap: 'https://hanamiecho.com/sitemap.xml',
   };
 } 

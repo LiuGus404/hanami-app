@@ -55,12 +55,12 @@ export default function HanamiMusicDetailPage() {
     }
   };
 
-  // 認證保護
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/aihome/auth/login');
-    }
-  }, [user, loading, router]);
+  // 移除認證保護 - 允許未登入用戶訪問
+  // useEffect(() => {
+  //   if (!loading && !user) {
+  //     router.push('/aihome/auth/login');
+  //   }
+  // }, [user, loading, router]);
 
   // 機構特色
   const features = [
@@ -173,10 +173,10 @@ export default function HanamiMusicDetailPage() {
     );
   }
 
-  // 如果未認證，不渲染內容
-  if (!user) {
-    return null;
-  }
+  // 移除未認證檢查 - 允許未登入用戶訪問
+  // if (!user) {
+  //   return null;
+  // }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] flex flex-col">
@@ -196,16 +196,18 @@ export default function HanamiMusicDetailPage() {
                 <ArrowLeftIcon className="w-6 h-6 text-[#4B4036]" />
               </motion.button>
 
-              {/* 選單按鈕 */}
-              <motion.button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                title="開啟選單"
-              >
-                <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
-              </motion.button>
+              {/* 選單按鈕 - 只在登入時顯示 */}
+              {user && (
+                <motion.button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                  title="開啟選單"
+                >
+                  <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
+                </motion.button>
+              )}
               
               <div className="w-10 h-10 relative">
                 <img 
@@ -227,21 +229,45 @@ export default function HanamiMusicDetailPage() {
                   minute: '2-digit' 
                 })}
               </div>
-              <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-[#4B4036]">
-                  {user.full_name?.charAt(0).toUpperCase() || 'U'}
-                </span>
-              </div>
-              <motion.button
-                onClick={handleLogout}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                title="登出"
-              >
-                <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">登出</span>
-              </motion.button>
+              
+              {user ? (
+                <>
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-[#4B4036]">
+                      {user.full_name?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                  <motion.button
+                    onClick={handleLogout}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
+                    title="登出"
+                  >
+                    <ArrowRightOnRectangleIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">登出</span>
+                  </motion.button>
+                </>
+              ) : (
+                <>
+                  <motion.button
+                    onClick={() => router.push('/aihome/auth/login')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-4 py-2 text-sm text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
+                  >
+                    登入
+                  </motion.button>
+                  <motion.button
+                    onClick={() => router.push('/aihome/auth/register')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-4 py-2 text-sm bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-lg font-medium transition-all duration-200"
+                  >
+                    註冊
+                  </motion.button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -249,12 +275,14 @@ export default function HanamiMusicDetailPage() {
 
       {/* 主內容區域 */}
       <div className="flex-1 flex">
-        {/* 側邊欄選單 */}
-        <AppSidebar 
-          isOpen={sidebarOpen} 
-          onClose={() => setSidebarOpen(false)}
-          currentPath="/aihome/course-activities/hanami-music"
-        />
+        {/* 側邊欄選單 - 只在登入時顯示 */}
+        {user && (
+          <AppSidebar 
+            isOpen={sidebarOpen} 
+            onClose={() => setSidebarOpen(false)}
+            currentPath="/aihome/course-activities/hanami-music"
+          />
+        )}
 
         {/* 主內容 */}
         <div className="flex-1 flex flex-col overflow-y-auto">
