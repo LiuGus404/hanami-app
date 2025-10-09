@@ -3616,6 +3616,8 @@ export default function TeacherZonePage() {
             }}
             onSubmit={async (assessment) => {
               console.log('能力評估提交:', assessment);
+              console.log('directTeacherAccess:', directTeacherAccess);
+              console.log('directTeacherAccess?.employeeData:', directTeacherAccess?.employeeData);
               
               try {
                 // 準備 API 調用的資料格式
@@ -3633,6 +3635,8 @@ export default function TeacherZonePage() {
                 };
 
                 console.log('準備的 API 資料:', apiData);
+                console.log('teacher_id 值:', apiData.teacher_id);
+                console.log('teacher_id 類型:', typeof apiData.teacher_id);
                 console.log('general_notes 提交值:', apiData.general_notes);
                 console.log('general_notes 類型:', typeof apiData.general_notes);
 
@@ -3754,29 +3758,6 @@ export default function TeacherZonePage() {
           </div>
         )} */}
 
-        {/* 能力評估模態框 */}
-        {showAbilityAssessmentModal && selectedStudentForAssessment && (
-          <SimpleAbilityAssessmentModal
-            onClose={() => {
-              setShowAbilityAssessmentModal(false);
-              setSelectedStudentForAssessment(null);
-            }}
-            defaultStudent={selectedStudentForAssessment}
-            lockStudent={true}
-            onSubmit={async (assessmentData) => {
-              try {
-                // 這裡可以添加保存評估數據的邏輯
-                console.log('保存能力評估:', assessmentData);
-                toast.success('能力評估已保存');
-                setShowAbilityAssessmentModal(false);
-                setSelectedStudentForAssessment(null);
-              } catch (error) {
-                console.error('保存評估失敗:', error);
-                toast.error('保存評估失敗: ' + (error as Error).message);
-              }
-            }}
-          />
-        )}
             </div>
           </main>
         </div>
