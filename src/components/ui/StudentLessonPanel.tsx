@@ -53,6 +53,7 @@ interface StudentLessonPanelProps {
   showAIMessageButton?: boolean; // 是否顯示 AI 訊息按鈕
   hideActionButtons?: boolean; // 是否隱藏新增課堂和編輯按鍵
   hideTeacherColumn?: boolean; // 是否隱藏負責老師欄位
+  hideCareAlert?: boolean; // 是否隱藏特別照顧欄位
 }
 
 interface LessonData {
@@ -83,7 +84,7 @@ interface LessonData {
   remarks: string | null;
 }
 
-export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData, showAIMessageButton = false, hideActionButtons = false, hideTeacherColumn = false }: StudentLessonPanelProps) {
+export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData, showAIMessageButton = false, hideActionButtons = false, hideTeacherColumn = false, hideCareAlert = false }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
   
   // 添加動畫樣式到 head
@@ -947,18 +948,20 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
               </div>
 
               {/* 需要特別照顧 */}
-              <div className="text-center">
-                <div className="text-xs font-medium text-[#4B4036]/70 mb-1">特別照顧</div>
-                <div className="flex justify-center">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                    studentData.care_alert 
-                      ? 'bg-[#FFE0E0] text-[#C62828]' 
-                      : 'bg-[#F0F0F0] text-[#666666]'
-                  }`}>
-                    {studentData.care_alert ? '需要特別照顧' : '一般照顧'}
-                  </span>
+              {!hideCareAlert && (
+                <div className="text-center">
+                  <div className="text-xs font-medium text-[#4B4036]/70 mb-1">特別照顧</div>
+                  <div className="flex justify-center">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      studentData.care_alert 
+                        ? 'bg-[#FFE0E0] text-[#C62828]' 
+                        : 'bg-[#F0F0F0] text-[#666666]'
+                    }`}>
+                      {studentData.care_alert ? '需要特別照顧' : '一般照顧'}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}

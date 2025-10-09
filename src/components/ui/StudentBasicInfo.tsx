@@ -75,9 +75,10 @@ type Props = {
   hideTeacherInfo?: boolean; // 是否隱藏負責老師資訊
   hideSensitiveInfo?: boolean; // 是否隱藏敏感資訊（備註、Email、密碼、時間戳）
   readonlyFields?: string[]; // 只讀欄位列表（即使編輯模式也不可編輯）
+  hideContactDays?: boolean; // 是否隱藏聯繫天數顯示
 }
 
-export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false, hideTeacherInfo = false, hideSensitiveInfo = false, readonlyFields = [] }: Props) {
+export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false, hideTeacherInfo = false, hideSensitiveInfo = false, readonlyFields = [], hideContactDays = false }: Props) {
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState<StudentFormData>({
     id: student?.id || '',
@@ -511,7 +512,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         <h2 className="text-lg font-bold">基本資料</h2>
         <div className="flex items-center gap-2">
           {/* 聯繫天數顯示 */}
-          {!loadingContactDays && contactDays !== null && (
+          {!hideContactDays && !loadingContactDays && contactDays !== null && (
             <button
               onClick={() => setChatDialogOpen(true)}
               className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm hover:shadow-md transition-all cursor-pointer"
@@ -525,7 +526,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
               </span>
             </button>
           )}
-          {!loadingContactDays && contactDays === null && (
+          {!hideContactDays && !loadingContactDays && contactDays === null && (
             <button
               onClick={() => setChatDialogOpen(true)}
               className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer"
@@ -535,7 +536,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
               <span>無聯繫記錄</span>
             </button>
           )}
-          {loadingContactDays && (
+          {!hideContactDays && loadingContactDays && (
             <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
               <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
               <span>載入中</span>

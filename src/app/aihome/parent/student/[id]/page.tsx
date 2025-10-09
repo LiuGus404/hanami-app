@@ -489,7 +489,9 @@ export default function ParentStudentDetailPage() {
               student={student}
               hideTeacherInfo={true}
               hideSensitiveInfo={true}
+              hideContactDays={true}
               readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
+              visibleFields={['full_name', 'nick_name', 'student_age', 'gender', 'course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'duration_months', 'school', 'address', 'health_notes', 'student_remarks']}
               onUpdate={(newData) => {
                 setStudent(newData);
                 // 如果是試堂學生且課程有更新，觸發課堂資料重新載入
@@ -525,6 +527,7 @@ export default function ParentStudentDetailPage() {
                     studentData={student}
                     hideActionButtons={true}
                     hideTeacherColumn={true}
+                    hideCareAlert={true}
                   />
                 );
               })()}
