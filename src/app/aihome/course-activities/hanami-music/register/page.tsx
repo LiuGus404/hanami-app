@@ -57,19 +57,6 @@ export default function HanamiMusicRegisterPage() {
   const [courseTypeInfo, setCourseTypeInfo] = useState<any>(null); // 課程類型資訊
   const [loadingSchedule, setLoadingSchedule] = useState(false); // 排程載入狀態
   const [showSmartFiltering, setShowSmartFiltering] = useState(false); // 顯示智能篩選界面
-  const [isTestMode, setIsTestMode] = useState(true); // 測試模式 - 跳過某些驗證
-  
-  // 測試模式下的預設資料
-  const testData = {
-    childFullName: '測試您孩子',
-    childBirthDate: '2020-01-01',
-    childGender: '男',
-    childPreferences: '喜歡音樂和遊戲',
-    parentPhone: '+85212345678',
-    parentEmail: 'test@example.com',
-    parentTitle: '爸爸',
-    parentCountryCode: '+852'
-  };
   
   // 新的價格系統狀態
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([]); // 課程類型列表
@@ -171,14 +158,20 @@ export default function HanamiMusicRegisterPage() {
 
   // 載入現有您孩子資料
   const loadExistingChildren = async () => {
+    // 🔒 安全檢查：必須先登入
+    if (!user || !user.email) {
+      alert('您尚未登入，請先登入以載入您孩子的資料');
+      return;
+    }
+
     setLoadingChildren(true);
     try {
-      // 獲取用戶信息
-      const userResponse = await fetch('/api/children/get-user-by-email?email=tqfea12@gmail.com');
+      // 使用當前登入用戶的郵箱
+      const userResponse = await fetch(`/api/children/get-user-by-email?email=${encodeURIComponent(user.email)}`);
       const userResult = await userResponse.json();
       
       if (!userResult.success || !userResult.user) {
-        alert('無法獲取用戶信息');
+        alert('無法獲取用戶信息，請確認您已登入');
         return;
       }
       
@@ -962,12 +955,6 @@ export default function HanamiMusicRegisterPage() {
   const validateStep = (step: number) => {
     const newErrors: Record<string, string> = {};
 
-    // 測試模式下跳過大部分驗證
-    if (isTestMode) {
-      console.log('🧪 測試模式：跳過步驟', step, '的驗證');
-      return newErrors;
-    }
-
     switch (step) {
       case 0:
         if (!formData.courseNature) newErrors.courseNature = '請選擇課程性質';
@@ -1083,7 +1070,7 @@ export default function HanamiMusicRegisterPage() {
 
   // 下一步
   const handleNext = async () => {
-    if (isTestMode || validateStep(currentStep)) {
+    if (validateStep(currentStep)) {
       // 如果當前是步驟2（孩子資料），自動保存孩子資料
       if (currentStep === 2) {
         await autoSaveChildData();
@@ -1392,66 +1379,6 @@ export default function HanamiMusicRegisterPage() {
                 </motion.button>
               )}
               
-              {/* 測試模式切換按鈕 - 在生產環境中隱藏 */}
-              {process.env.NODE_ENV === 'development' && (
-                <>
-                  <motion.button
-                    onClick={() => setIsTestMode(!isTestMode)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                      isTestMode 
-                        ? 'bg-green-100 text-green-700 border border-green-300' 
-                        : 'bg-gray-100 text-gray-700 border border-gray-300'
-                    }`}
-                    title={isTestMode ? '測試模式：已啟用' : '測試模式：已停用'}
-                  >
-                    🧪 {isTestMode ? '測試模式' : '正常模式'}
-                  </motion.button>
-                  
-                  {/* 快速填入測試資料按鈕 */}
-                  {isTestMode && (
-                    <motion.button
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          ...testData
-                        }));
-                        console.log('🧪 已填入測試資料');
-                      }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="px-3 py-1 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 border border-blue-300 transition-colors"
-                      title="快速填入測試資料"
-                    >
-                      📝 填入測試資料
-                    </motion.button>
-                  )}
-                  
-                  {/* 測試模式步驟跳轉 */}
-                  {isTestMode && (
-                    <div className="flex items-center space-x-1">
-                      <span className="text-xs text-gray-600">步驟:</span>
-                      {[0, 1, 2, 3, 4, 5].map((step) => (
-                        <motion.button
-                          key={step}
-                          onClick={() => setCurrentStep(step)}
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          className={`w-6 h-6 rounded-full text-xs font-medium transition-colors ${
-                            currentStep === step
-                              ? 'bg-[#FFD59A] text-[#4B4036]'
-                              : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                          }`}
-                          title={`跳轉到步驟 ${step + 1}`}
-                        >
-                          {step + 1}
-                        </motion.button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
               
               <div className="w-8 h-8 sm:w-10 sm:h-10 relative">
                 <img 
