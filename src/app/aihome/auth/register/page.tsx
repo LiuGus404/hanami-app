@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { EyeIcon, EyeSlashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, ArrowLeftIcon, HomeIcon } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import HanamiEchoLogo from '@/components/ui/HanamiEchoLogo';
 import { HanamiButton } from '@/components/ui/HanamiButton';
@@ -104,6 +104,18 @@ export default function RegisterPage() {
         transition={{ duration: 0.6 }}
         className="w-full max-w-md"
       >
+        {/* 返回首頁按鈕 */}
+        <motion.button
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          onClick={() => router.push('/aihome')}
+          className="group flex items-center gap-2 mb-6 px-4 py-2 rounded-xl bg-white/50 hover:bg-white/80 border border-[#EADBC8] hover:border-[#FFD59A] transition-all duration-200 text-[#4B4036] hover:text-[#FFD59A]"
+        >
+          <HomeIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+          <span className="font-medium">返回首頁</span>
+        </motion.button>
+
         <HanamiCard className="p-8">
           <div className="text-center mb-8">
             <HanamiEchoLogo size="lg" className="mx-auto mb-6" />

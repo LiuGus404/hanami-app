@@ -1392,61 +1392,65 @@ export default function HanamiMusicRegisterPage() {
                 </motion.button>
               )}
               
-              {/* 測試模式切換按鈕 */}
-              <motion.button
-                onClick={() => setIsTestMode(!isTestMode)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                  isTestMode 
-                    ? 'bg-green-100 text-green-700 border border-green-300' 
-                    : 'bg-gray-100 text-gray-700 border border-gray-300'
-                }`}
-                title={isTestMode ? '測試模式：已啟用' : '測試模式：已停用'}
-              >
-                🧪 {isTestMode ? '測試模式' : '正常模式'}
-              </motion.button>
-              
-              {/* 快速填入測試資料按鈕 */}
-              {isTestMode && (
-                <motion.button
-                  onClick={() => {
-                    setFormData(prev => ({
-                      ...prev,
-                      ...testData
-                    }));
-                    console.log('🧪 已填入測試資料');
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-3 py-1 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 border border-blue-300 transition-colors"
-                  title="快速填入測試資料"
-                >
-                  📝 填入測試資料
-                </motion.button>
-              )}
-              
-              {/* 測試模式步驟跳轉 */}
-              {isTestMode && (
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600">步驟:</span>
-                  {[0, 1, 2, 3, 4, 5].map((step) => (
+              {/* 測試模式切換按鈕 - 在生產環境中隱藏 */}
+              {process.env.NODE_ENV === 'development' && (
+                <>
+                  <motion.button
+                    onClick={() => setIsTestMode(!isTestMode)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                      isTestMode 
+                        ? 'bg-green-100 text-green-700 border border-green-300' 
+                        : 'bg-gray-100 text-gray-700 border border-gray-300'
+                    }`}
+                    title={isTestMode ? '測試模式：已啟用' : '測試模式：已停用'}
+                  >
+                    🧪 {isTestMode ? '測試模式' : '正常模式'}
+                  </motion.button>
+                  
+                  {/* 快速填入測試資料按鈕 */}
+                  {isTestMode && (
                     <motion.button
-                      key={step}
-                      onClick={() => setCurrentStep(step)}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className={`w-6 h-6 rounded-full text-xs font-medium transition-colors ${
-                        currentStep === step
-                          ? 'bg-[#FFD59A] text-[#4B4036]'
-                          : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                      }`}
-                      title={`跳轉到步驟 ${step + 1}`}
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          ...testData
+                        }));
+                        console.log('🧪 已填入測試資料');
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-3 py-1 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 border border-blue-300 transition-colors"
+                      title="快速填入測試資料"
                     >
-                      {step + 1}
+                      📝 填入測試資料
                     </motion.button>
-                  ))}
-                </div>
+                  )}
+                  
+                  {/* 測試模式步驟跳轉 */}
+                  {isTestMode && (
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs text-gray-600">步驟:</span>
+                      {[0, 1, 2, 3, 4, 5].map((step) => (
+                        <motion.button
+                          key={step}
+                          onClick={() => setCurrentStep(step)}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          className={`w-6 h-6 rounded-full text-xs font-medium transition-colors ${
+                            currentStep === step
+                              ? 'bg-[#FFD59A] text-[#4B4036]'
+                              : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                          }`}
+                          title={`跳轉到步驟 ${step + 1}`}
+                        >
+                          {step + 1}
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
               
               <div className="w-8 h-8 sm:w-10 sm:h-10 relative">
