@@ -1958,8 +1958,8 @@ export default function TeacherZonePage() {
         <div className="flex-1 flex flex-col">
           {/* 頂部導航欄 */}
           <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center h-16">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-14 sm:h-16">
                 <div className="flex items-center space-x-4">
                   {/* 選單按鈕 */}
                   <motion.button
@@ -1972,7 +1972,7 @@ export default function TeacherZonePage() {
                     <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
                   </motion.button>
                   
-                  <div className="w-10 h-10 relative">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 relative">
                     <img 
                       src="/@hanami.png" 
                       alt="HanamiEcho Logo" 
@@ -1980,20 +1980,20 @@ export default function TeacherZonePage() {
                     />
                   </div>
                   <div>
-                    <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-                    <p className="text-sm text-[#2B3A3B]">兒童與成人的智能伙伴</p>
+                    <h1 className="text-base sm:text-lg md:text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
+                    <p className="text-xs sm:text-sm text-[#2B3A3B] hidden sm:block">兒童與成人的智能伙伴</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-4">
-                  <div className="text-sm text-[#2B3A3B]">
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                  <div className="text-xs sm:text-sm text-[#2B3A3B] hidden md:block">
                     {currentTime.toLocaleTimeString('zh-TW', { 
                       hour: '2-digit', 
                       minute: '2-digit' 
                     })}
                   </div>
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-[#4B4036]">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                    <span className="text-xs sm:text-sm font-medium text-[#4B4036]">
                       {user?.full_name?.charAt(0).toUpperCase() || 'U'}
                     </span>
                   </div>
@@ -2001,11 +2001,11 @@ export default function TeacherZonePage() {
                     onClick={handleLogout}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
+                    className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
                     title="登出"
                   >
                     <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                    <span>登出</span>
+                    <span className="hidden sm:inline">登出</span>
                   </motion.button>
                 </div>
               </div>
@@ -2014,34 +2014,35 @@ export default function TeacherZonePage() {
           </nav>
 
           {/* 頁面內容 */}
-          <main className="flex-1 p-6">
-            <div className="container mx-auto px-4 py-6 max-w-7xl">
+          <main className="flex-1 p-3 sm:p-4 md:p-6">
+            <div className="container mx-auto px-2 sm:px-3 md:px-4 py-3 sm:py-4 md:py-6 max-w-7xl">
               {/* 頁面標題 */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <h1 className="text-3xl font-bold text-[#4B4036]">課堂活動管理</h1>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-3 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#4B4036]">課堂活動管理</h1>
                   
                   {/* 工作提示系統按鈕 */}
                   <motion.button
                     onClick={() => router.push('/aihome/task-management')}
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.95 }}
-                    className="relative overflow-hidden px-4 py-2 bg-gradient-to-br from-[#FFF4E6] via-[#FFE8CC] to-[#FFD59A] text-[#2B3A3B] rounded-xl hover:from-[#FFE8CC] hover:via-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-300 font-medium shadow-md hover:shadow-lg flex items-center gap-2 group border border-[#FFD59A]/50"
+                    className="relative overflow-hidden px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-gradient-to-br from-[#FFF4E6] via-[#FFE8CC] to-[#FFD59A] text-[#2B3A3B] rounded-xl hover:from-[#FFE8CC] hover:via-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-300 font-medium shadow-md hover:shadow-lg flex items-center gap-1 sm:gap-2 group border border-[#FFD59A]/50"
                   >
                     {/* 背景裝飾 */}
-                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white/30 blur-sm group-hover:bg-white/40 transition-all duration-300" />
-                    <div className="absolute -bottom-0.5 -left-0.5 w-3 h-3 rounded-full bg-white/20 blur-sm group-hover:bg-white/30 transition-all duration-300" />
+                    <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-white/30 blur-sm group-hover:bg-white/40 transition-all duration-300" />
+                    <div className="absolute -bottom-0.5 -left-0.5 w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-white/20 blur-sm group-hover:bg-white/30 transition-all duration-300" />
                     
                     {/* 圖標 */}
-                    <div className="relative z-10 w-4 h-4 bg-white/40 rounded-lg flex items-center justify-center group-hover:bg-white/50 transition-all duration-300 shadow-sm">
-                      <svg className="w-3 h-3 text-[#B8860B]" fill="currentColor" viewBox="0 0 24 24">
+                    <div className="relative z-10 w-3 h-3 sm:w-4 sm:h-4 bg-white/40 rounded-lg flex items-center justify-center group-hover:bg-white/50 transition-all duration-300 shadow-sm">
+                      <svg className="w-2 h-2 sm:w-3 sm:h-3 text-[#B8860B]" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
                         <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" fill="#10B981"/>
                       </svg>
                     </div>
                     
                     {/* 文字 */}
-                    <span className="relative z-10 text-sm font-medium">工作提示系統</span>
+                    <span className="relative z-10 text-xs sm:text-sm font-medium hidden sm:inline">工作提示系統</span>
+                    <span className="relative z-10 text-xs font-medium sm:hidden">提示</span>
                     
                     {/* 懸停效果 */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
@@ -2051,73 +2052,73 @@ export default function TeacherZonePage() {
               </div>
 
               {/* 顯示模式切換 */}
-              <div className="flex items-center justify-end mb-6">
+              <div className="flex items-center justify-end mb-4 sm:mb-6">
                 {/* 顯示模式切換 */}
-                <div className="flex items-center space-x-3 bg-white rounded-full p-1.5 shadow-md border border-hanami-border">
+                <div className="flex items-center space-x-2 sm:space-x-3 bg-white rounded-full p-1 sm:p-1.5 shadow-md border border-hanami-border">
                   <button
                     onClick={() => setDisplayMode('student')}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-300 ${
+                    className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-full font-medium transition-all duration-300 ${
                       displayMode === 'student'
                         ? 'bg-gradient-to-r from-hanami-primary to-hanami-accent text-hanami-text shadow-md'
                         : 'text-hanami-text-secondary hover:text-hanami-text'
                     }`}
                   >
-                    <UserIcon className="w-4 h-4" />
-                    <span className="text-sm">按學生</span>
+                    <UserIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm">按學生</span>
                   </button>
                   <button
                     onClick={() => setDisplayMode('class')}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-300 ${
+                    className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-full font-medium transition-all duration-300 ${
                       displayMode === 'class'
                         ? 'bg-gradient-to-r from-hanami-primary to-hanami-accent text-hanami-text shadow-md'
                         : 'text-hanami-text-secondary hover:text-hanami-text'
                     }`}
                   >
-                    <UserGroupIcon className="w-4 h-4" />
-                    <span className="text-sm">按班別</span>
+                    <UserGroupIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm">按班別</span>
                   </button>
                 </div>
               </div>
 
               {/* 日期導航和選擇器 */}
-              <div className="bg-white rounded-2xl p-6 mb-6 shadow-lg border border-[#EADBC8]">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
+              <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg border border-[#EADBC8]">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mb-3 sm:mb-4 gap-3 sm:gap-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button
                 onClick={goToPreviousDay}
                 disabled={true}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-lg border border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-gray-100 rounded-lg border border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
               >
-                <ChevronLeftIcon className="w-5 h-5" />
-                <span>前一天</span>
+                <ChevronLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-xs sm:text-sm hidden sm:inline">前一天</span>
               </button>
               
-              <div className="text-center">
-                <h2 className="text-xl font-semibold text-hanami-text">
+              <div className="text-center flex-1 sm:flex-initial">
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold text-hanami-text">
                   {selectedDates.length > 1 
-                    ? `${selectedDates.length} 個選中日期`
+                    ? `${selectedDates.length} 日期`
                     : getCurrentDateRange().start
                   }
                 </h2>
-                <p className="text-sm text-hanami-text-secondary">
-                  共 {timeSlotGroups.length} 個時段，{timeSlotGroups.reduce((total, group) => total + group.lessons.length, 0)} 堂課
+                <p className="text-xs sm:text-sm text-hanami-text-secondary">
+                  {timeSlotGroups.length} 時段，{timeSlotGroups.reduce((total, group) => total + group.lessons.length, 0)} 堂課
                 </p>
               </div>
               
               <button
                 onClick={goToNextDay}
                 disabled={true}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-lg border border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-gray-100 rounded-lg border border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
               >
-                <span>後一天</span>
-                <ChevronRightIcon className="w-5 h-5" />
+                <span className="text-xs sm:text-sm hidden sm:inline">後一天</span>
+                <ChevronRightIcon className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 justify-end flex-wrap sm:flex-nowrap">
               {/* 日期選擇器 */}
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-hanami-text">選擇日期:</label>
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                <label className="text-xs sm:text-sm font-medium text-hanami-text hidden md:inline">選擇日期:</label>
                 <input
                   type="date"
                   value={formatDateForInput(selectedDate)}
@@ -2130,14 +2131,14 @@ export default function TeacherZonePage() {
                       setSelectedDate(newDate);
                     }
                   }}
-                  className="px-3 py-2 border border-hanami-border rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
+                  className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-hanami-border rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
                 />
               </div>
               
               {/* 今天按鈕 */}
               <button
                 onClick={goToToday}
-                className="px-4 py-2 bg-gradient-to-r from-hanami-primary to-hanami-accent text-white rounded-lg font-medium shadow-lg cursor-pointer"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-gradient-to-r from-hanami-primary to-hanami-accent text-white rounded-lg font-medium shadow-lg cursor-pointer"
               >
                 今天
               </button>
@@ -2157,7 +2158,7 @@ export default function TeacherZonePage() {
           </div>
 
           {/* 星期選擇器 */}
-          <div className="flex items-center justify-center space-x-2">
+          <div className="flex items-center justify-center space-x-1 sm:space-x-2 overflow-x-auto pb-2">
             {['日', '一', '二', '三', '四', '五', '六'].map((day, index) => {
               // 計算當前週的每一天
               // 首先找到當前選中日期的週開始（星期日）
@@ -2202,7 +2203,7 @@ export default function TeacherZonePage() {
                     setSelectedDate(dayDate);
                   }}
                   disabled={!isToday}
-                  className={`w-12 h-12 rounded-lg font-medium transition-all duration-200 flex items-center justify-center ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg font-medium transition-all duration-200 flex items-center justify-center text-xs sm:text-sm md:text-base flex-shrink-0 ${
                     isToday 
                       ? isSelected
                         ? 'bg-hanami-primary/20 text-hanami-primary border-2 border-hanami-primary cursor-pointer'
@@ -2235,67 +2236,67 @@ export default function TeacherZonePage() {
                 >
                   {/* 班級標題卡片 */}
                   <div 
-                    className="time-slot-header hanami-card-glow rounded-2xl p-6 mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+                    className="time-slot-header hanami-card-glow rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
                     onClick={() => toggleClassExpansion(classGroup.id)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-8">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-8 w-full sm:w-auto">
                         {/* 班級資訊區塊 */}
-                        <div className="flex items-center space-x-4">
-                          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
+                        <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto">
+                          <div className="bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 border border-white/30 flex-1 sm:flex-initial">
                             <div className="text-center">
-                              <div className="text-sm font-medium text-white/90 mb-1">班別代碼</div>
-                              <div className="text-2xl font-bold text-white">
+                              <div className="text-xs sm:text-sm font-medium text-white/90 mb-0.5 sm:mb-1">班別代碼</div>
+                              <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                                 {classGroup.course_code}-{classGroup.course_section}
                               </div>
                             </div>
                           </div>
                           <div className="flex flex-col items-center">
-                            <div className="w-8 h-8 bg-hanami-accent rounded-full flex items-center justify-center text-white text-sm font-bold animate-pulse mb-1">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-hanami-accent rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-bold animate-pulse mb-0.5 sm:mb-1">
                               {classGroup.students.length}/{classGroup.max_students}
                             </div>
-                            <div className="text-xs text-white/70">學生人數</div>
+                            <div className="text-xs text-white/70 hidden sm:block">學生人數</div>
                           </div>
                         </div>
                         
                         {/* 課程詳細資訊 */}
-                        <div className="text-white">
-                          <h2 className="text-2xl font-bold mb-2">
+                        <div className="text-white w-full sm:w-auto">
+                          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">
                             {classGroup.course_type}
                           </h2>
-                          <div className="flex items-center space-x-4 text-white/80 text-sm">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4 text-white/80 text-xs sm:text-sm">
                             <div className="flex items-center space-x-1">
-                              <ClockIcon className="w-4 h-4" />
+                              <ClockIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                               <span>{classGroup.timeslot}</span>
                             </div>
                             
                             {/* 主教師 */}
                             <div 
-                              className="flex items-center space-x-2 cursor-default"
+                              className="flex items-center space-x-1 sm:space-x-2 cursor-default"
                             >
-                              <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-rose-400 rounded-full flex items-center justify-center shadow-md">
-                                <UserIcon className="w-5 h-5 text-white" />
+                              <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 bg-gradient-to-br from-orange-400 to-rose-400 rounded-full flex items-center justify-center shadow-md">
+                                <UserIcon className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                               </div>
-                              <span className="font-semibold text-orange-100">
+                              <span className="font-semibold text-orange-100 text-xs sm:text-sm">
                                 {classGroup.teacher_main_name || '未設定'}
                               </span>
                             </div>
                             
                             {/* 助教 */}
                             <div 
-                              className="flex items-center space-x-2 cursor-default"
+                              className="flex items-center space-x-1 sm:space-x-2 cursor-default"
                             >
-                              <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-400 rounded-full flex items-center justify-center shadow-md">
-                                <UserIcon className="w-5 h-5 text-white" />
+                              <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 bg-gradient-to-br from-cyan-400 to-blue-400 rounded-full flex items-center justify-center shadow-md">
+                                <UserIcon className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-white" />
                               </div>
-                              <span className="font-semibold text-cyan-100">
+                              <span className="font-semibold text-cyan-100 text-xs sm:text-sm">
                                 {classGroup.teacher_assist_name || '未設定'}
                               </span>
                             </div>
                             
                             {classGroup.room_id && (
                               <div className="flex items-center space-x-1">
-                                <span className="font-medium">教室: {classGroup.room_id}</span>
+                                <span className="font-medium text-xs sm:text-sm">教室: {classGroup.room_id}</span>
                               </div>
                             )}
                           </div>
@@ -2303,16 +2304,16 @@ export default function TeacherZonePage() {
                       </div>
                       
                       {/* 右側裝飾 */}
-                      <div className="text-white text-right">
-                        <div className="mb-2">
-                          <UserGroupIcon className="w-10 h-10 text-white/90" />
+                      <div className="text-white flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-0 w-full sm:w-auto">
+                        <div className="flex items-center space-x-2 sm:space-x-0 sm:flex-col sm:mb-2">
+                          <UserGroupIcon className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white/90" />
+                          <div className="text-xs sm:text-sm text-white/70 font-medium">班級管理</div>
                         </div>
-                        <div className="text-sm text-white/70 font-medium">班級管理</div>
-                        <div className="mt-2">
+                        <div className="mt-0 sm:mt-2">
                           {expandedClasses.has(classGroup.id) ? (
-                            <ChevronUpIcon className="w-6 h-6 text-white/70" />
+                            <ChevronUpIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white/70" />
                           ) : (
-                            <ChevronDownIcon className="w-6 h-6 text-white/70" />
+                            <ChevronDownIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white/70" />
                           )}
                         </div>
                       </div>
@@ -2321,7 +2322,7 @@ export default function TeacherZonePage() {
 
                   {/* 班級內學生卡片網格 */}
                   {expandedClasses.has(classGroup.id) && classGroup.students.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in mt-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6 animate-fade-in mt-4 sm:mt-6">
                       {classGroup.students.map((student: any, studentIndex: number) => {
                         const studentId = student.id;
                         const hasAttendance = student.hasAttendance;
@@ -2335,7 +2336,7 @@ export default function TeacherZonePage() {
                             className="group/card relative animate-fade-in-up"
                             style={{ animationDelay: `${(groupIndex * 100) + (studentIndex * 50)}ms` }}
                           >
-                            <div className={`student-card rounded-2xl p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden border-2 ${
+                            <div className={`student-card rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden border-2 ${
                               getStudentBackgroundColor(remainingLessons, isTrial)
                             }`}>
                               {/* 背景裝飾 */}
@@ -2344,16 +2345,16 @@ export default function TeacherZonePage() {
                               
                               {/* 試堂徽章 */}
                               {isTrial && hasAttendance && (
-                                <div className="absolute top-3 right-28 z-10">
-                                  <div className="trial-badge bg-gradient-to-r from-orange-400 to-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 animate-pulse">
-                                    <SparklesIcon className="w-3 h-3" />
-                                    <span>試堂</span>
+                                <div className="absolute top-2 sm:top-3 right-20 sm:right-24 md:right-28 z-10">
+                                  <div className="trial-badge bg-gradient-to-r from-orange-400 to-red-500 text-white px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 animate-pulse">
+                                    <SparklesIcon className="w-2 h-2 sm:w-3 sm:h-3" />
+                                    <span className="hidden sm:inline">試堂</span>
                                   </div>
                                 </div>
                               )}
                               
                               {/* 右上角按鈕區域 */}
-                              <div className="absolute top-3 right-3 z-50 flex flex-col space-y-2">
+                              <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-50 flex flex-col space-y-1 sm:space-y-2">
                                 {/* 關注按鈕 */}
                                 <button
                                   onClick={(e) => {
@@ -2371,15 +2372,15 @@ export default function TeacherZonePage() {
                                     const isUpdating = updatingCareAlert.has(studentId);
                                     
                                     return (
-                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                      <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
                                         isCareAlert 
                                           ? 'bg-gradient-to-br from-red-400 to-pink-500' // 需關注：紅色
                                           : 'bg-gradient-to-br from-gray-400 to-gray-500'  // 正常：灰色
                                       } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                         {isUpdating ? (
-                                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                          <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-2 border-white border-t-transparent"></div>
                                         ) : (
-                                          <ExclamationTriangleIcon className="w-5 h-5 text-white" />
+                                          <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                                         )}
                                       </div>
                                     );
@@ -2387,8 +2388,8 @@ export default function TeacherZonePage() {
                                   
                                   {/* 狀態指示器 */}
                                   {studentCareAlertStatus[studentId] && (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
-                                      <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                                    <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+                                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-pulse"></div>
                                     </div>
                                   )}
                                   
@@ -2414,23 +2415,23 @@ export default function TeacherZonePage() {
                                     const hasAssessment = studentAssessmentStatus[studentId] || false;
                                     
                                     return (
-                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                      <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
                                         hasAssessment 
                                           ? 'bg-gradient-to-br from-emerald-400 to-teal-500' // 已評估：綠色
                                           : 'bg-gradient-to-br from-orange-400 to-amber-500'  // 未評估：橙色
                                       }`}>
-                                        <AcademicCapIcon className="w-5 h-5 text-white" />
+                                        <AcademicCapIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                                       </div>
                                     );
                                   })()}
                                   
                                   {/* 狀態指示器 */}
-                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center">
-                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                                  <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-pulse"></div>
                                   </div>
                                   
-                                  {/* 懸停提示 */}
-                                  <div className="absolute top-12 right-0 opacity-0 group-hover/assessment:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                  {/* 懸停提示 - 在手機上隱藏 */}
+                                  <div className="hidden sm:block absolute top-10 sm:top-12 right-0 opacity-0 group-hover/assessment:opacity-100 transition-opacity duration-200 pointer-events-none">
                                     <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
                                       {studentAssessmentStatus[studentId] ? '已評估' : '新增評估'}
                                     </div>
@@ -2439,20 +2440,20 @@ export default function TeacherZonePage() {
                               </div>
 
                               {/* 學生頭像和資訊 */}
-                              <div className="relative z-10 mb-4">
-                                <div className="flex items-center space-x-4">
+                              <div className="relative z-10 mb-3 sm:mb-4">
+                                <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4">
                                   <div className="relative">
-                                    <div className="avatar-glow w-14 h-14 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg transform group-hover/card:rotate-12 transition-transform duration-300">
+                                    <div className="avatar-glow w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-xl sm:rounded-2xl flex items-center justify-center text-white font-bold text-base sm:text-lg md:text-xl shadow-lg transform group-hover/card:rotate-12 transition-transform duration-300">
                                       {student.full_name?.charAt(0) || '?'}
                                     </div>
-                                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white bg-gradient-to-br from-green-400 to-green-500 animate-pulse"></div>
+                                    <div className="absolute -bottom-0.5 sm:-bottom-1 -right-0.5 sm:-right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-white bg-gradient-to-br from-green-400 to-green-500 animate-pulse"></div>
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-lg truncate text-hanami-text">
+                                    <h3 className="font-bold text-sm sm:text-base md:text-lg truncate text-hanami-text">
                                       {student.full_name || '未知學生'}
                                     </h3>
                                     {student.nick_name && (
-                                      <p className="font-medium text-sm truncate text-hanami-text-secondary">
+                                      <p className="font-medium text-xs sm:text-sm truncate text-hanami-text-secondary">
                                         {student.nick_name}
                                       </p>
                                     )}
@@ -2461,17 +2462,17 @@ export default function TeacherZonePage() {
                               </div>
 
                               {/* 學生詳細資訊 */}
-                              <div className="relative z-10 space-y-3 mb-4">
-                                <div className="rounded-xl p-3 bg-hanami-primary/10">
-                                  <div className="flex items-center justify-between text-sm">
-                                    <div className="flex items-center space-x-2">
-                                      <CakeIcon className="w-4 h-4 text-hanami-primary" />
+                              <div className="relative z-10 space-y-2 sm:space-y-3 mb-3 sm:mb-4">
+                                <div className="rounded-lg sm:rounded-xl p-2 sm:p-3 bg-hanami-primary/10">
+                                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                                    <div className="flex items-center space-x-1 sm:space-x-2">
+                                      <CakeIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                       <span className="font-medium text-hanami-text">
                                         {convertAgeToYears(student.student_age)}
                                       </span>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                      <MusicalNoteIcon className="w-4 h-4 text-hanami-primary" />
+                                    <div className="flex items-center space-x-1 sm:space-x-2">
+                                      <MusicalNoteIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                       <span className="font-medium text-hanami-text">
                                         {student.course_type || '未設定'}
                                       </span>
@@ -2481,9 +2482,9 @@ export default function TeacherZonePage() {
                               </div>
 
                               {/* 學習中活動 */}
-                              <div className="relative z-10 mb-4">
-                                <h4 className="text-sm font-bold text-hanami-text mb-2 flex items-center">
-                                  <AcademicCapIcon className="w-4 h-4 mr-2 text-hanami-primary" />
+                              <div className="relative z-10 mb-3 sm:mb-4">
+                                <h4 className="text-xs sm:text-sm font-bold text-hanami-text mb-1.5 sm:mb-2 flex items-center">
+                                  <AcademicCapIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-hanami-primary" />
                                   學習中活動
                                 </h4>
                                 {(() => {
@@ -2642,14 +2643,14 @@ export default function TeacherZonePage() {
                               </div>
 
                               {/* 操作按鈕 */}
-                              <div className="relative z-10 flex items-center justify-between pt-3 border-t border-hanami-border/30">
+                              <div className="relative z-10 flex items-center justify-between pt-2 sm:pt-3 border-t border-hanami-border/30">
                                 <button
                                   onClick={() => {
                                     toast('學生活動分配功能開發中...');
                                   }}
-                                  className="hanami-action-btn flex items-center space-x-2 px-4 py-2 text-white rounded-xl font-medium shadow-md hover:shadow-lg"
+                                  className="hanami-action-btn flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium shadow-md hover:shadow-lg"
                                 >
-                                  <PlusIcon className="w-4 h-4" />
+                                  <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                                   <span>分配活動</span>
                                 </button>
                                 
@@ -2657,9 +2658,9 @@ export default function TeacherZonePage() {
                                   onClick={() => {
                                     toast('詳情功能開發中...');
                                   }}
-                                  className="p-2 text-hanami-text-secondary hover:text-hanami-primary transition-colors hover:scale-110 transform hover:bg-hanami-primary/10 rounded-lg"
+                                  className="p-1.5 sm:p-2 text-hanami-text-secondary hover:text-hanami-primary transition-colors hover:scale-110 transform hover:bg-hanami-primary/10 rounded-lg"
                                 >
-                                  <EyeIcon className="w-5 h-5" />
+                                  <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </button>
                               </div>
                             </div>
@@ -2671,8 +2672,8 @@ export default function TeacherZonePage() {
                   
                   {/* 收起狀態下的學生小圖卡 */}
                   {!expandedClasses.has(classGroup.id) && classGroup.students.length > 0 && (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 mt-6">
-                      <div className="flex flex-wrap gap-3">
+                    <div className="bg-gray-50 rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 border border-gray-200 mt-4 sm:mt-6">
+                      <div className="flex flex-wrap gap-2 sm:gap-3">
                         {classGroup.students.map((student: any, studentIndex: number) => {
                           const hasAttendance = student.hasAttendance;
                           const isTrial = student.lessonData && 'trial_status' in student.lessonData;
@@ -2680,28 +2681,28 @@ export default function TeacherZonePage() {
                           return (
                             <div 
                               key={`mini-${student.id}-${studentIndex}`}
-                              className="flex items-center space-x-3 bg-white rounded-lg p-3 shadow-sm border-2 border-hanami-primary/30 hover:border-hanami-primary/50 transition-all duration-200 hover:shadow-md"
+                              className="flex items-center space-x-2 sm:space-x-3 bg-white rounded-lg p-2 sm:p-3 shadow-sm border-2 border-hanami-primary/30 hover:border-hanami-primary/50 transition-all duration-200 hover:shadow-md"
                             >
                               {/* 學生頭像 */}
                               <div className="relative">
-                                <div className="w-8 h-8 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-sm">
                                   {student.full_name?.charAt(0) || '?'}
                                 </div>
-                                <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border border-white bg-gradient-to-br from-green-400 to-green-500"></div>
+                                <div className="absolute -bottom-0.5 sm:-bottom-1 -right-0.5 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border border-white bg-gradient-to-br from-green-400 to-green-500"></div>
                                 {/* 試堂徽章 */}
                                 {isTrial && hasAttendance && (
-                                  <div className="absolute -top-1 -left-1 w-4 h-4 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center">
-                                    <SparklesIcon className="w-2 h-2 text-white" />
+                                  <div className="absolute -top-0.5 sm:-top-1 -left-0.5 sm:-left-1 w-3 h-3 sm:w-4 sm:h-4 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center">
+                                    <SparklesIcon className="w-1.5 h-1.5 sm:w-2 sm:h-2 text-white" />
                                   </div>
                                 )}
                               </div>
                               
                               {/* 學生資訊 */}
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-sm truncate text-hanami-text">
+                                <h4 className="font-semibold text-xs sm:text-sm truncate text-hanami-text">
                                   {student.full_name || '未知學生'}
                                 </h4>
-                                <p className="text-xs text-hanami-text-secondary">
+                                <p className="text-xs text-hanami-text-secondary hidden sm:block">
                                   {convertAgeToYears(student.student_age)} 歲
                                 </p>
                               </div>
@@ -2711,9 +2712,9 @@ export default function TeacherZonePage() {
                                 onClick={() => {
                                   toast('學生活動分配功能開發中...');
                                 }}
-                                className="p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-hanami-primary/10 text-hanami-primary hover:bg-hanami-primary/20"
+                                className="p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-hanami-primary/10 text-hanami-primary hover:bg-hanami-primary/20"
                               >
-                                <AcademicCapIcon className="w-4 h-4" />
+                                <AcademicCapIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                               </button>
                             </div>
                           );
@@ -2724,10 +2725,10 @@ export default function TeacherZonePage() {
                   
                   {/* 沒有學生的提示 */}
                   {classGroup.students.length === 0 && (
-                    <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200 mt-6">
-                      <UserIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600 font-medium">此班別今天沒有學生</p>
-                      <p className="text-gray-500 text-sm mt-1">可能是公眾假期或特別安排</p>
+                    <div className="bg-gray-50 rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8 text-center border border-gray-200 mt-4 sm:mt-6">
+                      <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-2 sm:mb-3" />
+                      <p className="text-sm sm:text-base text-gray-600 font-medium">此班別今天沒有學生</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1">可能是公眾假期或特別安排</p>
                     </div>
                   )}
                 </div>
@@ -2738,16 +2739,16 @@ export default function TeacherZonePage() {
           /* 按學生顯示 - 原有的時段分組列表 */
         <div className="space-y-8">
           {timeSlotGroups.length === 0 ? (
-            <div className="bg-gradient-to-br from-hanami-primary/10 to-hanami-accent/10 backdrop-blur-sm rounded-2xl p-12 text-center border border-hanami-primary/20 shadow-lg">
-              <div className="animate-bounce mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-full mx-auto flex items-center justify-center">
-                  <CalendarIcon className="w-8 h-8 text-white" />
+            <div className="bg-gradient-to-br from-hanami-primary/10 to-hanami-accent/10 backdrop-blur-sm rounded-xl sm:rounded-2xl p-6 sm:p-8 md:p-12 text-center border border-hanami-primary/20 shadow-lg">
+              <div className="animate-bounce mb-3 sm:mb-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-full mx-auto flex items-center justify-center">
+                  <CalendarIcon className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
                 </div>
               </div>
-              <p className="text-hanami-text text-xl font-medium">
+              <p className="text-hanami-text text-base sm:text-lg md:text-xl font-medium">
                 今天沒有課程安排
               </p>
-              <p className="text-hanami-text-secondary mt-2">享受輕鬆的時光吧！</p>
+              <p className="text-hanami-text-secondary text-sm sm:text-base mt-2">享受輕鬆的時光吧！</p>
             </div>
           ) : (
             timeSlotGroups.map((group, groupIndex) => (
@@ -2758,50 +2759,49 @@ export default function TeacherZonePage() {
               >
                 {/* 時段標題卡片 */}
                 <div 
-                  className="time-slot-header hanami-card-glow rounded-2xl p-6 mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+                  className="time-slot-header hanami-card-glow rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
                   onClick={() => handleTimeSlotClick(group.date, group.timeSlot, group.lessons.map(lesson => getCourseType(lesson) || '未設定').filter((value, index, self) => self.indexOf(value) === index).join(' + '))}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-8">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-8 w-full sm:w-auto">
                       {/* 日期和時間區塊 */}
-                      <div className="flex items-center space-x-4">
-                        <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
+                      <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto">
+                        <div className="bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 border border-white/30 flex-1 sm:flex-initial">
                           <div className="text-center">
-                            <div className="text-sm font-medium text-white/90 mb-1">{formatDate(group.date)}</div>
-                            <div className="text-2xl font-bold text-white">{formatTime(group.timeSlot)}</div>
+                            <div className="text-xs sm:text-sm font-medium text-white/90 mb-0.5 sm:mb-1">{formatDate(group.date)}</div>
+                            <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">{formatTime(group.timeSlot)}</div>
                           </div>
                         </div>
                         <div className="flex flex-col items-center">
-                          <div className="w-8 h-8 bg-hanami-accent rounded-full flex items-center justify-center text-white text-sm font-bold animate-pulse mb-1">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-hanami-accent rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-bold animate-pulse mb-0.5 sm:mb-1">
                             {group.lessons.length}
                           </div>
-                          <div className="text-xs text-white/70">學生</div>
+                          <div className="text-xs text-white/70 hidden sm:block">學生</div>
                         </div>
                       </div>
                       
                       {/* 課程資訊區塊 */}
-                      <div className="text-white">
-                        <h2 className="text-2xl font-bold mb-2">
+                      <div className="text-white w-full sm:w-auto">
+                        <h2 className="text-base sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">
                           {group.lessons.map(lesson => getCourseType(lesson) || '未設定').filter((value, index, self) => self.indexOf(value) === index).join(' + ')}
                         </h2>
-                        <p className="text-white/80 font-medium text-lg">
+                        <p className="text-white/80 font-medium text-sm sm:text-base md:text-lg">
                           <span className="animate-pulse">{group.lessons.length}</span> 位可愛的小音樂家
                         </p>
                       </div>
                     </div>
                     
                     {/* 右側裝飾 */}
-                    <div className="text-white text-right flex items-center space-x-4">
-                      <div className="text-right">
-                        <div className="mb-2">
-                          <MusicalNoteIcon className="w-10 h-10 text-white/90" />
+                    <div className="text-white flex sm:flex-row items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-4 w-full sm:w-auto">
+                      <div className="flex items-center space-x-2 sm:space-x-0 sm:flex-col text-left sm:text-right">
+                        <div className="mb-0 sm:mb-2">
+                          <MusicalNoteIcon className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white/90" />
                         </div>
-                        <div className="text-sm text-white/70 font-medium">音樂時光</div>
-                        <div className="text-xs text-white/50 mt-1">點擊展開/收起</div>
+                        <div className="text-xs sm:text-sm text-white/70 font-medium">音樂時光</div>
                       </div>
                       <div className="flex flex-col items-center">
                         <ChevronDownIcon 
-                          className={`w-6 h-6 text-white/70 transition-transform duration-300 ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 text-white/70 transition-transform duration-300 ${
                             expandedTimeSlots[`${group.date}_${group.timeSlot}`] ? 'rotate-180' : ''
                           }`} 
                         />
@@ -2812,7 +2812,7 @@ export default function TeacherZonePage() {
 
                 {/* 學生卡片網格 */}
                 {expandedTimeSlots[`${group.date}_${group.timeSlot}`] && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in-up">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6 animate-fade-in-up">
                   {group.lessons.map((lesson, lessonIndex) => {
                     const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
                     const studentAssignedActivities = studentActivitiesMap.get(studentId) || [];
@@ -2826,23 +2826,23 @@ export default function TeacherZonePage() {
                         className="group/card relative animate-fade-in-up"
                         style={{ animationDelay: `${(groupIndex * 100) + (lessonIndex * 50)}ms` }}
                       >
-                        <div className={`student-card rounded-2xl p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden border-2 ${getStudentBackgroundColor(remainingLessons, isTrial)}`}>
+                        <div className={`student-card rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden border-2 ${getStudentBackgroundColor(remainingLessons, isTrial)}`}>
                           {/* 背景裝飾 */}
                           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-hanami-primary/10 to-hanami-accent/10 rounded-full -translate-y-8 translate-x-8 group-hover/card:scale-150 transition-transform duration-500"></div>
                           <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-hanami-secondary/10 to-hanami-primary/10 rounded-full translate-y-6 -translate-x-6 group-hover/card:scale-125 transition-transform duration-700"></div>
                           
                           {/* 試堂徽章 */}
                           {isTrial && (
-                            <div className="absolute top-3 right-28 z-10">
-                              <div className="trial-badge bg-gradient-to-r from-orange-400 to-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 animate-pulse">
-                                <SparklesIcon className="w-3 h-3" />
-                                <span>試堂</span>
+                            <div className="absolute top-2 sm:top-3 right-20 sm:right-24 md:right-28 z-10">
+                              <div className="trial-badge bg-gradient-to-r from-orange-400 to-red-500 text-white px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 animate-pulse">
+                                <SparklesIcon className="w-2 h-2 sm:w-3 sm:h-3" />
+                                <span className="hidden sm:inline">試堂</span>
                               </div>
                             </div>
                           )}
 
                           {/* 右上角按鈕區域 */}
-                          <div className="absolute top-3 right-3 z-50 flex flex-col space-y-2">
+                          <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-50 flex flex-col space-y-1 sm:space-y-2">
                             {/* 關注按鈕 */}
                             <button
                               onClick={(e) => {
@@ -2862,15 +2862,15 @@ export default function TeacherZonePage() {
                                 const isUpdating = updatingCareAlert.has(studentId);
                                 
                                 return (
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                  <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
                                     isCareAlert 
                                       ? 'bg-gradient-to-br from-red-400 to-pink-500' // 需關注：紅色
                                       : 'bg-gradient-to-br from-gray-400 to-gray-500'  // 正常：灰色
                                   } ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                     {isUpdating ? (
-                                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                      <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-2 border-white border-t-transparent"></div>
                                     ) : (
-                                      <ExclamationTriangleIcon className="w-5 h-5 text-white" />
+                                      <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                                     )}
                                   </div>
                                 );
@@ -2880,14 +2880,14 @@ export default function TeacherZonePage() {
                               {(() => {
                                 const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
                                 return studentCareAlertStatus[studentId] && (
-                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
-                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                                  <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-pulse"></div>
                                   </div>
                                 );
                               })()}
                               
-                              {/* 懸停提示 */}
-                              <div className="absolute top-12 right-0 opacity-0 group-hover/care:opacity-100 transition-opacity duration-200 pointer-events-none">
+                              {/* 懸停提示 - 在手機上隱藏 */}
+                              <div className="hidden sm:block absolute top-10 sm:top-12 right-0 opacity-0 group-hover/care:opacity-100 transition-opacity duration-200 pointer-events-none">
                                 <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
                                   {(() => {
                                     const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
@@ -2897,7 +2897,7 @@ export default function TeacherZonePage() {
                               </div>
                             </button>
 
-                          {/* 能力評估按鈕 */}
+                            {/* 能力評估按鈕 */}
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
@@ -2917,28 +2917,28 @@ export default function TeacherZonePage() {
                                 const hasAssessment = studentAssessmentStatus[studentId] || false;
                                 
                                 return (
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                  <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
                                     hasAssessment 
                                       ? 'bg-gradient-to-br from-emerald-400 to-teal-500' // 已評估：綠色
                                       : 'bg-gradient-to-br from-orange-400 to-amber-500'  // 未評估：橙色
                                   }`}>
-                                    <AcademicCapIcon className="w-5 h-5 text-white" />
+                                    <AcademicCapIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                                   </div>
                                 );
                               })()}
                               
                               {/* 動畫裝飾 */}
-                              <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full animate-ping opacity-75"></div>
-                              <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-cyan-400 rounded-full animate-bounce"></div>
+                              <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-2 h-2 sm:w-3 sm:h-3 bg-orange-400 rounded-full animate-ping opacity-75"></div>
+                              <div className="absolute -bottom-0.5 sm:-bottom-1 -left-0.5 sm:-left-1 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-cyan-400 rounded-full animate-bounce"></div>
                               
-                              {/* 懸停提示 - 根據評估狀態改變顏色 */}
+                              {/* 懸停提示 - 根據評估狀態改變顏色，在手機上隱藏 */}
                               {(() => {
                                 const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
                                 const hasAssessment = studentAssessmentStatus[studentId] || false;
                                 const tooltipColor = hasAssessment ? 'bg-emerald-600/90' : 'bg-orange-600/90';
                                 
                                 return (
-                                  <div className={`absolute top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/assessment:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
+                                  <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/assessment:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
                                     {hasAssessment ? '已完成評估' : '待評估'}
                                     <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipColor} transform rotate-45`}></div>
                                   </div>
@@ -2949,8 +2949,8 @@ export default function TeacherZonePage() {
 
                           {/* 剩餘堂數徽章 - 只顯示試堂和兩堂或以下 */}
                           {!isTrial && remainingLessons <= 2 && (
-                            <div className="absolute top-3 left-3 z-10">
-                              <div className={`px-2 py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 ${
+                            <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
+                              <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 ${
                                 remainingLessons === 0 
                                   ? 'bg-red-500 text-white' 
                                   : remainingLessons <= 2 
@@ -2963,20 +2963,20 @@ export default function TeacherZonePage() {
                           )}
 
                           {/* 學生頭像和資訊 */}
-                          <div className="relative z-10 mb-4">
-                            <div className="flex items-center space-x-4">
+                          <div className="relative z-10 mb-3 sm:mb-4">
+                            <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4">
                               <div className="relative">
-                                <div className="avatar-glow w-14 h-14 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg transform group-hover/card:rotate-12 transition-transform duration-300">
+                                <div className="avatar-glow w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-xl sm:rounded-2xl flex items-center justify-center text-white font-bold text-base sm:text-lg md:text-xl shadow-lg transform group-hover/card:rotate-12 transition-transform duration-300">
                                   {getStudentName(lesson).charAt(0)}
                                 </div>
-                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-gradient-to-br from-green-400 to-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                                <div className="absolute -bottom-0.5 sm:-bottom-1 -right-0.5 sm:-right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-green-400 to-green-500 rounded-full border-2 border-white animate-pulse"></div>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-hanami-text text-lg truncate">
+                                <h3 className="font-bold text-hanami-text text-sm sm:text-base md:text-lg truncate">
                                   {getStudentName(lesson)}
                                 </h3>
                                 {getStudentNickname(lesson) && (
-                                  <p className="text-hanami-text-secondary font-medium text-sm truncate">
+                                  <p className="text-hanami-text-secondary font-medium text-xs sm:text-sm truncate">
                                     {getStudentNickname(lesson)}
                                   </p>
                                 )}
@@ -2985,17 +2985,17 @@ export default function TeacherZonePage() {
                           </div>
 
                           {/* 學生詳細資訊 */}
-                          <div className="relative z-10 space-y-3 mb-4">
-                            <div className="bg-hanami-primary/10 rounded-xl p-3">
-                              <div className="flex items-center justify-between text-sm">
-                                <div className="flex items-center space-x-2">
-                                  <CakeIcon className="w-4 h-4 text-hanami-primary" />
+                          <div className="relative z-10 space-y-2 sm:space-y-3 mb-3 sm:mb-4">
+                            <div className="bg-hanami-primary/10 rounded-lg sm:rounded-xl p-2 sm:p-3">
+                              <div className="flex items-center justify-between text-xs sm:text-sm">
+                                <div className="flex items-center space-x-1 sm:space-x-2">
+                                  <CakeIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                   <span className="font-medium text-hanami-text">
                                     {convertAgeToYears(getStudentAge(lesson))}
                                   </span>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                  <MusicalNoteIcon className="w-4 h-4 text-hanami-primary" />
+                                <div className="flex items-center space-x-1 sm:space-x-2">
+                                  <MusicalNoteIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                   <span className="font-medium text-hanami-text">
                                     {getCourseType(lesson) || '未設定'}
                                   </span>
@@ -3003,19 +3003,19 @@ export default function TeacherZonePage() {
                               </div>
                             </div>
                             
-                            <div className="bg-hanami-secondary/10 rounded-xl p-3">
-                              <div className="flex items-center justify-between text-sm">
-                                <div className="flex items-center space-x-2">
-                                  <ClockIcon className="w-4 h-4 text-hanami-primary" />
+                            <div className="bg-hanami-secondary/10 rounded-lg sm:rounded-xl p-2 sm:p-3">
+                              <div className="flex items-center justify-between text-xs sm:text-sm">
+                                <div className="flex items-center space-x-1 sm:space-x-2">
+                                  <ClockIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                   <span className="font-medium text-hanami-text">
                                     {lesson.lesson_duration || '未設定'}
                                     {isTrial && ` (試堂)`}
                                   </span>
                                 </div>
                                 {getLessonTeacher(lesson) && (
-                                  <div className="flex items-center space-x-2">
-                                    <AcademicCapIcon className="w-4 h-4 text-hanami-primary" />
-                                    <span className="font-medium text-hanami-text truncate max-w-20">
+                                  <div className="flex items-center space-x-1 sm:space-x-2">
+                                    <AcademicCapIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
+                                    <span className="font-medium text-hanami-text truncate max-w-16 sm:max-w-20">
                                       {getLessonTeacher(lesson)}
                                     </span>
                                   </div>
@@ -3025,10 +3025,10 @@ export default function TeacherZonePage() {
                             
                             {/* 試堂狀態顯示 */}
                             {isTrial && (
-                              <div className="bg-orange-100 rounded-xl p-3">
-                                <div className="flex items-center justify-between text-sm">
-                                  <div className="flex items-center space-x-2">
-                                    <SparklesIcon className="w-4 h-4 text-orange-500" />
+                              <div className="bg-orange-100 rounded-lg sm:rounded-xl p-2 sm:p-3">
+                                <div className="flex items-center justify-between text-xs sm:text-sm">
+                                  <div className="flex items-center space-x-1 sm:space-x-2">
+                                    <SparklesIcon className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500" />
                                     <span className="font-medium text-orange-700">
                                       試堂狀態: {lesson.trial_status || '進行中'}
                                     </span>
@@ -3039,9 +3039,9 @@ export default function TeacherZonePage() {
                           </div>
 
                           {/* 學習中活動 */}
-                          <div className="relative z-10 mb-4">
-                            <h4 className="text-sm font-bold text-hanami-text mb-2 flex items-center">
-                              <AcademicCapIcon className="w-4 h-4 mr-2 text-hanami-primary" />
+                          <div className="relative z-10 mb-3 sm:mb-4">
+                            <h4 className="text-xs sm:text-sm font-bold text-hanami-text mb-1.5 sm:mb-2 flex items-center">
+                              <AcademicCapIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-hanami-primary" />
                               學習中活動
                             </h4>
                             <div className="space-y-2">
@@ -3199,19 +3199,19 @@ export default function TeacherZonePage() {
 
                           {/* 課程備註 */}
                           {getLessonNotes(lesson) && (
-                            <div className="relative z-10 mb-4">
-                              <h4 className="text-sm font-bold text-hanami-text mb-2 flex items-center">
-                                <DocumentTextIcon className="w-4 h-4 mr-2 text-hanami-primary" />
+                            <div className="relative z-10 mb-3 sm:mb-4">
+                              <h4 className="text-xs sm:text-sm font-bold text-hanami-text mb-1.5 sm:mb-2 flex items-center">
+                                <DocumentTextIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 text-hanami-primary" />
                                 課程備註
                               </h4>
-                              <p className="text-xs text-hanami-text-secondary bg-hanami-accent/10 p-3 rounded-lg border border-hanami-accent/20">
+                              <p className="text-xs text-hanami-text-secondary bg-hanami-accent/10 p-2 sm:p-3 rounded-lg border border-hanami-accent/20">
                                 {getLessonNotes(lesson)}
                               </p>
                             </div>
                           )}
 
                           {/* 操作按鈕 */}
-                          <div className="relative z-10 flex items-center justify-between pt-3 border-t border-hanami-border/30">
+                          <div className="relative z-10 flex items-center justify-between pt-2 sm:pt-3 border-t border-hanami-border/30">
                             <button
                               onClick={() => {
                                 const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
@@ -3224,9 +3224,9 @@ export default function TeacherZonePage() {
                                 });
                                 setShowStudentActivitiesModal(true);
                               }}
-                              className="hanami-action-btn flex items-center space-x-2 px-4 py-2 text-white rounded-xl font-medium shadow-md hover:shadow-lg"
+                              className="hanami-action-btn flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium shadow-md hover:shadow-lg"
                             >
-                              <PlusIcon className="w-4 h-4" />
+                              <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                               <span>分配活動</span>
                             </button>
                             
@@ -3234,9 +3234,9 @@ export default function TeacherZonePage() {
                               onClick={() => {
                                 toast('詳情功能開發中...');
                               }}
-                              className="p-2 text-hanami-text-secondary hover:text-hanami-primary transition-colors hover:scale-110 transform hover:bg-hanami-primary/10 rounded-lg"
+                              className="p-1.5 sm:p-2 text-hanami-text-secondary hover:text-hanami-primary transition-colors hover:scale-110 transform hover:bg-hanami-primary/10 rounded-lg"
                             >
-                              <EyeIcon className="w-5 h-5" />
+                              <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
                           </div>
                         </div>
@@ -3539,18 +3539,18 @@ export default function TeacherZonePage() {
 
         {/* 學生活動管理模態框 */}
         {showStudentActivitiesModal && selectedStudentForActivities && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-              <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+              <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-[#EADBC8] rounded-t-xl sm:rounded-t-2xl">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <UserIcon className="h-6 w-6 text-hanami-text" />
-                    <h3 className="text-xl font-bold text-hanami-text">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <UserIcon className="h-5 w-5 sm:h-6 sm:w-6 text-hanami-text" />
+                    <h3 className="text-sm sm:text-base md:text-xl font-bold text-hanami-text truncate">
                       課堂學生活動 - {selectedStudentForActivities.studentName}
                     </h3>
                   </div>
                   <button
-                    className="text-hanami-text hover:text-hanami-text-secondary transition-colors"
+                    className="text-hanami-text hover:text-hanami-text-secondary transition-colors p-1 sm:p-0"
                     onClick={() => {
                       setShowStudentActivitiesModal(false);
                       setSelectedStudentForActivities(null);
@@ -3561,7 +3561,7 @@ export default function TeacherZonePage() {
                 </div>
               </div>
               
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
                 <StudentActivitiesPanel
                   studentId={selectedStudentForActivities.studentId}
                   lessonDate={selectedStudentForActivities.lessonDate}

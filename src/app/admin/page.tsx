@@ -333,7 +333,7 @@ export default function AdminPage() {
                 <h3 className="text-lg font-semibold text-[#2B3A3B]">帳戶管理</h3>
               </div>
             </div>
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/hanami-tc')}>
+            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/class-activities')}>
               <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
                 <div className="w-12 h-12 mb-2">
                   <img alt="課堂管理" className="w-full h-full object-contain" src="/foxcat.png" />
