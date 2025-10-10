@@ -237,7 +237,7 @@ export default function HanamiMusicRegisterPage() {
   // 載入當前用戶資料
   const loadCurrentUserData = async () => {
     if (!user) {
-      alert('無法獲取用戶信息');
+      alert('您尚未登入，請先登入以載入您的聯絡資料');
       return;
     }
 
@@ -258,11 +258,12 @@ export default function HanamiMusicRegisterPage() {
     }
   };
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/aihome/auth/login');
-    }
-  }, [user, loading, router]);
+  // 移除認證保護 - 允許未登入用戶以訪客身份訪問
+  // useEffect(() => {
+  //   if (!loading && !user) {
+  //     router.push('/aihome/auth/login');
+  //   }
+  // }, [user, loading, router]);
 
   // 計算年齡範圍顯示文字
   const getAgeRangeText = (minAge?: number, maxAge?: number, ageRange?: string) => {
@@ -1358,7 +1359,8 @@ export default function HanamiMusicRegisterPage() {
     );
   }
 
-  if (!user) return null;
+  // 移除未認證檢查 - 允許未登入用戶以訪客身份訪問
+  // if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] flex flex-col">
@@ -1377,15 +1379,18 @@ export default function HanamiMusicRegisterPage() {
                 <ArrowLeftIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
               </motion.button>
 
-              <motion.button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                title="開啟選單"
-              >
-                <Bars3Icon className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
-              </motion.button>
+              {/* 選單按鈕 - 只在登入時顯示 */}
+              {user && (
+                <motion.button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                  title="開啟選單"
+                >
+                  <Bars3Icon className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
+                </motion.button>
+              )}
               
               {/* 測試模式切換按鈕 */}
               <motion.button
@@ -1461,21 +1466,44 @@ export default function HanamiMusicRegisterPage() {
               <div className="hidden sm:block text-sm text-[#2B3A3B]">
                 {currentTime.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
               </div>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                <span className="text-xs sm:text-sm font-medium text-[#4B4036]">
-                  {user.full_name?.charAt(0).toUpperCase() || 'U'}
-                </span>
-              </div>
-              <motion.button
-                onClick={handleLogout}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 text-xs sm:text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                title="登出"
-              >
-                <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">登出</span>
-              </motion.button>
+              {user ? (
+                <>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                    <span className="text-xs sm:text-sm font-medium text-[#4B4036]">
+                      {user.full_name?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                  <motion.button
+                    onClick={handleLogout}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 text-xs sm:text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
+                    title="登出"
+                  >
+                    <ArrowRightOnRectangleIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">登出</span>
+                  </motion.button>
+                </>
+              ) : (
+                <>
+                  <motion.button
+                    onClick={() => router.push('/aihome/auth/login')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-3 py-2 text-sm text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
+                  >
+                    登入
+                  </motion.button>
+                  <motion.button
+                    onClick={() => router.push('/aihome/auth/register')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-3 py-2 text-sm bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-lg font-medium transition-all duration-200"
+                  >
+                    註冊
+                  </motion.button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1544,11 +1572,14 @@ export default function HanamiMusicRegisterPage() {
 
       {/* 主內容區域 */}
       <div className="flex-1 flex pb-20 sm:pb-24">
-        <AppSidebar 
-          isOpen={sidebarOpen} 
-          onClose={() => setSidebarOpen(false)}
-          currentPath="/aihome/course-activities/hanami-music/register"
-        />
+        {/* 側邊欄選單 - 只在登入時顯示 */}
+        {user && (
+          <AppSidebar 
+            isOpen={sidebarOpen} 
+            onClose={() => setSidebarOpen(false)}
+            currentPath="/aihome/course-activities/hanami-music/register"
+          />
+        )}
 
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
