@@ -20,6 +20,7 @@ import { toast } from 'react-hot-toast';
 
 import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
 import { PlanUpgradeModal } from '@/components/ui/PlanUpgradeModal';
+import MediaEditor from './MediaEditor';
 import { supabase } from '@/lib/supabase';
 import { StudentMedia, StudentMediaQuota, DEFAULT_MEDIA_LIMITS } from '@/types/progress';
 import { 
@@ -110,6 +111,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
   // 新增：配額等級狀態
   const [quotaLevel, setQuotaLevel] = useState<any>(null);
+  
+  // 新增：媒體編輯器相關狀態
+  const [showMediaEditor, setShowMediaEditor] = useState(false);
+  const [fileToEdit, setFileToEdit] = useState<File | null>(null);
+  const [editingFileType, setEditingFileType] = useState<'video' | 'photo' | null>(null);
 
   useEffect(() => {
     if (isOpen && student) {
@@ -372,6 +378,34 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     setSelectedFiles(fileArray);
   };
 
+  // 新增：處理媒體編輯器保存
+  const handleMediaEditorSave = useCallback((editedFile: File) => {
+    // 找到被編輯的文件在 selectedFiles 中的索引
+    const editedFileIndex = selectedFiles.findIndex(file => file === fileToEdit);
+    
+    if (editedFileIndex !== -1) {
+      // 用編輯後的文件替換原文件
+      const newFiles = [...selectedFiles];
+      newFiles[editedFileIndex] = editedFile;
+      setSelectedFiles(newFiles);
+    } else {
+      // 如果找不到原文件，直接設置為編輯後的文件
+      setSelectedFiles([editedFile]);
+    }
+    
+    setShowMediaEditor(false);
+    setFileToEdit(null);
+    setEditingFileType(null);
+    toast.success('媒體編輯完成！');
+  }, [selectedFiles, fileToEdit]);
+
+  // 新增：處理媒體編輯器取消
+  const handleMediaEditorCancel = useCallback(() => {
+    setShowMediaEditor(false);
+    setFileToEdit(null);
+    setEditingFileType(null);
+  }, []);
+
   // 新增：檢查學生容量使用情況
   const checkStudentCapacity = async (selectedFiles?: File[]): Promise<{ hasSpace: boolean; message: string }> => {
     if (!student) {
@@ -521,8 +555,59 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     }
   }, [student, onQuotaChanged]);
 
+  // 獲取今天的課堂信息
+  const getTodayLesson = async (studentId: string) => {
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD 格式
+      
+      const { data: lessons, error } = await supabase
+        .from('hanami_student_lesson')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('lesson_date', todayStr)
+        .order('actual_timeslot', { ascending: true })
+        .limit(1);
+      
+      if (error) {
+        console.error('獲取今天課堂信息失敗:', error);
+        return null;
+      }
+      
+      return lessons && lessons.length > 0 ? lessons[0] : null;
+    } catch (error) {
+      console.error('獲取今天課堂信息錯誤:', error);
+      return null;
+    }
+  };
+
+  // 生成新的文件名格式：學生名＋今日上課日期時間
+  const generateFileName = (originalName: string, studentName: string, lesson?: any) => {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+    const timeStr = today.toTimeString().split(' ')[0].replace(/:/g, ''); // HHMMSS
+    
+    // 獲取文件擴展名
+    const fileExt = originalName.split('.').pop();
+    
+    // 如果有課堂信息，使用課堂時間
+    let timeIdentifier = timeStr;
+    if (lesson && lesson.actual_timeslot) {
+      timeIdentifier = lesson.actual_timeslot.replace(/:/g, '').replace(/-/g, '');
+    }
+    
+    // 生成新文件名：學生名_日期_時間.擴展名
+    const newFileName = `${studentName}_${dateStr}_${timeIdentifier}.${fileExt}`;
+    
+    return newFileName;
+  };
+
   const uploadFiles = async () => {
     if (!student || selectedFiles.length === 0) return;
+
+    // 獲取今天的課堂信息
+    const todayLesson = await getTodayLesson(student.id);
+    console.log('今天的課堂信息:', todayLesson);
 
     // 立即檢查容量
     const capacityCheck = await checkStudentCapacity(selectedFiles);
@@ -590,9 +675,12 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         // 如果 API 路由失敗，使用客戶端上傳
         console.log('使用客戶端上傳...');
         
+        // 生成新的文件名格式：學生名＋今日上課日期時間
+        const newFileName = generateFileName(file.name, student.full_name, todayLesson);
+        
         // 生成檔案路徑
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${student.id}/${mediaType}s/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const fileExt = newFileName.split('.').pop();
+        const fileName = `${student.id}/${mediaType}s/${newFileName}`;
 
         // 注意：Supabase Pro 版本支援更大的檔案，讓 Supabase 自己處理檔案大小限制
 
@@ -620,11 +708,12 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         const mediaData = {
           student_id: student.id,
           media_type: mediaType,
-          file_name: compressedFile.name,
+          file_name: newFileName, // 使用新的文件名
           file_path: fileName,
           file_size: compressedFile.size,
-          title: compressedFile.name.replace(/\.[^/.]+$/, ''),
-          uploaded_by: null // 設為 null 而不是字串
+          title: newFileName.replace(/\.[^/.]+$/, ''), // 使用新文件名作為標題
+          uploaded_by: null, // 設為 null 而不是字串
+          lesson_id: todayLesson?.id || null // 關聯到今天的課堂
         };
 
         console.log('準備插入的資料:', mediaData);
@@ -698,6 +787,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       setUploadProgress({});
       setShowUploadArea(false);
       loadStudentMedia(); // 重新載入媒體列表
+      
+      // 通知父組件配額已更改，觸發按鈕顏色更新
+      if (onQuotaChanged) {
+        onQuotaChanged();
+      }
     } catch (error) {
       console.error('上傳失敗:', error);
       toast.error(`檔案上傳失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
@@ -732,6 +826,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
       toast.success('媒體檔案已刪除');
       loadStudentMedia(); // 重新載入媒體列表
+      
+      // 通知父組件配額已更改，觸發按鈕顏色更新
+      if (onQuotaChanged) {
+        onQuotaChanged();
+      }
     } catch (error) {
       console.error('刪除失敗:', error);
       toast.error('刪除媒體檔案失敗');
@@ -1642,12 +1741,74 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                   <div className="mt-4 animate-in fade-in duration-300">
                     <h4 className="font-medium mb-2 text-sm sm:text-base text-[#A64B2A]">選中的檔案:</h4>
                     <div className="space-y-2">
-                      {selectedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between bg-white p-3 rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200">
-                          <span className="text-xs sm:text-sm truncate flex-1 text-[#2B3A3B]">{file.name}</span>
-                          <span className="text-xs sm:text-sm text-[#2B3A3B] ml-2">{getFileSize(file.size)}</span>
-                        </div>
-                      ))}
+                      {selectedFiles.map((file, index) => {
+                        const isVideo = file.type.startsWith('video/');
+                        const isPhoto = file.type.startsWith('image/');
+                        const canEdit = isVideo || isPhoto;
+                        
+                        return (
+                          <div key={index} className="flex items-center justify-between bg-white p-3 rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="flex-shrink-0">
+                                {isVideo ? (
+                                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                                    </svg>
+                                  </div>
+                                ) : isPhoto ? (
+                                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs sm:text-sm truncate text-[#2B3A3B] font-medium">{file.name}</div>
+                                <div className="text-xs text-[#2B3A3B] opacity-75">{getFileSize(file.size)}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {canEdit && (
+                                <button
+                                  onClick={() => {
+                                    setFileToEdit(file);
+                                    setEditingFileType(isVideo ? 'video' : 'photo');
+                                    setShowMediaEditor(true);
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-xs shadow-sm hover:shadow-md transform hover:scale-105"
+                                  title={`編輯${isVideo ? '影片' : '相片'}`}
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  <span>編輯</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  const newFiles = selectedFiles.filter((_, i) => i !== index);
+                                  setSelectedFiles(newFiles);
+                                }}
+                                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 text-xs shadow-sm hover:shadow-md transform hover:scale-105"
+                                title="移除檔案"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                <span>移除</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                     
                     <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -2159,6 +2320,16 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           onClose={() => setShowUpgradeModal(false)}
           student={student}
           onUpgradeSuccess={handleUpgradeSuccess}
+        />
+      )}
+      
+      {/* 媒體編輯器 */}
+      {showMediaEditor && fileToEdit && editingFileType && (
+        <MediaEditor
+          file={fileToEdit}
+          type={editingFileType}
+          onSave={handleMediaEditorSave}
+          onCancel={handleMediaEditorCancel}
         />
       )}
     </div>

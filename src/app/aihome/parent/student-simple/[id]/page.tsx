@@ -570,6 +570,7 @@ export default function SimpleStudentDetailPage() {
                     hideActionButtons={true}
                     hideTeacherColumn={true}
                     hideCareAlert={true}
+                    disableSelection={true}
                   />
                 );
               })()}

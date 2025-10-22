@@ -2,6 +2,53 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { QuotaChecker } from '@/lib/quota-checker';
 
+// 獲取今天的課堂信息
+async function getTodayLesson(supabase: any, studentId: string) {
+  try {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD 格式
+    
+    const { data: lessons, error } = await supabase
+      .from('hanami_student_lesson')
+      .select('*')
+      .eq('student_id', studentId)
+      .eq('lesson_date', todayStr)
+      .order('actual_timeslot', { ascending: true })
+      .limit(1);
+    
+    if (error) {
+      console.error('獲取今天課堂信息失敗:', error);
+      return null;
+    }
+    
+    return lessons && lessons.length > 0 ? lessons[0] : null;
+  } catch (error) {
+    console.error('獲取今天課堂信息錯誤:', error);
+    return null;
+  }
+}
+
+// 生成新的文件名格式：學生名＋今日上課日期時間
+function generateFileName(originalName: string, studentName: string, lesson?: any) {
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+  const timeStr = today.toTimeString().split(' ')[0].replace(/:/g, ''); // HHMMSS
+  
+  // 獲取文件擴展名
+  const fileExt = originalName.split('.').pop();
+  
+  // 如果有課堂信息，使用課堂時間
+  let timeIdentifier = timeStr;
+  if (lesson && lesson.actual_timeslot) {
+    timeIdentifier = lesson.actual_timeslot.replace(/:/g, '').replace(/-/g, '');
+  }
+  
+  // 生成新文件名：學生名_日期_時間.擴展名
+  const newFileName = `${studentName}_${dateStr}_${timeIdentifier}.${fileExt}`;
+  
+  return newFileName;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 記錄上傳開始時間
@@ -41,6 +88,24 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // 獲取學生信息和今天的課堂信息
+    const { data: studentData, error: studentError } = await supabase
+      .from('Hanami_Students')
+      .select('full_name')
+      .eq('id', studentId)
+      .single();
+
+    if (studentError || !studentData) {
+      console.error('獲取學生信息失敗:', studentError);
+      return NextResponse.json(
+        { error: '無法獲取學生信息' },
+        { status: 400 }
+      );
+    }
+
+    const todayLesson = await getTodayLesson(supabase, studentId);
+    console.log('今天的課堂信息:', todayLesson);
 
     console.log('開始上傳檔案:', {
       fileName: file.name,
@@ -87,9 +152,12 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // 生成新的文件名格式：學生名＋今日上課日期時間
+    const newFileName = generateFileName(file.name, studentData.full_name, todayLesson);
+    
     // 生成檔案路徑
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${studentId}/${mediaType}s/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+    const fileExt = newFileName.split('.').pop();
+    const fileName = `${studentId}/${mediaType}s/${newFileName}`;
 
     // 使用服務端金鑰上傳到 Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -118,11 +186,12 @@ export async function POST(request: NextRequest) {
     const mediaData = {
       student_id: studentId,
       media_type: mediaType,
-      file_name: file.name,
+      file_name: newFileName, // 使用新的文件名
       file_path: fileName,
       file_size: file.size,
-      title: file.name.replace(/\.[^/.]+$/, ''),
-      uploaded_by: null // 設為 null 而不是字串
+      title: newFileName.replace(/\.[^/.]+$/, ''), // 使用新文件名作為標題
+      uploaded_by: null, // 設為 null 而不是字串
+      lesson_id: todayLesson?.id || null // 關聯到今天的課堂
     };
 
     // 儲存到資料庫

@@ -54,6 +54,7 @@ interface StudentLessonPanelProps {
   hideActionButtons?: boolean; // 是否隱藏新增課堂和編輯按鍵
   hideTeacherColumn?: boolean; // 是否隱藏負責老師欄位
   hideCareAlert?: boolean; // 是否隱藏特別照顧欄位
+  disableSelection?: boolean; // 是否禁用勾選功能
 }
 
 interface LessonData {
@@ -84,7 +85,7 @@ interface LessonData {
   remarks: string | null;
 }
 
-export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData, showAIMessageButton = false, hideActionButtons = false, hideTeacherColumn = false, hideCareAlert = false }: StudentLessonPanelProps) {
+export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData, showAIMessageButton = false, hideActionButtons = false, hideTeacherColumn = false, hideCareAlert = false, disableSelection = false }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
   
   // 添加動畫樣式到 head
@@ -1045,16 +1046,18 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                           <table className="w-full min-w-max text-[#4B4036] text-xs sm:text-sm">
             <thead>
               <tr className="border-b border-[#E9E2D6]">
-                <th>
-                  <input
-                    className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
-                    type="checkbox"
-                    onChange={(e) => {
-                      if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id));
-                      else setSelected([]);
-                    }}
-                  />
-                </th>
+                {!disableSelection && (
+                  <th>
+                    <input
+                      className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
+                      type="checkbox"
+                      onChange={(e) => {
+                        if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id));
+                        else setSelected([]);
+                      }}
+                    />
+                  </th>
+                )}
                 <th 
                   className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
                   onClick={() => handleSort('lesson_date')}
@@ -1115,14 +1118,16 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                     animation: showSuccessIndicator ? 'fadeInUp 0.5s ease-out' : 'none'
                   }}
                 >
-                  <td className="px-2 py-2">
-                    <input
-                      checked={selected.includes(lesson.id)}
-                      className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
-                      type="checkbox"
-                      onChange={() => toggleSelect(lesson.id)}
-                    />
-                  </td>
+                  {!disableSelection && (
+                    <td className="px-2 py-2">
+                      <input
+                        checked={selected.includes(lesson.id)}
+                        className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
+                        type="checkbox"
+                        onChange={() => toggleSelect(lesson.id)}
+                      />
+                    </td>
+                  )}
                   <td className="text-[15px] font-medium px-2 py-2">{format(new Date(lesson.lesson_date), 'yyyy/MM/dd')}</td>
                   <td className="text-[15px] font-medium px-2 py-2">{typeof lesson.course_type === 'string' ? lesson.course_type : ''}</td>
                   <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>

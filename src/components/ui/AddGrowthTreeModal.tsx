@@ -34,7 +34,7 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const [treeName, setTreeName] = useState(props.editingTree?.tree_name || '');
   const [treeDescription, setTreeDescription] = useState(props.editingTree?.tree_description || '');
   const [treeColor, setTreeColor] = useState(props.editingTree?.tree_color || '#FFD59A');
-  const [treeIcon, setTreeIcon] = useState(props.editingTree?.tree_icon || '🌳');
+  const [treeIcon, setSparklesIcon] = useState(props.editingTree?.tree_icon || '🌳');
   const [treeLevel, setTreeLevel] = useState(props.editingTree?.tree_level || 1);
   const [courseType, setCourseType] = useState(props.editingTree?.course_type || '');
   const [reviewTeachers, setReviewTeachers] = useState<string[]>(props.editingTree?.review_teachers || []);
@@ -424,7 +424,7 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                   placeholder="🌳"
                   type="text"
                   value={treeIcon}
-                  onChange={e => setTreeIcon(e.target.value)}
+                  onChange={e => setSparklesIcon(e.target.value)}
                 />
               </div>
             </div>

@@ -6,6 +6,7 @@ import { HanamiButton, HanamiCard, HanamiInput } from './index';
 import { supabase } from '@/lib/supabase';
 import ActivitySelectionModal from './ActivitySelectionModal';
 import GrowthTreePathManager from './GrowthTreePathManager';
+import MinimalStudentGrowthTreeManager from './MinimalStudentGrowthTreeManager';
 import { toast } from 'react-hot-toast';
 
 interface Student {
@@ -2778,7 +2779,7 @@ export default function SimpleAbilityAssessmentModal({
                       <span className="text-xl mr-1">
                         <AcademicCapIcon className="w-6 h-6 text-[#A68A64]" />
                       </span>
-                      選擇成長樹
+                      選擇本次評估的成長樹
                     </label>
                     <div className="relative">
                       <button
@@ -2795,7 +2796,7 @@ export default function SimpleAbilityAssessmentModal({
                             </div>
                           </div>
                         ) : (
-                          <span className="text-[#A68A64]">請選擇成長樹</span>
+                          <span className="text-[#A68A64]">請選擇本次評估的成長樹</span>
                         )}
                       </button>
                       {showTreeDropdown && (
@@ -2881,6 +2882,29 @@ export default function SimpleAbilityAssessmentModal({
                         </p>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* 成長樹管理區域 */}
+                {selectedStudent && (
+                  <div className="mt-4">
+                    <MinimalStudentGrowthTreeManager
+                      studentId={selectedStudent.id}
+                      studentName={selectedStudent.full_name}
+                      onTreeChange={(trees) => {
+                        console.log('成長樹變更:', trees);
+                        setStudentTrees(trees);
+                        // 如果當前選中的成長樹被刪除，清空選擇
+                        if (selectedTreeId && !trees.find(t => t.id === selectedTreeId)) {
+                          setSelectedTreeId('');
+                        }
+                        // 如果只有一個成長樹，自動選擇它
+                        if (trees.length === 1 && !selectedTreeId) {
+                          setSelectedTreeId(trees[0].id);
+                        }
+                      }}
+                      className="border border-[#EADBC8] rounded-lg p-4 bg-[#FFF9F2]"
+                    />
                   </div>
                 )}
               </div>
@@ -3096,7 +3120,7 @@ export default function SimpleAbilityAssessmentModal({
                 /* 未選擇成長樹 */
                 <div className="text-center py-12">
                   <div className="text-4xl mb-4">🌳</div>
-                  <h4 className="text-lg font-medium text-[#2B3A3B] mb-2">請選擇成長樹</h4>
+                  <h4 className="text-lg font-medium text-[#2B3A3B] mb-2">請選擇本次評估的成長樹</h4>
                   <p className="text-[#87704e]">
                     請在左側選擇要評估的成長樹。
                   </p>
@@ -3566,7 +3590,7 @@ export default function SimpleAbilityAssessmentModal({
               disabled={!selectedStudent || !selectedTreeId}
             >
               {!selectedStudent ? '請選擇學生' : 
-               !selectedTreeId ? '請選擇成長樹' : 
+               !selectedTreeId ? '請選擇本次評估的成長樹' : 
                isEditMode ? '更新評估' : '儲存評估'}
             </button>
           </div>
