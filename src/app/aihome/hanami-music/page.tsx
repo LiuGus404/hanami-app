@@ -1584,7 +1584,7 @@ export default function HanamiMusicHomePage() {
                   </div>
                   <div className="space-y-3">
                     <motion.button
-                      onClick={() => router.push('/aihome/hanami-music/piano-class')}
+                      onClick={() => router.push('/aihome/hanami-music/music-focus-class')}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="w-full px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2"

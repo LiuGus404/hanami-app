@@ -581,8 +581,8 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     }
   };
 
-  // 生成新的文件名格式：學生名＋今日上課日期時間
-  const generateFileName = (originalName: string, studentName: string, lesson?: any) => {
+  // 生成新的文件名格式：student_id_日期_時間.副檔名（避免中文造成的 Storage key 問題）
+  const generateFileName = (originalName: string, studentId: string, lesson?: any) => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
     const timeStr = today.toTimeString().split(' ')[0].replace(/:/g, ''); // HHMMSS
@@ -596,8 +596,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       timeIdentifier = lesson.actual_timeslot.replace(/:/g, '').replace(/-/g, '');
     }
     
-    // 生成新文件名：學生名_日期_時間.擴展名
-    const newFileName = `${studentName}_${dateStr}_${timeIdentifier}.${fileExt}`;
+    // 直接使用 student_id 作為檔名前綴，確保安全
+    const safeStudentId = (studentId || 'student').toString().replace(/[^\w-]/g, '_');
+    
+    // 生成新文件名：student_id_日期_時間.擴展名
+    const newFileName = `${safeStudentId}_${dateStr}_${timeIdentifier}.${fileExt}`;
     
     return newFileName;
   };
@@ -676,7 +679,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         console.log('使用客戶端上傳...');
         
         // 生成新的文件名格式：學生名＋今日上課日期時間
-        const newFileName = generateFileName(file.name, student.full_name, todayLesson);
+        const newFileName = generateFileName(file.name, student.id, todayLesson);
         
         // 生成檔案路徑
         const fileExt = newFileName.split('.').pop();
