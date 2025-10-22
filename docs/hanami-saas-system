@@ -371,7 +371,7 @@ CREATE TABLE public.model_pricing (
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT model_pricing_pkey PRIMARY KEY (model, provider)
+  CONSTRAINT model_pricing_pkey PRIMARY KEY (provider, model)
 );
 CREATE TABLE public.parent_student_bindings (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -549,6 +549,73 @@ CREATE TABLE public.saas_emotional_support_logs (
   CONSTRAINT saas_emotional_support_logs_character_id_fkey FOREIGN KEY (character_id) REFERENCES public.saas_3d_characters(id),
   CONSTRAINT saas_emotional_support_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id)
 );
+CREATE TABLE public.saas_gacha_draw_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  machine_id uuid NOT NULL,
+  draw_type text NOT NULL CHECK (draw_type = ANY (ARRAY['single'::text, 'ten'::text])),
+  points_spent integer NOT NULL,
+  rewards_won jsonb NOT NULL,
+  draw_count integer NOT NULL DEFAULT 1,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saas_gacha_draw_history_pkey PRIMARY KEY (id),
+  CONSTRAINT saas_gacha_draw_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id),
+  CONSTRAINT saas_gacha_draw_history_machine_id_fkey FOREIGN KEY (machine_id) REFERENCES public.saas_gacha_machines(id)
+);
+CREATE TABLE public.saas_gacha_machine_rewards (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  machine_id uuid NOT NULL,
+  reward_id uuid NOT NULL,
+  probability numeric NOT NULL CHECK (probability >= 0::numeric AND probability <= 100::numeric),
+  weight integer NOT NULL DEFAULT 100,
+  is_active boolean DEFAULT true,
+  display_order integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saas_gacha_machine_rewards_pkey PRIMARY KEY (id),
+  CONSTRAINT saas_gacha_machine_rewards_machine_id_fkey FOREIGN KEY (machine_id) REFERENCES public.saas_gacha_machines(id),
+  CONSTRAINT saas_gacha_machine_rewards_reward_id_fkey FOREIGN KEY (reward_id) REFERENCES public.saas_gacha_rewards(id)
+);
+CREATE TABLE public.saas_gacha_machines (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  machine_name text NOT NULL,
+  machine_slug text NOT NULL UNIQUE,
+  description text,
+  image_url text,
+  background_url text,
+  theme_config jsonb DEFAULT '{}'::jsonb,
+  single_draw_cost integer NOT NULL DEFAULT 10,
+  ten_draw_cost integer NOT NULL DEFAULT 90,
+  ten_draw_bonus integer DEFAULT 1,
+  is_active boolean DEFAULT true,
+  is_default boolean DEFAULT false,
+  display_order integer DEFAULT 0,
+  start_time timestamp with time zone,
+  end_time timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saas_gacha_machines_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.saas_gacha_rewards (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  reward_name text NOT NULL,
+  reward_description text,
+  reward_type text NOT NULL CHECK (reward_type = ANY (ARRAY['discount_coupon'::text, 'free_trial'::text, 'course_voucher'::text, 'vip_upgrade'::text, 'subscription_extend'::text, 'physical_gift'::text, 'points_bonus'::text, 'custom'::text])),
+  rarity text NOT NULL CHECK (rarity = ANY (ARRAY['common'::text, 'rare'::text, 'epic'::text, 'legendary'::text])),
+  icon_emoji text,
+  icon_url text,
+  reward_value jsonb NOT NULL,
+  usage_limit integer,
+  valid_days integer,
+  delivery_type text NOT NULL DEFAULT 'auto'::text CHECK (delivery_type = ANY (ARRAY['auto'::text, 'manual'::text, 'physical'::text])),
+  stock_total integer,
+  stock_remaining integer,
+  is_active boolean DEFAULT true,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saas_gacha_rewards_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.saas_invoices (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -658,6 +725,34 @@ CREATE TABLE public.saas_phone_profiles (
   CONSTRAINT saas_phone_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT saas_phone_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id)
 );
+CREATE TABLE public.saas_point_earning_rules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  rule_name text NOT NULL,
+  rule_type text NOT NULL CHECK (rule_type = ANY (ARRAY['daily_login'::text, 'task_completion'::text, 'referral'::text, 'purchase_ratio'::text, 'event'::text])),
+  points_amount integer NOT NULL,
+  valid_days integer,
+  is_active boolean DEFAULT true,
+  conditions jsonb DEFAULT '{}'::jsonb,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saas_point_earning_rules_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.saas_point_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  transaction_type text NOT NULL CHECK (transaction_type = ANY (ARRAY['earn_login'::text, 'earn_task'::text, 'earn_referral'::text, 'earn_purchase'::text, 'earn_event'::text, 'earn_admin'::text, 'spend_gacha'::text, 'spend_redeem'::text, 'expire'::text, 'refund'::text])),
+  points_change integer NOT NULL,
+  balance_after integer NOT NULL,
+  source_type text,
+  source_id uuid,
+  description text,
+  expires_at timestamp with time zone,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saas_point_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT saas_point_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id)
+);
 CREATE TABLE public.saas_story_library (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   story_title text NOT NULL,
@@ -740,6 +835,41 @@ CREATE TABLE public.saas_user_learning_paths (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT saas_user_learning_paths_pkey PRIMARY KEY (id),
   CONSTRAINT saas_user_learning_paths_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id)
+);
+CREATE TABLE public.saas_user_points (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  total_points integer NOT NULL DEFAULT 0,
+  available_points integer NOT NULL DEFAULT 0,
+  used_points integer NOT NULL DEFAULT 0,
+  expired_points integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saas_user_points_pkey PRIMARY KEY (id),
+  CONSTRAINT saas_user_points_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id)
+);
+CREATE TABLE public.saas_user_rewards (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  reward_id uuid NOT NULL,
+  draw_history_id uuid,
+  reward_code text UNIQUE,
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'used'::text, 'expired'::text, 'cancelled'::text])),
+  usage_count integer DEFAULT 0,
+  usage_limit integer,
+  obtained_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone,
+  used_at timestamp with time zone,
+  delivery_status text CHECK (delivery_status = ANY (ARRAY['pending'::text, 'processing'::text, 'shipped'::text, 'delivered'::text, 'cancelled'::text])),
+  delivery_address jsonb,
+  tracking_number text,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT saas_user_rewards_pkey PRIMARY KEY (id),
+  CONSTRAINT saas_user_rewards_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id),
+  CONSTRAINT saas_user_rewards_reward_id_fkey FOREIGN KEY (reward_id) REFERENCES public.saas_gacha_rewards(id),
+  CONSTRAINT saas_user_rewards_draw_history_id_fkey FOREIGN KEY (draw_history_id) REFERENCES public.saas_gacha_draw_history(id)
 );
 CREATE TABLE public.saas_user_subscriptions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

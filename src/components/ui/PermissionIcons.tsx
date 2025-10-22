@@ -104,7 +104,7 @@ export const MediaIcon: React.FC<IconProps> = ({ className = "w-5 h-5", size = 2
 );
 
 // 成長樹圖標
-export const GrowthTreeIcon: React.FC<IconProps> = ({ className = "w-5 h-5", size = 20 }) => (
+export const GrowthSparklesIcon: React.FC<IconProps> = ({ className = "w-5 h-5", size = 20 }) => (
   <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
     <path d="M17 20H7c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2zM12 8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
   </svg>

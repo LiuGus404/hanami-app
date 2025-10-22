@@ -14,7 +14,7 @@ import {
   AdminIcon, UserManagementIcon, PermissionIcon, SettingsIcon, StudentIcon, TeacherIcon,
   CourseIcon, ScheduleIcon, AIIcon, ProgressIcon, ResourceIcon, TrialIcon, RegistrationIcon,
   DashboardIcon, ProfileIcon, MediaIcon, ChildIcon, PageIcon, ExportIcon, FinanceIcon,
-  LessonIcon, GrowthTreeIcon, AbilityIcon, ActivityIcon, AssessmentIcon, CommunicationIcon,
+  LessonIcon, GrowthSparklesIcon, AbilityIcon, ActivityIcon, AssessmentIcon, CommunicationIcon,
   FeatureIcon
 } from '@/components/ui/PermissionIcons';
 
@@ -1413,7 +1413,7 @@ function RoleForm({
     { name: 'lesson_management', label: '課程記錄', description: '課程記錄管理', role: 'teacher', icon: LessonIcon },
     { name: 'student_progress', label: '學生進度', description: '學生學習進度追蹤', role: 'teacher', icon: ProgressIcon },
     { name: 'media_management', label: '媒體管理', description: '學生作品管理', role: 'teacher', icon: MediaIcon },
-    { name: 'growth_tree_management', label: '成長樹管理', description: '學生成長樹管理', role: 'teacher', icon: GrowthTreeIcon },
+    { name: 'growth_tree_management', label: '成長樹管理', description: '學生成長樹管理', role: 'teacher', icon: GrowthSparklesIcon },
     { name: 'ability_development', label: '發展能力圖卡', description: '能力發展圖卡', role: 'teacher', icon: AbilityIcon },
     { name: 'teaching_activities', label: '教學活動管理', description: '教學活動管理', role: 'teacher', icon: ActivityIcon },
     { name: 'ability_assessment', label: '能力評估管理', description: '學生能力評估', role: 'teacher', icon: AssessmentIcon },
@@ -1918,7 +1918,7 @@ function PermissionForm({
     { name: 'lesson_management', label: '課程記錄', description: '課程記錄管理', role: 'teacher', icon: LessonIcon },
     { name: 'student_progress', label: '學生進度', description: '學生學習進度追蹤', role: 'teacher', icon: ProgressIcon },
     { name: 'media_management', label: '媒體管理', description: '學生作品管理', role: 'teacher', icon: MediaIcon },
-    { name: 'growth_tree_management', label: '成長樹管理', description: '學生成長樹管理', role: 'teacher', icon: GrowthTreeIcon },
+    { name: 'growth_tree_management', label: '成長樹管理', description: '學生成長樹管理', role: 'teacher', icon: GrowthSparklesIcon },
     { name: 'ability_development', label: '發展能力圖卡', description: '能力發展圖卡', role: 'teacher', icon: AbilityIcon },
     { name: 'teaching_activities', label: '教學活動管理', description: '教學活動管理', role: 'teacher', icon: ActivityIcon },
     { name: 'ability_assessment', label: '能力評估管理', description: '學生能力評估', role: 'teacher', icon: AssessmentIcon },

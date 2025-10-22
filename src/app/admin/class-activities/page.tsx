@@ -22,10 +22,12 @@ import {
   SparklesIcon,
   TagIcon,
   DocumentTextIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  VideoCameraIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 
-import { HanamiCard, HanamiButton, LessonPlanModal, GrowthTreeDetailModal, StudentActivitiesPanel } from '@/components/ui';
+import { HanamiCard, HanamiButton, LessonPlanModal, GrowthTreeDetailModal, StudentActivitiesPanel, StudentMediaModal } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
 import SimpleAbilityAssessmentModal from '@/components/ui/SimpleAbilityAssessmentModal';
@@ -238,6 +240,29 @@ export default function ClassActivitiesPage() {
     timeslot: string;
   } | null>(null);
   
+  // 學生媒體管理相關狀態
+  const [showStudentMediaModal, setShowStudentMediaModal] = useState(false);
+  const [selectedStudentForMedia, setSelectedStudentForMedia] = useState<{
+    id: string;
+    full_name: string;
+    nick_name?: string | null;
+    course_type?: string | null;
+    quota: {
+      student_id: string;
+      plan_type: 'free' | 'basic' | 'standard' | 'premium' | 'professional';
+      video_limit: number;
+      photo_limit: number;
+      video_count: number;
+      photo_count: number;
+      total_used_space: number;
+      last_updated: string;
+    };
+    media_count: {
+      video: number;
+      photo: number;
+    };
+  } | null>(null);
+  
   // 新增：學生活動狀態
   const [studentActivitiesMap, setStudentActivitiesMap] = useState<Map<string, any[]>>(new Map());
   const [loadingStudentActivities, setLoadingStudentActivities] = useState<Set<string>>(new Set());
@@ -271,6 +296,9 @@ export default function ClassActivitiesPage() {
     course_type: string;
   } | null>(null);
 
+  // 新增：學生媒體上傳狀態追蹤
+  const [studentMediaStatus, setStudentMediaStatus] = useState<Record<string, boolean>>({});
+  const [loadingMediaStatus, setLoadingMediaStatus] = useState(false);
 
   // 獲取單日日期範圍
   const getDayDates = (date: Date) => {
@@ -979,6 +1007,7 @@ export default function ClassActivitiesPage() {
   useEffect(() => {
     loadRemainingLessons();
     checkStudentAssessmentStatus(); // 檢查評估狀態
+    checkStudentMediaStatus(); // 檢查媒體上傳狀態
   }, [lessons]);
 
   // 當切換到班別顯示模式或課程資料更新時，重新載入班別資料
@@ -1051,6 +1080,162 @@ export default function ClassActivitiesPage() {
       return 'bg-gradient-to-br from-orange-100 to-yellow-100 border-orange-300';
     } else {
       return 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200';
+    }
+  };
+
+  // 檢查學生今天是否上傳媒體
+  const checkStudentMediaStatus = async () => {
+    if (loadingMediaStatus || lessons.length === 0) {
+      return;
+    }
+
+    try {
+      setLoadingMediaStatus(true);
+      
+      // 獲取今天香港時區的開始和結束時間
+      const today = getTodayInHongKong();
+      const todayStart = new Date(today);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+
+      // 獲取所有學生ID
+      const allStudentIds = Array.from(new Set([
+        ...lessons.map(lesson => lesson.student_id),
+        ...trialLessons.map(lesson => lesson.id) // 試聽學生的ID
+      ]));
+
+      if (allStudentIds.length > 0) {
+        // 查詢今天是否有媒體上傳記錄
+        const { data: todayMedia, error } = await supabase
+          .from('hanami_student_media')
+          .select('student_id')
+          .in('student_id', allStudentIds)
+          .gte('created_at', todayStart.toISOString())
+          .lte('created_at', todayEnd.toISOString());
+
+        if (!error && todayMedia) {
+          const statusMap: Record<string, boolean> = {};
+          allStudentIds.forEach(id => { 
+            statusMap[id] = false; 
+          });
+          
+          todayMedia.forEach(media => {
+            statusMap[media.student_id] = true;
+          });
+          
+          setStudentMediaStatus(statusMap);
+        }
+      }
+    } catch (error) {
+      console.error('檢查學生媒體狀態失敗:', error);
+    } finally {
+      setLoadingMediaStatus(false);
+    }
+  };
+
+  // 獲取學生媒體配額和計數
+  const getStudentMediaData = async (studentId: string) => {
+    try {
+      // 獲取學生配額
+      const { data: quotaData, error: quotaError } = await supabase
+        .from('hanami_student_media_quota')
+        .select('*')
+        .eq('student_id', studentId)
+        .single();
+
+      // 獲取媒體計數
+      const { data: mediaCount, error: mediaError } = await supabase
+        .from('hanami_student_media')
+        .select('media_type')
+        .eq('student_id', studentId);
+
+      if (quotaError && quotaError.code !== 'PGRST116') {
+        console.error('獲取配額錯誤:', quotaError);
+      }
+
+      if (mediaError) {
+        console.error('獲取媒體計數錯誤:', mediaError);
+      }
+
+      // 處理配額數據
+      const quota = quotaData ? {
+        student_id: quotaData.student_id,
+        plan_type: quotaData.plan_type || 'free',
+        video_limit: quotaData.video_limit || 5,
+        photo_limit: quotaData.photo_limit || 10,
+        video_count: quotaData.video_count || 0,
+        photo_count: quotaData.photo_count || 0,
+        total_used_space: quotaData.total_used_space || 0,
+        last_updated: quotaData.last_updated || new Date().toISOString()
+      } : {
+        student_id: studentId,
+        plan_type: 'free',
+        video_limit: 5,
+        photo_limit: 10,
+        video_count: 0,
+        photo_count: 0,
+        total_used_space: 0,
+        last_updated: new Date().toISOString()
+      };
+
+      // 處理媒體計數
+      const videoCount = mediaCount?.filter(m => m.media_type === 'video').length || 0;
+      const photoCount = mediaCount?.filter(m => m.media_type === 'photo').length || 0;
+
+      return {
+        quota,
+        media_count: {
+          video: videoCount,
+          photo: photoCount
+        }
+      };
+    } catch (error) {
+      console.error('獲取學生媒體數據錯誤:', error);
+      // 返回預設值
+      return {
+        quota: {
+          student_id: studentId,
+          plan_type: 'free',
+          video_limit: 5,
+          photo_limit: 10,
+          video_count: 0,
+          photo_count: 0,
+          total_used_space: 0,
+          last_updated: new Date().toISOString()
+        },
+        media_count: {
+          video: 0,
+          photo: 0
+        }
+      };
+    }
+  };
+
+  // 開啟學生媒體管理頁面
+  const openStudentMediaModal = async (student: any) => {
+    const studentId = student.student_id || student.id;
+    const studentName = getStudentName(student);
+    const studentNickname = getStudentNickname(student);
+    const courseType = getCourseType(student);
+    
+    try {
+      // 獲取學生的媒體配額和計數數據
+      const mediaData = await getStudentMediaData(studentId);
+      
+      // 設置選中的學生並打開媒體模態框
+      setSelectedStudentForMedia({
+        id: studentId,
+        full_name: studentName,
+        nick_name: studentNickname,
+        course_type: courseType,
+        quota: mediaData.quota,
+        media_count: mediaData.media_count
+      });
+      setShowStudentMediaModal(true);
+    } catch (error) {
+      console.error('開啟媒體模態框錯誤:', error);
+      toast.error('無法開啟媒體管理頁面');
     }
   };
 
@@ -2197,6 +2382,60 @@ export default function ClassActivitiesPage() {
                                 );
                               })()}
                             </button>
+
+                            {/* 媒體評估按鈕 */}
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const student = {
+                                  student_id: 'student_id' in lesson ? lesson.student_id : lesson.id,
+                                  id: 'student_id' in lesson ? lesson.student_id : lesson.id,
+                                  full_name: getStudentName(lesson),
+                                  nick_name: getStudentNickname(lesson),
+                                  course_type: getCourseType(lesson)
+                                };
+                                openStudentMediaModal(student);
+                              }}
+                              className="group/media relative cursor-pointer"
+                            >
+                              <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                (() => {
+                                  const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                  const hasUploadedToday = studentMediaStatus[studentId] || false;
+                                  return hasUploadedToday 
+                                    ? 'bg-gradient-to-br from-emerald-400 to-teal-500' 
+                                    : 'bg-gradient-to-br from-orange-400 to-amber-500';
+                                })()
+                              }`}>
+                                <VideoCameraIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                              </div>
+                              
+                              {/* 狀態指示器 */}
+                              {(() => {
+                                const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                const hasUploadedToday = studentMediaStatus[studentId] || false;
+                                return hasUploadedToday && (
+                                  <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white"></div>
+                                  </div>
+                                );
+                              })()}
+                              
+                              {/* 懸停提示 - 在手機上隱藏 */}
+                              {(() => {
+                                const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                                const hasUploadedToday = studentMediaStatus[studentId] || false;
+                                const tooltipColor = hasUploadedToday ? 'bg-emerald-600/90' : 'bg-orange-600/90';
+                                
+                                return (
+                                        <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
+                                          {hasUploadedToday ? '今日已上傳 - 查看媒體' : '上傳/編輯媒體'}
+                                          <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipColor} transform rotate-45`}></div>
+                                        </div>
+                                );
+                              })()}
+                            </button>
                           </div>
 
                           {/* 剩餘堂數徽章 */}
@@ -2239,13 +2478,15 @@ export default function ClassActivitiesPage() {
                           {/* 學生詳細資訊 */}
                           <div className="relative z-10 space-y-2 sm:space-y-3 mb-3 sm:mb-4">
                             <div className="bg-hanami-primary/10 rounded-lg sm:rounded-xl p-2 sm:p-3">
-                              <div className="flex items-center justify-between text-xs sm:text-sm">
+                              <div className="space-y-2 text-xs sm:text-sm">
+                                {/* 歲數 */}
                                 <div className="flex items-center space-x-1 sm:space-x-2">
                                   <CakeIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                   <span className="font-medium text-hanami-text">
                                     {convertAgeToYears(getStudentAge(lesson))}
                                   </span>
                                 </div>
+                                {/* 課程類型 */}
                                 <div className="flex items-center space-x-1 sm:space-x-2">
                                   <MusicalNoteIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                   <span className="font-medium text-hanami-text">
@@ -2734,6 +2975,57 @@ export default function ClassActivitiesPage() {
                                       );
                                     })()}
                                   </button>
+
+                                  {/* 媒體評估按鈕 */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const studentForMedia = {
+                                        student_id: studentId,
+                                        id: studentId,
+                                        full_name: student.full_name,
+                                        nick_name: student.nick_name,
+                                        course_type: student.course_type
+                                      };
+                                      openStudentMediaModal(studentForMedia);
+                                    }}
+                                    className="group/media relative cursor-pointer"
+                                  >
+                                    <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
+                                      (() => {
+                                        const hasUploadedToday = studentMediaStatus[studentId] || false;
+                                        return hasUploadedToday 
+                                          ? 'bg-gradient-to-br from-emerald-400 to-teal-500' 
+                                          : 'bg-gradient-to-br from-orange-400 to-amber-500';
+                                      })()
+                                    }`}>
+                                      <VideoCameraIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                                    </div>
+                                    
+                                    {/* 狀態指示器 */}
+                                    {(() => {
+                                      const hasUploadedToday = studentMediaStatus[studentId] || false;
+                                      return hasUploadedToday && (
+                                        <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                                          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white"></div>
+                                        </div>
+                                      );
+                                    })()}
+                                    
+                                    {/* 懸停提示 - 在手機上隱藏 */}
+                                    {(() => {
+                                      const hasUploadedToday = studentMediaStatus[studentId] || false;
+                                      const tooltipColor = hasUploadedToday ? 'bg-emerald-600/90' : 'bg-orange-600/90';
+                                      
+                                      return (
+                                        <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
+                                          {hasUploadedToday ? '今日已上傳 - 查看媒體' : '上傳/編輯媒體'}
+                                          <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipColor} transform rotate-45`}></div>
+                                        </div>
+                                      );
+                                    })()}
+                                  </button>
                                 </div>
 
                                 {/* 剩餘堂數徽章 */}
@@ -2776,13 +3068,15 @@ export default function ClassActivitiesPage() {
                                 {/* 學生詳細資訊 */}
                                 <div className="relative z-10 space-y-2 sm:space-y-3 mb-3 sm:mb-4">
                                   <div className="rounded-lg sm:rounded-xl p-2 sm:p-3 bg-hanami-primary/10">
-                                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                                    <div className="space-y-2 text-xs sm:text-sm">
+                                      {/* 歲數 */}
                                       <div className="flex items-center space-x-1 sm:space-x-2">
                                         <CakeIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                         <span className="font-medium text-hanami-text">
                                           {convertAgeToYears(student.student_age)}
                                         </span>
                                       </div>
+                                      {/* 課程類型 */}
                                       <div className="flex items-center space-x-1 sm:space-x-2">
                                         <MusicalNoteIcon className="w-3 h-3 sm:w-4 sm:h-4 text-hanami-primary" />
                                         <span className="font-medium text-hanami-text">
@@ -3012,33 +3306,96 @@ export default function ClassActivitiesPage() {
                                     {student.full_name || '未知學生'}
                                   </h4>
                                   <p className="text-xs text-hanami-text-secondary hidden sm:block">
-                                    {convertAgeToYears(student.student_age)} 歲
+                                    {convertAgeToYears(student.student_age)} 
                                   </p>
+                                  {/* 狀態指示點 */}
+                                  <div className="flex items-center space-x-1 mt-0.5">
+                                    {/* 評估狀態點 */}
+                                    <div className="flex items-center space-x-0.5">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${
+                                        studentAssessmentStatus[student.id] 
+                                          ? 'bg-green-500' 
+                                          : 'bg-orange-500'
+                                      }`}></div>
+                                      <AcademicCapIcon className="w-3 h-3 text-hanami-text-secondary" />
+                                    </div>
+                                    {/* 媒體狀態點 */}
+                                    <div className="flex items-center space-x-0.5">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${
+                                        studentMediaStatus[student.id] 
+                                          ? 'bg-green-500' 
+                                          : 'bg-orange-500'
+                                      }`}></div>
+                                      <VideoCameraIcon className="w-3 h-3 text-hanami-text-secondary" />
+                                    </div>
+                                  </div>
                                 </div>
                                 
                                 {/* 按鍵 */}
-                                <button
-                                  onClick={() => {
-                                    const formatLocalDate = (date: Date) => {
-                                      const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
-                                      const year = hongKongTime.getFullYear();
-                                      const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
-                                      const day = String(hongKongTime.getDate()).padStart(2, '0');
-                                      return `${year}-${month}-${day}`;
-                                    };
-                                    
-                                    setSelectedStudentForActivities({
-                                      studentId: student.id,
-                                      studentName: student.full_name || '未知學生',
-                                      lessonDate: formatLocalDate(selectedDate),
-                                      timeslot: classGroup.timeslot || ''
-                                    });
-                                    setShowStudentActivitiesModal(true);
-                                  }}
-                                  className="p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-hanami-primary/10 text-hanami-primary hover:bg-hanami-primary/20"
-                                >
-                                  <AcademicCapIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </button>
+                                <div className="flex items-center space-x-1">
+                                  {/* 評估按鈕 */}
+                                  <button
+                                    onClick={() => {
+                                      const formatLocalDate = (date: Date) => {
+                                        const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+                                        const year = hongKongTime.getFullYear();
+                                        const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
+                                        const day = String(hongKongTime.getDate()).padStart(2, '0');
+                                        return `${year}-${month}-${day}`;
+                                      };
+                                      
+                                      setSelectedStudentForActivities({
+                                        studentId: student.id,
+                                        studentName: student.full_name || '未知學生',
+                                        lessonDate: formatLocalDate(selectedDate),
+                                        timeslot: classGroup.timeslot || ''
+                                      });
+                                      setShowStudentActivitiesModal(true);
+                                    }}
+                                    className="p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-hanami-primary/10 text-hanami-primary hover:bg-hanami-primary/20"
+                                  >
+                                    <img 
+                                      src="/tree ui.png" 
+                                      alt="評估" 
+                                      className="w-8 h-8 sm:w-8 sm:h-8 object-contain"
+                                    />
+                                  </button>
+                                  
+                                  {/* 媒體按鈕 */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      console.log('🎬 媒體按鈕被點擊:', { studentId: student.id, student });
+                                      const studentData = {
+                                        student_id: student.id,
+                                        id: student.id,
+                                        full_name: student.full_name,
+                                        nick_name: student.nick_name,
+                                        course_type: student.course_type
+                                      };
+                                      console.log('📝 準備打開模態框，學生數據:', studentData);
+                                      openStudentMediaModal(studentData);
+                                    }}
+                                    className="group/media relative cursor-pointer p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-hanami-primary/10 text-hanami-primary hover:bg-hanami-primary/20"
+                                  >
+                                    <div className="flex items-center space-x-1">
+                                      {/* 移除圖標顯示 */}
+                                    </div>
+                                    {/* 懸停提示 */}
+                                    {(() => {
+                                      const hasUploadedToday = studentMediaStatus[student.id] || false;
+                                      const tooltipColor = hasUploadedToday ? 'bg-emerald-600/90' : 'bg-orange-600/90';
+                                      
+                                      return (
+                                        <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
+                                          {hasUploadedToday ? '今日已上傳 - 查看媒體' : '上傳/編輯媒體'}
+                                          <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipColor} transform rotate-45`}></div>
+                                        </div>
+                                      );
+                                    })()}
+                                  </button>
+                                </div>
                               </div>
                             );
                           })}
@@ -3343,6 +3700,22 @@ export default function ClassActivitiesPage() {
               setSelectedTimeSlot(null);
               // 可以選擇重新載入資料
               loadClassData();
+            }}
+          />
+        )}
+
+        {/* 學生媒體管理模態框 */}
+        {showStudentMediaModal && selectedStudentForMedia && (
+          <StudentMediaModal
+            isOpen={showStudentMediaModal}
+            onClose={() => {
+              setShowStudentMediaModal(false);
+              setSelectedStudentForMedia(null);
+            }}
+            student={selectedStudentForMedia}
+            onQuotaChanged={() => {
+              // 重新檢查媒體狀態
+              checkStudentMediaStatus();
             }}
           />
         )}
