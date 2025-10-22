@@ -147,6 +147,17 @@ export default function CourseActivitiesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
+              {/* 返回主頁按鈕 */}
+              <motion.button
+                onClick={() => router.push('/aihome')}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                title="返回主頁"
+              >
+                <HomeIcon className="w-6 h-6 text-[#4B4036]" />
+              </motion.button>
+
               {/* 選單按鈕 - 只在登入時顯示 */}
               {user && (
                 <motion.button
