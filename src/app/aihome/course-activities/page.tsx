@@ -16,7 +16,10 @@ import {
   HomeIcon,
   UserIcon,
   Cog6ToothIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  TrophyIcon,
+  SparklesIcon,
+  MusicalNoteIcon
 } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import AppSidebar from '@/components/AppSidebar';
@@ -96,22 +99,22 @@ export default function CourseActivitiesPage() {
       institution: 'Hanami Music 花見音樂',
       institutionLogo: '/@hanami.png',
       description: '專業音樂教育機構，提供創新的音樂教學方法',
-      location: '香港',
+      location: '香港九龍旺角威達商業大廈504-505室',
       courses: [
         {
           id: 'hanami-main',
           name: 'Hanami Music 精選課程',
-          description: '2022-2024連續獲得優秀教育機構及導師獎。以最有趣活潑又科學的音樂教學助孩子成長發展。孩子絕對會學上癮的非傳統音樂鋼琴教學法',
+          description: '2022-2024連續獲得優秀教育機構及導師獎。以最有趣活潑又科學的音樂教學助孩子成長發展。孩子絕對會學上癮的非傳統音樂鋼琴教學法。專業團隊精心設計，以遊戲、活動與訓練讓孩子愛上音樂',
           duration: '15個月起',
           level: '初級至高級',
-          instructor: '8年資深幼師、一級榮譽特殊幼師、奧福音樂導師專業團隊',
+          instructor: '8年資深幼師、一級榮譽特殊幼師、ABA行為治療師、奧福音樂導師專業團隊',
           schedule: '靈活安排',
-          location: '多個分校',
+          location: '香港九龍旺角威達商業大廈504-505室',
           maxStudents: 8,
           currentStudents: 6,
-          price: 0,
+          price: 168,
           rating: 5.0,
-          image: '/@hanami.png',
+          image: '/HanamiMusic/musicclass.png',
           status: '招生中',
           progress: 0,
           nextClass: '立即報名開始學習'
@@ -299,15 +302,28 @@ export default function CourseActivitiesPage() {
                     {/* 課程標題和狀態 */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-[#4B4036] mb-1">{course.name}</h3>
-                        <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          course.status === '進行中' 
-                            ? 'bg-green-100 text-green-800' 
-                            : course.status === '即將開始'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {course.status}
+                        <div className="flex items-center space-x-3 mb-2">
+                          {course.image && course.image !== '/@hanami.png' && (
+                            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+                              <img 
+                                src={course.image} 
+                                alt={course.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-[#4B4036] mb-1">{course.name}</h3>
+                            <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              course.status === '進行中' 
+                                ? 'bg-green-100 text-green-800' 
+                                : course.status === '即將開始'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-[#FFD59A]/20 text-[#4B4036]'
+                            }`}>
+                              {course.status}
+                            </div>
+                          </div>
                         </div>
                       </div>
                       <ChevronRightIcon className="w-5 h-5 text-[#2B3A3B]" />
@@ -321,12 +337,18 @@ export default function CourseActivitiesPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <ClockIcon className="w-4 h-4 text-[#4B4036]" />
-                        <span className="text-sm text-[#2B3A3B]">{course.schedule}</span>
+                        <span className="text-sm text-[#2B3A3B]">{course.duration}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <MapPinIcon className="w-4 h-4 text-[#4B4036]" />
-                        <span className="text-sm text-[#2B3A3B]">{course.location}</span>
+                        <span className="text-sm text-[#2B3A3B]">香港九龍旺角</span>
                       </div>
+                      {course.price > 0 && (
+                        <div className="flex items-center space-x-2">
+                          <StarIcon className="w-4 h-4 text-[#FFD59A]" />
+                          <span className="text-sm font-bold text-[#4B4036]">試堂 ${course.price}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* 進度條 */}
@@ -355,7 +377,24 @@ export default function CourseActivitiesPage() {
                     </div>
 
                     {/* 課程描述 */}
-                    <p className="text-sm text-[#2B3A3B] leading-relaxed">{course.description}</p>
+                    <div className="text-sm text-[#2B3A3B] leading-relaxed space-y-2">
+                      <div className="flex items-start space-x-2">
+                        <TrophyIcon className="w-4 h-4 text-[#FFD59A] flex-shrink-0 mt-0.5" />
+                        <span>2022-2024連續獲得優秀教育機構及導師獎</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <SparklesIcon className="w-4 h-4 text-[#FFD59A] flex-shrink-0 mt-0.5" />
+                        <span>以最有趣活潑又科學的音樂教學助孩子成長發展</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <MusicalNoteIcon className="w-4 h-4 text-[#FFD59A] flex-shrink-0 mt-0.5" />
+                        <span>孩子絕對會學上癮的非傳統音樂鋼琴教學法</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <AcademicCapIcon className="w-4 h-4 text-[#FFD59A] flex-shrink-0 mt-0.5" />
+                        <span>專業團隊精心設計，以遊戲、活動與訓練讓孩子愛上音樂</span>
+                      </div>
+                    </div>
                   </motion.div>
                 ))}
               </div>

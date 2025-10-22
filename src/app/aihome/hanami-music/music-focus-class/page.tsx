@@ -368,49 +368,6 @@ export default function MusicFocusClassPage() {
     { grade: 'Grade 7', result: 'Merit' }
   ];
 
-  // 腦部發展功能說明
-  const brainFunctions = [
-    {
-      lobe: '額葉',
-      color: 'from-amber-200 to-amber-300',
-      icon: (
-        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
-      ),
-      benefits: ['培養專注力', '促進協調能力', '訓練大小肌']
-    },
-    {
-      lobe: '頂葉',
-      color: 'from-green-200 to-green-300',
-      icon: (
-        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
-      ),
-      benefits: ['三維空間手指彈奏', '培養空間認知能力']
-    },
-    {
-      lobe: '枕葉',
-      color: 'from-blue-200 to-blue-300',
-      icon: (
-        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
-      ),
-      benefits: ['提高認知能力']
-    },
-    {
-      lobe: '顳葉',
-      color: 'from-pink-200 to-pink-300',
-      icon: (
-        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
-      ),
-      benefits: ['加強記憶力', '提升情感表達力']
-    }
-  ];
 
   // 課程優惠
   const courseOffers = [
@@ -782,89 +739,197 @@ export default function MusicFocusClassPage() {
             >
               <div className="bg-white rounded-3xl p-8 shadow-xl border border-[#EADBC8]/50">
                 <div className="text-center mb-8">
-                  <h2 className="text-3xl font-bold text-[#4B4036] mb-4">不一樣的音樂專注力教學法</h2>
-                  <p className="text-lg text-[#2B3A3B]">用主題遊戲、繪本、多種樂器和訓練活動，非常規的音樂Playgroup！</p>
+                  <h2 className="text-4xl md:text-5xl font-bold text-[#4B4036] mb-8">不一樣的音樂教學法</h2>
+                  
+                  {/* 主要特色描述 - 使用大號字體和漸層背景 */}
+                  <div className="relative mb-8">
+                    <div className="inline-block relative">
+                      {/* 背景裝飾 */}
+                      <div className="absolute -inset-4 bg-gradient-to-r from-[#FFB6C1]/20 via-[#FFD59A]/15 to-[#EBC9A4]/20 rounded-3xl blur-sm"></div>
+                      <div className="absolute -inset-3 bg-gradient-to-r from-[#FFB6C1]/30 via-[#FFD59A]/25 to-[#EBC9A4]/30 rounded-2xl"></div>
+                      
+                      {/* 主要文字容器 */}
+                      <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl px-10 py-8 border border-[#FFD59A]/40 shadow-xl">
+                        {/* 內部裝飾點 */}
+                        <div className="absolute top-3 left-6 w-3 h-3 bg-[#FFB6C1] rounded-full opacity-70"></div>
+                        <div className="absolute top-4 right-8 w-2 h-2 bg-[#FFD59A] rounded-full opacity-60"></div>
+                        <div className="absolute bottom-4 left-8 w-3 h-3 bg-[#EBC9A4] rounded-full opacity-75"></div>
+                        <div className="absolute bottom-3 right-6 w-2 h-2 bg-[#FFB6C1] rounded-full opacity-80"></div>
+                        
+                        {/* 主要文字 */}
+                        <div className="relative z-10">
+                          <p className="text-2xl md:text-3xl font-bold text-[#4B4036] leading-relaxed">
+                            <span className="text-[#FF6B6B]">用主題遊戲、繪本、多種樂器和訓練活動</span>
+                            <br />
+                            <span className="text-[#4B4036]">非常規的</span>
+                            <span className="text-[#FF8E53] font-extrabold text-3xl md:text-4xl">音樂Playgroup！</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 次要描述 - 使用不同樣式 */}
+                  <div className="bg-gradient-to-r from-[#FFD59A]/10 to-[#EBC9A4]/10 rounded-2xl px-8 py-6 border border-[#FFD59A]/20">
+                    <p className="text-xl text-[#2B3A3B] font-medium">
+                      <span className="text-[#4B4036] font-bold text-2xl">用音樂為孩子日後學習與學樂器做好準備</span>
+                    </p>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {/* 教學特色 */}
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                      <img 
-                        src="/HanamiMusic/ManyGames.png" 
-                        alt="主題遊戲" 
-                        className="w-full h-full object-cover"
-                      />
+                  <motion.div 
+                    className="text-center group"
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="relative">
+                      <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300">
+                        <img 
+                          src="/HanamiMusic/ManyGames.png" 
+                          alt="主題遊戲" 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
+                      {/* 裝飾性光暈 */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#FFB6C1]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
-                    <h3 className="text-xl font-bold text-[#4B4036] mb-2">主題遊戲</h3>
-                    <p className="text-[#2B3A3B]">用主題遊戲建立孩子音樂興趣</p>
-                  </div>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">主題遊戲</h3>
+                    <p className="text-[#2B3A3B] text-lg font-medium">用主題遊戲建立孩子音樂興趣</p>
+                  </motion.div>
                   
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                      <img 
-                        src="/HanamiMusic/StoryTelling.png" 
-                        alt="繪本故事" 
-                        className="w-full h-full object-cover"
-                      />
+                  <motion.div 
+                    className="text-center group"
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="relative">
+                      <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300">
+                        <img 
+                          src="/HanamiMusic/StoryTelling.png" 
+                          alt="繪本故事" 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
+                      {/* 裝飾性光暈 */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#FFB6C1]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
-                    <h3 className="text-xl font-bold text-[#4B4036] mb-2">繪本故事</h3>
-                    <p className="text-[#2B3A3B]">透過繪本引導音樂學習</p>
-                  </div>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">繪本故事</h3>
+                    <p className="text-[#2B3A3B] text-lg font-medium">透過繪本引導音樂學習</p>
+                  </motion.div>
                   
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[#EBC9A4] to-[#FFB6C1] rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                      <img 
-                        src="/HanamiMusic/MusicInstrument.png" 
-                        alt="多種樂器" 
-                        className="w-full h-full object-cover"
-                      />
+                  <motion.div 
+                    className="text-center group"
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="relative">
+                      <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-[#EBC9A4] to-[#FFB6C1] rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300">
+                        <img 
+                          src="/HanamiMusic/MusicInstrument.png" 
+                          alt="多種樂器" 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
+                      {/* 裝飾性光暈 */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#EBC9A4]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
-                    <h3 className="text-xl font-bold text-[#4B4036] mb-2">多種樂器</h3>
-                    <p className="text-[#2B3A3B]">接觸不同樂器，培養音樂感知</p>
-                  </div>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">多種樂器</h3>
+                    <p className="text-[#2B3A3B] text-lg font-medium">接觸不同樂器，培養音樂感知</p>
+                  </motion.div>
                   
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                      <img 
-                        src="/HanamiMusic/train.jpg" 
-                        alt="訓練活動" 
-                        className="w-full h-full object-cover"
-                      />
+                  <motion.div 
+                    className="text-center group"
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="relative">
+                      <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300">
+                        <img 
+                          src="/HanamiMusic/train.jpg" 
+                          alt="訓練活動" 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
+                      {/* 裝飾性光暈 */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#FFD59A]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
-                    <h3 className="text-xl font-bold text-[#4B4036] mb-2">訓練活動</h3>
-                    <p className="text-[#2B3A3B]">培養專注力、小肌肉發展、語言表達等</p>
-                  </div>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">訓練活動</h3>
+                    <p className="text-[#2B3A3B] text-lg font-medium">培養專注力、小肌肉發展、語言表達等</p>
+                  </motion.div>
                   
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                      <img 
-                        src="/HanamiMusic/Rythm.png" 
-                        alt="節奏律動" 
-                        className="w-full h-full object-cover"
-                      />
+                  <motion.div 
+                    className="text-center group"
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="relative">
+                      <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300">
+                        <img 
+                          src="/HanamiMusic/Rythm.png" 
+                          alt="節奏律動" 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
+                      {/* 裝飾性光暈 */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#FFB6C1]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
-                    <h3 className="text-xl font-bold text-[#4B4036] mb-2">節奏律動</h3>
-                    <p className="text-[#2B3A3B]">培養音感與節奏感</p>
-                  </div>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">節奏律動</h3>
+                    <p className="text-[#2B3A3B] text-lg font-medium">培養音感與節奏感</p>
+                  </motion.div>
                   
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[#EBC9A4] to-[#FFB6C1] rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                      <img 
-                        src="/HanamiMusic/SmallGroup.png" 
-                        alt="小組活動式" 
-                        className="w-full h-full object-cover"
-                      />
+                  <motion.div 
+                    className="text-center group"
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="relative">
+                      <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-[#EBC9A4] to-[#FFB6C1] rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300">
+                        <img 
+                          src="/HanamiMusic/SmallGroup.png" 
+                          alt="小組活動式" 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                      </div>
+                      {/* 裝飾性光暈 */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#EBC9A4]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
-                    <h3 className="text-xl font-bold text-[#4B4036] mb-2">小組活動式</h3>
-                    <p className="text-[#2B3A3B]">培養自信心、社交能力、團隊合作精神</p>
-                  </div>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">小組活動式</h3>
+                    <p className="text-[#2B3A3B] text-lg font-medium">培養自信心、社交能力、團隊合作精神</p>
+                  </motion.div>
                 </div>
                 
-                <div className="mt-8 p-6 bg-gradient-to-r from-[#FFD59A]/10 to-[#EBC9A4]/10 rounded-2xl border border-[#FFD59A]/20">
-                  <p className="text-center text-lg text-[#4B4036] font-semibold">
-                    把握1.5歲-7歲專注力及注意力發展黃金期，讓孩子愛上音樂，建立音樂基礎，培養幼兒專注力和多種發展能力
-                  </p>
+                {/* 重點強調區塊 - 使用特殊設計 */}
+                <div className="mt-8 relative">
+                  <div className="relative inline-block w-full">
+                    {/* 背景裝飾 */}
+                    <div className="absolute -inset-4 bg-gradient-to-r from-[#FFB6C1]/20 via-[#FFD59A]/15 to-[#EBC9A4]/20 rounded-3xl blur-sm"></div>
+                    <div className="absolute -inset-3 bg-gradient-to-r from-[#FFB6C1]/30 via-[#FFD59A]/25 to-[#EBC9A4]/30 rounded-2xl"></div>
+                    
+                    {/* 主要文字容器 */}
+                    <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl px-10 py-8 border border-[#FFD59A]/40 shadow-xl">
+                      {/* 內部裝飾點 */}
+                      <div className="absolute top-3 left-6 w-3 h-3 bg-[#FFB6C1] rounded-full opacity-70"></div>
+                      <div className="absolute top-4 right-8 w-2 h-2 bg-[#FFD59A] rounded-full opacity-60"></div>
+                      <div className="absolute bottom-4 left-8 w-3 h-3 bg-[#EBC9A4] rounded-full opacity-75"></div>
+                      <div className="absolute bottom-3 right-6 w-2 h-2 bg-[#FFB6C1] rounded-full opacity-80"></div>
+                      
+                      {/* 文字內容 */}
+                      <div className="relative z-10 text-center">
+                        <p className="text-xl md:text-2xl font-bold text-[#4B4036] leading-relaxed">
+                          <span className="text-[#FF6B6B] text-2xl md:text-3xl">把握1.5歲-7歲專注力及注意力發展黃金期</span>
+                          <br />
+                          <span className="text-[#4B4036]">讓孩子愛上音樂，建立音樂基礎</span>
+                          <br />
+                          <span className="text-[#4B4036] font-extrabold text-2xl md:text-3xl">培養</span>
+                          <span className="text-[#FF6B6B] font-extrabold text-2xl md:text-3xl">幼兒專注力</span>
+                          <span className="text-[#4B4036] font-extrabold text-2xl md:text-3xl">和</span>
+                          <span className="text-[#FF8E53] font-extrabold text-2xl md:text-3xl">多種發展能力</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.section>
@@ -878,57 +943,173 @@ export default function MusicFocusClassPage() {
             >
               <div className="bg-white rounded-3xl p-8 shadow-xl border border-[#EADBC8]/50">
                 <div className="text-center mb-8">
-                  <h2 className="text-3xl font-bold text-[#4B4036] mb-4">多份研究證明 音樂專注力訓練有助</h2>
-                  <p className="text-lg text-[#2B3A3B]">科學化音樂教學法，為1.5歲以上度身訂造</p>
+                  <h2 className="text-4xl md:text-5xl font-bold text-[#4B4036] mb-8">
+                    <span className="text-[#4B4036]">用音樂為孩子日後</span>
+                    <span className="text-[#FF6B6B]">學習</span>
+                    <span className="text-[#4B4036]">與</span>
+                    <span className="text-[#FF8E53]">學樂器</span>
+                    <span className="text-[#4B4036]">做好準備</span>
+                  </h2>
+                  <p className="text-lg text-[#2B3A3B] mb-8">科學化音樂教學法，為1.5歲以上度身訂造，全面提升孩子多種能力</p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                    {/* 專注及注意力 */}
+                    <motion.div 
+                      className="text-center group"
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="relative">
+                        <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300 border-2 border-[#FFD59A]">
+                          <img 
+                            src="/HanamiMusic/focusgroup/Focus.png" 
+                            alt="專注及注意力" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
+                        {/* 裝飾性光暈 */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#FFD59A]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">專注及注意力</h3>
+                      <p className="text-[#2B3A3B] text-lg font-medium">提升專注力與注意力</p>
+                    </motion.div>
+
+                    {/* 大小肌肉 */}
+                    <motion.div 
+                      className="text-center group"
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="relative">
+                        <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300 border-2 border-[#FFB6C1]">
+                          <img 
+                            src="/HanamiMusic/focusgroup/Finemotor.png" 
+                            alt="大小肌肉" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
+                        {/* 裝飾性光暈 */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#FFB6C1]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">大小肌肉</h3>
+                      <p className="text-[#2B3A3B] text-lg font-medium">發展大小肌肉協調</p>
+                    </motion.div>
+
+                    {/* 協調能力 */}
+                    <motion.div 
+                      className="text-center group"
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="relative">
+                        <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300 border-2 border-[#EBC9A4]">
+                          <img 
+                            src="/HanamiMusic/focusgroup/Coordinate.png" 
+                            alt="協調能力" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
+                        {/* 裝飾性光暈 */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#EBC9A4]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">協調能力</h3>
+                      <p className="text-[#2B3A3B] text-lg font-medium">增強身體協調能力</p>
+                    </motion.div>
+
+                    {/* 社交表達 */}
+                    <motion.div 
+                      className="text-center group"
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="relative">
+                        <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300 border-2 border-[#FFD59A]">
+                          <img 
+                            src="/HanamiMusic/focusgroup/unnamed-5 4.png" 
+                            alt="社交表達" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
+                        {/* 裝飾性光暈 */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#FFD59A]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">社交表達</h3>
+                      <p className="text-[#2B3A3B] text-lg font-medium">促進社交與情感表達</p>
+                    </motion.div>
+
+                    {/* 認知理解 */}
+                    <motion.div 
+                      className="text-center group"
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="relative">
+                        <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300 border-2 border-[#FFB6C1]">
+                          <img 
+                            src="/HanamiMusic/focusgroup/ProblemSolving.png" 
+                            alt="認知理解" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
+                        {/* 裝飾性光暈 */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#FFB6C1]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">認知理解</h3>
+                      <p className="text-[#2B3A3B] text-lg font-medium">啟發認知與理解能力</p>
+                    </motion.div>
+
+                    {/* 音感及節奏 */}
+                    <motion.div 
+                      className="text-center group"
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="relative">
+                        <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden group-hover:shadow-2xl transition-all duration-300 border-2 border-[#EBC9A4]">
+                          <img 
+                            src="/HanamiMusic/focusgroup/Music.png" 
+                            alt="音感及節奏" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
+                        {/* 裝飾性光暈 */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#EBC9A4]/20 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#4B4036] mb-3 group-hover:text-[#FF6B6B] transition-colors duration-300">音感及節奏</h3>
+                      <p className="text-[#2B3A3B] text-lg font-medium">培養音感與節奏感</p>
+                    </motion.div>
+                  </div>
                 </div>
                 
-                {/* 腦部圖示和功能說明 */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                  {/* 腦部圖示 */}
-                  <div className="relative">
-                    <div className="w-full max-w-lg mx-auto">
-                      <img 
-                        src="/HanamiMusic/pianoclass/7.jpg" 
-                        alt="多份研究證明學琴有助腦部發展" 
-                        className="w-full h-auto object-contain rounded-2xl shadow-lg"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* 功能說明 */}
-                  <div className="space-y-6">
-                    {brainFunctions.map((func, index) => (
-                      <motion.div
-                        key={func.lobe}
-                        initial={{ opacity: 0, x: 30 }}
-                        animate={isLoaded ? { opacity: 1, x: 0 } : {}}
-                        transition={{ duration: 0.5, delay: 0.8 + index * 0.1 }}
-                        className="flex items-start space-x-4 p-4 bg-gradient-to-r from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl border border-[#FFD59A]/30"
-                      >
-                        <div className={`w-12 h-12 bg-gradient-to-br ${func.color} rounded-full flex items-center justify-center flex-shrink-0`}>
-                          {func.icon}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold text-[#4B4036] mb-2">{func.lobe}</h3>
-                          <ul className="space-y-1">
-                            {func.benefits.map((benefit, i) => (
-                              <li key={i} className="text-[#2B3A3B] text-sm flex items-center">
-                                <CheckCircleIcon className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                                {benefit}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
                 
-                <div className="mt-8 text-center">
-                  <p className="text-lg text-[#4B4036] font-semibold">
-                    花見 讓你的孩子體驗 不一樣的音樂專注力成長之路...
-                  </p>
-                </div>
+                 <div className="mt-8 text-center">
+                   <div className="relative inline-block">
+                     {/* 背景裝飾 */}
+                     <div className="absolute -inset-3 bg-gradient-to-r from-[#FFB6C1]/15 via-[#FFD59A]/10 to-[#EBC9A4]/15 rounded-2xl blur-sm"></div>
+                     <div className="absolute -inset-2 bg-gradient-to-r from-[#FFB6C1]/25 via-[#FFD59A]/20 to-[#EBC9A4]/25 rounded-xl"></div>
+                     
+                     {/* 文字容器 */}
+                     <div className="relative bg-white/80 backdrop-blur-sm rounded-xl px-8 py-6 border border-[#FFD59A]/30 shadow-lg">
+                       {/* 內部裝飾點 */}
+                       <div className="absolute top-2 left-4 w-2 h-2 bg-[#FFB6C1] rounded-full opacity-70"></div>
+                       <div className="absolute top-3 right-6 w-1.5 h-1.5 bg-[#FFD59A] rounded-full opacity-60"></div>
+                       <div className="absolute bottom-3 left-6 w-2 h-2 bg-[#EBC9A4] rounded-full opacity-50"></div>
+                       <div className="absolute bottom-2 right-4 w-1.5 h-1.5 bg-[#FFB6C1] rounded-full opacity-80"></div>
+                       
+                       {/* 文字內容 */}
+                       <div className="relative z-10">
+                         <p className="text-2xl font-bold text-[#4B4036] leading-relaxed">
+                           <span className="text-[#FF6B6B]">花見</span>
+                           <span className="text-[#4B4036]"> 讓你的孩子體驗</span>
+                           <br />
+                           <span className="text-[#4B4036]">不一樣的</span>
+                           <span className="text-[#FF8E53] font-extrabold text-3xl">音樂學習與成長之路</span>
+                           <span className="text-[#4B4036]">...</span>
+                         </p>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
               </div>
             </motion.section>
 

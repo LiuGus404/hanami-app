@@ -1142,7 +1142,15 @@ export default function HanamiMusicHomePage() {
                         <ChevronRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                       </motion.button>
                       <motion.button
-                        onClick={() => router.push('/aihome/hanami-music/piano-class')}
+                        onClick={() => {
+                          const element = document.getElementById('music-focus-class-section');
+                          if (element) {
+                            element.scrollIntoView({ 
+                              behavior: 'smooth',
+                              block: 'start'
+                            });
+                          }
+                        }}
                         whileHover={{ scale: 1.05, y: -2 }}
                         whileTap={{ scale: 0.95 }}
                         className="group px-10 py-4 bg-white/20 backdrop-blur-sm text-white border-2 border-white/50 rounded-2xl font-bold text-lg hover:bg-white/30 transition-all duration-300 flex items-center justify-center space-x-3"
@@ -1529,6 +1537,7 @@ export default function HanamiMusicHomePage() {
 
             {/* 課程介紹和收費 */}
             <motion.section
+              id="music-focus-class-section"
               initial={{ opacity: 0, y: 20 }}
               animate={isLoaded ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.8, delay: 0.6 }}

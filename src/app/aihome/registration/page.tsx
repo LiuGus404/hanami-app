@@ -35,10 +35,10 @@ export default function WaitingListRegistrationPage() {
 
   // 表單資料
   const [formData, setFormData] = useState({
-    parentName: user?.full_name || '',
-    parentPhone: user?.phone || '',
+    parentName: '',
+    parentPhone: '',
     parentCountryCode: '+852',
-    parentEmail: user?.email || '',
+    parentEmail: '',
     parentTitle: '',
     childName: '',
     childBirthDate: '',
@@ -156,6 +156,16 @@ export default function WaitingListRegistrationPage() {
     return '適合所有年齡';
   };
 
+  // 圖片圖標對應表 - 移到組件頂層
+  const imageIconMap: Record<string, string> = {
+    'piano': '/HanamiMusic/piano.png',  // 鋼琴課程使用鋼琴圖片
+    'focus': '/HanamiMusic/musicclass.png',  // 專注力班使用音樂課堂圖片
+    'musical-note': '/HanamiMusic/musicclass.png',  // 音樂專注力也使用音樂課堂圖片
+    '鋼琴': '/HanamiMusic/piano.png',  // 鋼琴課程使用鋼琴圖片
+    '音樂專注力': '/HanamiMusic/musicclass.png',  // 音樂專注力班使用音樂課堂圖片
+    '音樂專注力班': '/HanamiMusic/musicclass.png'  // 音樂專注力班使用音樂課堂圖片
+  };
+
   // 載入機構和課程資料
   useEffect(() => {
     const loadInstitutionsAndCourses = async () => {
@@ -251,34 +261,39 @@ export default function WaitingListRegistrationPage() {
     loadInstitutionsAndCourses();
   }, []);
 
-  // 初始化用戶資料，處理已包含國碼的電話號碼
+  // 初始化用戶資料，處理已包含國碼的電話號碼（如果有登入用戶）
   useEffect(() => {
-    if (user?.phone) {
-      const countryCodes = ['+852', '+86', '+886', '+65', '+60', '+66', '+84', '+63', '+62', '+1', '+44', '+81', '+82', '+61', '+64'];
-      const foundCountry = countryCodes.find(code => user.phone!.startsWith(code));
-      
-      if (foundCountry) {
-        const phoneOnly = user.phone!.replace(foundCountry, '').trim();
-        setFormData(prev => ({
-          ...prev,
-          parentPhone: phoneOnly,
-          parentCountryCode: foundCountry
-        }));
-      } else {
-        setFormData(prev => ({
-          ...prev,
-          parentPhone: user.phone!
-        }));
+    if (user) {
+      // 如果有用戶資料，預填表單
+      setFormData(prev => ({
+        ...prev,
+        parentName: user.full_name || '',
+        parentEmail: user.email || ''
+      }));
+
+      // 處理電話號碼
+      if (user.phone) {
+        const countryCodes = ['+852', '+86', '+886', '+65', '+60', '+66', '+84', '+63', '+62', '+1', '+44', '+81', '+82', '+61', '+64'];
+        const foundCountry = countryCodes.find(code => user.phone!.startsWith(code));
+        
+        if (foundCountry) {
+          const phoneOnly = user.phone!.replace(foundCountry, '').trim();
+          setFormData(prev => ({
+            ...prev,
+            parentPhone: phoneOnly,
+            parentCountryCode: foundCountry
+          }));
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            parentPhone: user.phone!
+          }));
+        }
       }
     }
   }, [user]);
 
-  // 認證保護
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/aihome/auth/login');
-    }
-  }, [user, loading, router]);
+  // 移除認證保護 - 允許未登入用戶訪問等候區註冊頁面
 
   // 表單驗證
   const validateForm = () => {
@@ -508,7 +523,7 @@ export default function WaitingListRegistrationPage() {
   };
 
   // 顯示載入狀態
-  if (loading || !isLoaded) {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] flex items-center justify-center">
         <div className="text-center">
@@ -544,7 +559,7 @@ export default function WaitingListRegistrationPage() {
             {/* 標題 */}
             <div className="text-center mb-6 sm:mb-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">等候區註冊</h1>
-              <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫聯絡資料，有合適時間時我們會優先通知您</p>
+              <p className="text-sm sm:text-base text-[#2B3A3B]"><span className="text-[#FF6B6B] font-bold text-base sm:text-lg">請填寫</span>聯絡資料，我們將會在<span className="text-[#FF6B6B] font-bold text-base sm:text-lg">有位時第一時間通知您</span></p>
             </div>
 
             {/* 表單 */}
@@ -582,7 +597,7 @@ export default function WaitingListRegistrationPage() {
               <div>
                 <label className="block text-sm font-medium text-[#4B4036] mb-2">
                   聯絡電話 <span className="text-red-500">*</span>
-                  <span className="text-gray-500 text-xs ml-2">(建議填Whatsapp電話)</span>
+                  <span className="text-gray-500 text-xs ml-2">(建議填<span className="text-[#FF6B6B] font-bold text-base sm:text-lg">Whatsapp電話</span>)</span>
                 </label>
                 <PhoneInput
                   value={formData.parentPhone}
@@ -785,8 +800,16 @@ export default function WaitingListRegistrationPage() {
                         )}
                         
                         <div className="flex items-start space-x-3 mb-3">
-                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${course.color} flex items-center justify-center flex-shrink-0`}>
-                            <course.icon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${course.color} flex items-center justify-center flex-shrink-0 overflow-hidden`}>
+                            {imageIconMap[course.name] || imageIconMap[course.icon_type] ? (
+                              <img 
+                                src={imageIconMap[course.name] || imageIconMap[course.icon_type]} 
+                                alt={course.name}
+                                className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                              />
+                            ) : (
+                              <course.icon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-bold text-[#4B4036] mb-2 text-base sm:text-lg">{course.name}班</h3>

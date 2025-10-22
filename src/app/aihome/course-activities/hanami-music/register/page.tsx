@@ -20,6 +20,7 @@ import {
   GiftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   PhoneIcon,
   EnvelopeIcon,
   UserGroupIcon,
@@ -355,6 +356,16 @@ export default function HanamiMusicRegisterPage() {
       calculatePrice(formData.courseType, formData.selectedPlan, formData.promotionCode);
     }
   }, [formData.selectedPlan, formData.courseType, formData.promotionCode]); // 移除函數依賴項
+
+  // 圖片圖標對應表 - 移到組件頂層
+  const imageIconMap: Record<string, string> = {
+    'piano': '/HanamiMusic/piano.png',  // 鋼琴課程使用鋼琴圖片
+    'focus': '/HanamiMusic/musicclass.png',  // 專注力班使用音樂課堂圖片
+    'musical-note': '/HanamiMusic/musicclass.png',  // 音樂專注力也使用音樂課堂圖片
+    '鋼琴': '/HanamiMusic/piano.png',  // 鋼琴課程使用鋼琴圖片
+    '音樂專注力': '/HanamiMusic/musicclass.png',  // 音樂專注力班使用音樂課堂圖片
+    '音樂專注力班': '/HanamiMusic/musicclass.png'  // 音樂專注力班使用音樂課堂圖片
+  };
 
   // 載入課程類型
   const loadCourseTypes = useCallback(async () => {
@@ -1357,11 +1368,11 @@ export default function HanamiMusicRegisterPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2 sm:space-x-4">
               <motion.button
-                onClick={() => router.back()}
+                onClick={() => router.push('/aihome/course-activities')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                title="返回"
+                title="返回課程活動"
               >
                 <ArrowLeftIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
               </motion.button>
@@ -1677,6 +1688,41 @@ export default function HanamiMusicRegisterPage() {
                         <p className="text-lg sm:text-xl font-bold text-[#F89090]">立即開始</p>
                       </motion.button>
                     </div>
+
+                    {/* 等候區按鈕 */}
+                    <div className="mt-6 text-center">
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => router.push('/aihome/registration')}
+                        className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                      >
+                        <ClockIcon className="w-5 h-5" />
+                        <span>加入等候區</span>
+                        <ChevronRightIcon className="w-4 h-4" />
+                      </motion.button>
+                      <p className="text-xs text-[#2B3A3B] mt-2 opacity-70">我們將會在有位時第一時間通知您</p>
+                    </div>
+
+                    {/* 動態箭頭提醒向下滑動 */}
+                    <div className="mt-8 text-center">
+                      <motion.div
+                        animate={{ 
+                          y: [0, 10, 0],
+                          opacity: [0.7, 1, 0.7]
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                      >
+                        <p className="text-sm font-medium">選擇後向下滑動按下一步</p>
+                        <ChevronDownIcon className="w-6 h-6" />
+                      </motion.div>
+                    </div>
                   </div>
                 )}
 
@@ -1723,8 +1769,16 @@ export default function HanamiMusicRegisterPage() {
                           )}
                           
                           <div className="flex items-start space-x-3 mb-3">
-                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${(course as any).color || 'from-blue-500 to-purple-600'} flex items-center justify-center flex-shrink-0`}>
-                              {(course as any).icon && React.createElement((course as any).icon, { className: "w-6 h-6 sm:w-7 sm:h-7 text-white" })}
+                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${(course as any).color || 'from-blue-500 to-purple-600'} flex items-center justify-center flex-shrink-0 overflow-hidden`}>
+                              {imageIconMap[course.name] || imageIconMap[(course as any).icon_type] ? (
+                                <img 
+                                  src={imageIconMap[course.name] || imageIconMap[(course as any).icon_type]} 
+                                  alt={course.name}
+                                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                                />
+                              ) : (
+                                (course as any).icon && React.createElement((course as any).icon, { className: "w-6 h-6 sm:w-7 sm:h-7 text-white" })
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="font-bold text-[#4B4036] mb-2 text-base sm:text-lg">{course.name}班</h3>
