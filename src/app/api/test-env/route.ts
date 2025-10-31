@@ -1,98 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
+// 測試環境變數 API 路由
 export async function GET(request: NextRequest) {
   try {
-    // 檢查環境變數
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
     const envCheck = {
-      supabaseUrl: {
-        exists: !!supabaseUrl,
-        value: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'undefined',
-        valid: supabaseUrl && supabaseUrl.startsWith('https://')
-      },
-      supabaseAnonKey: {
-        exists: !!supabaseAnonKey,
-        value: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'undefined',
-        valid: supabaseAnonKey && supabaseAnonKey.length > 0
-      },
-      supabaseServiceKey: {
-        exists: !!supabaseServiceKey,
-        value: supabaseServiceKey ? `${supabaseServiceKey.substring(0, 20)}...` : 'undefined',
-        valid: supabaseServiceKey && supabaseServiceKey.length > 0
-      }
+      // 客戶端可讀取的環境變數
+      NEXT_PUBLIC_SUPABASE_SAAS_URL: process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL ? '已設置' : '未設置',
+      NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY ? '已設置' : '未設置',
+      NEXT_PUBLIC_INGRESS_SECRET: process.env.NEXT_PUBLIC_INGRESS_SECRET ? '已設置' : '未設置',
+      NEXT_PUBLIC_N8N_JWT_TOKEN: process.env.NEXT_PUBLIC_N8N_JWT_TOKEN ? '已設置' : '未設置',
+      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || '未設置',
+      
+      // 服務端專用環境變數
+      SUPABASE_SAAS_SERVICE_ROLE_KEY: process.env.SUPABASE_SAAS_SERVICE_ROLE_KEY ? '已設置' : '未設置',
+      INGRESS_SECRET: process.env.INGRESS_SECRET ? '已設置' : '未設置',
+      N8N_JWT_SECRET: process.env.N8N_JWT_SECRET ? '已設置' : '未設置',
+      N8N_INGRESS_WEBHOOK_URL: process.env.N8N_INGRESS_WEBHOOK_URL ? '已設置' : '未設置',
     };
 
-    // 檢查是否所有環境變數都存在
-    const allEnvVarsExist = envCheck.supabaseUrl.exists && 
-                           envCheck.supabaseAnonKey.exists && 
-                           envCheck.supabaseServiceKey.exists;
-
-    if (!allEnvVarsExist) {
-      return NextResponse.json({
-        success: false,
-        error: '環境變數缺失',
-        details: envCheck
-      }, { status: 500 });
-    }
-
-    // 測試 Supabase 連接
-    let connectionTest: { success: boolean; error: string | null } = { success: false, error: null };
-    let tableTest: { success: boolean; error: string | null; count: number } = { success: false, error: null, count: 0 };
-
-    try {
-      // 測試 service role 連接
-      const supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!);
-      
-      // 測試連接
-      const { data: connectionData, error: connectionError } = await supabaseAdmin
-        .from('hanami_media_quota_levels')
-        .select('count', { count: 'exact', head: true });
-
-      if (connectionError) {
-        connectionTest = { success: false, error: connectionError.message || '未知錯誤' };
-      } else {
-        connectionTest = { success: true, error: null };
-      }
-
-      // 測試資料表訪問
-      const { data: tableData, error: tableError, count } = await supabaseAdmin
-        .from('hanami_media_quota_levels')
-        .select('*', { count: 'exact' });
-
-      if (tableError) {
-        tableTest = { success: false, error: tableError.message || '未知錯誤', count: 0 };
-      } else {
-        tableTest = { success: true, error: null, count: count || 0 };
-      }
-
-    } catch (error) {
-      connectionTest = { success: false, error: error instanceof Error ? error.message : '未知錯誤' };
-      tableTest = { success: false, error: error instanceof Error ? error.message : '未知錯誤', count: 0 };
-    }
+    console.log('🔍 [API] 環境變數檢查:', envCheck);
 
     return NextResponse.json({
       success: true,
-      environment: envCheck,
-      connection: connectionTest,
-      table: tableTest,
-      summary: {
-        envVarsOk: allEnvVarsExist,
-        connectionOk: connectionTest.success,
-        tableOk: tableTest.success,
-        recordCount: tableTest.count
-      }
+      message: '環境變數檢查完成',
+      envCheck
     });
 
   } catch (error) {
-    console.error('環境變數檢查錯誤:', error);
-    return NextResponse.json({
-      success: false,
-      error: '環境變數檢查失敗',
-      details: error instanceof Error ? error.message : '未知錯誤'
-    }, { status: 500 });
+    console.error('❌ [API] 環境變數檢查失敗:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : '未知錯誤' 
+      },
+      { status: 500 }
+    );
   }
-} 
+}

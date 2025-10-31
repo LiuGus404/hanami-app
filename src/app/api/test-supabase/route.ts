@@ -1,67 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createSaasClient } from '@/lib/supabase-saas';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    // 檢查環境變數
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+    console.log('🧪 [測試] 開始測試 Supabase 連接...');
+    
+    const supabase = createSaasClient();
+    
+    // 測試 1: 檢查 chat_messages 表是否存在
+    console.log('🧪 [測試] 檢查 chat_messages 表...');
+    const { data: tableCheck, error: tableError } = await supabase
+      .from('chat_messages')
+      .select('id')
+      .limit(1);
+    
+    if (tableError) {
+      console.error('❌ [測試] chat_messages 表錯誤:', tableError);
       return NextResponse.json({
         success: false,
-        error: '環境變數缺失',
-        env: {
-          supabaseUrl: !!supabaseUrl,
-          supabaseAnonKey: !!supabaseAnonKey,
-          supabaseServiceKey: !!supabaseServiceKey,
-        }
+        error: 'chat_messages 表錯誤',
+        details: tableError
       }, { status: 500 });
     }
-
-    // 使用anon key測試基本連接
-    const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
     
-    // 使用service key測試
-    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
-
-    // 測試1: 使用anon key查詢
-    const { data: anonData, error: anonError } = await supabaseAnon
-      .rpc('get_tables_info');
-
-    // 測試2: 使用service key查詢
-    const { data: serviceData, error: serviceError } = await supabaseService
-      .rpc('get_tables_info');
-
+    console.log('✅ [測試] chat_messages 表存在');
+    
+    // 測試 2: 檢查插入權限
+    console.log('🧪 [測試] 測試插入權限...');
+    const testData = {
+      thread_id: '0295b429-ac89-40dd-a2a2-3a7cccd468ae', // 使用有效的 UUID
+      role: 'user',
+      message_type: 'user_request',
+      content: '測試訊息',
+      status: 'queued',
+      client_msg_id: 'test-' + Date.now(),
+      content_json: { test: true }
+    };
+    
+    const { data: insertData, error: insertError } = await supabase
+      .from('chat_messages')
+      .insert(testData)
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('❌ [測試] 插入權限錯誤:', insertError);
+      return NextResponse.json({
+        success: false,
+        error: '插入權限錯誤',
+        details: insertError
+      }, { status: 500 });
+    }
+    
+    console.log('✅ [測試] 插入成功:', insertData?.id);
+    
+    // 清理測試數據
+    await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('id', insertData?.id);
+    
     return NextResponse.json({
       success: true,
-      timestamp: new Date().toISOString(),
-      env: {
-        supabaseUrl: supabaseUrl.substring(0, 20) + '...',
-        supabaseAnonKey: supabaseAnonKey.substring(0, 20) + '...',
-        supabaseServiceKey: supabaseServiceKey.substring(0, 20) + '...',
-      },
-      tests: {
-        anonKey: {
-          success: !anonError,
-          error: anonError?.message,
-          data: anonData,
-        },
-        serviceKey: {
-          success: !serviceError,
-          error: serviceError?.message,
-          data: serviceData,
-        }
-      }
+      message: 'Supabase 連接和權限正常',
+      testData: insertData
     });
-
+    
   } catch (error) {
-    console.error('Supabase測試錯誤:', error);
+    console.error('❌ [測試] 意外錯誤:', error);
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : '未知錯誤',
-      timestamp: new Date().toISOString(),
+      error: error instanceof Error ? error.message : '未知錯誤'
     }, { status: 500 });
   }
-} 
+}

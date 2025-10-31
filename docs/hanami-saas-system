@@ -50,6 +50,8 @@ CREATE TABLE public.ai_roles (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   tone text,
+  available_models ARRAY DEFAULT ARRAY['gpt-4o-mini'::text],
+  available_model_ids ARRAY DEFAULT '{}'::uuid[],
   CONSTRAINT ai_roles_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.ai_rooms (
@@ -103,7 +105,7 @@ CREATE TABLE public.chat_messages (
   agent_id text,
   content text NOT NULL DEFAULT ''::text,
   content_json jsonb DEFAULT '{}'::jsonb,
-  status text NOT NULL DEFAULT 'queued'::text CHECK (status = ANY (ARRAY['queued'::text, 'processing'::text, 'completed'::text, 'error'::text])),
+  status text NOT NULL DEFAULT 'queued'::text CHECK (status = ANY (ARRAY['queued'::text, 'processing'::text, 'completed'::text, 'error'::text, 'cancelled'::text, 'sending'::text, 'deleted'::text])),
   client_msg_id text NOT NULL,
   turn_no integer DEFAULT 0,
   parent_id uuid,
@@ -113,6 +115,14 @@ CREATE TABLE public.chat_messages (
   food_cost integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  processing_lock_id text,
+  processing_started_at timestamp with time zone,
+  processing_worker_id text,
+  retry_count integer DEFAULT 0,
+  max_retries integer DEFAULT 3,
+  last_retry_at timestamp with time zone,
+  assigned_role_id text,
+  assigned_workflow text,
   CONSTRAINT chat_messages_pkey PRIMARY KEY (id),
   CONSTRAINT chat_messages_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.chat_threads(id),
   CONSTRAINT chat_messages_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.chat_messages(id)
@@ -328,6 +338,17 @@ CREATE TABLE public.message_costs (
   CONSTRAINT message_costs_pkey PRIMARY KEY (id),
   CONSTRAINT message_costs_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.chat_threads(id)
 );
+CREATE TABLE public.message_processing_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  message_id uuid NOT NULL,
+  workflow_name text NOT NULL,
+  worker_id text,
+  event_type text NOT NULL CHECK (event_type = ANY (ARRAY['queued'::text, 'processing'::text, 'completed'::text, 'error'::text, 'cancelled'::text, 'status_change'::text])),
+  event_data jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT message_processing_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT message_processing_logs_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.chat_messages(id)
+);
 CREATE TABLE public.model_configs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   provider text NOT NULL CHECK (provider ~ '^[a-z0-9][a-z0-9\-]*$'::text),
@@ -346,12 +367,17 @@ CREATE TABLE public.model_configs (
   is_available boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  model_id text,
+  model_id text NOT NULL UNIQUE,
   input_cost_usd numeric,
   output_cost_usd numeric,
   model_type text NOT NULL DEFAULT 'text'::text,
   is_free boolean DEFAULT false,
   metadata jsonb DEFAULT '{}'::jsonb,
+  context_window_display text,
+  pricing_details jsonb DEFAULT '{}'::jsonb,
+  supported_modalities ARRAY DEFAULT ARRAY['text'::text],
+  pricing_version integer DEFAULT 1,
+  effective_date timestamp with time zone DEFAULT now(),
   CONSTRAINT model_configs_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.model_pricing (
@@ -372,6 +398,22 @@ CREATE TABLE public.model_pricing (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT model_pricing_pkey PRIMARY KEY (provider, model)
+);
+CREATE TABLE public.model_pricing_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  model_config_id uuid NOT NULL,
+  pricing_version integer NOT NULL,
+  pricing_details jsonb NOT NULL,
+  context_window integer,
+  context_window_display text,
+  supported_modalities ARRAY,
+  effective_from timestamp with time zone NOT NULL,
+  effective_until timestamp with time zone,
+  changed_by text,
+  change_reason text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT model_pricing_history_pkey PRIMARY KEY (id),
+  CONSTRAINT model_pricing_history_model_config_id_fkey FOREIGN KEY (model_config_id) REFERENCES public.model_configs(id)
 );
 CREATE TABLE public.parent_student_bindings (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -559,8 +601,8 @@ CREATE TABLE public.saas_gacha_draw_history (
   draw_count integer NOT NULL DEFAULT 1,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT saas_gacha_draw_history_pkey PRIMARY KEY (id),
-  CONSTRAINT saas_gacha_draw_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id),
-  CONSTRAINT saas_gacha_draw_history_machine_id_fkey FOREIGN KEY (machine_id) REFERENCES public.saas_gacha_machines(id)
+  CONSTRAINT saas_gacha_draw_history_machine_id_fkey FOREIGN KEY (machine_id) REFERENCES public.saas_gacha_machines(id),
+  CONSTRAINT saas_gacha_draw_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.saas_gacha_machine_rewards (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -751,7 +793,7 @@ CREATE TABLE public.saas_point_transactions (
   metadata jsonb DEFAULT '{}'::jsonb,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT saas_point_transactions_pkey PRIMARY KEY (id),
-  CONSTRAINT saas_point_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id)
+  CONSTRAINT saas_point_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.saas_story_library (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -846,7 +888,7 @@ CREATE TABLE public.saas_user_points (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT saas_user_points_pkey PRIMARY KEY (id),
-  CONSTRAINT saas_user_points_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id)
+  CONSTRAINT saas_user_points_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.saas_user_rewards (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -867,9 +909,9 @@ CREATE TABLE public.saas_user_rewards (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT saas_user_rewards_pkey PRIMARY KEY (id),
-  CONSTRAINT saas_user_rewards_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id),
   CONSTRAINT saas_user_rewards_reward_id_fkey FOREIGN KEY (reward_id) REFERENCES public.saas_gacha_rewards(id),
-  CONSTRAINT saas_user_rewards_draw_history_id_fkey FOREIGN KEY (draw_history_id) REFERENCES public.saas_gacha_draw_history(id)
+  CONSTRAINT saas_user_rewards_draw_history_id_fkey FOREIGN KEY (draw_history_id) REFERENCES public.saas_gacha_draw_history(id),
+  CONSTRAINT saas_user_rewards_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.saas_user_subscriptions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -961,4 +1003,19 @@ CREATE TABLE public.user_food_balance (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_food_balance_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.user_role_settings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  role_id uuid NOT NULL,
+  model_override text,
+  tone_override text,
+  guidance_override text,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  model_config_id uuid,
+  CONSTRAINT user_role_settings_pkey PRIMARY KEY (id),
+  CONSTRAINT user_role_settings_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.ai_roles(id),
+  CONSTRAINT user_role_settings_model_config_id_fkey FOREIGN KEY (model_config_id) REFERENCES public.model_configs(id)
 );

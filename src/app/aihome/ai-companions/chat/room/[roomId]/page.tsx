@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { 
@@ -27,6 +27,13 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { getSaasSupabaseClient } from '@/lib/supabase';
 import Image from 'next/image';
 import { PicoSettings, MoriSettings } from '@/components/ai-companion';
+import { MessageStatusIndicator } from '@/components/ai-companion/MessageStatusIndicator';
+import { FoodBalanceDisplay } from '@/components/ai-companion/FoodBalanceDisplay';
+import { SecureImageDisplay } from '@/components/ai-companion/SecureImageDisplay';
+import { convertToPublicUrl, convertToShortUrl } from '@/lib/getSignedImageUrl';
+
+// ⭐ 全局發送鎖（跨組件實例共享，防止 React Strict Mode 雙重掛載）
+const globalSendingLock = new Map<string, boolean>();
 
 // 簡繁轉換工具函數
 const simplifiedToTraditionalMap: Record<string, string> = {
@@ -72,8 +79,10 @@ interface Message {
   sender: 'user' | 'hibi' | 'mori' | 'pico' | 'system';
   timestamp: Date;
   type: 'text' | 'image' | 'task_created' | 'task_completed';
+  status?: 'queued' | 'processing' | 'completed' | 'error' | 'cancelled'; // 新增：訊息狀態
   taskId?: string;
   metadata?: any;
+  content_json?: any; // 新增：內容 JSON 資料（包含食量資訊）
 }
 
 interface Task {
@@ -332,11 +341,23 @@ export default function RoomChatPage() {
   const companionParam = urlParams.companion;
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // 直接使用 React 狀態，不使用 sessionStorage
   const [messages, setMessages] = useState<Message[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);  // ⭐ 新增發送鎖
+  const isSendingRef = useRef(false);  // ⭐ 同步發送鎖（避免 React 狀態更新延遲）
+  const subscriptionRef = useRef<any>(null);  // ⭐ 保存訂閱引用
+  const processedMessageIds = useRef(new Set<string>());  // ⭐ 追蹤已處理的訊息 ID
+  const [forceRender, setForceRender] = useState(0);  // ⭐ 選擇性重新渲染計數器
+  
+  // 選擇性重新渲染函數 - 只在特定情況下觸發
+  const triggerSelectiveRender = useCallback((reason: string) => {
+    console.log(`🔄 [選擇性渲染] 觸發原因: ${reason}`);
+    setForceRender(prev => prev + 1);
+  }, []);
   const [showTaskPanel, setShowTaskPanel] = useState(false);
   const [activeRoles, setActiveRoles] = useState<('hibi' | 'mori' | 'pico')[]>(() => {
     console.log('🏁 初始化 activeRoles 為空陣列 (將被 URL 參數或資料庫覆蓋)');
@@ -345,6 +366,60 @@ export default function RoomChatPage() {
   const [selectedCompanion, setSelectedCompanion] = useState<'hibi' | 'mori' | 'pico'>('hibi'); // 預設 hibi 統籌
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+  
+  // Pico 圖片生成快捷選項
+  const [picoImageSize, setPicoImageSize] = useState<string>(() => {
+    // 從 localStorage 讀取上次選擇的尺寸
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('picoImageSize') || '';
+    }
+    return '';
+  });
+  const [picoImageStyle, setPicoImageStyle] = useState<string>(() => {
+    // 從 localStorage 讀取上次選擇的風格
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('picoImageStyle') || '';
+    }
+    return '';
+  });
+  const [picoCustomSize, setPicoCustomSize] = useState<string>(() => {
+    // 從 localStorage 讀取上次自訂的尺寸
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('picoCustomSize') || '';
+    }
+    return '';
+  });
+  const [picoCustomStyle, setPicoCustomStyle] = useState<string>(() => {
+    // 從 localStorage 讀取上次自訂的風格
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('picoCustomStyle') || '';
+    }
+    return '';
+  });
+  const [showCustomSizeInput, setShowCustomSizeInput] = useState<boolean>(() => {
+    // 從 localStorage 判斷是否顯示自訂尺寸輸入框
+    if (typeof window !== 'undefined') {
+      const customSize = localStorage.getItem('picoCustomSize');
+      return customSize ? true : false;
+    }
+    return false;
+  });
+  const [showCustomStyleInput, setShowCustomStyleInput] = useState<boolean>(() => {
+    // 從 localStorage 判斷是否顯示自訂風格輸入框
+    if (typeof window !== 'undefined') {
+      const customStyle = localStorage.getItem('picoCustomStyle');
+      return customStyle ? true : false;
+    }
+    return false;
+  });
+  const [picoOptionsExpanded, setPicoOptionsExpanded] = useState<boolean>(() => {
+    // 從 localStorage 讀取展開狀態，預設為收起 (false)
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('picoOptionsExpanded');
+      return saved === 'true';
+    }
+    return false;
+  });
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(roomId);
   // 兼容的 UUID 生成函數
   const generateUUID = () => {
@@ -368,6 +443,10 @@ export default function RoomChatPage() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showBlackboard, setShowBlackboard] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showSearchBox, setShowSearchBox] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Message[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
   const [hasLoadedFromDatabase, setHasLoadedFromDatabase] = useState(false);
   const [editingProject, setEditingProject] = useState(false);
   const [editProjectName, setEditProjectName] = useState('');
@@ -409,6 +488,59 @@ export default function RoomChatPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+  
+  // 切換 Pico 選項展開狀態並保存到 localStorage
+  const togglePicoOptions = () => {
+    const newState = !picoOptionsExpanded;
+    setPicoOptionsExpanded(newState);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('picoOptionsExpanded', String(newState));
+    }
+  };
+  
+  // 監聽 Pico 圖片尺寸變化並保存到 localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (picoImageSize) {
+        localStorage.setItem('picoImageSize', picoImageSize);
+      } else {
+        localStorage.removeItem('picoImageSize');
+      }
+    }
+  }, [picoImageSize]);
+  
+  // 監聽 Pico 圖片風格變化並保存到 localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (picoImageStyle) {
+        localStorage.setItem('picoImageStyle', picoImageStyle);
+      } else {
+        localStorage.removeItem('picoImageStyle');
+      }
+    }
+  }, [picoImageStyle]);
+  
+  // 監聽 Pico 自訂尺寸變化並保存到 localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (picoCustomSize) {
+        localStorage.setItem('picoCustomSize', picoCustomSize);
+      } else {
+        localStorage.removeItem('picoCustomSize');
+      }
+    }
+  }, [picoCustomSize]);
+  
+  // 監聽 Pico 自訂風格變化並保存到 localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (picoCustomStyle) {
+        localStorage.setItem('picoCustomStyle', picoCustomStyle);
+      } else {
+        localStorage.removeItem('picoCustomStyle');
+      }
+    }
+  }, [picoCustomStyle]);
 
   // 檢測用戶語言偏好
   const detectUserLanguage = (): 'traditional' | 'simplified' | 'other' => {
@@ -566,6 +698,76 @@ export default function RoomChatPage() {
     }
   };
 
+  // 載入角色設定的輔助函數
+  const loadRoleSettings = async (roleId: string, userId: string) => {
+    try {
+      const supabase = getSaasSupabaseClient();
+      
+      // 映射 companion.id 到實際的 slug
+      const getRoleSlug = (companionId: string) => {
+        const slugMap: Record<string, string> = {
+          'hibi': 'hibi-manager',
+          'mori': 'mori-researcher', 
+          'pico': 'pico-artist'
+        };
+        return slugMap[companionId] || companionId;
+      };
+      
+      const roleSlug = getRoleSlug(roleId);
+      
+      // 1. 先查角色基本資訊以獲取 role_id
+      const { data: roleData } = await supabase
+        .from('ai_roles' as any)
+        .select('id, slug, name, default_model, system_prompt, tone')
+        .eq('slug', roleSlug)
+        .maybeSingle();
+      
+      if (!roleData) return {};
+      
+      // 2. 再查用戶覆寫設定
+      const { data: userSettings } = await supabase
+        .from('user_role_settings' as any)
+        .select('*')
+        .eq('user_id', userId)
+        .eq('role_id', (roleData as any).id)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      // 處理多模型：將逗號分隔的字串轉換為陣列
+      const getModels = (modelString: string | null) => {
+        if (!modelString) return [];
+        return modelString.split(',').map(m => m.trim()).filter(Boolean);
+      };
+      
+      const userModels = (userSettings as any)?.model_override ? getModels((userSettings as any).model_override) : [];
+      const defaultModels = (roleData as any).default_model ? getModels((roleData as any).default_model) : [];
+      const finalModels = userModels.length > 0 ? userModels : defaultModels;
+      
+      return {
+        id: (roleData as any).slug,
+        name: (roleData as any).name,
+        models: finalModels,
+        tone: (userSettings as any)?.tone_override || (roleData as any).tone,
+        guidance: (userSettings as any)?.guidance_override || (roleData as any).system_prompt
+      };
+    } catch (error) {
+      console.error('載入角色設定失敗:', error);
+      return {};
+    }
+  };
+
+  // 載入群組角色設定的輔助函數
+  const loadGroupRoles = async (roleIds: string[], userId: string) => {
+    const roles = [];
+    for (const roleId of roleIds) {
+      const roleSettings = await loadRoleSettings(roleId, userId);
+      if (roleSettings.id) {
+        roles.push(roleSettings);
+      }
+    }
+    return roles;
+  };
+
   // 根據 URL 參數設置角色狀態（含正規化）
   useEffect(() => {
     console.log('🔄 角色設置 useEffect 觸發, urlParams:', urlParams);
@@ -654,6 +856,295 @@ export default function RoomChatPage() {
       }
     }
   }, [hasLoadedFromDatabase, activeRoles.length, urlParams.initialRole, urlParams.companion, room.title]);
+
+  // === 訂閱引用（用於手動觸發檢查）===
+
+  // === 新增: Realtime 訊息同步 ===
+  useEffect(() => {
+    if (!roomId || !user) return;
+    
+    let cleanup: (() => void) | null = null;
+    let isSubscribed = true;  // 追蹤訂閱狀態
+    
+    const setupRealtime = async () => {
+      if (!isSubscribed) return;  // 如果已經取消訂閱，就不要設置
+      
+      const { createSimpleMessageSync } = await import('@/lib/simpleMessageSync');
+      
+      console.log('📡 [Realtime] 開始簡單訊息同步:', roomId);
+      
+      const subscription = createSimpleMessageSync(roomId, {
+        onInsert: (newMsg) => {
+          if (!isSubscribed) return;  // 檢查訂閱狀態
+          
+          console.log('📨 [Realtime] 收到新訊息:', newMsg);
+          console.log('📨 [Realtime] 訊息詳情:', {
+            id: newMsg.id,
+            role: newMsg.role,
+            content: newMsg.content,
+            status: newMsg.status,
+            content_json: newMsg.content_json
+          });
+          
+          // ⭐ 全局檢查是否已處理過（雙重檢查）
+          if (processedMessageIds.current.has(newMsg.id)) {
+            console.log('📨 [Realtime] 訊息已在全局追蹤中，跳過:', newMsg.id);
+            return;
+          }
+          
+          // 標記為已處理
+          processedMessageIds.current.add(newMsg.id);
+          console.log('📨 [Realtime] 已添加到全局追蹤:', newMsg.id, '總數:', processedMessageIds.current.size);
+          
+          // 避免重複添加
+          setMessages(prev => {
+            console.log('📨 [Realtime] 當前訊息數量:', prev.length);
+            console.log('📨 [Realtime] 檢查是否重複:', prev.some(m => m.id === newMsg.id));
+            console.log('📨 [Realtime] 新訊息 ID:', newMsg.id);
+            
+            if (prev.some(m => m.id === newMsg.id)) {
+              console.log('📨 [Realtime] 訊息已存在，跳過');
+              return prev;
+            }
+            
+            // ⭐ 檢查是否已存在相同內容的訊息（防止重複顯示）
+            if (newMsg.role === 'user' && prev.some(m => 
+              m.content === newMsg.content && 
+              m.sender === 'user' && 
+              Math.abs(new Date(newMsg.created_at).getTime() - new Date(m.timestamp).getTime()) < 10000 // 10 秒內
+            )) {
+              console.log('📨 [Realtime] 訊息已存在（內容），跳過重複的用戶訊息');
+              return prev;
+            }
+            
+            // 判斷 sender
+            let sender: any = 'user';
+            if (newMsg.role === 'assistant' || newMsg.role === 'agent') {
+              sender = newMsg.content_json?.role_name || newMsg.content_json?.meta?.role || 'hibi';
+              console.log('📨 [Realtime] 判斷為助手訊息，sender:', sender);
+            } else if (newMsg.role === 'system') {
+              sender = 'system';
+              console.log('📨 [Realtime] 判斷為系統訊息');
+            } else {
+              console.log('📨 [Realtime] 判斷為用戶訊息');
+            }
+            
+            const newMessage = {
+              id: newMsg.id,
+              content: newMsg.content,
+              sender,
+              timestamp: new Date(newMsg.created_at),
+              type: 'text' as const,
+              status: newMsg.status,
+              content_json: newMsg.content_json // 新增：保存完整的 content_json
+            };
+            
+            console.log('📨 [Realtime] 添加新訊息:', newMessage);
+            
+            // ⭐ 如果是 AI 回應，隱藏思考 UI 並更新最後一條用戶訊息狀態為 completed
+            console.log('🔍 [調試] 檢查是否需要隱藏思考 UI:', {
+              sender,
+              isUser: sender === 'user',
+              isSystem: sender === 'system',
+              isAI: sender !== 'user' && sender !== 'system',
+              currentIsLoading: isLoading,
+              currentIsTyping: isTyping
+            });
+            
+            // ⭐ 強制隱藏思考 UI - 當任何非用戶訊息到達時
+            if (sender !== 'user' && sender !== 'system') {
+              console.log('🤖 [Realtime] AI 回應到達，強制隱藏思考 UI，sender:', sender);
+              // 使用 setTimeout 確保狀態更新在下一幀執行
+              setTimeout(() => {
+                setIsLoading(false);
+                setIsTyping(false);
+                console.log('✅ [Realtime] 思考 UI 已隱藏');
+              }, 0);
+              
+              // ⭐ 將最後一條 processing 狀態的用戶訊息改為 completed
+              return prev.map((msg, index) => {
+                if (msg.sender === 'user' && msg.status === 'processing') {
+                  const isLastUserMessage = !prev.slice(index + 1).some(m => m.sender === 'user');
+                  if (isLastUserMessage) {
+                    console.log('✅ [Realtime] 更新最後一條用戶訊息狀態為 completed:', msg.id);
+                    return { ...msg, status: 'completed' as const };
+                  }
+                }
+                return msg;
+              }).concat([newMessage]);
+            }
+            
+            return [...prev, newMessage];
+          });
+          
+          // ⭐ 不觸發重新渲染，讓 React 自然更新訊息列表
+        },
+        
+        onUpdate: (updatedMsg) => {
+          if (!isSubscribed) return;  // 檢查訂閱狀態
+          
+          console.log('🔄 [Realtime UPDATE] 訊息狀態更新:', {
+            id: updatedMsg.id,
+            role: updatedMsg.role,
+            status: updatedMsg.status,
+            content_length: updatedMsg.content?.length,
+            has_content_json: !!updatedMsg.content_json
+          });
+          
+          // ⭐ 處理錯誤狀態
+          if (updatedMsg.status === 'error') {
+            console.log('❌ [Realtime UPDATE] 訊息處理錯誤:', updatedMsg.error_message, updatedMsg.content_json);
+            
+            // 隱藏思考 UI
+            setTimeout(() => {
+              setIsLoading(false);
+              setIsTyping(false);
+              console.log('✅ [Realtime UPDATE] 錯誤時隱藏思考 UI');
+            }, 0);
+            
+            // 更新訊息狀態並顯示錯誤資訊
+            setMessages(prev => prev.map(m => {
+              if (m.id === updatedMsg.id) {
+                return {
+                  ...m,
+                  status: 'error',
+                  content_json: {
+                    ...m.content_json,
+                    error_code: updatedMsg.error_message || updatedMsg.content_json?.error_code,
+                    error_details: updatedMsg.content_json?.error_details || updatedMsg.content_json?.error_message
+                  }
+                };
+              }
+              return m;
+            }));
+            
+            return;
+          }
+          
+          // ⭐ 判斷 sender（用於 AI 回應）
+          let sender: any = 'user';
+          if (updatedMsg.role === 'assistant' || updatedMsg.role === 'agent') {
+            sender = updatedMsg.content_json?.role_name || updatedMsg.content_json?.meta?.role || 'hibi';
+            console.log('🔄 [Realtime UPDATE] 判斷為助手訊息，sender:', sender);
+          } else if (updatedMsg.role === 'system') {
+            sender = 'system';
+            console.log('🔄 [Realtime UPDATE] 判斷為系統訊息');
+          } else if (updatedMsg.role === 'user') {
+            sender = 'user';
+            console.log('🔄 [Realtime UPDATE] 判斷為用戶訊息');
+          }
+          
+          // ⭐ 如果 AI 回應狀態更新為 completed，隱藏思考 UI
+          console.log('🔍 [調試] 檢查 onUpdate 是否需要隱藏思考 UI:', {
+            status: updatedMsg.status,
+            role: updatedMsg.role,
+            sender,
+            isCompleted: updatedMsg.status === 'completed',
+            isNotUser: updatedMsg.role !== 'user',
+            shouldHide: updatedMsg.status === 'completed' && updatedMsg.role !== 'user',
+            currentIsLoading: isLoading,
+            currentIsTyping: isTyping
+          });
+          
+          if (updatedMsg.status === 'completed' && updatedMsg.role !== 'user' && updatedMsg.role !== 'system') {
+            console.log('🤖 [Realtime UPDATE] AI 回應完成，強制隱藏思考 UI');
+            // 使用 setTimeout 確保狀態更新在下一幀執行
+            setTimeout(() => {
+              setIsLoading(false);
+              setIsTyping(false);
+              console.log('✅ [Realtime UPDATE] 思考 UI 已隱藏（onUpdate）');
+            }, 0);
+            
+            // ⭐ 如果這是一條新訊息（之前未見過），添加到列表
+            setMessages(prev => {
+              const messageExists = prev.some(m => m.id === updatedMsg.id);
+              
+              if (!messageExists && updatedMsg.content && updatedMsg.content.trim()) {
+                console.log('📨 [Realtime UPDATE] 首次收到 AI 回應，添加到列表');
+                const newMessage = {
+                  id: updatedMsg.id,
+                  content: updatedMsg.content,
+                  sender,
+                  timestamp: new Date(updatedMsg.created_at),
+                  type: 'text' as const,
+                  status: updatedMsg.status,
+                  content_json: updatedMsg.content_json
+                };
+                
+                // 更新用戶訊息的狀態為 completed
+                return prev.map(m => {
+                  if (m.sender === 'user' && m.status === 'processing') {
+                    return { ...m, status: 'completed' as const };
+                  }
+                  return m;
+                }).concat([newMessage]);
+              }
+              
+              // ⭐ 更新已存在的訊息
+              return prev.map(m => {
+                if (m.id === updatedMsg.id) {
+                  console.log('🔄 [Realtime UPDATE] 更新已存在的訊息:', m.id);
+                  return { 
+                    ...m, 
+                    status: updatedMsg.status, 
+                    content: updatedMsg.content,
+                    content_json: updatedMsg.content_json,
+                    sender: sender // 更新 sender（以防有變化）
+                  };
+                }
+                return m;
+              });
+            });
+          } else {
+            // ⭐ 非 completed 狀態，只更新訊息
+            setMessages(prev => prev.map(m => {
+              if (m.id === updatedMsg.id) {
+                return { 
+                  ...m, 
+                  status: updatedMsg.status, 
+                  content: updatedMsg.content, 
+                  content_json: updatedMsg.content_json 
+                };
+              }
+              return m;
+            }));
+          }
+        },
+        
+        onDelete: (messageId) => {
+          if (!isSubscribed) return;
+          
+          console.log('🗑️ [Realtime DELETE] 刪除訊息:', messageId);
+          
+          // 從訊息列表中移除
+          setMessages(prev => prev.filter(m => m.id !== messageId));
+        }
+      });
+      
+      // 保存訂閱引用，以便手動觸發檢查
+      subscriptionRef.current = subscription;
+      
+      cleanup = () => {
+        console.log('🔌 [Realtime] 取消訂閱:', roomId);
+        subscription.unsubscribe();
+        subscriptionRef.current = null;
+      };
+    };
+    
+    setupRealtime().catch(err => {
+      console.error('❌ [Realtime] 設置失敗:', err);
+    });
+    
+    // 清理函數
+    return () => {
+      console.log('🧹 [Realtime] useEffect 清理:', roomId);
+      isSubscribed = false;  // 標記為已取消訂閱
+      processedMessageIds.current.clear();  // 清理已處理的訊息 ID
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, [roomId, user]);
 
   // 最終 fallback：確保至少有一個角色顯示
   useEffect(() => {
@@ -919,7 +1410,7 @@ export default function RoomChatPage() {
       description: '系統總管狐狸，智慧的協調者和統籌中樞，負責任務分配和團隊協作',
       specialty: '系統總管',
       icon: CpuChipIcon,
-      imagePath: '/3d-character-backgrounds/studio/Hibi/Hibi.png',
+      imagePath: '/3d-character-backgrounds/studio/Hibi/lulu(front).png',
       personality: '智慧、領導力、協調能力、友善',
       abilities: ['任務統籌', '團隊協調', '智能分析', '流程優化', '決策支援'],
       color: 'from-orange-400 to-red-500',
@@ -1017,9 +1508,9 @@ export default function RoomChatPage() {
         await ensureRoomMembership(roomId, user.id);
         
         const { data: historyMessages, error } = await saasSupabase
-          .from('ai_messages')
+          .from('chat_messages')
           .select('*')
-          .eq('room_id', roomId)
+          .eq('thread_id', roomId)
           .order('created_at', { ascending: true });
 
         console.log('🔍 資料庫查詢結果:', { historyMessages, error });
@@ -1031,23 +1522,20 @@ export default function RoomChatPage() {
         }
 
         if (historyMessages && historyMessages.length > 0) {
-          // 轉換 Supabase 訊息格式
-          const convertedMessages: Message[] = historyMessages.map((msg: any) => {
-            let sender: any = 'system';
+          // ⭐ 過濾掉已刪除的訊息（status = 'deleted'）
+          const activeMessages = historyMessages.filter((msg: any) => msg.status !== 'deleted');
+          console.log(`🔍 過濾已刪除訊息: 原始 ${historyMessages.length} 條，有效 ${activeMessages.length} 條`);
+          
+          // 轉換 chat_messages 表格式
+          const convertedMessages: Message[] = activeMessages.map((msg: any) => {
+            let sender: any = 'user';
             
-            if (msg.sender_type === 'user') {
+            if (msg.role === 'user') {
               sender = 'user';
-            } else if (msg.sender_type === 'role') {
-              // 從 content_json 中獲取角色名稱
-              if (msg.content_json && msg.content_json.role_name) {
-                sender = msg.content_json.role_name;
-              } else {
-                // 備用方案：根據內容推斷角色
-                if (msg.content && msg.content.includes('皮可')) sender = 'pico';
-                else if (msg.content && msg.content.includes('墨墨')) sender = 'mori';
-                else if (msg.content && msg.content.includes('Hibi')) sender = 'hibi';
-                else sender = 'pico'; // 預設
-              }
+            } else if (msg.role === 'assistant' || msg.role === 'agent') {
+              sender = msg.content_json?.role_name || 'hibi';
+            } else if (msg.role === 'system') {
+              sender = 'system';
             }
             
             return {
@@ -1055,14 +1543,27 @@ export default function RoomChatPage() {
               content: msg.content || '',
               sender,
               timestamp: new Date(msg.created_at),
-              type: 'text',
-              metadata: msg.content_json
+              type: msg.message_type === 'image' ? 'image' : 'text',
+              status: msg.status || 'completed',
+              metadata: msg.content_json,
+              content_json: msg.content_json // 新增：保存完整的 content_json
             };
           });
           
           setMessages(convertedMessages);
           setHasLoadedHistory(true); // 標記已載入歷史訊息
           console.log(`✅ 載入了 ${convertedMessages.length} 條歷史訊息`);
+          
+          // ⭐ 檢查最後一條用戶訊息狀態，如果是 processing，顯示思考 UI
+          const lastUserMessage = convertedMessages.filter(m => m.sender === 'user').pop();
+          if (lastUserMessage && lastUserMessage.status === 'processing') {
+            console.log('🔄 [載入] 檢測到最後一條用戶訊息狀態為 processing，顯示思考 UI');
+            setIsLoading(true);
+            setIsTyping(true);
+          }
+          
+          // 觸發選擇性重新渲染 - 進入/刷新聊天室
+          triggerSelectiveRender('進入/刷新聊天室');
           
           // 載入歷史訊息後滾動到底部
           setTimeout(() => {
@@ -1176,7 +1677,15 @@ export default function RoomChatPage() {
     }, 100); // 延遲 100ms 等待 activeRoles 穩定
 
     return () => clearTimeout(timer);
-  }, [roomId, activeRoles, hasLoadedHistory, messages.length]);
+  }, [roomId, activeRoles, hasLoadedHistory]); // 移除 messages.length 避免不停渲染
+
+  // 監控訊息狀態變化
+  // useEffect(() => {
+  //   console.log('📨 [狀態監控] messages 狀態變化:', {
+  //     count: messages.length,
+  //     lastMessage: messages[messages.length - 1]
+  //   });
+  // }, [messages]); // 移除 forceRender 依賴
 
   // 自動滾動到底部 - 當訊息變化時
   useEffect(() => {
@@ -1190,7 +1699,7 @@ export default function RoomChatPage() {
     }
     // 如果沒有訊息，也要返回一個清理函數（即使是空的）
     return () => {};
-  }, [messages]);
+  }, [messages]); // 移除 forceRender 依賴，只依賴 messages
 
   // 計時器管理（從個人對話頁面複製）
   useEffect(() => {
@@ -2136,149 +2645,290 @@ export default function RoomChatPage() {
     }
   };
 
-  // 發送訊息處理函數
+  // 發送訊息處理函數 - 持久化版本
   const handleSendMessage = async () => {
-    console.log('🚀 [新版] handleSendMessage 被呼叫，輸入內容:', inputMessage.trim());
-    if (!inputMessage.trim() || isLoading) return;
+    console.log('🚀 [持久化版] handleSendMessage 被呼叫');
     
-    const messageContent = inputMessage.trim();
+    // ⭐ 驗證輸入（先驗證，避免無效內容也加鎖）
+    if (!inputMessage.trim() || isLoading || !user?.id) {
+      console.warn('⚠️ [發送] 輸入無效，忽略請求');
+      return;
+    }
+    
+    let messageContent = inputMessage.trim();
+    const roleHint = selectedCompanion || (activeRoles[0] ?? 'auto');
+    
+    // ⭐ 如果是 Pico 且有選擇 size 或 style，則合併到訊息中
+    if (roleHint === 'pico') {
+      const additionalInfo = [];
+      if (picoImageSize) {
+        additionalInfo.push(`尺寸：${picoImageSize}`);
+      }
+      if (picoImageStyle) {
+        additionalInfo.push(`風格：${picoImageStyle}`);
+      }
+      if (additionalInfo.length > 0) {
+        messageContent = `${messageContent}\n\n【圖片設定】\n${additionalInfo.join('、')}`;
+        console.log('🎨 [Pico] 添加圖片設定:', messageContent);
+      }
+    }
+    
+    const lockKey = `${roomId}-${messageContent}`;  // 使用房間ID + 內容作為鎖鍵
+    
+    // ⭐ 第一步：檢查全局鎖（防止 React Strict Mode 雙重掛載）
+    if (globalSendingLock.get(lockKey)) {
+      console.warn('⚠️ [發送] 全局鎖：正在發送中，忽略重複請求');
+      return;
+    }
+    
+    // ⭐ 第二步：立即加全局鎖（跨組件實例有效）
+    globalSendingLock.set(lockKey, true);
+    isSendingRef.current = true;
+    setIsSending(true);
+    console.log('🔒 [發送] 已加全局鎖，鎖鍵:', lockKey);
+    
+    // ⭐ 立即顯示用戶訊息（不等待 API 響應）
+    const tempMessageId = generateUUID();
     const userMessage: Message = {
-      id: generateUUID(),
+      id: tempMessageId,
       content: messageContent,
       sender: 'user',
       timestamp: new Date(),
-      type: 'text'
+      type: 'text' as const,
+      status: 'processing'
     };
     
-    await addMessage(userMessage);
+    // 立即添加到 UI
+    setMessages(prev => {
+      const newMessages = [...prev, userMessage];
+      console.log('📨 [即時] 立即添加用戶訊息到 UI:', userMessage);
+      console.log('📨 [即時] 更新後的訊息列表:', newMessages.length, '條訊息');
+      console.log('📨 [即時] 完整新訊息列表:', newMessages);
+      return newMessages;
+    });
+    
+    // ⭐ 將臨時訊息 ID 添加到全局追蹤，防止重複
+    processedMessageIds.current.add(tempMessageId);
+    console.log('📨 [即時] 已添加臨時訊息 ID 到全局追蹤:', tempMessageId);
+    
+    // ⭐ 不觸發重新渲染，讓 React 自然更新訊息列表
+    
+    // 清空輸入框
     setInputMessage('');
     setIsLoading(true);
     setIsTyping(true);
-
-    // 同步送往統一 Ingress（n8n 由後端轉發）
+    
     try {
-      const { ingressClient } = await import('@/lib/ingress');
-      const roleHint = selectedCompanion || (activeRoles[0] ?? 'auto');
-      // 準備群組成員與當前角色設定、專案資訊
-      const groupRoles = activeRoles.map((rid) => ({ id: rid }));
-      const selectedRoleMeta: any = { id: roleHint };
-      // 從 localStorage 或資料庫取得目前角色的模型/語氣/指引
-      try {
-        const saved = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('ai_role_settings_'+roleHint) || 'null') : null;
-        if (saved) {
-          selectedRoleMeta.model = saved.model;
-          selectedRoleMeta.tone = saved.tone;
-          selectedRoleMeta.guidance = saved.guidance;
-        }
-      } catch (error) {
-        console.error('載入角色設定錯誤:', error);
-      }
-      if (!selectedRoleMeta.model || !selectedRoleMeta.guidance) {
-        try {
-          const { createSaasClient } = await import('@/lib/supabase-saas');
-          const saas = createSaasClient();
-          const slugMap: Record<string, string> = { hibi: 'hibi-manager', mori: 'mori-researcher', pico: 'pico-artist' };
-          const roleSlug = slugMap[roleHint] || roleHint;
-          // 先取使用者覆寫
-          const { data: override } = await saas
-            .from('ai_roles')
-            .select('default_model, system_prompt, tone')
-            .eq('slug', `${roleSlug}_${user?.id}`)
-            .eq('creator_user_id', user?.id || '')
-            .maybeSingle();
-          const { data: base } = await saas
-            .from('ai_roles')
-            .select('default_model, system_prompt, tone')
-            .eq('slug', roleSlug)
-            .maybeSingle();
-          selectedRoleMeta.model = (override as any)?.default_model || (base as any)?.default_model;
-          selectedRoleMeta.guidance = (override as any)?.system_prompt || (base as any)?.system_prompt;
-          selectedRoleMeta.tone = (override as any)?.tone || (base as any)?.tone || selectedRoleMeta.tone;
-          // 嘗試從 system_prompt 簡單抽出語氣片段
-          if (selectedRoleMeta.guidance && !selectedRoleMeta.tone) {
-            const m = String(selectedRoleMeta.guidance).match(/[語|语]氣[^，。]*[，。]?([^。\n]+)/);
-            if (m) selectedRoleMeta.tone = m[1]?.trim();
-          }
-          if (!selectedRoleMeta.tone) {
-            const toneFallback: Record<string, string> = {
-              hibi: '友善、專業且有條理',
-              mori: '專業冷靜，提供準確有根據的資訊',
-              pico: '活潑有創意並具啟發性'
-            };
-            selectedRoleMeta.tone = toneFallback[roleHint] || '中性專業';
-          }
-        } catch (error) {
-          console.error('載入角色資料庫設定錯誤:', error);
-        }
-      }
-      // 從當前房間設定或本地狀態推斷專案資訊（避免未宣告變數）
-      let persistedProject: any = null;
-      try {
-        persistedProject = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('ai_project_'+roomId) || 'null') : null;
-      } catch (error) {
-        console.error('載入專案設定錯誤:', error);
-      }
+      // === 使用 API 路由發送訊息 ===
+      console.log('📦 [API] 開始發送訊息到 API 路由...');
+
+      // === 載入角色設定資訊 ===
+      console.log('🔍 [角色設定] 開始載入角色設定...');
+      
+      // 載入當前選擇的角色設定
+      const selectedRoleData = await loadRoleSettings(selectedCompanion, user.id);
+      console.log('✅ [角色設定] 選擇的角色設定:', selectedRoleData);
+      
+      // 載入專案資訊
       const projectInfo = {
-        title: (persistedProject?.title || room?.title || undefined) as any,
-        guidance: (persistedProject?.guidance || persistedProject?.description || (room as any)?.project_guidance || room?.description || undefined) as any
+        title: room.title,
+        description: room.description,
+        guidance: (room as any).guidance || room.description
       };
-      await ingressClient.sendMessage(roomId, messageContent, {
-        roleHint: roleHint,
-        messageType: 'user_request',
-        priority: 'normal',
-        extra: {
-          room_id: roomId,
-          source: 'aihome_room_chat',
-          companions: activeRoles,
-          session_id: currentSessionId,
-          user_id: user?.id || null
-        },
-        groupRoles,
-        selectedRole: selectedRoleMeta,
-        project: projectInfo
+      console.log('✅ [專案資訊] 專案資訊:', projectInfo);
+      
+      // 載入群組角色設定
+      const groupRoles = await loadGroupRoles(activeRoles, user.id);
+      console.log('✅ [群組角色] 群組角色設定:', groupRoles);
+
+      // === 使用 API 路由發送 ===
+      console.log('🚀 [API] 準備發送訊息:', {
+        threadId: roomId,
+        userId: user.id,
+        content: messageContent,
+        roleHint,
+        selectedRole: selectedRoleData,
+        projectInfo: projectInfo,
+        groupRoles: groupRoles
       });
-      console.log('✅ 已送往統一 Ingress');
-    } catch (e) {
-      console.error('❌ 送往 Ingress 失敗（不中斷本地流程）:', e);
-    }
-    
-    // 根據選中的角色決定回應方式
-    if (selectedCompanion === 'pico' || (activeRoles.length === 1 && activeRoles[0] === 'pico')) {
-      console.log('🚀 聊天室中發送到 Pico webhook:', messageContent);
-      try {
-        const webhookResult = await sendToPicoWebhook(messageContent);
-        
-        // 檢查 webhook 是否成功
-        if (!webhookResult || !webhookResult.success) {
-          console.error('❌ Pico webhook 回應失敗:', webhookResult?.error);
-          await addAIMessage(getCompanionErrorMessage('pico'), 'pico');
-        }
-        // 如果成功，sendToPicoWebhook 內部已經處理了回應
-      } catch (error) {
-        console.error('❌ Pico webhook 發生異常:', error);
-        await addAIMessage(getCompanionErrorMessage('pico'), 'pico');
+      
+      console.log('🔍 [API] 用戶資訊檢查:', {
+        user: !!user,
+        userId: user?.id,
+        userEmail: user?.email,
+        roomId: roomId,
+        messageContent: messageContent,
+        messageContentLength: messageContent?.length
+      });
+      
+      // 檢查必要參數
+      if (!user?.id) {
+        console.error('❌ [API] 用戶 ID 為空');
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('用戶未登入');
+        return;
       }
-    } else if (selectedCompanion === 'mori' || (activeRoles.length === 1 && activeRoles[0] === 'mori')) {
-      console.log('🚀 聊天室中發送到 Mori webhook:', messageContent);
-      try {
-        const webhookResult = await sendToMoriWebhook(messageContent);
-        
-        // 檢查 webhook 是否成功
-        if (!webhookResult || !webhookResult.success) {
-          console.error('❌ Mori webhook 回應失敗:', webhookResult?.error);
-          await addAIMessage(getCompanionErrorMessage('mori'), 'mori');
-        }
-        // 如果成功，sendToMoriWebhook 內部已經處理了回應
-      } catch (error) {
-        console.error('❌ Mori webhook 發生異常:', error);
-        await addAIMessage(getCompanionErrorMessage('mori'), 'mori');
+      
+      if (!roomId) {
+        console.error('❌ [API] 房間 ID 為空');
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('房間 ID 無效');
+        return;
       }
+      
+      if (!messageContent) {
+        console.error('❌ [API] 訊息內容為空');
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('訊息內容不能為空');
+        return;
+      }
+      
+      console.log('🚀 [Fetch] 準備發送 fetch 請求...');
+      console.log('📦 [Fetch] 請求參數:', {
+        threadId: roomId,
+        userId: user.id,
+        content: messageContent,
+        roleHint,
+        selectedRole: selectedRoleData,
+        projectInfo: projectInfo,
+        groupRoles: groupRoles
+      });
+      
+      // 添加超時控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超時
+      
+      const response = await fetch('/api/ai-companions/send-message-simple', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          threadId: roomId,
+          userId: user.id,
+          content: messageContent,
+          roleHint,
+          selectedRole: selectedRoleData,  // 新增：選擇的角色設定
+          projectInfo: projectInfo,        // 新增：專案資訊
+          groupRoles: groupRoles           // 新增：群組角色列表
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      console.log('📡 [API] HTTP 響應狀態:', response.status, response.statusText);
+      console.log('📡 [API] 響應頭:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        console.error('❌ [API] HTTP 錯誤:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ [API] 錯誤詳情:', errorText);
+        const { default: toast } = await import('react-hot-toast');
+        toast.error(`發送失敗: ${response.status} ${response.statusText}`);
+        return;
+      }
+      
+      console.log('🔍 [API] 準備解析 JSON...');
+      const result = await response.json();
+      console.log('📤 [API] 發送結果:', result);
+      console.log('📤 [API] 結果類型:', typeof result);
+      console.log('📤 [API] 結果內容:', JSON.stringify(result));
+
+      // ⭐ 更新用戶訊息狀態（使用真實的 messageId）
+      console.log('✅ 訊息已持久化:', result.messageId);
+      
+      // 更新已顯示的用戶訊息狀態
+      setMessages(prev => {
+        return prev.map(msg => {
+          if (msg.id === tempMessageId) {
+            return {
+              ...msg,
+              id: result.messageId, // 使用真實的 ID
+              // ⭐ 保持 processing 狀態，等待 AI 回應完成後才改為 completed
+              status: result.success ? 'processing' : 'error'
+            };
+          }
+          return msg;
+        });
+      });
+      
+      // ⭐ 更新全局追蹤：移除臨時 ID，添加真實 ID
+      processedMessageIds.current.delete(tempMessageId);
+      processedMessageIds.current.add(result.messageId);
+      console.log('📨 [即時] 已更新全局追蹤：移除臨時 ID，添加真實 ID:', tempMessageId, '->', result.messageId);
+      
+      // ⭐ 不觸發重新渲染，讓 React 自然更新訊息狀態
+      
+      // ⭐ 如果 n8n 失敗，顯示警告但不阻止 UI 更新
+      if (!result.success) {
+        console.warn('⚠️ n8n 工作流失敗，但用戶訊息已顯示:', result.error);
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('AI 回應可能延遲，但您的訊息已發送');
+      }
+      
+      // ⭐ 檢查是否是重複請求錯誤（n8n 返回 success:true 但有 error）
+      if (result.success && result.ingressResponse?.error === '重複請求') {
+        console.warn('⚠️ n8n 檢測到重複請求，這通常意味著訊息已在處理中');
+        const { default: toast } = await import('react-hot-toast');
+        toast('訊息已發送，正在等待 AI 回應...', { icon: '⏳' });
+      }
+        
+        
+             // ⭐ Realtime 會自動檢測並顯示 AI 回應，無需手動觸發檢查
+             console.log('✅ [發送] 訊息已發送，等待 Realtime 推送 AI 回應...');
+
+      } catch (error) {
+      console.error('❌ 發送訊息錯誤:', error);
+      console.error('❌ 錯誤詳情:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      // 更新用戶訊息狀態為錯誤
+      setMessages(prev => {
+        return prev.map(msg => {
+          if (msg.id === tempMessageId) {
+            return {
+              ...msg,
+              status: 'error'
+            };
+          }
+          return msg;
+        });
+      });
+      
+      // ⭐ 更新全局追蹤：移除臨時 ID（錯誤情況下保持臨時 ID）
+      processedMessageIds.current.delete(tempMessageId);
+      console.log('📨 [即時] 錯誤情況下已移除臨時 ID 從全局追蹤:', tempMessageId);
+      
+      // ⭐ 不觸發重新渲染，讓 React 自然更新訊息狀態
+      
+      const { default: toast } = await import('react-hot-toast');
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('請求超時，請重試');
     } else {
-      await simulateAIResponse(messageContent);
+        toast.error('發送失敗，請重試');
+      }
+    } finally {
+      // ⭐ 不解鎖思考 UI，讓它在 AI 回應完成後自然消失
+      // setIsLoading(false);
+      // setIsTyping(false);
+      
+      // ⭐ 解鎖（延遲 1 秒，確保 API 完成）
+      setTimeout(() => {
+        const lockKey = `${roomId}-${messageContent}`;
+        globalSendingLock.delete(lockKey);  // 釋放全局鎖
+        isSendingRef.current = false;
+        setIsSending(false);
+        console.log('🔓 [發送] 已解鎖全局鎖，鎖鍵:', lockKey);
+        
+        // ⭐ 清除 Pico 選項（發送後重置，但保留在 localStorage 中供下次使用）
+        // 注意：這裡不清除選項，讓用戶下次使用時可以直接使用相同的設定
+        // 如果需要清除，用戶可以手動點擊清除按鈕
+      }, 1000);
     }
-    
-    setIsLoading(false);
-    setIsTyping(false);
   };
 
   // 模擬 AI 回應
@@ -2307,7 +2957,7 @@ export default function RoomChatPage() {
     await addMessage(aiResponse);
   };
 
-  // 刪除單個訊息
+  // 刪除單個訊息（使用軟刪除）
   const handleDeleteMessage = async (messageId: string) => {
     const isConfirmed = window.confirm('確定要刪除這條訊息嗎？');
     
@@ -2316,26 +2966,129 @@ export default function RoomChatPage() {
     try {
       console.log('🗑️ 刪除單個訊息:', messageId);
       
-      // 從資料庫刪除該訊息
-      const { error } = await saasSupabase
-        .from('ai_messages')
-        .delete()
+      // 先嘗試使用安全刪除 API
+      try {
+        const response = await fetch('/api/safe-delete-message', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ messageId }),
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log('✅ 通過 API 刪除成功:', result);
+          
+          // 從前端訊息列表中移除
+          setMessages(prev => prev.filter(msg => msg.id !== messageId));
+          
+          // 觸發選擇性重新渲染 - 刪除訊息
+          triggerSelectiveRender('刪除訊息');
+          return;
+        } else {
+          console.error('❌ API 刪除失敗:', result);
+          throw new Error(result.error || 'API 刪除失敗');
+        }
+      } catch (apiError) {
+        console.warn('⚠️ API 刪除失敗，嘗試直接 Supabase 操作:', apiError);
+        
+        // 回退到直接 Supabase 操作
+      const { error } = await (saasSupabase as any)
+          .from('chat_messages')
+          .update({ 
+            status: 'deleted',
+            updated_at: new Date().toISOString()
+          })
         .eq('id', messageId);
 
       if (error) {
-        console.error('❌ 刪除訊息失敗:', error);
-        alert('刪除訊息失敗，請稍後再試。');
+          console.error('❌ 軟刪除訊息失敗:', error);
+          alert(`刪除訊息失敗: ${error.message || error}\n\n錯誤代碼: ${error.code}\n詳細資訊: ${JSON.stringify(error, null, 2)}`);
         return;
       }
+        
+        console.log('✅ 訊息已標記為刪除');
 
       // 從前端訊息列表中移除
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
-      console.log('✅ 訊息已刪除');
+        
+        // 觸發選擇性重新渲染 - 刪除訊息
+        triggerSelectiveRender('刪除訊息');
+      }
       
     } catch (error) {
       console.error('❌ 刪除訊息錯誤:', error);
-      alert('刪除訊息時發生錯誤，請稍後再試。');
+      alert(`刪除訊息時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}\n\n請檢查控制台獲取詳細資訊。`);
     }
+  };
+
+  // 搜尋對話內容
+  const handleSearchMessages = () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(-1);
+      return;
+    }
+
+    console.log('🔍 搜尋對話內容:', searchQuery);
+
+    // 在所有訊息中搜尋包含關鍵字的內容
+    const results = messages.filter(msg => {
+      // 只搜尋非刪除的訊息
+      if ((msg as any).status === 'deleted') return false;
+      
+      // 搜尋內容（不分大小寫）
+      const content = msg.content?.toLowerCase() || '';
+      const query = searchQuery.toLowerCase();
+      
+      return content.includes(query);
+    });
+
+    console.log('🔍 找到', results.length, '條符合的訊息');
+    setSearchResults(results);
+    setCurrentSearchIndex(results.length > 0 ? 0 : -1);
+    
+    // 自動滾動到第一個結果
+    if (results.length > 0) {
+      scrollToMessage(results[0].id);
+    }
+  };
+
+  // 滾動到指定訊息
+  const scrollToMessage = (messageId: string) => {
+    const messageElement = document.getElementById(`message-${messageId}`);
+    if (messageElement) {
+      messageElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+      
+      // 高亮顯示訊息
+      messageElement.classList.add('highlight-search-result');
+      setTimeout(() => {
+        messageElement.classList.remove('highlight-search-result');
+      }, 2000);
+    }
+  };
+
+  // 導航到下一個搜尋結果
+  const navigateSearchNext = () => {
+    if (searchResults.length === 0 || currentSearchIndex === -1) return;
+    
+    const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+    setCurrentSearchIndex(nextIndex);
+    scrollToMessage(searchResults[nextIndex].id);
+  };
+
+  // 導航到上一個搜尋結果
+  const navigateSearchPrev = () => {
+    if (searchResults.length === 0 || currentSearchIndex === -1) return;
+    
+    const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1;
+    setCurrentSearchIndex(prevIndex);
+    scrollToMessage(searchResults[prevIndex].id);
   };
 
   // 清除歷史訊息
@@ -2347,11 +3100,11 @@ export default function RoomChatPage() {
     try {
       console.log('🗑️ 開始清除房間歷史訊息:', roomId);
       
-      // 從資料庫刪除該房間的所有訊息
+      // 從資料庫刪除該房間的所有訊息 (使用正確的表名和欄位名)
       const { error } = await saasSupabase
-        .from('ai_messages')
+        .from('chat_messages')
         .delete()
-        .eq('room_id', roomId);
+        .eq('thread_id', roomId);
 
       if (error) {
         console.error('❌ 清除歷史訊息失敗:', error);
@@ -2362,7 +3115,7 @@ export default function RoomChatPage() {
       // 清除前端訊息列表
       setMessages([]);
       setHasLoadedHistory(false); // 重置歷史載入狀態，允許重新顯示歡迎訊息
-      console.log('✅ 歷史訊息已清除');
+      console.log('✅ 歷史訊息已從資料庫清除');
       
       // 顯示成功提示
       alert('歷史訊息已成功清除！');
@@ -2586,6 +3339,11 @@ export default function RoomChatPage() {
 
             {/* 移動端：緊湊的圖標按鈕 */}
             <div className="flex md:hidden items-center space-x-2">
+              {/* 食量餘額顯示（移動端） */}
+              {user?.id && (
+                <FoodBalanceDisplay userId={user.id} />
+              )}
+              
               {/* 團隊成員按鈕 */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -2626,6 +3384,24 @@ export default function RoomChatPage() {
                       className="absolute top-12 right-0 bg-white rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[180px] z-50"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {/* 搜尋對話 */}
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FFFBEB" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setShowSearchBox(!showSearchBox);
+                          setShowMobileMenu(false);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-[#4B4036]">
+                          {showSearchBox ? '關閉搜尋' : '搜尋對話'}
+                        </span>
+                      </motion.button>
+
                       {/* 角色設定 */}
                       <motion.button
                         whileHover={{ backgroundColor: "#FFF9F2" }}
@@ -2688,6 +3464,28 @@ export default function RoomChatPage() {
             </div>
 
             <div className="hidden md:flex items-center space-x-2">
+              {/* 食量餘額顯示（與設定按鈕一起） */}
+              {user?.id && (
+                <FoodBalanceDisplay userId={user.id} />
+              )}
+
+              {/* 搜尋按鈕 */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowSearchBox(!showSearchBox)}
+                className={`p-2 rounded-xl transition-all shadow-md ${
+                  showSearchBox 
+                    ? 'bg-[#FFD59A] text-white shadow-lg' 
+                    : 'hover:bg-[#FFD59A]/20 text-[#4B4036] hover:shadow-lg'
+                }`}
+                title="搜尋對話"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </motion.button>
+
               {/* 角色設定按鈕 */}
               <motion.button
                 whileHover={{ scale: 1.05, rotate: 15 }}
@@ -2795,6 +3593,69 @@ export default function RoomChatPage() {
       <div className="flex h-[calc(100vh-64px)]">
         {/* 主要聊天區域 */}
         <div className="flex-1 flex flex-col">
+          {/* 搜尋框 */}
+          {showSearchBox && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-white border-b border-[#EADBC8] px-6 py-4"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSearchMessages();
+                      }
+                    }}
+                    placeholder="搜尋對話內容..."
+                    className="w-full px-4 py-2 pr-12 bg-[#FFF9F2] border border-[#EADBC8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFD59A] text-[#4B4036]"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSearchMessages}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-[#FFD59A]/20 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-[#2B3A3B]/60">
+                      {currentSearchIndex + 1} / {searchResults.length}
+                    </span>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={navigateSearchPrev}
+                        className="p-2 hover:bg-[#FFD59A]/20 rounded-lg transition-colors"
+                        title="上一個"
+                      >
+                        <svg className="w-4 h-4 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={navigateSearchNext}
+                        className="p-2 hover:bg-[#FFD59A]/20 rounded-lg transition-colors"
+                        title="下一個"
+                      >
+                        <svg className="w-4 h-4 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+          
           {/* 訊息區域 或 黑板區域 */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {showBlackboard && (
@@ -2806,13 +3667,15 @@ export default function RoomChatPage() {
             )}
             {!showBlackboard && (
             <AnimatePresence>
-              {messages.map((message) => (
+              {messages.map((message, index) => (
+                <div key={`${message.id}-${index}`} id={`message-${message.id}`}>
                 <MessageBubble
-                  key={message.id}
                   message={message}
                   companion={getCompanionInfo(message.sender as any)}
                   onDelete={handleDeleteMessage}
+                    isHighlighted={currentSearchIndex >= 0 && searchResults[currentSearchIndex]?.id === message.id}
                 />
+                </div>
               ))}
             </AnimatePresence>
             )}
@@ -2856,7 +3719,7 @@ export default function RoomChatPage() {
                               : companionParam === 'mori' || selectedCompanion === 'mori'
                                 ? '/3d-character-backgrounds/studio/Mori/Mori.png'
                                 : companionParam === 'hibi' || selectedCompanion === 'hibi'
-                                  ? '/3d-character-backgrounds/studio/Hibi/Hibi.png'
+                                  ? '/3d-character-backgrounds/studio/Hibi/lulu(front).png'
                                   : '/@hanami.png';
                           return src ? (
                             <Image src={src} alt="AI 助手" width={24} height={24} className="w-6 h-6 object-cover" />
@@ -3047,7 +3910,7 @@ export default function RoomChatPage() {
                 {(() => {
                   // 顯示當前活躍的角色
                   const modes = [
-                    { id: 'hibi', label: 'Hibi', purpose: '統籌', icon: CpuChipIcon, imagePath: '/owlui.png', color: 'from-[#FF8C42] to-[#FFB366]' },
+                    { id: 'hibi', label: 'Hibi', purpose: '統籌', icon: CpuChipIcon, imagePath: '/3d-character-backgrounds/studio/Hibi/lulu(front).png', color: 'from-[#FF8C42] to-[#FFB366]' },
                     { id: 'mori', label: '墨墨', purpose: '研究', icon: AcademicCapIcon, imagePath: '/3d-character-backgrounds/studio/Mori/Mori.png', color: 'from-[#D4A574] to-[#E6C8A0]' },
                     { id: 'pico', label: '皮可', purpose: '繪圖', icon: PaintBrushIcon, imagePath: '/3d-character-backgrounds/studio/Pico/Pico.png', color: 'from-[#FFB6C1] to-[#FFCDD6]' }
                   ];
@@ -3143,6 +4006,272 @@ export default function RoomChatPage() {
             animate={{ y: 0, opacity: 1 }}
             className="p-6 pb-24 lg:pb-6 bg-gradient-to-r from-white/80 to-white/70 backdrop-blur-sm border-t border-[#EADBC8]"
           >
+            {/* Pico 圖片選項 - 只在選擇 Pico 時顯示 */}
+            {selectedCompanion === 'pico' && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 overflow-hidden"
+              >
+                {/* 展開/收起按鈕 */}
+                <motion.button
+                  onClick={togglePicoOptions}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full p-3 bg-gradient-to-r from-[#FFB6C1]/10 to-[#FFD59A]/10 rounded-xl border border-[#FFB6C1]/30 hover:border-[#FFB6C1]/50 transition-all flex items-center justify-between"
+                >
+                  <div className="flex items-center space-x-2">
+                    <PaintBrushIcon className="w-5 h-5 text-[#FFB6C1]" />
+                    <span className="text-sm font-medium text-[#4B4036]">圖片設定選項</span>
+                    {(picoImageSize || picoImageStyle) && (
+                      <span className="px-2 py-0.5 bg-[#FFB6C1]/20 rounded-full text-xs text-[#FFB6C1]">
+                        已選擇
+                      </span>
+                    )}
+                  </div>
+                  <motion.div
+                    animate={{ rotate: picoOptionsExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <svg className="w-5 h-5 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </motion.div>
+                </motion.button>
+
+                {/* 選項內容 - 可展開/收起 */}
+                <AnimatePresence>
+                  {picoOptionsExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-2 p-4 bg-gradient-to-r from-[#FFB6C1]/10 to-[#FFD59A]/10 rounded-xl border border-[#FFB6C1]/30 space-y-3">
+                        {/* 尺寸選項 */}
+                        <div>
+                          <label className="text-sm font-medium text-[#4B4036] mb-2 block flex items-center">
+                            <svg className="w-4 h-4 mr-2 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                            </svg>
+                            圖片尺寸
+                          </label>
+                    <div className="flex flex-wrap gap-2">
+                      {['1024x1024', '1024x768', '768x1024', '1920x1080', 'A4'].map((size) => (
+                        <motion.button
+                          key={size}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            setPicoImageSize(picoImageSize === size ? '' : size);
+                            setShowCustomSizeInput(false);
+                            setPicoCustomSize('');
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                            picoImageSize === size && !showCustomSizeInput
+                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                              : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                          }`}
+                        >
+                          {size}
+                        </motion.button>
+                      ))}
+                      
+                      {/* 自訂尺寸按鈕 */}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          setShowCustomSizeInput(!showCustomSizeInput);
+                          if (!showCustomSizeInput) {
+                            setPicoImageSize('');
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-1 ${
+                          showCustomSizeInput
+                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                            : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                        }`}
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        <span>自訂</span>
+                      </motion.button>
+                      
+                      {(picoImageSize || showCustomSizeInput) && (
+                        <motion.button
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => {
+                            setPicoImageSize('');
+                            setPicoCustomSize('');
+                            setShowCustomSizeInput(false);
+                          }}
+                          className="px-2 py-1.5 rounded-lg text-sm bg-red-100 text-red-600 hover:bg-red-200 transition-colors flex items-center"
+                          title="清除選擇"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                        </motion.button>
+                      )}
+                    </div>
+                    
+                    {/* 自訂尺寸輸入框 */}
+                    <AnimatePresence>
+                      {showCustomSizeInput && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <input
+                            type="text"
+                            value={picoCustomSize}
+                            onChange={(e) => {
+                              setPicoCustomSize(e.target.value);
+                              setPicoImageSize(e.target.value);
+                            }}
+                            placeholder="例如：1280x720、16:9、正方形"
+                            className="w-full mt-2 px-3 py-2 rounded-lg border border-[#FFB6C1]/30 bg-white/80 text-[#4B4036] text-sm focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]/50 placeholder-[#4B4036]/40"
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                        {/* 風格選項 */}
+                        <div>
+                          <label className="text-sm font-medium text-[#4B4036] mb-2 block flex items-center">
+                            <svg className="w-4 h-4 mr-2 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                            </svg>
+                            繪圖風格
+                          </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: 'kawaii', label: '可愛風' },
+                        { value: 'realistic', label: '寫實' },
+                        { value: 'cartoon', label: '卡通' },
+                        { value: 'anime', label: '動漫' },
+                        { value: 'watercolor', label: '水彩' },
+                        { value: 'chibi', label: 'Q版' },
+                        { value: 'pastel', label: '粉彩' }
+                      ].map((style) => (
+                        <motion.button
+                          key={style.value}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            setPicoImageStyle(picoImageStyle === style.value ? '' : style.value);
+                            setShowCustomStyleInput(false);
+                            setPicoCustomStyle('');
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                            picoImageStyle === style.value && !showCustomStyleInput
+                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                              : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                          }`}
+                        >
+                          {style.label}
+                        </motion.button>
+                      ))}
+                      
+                      {/* 自訂風格按鈕 */}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          setShowCustomStyleInput(!showCustomStyleInput);
+                          if (!showCustomStyleInput) {
+                            setPicoImageStyle('');
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-1 ${
+                          showCustomStyleInput
+                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                            : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                        }`}
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        <span>自訂</span>
+                      </motion.button>
+                      
+                      {(picoImageStyle || showCustomStyleInput) && (
+                        <motion.button
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => {
+                            setPicoImageStyle('');
+                            setPicoCustomStyle('');
+                            setShowCustomStyleInput(false);
+                          }}
+                          className="px-2 py-1.5 rounded-lg text-sm bg-red-100 text-red-600 hover:bg-red-200 transition-colors flex items-center"
+                          title="清除選擇"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                        </motion.button>
+                      )}
+                    </div>
+                    
+                    {/* 自訂風格輸入框 */}
+                    <AnimatePresence>
+                      {showCustomStyleInput && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <input
+                            type="text"
+                            value={picoCustomStyle}
+                            onChange={(e) => {
+                              setPicoCustomStyle(e.target.value);
+                              setPicoImageStyle(e.target.value);
+                            }}
+                            placeholder="例如：油畫風、像素風、扁平化、賽博龐克"
+                            className="w-full mt-2 px-3 py-2 rounded-lg border border-[#FFB6C1]/30 bg-white/80 text-[#4B4036] text-sm focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]/50 placeholder-[#4B4036]/40"
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                        {/* 當前選擇提示 */}
+                        {(picoImageSize || picoImageStyle) && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="mt-2 p-2 bg-white/60 rounded-lg text-xs text-[#4B4036]"
+                          >
+                            <span className="font-medium">已選擇：</span>
+                            {picoImageSize && <span className="ml-1 text-[#FFB6C1]">尺寸 {picoImageSize}</span>}
+                            {picoImageSize && picoImageStyle && <span className="mx-1">•</span>}
+                            {picoImageStyle && <span className="text-[#FFD59A]">風格 {
+                              [
+                                { value: 'kawaii', label: '可愛風' },
+                                { value: 'realistic', label: '寫實' },
+                                { value: 'cartoon', label: '卡通' },
+                                { value: 'anime', label: '動漫' },
+                                { value: 'watercolor', label: '水彩' },
+                                { value: 'chibi', label: 'Q版' },
+                                { value: 'pastel', label: '粉彩' }
+                              ].find(s => s.value === picoImageStyle)?.label || picoImageStyle
+                            }</span>}
+                          </motion.div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
             <div className="flex items-end space-x-4">
               <div className="flex-1">
                 <textarea
@@ -3177,7 +4306,7 @@ export default function RoomChatPage() {
                     boxShadow: { duration: 2, repeat: Infinity }
                   }}
                   onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || isLoading || isTyping}
+                  disabled={!inputMessage.trim() || isLoading || isTyping || isSending}
                   className={`relative p-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white rounded-xl shadow-lg hover:shadow-xl transition-all ${
                     !inputMessage.trim() || isLoading || isTyping 
                       ? 'opacity-50 cursor-not-allowed' 
@@ -3621,9 +4750,10 @@ interface MessageBubbleProps {
   message: Message;
   companion?: any;
   onDelete?: (messageId: string) => void;
+  isHighlighted?: boolean;
 }
 
-function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
+function MessageBubble({ message, companion, onDelete, isHighlighted = false }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
   const isSystem = message.sender === 'system';
   const [showMobileActions, setShowMobileActions] = useState(false);
@@ -3700,9 +4830,13 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+      animate={{ 
+        opacity: isHighlighted ? [1, 0.7, 1] : 1,
+        scale: isHighlighted ? [1, 1.02, 1] : 1,
+        backgroundColor: isHighlighted ? ['rgba(255, 213, 154, 0)', 'rgba(255, 213, 154, 0.3)', 'rgba(255, 213, 154, 0)'] : 'transparent'
+      }}
+      transition={{ duration: 0.3, repeat: isHighlighted ? 2 : 0 }}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${isHighlighted ? 'rounded-xl' : ''}`}
     >
       <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} items-end space-x-3 max-w-[80%]`}>
         {/* 頭像 */}
@@ -3748,10 +4882,16 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
             {/* 訊息內容 - 支援圖片顯示 */}
             <div className="whitespace-pre-wrap break-words">
               {message.content.split('\n').map((line, index) => {
-                // 檢查是否為圖片 markdown 格式
-                const imageMatch = line.match(/!\[.*?\]\((.*?)\)/);
-                if (imageMatch) {
-                  let imageUrl = imageMatch[1];
+                // ⭐ 優先檢查是否為圖片 markdown 格式（必須在直接 URL 檢查之前）
+                // 改進正則：匹配 ![alt](url) 格式，支援 URL 中包含特殊字符
+                const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+                if (imageMatch && imageMatch.index !== undefined) {
+                  let imageUrl = imageMatch[2].trim(); // 捕獲組 2 是 URL，去除首尾空格
+                  
+                  // ⭐ 提取 Markdown 圖片前後的文字（完全移除 Markdown 標記）
+                  const markdownText = imageMatch[0]; // 完整的 ![alt](url)
+                  const textBefore = line.substring(0, imageMatch.index).trim();
+                  const textAfter = line.substring(imageMatch.index + markdownText.length).trim();
                   
                   // 如果是 iframe，提取其中的圖片 URL
                   if (imageUrl.includes('<iframe')) {
@@ -3763,32 +4903,164 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
                     }
                   }
                   
+                  // ⭐ 轉換為公開 URL（用於實際載入圖片）
+                  const publicUrl = convertToPublicUrl(imageUrl);
+                  // ⭐ 轉換為簡潔 URL（用於顯示和連結）
+                  const shortUrl = convertToShortUrl(imageUrl);
+                  
                   return (
                     <div key={index} className="mt-3">
-                      <div className="bg-white/30 rounded-lg p-2 shadow-sm">
-                        <img 
-                          src={imageUrl} 
-                          alt="Pico 創作作品"
-                          className="max-w-full h-auto rounded-lg shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-                          onClick={() => window.open(imageUrl, '_blank')}
-                          onError={(e) => {
-                            console.error('圖片載入失敗:', imageUrl);
-                            e.currentTarget.parentElement!.innerHTML = `
-                              <div class="text-blue-500 underline cursor-pointer" onclick="window.open('${imageUrl}', '_blank')">
-                                🖼️ 點擊查看圖片：${imageUrl}
-                              </div>
-                            `;
-                          }}
-                          onLoad={() => {
-                            console.log('✅ 聊天室圖片載入成功:', imageUrl);
-                          }}
-                        />
-                        <p className="text-xs text-[#2B3A3B]/70 mt-1 text-center">
-                          點擊圖片可在新視窗中查看
+                      {/* 如果 Markdown 前有文字，顯示文字 */}
+                      {textBefore && <p className="mb-2 text-sm opacity-80">{textBefore}</p>}
+                      
+                      <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2">
+                        <div className="relative">
+                          <SecureImageDisplay
+                            imageUrl={imageUrl}
+                            alt="Pico 創作作品"
+                            className="max-w-full h-auto rounded-lg shadow-lg hover:shadow-xl transition-all cursor-pointer border-2 border-[#FFB6C1]/30"
+                            onClick={() => window.open(shortUrl, '_blank')}
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between bg-white/50 rounded-lg p-2">
+                          <a 
+                            href={shortUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate"
+                            title={shortUrl}
+                          >
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="truncate">{shortUrl.replace(/^https?:\/\//, '')}</span>
+                          </a>
+                          
+                          <button
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(shortUrl);
+                                const { default: toast } = await import('react-hot-toast');
+                                toast.success('連結已複製', {
+                                  icon: '📋',
+                                  duration: 2000,
+                                  style: {
+                                    background: '#fff',
+                                    color: '#4B4036',
+                                  }
+                                });
+                              } catch (err) {
+                                console.error('❌ 複製失敗:', err);
+                              }
+                            }}
+                            className="ml-2 px-2 py-1 bg-[#FFD59A]/30 hover:bg-[#FFD59A]/50 rounded text-xs text-[#4B4036] transition-colors flex-shrink-0"
+                            title="複製連結"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                            </svg>
+                          </button>
+                        </div>
+                        
+                        <p className="text-xs text-[#2B3A3B]/60 text-center">
+                          點擊圖片可在新視窗中查看完整尺寸
                         </p>
                       </div>
+                      
+                      {/* 如果 Markdown 後有文字，顯示文字 */}
+                      {textAfter && <p className="mt-2 text-sm opacity-80">{textAfter}</p>}
                     </div>
                   );
+                }
+                
+                // 檢查是否為圖片 URL（支援多種格式）- 在 Markdown 檢查之後
+                const urlMatch = line.match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s]*)?/i);
+                
+                if (urlMatch) {
+                  const imageUrl = urlMatch[0];
+                  // ⭐ 轉換為公開 URL（用於實際載入圖片）
+                  const publicUrl = convertToPublicUrl(imageUrl);
+                  // ⭐ 轉換為簡潔 URL（用於顯示和連結）
+                  const shortUrl = convertToShortUrl(imageUrl);
+                  const textBefore = line.substring(0, urlMatch.index);
+                  const textAfter = line.substring(urlMatch.index! + imageUrl.length);
+                  
+                  return (
+                    <div key={index} className="mt-3">
+                      {/* 如果 URL 前有文字，顯示文字 */}
+                      {textBefore && <p className="mb-2 text-sm opacity-80">{textBefore}</p>}
+                      
+                      {/* 圖片預覽區域 */}
+                      <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2">
+                        {/* 圖片顯示 - 使用 SecureImageDisplay 組件處理 Public Bucket */}
+                        <div className="relative">
+                          <SecureImageDisplay
+                            imageUrl={imageUrl}
+                            alt="AI 生成圖片"
+                            className="max-w-full h-auto rounded-lg shadow-lg hover:shadow-xl transition-all cursor-pointer border-2 border-[#FFB6C1]/30"
+                            onClick={() => window.open(shortUrl, '_blank')}
+                          />
+                        </div>
+                        
+                        {/* 連結和下載按鈕 */}
+                        <div className="flex items-center justify-between bg-white/50 rounded-lg p-2">
+                          <a 
+                            href={shortUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate"
+                            title={shortUrl}
+                          >
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="truncate">{shortUrl.replace(/^https?:\/\//, '')}</span>
+                          </a>
+                          
+                          {/* 複製連結按鈕 */}
+                          <button
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(shortUrl);
+                                const { default: toast } = await import('react-hot-toast');
+                                toast.success('連結已複製', {
+                                  icon: '📋',
+                                  duration: 2000,
+                                  style: {
+                                    background: '#fff',
+                                    color: '#4B4036',
+                                  }
+                                });
+                              } catch (err) {
+                                console.error('❌ 複製失敗:', err);
+                              }
+                            }}
+                            className="ml-2 px-2 py-1 bg-[#FFD59A]/30 hover:bg-[#FFD59A]/50 rounded text-xs text-[#4B4036] transition-colors flex-shrink-0"
+                            title="複製連結"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                            </svg>
+                          </button>
+                        </div>
+                        
+                        <p className="text-xs text-[#2B3A3B]/60 text-center">
+                          點擊圖片可在新視窗中查看完整尺寸
+                        </p>
+                      </div>
+                      
+                      {/* 如果 URL 後有文字，顯示文字 */}
+                      {textAfter && <p className="mt-2 text-sm opacity-80">{textAfter}</p>}
+                    </div>
+                  );
+                }
+                
+                // 一般文字內容（排除 Markdown 圖片格式）
+                // 如果整行包含 Markdown 圖片格式但沒有匹配成功，跳過顯示（避免顯示原始 Markdown）
+                if (line.includes('![') && line.includes('](') && line.includes(')')) {
+                  // 可能是未匹配成功的 Markdown 格式，跳過避免顯示原始標記
+                  return null;
                 }
                 
                 // 一般文字內容
@@ -3803,6 +5075,20 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
             <div className={`absolute -top-2 -right-2 flex space-x-1 z-10 transition-opacity duration-200
                             ${showMobileActions ? 'opacity-100' : 'opacity-0'} 
                             md:opacity-0 md:group-hover:opacity-100`}>
+              {/* 食量顯示 - 僅 AI 回應訊息顯示，靠近時才顯示 */}
+              {!isUser && message.content_json?.food?.total_food_cost && (
+                                  <motion.button
+                    whileHover={{ scale: 1.2 }}
+                    className="w-12 h-8 md:w-12 md:h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center touch-manipulation"
+                    title={`消耗 ${message.content_json.food.total_food_cost} 食量`}
+                  >
+                    <span className="text-xs font-medium flex items-center space-x-1">
+                      <img src="/apple-icon.svg" alt="蘋果" className="w-5 h-5" />
+                      <span>{message.content_json.food.total_food_cost}</span>
+                    </span>
+                  </motion.button>
+              )}
+
               {/* 複製按鈕 */}
               <motion.button
                 whileHover={{ scale: 1.2 }}
@@ -3846,12 +5132,18 @@ function MessageBubble({ message, companion, onDelete }: MessageBubbleProps) {
             )}
           </motion.div>
 
-          {/* 時間戳 */}
-          <div className={`text-xs text-[#2B3A3B]/70 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
+          {/* 時間戳與狀態 */}
+          <div className={`flex items-center space-x-2 mt-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-xs text-[#2B3A3B]/70">
             {message.timestamp.toLocaleTimeString('zh-TW', {
               hour: '2-digit',
               minute: '2-digit'
             })}
+            </span>
+            {/* 訊息狀態指示器（僅用戶訊息） */}
+            {isUser && message.status && (
+              <MessageStatusIndicator status={message.status} compact />
+            )}
           </div>
         </div>
       </div>

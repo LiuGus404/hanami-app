@@ -65,10 +65,11 @@ export class IngressClient {
       groupRoles?: Array<{ id: string; name?: string; model?: string; capabilities?: any }>;
       selectedRole?: { id: string; model?: string; tone?: string; guidance?: string };
       project?: { title?: string; guidance?: string };
+      clientMsgId?: string; // 允許傳入已生成的 client_msg_id
     } = {}
   ): Promise<IngressResponse> {
     try {
-      const clientMsgId = generateULID();
+      const clientMsgId = options.clientMsgId || generateULID(); // 優先使用傳入的 ID
       const timestamp = Date.now();
 
       const request: IngressRequest = {
@@ -199,7 +200,8 @@ export class IngressClient {
 
 // 創建默認 Ingress 客戶端實例
 export function createIngressClient(): IngressClient {
-  const secret = process.env.NEXT_PUBLIC_INGRESS_SECRET || 'your-secret-key';
+  // 在服務端（API 路由）中，可以讀取沒有 NEXT_PUBLIC_ 前綴的環境變數
+  const secret = process.env.INGRESS_SECRET || process.env.NEXT_PUBLIC_INGRESS_SECRET || 'your-secret-key';
   // 預設使用相對路徑，避免在非本機/不同域名時出現 404
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? '';
   // JWT Token for n8n webhook authentication
