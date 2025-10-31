@@ -37,7 +37,7 @@ export function createMessagePolling(
         console.log('📨 [輪詢] 發現新訊息:', data.length);
         
         for (const message of data) {
-          console.log('📨 [輪詢] 處理新訊息:', message.id);
+          console.log('📨 [輪詢] 處理新訊息:', (message as any)?.id);
           if (callbacks.onInsert) {
             callbacks.onInsert(message as ChatMessage);
           }

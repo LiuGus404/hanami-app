@@ -57,14 +57,21 @@ export default function ChatRoomExample({ roomId, user }: any) {
             }
           }
           
+          // 轉換狀態類型
+          const msgStatus = msg.status as any;
+          let status: 'completed' | 'error' | 'queued' | 'processing' | undefined = msgStatus;
+          if (msgStatus === 'cancelled' || msgStatus === 'deleted') {
+            status = 'error';
+          }
+          
           return {
             id: msg.id,
             content: msg.content,
             sender,
-            timestamp: new Date(msg.createdAt),
+            timestamp: new Date(msg.created_at),
             type: 'text' as const,
-            status: msg.status,
-            errorMessage: msg.errorMessage
+            status: status,
+            errorMessage: msg.error_message
           };
         });
         
@@ -103,13 +110,20 @@ export default function ChatRoomExample({ roomId, user }: any) {
             }
           }
           
+          // 轉換狀態類型
+          const newMsgStatus = newMsg.status as any;
+          let status: 'completed' | 'error' | 'queued' | 'processing' | undefined = newMsgStatus;
+          if (newMsgStatus === 'cancelled' || newMsgStatus === 'deleted') {
+            status = 'error';
+          }
+          
           return [...prev, {
             id: newMsg.id,
             content: newMsg.content,
             sender,
             timestamp: new Date(newMsg.created_at),
             type: 'text',
-            status: newMsg.status
+            status: status
           }];
         });
       },
@@ -117,9 +131,16 @@ export default function ChatRoomExample({ roomId, user }: any) {
       onUpdate: (updatedMsg) => {
         console.log('🔄 訊息狀態更新:', updatedMsg.id, updatedMsg.status);
         
+        // 轉換狀態類型
+        const updatedStatus = updatedMsg.status as any;
+        let status: 'completed' | 'error' | 'queued' | 'processing' | undefined = updatedStatus;
+        if (updatedStatus === 'cancelled' || updatedStatus === 'deleted') {
+          status = 'error';
+        }
+        
         setMessages(prev => prev.map(m => 
           m.id === updatedMsg.id 
-            ? { ...m, status: updatedMsg.status, content: updatedMsg.content }
+            ? { ...m, status: status, content: updatedMsg.content }
             : m
         ));
       }

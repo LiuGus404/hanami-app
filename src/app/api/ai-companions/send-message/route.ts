@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // === 步驟 1: 寫入訊息到 Supabase ===
     const { data: userMsg, error: insertError } = await supabase
-      .from('chat_messages')
+      .from('chat_messages' as any)
       .insert({
         thread_id: threadId,
         role: 'user',
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log('✅ [API] 訊息已保存到 Supabase:', userMsg.id);
+    console.log('✅ [API] 訊息已保存到 Supabase:', (userMsg as any)?.id);
 
     // === 步驟 2: 發送到 n8n ===
     try {
@@ -98,29 +98,29 @@ export async function POST(request: NextRequest) {
         extra: {
           ...extra,
           user_id: userId,
-          client_msg_id: clientMsgId
+          client_msg_id: clientMsgId,
+          sessionId
         },
         groupRoles,
         selectedRole,
-        project,
-        sessionId
-      });
+        project
+      } as any);
 
       if (ingressResponse.success) {
         console.log('✅ [API] 成功發送到 n8n:', ingressResponse);
         
         // 更新訊息狀態為 processing
-        await supabase
+        await (supabase as any)
           .from('chat_messages')
           .update({ 
             status: 'processing',
             updated_at: new Date().toISOString()
           })
-          .eq('id', userMsg.id);
+          .eq('id', (userMsg as any)?.id);
 
         return NextResponse.json({
           success: true,
-          messageId: userMsg.id,
+          messageId: (userMsg as any)?.id,
           clientMsgId,
           ingressResponse
         });
@@ -128,19 +128,19 @@ export async function POST(request: NextRequest) {
         console.error('❌ [API] n8n 發送失敗:', ingressResponse.error);
         
         // 更新訊息狀態為 error
-        await supabase
+        await (supabase as any)
           .from('chat_messages')
           .update({ 
             status: 'error',
             error_message: ingressResponse.error,
             updated_at: new Date().toISOString()
           })
-          .eq('id', userMsg.id);
+          .eq('id', (userMsg as any)?.id);
 
         return NextResponse.json({
           success: false,
           error: ingressResponse.error,
-          messageId: userMsg.id,
+          messageId: (userMsg as any)?.id,
           clientMsgId
         });
       }
@@ -148,19 +148,19 @@ export async function POST(request: NextRequest) {
       console.error('❌ [API] n8n 發送異常:', n8nError);
       
       // 更新訊息狀態為 error
-      await supabase
+      await (supabase as any)
         .from('chat_messages')
         .update({ 
           status: 'error',
           error_message: n8nError instanceof Error ? n8nError.message : 'n8n 發送異常',
           updated_at: new Date().toISOString()
         })
-        .eq('id', userMsg.id);
+        .eq('id', (userMsg as any)?.id);
 
       return NextResponse.json({
         success: false,
         error: n8nError instanceof Error ? n8nError.message : 'n8n 發送異常',
-        messageId: userMsg.id,
+        messageId: (userMsg as any)?.id,
         clientMsgId
       });
     }

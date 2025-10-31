@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
       content_json: { test: true }
     };
     
-    const { data: insertData, error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await (supabase as any)
       .from('chat_messages')
-      .insert(testData)
+      .insert(testData as any)
       .select()
       .single();
     

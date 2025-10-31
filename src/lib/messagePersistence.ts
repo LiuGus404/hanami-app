@@ -66,7 +66,7 @@ export async function persistAndSendMessage(
   
   try {
     // === 步驟 1: 寫入訊息到 Supabase ===
-        const { data: userMsg, error: insertError } = await supabase
+        const { data: userMsg, error: insertError } = await (supabase as any)
           .from('chat_messages')
           .insert({
             thread_id: threadId,
@@ -81,7 +81,7 @@ export async function persistAndSendMessage(
               ...options.extra
             },
             created_at: new Date().toISOString()
-          })
+          } as any)
           .select()
           .single();
 
@@ -188,13 +188,13 @@ async function sendToN8nBackground(
         // 最後一次失敗，更新訊息狀態為 error
         console.error('❌ [n8n] 所有重試均失敗，標記訊息為錯誤');
         
-        await supabase
+        await (supabase as any)
           .from('chat_messages')
           .update({
             status: 'error',
             error_message: '無法連接到 AI 服務，請稍後重試',
             updated_at: new Date().toISOString()
-          })
+          } as any)
           .eq('client_msg_id', clientMsgId);
       } else {
         // 等待後重試（指數退避）
@@ -326,26 +326,26 @@ export async function retryFailedMessage(
     }
     
     // 重置狀態為 queued
-    await supabase
+    await (supabase as any)
       .from('chat_messages')
       .update({
         status: 'queued',
         error_message: null,
         updated_at: new Date().toISOString()
-      })
+      } as any)
       .eq('client_msg_id', clientMsgId);
     
     // 重新發送到 n8n
-    const userId = msg.content_json?.user_id || '';
-    const roleHint = msg.content_json?.role_hint || 'auto';
+    const userId = (msg as any)?.content_json?.user_id || '';
+    const roleHint = (msg as any)?.content_json?.role_hint || 'auto';
     
     await sendToN8nBackground(clientMsgId, {
-      threadId: msg.thread_id,
+      threadId: (msg as any)?.thread_id,
       userId,
-      content: msg.content,
+      content: (msg as any)?.content,
       roleHint,
-      messageType: msg.message_type,
-      extra: msg.content_json
+      messageType: (msg as any)?.message_type,
+      extra: (msg as any)?.content_json
     }, ingressClient);
     
     return { success: true };
@@ -379,9 +379,9 @@ export async function updateMessageStatus(
       updateData.error_message = errorMessage;
     }
     
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('chat_messages')
-      .update(updateData)
+      .update(updateData as any)
       .eq('id', messageId);
     
     if (error) {

@@ -61,7 +61,7 @@ export function CreateRoleModal({ isOpen, onClose, onSave, userId }: CreateRoleM
     try {
       const supabase = getSaasSupabaseClient();
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('ai_roles')
         .insert({
           name: formData.name.trim(),
@@ -76,7 +76,7 @@ export function CreateRoleModal({ isOpen, onClose, onSave, userId }: CreateRoleM
           creator_user_id: userId,
           is_public: false,
           status: 'active'
-        })
+        } as any)
         .select()
         .single();
       

@@ -111,7 +111,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
           .single();
         
         if (thread) {
-          threadId = thread.id;
+          threadId = (thread as any)?.id;
         }
 
         // 查詢房間角色
@@ -199,7 +199,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
       // 如果有成本記錄，獲取對應的訊息資料
       let messageRecords: any[] = [];
       if (costRecords && costRecords.length > 0) {
-        const messageIds = costRecords.map(record => record.message_id).filter(Boolean);
+        const messageIds = costRecords.map((record: any) => record.message_id).filter(Boolean);
         if (messageIds.length > 0) {
           const { data: messages, error: messageError } = await saasSupabase
             .from('chat_messages')
@@ -225,6 +225,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         const message = messageMap.get(record.message_id);
         return {
           id: record.id,
+          room_id: roomId || '',
           thread_id: record.thread_id,
           provider: record.model_provider || 'OpenRouter',
           model: record.model_name || 'unknown',
@@ -254,11 +255,11 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
       if (costRecords && costRecords.length > 0) {
         for (const record of costRecords) {
           // 直接使用 food_amount 欄位（已經從 message_costs 表獲取）
-          const food = record.food_amount || 0;
+          const food = (record as any)?.food_amount || 0;
           totalFoodConsumed += food;
 
           // 從關聯的 chat_messages 提取角色資訊
-          const msg = record.chat_messages;
+          const msg = (record as any)?.chat_messages;
           let roleSlug = 'hibi-manager'; // 默認為 Hibi
           
           // 嘗試從 role_hint 提取
@@ -293,7 +294,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
             };
           }
 
-          const totalTokens = record.total_tokens || 0;
+          const totalTokens = (record as any)?.total_tokens || 0;
 
           const existing = roleStats.get(roleSlug);
           if (existing) {

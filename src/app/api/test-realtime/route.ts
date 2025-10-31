@@ -8,7 +8,7 @@ export async function GET() {
     const clientMsgId = generateULID();
     
     // 插入測試訊息
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('chat_messages')
       .insert({
         thread_id: '0295b429-ac89-40dd-a2a2-3a7cccd468ae',
@@ -22,7 +22,7 @@ export async function GET() {
           role_name: 'hibi'
         },
         created_at: new Date().toISOString()
-      })
+      } as any)
       .select()
       .single();
 

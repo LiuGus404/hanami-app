@@ -10,7 +10,7 @@ export async function GET() {
     console.log('🧪 [API] 開始插入測試訊息...');
     
     // 插入測試訊息
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('chat_messages')
       .insert({
         thread_id: '0295b429-ac89-40dd-a2a2-3a7cccd468ae',
@@ -25,7 +25,7 @@ export async function GET() {
           timestamp: new Date().toISOString()
         },
         created_at: new Date().toISOString()
-      })
+      } as any)
       .select()
       .single();
 
@@ -39,14 +39,14 @@ export async function GET() {
     // 等待一秒後更新狀態
     setTimeout(async () => {
       console.log('🔄 [API] 更新訊息狀態...');
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('chat_messages')
         .update({ 
           status: 'completed',
           content: `測試訊息已更新 ${new Date().toLocaleTimeString()}`,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', data.id);
+        } as any)
+        .eq('id', (data as any)?.id);
         
       if (updateError) {
         console.error('❌ [API] 更新訊息失敗:', updateError);

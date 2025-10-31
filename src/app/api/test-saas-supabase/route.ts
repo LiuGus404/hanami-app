@@ -62,9 +62,9 @@ export async function POST(request: NextRequest) {
     const saasSupabase = getSaasSupabaseClient();
     
     // 測試軟刪除
-    const { data, error } = await saasSupabase
+    const { data, error } = await (saasSupabase as any)
       .from('chat_messages')
-      .update({ status: 'deleted' })
+      .update({ status: 'deleted' } as any)
       .eq('id', messageId)
       .select();
     

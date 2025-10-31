@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     
     // 2. 檢查當前狀態
     console.log('2. 檢查當前狀態...');
-    if (messageData.status === 'deleted') {
+    if ((messageData as any)?.status === 'deleted') {
       return NextResponse.json({
         success: true,
         message: 'Message already deleted',
@@ -57,12 +57,12 @@ export async function POST(request: NextRequest) {
     
     // 3. 嘗試軟刪除
     console.log('3. 嘗試軟刪除...');
-    const { data: updateData, error: updateError } = await saasSupabase
+    const { data: updateData, error: updateError } = await (saasSupabase as any)
       .from('chat_messages')
       .update({ 
         status: 'deleted',
         updated_at: new Date().toISOString()
-      })
+      } as any)
       .eq('id', messageId)
       .select();
     

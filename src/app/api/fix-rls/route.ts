@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
     
     for (const policyName of policiesToDrop) {
       try {
-        await supabase.rpc('exec_sql', {
+        await (supabase as any).rpc('exec_sql', {
           sql: `DROP POLICY IF EXISTS "${policyName}" ON public.chat_messages;`
-        });
+        } as any);
         console.log(`✅ [API] 刪除政策: ${policyName}`);
       } catch (error) {
         console.log(`⚠️ [API] 政策不存在或刪除失敗: ${policyName}`);
@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
         FOR ALL USING (true) WITH CHECK (true);
     `;
     
-    const { error: policyError } = await supabase.rpc('exec_sql', {
+    const { error: policyError } = await (supabase as any).rpc('exec_sql', {
       sql: createPolicySQL
-    });
+    } as any);
     
     if (policyError) {
       console.error('❌ [API] 創建政策失敗:', policyError);
@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
         FOR ALL USING (true) WITH CHECK (true);
     `;
     
-    const { error: threadPolicyError } = await supabase.rpc('exec_sql', {
+    const { error: threadPolicyError } = await (supabase as any).rpc('exec_sql', {
       sql: createThreadPolicySQL
-    });
+    } as any);
     
     if (threadPolicyError) {
       console.error('❌ [API] 創建 chat_threads 政策失敗:', threadPolicyError);
@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString()
     };
     
-    const { data: insertTest, error: insertError } = await supabase
+    const { data: insertTest, error: insertError } = await (supabase as any)
       .from('chat_messages')
-      .insert(testMessage)
+      .insert(testMessage as any)
       .select()
       .single();
     

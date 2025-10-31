@@ -10,7 +10,7 @@ export async function GET() {
     console.log('🧪 [完整測試] 開始完整系統測試...');
     
     // 1. 插入用戶訊息
-    const { data: userMsg, error: userError } = await supabase
+    const { data: userMsg, error: userError } = await (supabase as any)
       .from('chat_messages')
       .insert({
         thread_id: '0295b429-ac89-40dd-a2a2-3a7cccd468ae',
@@ -25,7 +25,7 @@ export async function GET() {
           test: true
         },
         created_at: new Date().toISOString()
-      })
+      } as any)
       .select()
       .single();
 
@@ -34,19 +34,19 @@ export async function GET() {
       return NextResponse.json({ success: false, error: userError.message }, { status: 500 });
     }
 
-    console.log('✅ [完整測試] 用戶訊息已插入:', userMsg.id);
+    console.log('✅ [完整測試] 用戶訊息已插入:', (userMsg as any)?.id);
     
     // 2. 模擬 n8n 處理：更新用戶訊息狀態
     setTimeout(async () => {
       console.log('🔄 [完整測試] 模擬 n8n 處理...');
       
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('chat_messages')
         .update({ 
           status: 'processing',
           updated_at: new Date().toISOString()
-        })
-        .eq('id', userMsg.id);
+        } as any)
+        .eq('id', (userMsg as any)?.id);
         
       if (updateError) {
         console.error('❌ [完整測試] 更新用戶訊息狀態失敗:', updateError);
@@ -59,7 +59,7 @@ export async function GET() {
       setTimeout(async () => {
         const assistantMsgId = generateULID();
         
-        const { data: assistantMsg, error: assistantError } = await supabase
+        const { data: assistantMsg, error: assistantError } = await (supabase as any)
           .from('chat_messages')
           .insert({
             thread_id: '0295b429-ac89-40dd-a2a2-3a7cccd468ae',
@@ -68,7 +68,7 @@ export async function GET() {
             content: '這是完整的系統測試回覆，驗證整個流程是否正常工作。',
             status: 'completed',
             client_msg_id: assistantMsgId,
-            parent_id: userMsg.id,
+            parent_id: (userMsg as any)?.id,
             content_json: {
               role_name: 'hibi',
               test: true,
@@ -76,7 +76,7 @@ export async function GET() {
               model: 'test-model'
             },
             created_at: new Date().toISOString()
-          })
+          } as any)
           .select()
           .single();
           
@@ -85,17 +85,17 @@ export async function GET() {
           return;
         }
         
-        console.log('✅ [完整測試] 助手訊息已插入:', assistantMsg.id);
+        console.log('✅ [完整測試] 助手訊息已插入:', (assistantMsg as any)?.id);
         
         // 4. 更新用戶訊息為完成
         setTimeout(async () => {
-          const { error: finalUpdateError } = await supabase
+          const { error: finalUpdateError } = await (supabase as any)
             .from('chat_messages')
             .update({ 
               status: 'completed',
               updated_at: new Date().toISOString()
-            })
-            .eq('id', userMsg.id);
+            } as any)
+            .eq('id', (userMsg as any)?.id);
             
           if (finalUpdateError) {
             console.error('❌ [完整測試] 最終更新失敗:', finalUpdateError);
@@ -112,7 +112,7 @@ export async function GET() {
     return NextResponse.json({ 
       success: true, 
       message: '完整系統測試已啟動，請檢查前端是否收到所有更新',
-      userMessageId: userMsg.id,
+      userMessageId: (userMsg as any)?.id,
       clientMsgId,
       timestamp: new Date().toISOString()
     });

@@ -43,14 +43,14 @@ export function createSimpleMessageSync(
         
         for (const message of sortedData) {
           // 檢查是否已處理過
-          if (seenMessageIds.has(message.id)) {
+          if (seenMessageIds.has((message as any)?.id)) {
             continue;
           }
           
-          console.log('📨 [簡化同步] 處理訊息:', message.id, 'role:', message.role, '內容:', message.content?.substring(0, 20));
+          console.log('📨 [簡化同步] 處理訊息:', (message as any)?.id, 'role:', (message as any)?.role, '內容:', (message as any)?.content?.substring(0, 20));
           
           // 標記為已處理
-          seenMessageIds.add(message.id);
+          seenMessageIds.add((message as any)?.id);
           
           // 觸發回調
           if (callbacks.onInsert) {
@@ -126,7 +126,7 @@ export function createSimpleMessageSync(
       const updatedMessage = payload.new as ChatMessage;
       
       // ⭐ 確保 status 不是 'deleted'
-      if (updatedMessage.status === 'deleted') {
+      if ((updatedMessage.status as any) === 'deleted') {
         console.log('📨 [Realtime UPDATE] 訊息已刪除，觸發 onDelete');
         // 觸發刪除回調
         if (callbacks.onDelete) {

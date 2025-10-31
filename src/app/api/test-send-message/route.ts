@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString()
     };
 
-    const { data: userMsg, error: insertError } = await supabase
+    const { data: userMsg, error: insertError } = await (supabase as any)
       .from('chat_messages')
-      .insert(insertData)
+      .insert(insertData as any)
       .select()
       .single();
     

@@ -17,7 +17,7 @@ export function FoodBalanceDisplay({ userId, className = '' }: FoodBalanceDispla
   const loadBalance = async () => {
     try {
       const supabase = getSaasSupabaseClient();
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_food_balance')
         .select('current_balance')
         .eq('user_id', userId)
@@ -25,7 +25,7 @@ export function FoodBalanceDisplay({ userId, className = '' }: FoodBalanceDispla
 
       if (error) throw error;
 
-      setBalance(data?.current_balance || 0);
+      setBalance((data as any)?.current_balance || 0);
       setError(null);
     } catch (err) {
       console.error('載入食量餘額錯誤:', err);
