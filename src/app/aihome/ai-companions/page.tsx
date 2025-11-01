@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
@@ -136,6 +137,11 @@ export default function AICompanionsPage() {
   const [selectedModelsMulti, setSelectedModelsMulti] = useState<string[]>([]);
   const [roleDefaultModel, setRoleDefaultModel] = useState<string>('gpt-4o-mini');
   const [openPanels, setOpenPanels] = useState<{ model: boolean; tone: boolean; guidance: boolean }>({ model: false, tone: false, guidance: false });
+  const modelSelectRef = useRef<HTMLDivElement>(null);
+  const modelInputRef = useRef<HTMLInputElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [clickedCompanionId, setClickedCompanionId] = useState<string | null>(null);
+  const [companionModels, setCompanionModels] = useState<Record<string, { modelId: string; displayName: string; food: number } | null>>({});
 
   const DEFAULT_MODEL_SENTINEL = '__default__';
   // 估算 100 字問題食量（僅輸入成本；3x 食量，轉為「分」）；最少顯示 1 食量
@@ -148,19 +154,28 @@ export default function AICompanionsPage() {
     return Math.max(food, 1);
   };
 
-  // 依 model_id 或逗號清單，回傳易讀名稱
-  const formatModelDisplay = (ids: string | undefined): string => {
-    if (!ids) return '';
-    const stripFree = (s: string) => s
+  // 移除所有 free 相關字樣的通用函數
+  const stripFree = (s: string): string => {
+    if (!s) return '';
+    return s
       .replace(/\((?:free|免費)\)/gi, '')
       .replace(/（(?:免費)）/g, '')
       .replace(/\bfree\b/gi, '')
+      .replace(/免費/gi, '')
+      .replace(/:free/gi, '') // 移除 model_id 中的 :free
       .replace(/\s{2,}/g, ' ')
       .trim();
+  };
+
+  // 依 model_id 或逗號清單，回傳易讀名稱
+  const formatModelDisplay = (ids: string | undefined): string => {
+    if (!ids) return '';
     const list = ids.split(',').map((s) => s.trim()).filter(Boolean);
     const names = list.map((id) => {
-      const m = availableModels.find((x: any) => x.model_id === id);
-      const raw = m?.display_name || id;
+      // 先移除 model_id 中的 :free
+      const cleanId = id.replace(/:free/gi, '');
+      const m = availableModels.find((x: any) => x.model_id === id || x.model_id === cleanId);
+      const raw = m?.display_name || cleanId;
       return stripFree(raw);
     });
     return names.join('、');
@@ -278,30 +293,72 @@ export default function AICompanionsPage() {
       
       if (roleData) {
         // 先取系統預設
-        const systemDefault = (companion.id === 'mori' && (!(roleData as any).default_model || (roleData as any).default_model === 'gpt-4o-mini'))
-          ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite'
-          : ((roleData as any).default_model || 'gpt-4o-mini');
+        // 對於 Mori，如果資料庫中沒有 default_model 或是舊的 gpt-4o-mini，使用新的多選預設
+        const dbDefaultModel = (roleData as any).default_model;
+        const systemDefault = (companion.id === 'mori' && (!dbDefaultModel || dbDefaultModel === 'gpt-4o-mini' || !dbDefaultModel.includes(',')))
+          ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini'
+          : (dbDefaultModel || 'gpt-4o-mini');
 
-        // 再檢查使用者覆寫
-        let userOverrideDefault = null as string | null;
-        if (user?.id) {
-          const { data: override } = await supabase
-            .from('ai_roles')
-            .select('default_model')
-            .eq('slug', `${companion.id}_${user.id}`)
-            .eq('creator_user_id', user.id)
+        // 再檢查使用者覆寫（從 user_role_settings 表載入）
+        let userOverrideModel = null as string | null;
+        let userOverrideGuidance = null as string | null;
+        let userOverrideTone = null as string | null;
+        
+        if (user?.id && (roleData as any).id) {
+          const { data: userSettings } = await supabase
+            .from('user_role_settings')
+            .select('model_override, guidance_override, tone_override')
+            .eq('user_id', user.id)
+            .eq('role_id', (roleData as any).id)
+            .eq('is_active', true)
             .maybeSingle();
-          userOverrideDefault = (override as any)?.default_model || null;
+          
+          if (userSettings) {
+            userOverrideModel = (userSettings as any)?.model_override || null;
+            userOverrideGuidance = (userSettings as any)?.guidance_override || null;
+            userOverrideTone = (userSettings as any)?.tone_override || null;
+          }
         }
 
-        const roleDefault = userOverrideDefault || systemDefault;
+        // 使用用戶覆寫或系統預設
+        const roleDefault = userOverrideModel || systemDefault;
         setRoleDefaultModel(roleDefault);
-        // 選擇「預設」哨兵值，讓下拉顯示預設選項被選中
-        setSelectedModel(DEFAULT_MODEL_SENTINEL);
-        setRoleGuidance((roleData as any).system_prompt || '');
         
-        // 優先使用資料庫欄位 tone，其次從 system_prompt 提取，再退回預設
-        if ((roleData as any).tone) {
+        // 對於 Mori 角色，檢查是否為多選模型（包含逗號）
+        if (companion.id === 'mori') {
+          if (roleDefault.includes(',')) {
+            // 多選模式：解析模型 ID 並設置到 selectedModelsMulti
+            const modelIds = roleDefault.split(',').map((id: string) => id.trim()).filter(Boolean);
+            setSelectedModelsMulti(modelIds);
+            setSelectedModel(DEFAULT_MODEL_SENTINEL); // 使用預設哨兵值
+            setModelSearch('');
+            console.log('✅ [Mori] 載入多選預設模型:', modelIds);
+          } else {
+            // 單選模式（可能有用戶覆寫為單選）
+            setSelectedModel(roleDefault);
+            setSelectedModelsMulti([]);
+            setModelSearch('');
+          }
+        } else {
+          // 非 Mori 角色：單選模式
+          if (userOverrideModel) {
+            setSelectedModel(userOverrideModel);
+            setModelSearch('');
+          } else {
+            setSelectedModel(DEFAULT_MODEL_SENTINEL);
+            setModelSearch('');
+          }
+          setSelectedModelsMulti([]);
+        }
+        
+        // 設定指引（優先用戶覆寫，其次系統預設）
+        const finalGuidance = userOverrideGuidance || (roleData as any).system_prompt || '';
+        setRoleGuidance(finalGuidance);
+        
+        // 設定語氣（優先用戶覆寫，其次系統預設）
+        if (userOverrideTone) {
+          setRoleTone(userOverrideTone);
+        } else if ((roleData as any).tone) {
           setRoleTone((roleData as any).tone);
         } else {
           const toneMatch = (roleData as any).system_prompt?.match(/你的語氣(.+?)。/);
@@ -322,7 +379,17 @@ export default function AICompanionsPage() {
   
   // 設定預設角色值
   const setDefaultRoleValues = (companion: AICompanion) => {
-    setSelectedModel('gpt-4o-mini');
+    if (companion.id === 'mori') {
+      // Mori 使用多選預設模型
+      const moriDefault = 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini';
+      setRoleDefaultModel(moriDefault);
+      const modelIds = moriDefault.split(',').map(id => id.trim()).filter(Boolean);
+      setSelectedModelsMulti(modelIds);
+      setSelectedModel(DEFAULT_MODEL_SENTINEL);
+    } else {
+      setSelectedModel('gpt-4o-mini');
+      setSelectedModelsMulti([]);
+    }
     setDefaultToneForRole(companion.id);
     setDefaultGuidanceForRole(companion.id);
   };
@@ -360,6 +427,117 @@ export default function AICompanionsPage() {
       'pico': 'pico-artist'
     };
     return slugMap[companionId] || companionId;
+  };
+
+  // 獲取角色的模型資訊
+  const getCompanionModel = async (companion: AICompanion) => {
+    if (companionModels[companion.id]) {
+      return companionModels[companion.id];
+    }
+
+    try {
+      const roleSlug = getRoleSlug(companion.id);
+      
+      // 先從資料庫獲取角色資訊
+      const { data: roleData } = await supabase
+        .from('ai_roles')
+        .select('id, default_model')
+        .eq('slug', roleSlug)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      let modelId: string | null = null;
+
+      if (roleData) {
+        // 先取系統預設
+        const dbDefaultModel = (roleData as any).default_model;
+        const systemDefault = (companion.id === 'mori' && (!dbDefaultModel || dbDefaultModel === 'gpt-4o-mini' || !dbDefaultModel.includes(',')))
+          ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini'
+          : (dbDefaultModel || 'gpt-4o-mini');
+
+        // 檢查使用者覆寫
+        if (user?.id && (roleData as any).id) {
+          const { data: userSettings } = await supabase
+            .from('user_role_settings')
+            .select('model_override')
+            .eq('user_id', user.id)
+            .eq('role_id', (roleData as any).id)
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (userSettings) {
+            modelId = (userSettings as any)?.model_override || systemDefault;
+          } else {
+            modelId = systemDefault;
+          }
+        } else {
+          modelId = systemDefault;
+        }
+      } else {
+        // 使用預設值
+        if (companion.id === 'mori') {
+          modelId = 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini';
+        } else {
+          modelId = 'gpt-4o-mini';
+        }
+      }
+
+      // 解析模型顯示名稱
+      let displayName = '';
+      let food = 1;
+
+      if (modelId && modelId.includes(',')) {
+        // 多選模型（Mori）
+        const modelIds = modelId.split(',').map(id => id.trim()).filter(Boolean);
+        const names = modelIds.map(id => {
+          const cleanId = id.replace(/:free/gi, '');
+          const m = availableModels.find((x: any) => x.model_id === id || x.model_id === cleanId);
+          return m ? stripFree(m.display_name || '') : cleanId;
+        });
+        displayName = names.join('、');
+        // 計算平均食量
+        const foods = modelIds.map(id => {
+          const cleanId = id.replace(/:free/gi, '');
+          const m = availableModels.find((x: any) => x.model_id === id || x.model_id === cleanId);
+          return computeFoodFor100(m);
+        });
+        food = Math.ceil(foods.reduce((a, b) => a + b, 0) / foods.length);
+      } else {
+        // 單選模型
+        const cleanId = modelId?.replace(/:free/gi, '') || '';
+        const m = availableModels.find((x: any) => x.model_id === modelId || x.model_id === cleanId);
+        displayName = m ? stripFree(m.display_name || '') : (modelId || '');
+        food = computeFoodFor100(m);
+      }
+
+      const modelInfo = {
+        modelId: modelId || '',
+        displayName: displayName || modelId || '未設定',
+        food
+      };
+
+      setCompanionModels(prev => ({
+        ...prev,
+        [companion.id]: modelInfo
+      }));
+
+      return modelInfo;
+    } catch (error) {
+      console.error('獲取角色模型資訊錯誤:', error);
+      return null;
+    }
+  };
+
+  // 處理角色點選
+  const handleCompanionClick = async (companion: AICompanion) => {
+    if (clickedCompanionId === companion.id) {
+      // 如果已經點選過，隱藏模型資訊
+      setClickedCompanionId(null);
+    } else {
+      // 點選新角色，顯示模型資訊
+      setClickedCompanionId(companion.id);
+      await getCompanionModel(companion);
+    }
   };
   
   // 載入 AI 角色資料
@@ -407,87 +585,235 @@ export default function AICompanionsPage() {
       const multiResolved = selectedModelsMulti.length > 0 ? selectedModelsMulti : [];
       const resolvedModel = multiResolved.length > 0 ? multiResolved.join(',') : primaryResolved;
 
-      // 如果是預設角色，只更新模型設定
-      if (isDefaultRole(selectedCompanion)) {
-        // 對於預設角色，我們可以創建一個用戶自訂的角色實例
-        const { data, error } = await (supabase as any)
-          .from('ai_roles')
-          .upsert({
-            slug: `${selectedCompanion.id}_${user?.id}`,
-            name: `${selectedCompanion.name} (自訂)`,
-            description: selectedCompanion.description,
-            default_model: resolvedModel,
-            // 預設角色僅允許修改模型，其餘沿用系統設定
-            creator_user_id: user?.id,
-            is_public: false,
-            status: 'active'
-          }, {
-            onConflict: 'slug'
-          })
-          .select()
-          .single();
-        
-        if (error) {
-          console.error('保存角色設定錯誤:', error);
-          return;
-        }
-        
-        console.log('預設角色自訂設定已保存:', data);
-      } else {
-        // 對於自訂角色，直接更新
-        const { data, error } = await (supabase as any)
-          .from('ai_roles')
-          .update({
-            default_model: resolvedModel,
-            system_prompt: roleGuidance,
-            updated_at: new Date().toISOString()
-          })
-          .eq('slug', selectedCompanion.id)
-          .eq('creator_user_id', user?.id)
-          .select()
-          .single();
-        
-        if (error) {
-          console.error('更新角色設定錯誤:', error);
-          return;
-        }
-        
-        console.log('自訂角色設定已更新:', data);
+      // 統一使用 user_role_settings 表儲存用戶設定
+      // 先獲取角色 ID
+      const roleSlug = isDefaultRole(selectedCompanion) 
+        ? getRoleSlug(selectedCompanion.id) 
+        : selectedCompanion.id;
+      
+      const { data: roleData } = await supabase
+        .from('ai_roles')
+        .select('id')
+        .eq('slug', roleSlug)
+        .maybeSingle();
+      
+      const roleId = (roleData as any)?.id;
+      if (!roleId) {
+        console.error('找不到角色:', roleSlug);
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('找不到角色設定', {
+          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+          duration: 2000,
+          style: {
+            background: '#fff',
+            color: '#4B4036',
+          }
+        });
+        return;
       }
+      
+      // 獲取系統預設的指引和語氣以便比較
+      const { data: systemRoleData } = await supabase
+        .from('ai_roles')
+        .select('system_prompt, tone')
+        .eq('slug', roleSlug)
+        .maybeSingle();
+      
+      const systemGuidance = (systemRoleData as any)?.system_prompt || '';
+      const systemTone = (systemRoleData as any)?.tone || '';
+      
+      // 檢查是否所有設定都是預設值（與系統預設一致）
+      const isUsingDefaultModel = selectedModel === DEFAULT_MODEL_SENTINEL;
+      const isUsingDefaultGuidance = !roleGuidance || roleGuidance.trim() === '' || roleGuidance.trim() === systemGuidance.trim();
+      const isUsingDefaultTone = !roleTone || roleTone.trim() === '' || roleTone.trim() === systemTone.trim();
+      
+      // 如果所有設定都是預設值，刪除 user_role_settings 記錄
+      if (isUsingDefaultModel && isUsingDefaultGuidance && isUsingDefaultTone) {
+        if (!user?.id) {
+          console.error('用戶未登入');
+          return;
+        }
+        
+        const { error } = await supabase
+          .from('user_role_settings')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('role_id', roleId);
+        
+        if (error) {
+          console.error('刪除用戶設定錯誤:', error);
+          const { default: toast } = await import('react-hot-toast');
+          toast.error(`恢復預設失敗: ${error.message || '未知錯誤'}`, {
+            icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+            duration: 3000,
+            style: {
+              background: '#fff',
+              color: '#4B4036',
+            }
+          });
+          return;
+        }
+        
+        const { default: toast } = await import('react-hot-toast');
+        toast.success('已恢復為系統預設設定', {
+          icon: <ArrowPathIcon className="w-5 h-5 text-green-600" />,
+          duration: 2000,
+          style: {
+            background: '#fff',
+            color: '#4B4036',
+          }
+        });
+        return;
+      }
+      
+      // 儲存或更新 user_role_settings（只儲存非預設的設定）
+      if (!user?.id) {
+        console.error('用戶未登入');
+        return;
+      }
+      
+      const { data, error } = await (supabase as any)
+        .from('user_role_settings')
+        .upsert({
+          user_id: user.id,
+          role_id: roleId,
+          model_override: isUsingDefaultModel ? null : resolvedModel,
+          guidance_override: isUsingDefaultGuidance ? null : roleGuidance,
+          tone_override: isUsingDefaultTone ? null : roleTone,
+          is_active: true,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,role_id'
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('保存角色設定錯誤:', error);
+        console.error('錯誤詳情:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        const { default: toast } = await import('react-hot-toast');
+        toast.error(`保存設定失敗: ${error.message || '未知錯誤'}`, {
+          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+          duration: 3000,
+          style: {
+            background: '#fff',
+            color: '#4B4036',
+          }
+        });
+        return;
+      }
+      
+      console.log('角色設定已保存:', data);
+      const { default: toast } = await import('react-hot-toast');
+      toast.success('角色設定已保存', {
+        icon: <CpuChipIcon className="w-5 h-5 text-green-600" />,
+        duration: 2000,
+        style: {
+          background: '#fff',
+          color: '#4B4036',
+        }
+      });
     } catch (err) {
       console.error('保存角色設定異常:', err);
     }
   };
 
-  // 還原預設設定（刪除使用者覆寫紀錄，恢復系統預設）
+  // 還原預設設定（刪除 user_role_settings 記錄，恢復系統預設）
   const handleResetToDefaults = async () => {
     if (!selectedCompanion || !user?.id) return;
     try {
       console.log('[Reset] start', { role: selectedCompanion.id, user: user.id });
-      if (isDefaultRole(selectedCompanion)) {
-        const { error } = await supabase
-          .from('ai_roles')
-          .delete()
-          .eq('slug', `${selectedCompanion.id}_${user.id}`)
-          .eq('creator_user_id', user.id);
-        if (error) {
-          console.error('刪除覆寫失敗', error);
-        } else {
-          console.log('[Reset] 覆寫已刪除');
-        }
+      
+      // 獲取角色 ID
+      const roleSlug = isDefaultRole(selectedCompanion) 
+        ? getRoleSlug(selectedCompanion.id) 
+        : selectedCompanion.id;
+      
+      const { data: roleData } = await supabase
+        .from('ai_roles')
+        .select('id')
+        .eq('slug', roleSlug)
+        .maybeSingle();
+      
+      const roleId = (roleData as any)?.id;
+      if (!roleId) {
+        console.error('找不到角色:', roleSlug);
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('找不到角色設定', {
+          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+          duration: 2000,
+          style: {
+            background: '#fff',
+            color: '#4B4036',
+          }
+        });
+        return;
       }
+      
+      // 刪除 user_role_settings 記錄以恢復系統預設
+      const { error } = await supabase
+        .from('user_role_settings')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('role_id', roleId);
+      
+      if (error) {
+        console.error('刪除覆寫失敗', error);
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('還原預設失敗', {
+          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+          duration: 2000,
+          style: {
+            background: '#fff',
+            color: '#4B4036',
+          }
+        });
+      } else {
+        console.log('[Reset] 覆寫已刪除');
+        const { default: toast } = await import('react-hot-toast');
+        toast.success('已還原為系統預設設定', {
+          icon: <ArrowPathIcon className="w-5 h-5 text-green-600" />,
+          duration: 2000,
+          style: {
+            background: '#fff',
+            color: '#4B4036',
+          }
+        });
+      }
+      
       // 重設本地狀態
       setSelectedModelsMulti([]);
       setSelectedModel(DEFAULT_MODEL_SENTINEL);
       // 立即套用系統預設模型（避免等待遠端）
       const systemDefault = selectedCompanion.id === 'mori'
-        ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite'
+        ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini'
         : (selectedCompanion.id === 'hibi' ? 'openai/gpt-5' : 'google/gemini-2.5-flash-image-preview');
       setRoleDefaultModel(systemDefault);
-      // 再重新載入角色資料以確保與資料庫一致
+      
+      // 如果是 Mori 且是多選模型，立即設置到 selectedModelsMulti
+      if (selectedCompanion.id === 'mori' && systemDefault.includes(',')) {
+        const modelIds = systemDefault.split(',').map(id => id.trim()).filter(Boolean);
+        setSelectedModelsMulti(modelIds);
+      }
+      
+      // 再重新載入角色資料以確保與資料庫一致（這會重置語氣和指引）
       await handleRoleSettings(selectedCompanion);
     } catch (e) {
       console.error('還原預設失敗:', e);
+      const { default: toast } = await import('react-hot-toast');
+      toast.error('還原預設失敗', {
+        icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+        duration: 2000,
+        style: {
+          background: '#fff',
+          color: '#4B4036',
+        }
+      });
     }
   };
 
@@ -982,6 +1308,32 @@ export default function AICompanionsPage() {
     }
   }, [user?.id]);
 
+  // 同步 modelSearch 與 selectedModel（當 availableModels 載入完成後）
+  useEffect(() => {
+    if (availableModels.length === 0) return;
+    
+    if (selectedModel === DEFAULT_MODEL_SENTINEL) {
+      // 如果選擇預設，清空輸入框讓 placeholder 顯示預設模型名稱
+      setModelSearch('');
+    } else {
+      // 如果選擇了具體模型，顯示該模型的顯示名稱
+      const selectedModelData = availableModels.find((m: any) => m.model_id === selectedModel);
+      if (selectedModelData) {
+        setModelSearch(stripFree(selectedModelData.display_name || selectedModel));
+      }
+    }
+  }, [availableModels, selectedModel]);
+
+  // 當 availableModels 載入完成且有點選的角色時，重新獲取模型資訊
+  useEffect(() => {
+    if (availableModels.length > 0 && clickedCompanionId) {
+      const companion = companions.find(c => c.id === clickedCompanionId);
+      if (companion) {
+        getCompanionModel(companion);
+      }
+    }
+  }, [availableModels, clickedCompanionId]);
+
   // 點擊外部關閉移動端下拉菜單
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1000,6 +1352,75 @@ export default function AICompanionsPage() {
       }
     };
   }, [showMobileDropdown]);
+
+  // 計算下拉選單位置
+  useEffect(() => {
+    const updateDropdownPosition = () => {
+      if (modelSelectOpen && modelInputRef.current) {
+        const rect = modelInputRef.current.getBoundingClientRect();
+        // 使用 fixed 定位時，getBoundingClientRect() 返回的是相對於視窗的位置
+        // 不需要加上 window.scrollY 和 window.scrollX
+        setDropdownPosition({
+          top: rect.bottom + 4, // 只加上間距
+          left: rect.left,
+          width: rect.width
+        });
+      } else {
+        setDropdownPosition(null);
+      }
+    };
+
+    updateDropdownPosition();
+    
+    // 監聽滾動和視窗大小改變
+    if (modelSelectOpen) {
+      // 使用 requestAnimationFrame 確保在瀏覽器重繪前更新位置
+      const handleScroll = () => {
+        requestAnimationFrame(updateDropdownPosition);
+      };
+      const handleResize = () => {
+        requestAnimationFrame(updateDropdownPosition);
+      };
+      
+      window.addEventListener('scroll', handleScroll, true);
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        window.removeEventListener('scroll', handleScroll, true);
+        window.removeEventListener('resize', handleResize);
+      };
+    }
+    
+    // 如果沒有監聽器，返回 undefined（清理函數是可選的）
+    return undefined;
+  }, [modelSelectOpen]);
+
+  // 點擊外部關閉模型選擇下拉選單
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      // 檢查點擊是否在輸入框或下拉選單內部
+      const isClickInsideInput = modelSelectRef.current?.contains(target);
+      const isClickInsideDropdown = (event.target as HTMLElement)?.closest('[data-model-dropdown]');
+      
+      if (!isClickInsideInput && !isClickInsideDropdown) {
+        setModelSelectOpen(false);
+      }
+    };
+
+    if (modelSelectOpen && typeof document !== 'undefined') {
+      // 使用 setTimeout 確保 Portal 已經渲染
+      setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 0);
+    }
+
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('mousedown', handleClickOutside);
+      }
+    };
+  }, [modelSelectOpen]);
 
   // 監聽聊天室更新通知
   useEffect(() => {
@@ -1605,44 +2026,41 @@ export default function AICompanionsPage() {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.9, y: -10 }}
                       transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                      className="absolute top-12 right-0 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[200px] z-50"
+                      className="absolute top-12 right-0 bg-white rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[180px] z-50"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {/* 視圖切換選項 */}
-                      <div className="space-y-1 mb-2">
-                        <div className="text-xs font-medium text-[#2B3A3B] px-3 py-1">切換視圖</div>
-                        {[
-                          { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
-                          { id: 'roles', label: '角色', icon: CpuChipIcon },
-                          { id: 'memory', label: '記憶', icon: SparklesIcon },
-                          { id: 'stats', label: '統計', icon: ChartBarIcon }
-                        ].map((tab) => (
-                          <motion.button
-                            key={tab.id}
-                            whileHover={{ backgroundColor: "#FFF9F2" }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => {
-                              setActiveView(tab.id as any);
-                              setShowMobileDropdown(false);
-                            }}
-                            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-all ${
-                              activeView === tab.id 
-                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' 
-                                : 'text-[#4B4036] hover:bg-[#FFD59A]/20'
-                            }`}
-                          >
-                            <tab.icon className="w-4 h-4" />
-                            <span className="text-sm font-medium">{tab.label}</span>
-                          </motion.button>
-                        ))}
-                      </div>
+                      {[
+                        { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
+                        { id: 'roles', label: '角色', icon: CpuChipIcon },
+                        { id: 'memory', label: '記憶', icon: SparklesIcon },
+                        { id: 'stats', label: '統計', icon: ChartBarIcon }
+                      ].map((tab) => (
+                        <motion.button
+                          key={tab.id}
+                          whileHover={{ backgroundColor: "#FFFBEB" }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setActiveView(tab.id as any);
+                            setShowMobileDropdown(false);
+                          }}
+                          className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+                            activeView === tab.id 
+                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' 
+                              : 'text-[#4B4036]'
+                          }`}
+                        >
+                          <tab.icon className="w-5 h-5" />
+                          <span className="text-sm font-medium">{tab.label}</span>
+                        </motion.button>
+                      ))}
 
                       {/* 分隔線 */}
                       <div className="border-t border-[#EADBC8]/30 my-2"></div>
 
                       {/* 快速創建選項 */}
                       <motion.button
-                        whileHover={{ backgroundColor: "#FFF9F2" }}
+                        whileHover={{ backgroundColor: "#FFFBEB" }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => {
                           const quickRoom = {
@@ -1653,9 +2071,9 @@ export default function AICompanionsPage() {
                           handleCreateProjectRoom(quickRoom);
                           setShowMobileDropdown(false);
                         }}
-                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-all text-[#4B4036] hover:bg-green-50"
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
                       >
-                        <PlusIcon className="w-4 h-4 text-green-600" />
+                        <PlusIcon className="w-5 h-5 text-[#4B4036]" />
                         <span className="text-sm font-medium">開始協作</span>
                       </motion.button>
                     </motion.div>
@@ -2342,6 +2760,38 @@ export default function AICompanionsPage() {
                     </div>
                   </div>
 
+                  {/* 點選顯示模型資訊 */}
+                  <motion.button
+                    onClick={() => handleCompanionClick(companion)}
+                    className="w-full mb-4 px-4 py-2 text-sm text-[#4B4036] bg-[#FFF9F2] hover:bg-[#FFD59A]/20 border border-[#EADBC8] rounded-lg transition-all"
+                  >
+                    {clickedCompanionId === companion.id ? '隱藏模型資訊' : '查看所選模型'}
+                  </motion.button>
+
+                  {/* 模型資訊顯示區域 */}
+                  {clickedCompanionId === companion.id && companionModels[companion.id] && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="mb-4 p-4 bg-gradient-to-r from-[#FFD59A]/10 to-[#FFB6C1]/10 rounded-xl border border-[#EADBC8]"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-[#4B4036]">所選模型：</span>
+                        </div>
+                        <div className="text-sm text-[#2B3A3B] font-semibold">
+                          {companionModels[companion.id]?.displayName || '載入中...'}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-[#2B3A3B]">
+                          <span>100字提問食量：約 {companionModels[companion.id]?.food || 1} 食量</span>
+                          <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* 互動按鈕 */}
                   <div className="flex space-x-3">
                           <motion.button
@@ -2645,7 +3095,7 @@ export default function AICompanionsPage() {
                     return (
                       <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2">
                         <span className="text-sm text-[#4B4036]">100字提問食量：約 {food} 食量</span>
-                        <img src="/3d-character-backgrounds/studio/food/food.png" alt="食量" className="w-5 h-5" />
+                        <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
                       </div>
                     );
                   })()}
@@ -2676,99 +3126,231 @@ export default function AICompanionsPage() {
                     {openPanels.model && (
                       <div className="px-4 pb-4 border-t border-[#EADBC8]">
                         <div className="relative mt-4 space-y-2">
-                          {isDefaultRole(selectedCompanion!) ? (
-                            <div className="text-sm text-[#4B4036] bg-[#FFF9F2] border border-[#EADBC8] rounded-md px-3 py-2">
-                              使用模型：{formatModelDisplay(roleDefaultModel)}（預設角色不可修改）
-                            </div>
-                          ) : (
-                            <>
-                              {/* 合併搜尋 + 下拉：使用 datalist 建立可搜尋選單 */}
-                              <input
-                                list="model-options"
-                                value={modelSearch}
-                                onChange={(e)=>{
-                                  const v = e.target.value;
-                                  setModelSearch(v);
-                                  if (v === DEFAULT_MODEL_SENTINEL) { setSelectedModel(v); setModelSearch('預設（建議）或輸入以搜尋模型'); return; }
+                          {/* 自訂下拉選單 */}
+                          <div className="relative" ref={modelSelectRef}>
+                            <input
+                              ref={modelInputRef}
+                              type="text"
+                              value={modelSearch}
+                              onChange={(e)=>{
+                                const v = e.target.value;
+                                setModelSearch(v);
+                                setModelSelectOpen(true);
+                                
+                                if (v === DEFAULT_MODEL_SENTINEL) { 
+                                  setSelectedModel(v); 
+                                  setModelSearch(''); // 清空以顯示 placeholder
+                                  if (selectedCompanion?.id === 'mori') {
+                                    setSelectedModelsMulti([]); // 清除多選
+                                  }
+                                  return; 
+                                }
+                                // 只在非 Mori 模式下自動選擇
+                                if (selectedCompanion?.id !== 'mori') {
                                   const exists = getFilteredModels().some(m => m.model_id === v) || availableModels.some(m=>m.model_id===v);
                                   if (exists) setSelectedModel(v);
-                                }}
-                                onFocus={()=>setModelSelectOpen(true)}
-                                onBlur={()=>setTimeout(()=>setModelSelectOpen(false),150)}
-                                placeholder="預設（建議）或輸入以搜尋模型"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white"
-                              />
-                              {/* 多選模型僅對 Mori 啟用 */}
-                              {selectedCompanion?.id === 'mori' ? (
-                          <div className="mt-2">
-                            <div className="flex flex-wrap gap-2">
-                              {selectedModelsMulti.map(id => {
-                                const m = availableModels.find(x=>x.model_id===id) || getFilteredModels().find(x=>x.model_id===id);
-                                return (
-                                  <span key={id} className="inline-flex items-center gap-1 bg-[#FFF9F2] border border-[#EADBC8] text-[#4B4036] text-xs px-2 py-1 rounded-full">
-                                    {m?.display_name || id}
-                                    <button type="button" onClick={()=>setSelectedModelsMulti(prev=>prev.filter(x=>x!==id))} className="ml-1 text-gray-500">×</button>
-                                  </span>
-                                );
-                              })}
+                                }
+                              }}
+                              onFocus={()=>setModelSelectOpen(true)}
+                              onBlur={()=>setTimeout(()=>setModelSelectOpen(false), 200)}
+                              placeholder={(() => {
+                                // Mori 多選模式
+                                if (selectedCompanion?.id === 'mori') {
+                                  if (selectedModelsMulti.length === 0) {
+                                    return "選擇至少 2 個模型（最多 4 個）";
+                                  }
+                                  return "繼續選擇模型或輸入以搜尋...";
+                                }
+                                // 單選模式：顯示預設模型
+                                if (selectedModel === DEFAULT_MODEL_SENTINEL && roleDefaultModel) {
+                                  const defaultDisplay = formatModelDisplay(roleDefaultModel);
+                                  return defaultDisplay ? `預設（建議）：${defaultDisplay}` : "預設（建議）或輸入以搜尋模型";
+                                }
+                                return "預設（建議）或輸入以搜尋模型";
+                              })()}
+                              className="w-full p-3 pr-10 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
+                            />
+                            {/* 下拉箭頭 */}
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                              <motion.div
+                                animate={{ rotate: modelSelectOpen ? 180 : 0 }}
+                                transition={{ duration: 0.2 }}
+                              >
+                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </motion.div>
                             </div>
-                            <div className="max-h-40 overflow-auto mt-2 divide-y border border-gray-200 rounded">
-                              {getFilteredModels().filter(m => {
-                                if ((m.price_tier||'').includes('免費') || (m.price_tier||'').toLowerCase().includes('free')) return false;
-                                const q = modelSearch.toLowerCase();
-                                if (!q) return true;
-                                return (
-                                  (m.display_name||'').toLowerCase().includes(q) ||
-                                  (m.description||'').toLowerCase().includes(q) ||
-                                  (m.provider||'').toLowerCase().includes(q) ||
-                                  (m.model_id||'').toLowerCase().includes(q)
-                                );
-                              }).map(m => {
-                                const disabled = selectedModelsMulti.includes(m.model_id) || selectedModelsMulti.length >= 4;
-                                return (
-                                  <button
-                                    type="button"
-                                    key={m.model_id}
-                                    disabled={disabled}
-                                    onClick={()=> setSelectedModelsMulti(prev => prev.includes(m.model_id) ? prev : [...prev, m.model_id])}
-                                    className={`w-full text-left px-2 py-2 text-sm ${disabled ? 'text-gray-400' : 'hover:bg-[#FFF9F2] text-[#4B4036]'}`}
-                                  >
-                                    {m.display_name} - {m.description} ({m.price_tier})
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <div className="mt-1 text-xs text-[#4B4036]">已選 {selectedModelsMulti.length} / 4（至少 2 個）</div>
-                              </div>
-                              ) : null}
-                            </>
-                          )}
-                          <datalist id="model-options">
-                            <option value={DEFAULT_MODEL_SENTINEL} label="預設（建議）" />
-                            {getFilteredModels().filter(m => {
-                              if ((m.price_tier||'').includes('免費') || (m.price_tier||'').toLowerCase().includes('free')) return false;
-                              if (!modelSearch.trim()) return true;
-                              const q = modelSearch.toLowerCase();
-                              return (
-                                (m.display_name||'').toLowerCase().includes(q) ||
-                                (m.description||'').toLowerCase().includes(q) ||
-                                (m.provider||'').toLowerCase().includes(q) ||
-                                (m.model_id||'').toLowerCase().includes(q)
-                              );
-                            }).map((model) => (
-                              <option
-                                key={model.model_id}
-                                value={model.model_id}
-                                label={`${model.display_name} - ${model.description || ''} (${model.price_tier})`}
-                              />
-                            ))}
-                          </datalist>
-                          {/* 自訂下拉箭頭 */}
-                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                            
+                            {/* 自訂下拉選單列表 - 使用 Portal 渲染到 body */}
+                            {typeof document !== 'undefined' && modelSelectOpen && dropdownPosition && createPortal(
+                              <AnimatePresence>
+                                <motion.div
+                                  initial={{ opacity: 0, y: -10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -10 }}
+                                  transition={{ duration: 0.2 }}
+                                  style={{
+                                    position: 'fixed',
+                                    top: `${dropdownPosition.top}px`,
+                                    left: `${dropdownPosition.left}px`,
+                                    width: `${dropdownPosition.width}px`,
+                                    zIndex: 9999
+                                  }}
+                                  className="bg-white border border-[#EADBC8] rounded-lg shadow-xl max-h-60 overflow-y-auto"
+                                  data-model-dropdown
+                                >
+                                {/* 預設選項 */}
+                                <motion.button
+                                  whileHover={{ backgroundColor: "#FFFBEB" }}
+                                  whileTap={{ scale: 0.98 }}
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault(); // 防止觸發 onBlur
+                                    setSelectedModel(DEFAULT_MODEL_SENTINEL);
+                                    setModelSearch('');
+                                    setModelSelectOpen(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                                    selectedModel === DEFAULT_MODEL_SENTINEL 
+                                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' 
+                                      : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                  }`}
+                                >
+                                  預設（建議）
+                                </motion.button>
+                                
+                                {/* 多選模型提示（僅 Mori） */}
+                                {selectedCompanion?.id === 'mori' && (
+                                  <div className="px-3 py-2 bg-[#FFF9F2] border-b border-[#EADBC8]/30">
+                                    <div className="text-xs font-medium text-[#4B4036]">
+                                      已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* 模型選項 */}
+                                {getFilteredModels().filter(m => {
+                                  if ((m.price_tier||'').includes('免費') || (m.price_tier||'').toLowerCase().includes('free')) return false;
+                                  if (!modelSearch.trim()) return true;
+                                  const q = modelSearch.toLowerCase();
+                                  return (
+                                    (m.display_name||'').toLowerCase().includes(q) ||
+                                    (m.description||'').toLowerCase().includes(q) ||
+                                    (m.provider||'').toLowerCase().includes(q) ||
+                                    (m.model_id||'').toLowerCase().includes(q)
+                                  );
+                                }).map((model) => {
+                                  // 對於 Mori，檢查是否在多選列表中
+                                  const isMultiSelected = selectedCompanion?.id === 'mori' && selectedModelsMulti.includes(model.model_id);
+                                  const isSingleSelected = selectedCompanion?.id !== 'mori' && selectedModel === model.model_id;
+                                  const isSelected = isMultiSelected || isSingleSelected;
+                                  const isDisabled = selectedCompanion?.id === 'mori' && !isMultiSelected && selectedModelsMulti.length >= 4;
+                                  
+                                  return (
+                                    <motion.button
+                                      key={model.model_id}
+                                      whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
+                                      whileTap={{ scale: 0.98 }}
+                                      type="button"
+                                      disabled={isDisabled}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault(); // 防止觸發 onBlur
+                                        
+                                        if (selectedCompanion?.id === 'mori') {
+                                          // 多選模式
+                                          if (isMultiSelected) {
+                                            // 取消選擇
+                                            setSelectedModelsMulti(prev => prev.filter(id => id !== model.model_id));
+                                          } else if (selectedModelsMulti.length < 4) {
+                                            // 添加選擇
+                                            setSelectedModelsMulti(prev => [...prev, model.model_id]);
+                                          }
+                                          // 多選模式下不關閉下拉選單
+                                        } else {
+                                          // 單選模式
+                                          setSelectedModel(model.model_id);
+                                          setModelSearch(stripFree(model.display_name || model.model_id));
+                                          setModelSelectOpen(false);
+                                        }
+                                      }}
+                                      className={`w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 ${
+                                        isSelected
+                                          ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' 
+                                          : isDisabled
+                                            ? 'text-gray-400 cursor-not-allowed'
+                                            : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex-1">
+                                          <div className="font-medium">{stripFree(model.display_name || '')}</div>
+                                          <div className={`text-xs ${isSelected ? 'opacity-90' : 'opacity-80'}`}>
+                                            {stripFree(model.description || '')} ({stripFree(model.price_tier || '')})
+                                          </div>
+                                        </div>
+                                        {selectedCompanion?.id === 'mori' && (
+                                          <div className="ml-2 flex-shrink-0">
+                                            {isMultiSelected ? (
+                                              <motion.div
+                                                initial={{ scale: 0 }}
+                                                animate={{ scale: 1 }}
+                                                className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"
+                                              >
+                                                <svg className="w-3 h-3 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                              </motion.div>
+                                            ) : (
+                                              <div className={`w-5 h-5 rounded-full border-2 ${
+                                                isSelected ? 'border-white/80' : 'border-[#EADBC8]'
+                                              }`} />
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </motion.button>
+                                  );
+                                })}
+                                </motion.div>
+                              </AnimatePresence>,
+                              document.body
+                            )}
                           </div>
+                          
+                          {/* 多選模型僅對 Mori 啟用 - 已整合到上方 Portal 下拉選單中 */}
+                          {selectedCompanion?.id === 'mori' && selectedModelsMulti.length > 0 && (
+                            <div className="mt-2">
+                              <div className="flex flex-wrap gap-2">
+                                {selectedModelsMulti.map(id => {
+                                  const m = availableModels.find(x=>x.model_id===id) || getFilteredModels().find(x=>x.model_id===id);
+                                  return (
+                                    <motion.span
+                                      key={id}
+                                      initial={{ scale: 0, opacity: 0 }}
+                                      animate={{ scale: 1, opacity: 1 }}
+                                      exit={{ scale: 0, opacity: 0 }}
+                                      className="inline-flex items-center gap-1 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white text-xs px-3 py-1.5 rounded-full shadow-sm"
+                                    >
+                                      {stripFree(m?.display_name || id)}
+                                      <motion.button
+                                        whileHover={{ scale: 1.1 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        type="button"
+                                        onClick={()=>setSelectedModelsMulti(prev=>prev.filter(x=>x!==id))}
+                                        className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                                      >
+                                        <XMarkIcon className="w-3 h-3" />
+                                      </motion.button>
+                                    </motion.span>
+                                  );
+                                })}
+                              </div>
+                              <div className="mt-2 text-xs text-[#4B4036]">
+                                已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* 模式切換：自動/全部（預設角色不顯示） */}
@@ -2800,22 +3382,22 @@ export default function AICompanionsPage() {
                             return selectedModelData ? (
                               <>
                                 <div className="flex items-center justify-between">
-                                  <div className="text-sm font-medium text-[#4B4036]">{selectedModelData.display_name}</div>
+                                  <div className="text-sm font-medium text-[#4B4036]">{stripFree(selectedModelData.display_name || '')}</div>
                                   <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    selectedModelData.price_tier === '免費' ? 'bg-green-100 text-green-800' :
-                                    selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
-                                    selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
+                                    stripFree(selectedModelData.price_tier || '') === '免費' || selectedModelData.price_tier === '免費' ? 'bg-green-100 text-green-800' :
+                                    stripFree(selectedModelData.price_tier || '') === '經濟' || selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
+                                    stripFree(selectedModelData.price_tier || '') === '標準' || selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
                                     'bg-purple-100 text-purple-800'
                                   }`}>
-                                    {selectedModelData.price_tier}
+                                    {stripFree(selectedModelData.price_tier || '')}
                                   </div>
                                 </div>
-                                <div className="text-xs text-[#2B3A3B] mt-1">{selectedModelData.description}</div>
+                                <div className="text-xs text-[#2B3A3B] mt-1">{stripFree(selectedModelData.description || '')}</div>
                                 {/* 僅顯示食量與圖示，不顯示金額 */}
                                 <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2">
                                   
                                   <span className="text-sm text-[#4B4036]">100字提問：約 {computeFoodFor100(selectedModelData)} 食量</span>
-                                  <img src="/3d-character-backgrounds/studio/food/food.png" alt="食量" className="w-5 h-5" />
+                                  <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
                                 </div>
                               </>
                             ) : (<div className="text-sm text-[#4B4036]">請選擇模型</div>);
@@ -2846,12 +3428,8 @@ export default function AICompanionsPage() {
                           value={roleTone}
                           onChange={(e) => setRoleTone(e.target.value)}
                           placeholder="例如：溫柔親切、專業冷靜、活潑可愛…"
-                          className={`mt-4 w-full min-h-[100px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent ${isDefaultRole(selectedCompanion!) ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
-                          disabled={isDefaultRole(selectedCompanion!)}
+                          className="mt-4 w-full min-h-[100px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
                         />
-                        {isDefaultRole(selectedCompanion!) && (
-                          <div className="mt-2 text-xs text-gray-500">預設角色的語氣不可修改</div>
-                        )}
             </div>
                     )}
                   </motion.div>
@@ -2877,12 +3455,8 @@ export default function AICompanionsPage() {
                           value={roleGuidance}
                           onChange={(e) => setRoleGuidance(e.target.value)}
                           placeholder="在此輸入角色的系統指引（System Prompt）"
-                          className={`mt-4 w-full min-h-[140px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent ${isDefaultRole(selectedCompanion!) ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
-                          disabled={isDefaultRole(selectedCompanion!)}
+                          className="mt-4 w-full min-h-[140px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
                         />
-                        {isDefaultRole(selectedCompanion!) && (
-                          <div className="mt-2 text-xs text-gray-500">預設角色的指引不可修改</div>
-                        )}
                       </div>
                     )}
                   </motion.div>
