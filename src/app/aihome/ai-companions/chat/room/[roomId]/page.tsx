@@ -19,7 +19,8 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   UserIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 import { AcademicCapIcon, PaintBrushIcon, UsersIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
@@ -30,10 +31,321 @@ import { PicoSettings, MoriSettings } from '@/components/ai-companion';
 import { MessageStatusIndicator } from '@/components/ai-companion/MessageStatusIndicator';
 import { FoodBalanceDisplay } from '@/components/ai-companion/FoodBalanceDisplay';
 import { SecureImageDisplay } from '@/components/ai-companion/SecureImageDisplay';
-import { convertToPublicUrl, convertToShortUrl } from '@/lib/getSignedImageUrl';
+import { convertToPublicUrl, convertToShortUrl, getShortDisplayUrl, extractStoragePath } from '@/lib/getSignedImageUrl';
 
 // ⭐ 全局發送鎖（跨組件實例共享，防止 React Strict Mode 雙重掛載）
 const globalSendingLock = new Map<string, boolean>();
+
+// 添加水印到圖片的輔助函數
+const addWatermarkToImage = async (blob: Blob): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    // 創建圖片對象
+    const img = document.createElement('img');
+    const watermarkImg = document.createElement('img');
+    
+    // 載入原始圖片
+    img.onload = () => {
+      // 載入水印圖片
+      watermarkImg.onload = () => {
+        try {
+          // 創建 Canvas
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            reject(new Error('無法創建 Canvas 上下文'));
+            return;
+          }
+          
+          // 設置 Canvas 尺寸為原始圖片尺寸
+          canvas.width = img.width;
+          canvas.height = img.height;
+          
+          console.log('📐 [Watermark] 圖片尺寸:', img.width, 'x', img.height);
+          
+          // 繪製原始圖片
+          ctx.drawImage(img, 0, 0);
+          
+          // 計算水印尺寸（約為圖片寬度的 4-6%，但確保不超過圖片尺寸）
+          const baseSize = Math.min(img.width, img.height);
+          const watermarkSize = Math.min(
+            Math.max(baseSize * 0.05, 24), // 最小 24px
+            Math.min(baseSize * 0.08, 48) // 最大 48px
+          );
+          
+          console.log('🎯 [Watermark] 水印尺寸:', watermarkSize);
+          
+          // 計算水印位置（右下角，留一些邊距）
+          // 邊距為水印尺寸的 20%，至少 4px
+          const padding = Math.max(4, watermarkSize * 0.2);
+          
+          // 計算水印位置，確保不超出邊界
+          let watermarkX = canvas.width - watermarkSize - padding;
+          let watermarkY = canvas.height - watermarkSize - padding;
+          
+          // 邊界檢查：確保水印完全在圖片範圍內
+          if (watermarkX < 0) {
+            watermarkX = padding;
+            console.warn('⚠️ [Watermark] X 位置超出，調整為:', watermarkX);
+          }
+          if (watermarkY < 0) {
+            watermarkY = padding;
+            console.warn('⚠️ [Watermark] Y 位置超出，調整為:', watermarkY);
+          }
+          
+          // 最終檢查：確保水印不會超出 canvas 邊界
+          if (watermarkX + watermarkSize > canvas.width) {
+            watermarkX = canvas.width - watermarkSize - padding;
+            if (watermarkX < 0) watermarkX = 0;
+            console.warn('⚠️ [Watermark] X 位置調整為:', watermarkX);
+          }
+          if (watermarkY + watermarkSize > canvas.height) {
+            watermarkY = canvas.height - watermarkSize - padding;
+            if (watermarkY < 0) watermarkY = 0;
+            console.warn('⚠️ [Watermark] Y 位置調整為:', watermarkY);
+          }
+          
+          console.log('📍 [Watermark] 最終位置:', watermarkX, watermarkY);
+          
+          // 繪製水印（帶透明度）
+          ctx.globalAlpha = 0.7; // 70% 透明度
+          ctx.drawImage(
+            watermarkImg,
+            watermarkX,
+            watermarkY,
+            watermarkSize,
+            watermarkSize
+          );
+          ctx.globalAlpha = 1.0; // 恢復透明度
+          
+          console.log('✅ [Watermark] 水印繪製完成');
+          
+          // 轉換為 Blob
+          canvas.toBlob(
+            (resultBlob) => {
+              if (resultBlob) {
+                console.log('✅ [Watermark] Canvas 轉換成功，大小:', resultBlob.size);
+                resolve(resultBlob);
+              } else {
+                console.error('❌ [Watermark] Canvas 轉換失敗');
+                reject(new Error('Canvas 轉換失敗'));
+              }
+            },
+            blob.type || 'image/png',
+            0.95 // 高品質
+          );
+        } catch (error) {
+          console.error('❌ [Watermark] 繪製錯誤:', error);
+          reject(error);
+        }
+      };
+      
+      watermarkImg.onerror = (error) => {
+        // 如果水印載入失敗，直接返回原始圖片
+        console.warn('⚠️ [Download] 水印圖片載入失敗，使用原始圖片:', error);
+        resolve(blob);
+      };
+      
+      // 載入水印圖片
+      watermarkImg.crossOrigin = 'anonymous';
+      watermarkImg.src = '/@hanami.png';
+    };
+    
+    img.onerror = (error) => {
+      console.error('❌ [Download] 原始圖片載入失敗:', error);
+      reject(new Error('原始圖片載入失敗'));
+    };
+    
+    // 載入原始圖片
+    img.crossOrigin = 'anonymous';
+    img.src = URL.createObjectURL(blob);
+  });
+};
+
+// 下載圖片函數（帶水印）
+const downloadImage = async (imageUrl: string, filename?: string) => {
+  try {
+    // 檢查 URL 類型
+    const isAuthenticated = imageUrl.includes('/authenticated/');
+    const isPublic = imageUrl.includes('/public/');
+    const isSigned = imageUrl.includes('/sign/');
+    
+    // 提取 storage path
+    const storagePath = extractStoragePath(imageUrl);
+    
+    // 提取檔案名稱（格式：hanamiEcho + ID）
+    const getFilename = () => {
+      if (filename) return filename;
+      
+      // 從 storage path 或 URL 中提取檔案名稱
+      let fileName = '';
+      
+      if (storagePath) {
+        // 如果有 storage path，直接取最後一部分（檔案名）
+        const pathParts = storagePath.split('/');
+        fileName = pathParts[pathParts.length - 1];
+      } else {
+        // 否則從 URL 中提取
+        const urlParts = imageUrl.split('/');
+        fileName = urlParts[urlParts.length - 1].split('?')[0];
+      }
+      
+      // 移除查詢參數
+      fileName = fileName.split('?')[0];
+      
+      // 提取副檔名（先移除副檔名，避免重複）
+      const fileNameWithoutExt = fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+      const fileExt = fileName.includes('.') ? fileName.split('.').pop() : 'png';
+      
+      // 處理檔案名：移除 gemini_ 前綴和時間戳，只保留 UUID 部分
+      // 格式：gemini_1761836671505_adf71822_2121_41b5_9ead_2356e314b2c4.png
+      // 目標：hanamiEcho_adf71822_2121_41b5_9ead_2356e314b2c4.png
+      let imageId = fileNameWithoutExt;
+      
+      // 移除 gemini_ 前綴
+      if (imageId.startsWith('gemini_')) {
+        imageId = imageId.replace(/^gemini_/, '');
+      }
+      
+      // 移除時間戳（通常是數字，格式：1761836671505_）
+      // 匹配：數字_開頭的模式
+      imageId = imageId.replace(/^\d+_/, '');
+      
+      // 如果移除後為空或格式不對，嘗試從原始檔案名提取 UUID
+      if (!imageId || imageId.length < 10) {
+        // 嘗試提取 UUID（格式：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 或 xxxxxxxx_xxxx_xxxx_xxxx_xxxxxxxxxxxx）
+        const uuidMatch = fileNameWithoutExt.match(/([0-9a-f]{8}[_-]?[0-9a-f]{4}[_-]?[0-9a-f]{4}[_-]?[0-9a-f]{4}[_-]?[0-9a-f]{12})/i);
+        if (uuidMatch) {
+          imageId = uuidMatch[1].replace(/[_-]/g, '_');
+        } else {
+          // 如果找不到 UUID，使用檔案名的最後部分（去掉前綴後）
+          const parts = fileNameWithoutExt.split('_');
+          if (parts.length > 1) {
+            // 取最後幾個部分作為 ID
+            imageId = parts.slice(-4).join('_');
+          } else {
+            imageId = fileNameWithoutExt;
+          }
+        }
+      }
+      
+      // 確保 imageId 不包含副檔名
+      imageId = imageId.split('.')[0];
+      
+      // 組合最終檔案名：hanamiEcho + ID + 副檔名
+      const finalFileName = `hanamiEcho_${imageId}.${fileExt}`;
+      
+      return finalFileName;
+    };
+    
+    if (!storagePath) {
+      throw new Error('無法提取 storage path');
+    }
+    
+    // 如果是 authenticated 或 signed URL，必須使用代理 API
+    // 如果是 public URL，可以先嘗試直接下載，失敗再用代理 API
+    if (isAuthenticated || isSigned) {
+      // 直接使用代理 API，不嘗試直接下載
+    } else if (isPublic) {
+      // 先嘗試直接下載（public URL 可能可以直接下載）
+      try {
+        const response = await fetch(imageUrl, {
+          mode: 'cors',
+          credentials: 'omit'
+        });
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          
+          // 添加水印
+          const watermarkedBlob = await addWatermarkToImage(blob);
+          
+          // 創建 Blob URL 並強制下載
+          const url = window.URL.createObjectURL(watermarkedBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = getFilename();
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          
+          setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }, 100);
+          
+          const { default: toast } = await import('react-hot-toast');
+          toast.success('圖片下載成功', {
+            icon: <ArrowDownTrayIcon className="w-5 h-5 text-green-600" />,
+            duration: 2000,
+            style: {
+              background: '#fff',
+              color: '#4B4036',
+            }
+          });
+          return;
+        } else {
+          console.warn('⚠️ [Download] 直接下載失敗，狀態:', response.status, '改用代理 API');
+        }
+      } catch (directError) {
+        console.warn('⚠️ [Download] 直接下載異常:', directError, '改用代理 API');
+      }
+    }
+    
+    // 使用代理 API 下載
+    const proxyUrl = `/api/storage/proxy-image?path=${encodeURIComponent(storagePath)}&download=1`;
+    
+    const response = await fetch(proxyUrl);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [Download] 代理 API 失敗:', response.status);
+      throw new Error(`代理 API 失敗: ${response.status} - ${errorText}`);
+    }
+    
+    const blob = await response.blob();
+    
+    // 添加水印
+    const watermarkedBlob = await addWatermarkToImage(blob);
+    
+    // 創建 Blob URL 並強制下載
+    const url = window.URL.createObjectURL(watermarkedBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = getFilename();
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    
+    // 清理
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
+    
+    const { default: toast } = await import('react-hot-toast');
+    toast.success('圖片下載成功', {
+      icon: <ArrowDownTrayIcon className="w-5 h-5 text-green-600" />,
+      duration: 2000,
+      style: {
+        background: '#fff',
+        color: '#4B4036',
+      }
+    });
+  } catch (error) {
+    console.error('❌ [Download] 下載圖片失敗:', error instanceof Error ? error.message : '未知錯誤');
+    
+    const { default: toast } = await import('react-hot-toast');
+    toast.error(`下載失敗: ${error instanceof Error ? error.message : '未知錯誤'}`, {
+      icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+      duration: 3000,
+      style: {
+        background: '#fff',
+        color: '#4B4036',
+      }
+    });
+  }
+};
 
 // 簡繁轉換工具函數
 const simplifiedToTraditionalMap: Record<string, string> = {
@@ -331,8 +643,6 @@ export default function RoomChatPage() {
     const initialRole = urlSearchParams.get('initialRole');
     const companion = urlSearchParams.get('companion');
     
-    console.log('🔍 直接從 URL 獲取參數 - initialRole:', initialRole, 'companion:', companion);
-    console.log('🔍 完整 URL:', window.location.href);
     
     setUrlParams({ initialRole: initialRole || undefined, companion: companion || undefined });
   }, []);
@@ -1410,7 +1720,7 @@ export default function RoomChatPage() {
       description: '系統總管狐狸，智慧的協調者和統籌中樞，負責任務分配和團隊協作',
       specialty: '系統總管',
       icon: CpuChipIcon,
-      imagePath: '/3d-character-backgrounds/studio/Hibi/lulu(front).png',
+      imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
       personality: '智慧、領導力、協調能力、友善',
       abilities: ['任務統籌', '團隊協調', '智能分析', '流程優化', '決策支援'],
       color: 'from-orange-400 to-red-500',
@@ -1502,7 +1812,6 @@ export default function RoomChatPage() {
 
       try {
         console.log('🔍 載入聊天室歷史訊息:', roomId);
-        console.log('🔍 用戶 ID:', user.id);
         
         // 確保用戶是房間成員（如果不是，自動添加）
         await ensureRoomMembership(roomId, user.id);
@@ -2331,7 +2640,7 @@ export default function RoomChatPage() {
                 imageUrl = parsedData.image_url;
                 responseContent = '🎨 我為您創作完成了！太可愛了！';
                 messageType = 'image';
-                console.log('✅ 從 JSON 提取圖片 URL:', imageUrl);
+                // 圖片 URL 已提取
               } else if (parsedData.content || parsedData.text || parsedData.message) {
                 // 處理 JSON 中的文字回應
                 rawResponse = parsedData.content || parsedData.text || parsedData.message;
@@ -2359,7 +2668,7 @@ export default function RoomChatPage() {
             imageUrl = out.data.image_url;
             responseContent = '🎨 我為您創作完成了！太可愛了！';
             messageType = 'image';
-            console.log('✅ 從物件提取圖片 URL:', imageUrl);
+            // 圖片 URL 已提取
             
             // 提取 token 使用量
             if (out.data.prompt_tokens || out.data.completion_tokens || out.data.total_tokens) {
@@ -2430,7 +2739,7 @@ export default function RoomChatPage() {
                 imageUrl = urlMatch[0];
                 responseContent = `🎨 我為您創作完成了！太可愛了！`;
                 messageType = 'image';
-                console.log('✅ 從 iframe 提取圖片 URL:', imageUrl);
+                // 圖片 URL 已從 iframe 提取
               } else {
                 responseContent = '🎨 創作完成！但圖片連結解析失敗。';
                 console.error('❌ 無法從 iframe 提取圖片 URL');
@@ -2440,7 +2749,7 @@ export default function RoomChatPage() {
               imageUrl = rawResponse.trim();
               responseContent = `🎨 我為您創作完成了！太可愛了！`;
               messageType = 'image';
-              console.log('✅ 直接圖片 URL:', imageUrl);
+              // 圖片 URL 已識別
             } else {
               responseContent = rawResponse;
               console.log('📝 文字回應:', rawResponse);
@@ -2449,7 +2758,7 @@ export default function RoomChatPage() {
         }
         
         console.log('🔍 最終 responseContent:', responseContent);
-        console.log('🔍 最終 imageUrl:', imageUrl);
+        // 圖片處理完成
         console.log('🔍 最終 tokenUsage:', tokenUsage);
         
         // 如果沒有找到明確的回應，使用預設訊息
@@ -2871,7 +3180,9 @@ export default function RoomChatPage() {
       if (result.success && result.ingressResponse?.error === '重複請求') {
         console.warn('⚠️ n8n 檢測到重複請求，這通常意味著訊息已在處理中');
         const { default: toast } = await import('react-hot-toast');
-        toast('訊息已發送，正在等待 AI 回應...', { icon: '⏳' });
+        toast('訊息已發送，正在等待 AI 回應...', { 
+          icon: <ClockIcon className="w-5 h-5 text-blue-600" />
+        });
       }
         
         
@@ -3273,13 +3584,33 @@ export default function RoomChatPage() {
                     >
                       <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion?.color} p-0.5 shadow-lg`}>
                         <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                          <Image
-                            src={companion?.imagePath || ''}
-                            alt={companion?.name || ''}
-                            width={32}
-                            height={32}
-                            className="w-8 h-8 object-cover"
-                          />
+                          {companion?.imagePath ? (
+                            <Image
+                              src={companion.imagePath}
+                              alt={companion.name || 'AI 角色'}
+                              width={32}
+                              height={32}
+                              className="w-8 h-8 object-cover"
+                              unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                              onError={(e) => {
+                                console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                // 如果圖片載入失敗，顯示備用圖標
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent && companion?.icon) {
+                                  const iconElement = document.createElement('div');
+                                  iconElement.className = 'w-8 h-8 flex items-center justify-center';
+                                  const IconComponent = companion.icon;
+                                  parent.appendChild(iconElement);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-8 h-8 flex items-center justify-center">
+                              {companion?.icon && <companion.icon className="w-6 h-6 text-gray-400" />}
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -3719,10 +4050,17 @@ export default function RoomChatPage() {
                               : companionParam === 'mori' || selectedCompanion === 'mori'
                                 ? '/3d-character-backgrounds/studio/Mori/Mori.png'
                                 : companionParam === 'hibi' || selectedCompanion === 'hibi'
-                                  ? '/3d-character-backgrounds/studio/Hibi/lulu(front).png'
+                                  ? '/3d-character-backgrounds/studio/lulu(front).png'
                                   : '/@hanami.png';
                           return src ? (
-                            <Image src={src} alt="AI 助手" width={24} height={24} className="w-6 h-6 object-cover" />
+                            <Image 
+                              src={src} 
+                              alt="AI 助手" 
+                              width={24} 
+                              height={24} 
+                              className="w-6 h-6 object-cover"
+                              unoptimized={src.includes('(') || src.includes(')')}
+                            />
                           ) : null;
                         })()}
                       </div>
@@ -3910,7 +4248,7 @@ export default function RoomChatPage() {
                 {(() => {
                   // 顯示當前活躍的角色
                   const modes = [
-                    { id: 'hibi', label: 'Hibi', purpose: '統籌', icon: CpuChipIcon, imagePath: '/3d-character-backgrounds/studio/Hibi/lulu(front).png', color: 'from-[#FF8C42] to-[#FFB366]' },
+                    { id: 'hibi', label: 'Hibi', purpose: '統籌', icon: CpuChipIcon, imagePath: '/3d-character-backgrounds/studio/lulu(front).png', color: 'from-[#FF8C42] to-[#FFB366]' },
                     { id: 'mori', label: '墨墨', purpose: '研究', icon: AcademicCapIcon, imagePath: '/3d-character-backgrounds/studio/Mori/Mori.png', color: 'from-[#D4A574] to-[#E6C8A0]' },
                     { id: 'pico', label: '皮可', purpose: '繪圖', icon: PaintBrushIcon, imagePath: '/3d-character-backgrounds/studio/Pico/Pico.png', color: 'from-[#FFB6C1] to-[#FFCDD6]' }
                   ];
@@ -4495,13 +4833,25 @@ export default function RoomChatPage() {
                           >
                             <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
                               <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                <Image
-                                  src={companion.imagePath}
-                                  alt={companion.name}
-                                  width={32}
-                                  height={32}
-                                  className="w-8 h-8 object-cover"
-                                />
+                                {companion.imagePath ? (
+                                  <Image
+                                    src={companion.imagePath}
+                                    alt={companion.name}
+                                    width={32}
+                                    height={32}
+                                    className="w-8 h-8 object-cover"
+                                    unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                                    onError={(e) => {
+                                      console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 flex items-center justify-center">
+                                    {companion.icon && <companion.icon className="w-6 h-6 text-gray-400" />}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="flex-1">
@@ -4541,13 +4891,25 @@ export default function RoomChatPage() {
                           >
                             <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
                               <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                <Image
-                                  src={companion.imagePath}
-                                  alt={companion.name}
-                                  width={40}
-                                  height={40}
-                                  className="w-10 h-10 object-cover"
-                                />
+                                {companion.imagePath ? (
+                                  <Image
+                                    src={companion.imagePath}
+                                    alt={companion.name}
+                                    width={40}
+                                    height={40}
+                                    className="w-10 h-10 object-cover"
+                                    unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                                    onError={(e) => {
+                                      console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 flex items-center justify-center">
+                                    {companion.icon && <companion.icon className="w-8 h-8 text-gray-400" />}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="flex-1 text-left">
@@ -4905,66 +5267,63 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                   
                   // ⭐ 轉換為公開 URL（用於實際載入圖片）
                   const publicUrl = convertToPublicUrl(imageUrl);
-                  // ⭐ 轉換為簡潔 URL（用於顯示和連結）
+                  // ⭐ 轉換為簡潔 URL（用於連結，包含完整路徑資訊）
                   const shortUrl = convertToShortUrl(imageUrl);
+                  // ⭐ 獲取簡潔顯示 URL（僅用於顯示文字）
+                  const displayUrl = getShortDisplayUrl(imageUrl);
                   
                   return (
                     <div key={index} className="mt-3">
                       {/* 如果 Markdown 前有文字，顯示文字 */}
                       {textBefore && <p className="mb-2 text-sm opacity-80">{textBefore}</p>}
                       
-                      <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2">
-                        <div className="relative">
+                      <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2 relative">
+                        {/* 食量顯示 - 圖片訊息框右上角 */}
+                        {!isUser && message.content_json?.food?.total_food_cost && (
+                          <motion.div
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className="absolute top-1 right-1 z-30"
+                          >
+                            <motion.button
+                              whileHover={{ scale: 1.15 }}
+                              className="w-auto h-6 px-2 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center"
+                              title={`消耗 ${message.content_json.food.total_food_cost} 食量`}
+                            >
+                              <span className="text-xs font-medium flex items-center space-x-1">
+                                <img src="/apple-icon.svg" alt="蘋果" className="w-4 h-4" />
+                                <span>{message.content_json.food.total_food_cost}</span>
+                              </span>
+                            </motion.button>
+                          </motion.div>
+                        )}
+                        <div className="relative group">
                           <SecureImageDisplay
-                            imageUrl={imageUrl}
+                            imageUrl={publicUrl}
                             alt="Pico 創作作品"
-                            className="max-w-full h-auto rounded-lg shadow-lg hover:shadow-xl transition-all cursor-pointer border-2 border-[#FFB6C1]/30"
-                            onClick={() => window.open(shortUrl, '_blank')}
+                            className="rounded-lg shadow-lg border-2 border-[#FFB6C1]/30"
+                            thumbnail={true}
+                            thumbnailSize={200}
+                            onDownload={() => downloadImage(imageUrl)}
                           />
                         </div>
                         
                         <div className="flex items-center justify-between bg-white/50 rounded-lg p-2">
-                          <a 
-                            href={shortUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate"
-                            title={shortUrl}
+                          <button
+                            onClick={() => downloadImage(imageUrl)}
+                            className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate text-left"
+                            title="點擊下載圖片"
                           >
                             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
-                            <span className="truncate">{shortUrl.replace(/^https?:\/\//, '')}</span>
-                          </a>
-                          
-                          <button
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(shortUrl);
-                                const { default: toast } = await import('react-hot-toast');
-                                toast.success('連結已複製', {
-                                  icon: '📋',
-                                  duration: 2000,
-                                  style: {
-                                    background: '#fff',
-                                    color: '#4B4036',
-                                  }
-                                });
-                              } catch (err) {
-                                console.error('❌ 複製失敗:', err);
-                              }
-                            }}
-                            className="ml-2 px-2 py-1 bg-[#FFD59A]/30 hover:bg-[#FFD59A]/50 rounded text-xs text-[#4B4036] transition-colors flex-shrink-0"
-                            title="複製連結"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                            </svg>
+                            <span className="truncate">點擊下載圖片</span>
                           </button>
                         </div>
                         
                         <p className="text-xs text-[#2B3A3B]/60 text-center">
-                          點擊圖片可在新視窗中查看完整尺寸
+                          點擊圖片可放大查看，點擊連結可下載
                         </p>
                       </div>
                       
@@ -4981,8 +5340,10 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                   const imageUrl = urlMatch[0];
                   // ⭐ 轉換為公開 URL（用於實際載入圖片）
                   const publicUrl = convertToPublicUrl(imageUrl);
-                  // ⭐ 轉換為簡潔 URL（用於顯示和連結）
+                  // ⭐ 轉換為簡潔 URL（用於連結，包含完整路徑資訊）
                   const shortUrl = convertToShortUrl(imageUrl);
+                  // ⭐ 獲取簡潔顯示 URL（僅用於顯示文字）
+                  const displayUrl = getShortDisplayUrl(imageUrl);
                   const textBefore = line.substring(0, urlMatch.index);
                   const textAfter = line.substring(urlMatch.index! + imageUrl.length);
                   
@@ -4992,61 +5353,55 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                       {textBefore && <p className="mb-2 text-sm opacity-80">{textBefore}</p>}
                       
                       {/* 圖片預覽區域 */}
-                      <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2">
+                      <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2 relative">
+                        {/* 食量顯示 - 圖片訊息框右上角 */}
+                        {!isUser && message.content_json?.food?.total_food_cost && (
+                          <motion.div
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className="absolute top-1 right-1 z-30"
+                          >
+                            <motion.button
+                              whileHover={{ scale: 1.15 }}
+                              className="w-auto h-6 px-2 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center"
+                              title={`消耗 ${message.content_json.food.total_food_cost} 食量`}
+                            >
+                              <span className="text-xs font-medium flex items-center space-x-1">
+                                <img src="/apple-icon.svg" alt="蘋果" className="w-4 h-4" />
+                                <span>{message.content_json.food.total_food_cost}</span>
+                              </span>
+                            </motion.button>
+                          </motion.div>
+                        )}
                         {/* 圖片顯示 - 使用 SecureImageDisplay 組件處理 Public Bucket */}
-                        <div className="relative">
+                        <div className="relative group">
                           <SecureImageDisplay
-                            imageUrl={imageUrl}
+                            imageUrl={publicUrl}
                             alt="AI 生成圖片"
-                            className="max-w-full h-auto rounded-lg shadow-lg hover:shadow-xl transition-all cursor-pointer border-2 border-[#FFB6C1]/30"
-                            onClick={() => window.open(shortUrl, '_blank')}
+                            className="rounded-lg shadow-lg border-2 border-[#FFB6C1]/30"
+                            thumbnail={true}
+                            thumbnailSize={200}
+                            onDownload={() => downloadImage(imageUrl)}
                           />
                         </div>
                         
-                        {/* 連結和下載按鈕 */}
+                        {/* 下載連結 */}
                         <div className="flex items-center justify-between bg-white/50 rounded-lg p-2">
-                          <a 
-                            href={shortUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate"
-                            title={shortUrl}
+                          <button
+                            onClick={() => downloadImage(imageUrl)}
+                            className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate text-left"
+                            title="點擊下載圖片"
                           >
                             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
-                            <span className="truncate">{shortUrl.replace(/^https?:\/\//, '')}</span>
-                          </a>
-                          
-                          {/* 複製連結按鈕 */}
-                          <button
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(shortUrl);
-                                const { default: toast } = await import('react-hot-toast');
-                                toast.success('連結已複製', {
-                                  icon: '📋',
-                                  duration: 2000,
-                                  style: {
-                                    background: '#fff',
-                                    color: '#4B4036',
-                                  }
-                                });
-                              } catch (err) {
-                                console.error('❌ 複製失敗:', err);
-                              }
-                            }}
-                            className="ml-2 px-2 py-1 bg-[#FFD59A]/30 hover:bg-[#FFD59A]/50 rounded text-xs text-[#4B4036] transition-colors flex-shrink-0"
-                            title="複製連結"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                            </svg>
+                            <span className="truncate">點擊下載圖片</span>
                           </button>
                         </div>
                         
                         <p className="text-xs text-[#2B3A3B]/60 text-center">
-                          點擊圖片可在新視窗中查看完整尺寸
+                          點擊圖片可放大查看，點擊連結可下載
                         </p>
                       </div>
                       

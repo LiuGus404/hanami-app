@@ -42,6 +42,35 @@ export async function GET(request: NextRequest) {
     path = path.replace(/^\/+/, '');
     
     console.log('🔍 [Proxy] 處理後的路徑:', path);
+    console.log('🔍 [Proxy] 路徑長度:', path.length);
+    console.log('🔍 [Proxy] 路徑編碼:', encodeURIComponent(path));
+
+    // 先嘗試列出路徑所在的目錄，確認檔案是否存在
+    const pathParts = path.split('/');
+    const directory = pathParts.slice(0, -1).join('/');
+    const fileName = pathParts[pathParts.length - 1];
+    
+    console.log('🔍 [Proxy] 目錄:', directory || '(根目錄)');
+    console.log('🔍 [Proxy] 檔案名:', fileName);
+    
+    // 如果不在根目錄，先列出目錄內容（用於調試）
+    if (directory) {
+      try {
+        const { data: listData, error: listError } = await supabaseAdmin.storage
+          .from('ai-images')
+          .list(directory, { limit: 100 });
+        
+        if (!listError && listData) {
+          console.log('📂 [Proxy] 目錄內容:', listData.map(f => f.name));
+          const fileExists = listData.some(f => f.name === fileName);
+          console.log('📂 [Proxy] 檔案存在:', fileExists);
+        } else {
+          console.warn('⚠️ [Proxy] 無法列出目錄:', listError);
+        }
+      } catch (listErr) {
+        console.warn('⚠️ [Proxy] 列出目錄異常:', listErr);
+      }
+    }
 
     console.log('📡 [Proxy] 開始從 Supabase Storage 下載...');
     const { data, error } = await supabaseAdmin.storage

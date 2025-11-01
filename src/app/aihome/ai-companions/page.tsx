@@ -1072,7 +1072,7 @@ export default function AICompanionsPage() {
       description: '系統總管狐狸，智慧的協調者和統籌中樞，負責任務分配和團隊協作',
       specialty: '系統總管',
       icon: CpuChipIcon,
-      imagePath: '/3d-character-backgrounds/studio/Hibi/Hibi.png',
+      imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
       personality: '智慧、領導力、協調能力、友善',
       abilities: ['任務統籌', '團隊協調', '智能分析', '流程優化', '決策支援'],
       color: 'from-orange-400 to-red-500',
@@ -1745,6 +1745,12 @@ export default function AICompanionsPage() {
                             width={72}
                             height={72}
                             className="w-18 h-18 object-cover"
+                            unoptimized={true}
+                            onError={(e) => {
+                              console.error('❌ [Hibi 圖標] 圖片載入失敗');
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
                           />
                         </div>
                       </div>
@@ -2066,13 +2072,25 @@ export default function AICompanionsPage() {
                                     >
                                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${companion.color} p-0.5 shadow-lg group-hover/role:shadow-xl transition-shadow`}>
                                         <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                          <Image
-                                            src={companion.imagePath}
-                                            alt={companion.name}
-                                            width={28}
-                                            height={28}
-                                            className="w-7 h-7 object-cover"
-                                          />
+                                          {companion.imagePath ? (
+                                            <Image
+                                              src={companion.imagePath}
+                                              alt={companion.name}
+                                              width={28}
+                                              height={28}
+                                              className="w-7 h-7 object-cover"
+                                              unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                                              onError={(e) => {
+                                                console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                              }}
+                                            />
+                                          ) : (
+                                            <div className="w-7 h-7 flex items-center justify-center">
+                                              {companion.icon && <companion.icon className="w-5 h-5 text-gray-400" />}
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                       
@@ -2240,13 +2258,25 @@ export default function AICompanionsPage() {
                           >
                             <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${companion.color} p-1 shadow-lg`}>
                         <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                          <Image
-                            src={companion.imagePath}
-                            alt={companion.name}
-                            width={120}
-                            height={120}
-                            className="w-30 h-30 object-cover"
-                          />
+                          {companion.imagePath ? (
+                            <Image
+                              src={companion.imagePath}
+                              alt={companion.name}
+                              width={120}
+                              height={120}
+                              className="w-30 h-30 object-cover"
+                              unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                              onError={(e) => {
+                                console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-30 h-30 flex items-center justify-center">
+                              {companion.icon && <companion.icon className="w-24 h-24 text-gray-400" />}
+                            </div>
+                          )}
                         </div>
                       </div>
                             <motion.div 
@@ -3116,13 +3146,25 @@ export default function AICompanionsPage() {
                             <div className="flex items-center space-x-3">
                               <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
                                 <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                  <Image
-                                    src={companion.imagePath}
-                                    alt={companion.name}
-                                    width={32}
-                                    height={32}
-                                    className="w-8 h-8 object-cover"
-                                  />
+                                  {companion.imagePath ? (
+                                    <Image
+                                      src={companion.imagePath}
+                                      alt={companion.name}
+                                      width={32}
+                                      height={32}
+                                      className="w-8 h-8 object-cover"
+                                      unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                                      onError={(e) => {
+                                        console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 flex items-center justify-center">
+                                      {companion.icon && <companion.icon className="w-6 h-6 text-gray-400" />}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex-1 min-w-0">
@@ -3285,13 +3327,25 @@ function RoleSelectionGrid({
             <div className="flex items-center space-x-4">
               <div className="relative">
                 <motion.div animate={{ y: [0, -2, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}>
-                  <Image
-                    src={companion.imagePath}
-                    alt={companion.name}
-                    width={48}
-                    height={48}
-                    className="rounded-full object-cover shadow-sm"
-                  />
+                  {companion.imagePath ? (
+                    <Image
+                      src={companion.imagePath}
+                      alt={companion.name}
+                      width={48}
+                      height={48}
+                      className="rounded-full object-cover shadow-sm"
+                      unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                      onError={(e) => {
+                        console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100">
+                      {companion.icon && <companion.icon className="w-8 h-8 text-gray-400" />}
+                    </div>
+                  )}
                 </motion.div>
                 {selectedRoles.includes(companion.name) && (
                   <motion.div
