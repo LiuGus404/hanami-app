@@ -20,6 +20,7 @@ import StudentTreeAssignmentModal from './StudentTreeAssignmentModal';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import Image from 'next/image';
 
 interface StudentActivity {
   id: string;
@@ -1943,7 +1944,13 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
             {studentGrowthTrees.length > 0 && (
               <div className="bg-[#FFF9F2] rounded-lg border border-[#EADBC8] p-4">
                 <h4 className="text-sm font-medium text-[#4B4036] mb-3 flex items-center gap-2">
-                  <span className="text-lg">🌳</span>
+                  <Image
+                    src="/tree ui.png"
+                    alt="成長樹"
+                    width={24}
+                    height={24}
+                    className="h-6 w-6"
+                  />
                   學生的成長樹 ({studentGrowthTrees.length})
                 </h4>
                 <div className="space-y-2">

@@ -1,10 +1,15 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { toast } from 'react-hot-toast';
 
 import { PopupSelect } from '@/components/ui/PopupSelect'; // 新增引入 PopupSelect
 import { supabase } from '@/lib/supabase';
+import { getUserSession } from '@/lib/authUtils';
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 // 欄目設計參考 LessonAvailabilityDashboard
 const columns = [
@@ -35,6 +40,19 @@ function formatAge(months: number | null | undefined): string {
 }
 
 export default function TrialQueueListPage() {
+  // 從會話中獲取機構信息（admin 頁面可能沒有 OrganizationProvider）
+  const session = getUserSession();
+  const currentOrganization = session?.organization || null;
+  
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) {
+      return null;
+    }
+    return UUID_REGEX.test(currentOrganization.id) ? currentOrganization.id : null;
+  }, [currentOrganization?.id]);
+  
+  const isAllowedOrg = validOrgId === 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
+  
   const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -430,8 +448,18 @@ export default function TrialQueueListPage() {
           <h2 className="text-2xl font-bold text-[#4B4036]">輪候中學生列表</h2>
           <Image alt="icon" height={32} src="/rabbit.png" width={32} />
           <a
-            className="ml-4 px-4 py-2 rounded-full bg-[#FFD59A] text-[#4B4036] font-semibold shadow hover:bg-[#FFB84C] transition-colors text-sm md:text-base"
+            className={`ml-4 px-4 py-2 rounded-full font-semibold shadow transition-colors text-sm md:text-base ${
+              isAllowedOrg
+                ? 'bg-[#FFD59A] text-[#4B4036] hover:bg-[#FFB84C]'
+                : 'bg-gray-400 opacity-60 text-white cursor-pointer'
+            }`}
             href="/admin/add-trial-students"
+            onClick={(e) => {
+              if (!isAllowedOrg) {
+                e.preventDefault();
+                toast.error('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com');
+              }
+            }}
           >
             新增輪候學生
           </a>
@@ -859,8 +887,18 @@ export default function TrialQueueListPage() {
                       <td className="p-3 text-sm text-[#2B3A3B]">{stu.created_at ? stu.created_at.replace('T', ' ').slice(0, 16) : ''}</td>
                       <td className="p-3 text-sm text-[#2B3A3B]">
                         <button
-                          className="px-3 py-1 rounded bg-[#FFD59A] text-[#4B4036] font-semibold hover:bg-[#FDE6B8] border border-[#EADBC8] transition mr-2"
-                          onClick={() => window.location.href = `/admin/add-trial-students?id=${stu.id}`}
+                          className={`px-3 py-1 rounded font-semibold border transition mr-2 ${
+                            isAllowedOrg
+                              ? 'bg-[#FFD59A] text-[#4B4036] hover:bg-[#FDE6B8] border-[#EADBC8]'
+                              : 'bg-gray-400 opacity-60 text-white border-gray-400 cursor-pointer'
+                          }`}
+                          onClick={() => {
+                            if (!isAllowedOrg) {
+                              toast.error('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com');
+                              return;
+                            }
+                            window.location.href = `/admin/add-trial-students?id=${stu.id}`;
+                          }}
                         >
                           編輯
                         </button>

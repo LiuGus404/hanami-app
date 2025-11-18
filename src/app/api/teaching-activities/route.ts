@@ -4,11 +4,24 @@ import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    // 查詢所有教學活動
-    const { data: activities, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const orgId = searchParams.get('orgId');
+    
+    // 查詢教學活動（根據 org_id 過濾）
+    let activitiesQuery = supabase
       .from('hanami_teaching_activities')
-      .select('id, activity_name, activity_description, activity_type, difficulty_level')
-      .order('activity_name');
+      .select('id, activity_name, activity_description, activity_type, difficulty_level, duration_minutes, materials_needed, instructions, is_active')
+      .eq('is_active', true);
+    
+    // 根據 org_id 過濾
+    if (orgId) {
+      activitiesQuery = activitiesQuery.eq('org_id', orgId);
+    } else {
+      // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+      activitiesQuery = activitiesQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+    }
+    
+    const { data: activities, error } = await activitiesQuery.order('activity_name');
 
     if (error) {
       console.error('查詢教學活動失敗:', error);
@@ -116,6 +129,11 @@ export async function POST(request: NextRequest) {
       
       // UUID 欄位
       insertData.template_id = (body.template_id && typeof body.template_id === 'string' && body.template_id.trim().length > 0) ? body.template_id : null;
+      
+      // org_id 欄位
+      if (body.org_id && typeof body.org_id === 'string' && body.org_id.trim().length > 0) {
+        insertData.org_id = body.org_id;
+      }
       
       // JSONB 欄位
       insertData.custom_fields = body.custom_fields || null;

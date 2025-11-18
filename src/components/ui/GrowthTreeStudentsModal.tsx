@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { XMarkIcon, MagnifyingGlassIcon, UserIcon, StarIcon, AcademicCapIcon, HeartIcon, ChatBubbleLeftIcon } from '@heroicons/react/24/outline';
 import { HanamiButton, HanamiCard } from './index';
 import { supabase } from '@/lib/supabase';
+import Image from 'next/image';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Student {
   id: string;
@@ -46,6 +48,18 @@ export default function GrowthTreeStudentsModal({
   activitiesOptions,
   onClose
 }: GrowthTreeStudentsModalProps) {
+  const { currentOrganization } = useOrganization();
+  
+  const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const PLACEHOLDER_ORG_IDS = new Set(['default-org', 'unassigned-org-placeholder']);
+  
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) return null;
+    return UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id)
+      ? currentOrganization.id
+      : null;
+  }, [currentOrganization?.id]);
+  
   const [students, setStudents] = useState<Student[]>([]);
   const [studentAbilities, setStudentAbilities] = useState<StudentAbility[]>([]);
   const [activityStats, setActivityStats] = useState<{[key: string]: number}>({});
@@ -62,7 +76,7 @@ export default function GrowthTreeStudentsModal({
 
   useEffect(() => {
     loadData();
-  }, [treeId, treeCourseType]);
+  }, [treeId, treeCourseType, validOrgId]);
 
   const loadData = async () => {
     console.log('開始載入學生管理資料...');
@@ -130,11 +144,17 @@ export default function GrowthTreeStudentsModal({
       setStudents(formattedStudents);
 
       // 2. 載入所有學生（用於選擇器）
-      console.log('步驟2: 載入所有學生');
-      const { data: allStudentsData, error: allStudentsError } = await supabase
+      console.log('步驟2: 載入所有學生', { validOrgId });
+      let allStudentsQuery = supabase
         .from('Hanami_Students')
-        .select('id, full_name, nick_name, student_age, course_type')
-        .order('full_name');
+        .select('id, full_name, nick_name, student_age, course_type');
+      
+      // 根據 org_id 過濾
+      if (validOrgId) {
+        allStudentsQuery = allStudentsQuery.eq('org_id', validOrgId);
+      }
+      
+      const { data: allStudentsData, error: allStudentsError } = await allStudentsQuery.order('full_name');
 
       if (allStudentsError) {
         console.error('載入所有學生失敗:', allStudentsError);
@@ -519,7 +539,13 @@ export default function GrowthTreeStudentsModal({
         <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">🌳</span>
+              <Image
+                src="/tree ui.png"
+                alt="成長樹"
+                width={36}
+                height={36}
+                className="h-9 w-9"
+              />
               <div>
                 <h2 className="text-2xl font-bold text-hanami-text">{treeName}</h2>
                 <p className="text-hanami-text-secondary">學生管理</p>
@@ -822,7 +848,13 @@ export default function GrowthTreeStudentsModal({
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
               <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">🌳</span>
+                  <Image
+                    src="/tree ui.png"
+                    alt="成長樹"
+                    width={32}
+                    height={32}
+                    className="h-8 w-8"
+                  />
                   <h2 className="text-xl font-bold text-hanami-text">從成長樹移除學生</h2>
                 </div>
               </div>

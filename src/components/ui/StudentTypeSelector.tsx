@@ -7,17 +7,21 @@ import { useRouter } from 'next/navigation';
 interface StudentTypeSelectorProps {
   isOpen: boolean;
   onClose: () => void;
+  regularPath?: string;
+  trialPath?: string;
 }
 
-export default function StudentTypeSelector({ isOpen, onClose }: StudentTypeSelectorProps) {
+export default function StudentTypeSelector({
+  isOpen,
+  onClose,
+  regularPath = '/admin/students/new?type=regular',
+  trialPath = '/admin/students/new?type=trial',
+}: StudentTypeSelectorProps) {
   const router = useRouter();
 
   const handleSelectType = (type: 'regular' | 'trial') => {
-    if (type === 'regular') {
-      router.push('/admin/students/new?type=regular');
-    } else {
-      router.push('/admin/students/new?type=trial');
-    }
+    const target = type === 'regular' ? regularPath : trialPath;
+    router.push(target);
     onClose();
   };
 

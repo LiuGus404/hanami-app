@@ -3,12 +3,15 @@ import { useState, useEffect, useRef } from 'react';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { Spinner } from '@/components/ui/spinner';
 import { getSupabaseClient } from '@/lib/supabase';
+import { fallbackOrganization } from '@/lib/authUtils';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
 import { TrialLesson } from '@/types';
 import { useContactDays } from '@/hooks/useContactDays';
 import { useBatchContactDays } from '@/hooks/useBatchContactDays';
 import { MessageCircle } from 'lucide-react';
 import { ContactChatDialog } from './ContactChatDialog';
+import toast from 'react-hot-toast';
+import Calendarui from './Calendarui';
 
 // 固定香港時區的 Date 產生器
 const getHongKongDate = (date = new Date()) => {
@@ -100,7 +103,13 @@ type Holiday = {
   title: string;
 };
 
-const HanamiCalendar = () => {
+interface HanamiCalendarProps {
+  organizationId?: string | null;
+  forceEmpty?: boolean;
+  userEmail?: string | null; // 用戶 email，用於 API 查詢
+}
+
+const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail = null }: HanamiCalendarProps = {}) => {
   const [view, setView] = useState<'day' | 'week' | 'month'>('day');
   const [currentDate, setCurrentDate] = useState(getHongKongDate());
   const supabase = getSupabaseClient();
@@ -116,6 +125,18 @@ const HanamiCalendar = () => {
   // 添加 loading 狀態
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDateTeachers, setSelectedDateTeachers] = useState<{name: string, start: string, end: string}[]>([]);
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [dateInputValue, setDateInputValue] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const effectiveOrgId =
+    !forceEmpty &&
+    organizationId &&
+    organizationId !== 'default-org' &&
+    organizationId !== fallbackOrganization.id
+      ? organizationId
+      : null;
+  const disableData = forceEmpty || !effectiveOrgId;
 
   // 提取所有有效的電話號碼用於批量載入
   const allPhoneNumbers = lessons
@@ -138,43 +159,118 @@ const HanamiCalendar = () => {
 
   // 抓取節日資料和學生資料
   useEffect(() => {
+    if (disableData) {
+      setHolidays([]);
+      setStudents([]);
+      return;
+    }
+
     const fetchHolidays = async () => {
-      const { data, error } = await supabase.from('hanami_holidays').select('date, title');
+      let query = supabase.from('hanami_holidays').select('date, title, org_id');
+      
+      // 根據 org_id 過濾假期
+      if (effectiveOrgId) {
+        query = query.eq('org_id', effectiveOrgId);
+        console.log('✅ [HanamiCalendar] 假期查詢已添加 org_id 過濾:', effectiveOrgId);
+      } else {
+        // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+        query = query.eq('org_id', '00000000-0000-0000-0000-000000000000');
+        console.warn('⚠️ [HanamiCalendar] effectiveOrgId 為 null，假期查詢將返回空結果');
+      }
+      
+      const { data, error } = await query;
       if (!error && data) {
-        // 確保資料符合 Holiday 型別
+        console.log('📊 [HanamiCalendar] 載入的假期數量:', data.length, 'effectiveOrgId:', effectiveOrgId);
+        // 確保資料符合 Holiday 型別，並且只包含當前機構的假期
         const validHolidays: Holiday[] = data
-          .filter((h): h is Holiday => h.date !== null && h.title !== null)
+          .filter((h): boolean => {
+            const isValid = h.date !== null && h.title !== null;
+            if (isValid && effectiveOrgId) {
+              // 額外檢查 org_id 是否匹配（以防萬一）
+              const orgIdMatch = (h as any).org_id === effectiveOrgId;
+              if (!orgIdMatch) {
+                console.warn('⚠️ [HanamiCalendar] 發現不匹配的假期記錄:', h, 'expected org_id:', effectiveOrgId);
+              }
+              return orgIdMatch;
+            }
+            return isValid;
+          })
           .map(h => ({
             date: h.date,
             title: h.title,
           }));
+        console.log('📊 [HanamiCalendar] 有效的假期列表:', validHolidays.map(h => ({ date: h.date, title: h.title })));
         setHolidays(validHolidays);
+      } else if (error) {
+        console.error('❌ [HanamiCalendar] 查詢假期錯誤:', error);
+      } else {
+        console.log('📊 [HanamiCalendar] 沒有載入到任何假期，effectiveOrgId:', effectiveOrgId);
       }
     };
 
     const fetchStudents = async () => {
-      const { data, error } = await supabase
-        .from('Hanami_Students')
-        .select('id, full_name, student_age, student_dob');
-      if (!error && data) {
-        console.log('載入的學生數據:', data.slice(0, 3)); // 顯示前3個學生
-        setStudents(data);
+      if (!effectiveOrgId) {
+        setStudents([]);
+        return;
+      }
+
+      // 如果提供了 userEmail，使用 API 端點（繞過 RLS）
+      if (userEmail) {
+        try {
+          const response = await fetch(
+            `/api/students/list?orgId=${encodeURIComponent(effectiveOrgId)}&userEmail=${encodeURIComponent(userEmail)}`
+          );
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('載入學生數據錯誤:', errorData);
+            setStudents([]);
+            return;
+          }
+
+          const result = await response.json();
+          const studentsData = result.data || [];
+          console.log('載入的學生數據:', studentsData.slice(0, 3)); // 顯示前3個學生
+          setStudents(studentsData);
+        } catch (error) {
+          console.error('載入學生數據異常:', error);
+          setStudents([]);
+        }
       } else {
-        console.error('載入學生數據錯誤:', error);
+        // 回退到直接查詢（可能會有 RLS 問題）
+        let query = supabase
+          .from('Hanami_Students')
+          .select('id, full_name, student_age, student_dob')
+          .eq('org_id', effectiveOrgId);
+        const { data, error } = await query;
+        if (!error && data) {
+          console.log('載入的學生數據:', data.slice(0, 3)); // 顯示前3個學生
+          setStudents(data);
+        } else {
+          console.error('載入學生數據錯誤:', error);
+        }
       }
     };
 
     fetchHolidays();
     fetchStudents();
-  }, []);
+  }, [disableData, effectiveOrgId, supabase, userEmail]);
 
   // 判斷是否為節日
   const isHoliday = (dateStr: string) => {
-    return holidays.find(h => h.date === dateStr);
+    const holiday = holidays.find(h => h.date === dateStr);
+    if (holiday) {
+      console.log('🎉 [HanamiCalendar] 找到假期:', dateStr, holiday.title);
+    }
+    return holiday;
   };
 
   // fetchLessons 支援日期範圍
   const fetchLessons = async (startDate: Date, endDate: Date) => {
+    if (!effectiveOrgId) {
+      setLessons([]);
+      return;
+    }
     const { data, error } = await supabase
       .from('hanami_student_lesson')
       .select(`
@@ -184,7 +280,8 @@ const HanamiCalendar = () => {
         )
       `)
       .gte('lesson_date', startDate.toISOString())
-      .lte('lesson_date', endDate.toISOString());
+      .lte('lesson_date', endDate.toISOString())
+      .eq('org_id', effectiveOrgId);
     if (error) {
       console.error('Fetch error:', error);
       return;
@@ -196,6 +293,15 @@ const HanamiCalendar = () => {
   };
 
   useEffect(() => {
+    if (disableData || !effectiveOrgId) {
+      setIsLoading(false);
+      setLessons([]);
+      setSelectedDetail(null);
+      lessonsFetchedRef.current = false;
+      loadingRef.current = false;
+      return;
+    }
+
     // 如果 view 和 currentDate 沒有變化且已經載入過，不重複載入
     const dateStr = getDateString(currentDate);
     const viewKey = `${view}_${dateStr}`;
@@ -219,18 +325,46 @@ const HanamiCalendar = () => {
           const dateStr = getDateString(currentDate);
           console.log('查詢日期:', dateStr);
           
-          // 獲取常規學生的課堂，明確指定關聯關係
-          const { data: regularLessonsData, error: regularLessonsError } = await supabase
-            .from('hanami_student_lesson')
-            .select(`
-              *,
-              Hanami_Students!hanami_student_lesson_student_id_fkey (
-                full_name,
-                student_age,
-                contact_number
-              )
-            `)
-            .eq('lesson_date', dateStr);
+          // 獲取常規學生的課堂
+          let regularLessonsData: any[] = [];
+          let regularLessonsError: any = null;
+
+          // 如果提供了 userEmail，使用 API 端點（繞過 RLS）
+          if (userEmail && effectiveOrgId) {
+            try {
+              const lessonsResponse = await fetch(
+                `/api/lessons/list?orgId=${encodeURIComponent(effectiveOrgId)}&userEmail=${encodeURIComponent(userEmail)}&lessonDate=${dateStr}`
+              );
+
+              if (lessonsResponse.ok) {
+                const lessonsData = await lessonsResponse.json();
+                regularLessonsData = lessonsData.data || [];
+                
+                // API 端點已經返回關聯的學生資料，無需手動關聯
+              } else {
+                const errorData = await lessonsResponse.json().catch(() => ({}));
+                regularLessonsError = errorData;
+              }
+            } catch (error) {
+              regularLessonsError = error;
+            }
+          } else {
+            // 回退到直接查詢（可能會有 RLS 問題）
+            const { data, error } = await supabase
+              .from('hanami_student_lesson')
+              .select(`
+                *,
+                Hanami_Students!hanami_student_lesson_student_id_fkey (
+                  full_name,
+                  student_age,
+                  contact_number
+                )
+              `)
+              .eq('lesson_date', dateStr)
+              .eq('org_id', effectiveOrgId);
+            regularLessonsData = data || [];
+            regularLessonsError = error;
+          }
 
           console.log('常規學生課堂:', regularLessonsData);
           console.log('常規學生課堂詳細:', regularLessonsData?.slice(0, 3).map(l => ({
@@ -245,7 +379,8 @@ const HanamiCalendar = () => {
           const { data: trialLessonsData, error: trialLessonsError } = await supabase
             .from('hanami_trial_students')
             .select('*')
-            .eq('lesson_date', dateStr);
+            .eq('lesson_date', dateStr)
+            .eq('org_id', effectiveOrgId);
 
           console.log('試堂學生課堂:', trialLessonsData);
 
@@ -264,7 +399,9 @@ const HanamiCalendar = () => {
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
           
-          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date(), {
+            organizationId: effectiveOrgId || undefined,
+          });
 
           // 處理常規學生數據
           const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
@@ -343,14 +480,16 @@ const HanamiCalendar = () => {
               )
             `)
             .gte('lesson_date', startDateStr)
-            .lte('lesson_date', endDateStr);
+            .lte('lesson_date', endDateStr)
+            .eq('org_id', effectiveOrgId);
 
           // 獲取試堂學生的課堂
           const { data: trialLessonsData, error: trialLessonsError } = await supabase
             .from('hanami_trial_students')
             .select('*')
             .gte('lesson_date', startDateStr)
-            .lte('lesson_date', endDateStr);
+            .lte('lesson_date', endDateStr)
+            .eq('org_id', effectiveOrgId);
 
           if (regularLessonsError || trialLessonsError) {
             console.error('Fetch error:', regularLessonsError || trialLessonsError);
@@ -362,7 +501,9 @@ const HanamiCalendar = () => {
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
           
-          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date(), {
+            organizationId: effectiveOrgId || undefined,
+          });
 
           // 處理常規學生數據
           const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
@@ -433,14 +574,16 @@ const HanamiCalendar = () => {
               )
             `)
             .gte('lesson_date', startDateStr)
-            .lte('lesson_date', endDateStr);
+            .lte('lesson_date', endDateStr)
+            .eq('org_id', effectiveOrgId);
 
           // 獲取試堂學生的課堂
           const { data: trialLessonsData, error: trialLessonsError } = await supabase
             .from('hanami_trial_students')
             .select('*')
             .gte('lesson_date', startDateStr)
-            .lte('lesson_date', endDateStr);
+            .lte('lesson_date', endDateStr)
+            .eq('org_id', effectiveOrgId);
 
           if (regularLessonsError || trialLessonsError) {
             console.error('Fetch error:', regularLessonsError || trialLessonsError);
@@ -452,7 +595,9 @@ const HanamiCalendar = () => {
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
           
-          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+          const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date(), {
+            organizationId: effectiveOrgId || undefined,
+          });
 
           // 處理常規學生數據
           const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
@@ -500,7 +645,7 @@ const HanamiCalendar = () => {
 
       fetchMonth();
     }
-  }, [view, currentDate]);
+  }, [view, currentDate, disableData, effectiveOrgId]);
 
   // 當 view 或 currentDate 變化時重置防抖狀態
   useEffect(() => {
@@ -539,12 +684,14 @@ const HanamiCalendar = () => {
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       const weekEnd = getHongKongDate(new Date(weekStart));
       weekEnd.setDate(weekEnd.getDate() + 6);
-      // 顯示跨月時包含月份
-      return `${weekStart.getFullYear()}/${weekStart.getMonth() + 1}/${weekStart.getDate()}-${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
+      // 顯示跨月時包含月份：日/月-日/月
+      return `${weekStart.getDate()}/${weekStart.getMonth() + 1}-${weekEnd.getDate()}/${weekEnd.getMonth() + 1}`;
     } else if (view === 'month') {
-      return `${date.getFullYear()}/${date.getMonth() + 1}`;
+      // 月視圖：月/年
+      return `${date.getMonth() + 1}/${date.getFullYear()}`;
     } else {
-      return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+      // 日視圖：日/月/年
+      return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
     }
   };
 
@@ -613,7 +760,9 @@ const HanamiCalendar = () => {
     const regularStudentIds = (regularLessonsData || [])
       .filter(lesson => lesson.student_id)
       .map(lesson => lesson.student_id!);
-    const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+    const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date(), {
+      organizationId: effectiveOrgId || undefined,
+    });
 
     // 處理常規學生數據
     const processedRegularLessons = (regularLessonsData || []).map((lesson: any) => ({
@@ -792,6 +941,20 @@ const HanamiCalendar = () => {
 
   // 處理點擊聯繫天數圖標
   const handleContactIconClick = (phoneNumber: string, contactDays: number | null) => {
+    // 檢查 org_id 是否為指定值
+    const ALLOWED_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
+    if (effectiveOrgId !== ALLOWED_ORG_ID) {
+      toast.error('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com', {
+        duration: 4000,
+        style: {
+          background: '#FFFDF8',
+          color: '#4B4036',
+          border: '1px solid #EADBC8',
+        },
+      });
+      return;
+    }
+    
     setSelectedPhoneNumber(phoneNumber);
     setSelectedContactDays(contactDays);
     setChatDialogOpen(true);
@@ -804,12 +967,16 @@ const HanamiCalendar = () => {
       return null;
     }
 
+    // 檢查 org_id 是否為指定值
+    const ALLOWED_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
+    const isFeatureEnabled = effectiveOrgId === ALLOWED_ORG_ID;
+
     // 從批量載入結果中獲取數據
     const contactDays = batchContactResults[phoneNumber];
     const loading = batchLoading;
     
-    // 只在開發模式下顯示調試信息
-    if (process.env.NODE_ENV === 'development') {
+    // 僅在顯式開啟除錯旗標時輸出詳盡日誌，避免汙染瀏覽器主控台
+    if (process.env.NEXT_PUBLIC_ENABLE_CONTACTDAY_DEBUG === 'true') {
       console.log('ContactDaysIcon - phoneNumber:', phoneNumber, 'contactDays:', contactDays, 'loading:', loading);
     }
     
@@ -826,8 +993,12 @@ const HanamiCalendar = () => {
       return (
         <button
           onClick={() => handleContactIconClick(phoneNumber, null)}
-          className="flex items-center px-1.5 py-0.5 bg-gray-100 rounded-full text-xs font-medium text-gray-600 border border-white hover:bg-gray-200 transition-colors cursor-pointer"
-          title="點擊聯繫家長"
+          className={`flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium border border-white transition-colors cursor-pointer ${
+            isFeatureEnabled
+              ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-gray-400 text-gray-500 hover:bg-gray-500 opacity-60'
+          }`}
+          title={isFeatureEnabled ? '點擊聯繫家長' : '功能未開放'}
         >
           <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
           <span>無記錄</span>
@@ -844,6 +1015,9 @@ const HanamiCalendar = () => {
     };
     
     const getBgColor = () => {
+      if (!isFeatureEnabled) {
+        return 'from-gray-400 to-gray-500';
+      }
       if (days === 0) return 'from-green-100 to-green-200';
       if (days <= 3) return 'from-[#FFD59A] to-[#EBC9A4]';
       if (days <= 7) return 'from-yellow-100 to-yellow-200';
@@ -853,8 +1027,12 @@ const HanamiCalendar = () => {
     return (
       <button
         onClick={() => handleContactIconClick(phoneNumber, days)}
-        className={`flex items-center px-1.5 py-0.5 bg-gradient-to-r ${getBgColor()} rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm border border-white hover:shadow-md transition-all cursor-pointer`}
-        title="點擊聯繫家長"
+        className={`flex items-center px-1.5 py-0.5 bg-gradient-to-r ${getBgColor()} rounded-full text-xs font-medium shadow-sm border border-white transition-all cursor-pointer ${
+          isFeatureEnabled
+            ? 'text-[#2B3A3B] hover:shadow-md'
+            : 'text-gray-500 opacity-60 hover:opacity-70'
+        }`}
+        title={isFeatureEnabled ? '點擊聯繫家長' : '功能未開放'}
       >
         <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
         <span>{getDisplayText()}</span>
@@ -963,10 +1141,15 @@ const HanamiCalendar = () => {
   };
 
   useEffect(() => {
+    if (disableData || !effectiveOrgId) {
+      setSelectedDateTeachers([]);
+      return;
+    }
+
     const fetchSelectedDateTeachers = async () => {
       const supabase = getSupabaseClient();
       const selectedDateStr = getDateString(currentDate); // 使用現有的 getDateString 函數
-      const { data, error } = await supabase
+      let query = supabase
         .from('teacher_schedule')
         .select(`
           id,
@@ -975,58 +1158,151 @@ const HanamiCalendar = () => {
           hanami_employee:teacher_id (teacher_nickname)
         `)
         .eq('scheduled_date', selectedDateStr);
+      
+      // 根據 org_id 過濾排班記錄
+      if (effectiveOrgId) {
+        query = query.eq('org_id', effectiveOrgId);
+        console.log('✅ [HanamiCalendar] 排班記錄查詢已添加 org_id 過濾:', effectiveOrgId);
+      } else {
+        // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+        query = query.eq('org_id', '00000000-0000-0000-0000-000000000000');
+        console.warn('⚠️ [HanamiCalendar] effectiveOrgId 為 null，排班記錄查詢將返回空結果');
+      }
+      
+      const { data, error } = await query;
       if (!error && data) {
+        console.log('📊 [HanamiCalendar] 載入的排班記錄數量:', data.length, 'effectiveOrgId:', effectiveOrgId);
         const list: {name: string, start: string, end: string}[] = [];
         data.forEach((row: any) => {
           if (row.hanami_employee?.teacher_nickname && row.start_time && row.end_time) {
             list.push({ name: row.hanami_employee.teacher_nickname, start: row.start_time, end: row.end_time });
           }
         });
+        console.log('📊 [HanamiCalendar] 載入的老師列表:', list.map(t => ({ name: t.name, start: t.start, end: t.end })));
         setSelectedDateTeachers(list);
+      } else if (error) {
+        console.error('❌ [HanamiCalendar] 查詢排班記錄錯誤:', error);
       }
     };
     fetchSelectedDateTeachers();
-  }, [currentDate]);
+  }, [currentDate, disableData, effectiveOrgId]);
 
   return (
     <div className="bg-[#FFFDF8] p-4 rounded-xl shadow-md">
-      <div className="flex flex-wrap gap-2 items-center mb-4 overflow-x-auto">
-        <button
-          className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
-          onClick={handlePrev}
-        >{'◀'}
-        </button>
-        {view === 'day' ? (
-          <input
-            className="border-2 border-[#EAC29D] px-3 py-2 rounded-full w-[120px] bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] transition-all duration-200"
-            style={{ minWidth: '100px' }}
-            type="date"
-            value={getDateString(currentDate)}
-            onChange={(e) => {
-              const [year, month, day] = e.target.value.split('-').map(Number);
-              const newDate = getHongKongDate(new Date(year, month - 1, day));
-              setCurrentDate(newDate);
-            }}
-          />
-        ) : (
-          <span className="font-semibold w-fit min-w-0 max-w-[120px] truncate text-[#4B4036]">{formatDate(currentDate)}</span>
-        )}
-        <button
-          className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
-          onClick={handleNext}
-        >{'▶'}
-        </button>
-        <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'day' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('day')}>日</button>
-        <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'week' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('week')}>週</button>
-        <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'month' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('month')}>月</button>
-        <button
-          className="hanami-btn-soft w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ml-2"
-          id="refresh-btn"
-          title="刷新資料"
-          onClick={async () => {
-            lessonsFetchedRef.current = false;
-            loadingRef.current = false;
-            setIsLoading(true);
+      <div className="flex flex-col gap-2 mb-4">
+        {/* 第一行：日期導航 */}
+        <div className="flex flex-wrap gap-2 items-center overflow-x-auto">
+          <button
+            className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
+            onClick={handlePrev}
+          >{'◀'}
+          </button>
+          <div className="relative">
+            {isEditingDate ? (
+              <input
+                type="text"
+                value={dateInputValue}
+                onChange={(e) => setDateInputValue(e.target.value)}
+                onBlur={() => {
+                  // 解析日期輸入（格式：日/月/年）
+                  const dateParts = dateInputValue.split('/');
+                  if (dateParts.length === 3) {
+                    const day = parseInt(dateParts[0], 10);
+                    const month = parseInt(dateParts[1], 10) - 1; // 月份從 0 開始
+                    const year = parseInt(dateParts[2], 10);
+                    
+                    if (!isNaN(day) && !isNaN(month) && !isNaN(year) && month >= 0 && month <= 11) {
+                      const newDate = getHongKongDate(new Date(year, month, day));
+                      if (!isNaN(newDate.getTime())) {
+                        setCurrentDate(newDate);
+                      }
+                    }
+                  }
+                  setIsEditingDate(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Escape') {
+                    setIsEditingDate(false);
+                    setDateInputValue('');
+                  }
+                }}
+                autoFocus
+                className="font-semibold w-fit min-w-0 max-w-[120px] px-2 py-1 border-2 border-[#EAC29D] rounded-full bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] text-[#4B4036] text-center"
+                placeholder="日/月/年"
+              />
+            ) : (
+              <span
+                className="font-semibold w-fit min-w-0 max-w-[120px] truncate text-[#4B4036] cursor-pointer hover:text-[#A68A64] transition-colors"
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                title="點擊選擇日期或雙擊編輯"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  const formatted = formatDate(currentDate);
+                  setDateInputValue(formatted);
+                  setIsEditingDate(true);
+                }}
+              >
+                {formatDate(currentDate)}
+              </span>
+            )}
+            {showDatePicker && (
+              <>
+                {/* 背景遮罩 */}
+                <div 
+                  className="fixed inset-0 z-[9998] bg-black/20"
+                  onClick={() => setShowDatePicker(false)}
+                />
+                {/* 日曆彈出窗口 - 使用 fixed 定位確保不被遮蓋 */}
+                <div 
+                  className="fixed z-[9999]"
+                  style={{
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <div className="relative">
+                    {/* 關閉按鈕 */}
+                    <button
+                      onClick={() => setShowDatePicker(false)}
+                      className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-full shadow-lg border border-[#EADBC8] flex items-center justify-center text-[#4B4036] hover:bg-[#FFF9F2] hover:text-[#A68A64] transition-colors z-10"
+                      title="關閉"
+                    >
+                      ×
+                    </button>
+                    <Calendarui
+                      value={getDateString(currentDate)}
+                      onSelect={(dateStr) => {
+                        if (dateStr) {
+                          const [year, month, day] = dateStr.split('-').map(Number);
+                          const newDate = getHongKongDate(new Date(year, month - 1, day));
+                          setCurrentDate(newDate);
+                        }
+                        setShowDatePicker(false);
+                      }}
+                      onClose={() => setShowDatePicker(false)}
+                      inline={true}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
+            onClick={handleNext}
+          >{'▶'}
+          </button>
+          <button
+            className="hanami-btn-soft w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ml-2"
+            id="refresh-btn"
+            title="刷新資料"
+            onClick={async () => {
+              lessonsFetchedRef.current = false;
+              loadingRef.current = false;
+              setIsLoading(true);
             const newDate = new Date(currentDate);
             setCurrentDate(newDate);
             const btn = document.getElementById('refresh-btn');
@@ -1038,6 +1314,13 @@ const HanamiCalendar = () => {
         >
           <img alt="Refresh" className="w-4 h-4" src="/refresh.png" />
         </button>
+        </div>
+        {/* 第二行：視圖切換按鈕 */}
+        <div className="flex flex-wrap gap-2 items-center overflow-x-auto">
+          <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'day' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('day')}>日</button>
+          <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'week' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('week')}>週</button>
+          <button className={`hanami-btn w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ${view === 'month' ? 'hanami-btn' : 'hanami-btn-soft'}`} onClick={() => setView('month')}>月</button>
+        </div>
       </div>
       {/* 選擇日期上班老師圓角按鈕區塊 */}
       <div className="flex flex-wrap gap-2 mb-4">

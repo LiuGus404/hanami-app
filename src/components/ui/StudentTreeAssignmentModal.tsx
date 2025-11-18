@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
 import { 
@@ -12,6 +12,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { TreePine, Users } from 'lucide-react';
 import { getHKDateString } from '@/lib/utils';
+import Image from 'next/image';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Student {
   id: string;
@@ -46,6 +48,18 @@ export default function StudentTreeAssignmentModal({
   student,
   onSuccess
 }: StudentTreeAssignmentModalProps) {
+  const { currentOrganization } = useOrganization();
+  
+  const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const PLACEHOLDER_ORG_IDS = new Set(['default-org', 'unassigned-org-placeholder']);
+  
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) return null;
+    return UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id)
+      ? currentOrganization.id
+      : null;
+  }, [currentOrganization?.id]);
+  
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [trees, setTrees] = useState<GrowthTree[]>([]);
@@ -100,10 +114,16 @@ export default function StudentTreeAssignmentModal({
         setSelectedStudents([student.id]);
       } else {
         // 載入所有學生資料
-        const { data: studentsData, error: studentsError } = await supabase
+        let studentsQuery = supabase
           .from('Hanami_Students')
-          .select('id, full_name, nick_name, course_type')
-          .order('full_name');
+          .select('id, full_name, nick_name, course_type');
+        
+        // 根據 org_id 過濾
+        if (validOrgId) {
+          studentsQuery = studentsQuery.eq('org_id', validOrgId);
+        }
+        
+        const { data: studentsData, error: studentsError } = await studentsQuery.order('full_name');
 
         if (studentsError) throw studentsError;
         setStudents(studentsData || []);
@@ -211,7 +231,13 @@ export default function StudentTreeAssignmentModal({
         <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">🌳</span>
+              <Image
+                src="/tree ui.png"
+                alt="成長樹"
+                width={36}
+                height={36}
+                className="h-9 w-9"
+              />
               <div>
                 <h2 className="text-2xl font-bold text-hanami-text">成長樹分配管理</h2>
                 <p className="text-hanami-text-secondary">

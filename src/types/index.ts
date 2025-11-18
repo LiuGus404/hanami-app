@@ -57,6 +57,7 @@ export interface Lesson {
   id: string;
   student_id: string;
   student_oid: string | null;
+  org_id: string | null;
   lesson_date: string;
   regular_timeslot: string;
   actual_timeslot: string | null;

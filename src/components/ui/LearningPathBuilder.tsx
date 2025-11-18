@@ -49,10 +49,13 @@ interface LearningNode {
     learningObjectives: string[];
     activityId?: string; // 添加活動ID
     activityDetails?: {
-      duration_minutes?: number;
-      category?: string;
-      difficulty_level?: number;
-      activity_type?: string;
+      duration_minutes?: number | null;
+      estimated_duration?: number | null;
+      category?: string | null;
+      difficulty_level?: number | null;
+      activity_type?: string | null;
+      materials_needed?: string[];
+      materials?: string[];
     };
   };
 }
@@ -76,6 +79,7 @@ interface LearningPathBuilderProps {
   onSave?: (path: LearningPath) => void;
   onPreview?: (path: LearningPath) => void;
   onClose?: () => void; // 添加退出回調
+  orgId?: string | null; // 機構 ID
 }
 
 const NODE_TYPES = {
@@ -172,7 +176,31 @@ function ActivityOrderBadge({ order, isAnimated = true }: { order: number; isAni
   );
 }
 
-export default function LearningPathBuilder({ treeId, initialPath, activities, onSave, onPreview, onClose }: LearningPathBuilderProps) {
+export default function LearningPathBuilder({ treeId, initialPath, activities, onSave, onPreview, onClose, orgId }: LearningPathBuilderProps) {
+  // 檢測是否為手機或窄屏
+  const [isMobile, setIsMobile] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
+  const [showOrientationTip, setShowOrientationTip] = useState(false);
+  
+  // 工具欄展開/收起狀態：根據屏幕寬度決定預設值
+  const [isToolbarExpanded, setIsToolbarExpanded] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768; // 平板及以上預設展開
+    }
+    return true;
+  });
+  
+  // 左側邊欄展開/收起狀態：根據屏幕寬度決定預設值
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768; // 平板及以上預設展開
+    }
+    return true;
+  });
+  
+  // 全螢幕狀態
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
   // 追蹤是否有未儲存的變更
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [originalPath, setOriginalPath] = useState<LearningPath | null>(null);
@@ -567,13 +595,27 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       ? activity.hanami_teaching_activities.activity_description
       : activity.custom_activity_description || '';
 
+    // 獲取教學活動的 ID（如果是 teaching 類型，使用 activity_id 或 hanami_teaching_activities.id）
+    const teachingActivityId = activity.activity_source === 'teaching' 
+      ? (activity.activity_id || activity.hanami_teaching_activities?.id || undefined)
+      : undefined;
+
+    // 獲取活動類型和持續時間（優先從教學活動數據中獲取）
+    const activityType = activity.activity_source === 'teaching' && activity.hanami_teaching_activities
+      ? activity.hanami_teaching_activities.activity_type
+      : activity.activity_type || null;
+
+    const durationMinutes = activity.activity_source === 'teaching' && activity.hanami_teaching_activities
+      ? (activity.hanami_teaching_activities.duration_minutes || (activity.hanami_teaching_activities as any).estimated_duration)
+      : (activity as any).estimated_duration || 30;
+
     return {
       id: `tree_activity_${activity.id}`,
       title: activityName,
       description: activityDescription || '',
       type: 'activity' as const,
       position: { x: 0, y: 0 },
-      duration: activity.estimated_duration || 30,
+      duration: durationMinutes,
       difficulty: (activity.difficulty_level || 1) as 1 | 2 | 3 | 4 | 5,
       prerequisites: [],
       reward: `完成 ${activityName}`,
@@ -581,11 +623,20 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       isLocked: false,
       connections: [],
       metadata: {
-        activityId: activity.id,
-        activityType: activity.activity_type,
-        materials: [],
-        instructions: '',
-        learningObjectives: []
+        activityId: teachingActivityId, // 使用教學活動的 ID，而不是樹活動的 ID
+        activityType: activityType || undefined,
+        materials: activity.materials_needed || activity.hanami_teaching_activities?.materials_needed || [],
+        instructions: activity.instructions || activity.hanami_teaching_activities?.instructions || '',
+        learningObjectives: (activity as any).learning_objectives || (activity.hanami_teaching_activities as any)?.learning_objectives || [],
+        // 如果已經有教學活動數據，直接設置 activityDetails
+        activityDetails: activity.activity_source === 'teaching' && activity.hanami_teaching_activities ? {
+          duration_minutes: activity.hanami_teaching_activities.duration_minutes || (activity.hanami_teaching_activities as any).estimated_duration || null,
+          estimated_duration: (activity.hanami_teaching_activities as any).estimated_duration || activity.hanami_teaching_activities.duration_minutes || null,
+          category: (activity.hanami_teaching_activities as any).category || null,
+          difficulty_level: activity.hanami_teaching_activities.difficulty_level || activity.difficulty_level || null,
+          activity_type: activity.hanami_teaching_activities.activity_type || activity.activity_type || null,
+          materials_needed: activity.hanami_teaching_activities.materials_needed || activity.materials_needed || []
+        } : undefined
       }
     };
   };
@@ -1611,7 +1662,9 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             ${isNodeDragging ? 'shadow-2xl scale-105' : ''}
             ${node.type === 'start' || node.type === 'end' 
               ? 'rounded-full w-32 h-32' // 開始和結束節點：圓形，固定尺寸
-              : 'rounded-2xl w-[280px] min-h-[200px]' // 活動節點：矩形，保持原有尺寸
+              : isMobile 
+                ? 'rounded-2xl w-[180px] min-h-[80px]' // 手機/平板：較小尺寸，只顯示標題
+                : 'rounded-2xl w-[280px] min-h-[200px]' // 桌面：矩形，保持原有尺寸
             }
           `}
           style={{ 
@@ -1744,9 +1797,9 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
               </div>
             </div>
           ) : (
-            // 活動節點：保持原有布局
+            // 活動節點：根據設備類型顯示不同內容
             <>
-              <div className="flex items-center gap-3 mb-3">
+              <div className={`flex items-center gap-3 ${isMobile ? 'mb-0' : 'mb-3'}`}>
                 <div className="flex-shrink-0">
                   <nodeType.icon className="w-5 h-5" />
                 </div>
@@ -1755,8 +1808,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                     <span className="font-bold text-base truncate" title={node.title}>
                       {node.title}
                 </span>
-                    {/* 可愛的活動次序標示 */}
-                    {node.type === 'activity' && (
+                    {/* 可愛的活動次序標示 - 只在非手機/平板時顯示 */}
+                    {node.type === 'activity' && !isMobile && (
                       <ActivityOrderBadge order={path.nodes.filter(n => n.type === 'activity').findIndex(n => n.id === node.id) + 1} />
               )}
                   </div>
@@ -1764,16 +1817,19 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             </div>
           </div>
           
-              <div className="text-sm opacity-90 mb-3 leading-relaxed line-clamp-2 max-h-12 overflow-hidden" title={node.description || ''}>
-            {node.description || ''}
-          </div>
+              {/* 描述 - 只在非手機/平板時顯示 */}
+              {!isMobile && (
+                <div className="text-sm opacity-90 mb-3 leading-relaxed line-clamp-2 max-h-12 overflow-hidden" title={node.description || ''}>
+                  {node.description || ''}
+                </div>
+              )}
             </>
           )}
           
 
           
-          {/* 活動節點詳細信息 */}
-          {node.type === 'activity' && (
+          {/* 活動節點詳細信息 - 只在非手機/平板時顯示 */}
+          {node.type === 'activity' && !isMobile && (
             <div className="grid grid-cols-2 gap-2 mb-3">
               
               {/* 時間 */}
@@ -1782,39 +1838,83 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                   <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                   </svg>
-                  <span className="truncate">{node.metadata?.activityDetails?.duration_minutes || node.duration || 30}分鐘</span>
+                  <span className="truncate">
+                    {node.metadata?.activityDetails?.duration_minutes || 
+                     node.metadata?.activityDetails?.estimated_duration || 
+                     node.duration || 
+                     30}分鐘
+                  </span>
                 </span>
               </div>
               
-              {/* 分類 - 琴譜 */}
-              <div className="flex items-center gap-1 text-xs">
-                <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
-                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  <span className="truncate">琴譜</span>
-                  </span>
-                </div>
+              {/* 分類 - 根據活動實際分類顯示 */}
+              {(() => {
+                // 優先從 activityDetails 獲取 activity_type
+                const activityType = node.metadata?.activityDetails?.activity_type || 
+                                    node.metadata?.activityType || 
+                                    null;
+                
+                // 如果是 custom 類型，顯示「自訂活動」
+                if (activityType === 'custom') {
+                  return (
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
+                        <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="truncate">自訂活動</span>
+                      </span>
+                    </div>
+                  );
+                }
+                
+                // 其他情況優先顯示活動類型（如 exercise, teaching 等），如果沒有則顯示分類
+                const displayType = activityType || 
+                                  node.metadata?.activityDetails?.category || 
+                                  null;
+                return displayType ? (
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
+                      <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="truncate">{displayType}</span>
+                    </span>
+                  </div>
+                ) : null;
+              })()}
               
               {/* 難度 */}
               <div className="flex items-center gap-1 text-xs">
                 <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
                   <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
                   <span className="truncate">難度 {node.metadata?.activityDetails?.difficulty_level || node.difficulty || 1}</span>
-                  </span>
-                </div>
+                </span>
+              </div>
               
-              {/* 材料類型 - 鋼琴教材 */}
-              <div className="flex items-center gap-1 text-xs">
-                <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
-                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
-                    </svg>
-                  <span className="truncate">鋼琴教材</span>
-                  </span>
-                </div>
+              {/* 材料類型 - 根據活動實際材料顯示 */}
+              {(() => {
+                // 嘗試從多個來源獲取材料信息
+                const materials = node.metadata?.materials || 
+                                 node.metadata?.activityDetails?.materials_needed || 
+                                 (Array.isArray(node.metadata?.activityDetails?.materials) ? node.metadata.activityDetails.materials : []);
+                
+                // 如果有材料，顯示第一個材料；否則不顯示
+                const material = Array.isArray(materials) && materials.length > 0 ? materials[0] : null;
+                
+                return material ? (
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 w-full justify-center">
+                      <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                      </svg>
+                      <span className="truncate">{material}</span>
+                    </span>
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
           
@@ -2149,7 +2249,8 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         },
         body: JSON.stringify({
           treeId: treeId,
-          pathData: savedPathData
+          pathData: savedPathData,
+          orgId: orgId // 包含 org_id
         }),
       });
 
@@ -2669,9 +2770,10 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             difficulty_level,
             activity_type,
             category,
-            materials,
+            materials_needed,
             instructions,
-            learning_objectives
+            tags,
+            status
           )
         `)
         .eq('tree_id', treeId)
@@ -2695,41 +2797,149 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
   const loadAllActivityDetails = useCallback(async () => {
     const activityNodes = path.nodes?.filter(node => 
       node.type === 'activity' && 
-      !node.metadata?.activityDetails
+      // 如果沒有 activityDetails 或缺少關鍵字段，需要載入
+      (!node.metadata?.activityDetails || 
+       !node.metadata?.activityDetails?.activity_type || 
+       !node.metadata?.activityDetails?.duration_minutes)
     );
     
-    if (activityNodes.length === 0) return;
+    if (activityNodes.length === 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('ℹ️ 沒有需要載入詳細信息的活動節點');
+      }
+      return;
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 開始載入活動詳細信息，節點數量:', activityNodes.length);
+    }
     
     for (const node of activityNodes) {
       try {
         let data: any = null;
         let error: any = null;
         
-        // 方法1: 如果有activityId，直接查詢
+        // 方法1: 如果有activityId且是有效的UUID，直接查詢
         if (node.metadata?.activityId) {
-          try {
-          const result = await supabase
-            .from('hanami_teaching_activities')
-            .select('*')
-            .eq('id', node.metadata.activityId)
-            .single();
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           
-          data = result.data;
-          error = result.error;
-            
-            if (error) {
-              console.warn('查詢活動詳細信息失敗:', error);
-              // 如果查詢失敗，跳過這個節點，不影響其他功能
-              continue;
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 檢查節點 activityId:', {
+              nodeId: node.id,
+              nodeTitle: node.title,
+              activityId: node.metadata.activityId,
+              isValidUUID: uuidRegex.test(node.metadata.activityId),
+              metadata: node.metadata
+            });
+          }
+          
+          if (!uuidRegex.test(node.metadata.activityId)) {
+            // activityId 不是有效的 UUID，跳過直接查詢，使用後續方法
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ activityId 不是有效的 UUID，將從樹活動表查詢:', {
+                activityId: node.metadata.activityId,
+                nodeId: node.id
+              });
             }
-          } catch (queryError) {
-            console.warn('查詢 hanami_teaching_activities 表失敗:', queryError);
-            // 如果表不存在或權限不足，跳過查詢
-            continue;
+          } else {
+            // activityId 是有效的 UUID，直接查詢
+            try {
+              const result = await supabase
+                .from('hanami_teaching_activities')
+                .select('id, activity_name, activity_type, duration_minutes, estimated_duration, category, difficulty_level')
+                .eq('id', node.metadata.activityId)
+                .maybeSingle();
+            
+              data = result.data;
+              error = result.error;
+                
+              if (error) {
+                console.error('❌ 查詢活動詳細信息失敗:', {
+                  error,
+                  activityId: node.metadata.activityId,
+                  nodeId: node.id,
+                  nodeTitle: node.title,
+                  errorCode: error.code,
+                  errorMessage: error.message,
+                  errorDetails: error.details,
+                  errorHint: error.hint
+                });
+                // 如果查詢失敗，繼續嘗試其他方法
+              } else if (data) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('✅ 通過 activityId 成功載入活動詳細信息:', {
+                    id: data.id,
+                    activity_type: data.activity_type,
+                    duration_minutes: data.duration_minutes,
+                    estimated_duration: data.estimated_duration
+                  });
+                }
+              }
+            } catch (queryError) {
+              console.warn('查詢 hanami_teaching_activities 表失敗:', queryError);
+            }
           }
         }
         
-        // 方法2: 如果沒有activityId或查詢失敗，嘗試從標題中提取活動信息
+        // 如果還沒有數據，嘗試從節點 ID 中提取樹活動 ID
+        if (!data || error) {
+          // 方法1.5: 從節點 ID 中提取樹活動 ID，然後查詢樹活動表
+          if (node.id.startsWith('tree_activity_')) {
+            const treeActivityId = node.id.replace('tree_activity_', '');
+            try {
+              const treeActivityResult = await supabase
+                .from('hanami_tree_activities')
+                .select(`
+                  activity_id, 
+                  activity_source, 
+                  hanami_teaching_activities (
+                    id,
+                    activity_name,
+                    activity_type,
+                    duration_minutes,
+                    estimated_duration,
+                    category,
+                    difficulty_level
+                  )
+                `)
+                .eq('id', treeActivityId)
+                .single();
+              
+              if (treeActivityResult.data) {
+                if (treeActivityResult.data.hanami_teaching_activities) {
+                  // 如果有關聯的教學活動數據，直接使用
+                  data = treeActivityResult.data.hanami_teaching_activities;
+                  error = null;
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('✅ 從樹活動表成功獲取教學活動數據:', data);
+                  }
+                } else if (treeActivityResult.data.activity_id) {
+                  // 如果有 activity_id，查詢教學活動表
+                  const realActivityId = treeActivityResult.data.activity_id;
+                  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                  if (uuidRegex.test(realActivityId)) {
+                    const result = await supabase
+                      .from('hanami_teaching_activities')
+                      .select('id, activity_name, activity_type, duration_minutes, estimated_duration, category, difficulty_level')
+                      .eq('id', realActivityId)
+                      .maybeSingle();
+                    data = result.data;
+                    error = result.error;
+                    if (data && !error) {
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('✅ 通過樹活動的 activity_id 成功查詢教學活動:', data);
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (treeError) {
+              console.error('❌ 從樹活動表查詢失敗:', treeError);
+            }
+          }
+        }
+        
+        // 方法2: 如果還沒有數據，嘗試從標題中提取活動信息
         if (!data || error) {
           // 從標題中提取活動名稱（去掉數字前綴）
           const titleMatch = node.title.match(/^\d{4}-(.+)/);
@@ -2740,10 +2950,10 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             // 嘗試通過活動名稱查詢
             const result = await supabase
               .from('hanami_teaching_activities')
-              .select('*')
+              .select('id, activity_name, activity_type, duration_minutes, estimated_duration, category, difficulty_level')
               .ilike('activity_name', `%${activityName}%`)
               .limit(1)
-              .single();
+              .maybeSingle();
             
             data = result.data;
             error = result.error;
@@ -2771,8 +2981,38 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
           }
         }
         
+        // 如果還是沒有數據，跳過
+        if (!data || error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ 最終未找到活動數據，跳過:', {
+              nodeId: node.id,
+              nodeTitle: node.title,
+              hasActivityId: !!node.metadata?.activityId,
+              activityId: node.metadata?.activityId
+            });
+          }
+          continue;
+        }
+        
         // 如果找到了活動數據，添加詳細信息
         if (data && !error) {
+          const activityDetails = {
+            duration_minutes: data.duration_minutes ?? data.estimated_duration ?? null,
+            estimated_duration: data.estimated_duration ?? data.duration_minutes ?? null,
+            category: data.category ?? null,
+            difficulty_level: data.difficulty_level ?? null,
+            activity_type: data.activity_type ?? null,
+            materials_needed: data.materials_needed || []
+          };
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📝 更新節點 activityDetails:', {
+              nodeId: node.id,
+              nodeTitle: node.title,
+              activityDetails
+            });
+          }
+          
           updatePathWithChangeTracking(prev => ({
             ...prev,
             nodes: prev.nodes.map(n => 
@@ -2780,16 +3020,20 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                 ...n,
                 metadata: {
                   ...n.metadata,
-                  activityDetails: {
-                    duration_minutes: data.duration_minutes || data.estimated_duration,
-                    category: data.category,
-                    difficulty_level: data.difficulty_level,
-                    activity_type: data.activity_type
-                  }
+                  materials: data.materials_needed || n.metadata?.materials || [],
+                  activityDetails: activityDetails
                 }
               } : n
             )
           }));
+        } else if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ 未找到活動數據或查詢失敗:', {
+            nodeId: node.id,
+            nodeTitle: node.title,
+            activityId: node.metadata?.activityId,
+            hasData: !!data,
+            error: error
+          });
         }
       } catch (loadError) {
         if (process.env.NODE_ENV === 'development') {
@@ -3698,12 +3942,123 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
         }
       }
     }
-  }, [isInitialized, path.nodes.length]); // 只在初始化狀態或節點數量變化時執行
+  }, [isInitialized, path.nodes.length, updatePathWithChangeTracking]); // 只在初始化狀態或節點數量變化時執行
+
+  // 全螢幕功能
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        // 進入全螢幕
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        // 退出全螢幕
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (error) {
+      console.error('全螢幕切換失敗:', error);
+      toast.error('全螢幕功能不可用');
+    }
+  }, []);
+
+  // 監聽全螢幕狀態變化
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // 追蹤之前的屏幕狀態
+  const wasMobileRef = useRef(false);
+  const isInitialMount = useRef(true);
+
+  // 檢測屏幕尺寸和方向
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const mobile = width < 768; // 小於 768px 視為手機
+      const portrait = height > width; // 豎屏
+      
+      setIsMobile(mobile);
+      setIsPortrait(portrait);
+      
+      // 如果是手機且是豎屏，顯示提示
+      if (mobile && portrait) {
+        setShowOrientationTip(true);
+      } else {
+        setShowOrientationTip(false);
+      }
+      
+      // 只在初始加載或從寬屏切換到窄屏時自動收起，避免用戶手動展開後被強制收起
+      if (isInitialMount.current || (mobile && !wasMobileRef.current)) {
+        setIsToolbarExpanded(!mobile);
+        setIsSidebarExpanded(!mobile);
+        isInitialMount.current = false;
+      }
+      
+      wasMobileRef.current = mobile;
+    };
+
+    // 初始檢測
+    checkScreenSize();
+
+    // 監聽窗口大小變化
+    window.addEventListener('resize', checkScreenSize);
+    window.addEventListener('orientationchange', checkScreenSize);
+
+    return () => {
+      window.removeEventListener('resize', checkScreenSize);
+      window.removeEventListener('orientationchange', checkScreenSize);
+    };
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-[#F9F2EF] via-[#D2E0AA] to-[#ABD7FB] overflow-hidden">
+      {/* 手機橫向提示 */}
+      {showOrientationTip && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-[#F98C53] to-[#FCCEB4] text-white p-4 shadow-lg flex items-center justify-center gap-3"
+        >
+          <svg className="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <div className="flex-1 text-center">
+            <p className="font-semibold">請將手機橫向使用以獲得最佳體驗</p>
+            <p className="text-sm opacity-90 mt-1">建議旋轉手機至橫向模式</p>
+          </div>
+          <button
+            onClick={() => setShowOrientationTip(false)}
+            className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            aria-label="關閉提示"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </motion.div>
+      )}
+      
       {/* 遊戲風格頂部橫幅 */}
-      <div className="bg-gradient-to-r from-[#F98C53] to-[#FCCEB4] text-white p-6 shadow-lg relative overflow-hidden">
+      <motion.div 
+        className="bg-gradient-to-r from-[#F98C53] to-[#FCCEB4] text-white shadow-lg relative overflow-hidden"
+        initial={false}
+        animate={{ 
+          height: isToolbarExpanded ? 'auto' : 0,
+          padding: isToolbarExpanded ? '1.5rem' : '0',
+          opacity: isToolbarExpanded ? 1 : 0
+        }}
+        transition={{ duration: 0.3, ease: 'easeInOut' }}
+      >
         {/* 背景裝飾 */}
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-4 left-4 w-8 h-8 bg-white/20 rounded-full"></div>
@@ -3769,10 +4124,44 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             退出
           </button>
         </div>
+      </motion.div>
+
+      {/* 工具欄展開/收起按鈕 */}
+      <div className="flex justify-center py-2 bg-white/50 backdrop-blur-sm border-b border-[#FCCEB4]">
+        <button
+          onClick={() => setIsToolbarExpanded(!isToolbarExpanded)}
+          className="px-4 py-1.5 bg-white/70 backdrop-blur-sm border border-[#FCCEB4] rounded-full shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 flex items-center gap-2 text-gray-700 font-medium text-sm"
+          title={isToolbarExpanded ? '收起工具欄' : '展開工具欄'}
+        >
+          {isToolbarExpanded ? (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+              收起工具欄
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              展開工具欄
+            </>
+          )}
+        </button>
       </div>
 
       {/* 工具欄 */}
-      <div className="bg-white/90 backdrop-blur-sm border-b border-[#FCCEB4] p-4 shadow-sm">
+      <motion.div 
+        className="bg-white/90 backdrop-blur-sm border-b border-[#FCCEB4] shadow-sm overflow-hidden"
+        initial={false}
+        animate={{ 
+          height: isToolbarExpanded ? 'auto' : 0,
+          padding: isToolbarExpanded ? '1rem' : '0',
+          opacity: isToolbarExpanded ? 1 : 0
+        }}
+        transition={{ duration: 0.3, ease: 'easeInOut' }}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
@@ -3868,18 +4257,40 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                 <MapIcon className="w-4 h-4 inline mr-1" />
                 小地圖
               </button>
+              
+              {/* 全螢幕按鈕 */}
+              <button
+                onClick={toggleFullscreen}
+                className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors flex items-center gap-1"
+                title={isFullscreen ? '退出全螢幕' : '進入全螢幕'}
+              >
+                {isFullscreen ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    退出全螢幕
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    全螢幕
+                  </>
+                )}
+              </button>
             
             {/* 儲存按鈕 */}
             {viewMode === 'edit' && (
               <button
                 onClick={handleSave}
-                disabled={!hasUnsavedChanges}
                 className={`px-4 py-2 rounded-full font-medium transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2 ${
                   hasUnsavedChanges
                     ? 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white hover:from-[#FFA5B3] hover:to-[#FFC880]'
                 }`}
-                title={hasUnsavedChanges ? (onSave ? '儲存變更' : '更新狀態') : '無變更需要儲存'}
+                title={hasUnsavedChanges ? (onSave ? '儲存變更' : '更新狀態') : '儲存學習路線'}
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h-1v5.586l-2.293-2.293z" />
@@ -3917,13 +4328,21 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
             {/* 播放路徑按鈕 - 已移除 */}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* 側邊欄 */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 右側邊欄 */}
-        <div className="w-80 bg-white/95 backdrop-blur-sm border-l border-[#FCCEB4] flex flex-col h-full">
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* 左側邊欄 */}
+        <motion.div 
+          className="bg-white/95 backdrop-blur-sm border-r border-[#FCCEB4] flex flex-col h-full overflow-hidden"
+          initial={false}
+          animate={{ 
+            width: isSidebarExpanded ? '20rem' : '0',
+            opacity: isSidebarExpanded ? 1 : 0
+          }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+        >
+          <div className="w-80 flex-1 overflow-y-auto p-3 space-y-2">
             {/* 路線資訊 */}
             <div className="bg-white/80 rounded-lg p-2 border border-[#FCCEB4]/50">
               <h3 className="font-semibold text-gray-800 mb-1.5 flex items-center gap-2">
@@ -4299,7 +4718,26 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
+        
+        {/* 展開/收起按鈕 - 固定在側邊欄邊緣（左側） */}
+        <button
+          onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+          className={`absolute top-1/2 -translate-y-1/2 z-20 px-2 py-4 bg-white/70 backdrop-blur-sm border border-[#FCCEB4] shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center text-gray-700 font-medium text-sm ${
+            isSidebarExpanded ? 'left-[20rem] rounded-r-lg' : 'left-0 rounded-l-lg'
+          }`}
+          title={isSidebarExpanded ? '收起側邊欄' : '展開側邊欄'}
+        >
+          {isSidebarExpanded ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          )}
+        </button>
 
         {/* 主畫布 */}
         <div className="flex-1 relative overflow-hidden select-none">

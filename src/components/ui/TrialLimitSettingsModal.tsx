@@ -1,9 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { supabase } from '@/lib/supabase';
+import { getUserSession } from '@/lib/authUtils';
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 interface TrialLimitSettingsModalProps {
   isOpen: boolean
@@ -18,6 +22,17 @@ export default function TrialLimitSettingsModal({
   onSave, 
   currentSettings, 
 }: TrialLimitSettingsModalProps) {
+  // 從會話中獲取機構信息
+  const session = getUserSession();
+  const currentOrganization = session?.organization || null;
+  
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) {
+      return null;
+    }
+    return UUID_REGEX.test(currentOrganization.id) ? currentOrganization.id : null;
+  }, [currentOrganization?.id]);
+  
   const [courseTypes, setCourseTypes] = useState<{[id: string]: { name: string, trial_limit: number }} >({});
   const [settings, setSettings] = useState<{[courseTypeId: string]: number}>({});
   const [loading, setLoading] = useState(false);
@@ -28,14 +43,21 @@ export default function TrialLimitSettingsModal({
       loadCourseTypes();
       setSettings(currentSettings);
     }
-  }, [isOpen, currentSettings]);
+  }, [isOpen, currentSettings, validOrgId]);
 
   const loadCourseTypes = async () => {
     try {
+      if (!validOrgId) {
+        setError('尚未選擇機構，無法載入課程類型');
+        setCourseTypes({});
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('Hanami_CourseTypes')
         .select('id, name, trial_limit')
         .eq('status', true)
+        .eq('org_id', validOrgId)
         .order('name');
 
       if (error) {
@@ -63,16 +85,25 @@ export default function TrialLimitSettingsModal({
   };
 
   const handleSave = async () => {
+    if (!validOrgId) {
+      setError('尚未選擇機構，無法保存設定');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     try {
-      // 並行更新所有異動過的課程類型
+      // 並行更新所有異動過的課程類型，確保 org_id 被記錄
       await Promise.all(
         Object.entries(settings).map(async ([id, limit]) => {
           const { error } = await supabase
             .from('Hanami_CourseTypes')
-            .update({ trial_limit: limit })
-            .eq('id', id);
+            .update({ 
+              trial_limit: limit,
+              org_id: validOrgId
+            })
+            .eq('id', id)
+            .eq('org_id', validOrgId);
           if (error) throw error;
         }),
       );

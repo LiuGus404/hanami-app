@@ -1,10 +1,11 @@
 'use client';
 
-import { 
-  ClockIcon, 
-  EyeIcon, 
-  PencilIcon, 
-  PlusIcon, 
+import Image from 'next/image';
+import {
+  ClockIcon,
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
   UserGroupIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -13,10 +14,12 @@ import {
   StarIcon,
   DocumentTextIcon,
   VideoCameraIcon,
+  AcademicCapIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, Database, ChevronDown } from 'lucide-react';
 import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 
 import ActivityDetailModal from '@/components/admin/ActivityDetailModal';
@@ -26,7 +29,100 @@ import { PopupSelect } from '@/components/ui/PopupSelect';
 import { supabase } from '@/lib/supabase';
 import { TeachingActivity } from '@/types/progress';
 
-export default function TeachingActivitiesPage() {
+type NavigationOverrides = Partial<{
+  dashboard: string;
+  growthTrees: string;
+  learningPaths: string;
+  abilities: string;
+  activities: string;
+  assessments: string;
+  media: string;
+  studentManagement: string;
+  templates: string;
+}>;
+
+type TeachingActivitiesPageProps = {
+  navigationOverrides?: NavigationOverrides;
+  forcedOrgId?: string | null;
+  forcedOrgName?: string | null;
+  disableOrgFallback?: boolean;
+};
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+const PLACEHOLDER_ORG_IDS = new Set([
+  'default-org',
+  'unassigned-org-placeholder',
+]);
+
+const DEFAULT_ACTIVITY_TYPES = [
+  { value: 'game', label: '遊戲活動' },
+  { value: 'training', label: '訓練活動' },
+  { value: 'exercise', label: '練習活動' },
+  { value: 'storybook', label: '繪本活動' },
+  { value: 'performance', label: '表演活動' },
+];
+
+const DEFAULT_STATUSES = [
+  { value: 'draft', label: '草稿' },
+  { value: 'published', label: '已發布' },
+  { value: 'archived', label: '已封存' },
+];
+
+export default function TeachingActivitiesPage({
+  navigationOverrides,
+  forcedOrgId = null,
+  forcedOrgName = null,
+  disableOrgFallback = false,
+}: TeachingActivitiesPageProps = {}) {
+  const navigationPaths = useMemo(
+    () => ({
+      dashboard: '/admin/student-progress',
+      growthTrees: '/admin/student-progress/growth-trees',
+      learningPaths: '/admin/student-progress/learning-paths',
+      abilities: '/admin/student-progress/abilities',
+      activities: '/admin/student-progress/activities',
+      assessments: '/admin/student-progress/ability-assessments',
+      media: '/admin/student-progress/student-media',
+      studentManagement: '/admin/students',
+      templates: '/admin/student-progress/templates',
+      ...(navigationOverrides ?? {}),
+    }),
+    [navigationOverrides],
+  );
+
+  const normalizedForcedOrgId =
+    forcedOrgId &&
+    UUID_REGEX.test(forcedOrgId) &&
+    !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
+      ? forcedOrgId
+      : null;
+
+  const invalidForcedId = forcedOrgId !== null && !normalizedForcedOrgId;
+  const validOrgId = normalizedForcedOrgId;
+  const orgDataDisabled =
+    (disableOrgFallback && !validOrgId) || invalidForcedId;
+  const organizationNameLabel = forcedOrgName ?? null;
+
+  const applyOrgFilter = <T extends { eq: (column: string, value: any) => T }>(
+    query: T,
+    column = 'org_id',
+  ) => {
+    if (validOrgId) {
+      return query.eq(column, validOrgId);
+    }
+    return query;
+  };
+
+  const ensureOrgAvailable = () => {
+    if (orgDataDisabled) {
+      toast.error('請先創建屬於您的機構');
+      return false;
+    }
+    return true;
+  };
+
   // 基本狀態
   const [activities, setActivities] = useState<TeachingActivity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,71 +183,61 @@ export default function TeachingActivitiesPage() {
     { value: 'estimated_duration', label: '時長' },
   ];
 
-  const NOTION_TOKEN = process.env.NEXT_PUBLIC_NOTION_TOKEN || '';
+const NOTION_TOKEN = process.env.NEXT_PUBLIC_NOTION_TOKEN || '';
 
-  useEffect(() => {
-    loadActivities();
-  }, []);
+const loadMasterOptions = async () => {
+  if (orgDataDisabled) {
+    setActivityTypeOptions(DEFAULT_ACTIVITY_TYPES);
+    setStatusOptions(DEFAULT_STATUSES);
+    setTagOptions([]);
+    return;
+  }
 
-  // 載入 master list
-  useEffect(() => {
-    const loadMasterOptions = async () => {
-      try {
-        // 活動類型 - 包含預設和自訂選項
-        const { data: typeData } = await supabase
-          .from('hanami_custom_options')
-          .select('*')
-          .eq('option_type', 'activity_type')
-          .eq('is_active', true)
-          .order('sort_order');
+  try {
+    let typeQuery = supabase
+      .from('hanami_custom_options')
+      .select('*')
+      .eq('option_type', 'activity_type')
+      .eq('is_active', true)
+      .order('sort_order');
+    typeQuery = applyOrgFilter(typeQuery);
+    const { data: typeData } = await typeQuery;
 
-        const defaultTypes = [
-          { value: 'game', label: '遊戲活動' },
-          { value: 'training', label: '訓練活動' },
-          { value: 'exercise', label: '練習活動' },
-          { value: 'storybook', label: '繪本活動' },
-          { value: 'performance', label: '表演活動' },
-        ];
-        const customTypes = (typeData || []).map((item: any) => ({ 
-          value: item.option_value, 
-          label: item.option_name, 
-        }));
-        setActivityTypeOptions([...defaultTypes, ...customTypes]);
+    const customTypes = (typeData || []).map((item: any) => ({
+      value: item.option_value,
+      label: item.option_name,
+    }));
+    setActivityTypeOptions([...DEFAULT_ACTIVITY_TYPES, ...customTypes]);
 
-        // 狀態 - 包含預設和自訂選項
-        const { data: statusData } = await supabase
-          .from('hanami_custom_options')
-          .select('*')
-          .eq('option_type', 'status')
-          .eq('is_active', true)
-          .order('sort_order');
+    let statusQuery = supabase
+      .from('hanami_custom_options')
+      .select('*')
+      .eq('option_type', 'status')
+      .eq('is_active', true)
+      .order('sort_order');
+    statusQuery = applyOrgFilter(statusQuery);
+    const { data: statusData } = await statusQuery;
 
-        const defaultStatuses = [
-          { value: 'draft', label: '草稿' },
-          { value: 'published', label: '已發布' },
-          { value: 'archived', label: '已封存' },
-        ];
-        const customStatuses = (statusData || []).map((item: any) => ({ 
-          value: item.option_value, 
-          label: item.option_name, 
-        }));
-        setStatusOptions([...defaultStatuses, ...customStatuses]);
+    const customStatuses = (statusData || []).map((item: any) => ({
+      value: item.option_value,
+      label: item.option_name,
+    }));
+    setStatusOptions([...DEFAULT_STATUSES, ...customStatuses]);
 
-        // 標籤
-        const { data: tagData } = await supabase
-          .from('hanami_resource_tags')
-          .select('*')
-          .eq('is_active', true)
-          .order('tag_name');
-        setTagOptions(
-          (tagData || []).map((item: any) => ({ value: item.tag_name, label: item.tag_name })),
-        );
-      } catch (error) {
-        console.error('載入篩選選項失敗:', error);
-      }
-    };
-    loadMasterOptions();
-  }, []);
+    let tagQuery = supabase
+      .from('hanami_resource_tags')
+      .select('*')
+      .eq('is_active', true)
+      .order('tag_name');
+    tagQuery = applyOrgFilter(tagQuery);
+    const { data: tagData } = await tagQuery;
+    setTagOptions(
+      (tagData || []).map((item: any) => ({ value: item.tag_name, label: item.tag_name })),
+    );
+  } catch (error) {
+    console.error('載入篩選選項失敗:', error);
+  }
+};
 
   // 搜尋功能
   useEffect(() => {
@@ -187,11 +273,19 @@ export default function TeachingActivitiesPage() {
   // 載入教學活動
   const loadActivities = async () => {
     try {
+      if (orgDataDisabled) {
+        setActivities([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
-      const { data, error } = await supabase
+      let activitiesQuery = supabase
         .from('hanami_teaching_activities')
         .select('*')
         .order('activity_name');
+      activitiesQuery = applyOrgFilter(activitiesQuery);
+      const { data, error } = await activitiesQuery;
 
       if (error) throw error;
       
@@ -212,8 +306,28 @@ export default function TeachingActivitiesPage() {
     }
   };
 
+  useEffect(() => {
+    if (orgDataDisabled) {
+      setActivities([]);
+      setFilteredNotionData([]);
+      setNotionData([]);
+      setActivityTypeOptions(DEFAULT_ACTIVITY_TYPES);
+      setStatusOptions(DEFAULT_STATUSES);
+      setTagOptions([]);
+      setLoading(false);
+      return;
+    }
+
+    loadMasterOptions();
+    loadActivities();
+  }, [orgDataDisabled, validOrgId]);
+
   // 篩選和排序活動
   const getFilteredAndSortedActivities = () => {
+    if (orgDataDisabled) {
+      return [];
+    }
+
     const filtered = activities.filter(activity => {
       const matchesSearch = !searchTerm || 
         activity.activity_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -243,13 +357,19 @@ export default function TeachingActivitiesPage() {
 
   // 新增活動
   const handleAddActivity = async (activityData: Partial<TeachingActivity>) => {
+    if (!ensureOrgAvailable()) return;
+
     try {
+      const payload = validOrgId
+        ? { ...activityData, org_id: validOrgId }
+        : activityData;
+
       const response = await fetch('/api/teaching-activities', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(activityData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -269,14 +389,19 @@ export default function TeachingActivitiesPage() {
   // 更新活動
   const handleUpdateActivity = async (activityData: Partial<TeachingActivity>) => {
     if (!editingActivity) return;
+    if (!ensureOrgAvailable()) return;
     
     try {
+      const payload = validOrgId
+        ? { ...activityData, org_id: validOrgId }
+        : activityData;
+
       const response = await fetch(`/api/teaching-activities/${editingActivity.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(activityData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -297,12 +422,15 @@ export default function TeachingActivitiesPage() {
   // 刪除活動
   const handleDeleteActivity = async (id: string) => {
     if (!confirm('確定要刪除此教學活動嗎？此操作無法復原。')) return;
+    if (!ensureOrgAvailable()) return;
 
     try {
-      const { error } = await supabase
+      let deleteQuery = supabase
         .from('hanami_teaching_activities')
         .delete()
         .eq('id', id);
+      deleteQuery = applyOrgFilter(deleteQuery);
+      const { error } = await deleteQuery;
 
       if (error) throw error;
       
@@ -318,6 +446,8 @@ export default function TeachingActivitiesPage() {
 
   // 複製活動
   const handleDuplicateActivity = async (activity: TeachingActivity) => {
+    if (!ensureOrgAvailable()) return;
+
     try {
       const newActivityData = {
         activity_name: `${activity.activity_name} (複製)`,
@@ -332,6 +462,7 @@ export default function TeachingActivitiesPage() {
         tags: activity.tags || [],
         category: activity.category || '',
         status: 'draft',
+        org_id: validOrgId ?? (activity as any).org_id ?? null,
       };
 
       const { error } = await supabase
@@ -350,12 +481,14 @@ export default function TeachingActivitiesPage() {
 
   // 查看活動詳情
   const handleViewActivity = (activity: TeachingActivity) => {
+    if (!ensureOrgAvailable()) return;
     setSelectedActivity(activity);
     setShowDetailModal(true);
   };
 
   // 編輯活動
   const handleEditActivity = (activity: TeachingActivity) => {
+    if (!ensureOrgAvailable()) return;
     setEditingActivity(activity);
     setShowAddModal(true);
   };
@@ -691,73 +824,25 @@ export default function TeachingActivitiesPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <div className="relative">
-              <HanamiButton
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                disabled={notionLoading}
-                onClick={fetchDatabases}
-              >
-                <Database className="h-5 w-5 mr-2" />
-                {notionLoading ? '載入中...' : '載入 Notion 資料'}
-              </HanamiButton>
-              
-              {showDatabaseSelect && databases.length > 0 && (
-                <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-[#EADBC8] z-50">
-                  <div className="p-3 border-b border-[#EADBC8]">
-                    <h3 className="font-semibold text-[#2B3A3B]">選擇資料庫</h3>
-                    <div className="mt-2 space-y-2">
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          checked={getPageContent}
-                          className="rounded"
-                          type="checkbox"
-                          onChange={(e) => setGetPageContent(e.target.checked)}
-                        />
-                        <span>載入頁面內容（較慢但包含教案區塊）</span>
-                      </label>
-                    </div>
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {databases.map((db) => (
-                      <button
-                        key={db.id}
-                        className="w-full p-3 text-left hover:bg-[#FFF9F2] border-b border-[#EADBC8] last:border-b-0"
-                        disabled={isLoadingAll || isAutoLoading}
-                        onClick={() => {
-                          setSelectedDatabase(db.id);
-                          fetchNotionData(db.id);
-                        }}
-                      >
-                        <div className="font-medium text-[#2B3A3B]">
-                          {db.title?.[0]?.plain_text || '無標題資料庫'}
-                        </div>
-                        <div className="text-xs text-[#A68A64] mt-1">
-                          ID: {db.id}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="p-3 border-t border-[#EADBC8]">
-                    <button
-                      className="text-sm text-[#A68A64] hover:text-[#8B7355]"
-                      onClick={() => setShowDatabaseSelect(false)}
-                    >
-                      關閉
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* 載入 Notion 資料按鈕已隱藏 */}
             <HanamiButton
               className="bg-gradient-to-r from-hanami-primary to-hanami-secondary"
-              onClick={() => setShowAddModal(true)}
+              disabled={orgDataDisabled}
+              onClick={() => {
+                if (!ensureOrgAvailable()) return;
+                setShowAddModal(true);
+              }}
             >
               <PlusIcon className="h-5 w-5 mr-2" />
               新增活動
             </HanamiButton>
             <HanamiButton
               variant="secondary"
-              onClick={() => window.location.href = '/admin/template-management'}
+              disabled={orgDataDisabled}
+              onClick={() => {
+                if (!ensureOrgAvailable()) return;
+                window.location.href = navigationPaths.templates;
+              }}
             >
               <DocumentTextIcon className="h-5 w-5 mr-2" />
               管理範本
@@ -772,43 +857,67 @@ export default function TeachingActivitiesPage() {
               {
                 icon: BarChart3,
                 label: "進度管理面板",
-                href: "/admin/student-progress",
+                href: navigationPaths.dashboard,
                 variant: "secondary"
               },
               {
                 icon: TreePine,
                 label: "成長樹管理",
-                href: "/admin/student-progress/growth-trees",
+                href: navigationPaths.growthTrees,
+                variant: "secondary"
+              },
+              {
+                icon: BookOpenIcon,
+                label: "學習路線管理",
+                href: navigationPaths.learningPaths,
                 variant: "secondary"
               },
               {
                 icon: TrendingUp,
                 label: "發展能力圖卡",
-                href: "/admin/student-progress/abilities",
+                href: navigationPaths.abilities,
                 variant: "secondary"
               },
               {
                 icon: Gamepad2,
                 label: "教學活動管理",
-                href: "/admin/student-progress/activities",
+                href: navigationPaths.activities,
                 variant: "primary"
+              },
+              {
+                icon: AcademicCapIcon,
+                label: "能力評估管理",
+                href: navigationPaths.assessments,
+                variant: "secondary"
               },
               {
                 icon: VideoCameraIcon,
                 label: "學生媒體管理",
-                href: "/admin/student-progress/student-media",
+                href: navigationPaths.media,
                 variant: "secondary"
               },
               {
                 icon: Users,
                 label: "返回學生管理",
-                href: "/admin/students",
+                href: navigationPaths.studentManagement,
                 variant: "accent"
               }
             ]}
-            currentPage="/admin/student-progress/activities"
+            currentPage={navigationPaths.activities}
           />
         </div>
+
+        {orgDataDisabled && (
+          <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
+            <Image alt="機構提示" className="mb-4" height={64} src="/tree ui.png" width={64} />
+            <h2 className="text-lg font-semibold text-hanami-text">尚未設定機構資料</h2>
+            <p className="mt-2 text-sm text-hanami-text-secondary">
+              請先創建屬於您的機構
+              {organizationNameLabel ? `（${organizationNameLabel}）` : ''}
+              ，並建立教學活動後再查看內容。
+            </p>
+          </div>
+        )}
 
         {/* 篩選和搜尋區域 */}
         <div className="mb-6 p-4 bg-white rounded-xl border border-[#EADBC8] shadow-sm">
@@ -880,9 +989,15 @@ export default function TeachingActivitiesPage() {
             </div>
           )}
           <div className="mt-3 text-sm text-hanami-text-secondary">
-            共 {filteredActivities.length} 個活動
-            {(searchTerm || filterTypes.length > 0 || filterStatuses.length > 0 || filterTags.length > 0) && (
-              <span className="ml-2 text-hanami-accent">(已篩選)</span>
+            {orgDataDisabled ? (
+              <>目前無法載入教學活動</>
+            ) : (
+              <>
+                共 {filteredActivities.length} 個活動
+                {(searchTerm || filterTypes.length > 0 || filterStatuses.length > 0 || filterTags.length > 0) && (
+                  <span className="ml-2 text-hanami-accent">(已篩選)</span>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1013,15 +1128,31 @@ export default function TeachingActivitiesPage() {
         </div>
 
         {filteredActivities.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🎮</div>
-            <p className="text-hanami-text-secondary text-lg mb-2">
-              {searchTerm || filterTypes.length > 0 || filterStatuses.length > 0 || filterTags.length > 0 ? '沒有符合條件的活動' : '尚無教學活動'}
-            </p>
-            <p className="text-hanami-text-secondary">
-              {searchTerm || filterTypes.length > 0 || filterStatuses.length > 0 || filterTags.length > 0 ? '請調整搜尋條件' : '點擊「新增活動」開始建立'}
-            </p>
-          </div>
+          orgDataDisabled ? (
+            <div className="mx-auto my-12 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
+              <Image alt="機構提示" className="mb-4" height={64} src="/tree ui.png" width={64} />
+              <h3 className="text-lg font-semibold text-hanami-text">尚未設定機構資料</h3>
+              <p className="mt-2 text-sm text-hanami-text-secondary">
+                請先創建屬於您的機構
+                {organizationNameLabel ? `（${organizationNameLabel}）` : ''}
+                ，並建立教學活動後再查看內容。
+              </p>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Image alt="教學活動" className="mx-auto mb-4" height={72} src="/tree ui.png" width={72} />
+              <p className="text-hanami-text text-lg font-medium mb-2">
+                {searchTerm || filterTypes.length > 0 || filterStatuses.length > 0 || filterTags.length > 0
+                  ? '沒有符合條件的活動'
+                  : '尚無教學活動'}
+              </p>
+              <p className="text-hanami-text-secondary">
+                {searchTerm || filterTypes.length > 0 || filterStatuses.length > 0 || filterTags.length > 0
+                  ? '請調整搜尋或篩選條件再試一次'
+                  : '點擊「新增活動」開始建立新的教學活動'}
+              </p>
+            </div>
+          )
         )}
 
         {/* 新增/編輯活動模態框 */}
@@ -1029,6 +1160,8 @@ export default function TeachingActivitiesPage() {
           <ActivityForm
             activity={editingActivity}
             mode={editingActivity ? 'edit' : 'create'}
+            orgId={validOrgId}
+            orgName={organizationNameLabel}
             onCancel={() => {
               setShowAddModal(false);
               setEditingActivity(null);

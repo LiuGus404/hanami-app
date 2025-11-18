@@ -128,6 +128,18 @@ export function ActivityTemplateBuilder({
       return;
     }
 
+    // 保留現有的 template_schema 結構（如果有的話）
+    const existingSchema = initialTemplate?.template_schema || {};
+    const newSchema = {
+      ...existingSchema,
+      fields: template.fields,
+      metadata: {
+        ...(existingSchema.metadata || {}),
+        version: existingSchema.metadata?.version || "1.0",
+        last_updated: new Date().toISOString(),
+      },
+    };
+
     const newTemplate: ActivityTemplate = {
       id: initialTemplate?.id || `template_${Date.now()}`,
       name: template.name,
@@ -140,12 +152,10 @@ export function ActivityTemplateBuilder({
       // 新增資料庫格式的欄位
       template_name: template.name,
       template_description: template.description || '',
-      template_schema: {
-        fields: template.fields,
-      },
-      template_category: template.category || 'custom',
-      is_active: true,
-    };
+      template_schema: newSchema,
+      template_type: template.category || (initialTemplate as any)?.template_type || 'custom',
+      is_active: (initialTemplate as any)?.is_active !== undefined ? (initialTemplate as any).is_active : true,
+    } as any;
 
     onSave(newTemplate);
   };
@@ -208,19 +218,34 @@ export function ActivityTemplateBuilder({
           
           {/* 欄位類型網格 */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {filteredTypes.map(fieldType => (
-              <button
-                key={fieldType.type}
-                className="p-4 rounded-lg border-2 border-hanami-border hover:border-hanami-primary hover:bg-hanami-surface transition-all text-left group"
-                onClick={() => selectFieldType(fieldType.type)}
-              >
-                <div className="mb-2 text-hanami-primary group-hover:text-hanami-accent">
-                  {renderIcon(fieldType.icon)}
-                </div>
-                <div className="font-medium text-hanami-text">{fieldType.name}</div>
-                <div className="text-sm text-hanami-text-secondary">{fieldType.description}</div>
-              </button>
-            ))}
+            {filteredTypes.map(fieldType => {
+              const isFileUpload = fieldType.type === 'file_upload';
+              const isDisabled = isFileUpload;
+              
+              return (
+                <button
+                  key={fieldType.type}
+                  className={`p-4 rounded-lg border-2 transition-all text-left group ${
+                    isDisabled
+                      ? 'border-gray-300 bg-gray-100 cursor-not-allowed opacity-60'
+                      : 'border-hanami-border hover:border-hanami-primary hover:bg-hanami-surface'
+                  }`}
+                  onClick={() => !isDisabled && selectFieldType(fieldType.type)}
+                  disabled={isDisabled}
+                >
+                  <div className={`mb-2 ${isDisabled ? 'text-gray-400' : 'text-hanami-primary group-hover:text-hanami-accent'}`}>
+                    {renderIcon(fieldType.icon)}
+                  </div>
+                  <div className={`font-medium ${isDisabled ? 'text-gray-500' : 'text-hanami-text'}`}>
+                    {fieldType.name}
+                    {isDisabled && <span className="ml-2 text-xs text-gray-400">(暫未啟用)</span>}
+                  </div>
+                  <div className={`text-sm ${isDisabled ? 'text-gray-400' : 'text-hanami-text-secondary'}`}>
+                    {isDisabled ? '此功能暫時無法使用' : fieldType.description}
+                  </div>
+                </button>
+              );
+            })}
           </div>
           
           <div className="flex justify-end mt-4">
@@ -552,7 +577,11 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
         
       case 'file_upload':
         return (
-          <div className="space-y-3">
+          <div className="space-y-3 opacity-60">
+            <div className="p-4 bg-gray-100 border border-gray-300 rounded-lg">
+              <p className="text-sm text-gray-500 font-medium mb-2">暫未啟用</p>
+              <p className="text-xs text-gray-400">檔案上傳功能暫時無法使用</p>
+            </div>
             <HanamiInput
               label="允許的檔案類型"
               placeholder="pdf, jpg, png, mp3"
@@ -561,6 +590,7 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
                 ...fieldData,
                 allowed_types: value.split(',').map(t => t.trim()),
               })}
+              disabled
             />
             <HanamiInput
               label="最大檔案大小 (MB)"
@@ -570,17 +600,16 @@ function FieldEditor({ field, onSave, onCancel }: FieldEditorProps) {
                 ...fieldData,
                 max_size: parseInt(value) * 1024 * 1024,
               })}
+              disabled
             />
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 opacity-60 cursor-not-allowed">
               <input
                 checked={fieldData.multiple_files || false}
                 type="checkbox"
-                onChange={(e) => setFieldData({
-                  ...fieldData,
-                  multiple_files: e.target.checked,
-                })}
+                disabled
+                onChange={() => {}}
               />
-              <span className="text-sm">允許多個檔案</span>
+              <span className="text-sm text-gray-500">允許多個檔案</span>
             </label>
           </div>
         );

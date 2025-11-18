@@ -3,7 +3,11 @@ import { getServerSupabaseClient } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
-    const { selectedDates, selectedCourses, selectedWeekdays, searchTerm } = await request.json();
+    const { selectedDates, selectedCourses, selectedWeekdays, searchTerm, orgId } = await request.json();
+
+    if (!orgId) {
+      return NextResponse.json({ error: '缺少 orgId' }, { status: 400 });
+    }
 
     console.log('收到篩選條件:', { selectedDates, selectedCourses, selectedWeekdays, searchTerm });
 
@@ -14,12 +18,14 @@ export async function POST(request: Request) {
     let regularStudentQuery = supabase
       .from('Hanami_Students')
       .select('*')
-      .eq('student_type', '常規');
+      .eq('student_type', '常規')
+      .eq('org_id', orgId);
 
     // 查詢試堂學生
     let trialStudentQuery = supabase
       .from('hanami_trial_students')
-      .select('*');
+      .select('*')
+      .eq('org_id', orgId);
 
     // 查詢停用學生
     let inactiveStudentQuery = supabase
@@ -162,18 +168,21 @@ export async function POST(request: Request) {
     
     if (shouldQueryRegular) {
       regularStudents = results[resultIndex].data || [];
+      regularStudents = regularStudents.filter(student => (student as any).org_id === orgId);
       allStudents.push(...regularStudents);
       resultIndex++;
     }
     
     if (shouldQueryTrial) {
       trialStudents = results[resultIndex].data || [];
+      trialStudents = trialStudents.filter(student => (student as any).org_id === orgId);
       // 處理試堂學生資料，統一欄位名稱
       const normalizedTrialStudents = trialStudents.map(student => ({
         ...student,
         student_type: '試堂', // 確保有 student_type 欄位
         regular_weekday: student.weekday || student.regular_weekday, // 統一欄位名稱
         regular_timeslot: student.actual_timeslot || student.regular_timeslot, // 統一欄位名稱
+        org_id: (student as any).org_id ?? orgId,
       }));
       allStudents.push(...normalizedTrialStudents);
       resultIndex++;
@@ -181,6 +190,37 @@ export async function POST(request: Request) {
     
     if (shouldQueryInactive) {
       inactiveStudents = results[resultIndex].data || [];
+      let inactiveOriginalOrgMap = new Map<string, string>();
+
+      const inactiveOriginalIds = inactiveStudents
+        .map(student => student.original_id)
+        .filter((id): id is string => Boolean(id));
+
+      if (inactiveOriginalIds.length > 0) {
+        const { data: originalStudentsData, error: originalError } = await supabase
+          .from('Hanami_Students')
+          .select('id, org_id')
+          .in('id', inactiveOriginalIds);
+
+        if (originalError) {
+          console.error('獲取停用學生 org_id 失敗:', originalError);
+        } else if (originalStudentsData) {
+          const originalStudents = originalStudentsData as Array<{ id: string; org_id: string }>;
+          inactiveOriginalOrgMap = new Map(originalStudents.map(item => [item.id, item.org_id]));
+        }
+      }
+
+      inactiveStudents = inactiveStudents.filter(student => {
+        const directOrgId = (student as any).org_id;
+        if (directOrgId) {
+          return directOrgId === orgId;
+        }
+        if (student.original_id) {
+          const mappedOrgId = inactiveOriginalOrgMap.get(student.original_id);
+          return mappedOrgId === orgId;
+        }
+        return false;
+      });
       // 處理停用學生資料，統一欄位名稱
       const normalizedInactiveStudents = inactiveStudents.map(student => ({
         ...student,
@@ -188,6 +228,7 @@ export async function POST(request: Request) {
         regular_weekday: student.weekday || student.regular_weekday, // 統一欄位名稱
         regular_timeslot: student.actual_timeslot || student.regular_timeslot, // 統一欄位名稱
         is_inactive: true, // 標記為停用學生
+        org_id: (student as any).org_id ?? orgId,
       }));
       allStudents.push(...normalizedInactiveStudents);
     }

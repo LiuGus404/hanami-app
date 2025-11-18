@@ -7,6 +7,7 @@ interface CalendaruiProps {
   onClose?: () => void; // 關閉回調
   className?: string;
   multiple?: boolean; // 是否為多選模式
+  inline?: boolean; // 是否為內聯模式（不使用全屏覆蓋）
 }
 
 const getToday = () => {
@@ -37,7 +38,8 @@ const Calendarui: React.FC<CalendaruiProps> = ({
   onSelect, 
   onClose, 
   className, 
-  multiple = false 
+  multiple = false,
+  inline = false
 }) => {
   const today = getToday();
   
@@ -70,6 +72,10 @@ const Calendarui: React.FC<CalendaruiProps> = ({
     }
     return { year: today.getFullYear(), month: today.getMonth() };
   });
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [dateInputValue, setDateInputValue] = useState('');
+  const [showDateInput, setShowDateInput] = useState(false);
 
   const monthDays = getMonthDays(calendarMonth.year, calendarMonth.month);
   const firstDayOfWeek = new Date(calendarMonth.year, calendarMonth.month, 1).getDay();
@@ -115,6 +121,10 @@ const Calendarui: React.FC<CalendaruiProps> = ({
       if (onSelect) {
         onSelect(dateStr);
       }
+      // 單選模式下，選擇日期後立即關閉
+      if (onClose) {
+        onClose();
+      }
     }
   };
 
@@ -151,9 +161,8 @@ const Calendarui: React.FC<CalendaruiProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#FFFDF8] border border-[#D8CDBF] rounded-[24px] shadow-xl text-[#4B4036] max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+  const content = (
+    <div className={`bg-[#FFFDF8] border border-[#D8CDBF] rounded-[24px] shadow-xl text-[#4B4036] ${inline ? 'w-full' : 'max-w-md w-full'} ${inline ? '' : 'max-h-[90vh]'} flex flex-col overflow-hidden`}>
         {/* 標題區域 */}
         <div className="p-6 pb-4">
           <h2 className="text-xl font-bold text-center text-[#4B4036]">
@@ -178,25 +187,165 @@ const Calendarui: React.FC<CalendaruiProps> = ({
         )}
         
         {/* 日曆區域 */}
-        <div className="px-6 pb-4 flex-1 overflow-y-auto">
+        <div className="px-6 pb-4 flex-1 overflow-y-auto relative">
     <div className={className || ''}>
             {/* 月份導航 */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 relative">
               <button 
                 className="w-10 h-10 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#EAC29D] font-bold text-lg hover:bg-[#FDE6B8] transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md" 
                 onClick={handlePrevMonth}
               >
                 ◀
               </button>
-              <span className="font-bold text-[#4B4036] text-lg">
-                {calendarMonth.year} 年 {calendarMonth.month + 1} 月
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  className="font-bold text-[#4B4036] text-lg hover:text-[#A68A64] transition-colors px-2 py-1 rounded-lg hover:bg-[#FFF9F2]"
+                  onClick={() => {
+                    setShowYearPicker(!showYearPicker);
+                    setShowMonthPicker(false);
+                  }}
+                >
+                  {calendarMonth.year} 年
+                </button>
+                <button
+                  className="font-bold text-[#4B4036] text-lg hover:text-[#A68A64] transition-colors px-2 py-1 rounded-lg hover:bg-[#FFF9F2]"
+                  onClick={() => {
+                    setShowMonthPicker(!showMonthPicker);
+                    setShowYearPicker(false);
+                  }}
+                >
+                  {calendarMonth.month + 1} 月
+                </button>
+              </div>
               <button 
                 className="w-10 h-10 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#EAC29D] font-bold text-lg hover:bg-[#FDE6B8] transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md" 
                 onClick={handleNextMonth}
               >
                 ▶
               </button>
+      </div>
+      
+      {/* 年份選擇器 */}
+      {showYearPicker && (
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-4 max-h-60 overflow-y-auto w-56">
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: 20 }, (_, i) => {
+              const year = calendarMonth.year - 10 + i;
+              return (
+                <button
+                  key={year}
+                  className={`px-2 py-2 rounded-lg text-sm font-medium transition-colors text-center min-w-[3rem] ${
+                    year === calendarMonth.year
+                      ? 'bg-[#EAC29D] text-white'
+                      : 'bg-[#FFF9F2] text-[#4B4036] hover:bg-[#FDE6B8]'
+                  }`}
+                  onClick={() => {
+                    setCalendarMonth({ ...calendarMonth, year });
+                    setShowYearPicker(false);
+                  }}
+                >
+                  {year}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* 月份選擇器 */}
+      {showMonthPicker && (
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-4 w-48">
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 12 }, (_, i) => (
+              <button
+                key={i}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  i === calendarMonth.month
+                    ? 'bg-[#EAC29D] text-white'
+                    : 'bg-[#FFF9F2] text-[#4B4036] hover:bg-[#FDE6B8]'
+                }`}
+                onClick={() => {
+                  setCalendarMonth({ ...calendarMonth, month: i });
+                  setShowMonthPicker(false);
+                }}
+              >
+                {i + 1} 月
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* 日期輸入框 */}
+      <div className="mb-4">
+        <button
+          className="text-sm text-[#A68A64] hover:text-[#4B4036] underline"
+          onClick={() => {
+            setShowDateInput(!showDateInput);
+            if (!showDateInput && value) {
+              const dateStr = typeof value === 'string' ? value : formatDateLocal(value[0] || today);
+              const [year, month, day] = dateStr.split('-').map(Number);
+              setDateInputValue(`${day}/${month}/${year}`);
+            }
+          }}
+        >
+          {showDateInput ? '隱藏輸入' : '直接輸入日期'}
+        </button>
+        {showDateInput && (
+          <div className="mt-2 flex gap-2 items-center">
+            <input
+              type="text"
+              value={dateInputValue}
+              onChange={(e) => setDateInputValue(e.target.value)}
+              placeholder="日/月/年 (例如: 17/11/2025)"
+              className="flex-1 px-3 py-2 border-2 border-[#EAC29D] rounded-lg bg-white focus:ring-2 focus:ring-[#FDE6B8] focus:border-[#EAC29D] text-[#4B4036] text-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const dateParts = dateInputValue.split('/');
+                  if (dateParts.length === 3) {
+                    const day = parseInt(dateParts[0], 10);
+                    const month = parseInt(dateParts[1], 10) - 1;
+                    const year = parseInt(dateParts[2], 10);
+                    
+                    if (!isNaN(day) && !isNaN(month) && !isNaN(year) && month >= 0 && month <= 11) {
+                      const newDate = new Date(year, month, day);
+                      if (!isNaN(newDate.getTime())) {
+                        handleDateClick(newDate);
+                        setShowDateInput(false);
+                        setDateInputValue('');
+                      }
+                    }
+                  }
+                } else if (e.key === 'Escape') {
+                  setShowDateInput(false);
+                  setDateInputValue('');
+                }
+              }}
+            />
+            <button
+              className="px-4 py-2 bg-[#EAC29D] text-white rounded-lg hover:bg-[#D8B88A] transition-colors text-sm font-medium"
+              onClick={() => {
+                const dateParts = dateInputValue.split('/');
+                if (dateParts.length === 3) {
+                  const day = parseInt(dateParts[0], 10);
+                  const month = parseInt(dateParts[1], 10) - 1;
+                  const year = parseInt(dateParts[2], 10);
+                  
+                  if (!isNaN(day) && !isNaN(month) && !isNaN(year) && month >= 0 && month <= 11) {
+                    const newDate = new Date(year, month, day);
+                    if (!isNaN(newDate.getTime())) {
+                      handleDateClick(newDate);
+                      setShowDateInput(false);
+                      setDateInputValue('');
+                    }
+                  }
+                }
+              }}
+            >
+              確定
+            </button>
+          </div>
+        )}
       </div>
             
             {/* 星期標題 */}
@@ -228,24 +377,35 @@ const Calendarui: React.FC<CalendaruiProps> = ({
           </div>
         </div>
         
-        {/* 按鈕區域 */}
-        <div className="p-6 pt-4 border-t border-[#EADBC8] bg-[#FFF9F2]">
-          <div className="flex justify-around gap-3">
-            <button
-              className="flex-1 px-6 py-3 border-2 border-[#FFD59A] bg-transparent text-[#A68A64] font-semibold rounded-2xl transition-all duration-200 shadow-sm hover:bg-[#FFF9F2] hover:border-[#FFB6C1] hover:text-[#FFB6C1] active:scale-95 active:shadow-lg focus:outline-none mr-2"
-              onClick={handleCancel}
-            >
-              取消
-            </button>
-            <button
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-[#FFD59A] via-[#FFB6C1] to-[#EBC9A4] text-[#4B4036] font-bold rounded-2xl shadow-md hover:from-[#FFB6C1] hover:to-[#FFD59A] hover:shadow-xl active:scale-95 active:shadow-2xl transition-all duration-200 focus:outline-none ml-2"
-              onClick={handleConfirm}
-            >
-              確定
-            </button>
+        {/* 按鈕區域 - 只在多選模式下顯示 */}
+        {multiple && (
+          <div className="p-6 pt-4 border-t border-[#EADBC8] bg-[#FFF9F2]">
+            <div className="flex justify-around gap-3">
+              <button
+                className="flex-1 px-6 py-3 border-2 border-[#FFD59A] bg-transparent text-[#A68A64] font-semibold rounded-2xl transition-all duration-200 shadow-sm hover:bg-[#FFF9F2] hover:border-[#FFB6C1] hover:text-[#FFB6C1] active:scale-95 active:shadow-lg focus:outline-none mr-2"
+                onClick={handleCancel}
+              >
+                取消
+              </button>
+              <button
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-[#FFD59A] via-[#FFB6C1] to-[#EBC9A4] text-[#4B4036] font-bold rounded-2xl shadow-md hover:from-[#FFB6C1] hover:to-[#FFD59A] hover:shadow-xl active:scale-95 active:shadow-2xl transition-all duration-200 focus:outline-none ml-2"
+                onClick={handleConfirm}
+              >
+                確定
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
+  );
+
+  if (inline) {
+    return content;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+      {content}
     </div>
   );
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
@@ -99,7 +99,8 @@ const getUserAccessibleRoomIds = async (userId: string): Promise<string> => {
 export default function AICompanionsPage() {
   const { user, loading } = useSaasAuth();
   const router = useRouter();
-  const supabase = getSaasSupabaseClient(); // 使用 SaaS 專案的 Supabase 客戶端來訪問 ai_roles 表
+  const saasSupabaseClient = getSaasSupabaseClient();
+  const supabase = saasSupabaseClient; // 使用 SaaS 專案的 Supabase 客戶端來訪問 ai_roles 表
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState<'chat' | 'roles' | 'memory' | 'stats'>('chat');
   const [showCreateRoom, setShowCreateRoom] = useState(false);
@@ -912,102 +913,8 @@ export default function AICompanionsPage() {
               
               console.log('房間最終角色（備用邏輯）:', room.title, '→', activeRoles);
               
-              // 載入該房間的最新訊息（備用邏輯）
-              let lastMessage = '點擊進入對話...';
-              let messageCount = 0;
-              
-              try {
-                console.log('🔍 開始查詢房間訊息（備用）:', room.id, room.title);
-                
-                // 查詢最新訊息，包含 content_json 以檢查訊息類型
-                const { data: latestMessage, error: messageError } = await saasSupabase
-                  .from('ai_messages')
-                  .select('content, content_json, created_at')
-                  .eq('room_id', room.id)
-                  .order('created_at', { ascending: false })
-                  .limit(1)
-                  .single();
-                
-                console.log('🔍 查詢結果（備用）:', { latestMessage, messageError });
-                
-                if (!messageError && latestMessage) {
-                  const content = (latestMessage as any).content || '';
-                  
-                  // 檢查訊息類型
-                  let messageType = 'text';
-                  if ((latestMessage as any).content_json) {
-                    try {
-                      const contentJson = typeof (latestMessage as any).content_json === 'string' 
-                        ? JSON.parse((latestMessage as any).content_json) 
-                        : (latestMessage as any).content_json;
-                      messageType = contentJson.type || 'text';
-                    } catch (e) {
-                      // JSON 解析失敗，使用內容分析
-                      messageType = 'text';
-                    }
-                  }
-                  
-                  // 如果 content_json 沒有類型信息，通過內容分析判斷
-                  if (messageType === 'text') {
-                    // 檢查是否為圖片訊息
-                    if (content.includes('image_url') || 
-                        content.includes('🎨') || 
-                        content.includes('創作完成') ||
-                        content.includes('圖片') ||
-                        content.match(/https?:\/\/.*\.(jpg|jpeg|png|gif|webp)/i)) {
-                      messageType = 'image';
-                    }
-                    // 檢查是否為影片訊息
-                    else if (content.includes('video_url') || 
-                             content.includes('🎬') ||
-                             content.includes('影片') ||
-                             content.match(/https?:\/\/.*\.(mp4|avi|mov|wmv|webm)/i)) {
-                      messageType = 'video';
-                    }
-                  }
-                  
-                  // 根據訊息類型設置顯示文字
-                  if (messageType === 'image') {
-                    lastMessage = '（圖片）';
-                  } else if (messageType === 'video') {
-                    lastMessage = '（影片）';
-                  } else {
-                    // 文字訊息：截取內容（最多50個字符）
-                    lastMessage = content.length > 50 
-                      ? content.substring(0, 50) + '...' 
-                      : content;
-                  }
-                  
-                  console.log('✅ 載入最新訊息（備用）:', room.title, '→', lastMessage, `(類型: ${messageType})`);
-                } else {
-                  console.log('⚠️ 未找到該房間的訊息（備用）:', room.title, messageError?.message);
-                }
-
-                // 查詢訊息總數
-                const { count, error: countError } = await saasSupabase
-                  .from('ai_messages')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('room_id', room.id);
-                
-                if (!countError && count !== null) {
-                  messageCount = count;
-                  console.log('✅ 載入訊息數量（備用）:', room.title, '→', messageCount);
-                }
-              } catch (error) {
-                console.log('⚠️ 載入訊息資料時發生錯誤（備用）:', error);
-              }
-              
-              return {
-                id: room.id,
-                title: room.title,
-                description: room.description || '',
-                lastMessage: lastMessage,
-                lastActivity: new Date(room.last_message_at),
-                memberCount: 1,
-                activeRoles,
-                messageCount: messageCount,
-                status: 'active' as const
-              };
+              const roomDisplay = await buildRoomDisplay(room, activeRoles, 1);
+              return roomDisplay;
             }));
             
             setRooms(roomsWithStats);
@@ -1171,114 +1078,8 @@ export default function AICompanionsPage() {
               // 調試日誌 - 最終角色
               console.log('房間最終角色:', room.title, '→', activeRoles);
 
-              // 載入該房間的最新訊息
-              let lastMessage = '點擊進入對話...';
-              let messageCount = 0;
-              
-              try {
-                console.log('🔍 開始查詢房間訊息:', room.id, room.title);
-                
-                // 先查詢該房間是否有任何訊息
-                const { count: totalMessages } = await saasSupabase
-                  .from('ai_messages')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('room_id', room.id);
-                
-                console.log('🔍 該房間總訊息數:', totalMessages);
-                
-                if (totalMessages && totalMessages > 0) {
-                  // 查詢最新訊息，包含 content_json 以檢查訊息類型
-                  const { data: latestMessage, error: messageError } = await saasSupabase
-                    .from('ai_messages')
-                    .select('content, content_json, created_at')
-                    .eq('room_id', room.id)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-                  
-                  console.log('🔍 查詢結果:', { latestMessage, messageError });
-                  
-                  if (!messageError && latestMessage) {
-                    const content = (latestMessage as any).content || '';
-                    
-                    // 檢查訊息類型
-                    let messageType = 'text';
-                    if ((latestMessage as any).content_json) {
-                      try {
-                        const contentJson = typeof (latestMessage as any).content_json === 'string' 
-                          ? JSON.parse((latestMessage as any).content_json) 
-                          : (latestMessage as any).content_json;
-                        messageType = contentJson.type || 'text';
-                      } catch (e) {
-                        // JSON 解析失敗，使用內容分析
-                        messageType = 'text';
-                      }
-                    }
-                    
-                    // 如果 content_json 沒有類型信息，通過內容分析判斷
-                    if (messageType === 'text') {
-                      // 檢查是否為圖片訊息
-                      if (content.includes('image_url') || 
-                          content.includes('🎨') || 
-                          content.includes('創作完成') ||
-                          content.includes('圖片') ||
-                          content.match(/https?:\/\/.*\.(jpg|jpeg|png|gif|webp)/i)) {
-                        messageType = 'image';
-                      }
-                      // 檢查是否為影片訊息
-                      else if (content.includes('video_url') || 
-                               content.includes('🎬') ||
-                               content.includes('影片') ||
-                               content.match(/https?:\/\/.*\.(mp4|avi|mov|wmv|webm)/i)) {
-                        messageType = 'video';
-                      }
-                    }
-                    
-                    // 根據訊息類型設置顯示文字
-                    if (messageType === 'image') {
-                      lastMessage = '（圖片）';
-                    } else if (messageType === 'video') {
-                      lastMessage = '（影片）';
-                    } else {
-                      // 文字訊息：截取內容（最多50個字符）
-                      lastMessage = content.length > 50 
-                        ? content.substring(0, 50) + '...' 
-                        : content;
-                    }
-                    
-                    console.log('✅ 載入最新訊息:', room.title, '→', lastMessage, `(類型: ${messageType})`);
-                  } else {
-                    console.log('⚠️ 未找到該房間的訊息:', room.title, messageError?.message);
-                  }
-                } else {
-                  console.log('⚠️ 該房間沒有訊息:', room.title);
-                }
-
-                // 查詢訊息總數
-                const { count, error: countError } = await saasSupabase
-                  .from('ai_messages')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('room_id', room.id);
-                
-                if (!countError && count !== null) {
-                  messageCount = count;
-                  console.log('✅ 載入訊息數量:', room.title, '→', messageCount);
-                }
-              } catch (error) {
-                console.log('⚠️ 載入訊息資料時發生錯誤:', error);
-              }
-
-              return {
-                id: room.id,
-                title: room.title,
-                description: room.description || '',
-                lastMessage: lastMessage,
-                lastActivity: new Date(room.last_message_at),
-                memberCount: 1,
-                activeRoles,
-                messageCount: messageCount,
-                status: 'active' as const
-              };
+              const roomDisplay = await buildRoomDisplay(room, activeRoles, 1);
+              return roomDisplay;
             }));
 
             setRooms(roomsWithStats);
@@ -1527,6 +1328,169 @@ export default function AICompanionsPage() {
       status: 'online'
     }
   ];
+
+  const truncatePreview = useCallback((value: string, maxLength = 50) => {
+    if (!value) return '';
+    const singleLine = value.replace(/\s+/g, ' ').trim();
+    if (!singleLine) return '';
+    if (singleLine.length <= maxLength) return singleLine;
+    return `${singleLine.slice(0, maxLength)}…`;
+  }, []);
+
+  const formatMessagePreview = useCallback((message: any) => {
+    if (!message) return '點擊進入對話...';
+
+    const rawContent = typeof message?.content === 'string' ? message.content.trim() : '';
+    if (rawContent) {
+      if (/!\[[^\]]*\]\([^)]*\)/.test(rawContent)) {
+        return '（圖片）';
+      }
+      if (/https?:\/\/[^\s]+\.(png|jpe?g|gif|webp)(\?|$)/i.test(rawContent)) {
+        return '（圖片）';
+      }
+      if (/https?:\/\/[^\s]+\.(mp4|mov|avi|webm)(\?|$)/i.test(rawContent)) {
+        return '（影片）';
+      }
+      return truncatePreview(rawContent);
+    }
+
+    let contentJson = message?.content_json ?? null;
+    if (typeof contentJson === 'string') {
+      try {
+        contentJson = JSON.parse(contentJson);
+      } catch (error) {
+        contentJson = null;
+      }
+    }
+
+    const detectMedia = (data: any, keywords: RegExp) => {
+      try {
+        const jsonString = typeof data === 'string' ? data : JSON.stringify(data);
+        return keywords.test(jsonString.toLowerCase());
+      } catch (error) {
+        return false;
+      }
+    };
+
+    const extractText = (node: any): string | null => {
+      if (!node) return null;
+      if (typeof node === 'string') {
+        const trimmed = node.trim();
+        return trimmed || null;
+      }
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          const result = extractText(item);
+          if (result) return result;
+        }
+        return null;
+      }
+      if (typeof node === 'object') {
+        if (typeof node.text === 'string' && node.text.trim()) return node.text.trim();
+        if (typeof node.content === 'string' && node.content.trim()) return node.content.trim();
+        if (Array.isArray(node.content)) {
+          const fromContent = extractText(node.content);
+          if (fromContent) return fromContent;
+        }
+        if (Array.isArray(node.parts)) {
+          const fromParts = extractText(node.parts);
+          if (fromParts) return fromParts;
+        }
+        if (Array.isArray(node.messages)) {
+          const fromMessages = extractText(node.messages);
+          if (fromMessages) return fromMessages;
+        }
+        for (const value of Object.values(node)) {
+          const result = extractText(value);
+          if (result) return result;
+        }
+      }
+      return null;
+    };
+
+    if (contentJson) {
+      if (detectMedia(contentJson, /(image_url|"image"|\.png|\.jpe?g|\.gif|\.webp)/)) {
+        return '（圖片）';
+      }
+      if (detectMedia(contentJson, /(video_url|"video"|\.mp4|\.mov|\.avi|\.webm)/)) {
+        return '（影片）';
+      }
+      const extracted = extractText(contentJson);
+      if (extracted) {
+        return truncatePreview(extracted);
+      }
+    }
+
+    return '（系統訊息）';
+  }, [truncatePreview]);
+
+  const fetchRoomMessageStats = useCallback(async (roomId: string) => {
+    const defaults = {
+      lastMessage: '點擊進入對話...',
+      lastActivity: null as Date | null,
+      messageCount: 0,
+    };
+
+    if (!roomId) return defaults;
+
+    try {
+      const latestPromise = saasSupabaseClient
+        .from('chat_messages')
+        .select('id, content, content_json, created_at, status, message_type')
+        .eq('thread_id', roomId)
+        .neq('status', 'deleted')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const countPromise = saasSupabaseClient
+        .from('chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('thread_id', roomId)
+        .neq('status', 'deleted');
+
+      const [latestResult, countResult] = await Promise.all([latestPromise, countPromise]);
+
+      if (latestResult.error) {
+        console.warn('⚠️ 無法取得最新訊息:', latestResult.error);
+      }
+
+      if (countResult.error) {
+        console.warn('⚠️ 無法取得訊息數量:', countResult.error);
+      }
+
+      const latestMessage = latestResult.data as { created_at?: string | null } | null;
+      const lastMessagePreview = formatMessagePreview(latestMessage);
+      const lastActivity = latestMessage?.created_at ? new Date(latestMessage.created_at) : null;
+
+      return {
+        lastMessage: lastMessagePreview,
+        lastActivity,
+        messageCount: typeof countResult.count === 'number' ? countResult.count : defaults.messageCount,
+      };
+    } catch (error) {
+      console.error('❌ 取得聊天室統計失敗:', error);
+      return defaults;
+    }
+  }, [saasSupabaseClient, formatMessagePreview]);
+
+  const buildRoomDisplay = useCallback(async (room: any, activeRoles: string[], memberCount = 1) => {
+    const stats = await fetchRoomMessageStats(room.id);
+    const fallbackTimestamp = room?.last_message_at || room?.created_at;
+    const fallbackDate = fallbackTimestamp ? new Date(fallbackTimestamp) : new Date();
+
+    return {
+      id: room.id,
+      title: room.title,
+      description: room.description || '',
+      lastMessage: stats.lastMessage,
+      lastActivity: stats.lastActivity ?? fallbackDate,
+      memberCount,
+      activeRoles: activeRoles.length > 0 ? activeRoles : ['墨墨'],
+      messageCount: stats.messageCount,
+      status: 'active' as const,
+    };
+  }, [fetchRoomMessageStats]);
 
   const handleStartChat = (companion: AICompanion) => {
     console.log('🚀 開始對話按鈕被點擊:', companion.name);

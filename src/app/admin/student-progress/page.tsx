@@ -1,33 +1,50 @@
 'use client';
 
-import { 
-  AcademicCapIcon, 
-  LightBulbIcon, 
-  ClockIcon, 
+import Image from 'next/image';
+import {
+  AcademicCapIcon,
+  LightBulbIcon,
+  ClockIcon,
+  BookOpenIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
   ExclamationTriangleIcon,
   StarIcon,
   CalendarIcon,
   UserIcon,
-  VideoCameraIcon
+  VideoCameraIcon,
 } from '@heroicons/react/24/outline';
-import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
+import { BarChart3, TreePine, TrendingUp, Gamepad2, Users, GraduationCap, Video } from 'lucide-react';
 import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { HanamiNumberSelector } from '@/components/ui/HanamiNumberSelector';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 
-import { HanamiCard, HanamiButton, HanamiInput, PopupSelect, SimpleAbilityAssessmentModal, StudentTreeAssignmentModal, PerformanceMonitor } from '@/components/ui';
+import {
+  HanamiCard,
+  HanamiInput,
+  SimpleAbilityAssessmentModal,
+  StudentTreeAssignmentModal,
+} from '@/components/ui';
 import Calendarui from '@/components/ui/Calendarui';
 import { supabase } from '@/lib/supabase';
 import { getHKDateString } from '@/lib/utils';
-import { DevelopmentAbility, GrowthTree, TeachingActivity, StudentProgress } from '@/types/progress';
-import { 
-  getStudentAssessmentStatus, 
-  getStudentMediaStatus, 
+import {
+  DevelopmentAbility,
+  GrowthTree,
+  TeachingActivity,
+} from '@/types/progress';
+import {
+  getStudentAssessmentStatus,
+  getStudentMediaStatus,
   getBaseDashboardData,
-  clearCache 
+  clearCache,
 } from '@/lib/optimizedQueries';
+import {
+  fallbackOrganization,
+  getUserSession,
+  type OrganizationProfile,
+} from '@/lib/authUtils';
 
 interface AbilityAssessment {
   id: string;
@@ -80,7 +97,88 @@ interface DashboardCache {
 // 快取過期時間（5分鐘）
 const CACHE_EXPIRY = 5 * 60 * 1000;
 
-export default function StudentProgressDashboard() {
+const allowOrgData =
+  typeof process !== 'undefined' &&
+  process.env.NEXT_PUBLIC_ENABLE_ORG_DATA === 'true';
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const PLACEHOLDER_ORG_IDS = new Set([
+  fallbackOrganization.id,
+  'default-org',
+  'unassigned-org-placeholder',
+]);
+
+const EMPTY_TEACHER_LINK_ORG: OrganizationProfile = {
+  id: '',
+  name: '未設定機構',
+  slug: 'unassigned-org',
+  status: null,
+};
+
+type StudentProgressPageProps = {
+  forcedOrgId?: string | null;
+  forcedOrgName?: string | null;
+  disableOrgFallback?: boolean;
+  navigationOverrides?: Partial<{
+    dashboard: string;
+    growthTrees: string;
+    learningPaths: string;
+    abilities: string;
+    activities: string;
+    assessments: string;
+    media: string;
+    studentManagement: string;
+  }>;
+};
+
+export default function StudentProgressDashboard(
+  props: StudentProgressPageProps = {},
+) {
+  const {
+    forcedOrgId = null,
+    forcedOrgName = null,
+    disableOrgFallback = false,
+    navigationOverrides,
+  } = props;
+  const adminNavigationDefaults = useMemo(
+    () => ({
+      dashboard: '/admin/student-progress',
+      growthTrees: '/admin/student-progress/growth-trees',
+      learningPaths: '/admin/student-progress/learning-paths',
+      abilities: '/admin/student-progress/abilities',
+      activities: '/admin/student-progress/activities',
+      assessments: '/admin/student-progress/ability-assessments',
+      media: '/admin/student-progress/student-media',
+      studentManagement: '/admin/students',
+    }),
+    [],
+  );
+
+  const teacherLinkNavigationDefaults = useMemo(
+    () => ({
+      dashboard: '/aihome/teacher-link/create/student-progress',
+      growthTrees: '/aihome/teacher-link/create/student-progress/growth-trees',
+      learningPaths: '/aihome/teacher-link/create/student-progress/learning-paths',
+      abilities: '/aihome/teacher-link/create/student-progress/abilities',
+      activities: '/aihome/teacher-link/create/student-progress/activities',
+      assessments: '/aihome/teacher-link/create/student-progress/ability-assessments',
+      media: '/aihome/teacher-link/create/student-progress/student-media',
+      studentManagement: '/aihome/teacher-link/create/students',
+    }),
+    [],
+  );
+
+  const navigationPaths = useMemo(() => {
+    const defaults = disableOrgFallback
+      ? teacherLinkNavigationDefaults
+      : adminNavigationDefaults;
+    return {
+      ...defaults,
+      ...(navigationOverrides ?? {}),
+    };
+  }, [adminNavigationDefaults, disableOrgFallback, navigationOverrides, teacherLinkNavigationDefaults]);
+
   const [abilities, setAbilities] = useState<DevelopmentAbility[]>([]);
   const [trees, setTrees] = useState<GrowthTree[]>([]);
   const [activities, setActivities] = useState<TeachingActivity[]>([]);
@@ -91,6 +189,49 @@ export default function StudentProgressDashboard() {
   const [studentsWithoutMedia, setStudentsWithoutMedia] = useState<StudentMediaStatus[]>([]);
   const [studentsWithMedia, setStudentsWithMedia] = useState<StudentMediaStatus[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const allowOrgDataEffective = useMemo(
+    () => (disableOrgFallback ? true : allowOrgData),
+    [disableOrgFallback],
+  );
+
+  const hasForcedOrg = useMemo(() => {
+    if (!forcedOrgId) {
+      return false;
+    }
+    return (
+      UUID_REGEX.test(forcedOrgId) && !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
+    );
+  }, [forcedOrgId]);
+
+  const forcedOrganization = useMemo<OrganizationProfile | null>(() => {
+    if (!hasForcedOrg || !forcedOrgId) {
+      return null;
+    }
+
+    return {
+      id: forcedOrgId,
+      name: forcedOrgName || fallbackOrganization.name,
+      slug: fallbackOrganization.slug,
+      status: null,
+    };
+  }, [hasForcedOrg, forcedOrgId, forcedOrgName]);
+
+  const searchParams = useSearchParams();
+  const [organization, setOrganization] = useState<OrganizationProfile>(
+    forcedOrganization ??
+      (disableOrgFallback ? EMPTY_TEACHER_LINK_ORG : fallbackOrganization),
+  );
+  const [organizationResolved, setOrganizationResolved] = useState(
+    hasForcedOrg ? true : disableOrgFallback ? true : !allowOrgData,
+  );
+
+  useEffect(() => {
+    if (hasForcedOrg && forcedOrganization) {
+      setOrganization(forcedOrganization);
+      setOrganizationResolved(true);
+    }
+  }, [hasForcedOrg, forcedOrganization]);
   
   // 搜尋和篩選狀態
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,13 +263,27 @@ export default function StudentProgressDashboard() {
   const [cache, setCache] = useState<DashboardCache | null>(null);
 
   // 性能監控狀態
-  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
-  const [performanceMetrics, setPerformanceMetrics] = useState({
-    pageLoadTime: 0,
-    dataLoadTime: 0,
-    cacheHitRate: 0,
-    queryCount: 0
-  });
+
+  const normalizedOrgId = organizationResolved ? organization?.id ?? null : null;
+  const hasValidOrgId = hasForcedOrg
+    ? Boolean(forcedOrganization?.id)
+    : !allowOrgDataEffective ||
+      (!!normalizedOrgId &&
+        UUID_REGEX.test(normalizedOrgId) &&
+        !PLACEHOLDER_ORG_IDS.has(normalizedOrgId));
+  const effectiveOrgId = hasForcedOrg
+    ? (forcedOrganization?.id as string | undefined)
+    : allowOrgDataEffective && hasValidOrgId
+      ? (normalizedOrgId as string)
+      : undefined;
+  const orgDataDisabled = hasForcedOrg
+    ? !forcedOrganization?.id
+    : allowOrgDataEffective
+      ? !hasValidOrgId
+      : false;
+  const showOrgEmptyState =
+    (allowOrgDataEffective || disableOrgFallback) &&
+    (hasForcedOrg ? !forcedOrganization?.id : orgDataDisabled);
 
   // 檢查快取是否有效
   const isCacheValid = useCallback((cacheData: DashboardCache | null, currentAssessmentDate: string, currentMediaDate: string) => {
@@ -144,21 +299,35 @@ export default function StudentProgressDashboard() {
 
   // 優化的基礎資料載入函數
   const loadBaseData = useCallback(async () => {
+    if (orgDataDisabled) {
+      return {
+        abilities: [],
+        trees: [],
+        activities: [],
+        assessments: [],
+      };
+    }
+
     try {
-      // 開始性能監控
       if ((window as any).performanceMonitor) {
         (window as any).performanceMonitor.startDataLoad();
       }
 
-      const baseData = await getBaseDashboardData(assessmentLimit);
+      const baseData = await getBaseDashboardData(assessmentLimit, {
+        organizationId: effectiveOrgId,
+      });
 
-      // 確保資料是陣列格式
-      const abilitiesData = Array.isArray(baseData.abilities) ? baseData.abilities : [];
+      const abilitiesData = Array.isArray(baseData.abilities)
+        ? baseData.abilities
+        : [];
       const treesData = Array.isArray(baseData.trees) ? baseData.trees : [];
-      const activitiesData = Array.isArray(baseData.activities) ? baseData.activities : [];
-      const assessmentsData = Array.isArray(baseData.assessments) ? baseData.assessments : [];
+      const activitiesData = Array.isArray(baseData.activities)
+        ? baseData.activities
+        : [];
+      const assessmentsData = Array.isArray(baseData.assessments)
+        ? baseData.assessments
+        : [];
 
-      // 修正資料格式
       const fixedAbilities = abilitiesData.map((a: any) => ({
         ...a,
         ability_description: a.ability_description ?? undefined,
@@ -182,12 +351,12 @@ export default function StudentProgressDashboard() {
 
       const fixedAssessments = assessmentsData.map((a: any) => ({
         ...a,
-        assessment_date: a.assessment_date ?? a.created_at?.split('T')[0] ?? '',
+        assessment_date:
+          a.assessment_date ?? a.created_at?.split('T')[0] ?? '',
         general_notes: a.general_notes ?? undefined,
         next_lesson_focus: a.next_lesson_focus ?? undefined,
       }));
 
-      // 結束性能監控
       if ((window as any).performanceMonitor) {
         (window as any).performanceMonitor.endDataLoad();
       }
@@ -196,66 +365,89 @@ export default function StudentProgressDashboard() {
         abilities: fixedAbilities,
         trees: fixedTrees,
         activities: fixedActivities,
-        assessments: fixedAssessments
+        assessments: fixedAssessments,
       };
     } catch (error) {
       console.error('載入基礎資料時發生錯誤:', error);
       throw error;
     }
-  }, [assessmentLimit]);
+  }, [assessmentLimit, effectiveOrgId, organizationResolved, orgDataDisabled]);
 
   // 優化的學生評估狀態載入函數
   const loadStudentsWithoutAssessment = useCallback(async () => {
+    if (orgDataDisabled) {
+      setStudentsWithoutAssessment([]);
+      setStudentsAssessed([]);
+      setStudentsNoTree([]);
+      setLoadingStudents(false);
+      return;
+    }
+
     try {
       setLoadingStudents(true);
 
-      const data = await getStudentAssessmentStatus(selectedAssessmentDate);
+      const data = await getStudentAssessmentStatus(selectedAssessmentDate, {
+        organizationId: effectiveOrgId,
+      });
       
-      // 確保資料是陣列格式
       const lessonsData = Array.isArray(data.lessons) ? data.lessons : [];
-      const assessmentsData = Array.isArray(data.assessments) ? data.assessments : [];
+      const assessmentsData = Array.isArray(data.assessments)
+        ? data.assessments
+        : [];
       const studentsData = Array.isArray(data.students) ? data.students : [];
       const treesData = Array.isArray(data.trees) ? data.trees : [];
 
-      // 建立映射表以提高查詢效率
       const lessonTimeMap = new Map();
       lessonsData.forEach((lesson: any) => {
         lessonTimeMap.set(lesson.student_id, lesson.actual_timeslot);
       });
 
-      const assessedStudentIds = new Set(assessmentsData.map((a: any) => a.student_id));
+      const assessedStudentIds = new Set(
+        assessmentsData.map((a: any) => a.student_id),
+      );
       const studentTreeMap = new Map();
       treesData.forEach((item: any) => {
         studentTreeMap.set(item.student_id, item.tree_id);
       });
 
-      // 獲取所有學生的最後評估日期（批量查詢）
-      const studentIds = [...new Set(lessonsData.map((lesson: any) => lesson.student_id).filter((id: any): id is string => id !== null))] as string[];
-      
+      const studentIds = [
+        ...new Set(
+          lessonsData
+            .map((lesson: any) => lesson.student_id)
+            .filter((id: any): id is string => id !== null),
+        ),
+      ] as string[];
+
       let lastAssessmentMap = new Map();
       if (studentIds.length > 0) {
-        const { data: lastAssessmentsData } = await supabase
+        let lastAssessmentsQuery = supabase
           .from('hanami_ability_assessments')
           .select('student_id, assessment_date')
           .in('student_id', studentIds)
           .order('assessment_date', { ascending: false });
 
-        // 建立最後評估日期映射
+        if (effectiveOrgId) {
+          lastAssessmentsQuery = lastAssessmentsQuery.eq('org_id', effectiveOrgId);
+        }
+
+        const { data: lastAssessmentsData } = await lastAssessmentsQuery;
+
         lastAssessmentsData?.forEach((assessment: any) => {
           if (!lastAssessmentMap.has(assessment.student_id)) {
-            lastAssessmentMap.set(assessment.student_id, assessment.assessment_date);
+            lastAssessmentMap.set(
+              assessment.student_id,
+              assessment.assessment_date,
+            );
           }
         });
       }
 
-      // 分類學生
       const categorizedStudents = {
         assessed: [] as StudentWithoutAssessment[],
         unassessed: [] as StudentWithoutAssessment[],
-        noTree: [] as StudentWithoutAssessment[]
+        noTree: [] as StudentWithoutAssessment[],
       };
 
-      // 處理每個學生
       studentsData.forEach((student: any) => {
         const hasLesson = lessonTimeMap.has(student.id);
         const isAssessedToday = assessedStudentIds.has(student.id);
@@ -266,7 +458,7 @@ export default function StudentProgressDashboard() {
         const studentWithData = {
           ...student,
           last_assessment_date: lastAssessmentDate,
-          lesson_time: lessonTime
+          lesson_time: lessonTime,
         };
 
         if (hasLesson) {
@@ -280,8 +472,10 @@ export default function StudentProgressDashboard() {
         }
       });
 
-      // 按時間排序
-      const sortByTime = (a: StudentWithoutAssessment, b: StudentWithoutAssessment) => {
+      const sortByTime = (
+        a: StudentWithoutAssessment,
+        b: StudentWithoutAssessment,
+      ) => {
         const timeA = a.lesson_time || '';
         const timeB = b.lesson_time || '';
         return timeA.localeCompare(timeB);
@@ -294,22 +488,37 @@ export default function StudentProgressDashboard() {
       setStudentsWithoutAssessment(categorizedStudents.unassessed);
       setStudentsAssessed(categorizedStudents.assessed);
       setStudentsNoTree(categorizedStudents.noTree);
-
     } catch (error) {
       console.error('載入需要評估的學生時發生錯誤:', error);
+      setStudentsWithoutAssessment([]);
+      setStudentsAssessed([]);
+      setStudentsNoTree([]);
     } finally {
       setLoadingStudents(false);
     }
-  }, [selectedAssessmentDate]);
+  }, [
+    selectedAssessmentDate,
+    effectiveOrgId,
+    organizationResolved,
+    orgDataDisabled,
+  ]);
 
   // 優化的學生媒體狀態載入函數
   const loadStudentsMediaStatus = useCallback(async () => {
+    if (orgDataDisabled) {
+      setStudentsWithoutMedia([]);
+      setStudentsWithMedia([]);
+      setLoadingStudents(false);
+      return;
+    }
+
     try {
       setLoadingStudents(true);
 
-      const data = await getStudentMediaStatus(selectedMediaDate);
+      const data = await getStudentMediaStatus(selectedMediaDate, {
+        organizationId: effectiveOrgId,
+      });
       
-      // 確保資料是陣列格式
       const lessonsData = Array.isArray(data.lessons) ? data.lessons : [];
       const mediaData = Array.isArray(data.media) ? data.media : [];
 
@@ -319,10 +528,8 @@ export default function StudentProgressDashboard() {
         return;
       }
 
-      // 建立媒體狀態映射
       const mediaStatusMap = new Map();
 
-      // 初始化所有學生為未上傳狀態
       lessonsData.forEach((lesson: any) => {
         const studentId = lesson.student_id;
         if (!mediaStatusMap.has(studentId)) {
@@ -334,12 +541,11 @@ export default function StudentProgressDashboard() {
             lesson_time: lesson.actual_timeslot,
             has_media: false,
             media_count: 0,
-            last_media_upload: null
+            last_media_upload: null,
           });
         }
       });
 
-      // 更新有媒體的學生狀態
       mediaData.forEach((media: any) => {
         const studentId = media.student_id;
         if (mediaStatusMap.has(studentId)) {
@@ -352,7 +558,6 @@ export default function StudentProgressDashboard() {
         }
       });
 
-      // 分類學生
       const withMedia: StudentMediaStatus[] = [];
       const withoutMedia: StudentMediaStatus[] = [];
 
@@ -364,7 +569,6 @@ export default function StudentProgressDashboard() {
         }
       });
 
-      // 按時間排序
       const sortByTime = (a: StudentMediaStatus, b: StudentMediaStatus) => {
         const timeA = a.lesson_time || '';
         const timeB = b.lesson_time || '';
@@ -373,28 +577,42 @@ export default function StudentProgressDashboard() {
 
       setStudentsWithMedia(withMedia.sort(sortByTime));
       setStudentsWithoutMedia(withoutMedia.sort(sortByTime));
-
     } catch (error) {
       console.error('載入學生媒體狀態時發生錯誤:', error);
+      setStudentsWithoutMedia([]);
+      setStudentsWithMedia([]);
     } finally {
       setLoadingStudents(false);
     }
-  }, [selectedMediaDate]);
+  }, [selectedMediaDate, effectiveOrgId, organizationResolved, orgDataDisabled]);
 
   // 主載入函數
   const loadDashboardData = useCallback(async () => {
+    if (orgDataDisabled) {
+      setAbilities([]);
+      setTrees([]);
+      setActivities([]);
+      setRecentAssessments([]);
+      setStudentsWithoutAssessment([]);
+      setStudentsAssessed([]);
+      setStudentsNoTree([]);
+      setStudentsWithoutMedia([]);
+      setStudentsWithMedia([]);
+      setLoadingStudents(false);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
-      // 檢查快取
       if (isCacheValid(cache, selectedAssessmentDate, selectedMediaDate)) {
         console.log('使用快取資料');
         setAbilities(cache!.abilities);
         setTrees(cache!.trees);
         setActivities(cache!.activities);
         setRecentAssessments(cache!.recentAssessments);
-        
-        // 更新快取命中率
+
         if ((window as any).performanceMonitor) {
           (window as any).performanceMonitor.updateCacheHitRate(1);
         }
@@ -406,7 +624,6 @@ export default function StudentProgressDashboard() {
         setActivities(baseData.activities);
         setRecentAssessments(baseData.assessments);
 
-        // 更新快取
         setCache({
           abilities: baseData.abilities,
           trees: baseData.trees,
@@ -414,27 +631,88 @@ export default function StudentProgressDashboard() {
           recentAssessments: baseData.assessments,
           lastUpdated: Date.now(),
           assessmentDate: selectedAssessmentDate,
-          mediaDate: selectedMediaDate
+          mediaDate: selectedMediaDate,
         });
-        
-        // 更新快取命中率
+
         if ((window as any).performanceMonitor) {
           (window as any).performanceMonitor.updateCacheHitRate(0);
         }
       }
 
-      // 並行載入學生相關資料
       await Promise.all([
         loadStudentsWithoutAssessment(),
-        loadStudentsMediaStatus()
+        loadStudentsMediaStatus(),
       ]);
-
     } catch (error) {
       console.error('載入管理面板資料時發生錯誤:', error);
     } finally {
       setLoading(false);
     }
-  }, [cache, selectedAssessmentDate, selectedMediaDate, isCacheValid, loadBaseData, loadStudentsWithoutAssessment, loadStudentsMediaStatus]);
+  }, [
+    cache,
+    effectiveOrgId,
+    loadBaseData,
+    loadStudentsMediaStatus,
+    loadStudentsWithoutAssessment,
+    orgDataDisabled,
+    selectedAssessmentDate,
+    selectedMediaDate,
+  ]);
+
+  useEffect(() => {
+    if (hasForcedOrg || disableOrgFallback) {
+      return;
+    }
+
+    let resolvedOrg: OrganizationProfile = fallbackOrganization;
+
+    const queryOrgId = searchParams?.get('orgId');
+    const queryOrgName = searchParams?.get('orgName');
+    const queryOrgSlug = searchParams?.get('orgSlug');
+
+    if (queryOrgId) {
+      resolvedOrg = {
+        id: queryOrgId,
+        name: queryOrgName || fallbackOrganization.name,
+        slug: queryOrgSlug || fallbackOrganization.slug,
+        status: null,
+      };
+    } else if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('hanami_current_org');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.id) {
+            resolvedOrg = {
+              id: parsed.id,
+              name: parsed.name || fallbackOrganization.name,
+              slug: parsed.slug || fallbackOrganization.slug,
+              status: parsed.status ?? null,
+            };
+          }
+        }
+      } catch (error) {
+        console.error('student-progress: failed to parse stored organization', error);
+      }
+    }
+
+    if (
+      (!resolvedOrg || !resolvedOrg.id || resolvedOrg.id === fallbackOrganization.id) &&
+      typeof window !== 'undefined'
+    ) {
+      try {
+        const session = getUserSession();
+        if (session?.organization?.id) {
+          resolvedOrg = session.organization;
+        }
+      } catch (error) {
+        console.error('student-progress: failed to read user session organization', error);
+      }
+    }
+
+    setOrganization(resolvedOrg ?? fallbackOrganization);
+    setOrganizationResolved(true);
+  }, [disableOrgFallback, hasForcedOrg, searchParams]);
 
   useEffect(() => {
     loadDashboardData();
@@ -473,7 +751,8 @@ export default function StudentProgressDashboard() {
         overall_performance_rating: assessment.overall_performance_rating || 3,
         general_notes: assessment.general_notes || '',
         next_lesson_focus: assessment.next_lesson_focus || '',
-        goals: assessment.goals || []
+        goals: assessment.goals || [],
+        organization_id: effectiveOrgId || null,
       };
 
       console.log('準備的 API 資料:', apiData);
@@ -549,14 +828,14 @@ export default function StudentProgressDashboard() {
 
   // 處理能力評估記錄點擊
   const handleAssessmentClick = (assessment: AbilityAssessment) => {
-    // 導航到能力評估管理頁面並顯示該學生的評估詳情
-    window.location.href = `/admin/student-progress/ability-assessments?student_id=${assessment.student_id}&assessment_id=${assessment.id}`;
+    window.location.href = `${navigationPaths.assessments}?student_id=${assessment.student_id}&assessment_id=${assessment.id}`;
   };
 
-  // 性能監控回調
-  const handlePerformanceMetricsUpdate = useCallback((metrics: any) => {
-    setPerformanceMetrics(metrics);
-  }, []);
+  useEffect(() => {
+    setCache(null);
+  }, [effectiveOrgId]);
+
+  const displayOrgWarning = showOrgEmptyState;
 
   if (loading) {
     return (
@@ -570,10 +849,6 @@ export default function StudentProgressDashboard() {
             <p className="text-hanami-text-secondary text-sm">正在優化載入速度</p>
           </div>
         </div>
-        <PerformanceMonitor 
-          onMetricsUpdate={handlePerformanceMetricsUpdate}
-          showDebugInfo={showPerformanceMonitor}
-        />
       </div>
     );
   }
@@ -581,6 +856,23 @@ export default function StudentProgressDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
       <div className="max-w-7xl mx-auto">
+        {displayOrgWarning && (
+          <div className="mb-8 rounded-3xl border border-hanami-border bg-white px-6 py-6 text-center shadow-sm">
+            <div className="mb-4 flex justify-center">
+              <Image
+                src="/rabbit.png"
+                alt="Hanami 機構提示"
+                width={56}
+                height={56}
+                className="h-14 w-14"
+              />
+            </div>
+            <h2 className="text-lg font-semibold text-hanami-text">尚未設定機構資料</h2>
+            <p className="mt-2 text-sm text-hanami-text-secondary">
+              請先創建屬於您的機構，並建立學生與課程資料後再查看進度統計。
+            </p>
+          </div>
+        )}
         <div className="mb-8">
           <div className="flex justify-between items-center">
             <div>
@@ -591,23 +883,6 @@ export default function StudentProgressDashboard() {
                 管理學生發展能力、成長樹和教學活動
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                onClick={() => setShowPerformanceMonitor(!showPerformanceMonitor)}
-              >
-                {showPerformanceMonitor ? '隱藏' : '顯示'}性能監控
-              </button>
-              <button
-                className="px-3 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded-md transition-colors"
-                onClick={() => {
-                  clearCache();
-                  alert('快取已清除');
-                }}
-              >
-                清除快取
-              </button>
-            </div>
           </div>
         </div>
 
@@ -615,50 +890,16 @@ export default function StudentProgressDashboard() {
         <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
           <ResponsiveNavigationDropdown
             items={[
-              {
-                icon: BarChart3,
-                label: "進度管理面板",
-                href: "/admin/student-progress",
-                variant: "primary"
-              },
-              {
-                icon: TreePine,
-                label: "成長樹管理",
-                href: "/admin/student-progress/growth-trees",
-                variant: "secondary"
-              },
-              {
-                icon: TrendingUp,
-                label: "發展能力圖卡",
-                href: "/admin/student-progress/abilities",
-                variant: "secondary"
-              },
-              {
-                icon: Gamepad2,
-                label: "教學活動管理",
-                href: "/admin/student-progress/activities",
-                variant: "secondary"
-              },
-              {
-                icon: AcademicCapIcon,
-                label: "能力評估管理",
-                href: "/admin/student-progress/ability-assessments",
-                variant: "secondary"
-              },
-              {
-                icon: VideoCameraIcon,
-                label: "學生媒體管理",
-                href: "/admin/student-progress/student-media",
-                variant: "secondary"
-              },
-              {
-                icon: Users,
-                label: "返回學生管理",
-                href: "/admin/students",
-                variant: "accent"
-              }
+              { icon: BarChart3, label: '進度管理面板', href: navigationPaths.dashboard, variant: 'primary' },
+              { icon: TreePine, label: '成長樹管理', href: navigationPaths.growthTrees, variant: 'secondary' },
+              { icon: BookOpenIcon, label: '學習路線管理', href: navigationPaths.learningPaths, variant: 'secondary' },
+              { icon: TrendingUp, label: '發展能力圖卡', href: navigationPaths.abilities, variant: 'secondary' },
+              { icon: Gamepad2, label: '教學活動管理', href: navigationPaths.activities, variant: 'secondary' },
+              { icon: GraduationCap, label: '能力評估管理', href: navigationPaths.assessments, variant: 'secondary' },
+              { icon: Video, label: '學生媒體管理', href: navigationPaths.media, variant: 'secondary' },
+              { icon: Users, label: '返回學生管理', href: navigationPaths.studentManagement, variant: 'accent' },
             ]}
-            currentPage="/admin/student-progress"
+            currentPage={navigationPaths.dashboard}
           />
         </div>
 
@@ -1110,7 +1351,9 @@ export default function StudentProgressDashboard() {
                           <div className="text-right">
                             <button
                               className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-gradient-to-r from-red-400 to-rose-400 text-white hover:from-red-500 hover:to-rose-500 transition-all duration-200 shadow-sm"
-                              onClick={() => window.location.href = `/admin/student-progress/student-media?student_id=${student.id}`}
+                              onClick={() => {
+                                window.location.href = `${navigationPaths.media}?student_id=${student.id}`;
+                              }}
                             >
                               <VideoCameraIcon className="w-3 h-3" />
                               查看媒體
@@ -1160,7 +1403,9 @@ export default function StudentProgressDashboard() {
                           <div className="text-right">
                             <button
                               className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-gradient-to-r from-green-400 to-emerald-400 text-white hover:from-green-500 hover:to-emerald-500 transition-all duration-200 shadow-sm"
-                              onClick={() => window.location.href = `/admin/student-progress/student-media?student_id=${student.id}`}
+                              onClick={() => {
+                                window.location.href = `${navigationPaths.media}?student_id=${student.id}`;
+                              }}
                             >
                               <VideoCameraIcon className="w-3 h-3" />
                               查看媒體
@@ -1248,11 +1493,6 @@ export default function StudentProgressDashboard() {
         />
       )}
 
-      {/* 性能監控組件 */}
-      <PerformanceMonitor 
-        onMetricsUpdate={handlePerformanceMetricsUpdate}
-        showDebugInfo={showPerformanceMonitor}
-      />
     </div>
   );
 }

@@ -1,9 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { supabase } from '@/lib/supabase';
+import { useUser } from '@/hooks/useUser';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface AvailableTimeSlot {
   weekday: number
@@ -28,6 +30,18 @@ interface CopyAvailableTimesModalProps {
 }
 
 export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailableTimesModalProps) {
+  const { user } = useUser();
+  const { currentOrganization } = useOrganization();
+  const effectiveOrgId = useMemo(
+    () => currentOrganization?.id || user?.organization?.id || null,
+    [currentOrganization?.id, user?.organization?.id]
+  );
+  const validOrgId = useMemo(
+    () =>
+      effectiveOrgId && /^[0-9a-fA-F-]{36}$/.test(effectiveOrgId) ? effectiveOrgId : null,
+    [effectiveOrgId]
+  );
+  const hasValidOrg = Boolean(validOrgId);
   const [availableSlots, setAvailableSlots] = useState<AvailableTimeSlot[]>([]);
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
@@ -50,23 +64,35 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
   ];
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && hasValidOrg) {
       fetchCourseTypes();
+    } else if (isOpen) {
+      setCourseTypes([]);
+      setAvailableSlots([]);
+      setSelectedWeekdays([]);
+      setSelectedCourses([]);
+      setSelectedTimeSlots([]);
+      setSelectedSlots([]);
     }
-  }, [isOpen]);
+  }, [isOpen, hasValidOrg, validOrgId]);
 
   useEffect(() => {
-    if (isOpen && courseTypes.length > 0) {
+    if (isOpen && hasValidOrg && courseTypes.length > 0) {
       fetchAvailableSlots();
     }
-  }, [isOpen, courseTypes]);
+  }, [isOpen, courseTypes, hasValidOrg, validOrgId]);
 
   const fetchCourseTypes = async () => {
+    if (!hasValidOrg) {
+      setError(null);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('Hanami_CourseTypes')
         .select('*')
         .eq('status', true)
+        .eq('org_id', validOrgId as string)
         .order('name');
 
       if (error) {
@@ -81,6 +107,7 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
   };
 
   const fetchAvailableSlots = async () => {
+    if (!hasValidOrg) return;
     setLoading(true);
     setError(null);
     
@@ -89,6 +116,7 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('hanami_schedule')
         .select('*')
+        .eq('org_id', validOrgId as string)
         .order('weekday', { ascending: true })
         .order('timeslot', { ascending: true });
 
@@ -101,6 +129,7 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
       const { data: regularData, error: regularError } = await supabase
         .from('Hanami_Students')
         .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
+        .eq('org_id', validOrgId as string)
         .in('student_type', ['常規', '試堂'])
         .not('regular_weekday', 'is', null)
         .not('regular_timeslot', 'is', null);

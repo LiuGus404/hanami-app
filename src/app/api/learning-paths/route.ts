@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { treeId, pathData } = body;
+    const { treeId, pathData, orgId } = body;
 
     console.log('=== API 接收到的數據 ===');
     console.log('treeId:', treeId);
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     if (existingPath) {
       // 如果已存在，則更新現有的學習路線
-      const updateData = {
+      const updateData: any = {
         name: pathData.name,
         description: pathData.description,
         nodes: pathData.nodes,
@@ -69,6 +69,11 @@ export async function POST(request: NextRequest) {
         tags: pathData.tags || [],
         updated_at: new Date().toISOString()
       };
+      
+      // 如果提供了 orgId，則更新它
+      if (orgId) {
+        updateData.org_id = orgId;
+      }
 
       const { data, error } = await supabase
         .from('hanami_learning_paths')
@@ -89,7 +94,7 @@ export async function POST(request: NextRequest) {
       message = '學習路徑更新成功';
     } else {
       // 如果不存在，則創建新的學習路線
-      const learningPathData = {
+      const learningPathData: any = {
         name: pathData.name,
         description: pathData.description,
         tree_id: treeId,
@@ -104,6 +109,11 @@ export async function POST(request: NextRequest) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+      
+      // 如果提供了 orgId，則包含它
+      if (orgId) {
+        learningPathData.org_id = orgId;
+      }
 
       const { data, error } = await supabase
         .from('hanami_learning_paths')

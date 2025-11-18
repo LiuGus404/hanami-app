@@ -1,9 +1,11 @@
 'use client';
 
 import { PlusIcon, MagnifyingGlassIcon, FunnelIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
-import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, History } from 'lucide-react';
+import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { toast } from 'react-hot-toast';
+import Image from 'next/image';
 
 import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
 import AddGrowthTreeModal from '@/components/ui/AddGrowthTreeModal';
@@ -13,8 +15,49 @@ import { supabase } from '@/lib/supabase';
 import { GrowthTree, GrowthGoal } from '@/types/progress';
 import { VideoCameraIcon } from '@heroicons/react/24/outline';
 import { BookOpenIcon } from '@heroicons/react/24/outline';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
-export default function GrowthTreesPage() {
+type NavigationOverrides = Partial<{
+  dashboard: string;
+  growthTrees: string;
+  learningPaths: string;
+  abilities: string;
+  activities: string;
+  assessments: string;
+  media: string;
+  studentManagement: string;
+}>;
+
+type GrowthTreesPageProps = {
+  navigationOverrides?: NavigationOverrides;
+  forcedOrgId?: string | null;
+  forcedOrgName?: string | null;
+  disableOrgFallback?: boolean;
+};
+
+export default function GrowthTreesPage({
+  navigationOverrides,
+  forcedOrgId = null,
+  forcedOrgName = null,
+  disableOrgFallback = false,
+}: GrowthTreesPageProps = {}) {
+  const { currentOrganization } = useOrganization();
+  
+  const navigationPaths = useMemo(
+    () => ({
+      dashboard: '/admin/student-progress',
+      growthTrees: '/admin/student-progress/growth-trees',
+      learningPaths: '/admin/student-progress/learning-paths',
+      abilities: '/admin/student-progress/abilities',
+      activities: '/admin/student-progress/activities',
+      assessments: '/admin/student-progress/ability-assessments',
+      media: '/admin/student-progress/student-media',
+      studentManagement: '/admin/students',
+      ...(navigationOverrides ?? {}),
+    }),
+    [navigationOverrides],
+  );
+
   const [trees, setTrees] = useState<GrowthTree[]>([]);
   const [goals, setGoals] = useState<GrowthGoal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,21 +95,80 @@ export default function GrowthTreesPage() {
   const [showPopup, setShowPopup] = useState<{ field: string, open: boolean }>({ field: '', open: false });
   const [popupSelected, setPopupSelected] = useState<string | string[]>([]);
 
-  useEffect(() => {
-    loadAllData();
-  }, []);
+  const UUID_REGEX =
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const PLACEHOLDER_ORG_IDS = new Set([
+    'default-org',
+    'unassigned-org-placeholder',
+  ]);
+
+  // 優先使用 forcedOrgId，如果沒有則使用 OrganizationContext 中的機構 ID
+  const orgIdFromContext = useMemo(() => {
+    if (!currentOrganization?.id) return null;
+    return UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id)
+      ? currentOrganization.id
+      : null;
+  }, [currentOrganization?.id]);
+
+  const normalizedForcedOrgId = useMemo(() => {
+    if (!forcedOrgId) return null;
+    return UUID_REGEX.test(forcedOrgId) && !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
+      ? forcedOrgId
+      : null;
+  }, [forcedOrgId]);
+
+  const invalidForcedId = forcedOrgId !== null && !normalizedForcedOrgId;
+  const validOrgId = normalizedForcedOrgId || orgIdFromContext;
+  const orgDataDisabled =
+    (disableOrgFallback && !validOrgId) || invalidForcedId;
+  const organizationNameLabel = forcedOrgName ?? currentOrganization?.name ?? null;
+
+  const applyOrgFilter = useCallback(<T extends { eq: (column: string, value: any) => T }>(
+    query: T,
+    column = 'org_id',
+  ) => {
+    if (validOrgId) {
+      return query.eq(column, validOrgId);
+    }
+    return query;
+  }, [validOrgId]);
+
+  const ensureOrgAvailable = useCallback(() => {
+    if (!validOrgId || orgDataDisabled) {
+      toast.error('請先創建屬於您的機構');
+      return false;
+    }
+    return true;
+  }, [validOrgId, orgDataDisabled]);
+
+useEffect(() => {
+  loadAllData();
+}, [orgDataDisabled, validOrgId]);
 
   const loadAllData = async () => {
+    if (orgDataDisabled || !validOrgId) {
+      setTrees([]);
+      setGoals([]);
+      setAbilitiesOptions([]);
+      setActivitiesOptions([]);
+      setTeachersOptions([]);
+      setCourseTypesOptions([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       console.log('開始載入資料...');
       
       // 成長樹
-      const { data: treesData, error: treesError } = await supabase
+      let treesQuery = supabase
         .from('hanami_growth_trees')
         .select('*')
         .order('tree_name');
+      treesQuery = applyOrgFilter(treesQuery);
+      const { data: treesData, error: treesError } = await treesQuery;
       if (treesError) throw treesError;
       const fixedTrees = (treesData || []).map((t: any) => ({
         ...t,
@@ -77,10 +179,12 @@ export default function GrowthTreesPage() {
       console.log('載入成長樹:', fixedTrees);
       
       // 目標
-      const { data: goalsData, error: goalsError } = await supabase
+      let goalsQuery = supabase
         .from('hanami_growth_goals')
         .select('*')
         .order('goal_order');
+      goalsQuery = applyOrgFilter(goalsQuery);
+      const { data: goalsData, error: goalsError } = await goalsQuery;
       if (goalsError) throw goalsError;
       const fixedGoals = (goalsData || []).map((g: any) => {
         console.log(`處理目標 ${g.goal_name} 的原始資料:`, g);
@@ -110,32 +214,40 @@ export default function GrowthTreesPage() {
       console.log('載入目標:', fixedGoals);
       
       // 發展能力
-      const { data: abilitiesData, error: abilitiesError } = await supabase
+      let abilitiesQuery = supabase
         .from('hanami_development_abilities')
         .select('id, ability_name')
         .order('ability_name');
+      abilitiesQuery = applyOrgFilter(abilitiesQuery);
+      const { data: abilitiesData, error: abilitiesError } = await abilitiesQuery;
       if (abilitiesError) throw abilitiesError;
       setAbilitiesOptions((abilitiesData || []).map((a: any) => ({ value: a.id, label: a.ability_name })));
       
       // 活動
-      const { data: activitiesData, error: activitiesError } = await supabase
+      let activitiesQuery = supabase
         .from('hanami_teaching_activities')
         .select('id, activity_name')
         .order('activity_name');
+      activitiesQuery = applyOrgFilter(activitiesQuery);
+      const { data: activitiesData, error: activitiesError } = await activitiesQuery;
       if (activitiesError) throw activitiesError;
       setActivitiesOptions((activitiesData || []).map((a: any) => ({ value: a.id, label: a.activity_name })));
       
       // 老師
-      const { data: teachersData, error: teachersError } = await supabase
+      let teachersQuery = supabase
         .from('hanami_employee')
         .select('id, teacher_nickname, teacher_fullname')
         .order('teacher_nickname');
+      teachersQuery = applyOrgFilter(teachersQuery);
+      const { data: teachersData, error: teachersError } = await teachersQuery;
       if (teachersError) throw teachersError;
       // 管理員
-      const { data: adminsData, error: adminsError } = await supabase
+      let adminsQuery = supabase
         .from('hanami_admin')
         .select('id, admin_name')
         .order('admin_name');
+      adminsQuery = applyOrgFilter(adminsQuery);
+      const { data: adminsData, error: adminsError } = await adminsQuery;
       if (adminsError) throw adminsError;
       setTeachersOptions([
         ...((teachersData || []).map((t: any) => ({ value: t.id, label: t.teacher_nickname || t.teacher_fullname || '老師' }))),
@@ -143,11 +255,13 @@ export default function GrowthTreesPage() {
       ]);
       
       // 課程類型
-      const { data: courseTypesData, error: courseTypesError } = await supabase
+      let courseTypesQuery = supabase
         .from('Hanami_CourseTypes')
         .select('id, name')
         .eq('status', true)
         .order('name');
+      courseTypesQuery = applyOrgFilter(courseTypesQuery);
+      const { data: courseTypesData, error: courseTypesError } = await courseTypesQuery;
       if (courseTypesError) throw courseTypesError;
       setCourseTypesOptions((courseTypesData || []).map((ct: any) => ({ value: ct.id, label: ct.name })));
       
@@ -162,6 +276,10 @@ export default function GrowthTreesPage() {
 
   // 新增成長樹與目標
   const handleAddTree = async (treeData: any, goals: any[]) => {
+    if (!ensureOrgAvailable()) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -178,6 +296,7 @@ export default function GrowthTreesPage() {
           course_type_id: treeData.course_type,
           tree_level: treeData.tree_level,
           is_active: true,
+          org_id: validOrgId,
         }])
         .select()
         .single();
@@ -214,6 +333,7 @@ export default function GrowthTreesPage() {
             assessment_mode: g.assessment_mode || 'progress',
             multi_select_levels: Array.isArray(g.multi_select_levels) ? g.multi_select_levels : [],
             multi_select_descriptions: Array.isArray(g.multi_select_descriptions) ? g.multi_select_descriptions : [],
+            org_id: validOrgId,
           };
           console.log(`新增目標 ${g.goal_name} 的資料:`, goalData);
           return goalData;
@@ -250,6 +370,10 @@ export default function GrowthTreesPage() {
 
   // 更新成長樹與目標
   const handleUpdateTree = async (treeData: any, goals: any[]) => {
+    if (!ensureOrgAvailable()) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -261,7 +385,7 @@ export default function GrowthTreesPage() {
       }
       
       // 1. 更新成長樹
-      const { error: treeError } = await supabase
+      let treeUpdate = supabase
         .from('hanami_growth_trees')
         .update({
           tree_name: treeData.tree_name,
@@ -271,8 +395,9 @@ export default function GrowthTreesPage() {
           review_teachers: treeData.review_teachers,
           notes: treeData.notes,
           tree_level: treeData.tree_level,
-        })
-        .eq('id', editingTree.id);
+        });
+      treeUpdate = applyOrgFilter(treeUpdate);
+      const { error: treeError } = await treeUpdate.eq('id', editingTree.id);
       
       if (treeError) {
         console.error('更新成長樹失敗:', treeError);
@@ -282,10 +407,12 @@ export default function GrowthTreesPage() {
       console.log('成長樹更新成功');
       
       // 2. 獲取現有目標的所有資料
-      const { data: existingGoals, error: fetchError } = await supabase
+      let existingGoalsQuery = supabase
         .from('hanami_growth_goals')
         .select('*')
         .eq('tree_id', editingTree.id);
+      existingGoalsQuery = applyOrgFilter(existingGoalsQuery);
+      const { data: existingGoals, error: fetchError } = await existingGoalsQuery;
       
       if (fetchError) {
         console.error('獲取現有目標失敗:', fetchError);
@@ -299,10 +426,12 @@ export default function GrowthTreesPage() {
       });
       
       // 3. 刪除現有目標
-      const { error: deleteError } = await supabase
+      let deleteExistingGoalsQuery = supabase
         .from('hanami_growth_goals')
         .delete()
         .eq('tree_id', editingTree.id);
+      deleteExistingGoalsQuery = applyOrgFilter(deleteExistingGoalsQuery);
+      const { error: deleteError } = await deleteExistingGoalsQuery;
       
       if (deleteError) {
         console.error('刪除現有目標失敗:', deleteError);
@@ -345,6 +474,7 @@ export default function GrowthTreesPage() {
             multi_select_descriptions: Array.isArray(g.multi_select_descriptions) && g.multi_select_descriptions.length > 0
               ? g.multi_select_descriptions 
               : (Array.isArray(existingGoal?.multi_select_descriptions) ? existingGoal.multi_select_descriptions : []),
+            org_id: validOrgId,
           };
           console.log(`目標 ${g.goal_name} 的資料:`, goalData);
           return goalData;
@@ -381,19 +511,24 @@ export default function GrowthTreesPage() {
 
   const handleDeleteTree = async (id: string) => {
     if (!confirm('確定要刪除此成長樹嗎？相關的目標也會被刪除。')) return;
+    if (!ensureOrgAvailable()) return;
 
     try {
       // 先刪除相關的目標
-      await supabase
+      let deleteGoalsQuery = supabase
         .from('hanami_growth_goals')
         .delete()
         .eq('tree_id', id);
+      deleteGoalsQuery = applyOrgFilter(deleteGoalsQuery);
+      await deleteGoalsQuery;
 
       // 再刪除成長樹
-      const { error } = await supabase
+      let deleteTreeQuery = supabase
         .from('hanami_growth_trees')
         .delete()
         .eq('id', id);
+      deleteTreeQuery = applyOrgFilter(deleteTreeQuery);
+      const { error } = await deleteTreeQuery;
 
       if (error) throw error;
       await loadAllData();
@@ -410,12 +545,18 @@ export default function GrowthTreesPage() {
 
   // 載入現有目標
   const loadExistingGoals = async (treeId: string) => {
+    if (orgDataDisabled || !validOrgId) {
+      return [];
+    }
+
     try {
-      const { data: goalsData, error: goalsError } = await supabase
+      let goalsQuery = supabase
         .from('hanami_growth_goals')
         .select('*')
         .eq('tree_id', treeId)
         .order('goal_order');
+      goalsQuery = applyOrgFilter(goalsQuery);
+      const { data: goalsData, error: goalsError } = await goalsQuery;
       
       if (goalsError) throw goalsError;
       
@@ -449,13 +590,16 @@ export default function GrowthTreesPage() {
 
   // 切換目標完成狀態
   const toggleGoalCompletion = async (goalId: string, currentStatus: boolean) => {
+    if (!ensureOrgAvailable()) return;
+
     try {
       console.log(`切換目標 ${goalId} 的完成狀態: ${currentStatus} -> ${!currentStatus}`);
       
-      const { error } = await supabase
+      let updateQuery = supabase
         .from('hanami_growth_goals')
-        .update({ is_completed: !currentStatus })
-        .eq('id', goalId);
+        .update({ is_completed: !currentStatus });
+      updateQuery = applyOrgFilter(updateQuery);
+      const { error } = await updateQuery.eq('id', goalId);
       
       if (error) {
         console.error('切換目標完成狀態失敗:', error);
@@ -474,11 +618,16 @@ export default function GrowthTreesPage() {
 
   // 載入在此成長樹的學生資料
   const loadStudentsInTree = async (treeId: string) => {
+    if (orgDataDisabled || !validOrgId) {
+      setStudentsInTree([]);
+      return;
+    }
+
     try {
       console.log('載入在此成長樹的學生資料:', treeId);
       
       // 使用現有的關聯表查詢學生
-      const { data: studentsData, error } = await supabase
+      let studentsQuery = supabase
         .from('hanami_student_trees')
         .select(`
           student_id,
@@ -499,6 +648,8 @@ export default function GrowthTreesPage() {
         `)
         .eq('tree_id', treeId)
         .or('status.eq.active,tree_status.eq.active');
+      studentsQuery = applyOrgFilter(studentsQuery);
+      const { data: studentsData, error } = await studentsQuery;
       
       if (error) {
         console.error('載入學生資料失敗:', error);
@@ -714,18 +865,6 @@ export default function GrowthTreesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
       <div className="max-w-7xl mx-auto">
-        {/* 調試資訊 */}
-        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded-lg">
-          <h3 className="font-bold text-yellow-800 mb-2">調試資訊</h3>
-          <div className="text-sm text-yellow-700 space-y-1">
-            <div>總成長樹數量: {trees.length}</div>
-            <div>總目標數量: {goals.length}</div>
-            <div>篩選條件: {JSON.stringify(filters)}</div>
-            <div>篩選後成長樹數量: {getFilteredTrees().length}</div>
-            <div>載入狀態: {loading ? '載入中' : '完成'}</div>
-          </div>
-        </div>
-
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-hanami-text mb-2">
@@ -736,8 +875,12 @@ export default function GrowthTreesPage() {
             </p>
           </div>
           <HanamiButton
-            className="bg-gradient-to-r from-hanami-primary to-hanami-secondary"
-            onClick={() => setShowAddModal(true)}
+            className="bg-gradient-to-r from-hanami-primary to-hanami-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={orgDataDisabled || !validOrgId}
+            onClick={() => {
+              if (!ensureOrgAvailable()) return;
+              setShowAddModal(true);
+            }}
           >
             <PlusIcon className="h-5 w-5 mr-2" />
             新增成長樹
@@ -748,205 +891,226 @@ export default function GrowthTreesPage() {
         <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
           <ResponsiveNavigationDropdown
             items={[
-              { label: '成長樹管理', href: '/admin/student-progress/growth-trees', icon: TreePine },
-              { label: '學習路線管理', href: '/admin/student-progress/learning-paths', icon: BookOpenIcon },
-              { label: '能力評估', href: '/admin/student-progress/ability-assessments', icon: BarChart3 },
-              { label: '學習活動', href: '/admin/student-progress/activities', icon: Gamepad2 },
-              { label: '學生媒體', href: '/admin/student-progress/student-media', icon: VideoCameraIcon },
-              { label: '版本管理', href: '/admin/student-progress/growth-tree-versions', icon: History },
+              { label: '進度管理面板', href: navigationPaths.dashboard, icon: BarChart3 },
+              { label: '成長樹管理', href: navigationPaths.growthTrees, icon: TreePine },
+              { label: '學習路線管理', href: navigationPaths.learningPaths, icon: BookOpenIcon },
+              { label: '發展能力圖卡', href: navigationPaths.abilities, icon: TrendingUp },
+              { label: '教學活動管理', href: navigationPaths.activities, icon: Gamepad2 },
+              { label: '能力評估管理', href: navigationPaths.assessments, icon: AcademicCapIcon },
+              { label: '學生媒體管理', href: navigationPaths.media, icon: VideoCameraIcon },
+              { label: '返回學生管理', href: navigationPaths.studentManagement, icon: Users },
             ]}
+            currentPage={navigationPaths.growthTrees}
           />
         </div>
 
-        {/* 搜尋和篩選工具列 */}
-        <div className="bg-white rounded-xl p-6 mb-6 shadow-sm border border-hanami-border">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* 搜尋和篩選 */}
-            <div className="flex items-center gap-4 flex-1">
-              <div className="relative flex-1 max-w-md">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <HanamiInput
-                  className="pl-10"
-                  placeholder="搜尋成長樹名稱或描述..."
-                  value={filters.search}
-                  onChange={(value) => handleFilterChange('search', value)}
-                />
-              </div>
-              
-              {/* 成長樹等級多選篩選 */}
-              <div className="relative">
-                <button
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[140px]"
-                  type="button"
-                  onClick={() => handleFilterPopupOpen('tree_levels')}
-                >
-                  <FunnelIcon className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-700">成長樹等級</span>
-                  {filters.tree_levels.length > 0 && (
-                    <span className="ml-auto bg-hanami-primary text-white text-xs rounded-full px-2 py-1">
-                      {filters.tree_levels.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* 狀態多選篩選 */}
-              <div className="relative">
-                <button
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
-                  type="button"
-                  onClick={() => handleFilterPopupOpen('statuses')}
-                >
-                  <FunnelIcon className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-700">狀態</span>
-                  {filters.statuses.length > 0 && (
-                    <span className="ml-auto bg-hanami-secondary text-white text-xs rounded-full px-2 py-1">
-                      {filters.statuses.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* 能力多選篩選 */}
-              <div className="relative">
-                <button
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
-                  type="button"
-                  onClick={() => handleFilterPopupOpen('abilities')}
-                >
-                  <FunnelIcon className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-700">能力</span>
-                  {filters.abilities.length > 0 && (
-                    <span className="ml-auto bg-hanami-accent text-white text-xs rounded-full px-2 py-1">
-                      {filters.abilities.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* 活動多選篩選 */}
-              <div className="relative">
-                <button
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
-                  type="button"
-                  onClick={() => handleFilterPopupOpen('activities')}
-                >
-                  <FunnelIcon className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-700">活動</span>
-                  {filters.activities.length > 0 && (
-                    <span className="ml-auto bg-hanami-success text-white text-xs rounded-full px-2 py-1">
-                      {filters.activities.length}
-                    </span>
-                  )}
-                </button>
-              </div>
+        {(orgDataDisabled || !validOrgId) && (
+          <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
+            <div className="mb-4">
+              <Image alt="機構提示" height={64} src="/tree ui.png" width={64} />
             </div>
-
-            {/* 清除篩選按鈕 */}
-            <div className="flex items-center gap-2">
-              <HanamiButton
-                variant="secondary"
-                size="sm"
-                onClick={clearFilters}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                清除篩選
-              </HanamiButton>
-            </div>
+            <h2 className="text-lg font-semibold text-hanami-text">尚未設定機構資料</h2>
+            <p className="mt-2 text-sm text-hanami-text-secondary">
+              請先創建屬於您的機構
+              {organizationNameLabel ? `（${organizationNameLabel}）` : ''}
+              ，並建立成長樹資料後再查看內容。
+            </p>
           </div>
+        )}
 
-          {/* 已選擇的篩選條件顯示 */}
-          {(filters.tree_levels.length > 0 || filters.statuses.length > 0 || filters.abilities.length > 0 || filters.activities.length > 0) && (
-            <div className="mt-4 pt-4 border-t border-hanami-border">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-medium text-gray-700">已選擇的篩選條件：</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {filters.tree_levels.map(level => (
-                  <span key={level} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-primary text-white text-xs rounded-full">
-                    等級 {level}
+        {orgDataDisabled || !validOrgId ? null : (
+          <>
+            {/* 搜尋和篩選工具列 */}
+            <div className="bg-white rounded-xl p-6 mb-6 shadow-sm border border-hanami-border">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                {/* 搜尋和篩選 */}
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="relative flex-1 max-w-md">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <HanamiInput
+                      className="pl-10"
+                      placeholder="搜尋成長樹名稱或描述..."
+                      value={filters.search}
+                      onChange={(value) => handleFilterChange('search', value)}
+                    />
+                  </div>
+                  
+                  {/* 成長樹等級多選篩選 */}
+                  <div className="relative">
                     <button
-                      onClick={() => handleFilterChange('tree_levels', filters.tree_levels.filter(l => l !== level))}
-                      className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[140px]"
+                      type="button"
+                      onClick={() => handleFilterPopupOpen('tree_levels')}
                     >
-                      ×
+                      <FunnelIcon className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">成長樹等級</span>
+                      {filters.tree_levels.length > 0 && (
+                        <span className="ml-auto bg-hanami-primary text-white text-xs rounded-full px-2 py-1">
+                          {filters.tree_levels.length}
+                        </span>
+                      )}
                     </button>
-                  </span>
-                ))}
-                {filters.statuses.map(status => (
-                  <span key={status} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-secondary text-white text-xs rounded-full">
-                    {status === 'active' ? '啟用' : '停用'}
-                    <button
-                      onClick={() => handleFilterChange('statuses', filters.statuses.filter(s => s !== status))}
-                      className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-                {filters.abilities.map(abilityId => {
-                  const ability = abilitiesOptions.find(a => a.value === abilityId);
-                  return (
-                    <span key={abilityId} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-accent text-white text-xs rounded-full">
-                      {ability?.label || abilityId}
-                      <button
-                        onClick={() => handleFilterChange('abilities', filters.abilities.filter(a => a !== abilityId))}
-                        className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  );
-                })}
-                {filters.activities.map(activityId => {
-                  const activity = activitiesOptions.find(a => a.value === activityId);
-                  return (
-                    <span key={activityId} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-success text-white text-xs rounded-full">
-                      {activity?.label || activityId}
-                      <button
-                        onClick={() => handleFilterChange('activities', filters.activities.filter(a => a !== activityId))}
-                        className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+                  </div>
 
-        {/* 統計資訊 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <HanamiCard className="p-6 text-center">
-            <div className="text-2xl font-bold text-hanami-text mb-2">
-              {getFilteredTrees().length}
+                  {/* 狀態多選篩選 */}
+                  <div className="relative">
+                    <button
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
+                      type="button"
+                      onClick={() => handleFilterPopupOpen('statuses')}
+                    >
+                      <FunnelIcon className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">狀態</span>
+                      {filters.statuses.length > 0 && (
+                        <span className="ml-auto bg-hanami-secondary text-white text-xs rounded-full px-2 py-1">
+                          {filters.statuses.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* 能力多選篩選 */}
+                  <div className="relative">
+                    <button
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
+                      type="button"
+                      onClick={() => handleFilterPopupOpen('abilities')}
+                    >
+                      <FunnelIcon className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">能力</span>
+                      {filters.abilities.length > 0 && (
+                        <span className="ml-auto bg-hanami-accent text-white text-xs rounded-full px-2 py-1">
+                          {filters.abilities.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* 活動多選篩選 */}
+                  <div className="relative">
+                    <button
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white hover:bg-gray-50 transition-colors min-w-[100px]"
+                      type="button"
+                      onClick={() => handleFilterPopupOpen('activities')}
+                    >
+                      <FunnelIcon className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">活動</span>
+                      {filters.activities.length > 0 && (
+                        <span className="ml-auto bg-hanami-success text-white text-xs rounded-full px-2 py-1">
+                          {filters.activities.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 清除篩選按鈕 */}
+                <div className="flex items-center gap-2">
+                  <HanamiButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="text-gray-600 hover:text-gray-800"
+                  >
+                    清除篩選
+                  </HanamiButton>
+                </div>
+              </div>
+
+              {/* 已選擇的篩選條件顯示 */}
+              {(filters.tree_levels.length > 0 || filters.statuses.length > 0 || filters.abilities.length > 0 || filters.activities.length > 0) && (
+                <div className="mt-4 pt-4 border-t border-hanami-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-sm font-medium text-gray-700">已選擇的篩選條件：</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {filters.tree_levels.map(level => (
+                      <span key={level} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-primary text-white text-xs rounded-full">
+                        等級 {level}
+                        <button
+                          onClick={() => handleFilterChange('tree_levels', filters.tree_levels.filter(l => l !== level))}
+                          className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    {filters.statuses.map(status => (
+                      <span key={status} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-secondary text-white text-xs rounded-full">
+                        {status === 'active' ? '啟用' : '停用'}
+                        <button
+                          onClick={() => handleFilterChange('statuses', filters.statuses.filter(s => s !== status))}
+                          className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    {filters.abilities.map(abilityId => {
+                      const ability = abilitiesOptions.find(a => a.value === abilityId);
+                      return (
+                        <span key={abilityId} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-accent text-white text-xs rounded-full">
+                          {ability?.label || abilityId}
+                          <button
+                            onClick={() => handleFilterChange('abilities', filters.abilities.filter(a => a !== abilityId))}
+                            className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                    {filters.activities.map(activityId => {
+                      const activity = activitiesOptions.find(a => a.value === activityId);
+                      return (
+                        <span key={activityId} className="inline-flex items-center gap-1 px-2 py-1 bg-hanami-success text-white text-xs rounded-full">
+                          {activity?.label || activityId}
+                          <button
+                            onClick={() => handleFilterChange('activities', filters.activities.filter(a => a !== activityId))}
+                            className="ml-1 hover:bg-white hover:bg-opacity-20 rounded-full p-0.5"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="text-sm text-hanami-text-secondary">總成長樹數</div>
-          </HanamiCard>
-          
-          <HanamiCard className="p-6 text-center">
-            <div className="text-2xl font-bold text-green-600 mb-2">
-              {getFilteredTrees().filter(t => t.is_active).length}
+
+            {/* 統計資訊 */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <HanamiCard className="p-6 text-center">
+                <div className="text-2xl font-bold text-hanami-text mb-2">
+                  {getFilteredTrees().length}
+                </div>
+                <div className="text-sm text-hanami-text-secondary">總成長樹數</div>
+              </HanamiCard>
+              
+              <HanamiCard className="p-6 text-center">
+                <div className="text-2xl font-bold text-green-600 mb-2">
+                  {getFilteredTrees().filter(t => t.is_active).length}
+                </div>
+                <div className="text-sm text-hanami-text-secondary">啟用中</div>
+              </HanamiCard>
+              
+              <HanamiCard className="p-6 text-center">
+                <div className="text-2xl font-bold text-blue-600 mb-2">
+                  {goals.length}
+                </div>
+                <div className="text-sm text-hanami-text-secondary">總目標數</div>
+              </HanamiCard>
+              
+              <HanamiCard className="p-6 text-center">
+                <div className="text-2xl font-bold text-purple-600 mb-2">
+                  {abilitiesOptions.length}
+                </div>
+                <div className="text-sm text-hanami-text-secondary">相關能力</div>
+              </HanamiCard>
             </div>
-            <div className="text-sm text-hanami-text-secondary">啟用中</div>
-          </HanamiCard>
-          
-          <HanamiCard className="p-6 text-center">
-            <div className="text-2xl font-bold text-blue-600 mb-2">
-              {goals.length}
-            </div>
-            <div className="text-sm text-hanami-text-secondary">總目標數</div>
-          </HanamiCard>
-          
-          <HanamiCard className="p-6 text-center">
-            <div className="text-2xl font-bold text-purple-600 mb-2">
-              {abilitiesOptions.length}
-            </div>
-            <div className="text-sm text-hanami-text-secondary">相關能力</div>
-          </HanamiCard>
-        </div>
+          </>
+        )}
 
         {/* 彈出選擇組件 */}
         {showPopup.open && (
@@ -988,6 +1152,8 @@ export default function GrowthTreesPage() {
             courseTypesOptions={courseTypesOptions}
             onClose={() => setShowAddModal(false)}
             onSubmit={handleAddTree}
+            organizationName={organizationNameLabel}
+            organizationId={validOrgId}
           />
         )}
 
@@ -1024,6 +1190,8 @@ export default function GrowthTreesPage() {
             courseTypesOptions={courseTypesOptions}
             onClose={() => setEditingTree(null)}
             onSubmit={handleUpdateTree}
+            organizationName={organizationNameLabel}
+            organizationId={validOrgId}
           />
         )}
 
@@ -1035,6 +1203,7 @@ export default function GrowthTreesPage() {
             abilitiesOptions={abilitiesOptions}
             activitiesOptions={activitiesOptions}
             teachersOptions={teachersOptions}
+            courseTypesOptions={courseTypesOptions}
             studentsInTree={studentsInTree}
             onClose={closeDetailModal}
             onEdit={() => {
@@ -1082,7 +1251,17 @@ export default function GrowthTreesPage() {
               
               <div className="p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-3xl">{treeToDelete.tree_icon || '🌳'}</span>
+                  {treeToDelete?.tree_icon && treeToDelete.tree_icon !== '🌳' && treeToDelete.tree_icon !== '/tree ui.png' ? (
+                    <span className="text-3xl">{treeToDelete.tree_icon}</span>
+                  ) : (
+                    <Image
+                      src="/tree ui.png"
+                      alt="成長樹圖示"
+                      width={36}
+                      height={36}
+                      className="h-9 w-9"
+                    />
+                  )}
                   <div>
                     <h3 className="text-lg font-semibold text-hanami-text">{treeToDelete.tree_name}</h3>
                     <p className="text-sm text-hanami-text-secondary">成長樹</p>
@@ -1133,7 +1312,17 @@ export default function GrowthTreesPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1 min-w-0 pr-16">
                     <h3 className="text-lg font-semibold text-hanami-text mb-2 flex items-start gap-2 break-words">
-                      <span className="text-2xl flex-shrink-0">{tree.tree_icon || '🌳'}</span>
+                      {tree.tree_icon && tree.tree_icon !== '🌳' && tree.tree_icon !== '/tree ui.png' ? (
+                        <span className="text-2xl flex-shrink-0">{tree.tree_icon}</span>
+                      ) : (
+                        <Image
+                          src="/tree ui.png"
+                          alt="成長樹圖示"
+                          width={32}
+                          height={32}
+                          className="h-8 w-8 flex-shrink-0"
+                        />
+                      )}
                       <span className="break-words">{tree.tree_name}</span>
                     </h3>
                     <p className="text-sm text-hanami-text-secondary mb-3 break-words">{tree.tree_description}</p>
@@ -1157,7 +1346,11 @@ export default function GrowthTreesPage() {
                 </div>
                 <div className="space-y-2 mb-4">
                   <div className="flex flex-wrap items-center text-sm text-hanami-text-secondary gap-2">
-                    <span className="break-words">課程類型: {tree.course_type}</span>
+                    <span className="break-words">課程類型: {
+                      tree.course_type 
+                        ? (courseTypesOptions.find(opt => opt.value === tree.course_type)?.label || tree.course_type)
+                        : '未指定'
+                    }</span>
                     <span className="flex-shrink-0">等級: Lv.{tree.tree_level || 1}</span>
                     <span className="flex-shrink-0">狀態: {tree.is_active ? '啟用' : '停用'}</span>
                   </div>
@@ -1187,7 +1380,17 @@ export default function GrowthTreesPage() {
                         >
                           <span className={`w-2 h-2 rounded-full mr-2 mt-1.5 flex-shrink-0 ${goal.is_completed ? 'bg-green-500' : 'bg-gray-300'}`} />
                           <span className={`text-xs break-words flex-1 ${goal.is_completed ? 'text-green-600' : 'text-hanami-text-secondary'}`}>
-                            {goal.goal_icon || '⭐'} {goal.goal_name}
+                            {(goal.goal_icon === '/apple-icon.svg' || !goal.goal_icon || goal.goal_icon === '⭐') ? (
+                              <Image
+                                src="/apple-icon.svg"
+                                alt="目標圖案"
+                                width={20}
+                                height={20}
+                                className="h-5 w-5 inline-block align-middle mr-1"
+                              />
+                            ) : (
+                              <span className="text-lg">{goal.goal_icon}</span>
+                            )} {goal.goal_name}
                           </span>
                           <span className="text-xs text-gray-400 ml-2 flex-shrink-0">
                             {goal.is_completed ? '✓' : '○'}

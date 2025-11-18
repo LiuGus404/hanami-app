@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const studentId = searchParams.get('studentId');
     const lessonDate = searchParams.get('lessonDate');
     const timeslot = searchParams.get('timeslot');
+    const orgId = searchParams.get('orgId');
 
     if (!studentId) {
       return NextResponse.json(
@@ -26,8 +27,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 先獲取符合 org_id 的教學活動 ID 列表
+    let validActivityIds: string[] = [];
+    if (orgId) {
+      const { data: validActivitiesData, error: validActivitiesError } = await supabase
+        .from('hanami_teaching_activities')
+        .select('id')
+        .eq('is_active', true)
+        .eq('org_id', orgId);
+      
+      if (!validActivitiesError && validActivitiesData) {
+        validActivityIds = validActivitiesData.map(a => a.id);
+      }
+    }
+
     // 並行查詢所有活動類型
     console.log('開始並行查詢學生活動，學生ID:', studentId);
+    console.log('符合 org_id 的活動 ID 列表:', validActivityIds);
     
     const queries = [];
     
@@ -54,7 +70,8 @@ export async function GET(request: NextRequest) {
             difficulty_level,
             duration_minutes,
             materials_needed,
-            instructions
+            instructions,
+            org_id
           )
         `)
         .eq('student_id', studentId)
@@ -66,6 +83,14 @@ export async function GET(request: NextRequest) {
         query = query.eq('timeslot', timeslot);
       }
       
+      // 根據 org_id 過濾活動
+      if (orgId && validActivityIds.length > 0) {
+        query = query.in('activity_id', validActivityIds);
+      } else if (orgId && validActivityIds.length === 0) {
+        // 如果沒有符合的活動，查詢一個不存在的 ID 以確保不返回任何結果
+        query = query.eq('activity_id', '00000000-0000-0000-0000-000000000000');
+      }
+      
       queries.push(query);
     } else {
       queries.push(Promise.resolve({ data: [], error: null }));
@@ -73,45 +98,7 @@ export async function GET(request: NextRequest) {
     
     // 上次課堂活動查詢
     if (lessonDate) {
-      queries.push(
-        supabase
-          .from('hanami_student_activities')
-          .select(`
-            id,
-            completion_status,
-            assigned_at,
-            time_spent,
-            teacher_notes,
-            student_feedback,
-            progress,
-            lesson_date,
-            timeslot,
-            activity_id,
-            hanami_teaching_activities!left (
-              id,
-              activity_name,
-              activity_description,
-              activity_type,
-              difficulty_level,
-              duration_minutes,
-              materials_needed,
-              instructions
-            )
-          `)
-          .eq('student_id', studentId)
-          .eq('activity_type', 'lesson')
-          .lt('lesson_date', lessonDate)
-          .order('lesson_date', { ascending: false })
-          .limit(5)
-      );
-    } else {
-      queries.push(Promise.resolve({ data: [], error: null }));
-    }
-    
-    // 正在學習的活動查詢（包含 ongoing 和成長樹相關的 lesson 類型活動）
-    // 修改：查詢所有 ongoing 類型 + 成長樹相關的 lesson 類型活動，不區分完成狀態
-    queries.push(
-      supabase
+      let previousQuery = supabase
         .from('hanami_student_activities')
         .select(`
           id,
@@ -121,11 +108,9 @@ export async function GET(request: NextRequest) {
           teacher_notes,
           student_feedback,
           progress,
-          activity_id,
-          activity_type,
-          tree_id,
           lesson_date,
           timeslot,
+          activity_id,
           hanami_teaching_activities!left (
             id,
             activity_name,
@@ -134,13 +119,71 @@ export async function GET(request: NextRequest) {
             difficulty_level,
             duration_minutes,
             materials_needed,
-            instructions
+            instructions,
+            org_id
           )
         `)
         .eq('student_id', studentId)
-        .or('activity_type.eq.ongoing,and(activity_type.eq.lesson,tree_id.not.is.null)') // 查詢 ongoing 或 有 tree_id 的 lesson 類型
-        .order('assigned_at', { ascending: false })
-    );
+        .eq('activity_type', 'lesson')
+        .lt('lesson_date', lessonDate);
+      
+      // 根據 org_id 過濾活動
+      if (orgId && validActivityIds.length > 0) {
+        previousQuery = previousQuery.in('activity_id', validActivityIds);
+      } else if (orgId && validActivityIds.length === 0) {
+        // 如果沒有符合的活動，查詢一個不存在的 ID 以確保不返回任何結果
+        previousQuery = previousQuery.eq('activity_id', '00000000-0000-0000-0000-000000000000');
+      }
+      
+      queries.push(previousQuery.order('lesson_date', { ascending: false }).limit(5));
+    } else {
+      queries.push(Promise.resolve({ data: [], error: null }));
+    }
+    
+    // 正在學習的活動查詢（包含 ongoing 和成長樹相關的 lesson 類型活動）
+    // 修改：查詢所有 ongoing 類型 + 成長樹相關的 lesson 類型活動，不區分完成狀態
+    let ongoingQuery = supabase
+      .from('hanami_student_activities')
+      .select(`
+        id,
+        completion_status,
+        assigned_at,
+        time_spent,
+        teacher_notes,
+        student_feedback,
+        progress,
+        activity_id,
+        activity_type,
+        tree_id,
+        lesson_date,
+        timeslot,
+        hanami_teaching_activities!left (
+          id,
+          activity_name,
+          activity_description,
+          activity_type,
+          difficulty_level,
+          duration_minutes,
+          materials_needed,
+          instructions,
+          org_id
+        )
+      `)
+      .eq('student_id', studentId)
+      .or('activity_type.eq.ongoing,and(activity_type.eq.lesson,tree_id.not.is.null)'); // 查詢 ongoing 或 有 tree_id 的 lesson 類型
+    
+    // 根據 org_id 過濾活動
+    if (orgId && validActivityIds.length > 0) {
+      // 對於 ongoing 類型，可能沒有 activity_id，所以需要特殊處理
+      // 我們使用 or 條件：activity_id 在列表中，或者 activity_id 為 null（ongoing 類型，但這些可能不屬於任何機構）
+      // 為了更嚴格，我們只保留 activity_id 在列表中的記錄
+      ongoingQuery = ongoingQuery.in('activity_id', validActivityIds);
+    } else if (orgId && validActivityIds.length === 0) {
+      // 如果沒有符合的活動，查詢一個不存在的 ID 以確保不返回任何結果
+      ongoingQuery = ongoingQuery.eq('activity_id', '00000000-0000-0000-0000-000000000000');
+    }
+    
+    queries.push(ongoingQuery.order('assigned_at', { ascending: false }));
     
     // 為了向後兼容，保留一個空的查詢結果
     queries.push(Promise.resolve({ data: [], error: null }));

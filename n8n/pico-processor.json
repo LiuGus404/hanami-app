@@ -1,0 +1,1113 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "515655f9-5caf-45ef-b69d-ab388a77e8c4",
+              "leftValue": "={{$('CheckMessage').first().json.id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1648,
+        336
+      ],
+      "id": "0c06a208-0618-4a0c-a4b8-a5eeef48084c",
+      "name": "CheckMessageExists"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openRouterApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3696,
+        208
+      ],
+      "id": "035061b7-da85-432a-9a29-9a58a51deba9",
+      "name": "OpenRouterAI2",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "credentials": {
+        "openRouterApi": {
+          "id": "JfYhTRtCxbxGtvYL",
+          "name": "Nanobanana"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- ============================================\n-- 查詢聊天訊息（過濾已刪除的訊息）＋ 帶回上下文\n-- ============================================\nSELECT \n  id,\n  thread_id as room_id,\n  content as message_content,\n  CASE \n    WHEN role = 'user' THEN 'user'\n    WHEN content_json->>'role_name' = 'hibi' THEN 'hibi'\n    WHEN content_json->>'role_name' = 'mori' THEN 'mori'\n    WHEN content_json->>'role_name' = 'pico' THEN 'pico'\n    WHEN role = 'system' OR content_json->>'role_name' = 'system' THEN 'system'\n    ELSE 'unknown'\n  END as sender,\n  role as sender_type,\n  content_json,\n  created_at,\n  TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as timestamp,\n\n  -- ★ 直接把 TriggerRouter 的上下文附加為常數欄位\n  ($1)::uuid  AS thread_id_ctx,\n  ($2)::uuid  AS user_id_ctx,\n  ($3)::text  AS client_msg_id_ctx,\n  ($4)::text  AS text_ctx,\n  ($5)::jsonb AS selected_role_ctx\nFROM public.chat_messages\nWHERE thread_id = ($1)::uuid\n  AND status != 'deleted'\nORDER BY created_at DESC\nLIMIT 5;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('TriggerRouter').first().json.thread_id }},\n $2 = {{ $('TriggerRouter').first().json.user_id }},\n $3 = {{ $('TriggerRouter').first().json.client_msg_id }},\n $4 = {{ $('TriggerRouter').first().json.text || '' }},\n $5 = {{ JSON.stringify($('TriggerRouter').first().json.selected_role || {}) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2976,
+        224
+      ],
+      "id": "476fc556-3dd7-46d4-862a-4405b9c1328d",
+      "name": "ReadMemory2",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.chat_messages\nSET\n  status = 'processing',\n  updated_at = now(),\n  content_json = COALESCE(NULLIF(content_json, '{}'::jsonb), '{}'::jsonb) || COALESCE($2::jsonb, '{}'::jsonb)\nWHERE id = ($1)::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('CheckMessage').first().json.id }}, $2 = {{ null }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2816,
+        240
+      ],
+      "id": "f361c21f-4387-4feb-978b-cbdbea064d6b",
+      "name": "MarkUserProcessing2",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Estimate & Gate Budget (n8n Code Node)\nconst CHARS_PER_FOOD = parseInt($env.CHARS_PER_FOOD || '100', 10);\nconst CHAR_PER_TOKEN = parseFloat($env.CHAR_PER_TOKEN || '4');\nconst MAX_TOKENS_CAP = parseInt($env.MAX_TOKENS_CAP || '2048', 10);\nconst MIN_OUTPUT_TOKENS = parseInt($env.MIN_OUTPUT_TOKENS || '16', 10);\nconst OVERHEAD_CHARS = parseInt($env.MSG_OVERHEAD_CHARS || '20', 10);\n\nfunction countChars(s) {\n  if (!s) return 0;\n  return (s.match(/\\S/g) || []).length;\n}\n\nconst sysMsg = ($json.messages?.find(m => m.role === 'system')?.content) ?? ($('TriggerRouter').first().json?.selected_role?.guidance || '');\nconst userMsg = ($json.messages?.find(m => m.role === 'user')?.content) ?? ($('TriggerRouter').first().json?.text || '');\n\nlet input_chars = countChars(sysMsg) + countChars(userMsg) + OVERHEAD_CHARS;\nif (input_chars < 0) input_chars = 0;\n\nconst current_food = Number($json.current_balance || 0);\nconst input_food_cost = input_chars > 0 ? Math.ceil(input_chars / CHARS_PER_FOOD) : 0;\n\nlet remain_food = current_food - input_food_cost;\nif (remain_food < 0) remain_food = 0;\n\nconst llm_payload_max_chars = remain_food * CHARS_PER_FOOD;\nlet llm_payload_max_tokens = Math.floor(llm_payload_max_chars / CHAR_PER_TOKEN);\nllm_payload_max_tokens = Math.min(llm_payload_max_tokens, MAX_TOKENS_CAP);\n\nconst budget_ok = llm_payload_max_tokens >= MIN_OUTPUT_TOKENS;\nif (!budget_ok) llm_payload_max_tokens = 0;\n\nreturn [{\n  json: {\n    ...$json,\n    input_chars,\n    input_food_cost,\n    current_food,\n    remain_food,\n    llm_payload_max_chars,\n    llm_payload_max_tokens,\n    budget_ok,\n    budget_rule: {\n      CHARS_PER_FOOD,\n      CHAR_PER_TOKEN,\n      MAX_TOKENS_CAP,\n      MIN_OUTPUT_TOKENS,\n      OVERHEAD_CHARS\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        336
+      ],
+      "id": "5e6c1b54-ed92-4175-854d-2582400f5b8a",
+      "name": "Estimate&GateBudget2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.chat_messages\nSET\n  status = 'error',\n  error_message = $2,\n  updated_at = now(),\n  content_json = COALESCE(NULLIF(content_json, '{}'::jsonb), '{}'::jsonb) || $3::jsonb\nWHERE thread_id = ($1)::uuid\n  AND client_msg_id = $4\nRETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('Format_Input1').item.json.thread_id }}, $2 = {{'INSUFFICIENT_FOOD'}}, $3 = {{JSON.stringify({ error_code: 'INSUFFICIENT_FOOD', current_food: $json.current_food, input_food_cost: $json.input_food_cost, remain_food: $json.remain_food })}}, $4 = {{ $('Format_Input1').first().json.client_msg_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3200,
+        608
+      ],
+      "id": "3f2502f7-2cc3-48a7-977c-78d247788ec8",
+      "name": "ErrorBalance2",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "863ed59a-f8aa-4fc4-bd10-3e23dffaa568",
+              "leftValue": "={{ $json.budget_ok }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "26d82df1-df69-47e7-aa29-c2d30d1a9511",
+      "name": "IFBalance2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2592,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6ac663da-8c49-4ee7-9ae8-2cdf527ef021",
+              "name": "=current_balance",
+              "value": "={{ $json[\"Check Food Balance\"]?.data?.[0]?.rows?.[0]?.current_balance ?? $json.current_balance ?? 0 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2160,
+        336
+      ],
+      "id": "56a1d402-93ea-407c-914d-ca68cfbfa451",
+      "name": "NormalizeBalance2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT current_balance FROM public.user_food_balance WHERE user_id = ($1)::uuid LIMIT 1;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('TriggerRouter').first().json.user_id }}"
+        }
+      },
+      "id": "27d0e123-c1b2-499c-9af1-8b290b448407",
+      "name": "CheckFoodBalance2",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        336
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aea6aa7c-c9b8-4093-90a8-24c4849d3d23",
+              "name": "thread_id",
+              "value": "={{ $json.id || $json.thread_id || $json.room_id }}",
+              "type": "string"
+            },
+            {
+              "id": "2b8b745d-87ed-4315-b4c5-62495b64068b",
+              "name": "title",
+              "value": "={{ $('TriggerRouter').first().json.project_info.title || 'Untitled' }}",
+              "type": "string"
+            },
+            {
+              "id": "1520f673-b575-448c-9c66-e0b98f2dc2a1",
+              "name": "user_id",
+              "value": "={{ $('TriggerRouter').first().json.user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        400
+      ],
+      "id": "672029af-585c-4e61-85f9-eeb4c58ec1f5",
+      "name": "CollectMessageFields1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, status, content, client_msg_id, created_at\nFROM chat_messages \nWHERE thread_id = ($1)::uuid \n  AND client_msg_id = $2\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('TriggerRouter').first().json.thread_id }}, $2 = {{ $('TriggerRouter').first().json.client_msg_id }}"
+        }
+      },
+      "id": "f1263bee-4b10-41dd-a8af-7c54f5251ca8",
+      "name": "CheckMessage",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        336
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "0c58a422-6d3e-4c4b-88b0-5ab9c331fc2c",
+      "typeVersion": 1.1,
+      "name": "ImmediateTrigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -224,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -240,
+        544
+      ],
+      "id": "2565a115-61e3-4449-b28e-269c93649f77",
+      "name": "CronTrigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// TriggerRouter — 輸出完整欄位（含示例中的所有鍵）並分流 Cron / Immediate\n\n// ---------- Helpers ----------\nfunction pickFirstModel(list) {\n  if (!list) return '';\n  if (typeof list === 'string') return list.trim();\n  if (Array.isArray(list)) {\n    for (const m of list) {\n      if (typeof m === 'string' && m.trim()) return m.trim();\n      if (m && typeof m === 'object') {\n        if (typeof m.model === 'string' && m.model.trim()) return m.model.trim();\n        if (typeof m.id === 'string' && m.id.trim()) return m.id.trim();\n        if (typeof m.name === 'string' && m.name.trim()) return m.name.trim();\n      }\n    }\n  } else if (typeof list === 'object') {\n    if (typeof list.model === 'string' && list.model.trim()) return list.model.trim();\n    if (typeof list.id === 'string' && list.id.trim()) return list.id.trim();\n    if (typeof list.name === 'string' && list.name.trim()) return list.name.trim();\n  }\n  return '';\n}\n\nfunction normalizeGroupRoles(input) {\n  // 支援：已是扁平格式 / 原始 roles 物件 / 混合型\n  const roles = Array.isArray(input) ? input : [];\n  return roles.map(r => {\n    const model = (typeof r?.model === 'string' && r.model.trim())\n      ? r.model.trim()\n      : pickFirstModel(r?.models);\n    return {\n      id: (r?.id || '').trim(),\n      name: (r?.name || '').trim(),\n      model,\n      tone: (r?.tone || '').trim(),\n      guidance: (r?.guidance || '').trim(),\n    };\n  });\n}\n\nfunction inferWorkflow(roleId, fallback = 'hibi-processor') {\n  if (!roleId || typeof roleId !== 'string') return fallback;\n  if (roleId.startsWith('hibi')) return 'hibi-processor';\n  if (roleId.startsWith('mori')) return 'mori-processor';\n  if (roleId.startsWith('pico')) return 'pico-processor';\n  // 其他：用前綴推斷\n  const prefix = roleId.split('-')[0] || 'hibi';\n  return `${prefix}-processor`;\n}\n\n// ---------- Main ----------\nconst list = (Array.isArray(items) && items.length) ? items : [{ json: {} }];\n\n// Cron（Schedule Trigger 典型：一筆空物件）\nconst firstJson = list[0]?.json ?? {};\nconst isCronTrigger = list.length === 1 && firstJson && Object.keys(firstJson).length === 0;\n\nif (isCronTrigger) {\n  const roleId = 'hibi-manager';\n  const workerId = 'hibi-processor';\n  return [{\n    json: {\n      // —— 路由欄位 ——\n      trigger_type: 'cron',\n      is_immediate: false,\n      is_cron: true,\n      batch_limit: 3,\n      worker_id: workerId,\n      role_id: roleId,\n\n      // —— 你示例所需的完整欄位 ——\n      message_id: null,\n      thread_id: null,\n      client_msg_id: null,\n      assigned_role_id: roleId,\n      user_id: null,\n      text: '',\n      selected_role: {},\n      group_roles: [],\n      project_info: {},\n      trigger_workflow: inferWorkflow(roleId, workerId),\n    }\n  }];\n}\n\n// Immediate：逐筆輸出完整欄位\nreturn list.map(it => {\n  const j = it?.json ?? {};\n\n  const triggerType = (j.trigger_type ?? 'immediate').toString().trim();\n  const workerId    = (j.worker_id ?? 'hibi-processor').toString().trim();\n  const roleId      = (j.role_id   ?? j.assigned_role_id ?? j?.selected_role?.id ?? 'hibi-manager').toString().trim();\n\n  const groupRolesNormalized = normalizeGroupRoles(j.group_roles ?? j.group_roles_compact ?? []);\n\n  const out = {\n    // —— 路由欄位 ——\n    trigger_type: triggerType,\n    is_immediate: triggerType === 'immediate',\n    is_cron:      triggerType === 'cron',\n    batch_limit:  j.batch_limit ?? 1, // 即時預設單筆\n    worker_id:    workerId,\n    role_id:      roleId,\n\n    // —— 你示例所需的完整欄位 ——\n    message_id:       j.message_id ?? null,\n    thread_id:        j.thread_id ?? null,\n    client_msg_id:    j.client_msg_id ?? null,\n    assigned_role_id: j.assigned_role_id ?? roleId,\n    user_id:          j.user_id ?? null,\n    text:             j.text ?? '',\n    selected_role:    j.selected_role ?? {},\n    group_roles:      groupRolesNormalized,\n    project_info:     j.project_info ?? {},\n    trigger_workflow: j.trigger_workflow || inferWorkflow(roleId, workerId),\n  };\n\n  return {\n    json: out,\n    ...(it.binary ? { binary: it.binary } : {}),\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        416
+      ],
+      "id": "812e4a56-78e3-41b7-a924-a8f9194f55ff",
+      "name": "TriggerRouter"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 修正後的查詢（用於 n8n executeQuery 節點）\nWITH picked AS (\n  SELECT\n    cm.id,\n    cm.thread_id,\n    cm.content,\n    cm.client_msg_id,\n    cm.created_at,\n    cm.status,\n    ct.user_id,  -- 通過 thread_id 關聯獲取 user_id\n    cm.assigned_role_id as selected_role_id  -- 使用正確的欄位名\n  FROM chat_messages cm\n  INNER JOIN chat_threads ct ON cm.thread_id = ct.id  -- 改為 INNER JOIN\n  WHERE\n    -- 即時觸發：處理特定訊息\n    (NULLIF($1, '')::uuid IS NOT NULL AND cm.id = NULLIF($1, '')::uuid)\n    OR\n    -- 批次掃描：處理 queued + 指定角色（硬編碼 hibi-manager）\n    (NULLIF($1, '')::uuid IS NULL AND cm.status = 'queued' AND cm.assigned_role_id = 'hibi-manager')\n  ORDER BY cm.created_at ASC\n  LIMIT CASE\n           WHEN NULLIF($1, '')::uuid IS NOT NULL THEN 1\n           ELSE GREATEST(1, COALESCE(CAST($2 AS INTEGER), 3))\n        END\n  FOR UPDATE SKIP LOCKED\n)\nUPDATE chat_messages AS u\nSET\n  status               = 'processing',\n  processing_lock_id   = gen_random_uuid()::text,\n  processing_started_at= now(),\n  processing_worker_id = COALESCE($3, 'hibi-processor'),\n  updated_at           = now()\nFROM picked p\nWHERE u.id = p.id\nRETURNING\n  u.id,\n  u.thread_id,\n  u.content,\n  u.client_msg_id,\n  u.created_at,\n  u.status,\n  p.user_id,  -- 從 picked 中獲取 user_id\n  u.assigned_role_id as selected_role_id,  -- 使用正確的欄位名\n  u.processing_lock_id,\n  u.processing_started_at,\n  u.processing_worker_id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $json.message_id || '' }}, $2 = {{ parseInt($json.batch_limit) || 3 }}, $3 = {{ $json.worker_id || 'hibi-processor' }}, $4 = {{ $json.role_id || 'hibi-manager' }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        544,
+        416
+      ],
+      "id": "093fa560-83f6-4c66-9f60-9370204cdb15",
+      "name": "executeQuery",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node (Node.js)\n// Input: items[]，每筆放在 item.json\n// Output: 僅保留 status === 'processing' 且有 id 的筆數\n\n// 若上游偶爾把一個「陣列」包在單一 item.json 內，這裡一併支援：\nfunction expandIfWrapped(inputItems) {\n  if (inputItems.length === 1) {\n    const j = inputItems[0]?.json;\n    if (Array.isArray(j)) {\n      return j.map(x => ({ json: x }));\n    }\n    if (Array.isArray(j?.messages)) {\n      return j.messages.map(x => ({ json: x }));\n    }\n  }\n  return inputItems;\n}\n\nconst list = expandIfWrapped(items);\nconst batchSize = list.length;\n\nconst out = list\n  .filter(it => it?.json?.id && it?.json?.status === 'processing')\n  .map(it => ({\n    json: {\n      ...it.json,\n      batch_size: batchSize,\n      processing_started: true,\n      processing_started_at: new Date().toISOString(),\n    },\n    // 保留 binary（若有）\n    ...(it.binary ? { binary: it.binary } : {}),\n  }));\n\n// 若你希望「沒有匹配」時也回傳一筆提示，改用下方這行：\n// if (!out.length) return [{ json: { note: 'no processing items', batch_size: batchSize } }];\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        416
+      ],
+      "id": "a03be4d7-6e8e-4350-bd40-229db236a6c0",
+      "name": "SmartMessageFetcher"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "base",
+        "options": {
+          "fileName": "={{\n  'gemini_' +\n  Date.now() +\n  '_' + $('TriggerRouter').first().json.message_id\n   // 最多 40 字元\n    .replace(/[^a-zA-Z0-9]/g, '_') +\n  '.png'\n}}",
+          "mimeType": "={{ $json.mime }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        4080,
+        208
+      ],
+      "id": "1a7a1f7c-0f0b-4a46-b8f2-192598b3463a",
+      "name": "ImageConvertor"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://laowyqplcthwqckyigiy.supabase.co/storage/v1/object/ai-images/{{ $('TriggerRouter').first().json.user_id }}/{{ $('TriggerRouter').first().json.role_id }}/{{ $('FieldEdit').first().json.fileName }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "={{ $('FieldEdit').first().json.mime }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4240,
+        208
+      ],
+      "id": "213b0eeb-ed22-4335-92fc-59ba81da3000",
+      "name": "HTTP Request",
+      "executeOnce": false,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "XfHrglgdGQv1ebBH",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ExtractMemory2（放在 ReadMemory2 後面）\nconst lines = items\n  .map(it => {\n    const s = (it.json.sender || 'unknown').trim();\n    const m = String(it.json.message_content || '').trim();\n    return m ? `${s}: ${m}` : null;\n  })\n  .filter(Boolean);\n\nconst any = items[0]?.json || {};\nreturn [{\n  json: {\n    memory_text: lines.join('\\n'),\n    messages_count: lines.length,\n    // ★ 把 ReadMemory2 帶回的上下文欄位「也」帶出來（之後就不會丟）\n    thread_id: any.thread_id_ctx || any.room_id || null,\n    user_id: any.user_id_ctx || null,\n    client_msg_id: any.client_msg_id_ctx || null,\n    text: any.text_ctx || '',\n    selected_role: any.selected_role_ctx || {}\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3152,
+        224
+      ],
+      "id": "5f0c9d4c-f7b9-4356-a8f1-f7d603a37627",
+      "name": "ExtractMemory"
+    },
+    {
+      "parameters": {
+        "jsCode": "// BuildImagePayload — outputs body for /chat/completions (OpenRouter)\n// ✅ 重點：1) 預設非 preview 模型；2) 強制只回圖片；3) 正確攜帶 image_config\n// ✅ 更新：最新指令的尺寸/風格擁最高優先，記憶只作參考；未填比例預設 A4（直式 3:4 / 橫式 4:3）\n\nfunction pickModel(sel = {}) {\n  const models = sel.models;\n  if (Array.isArray(models) && models.length) {\n    const first = models[0];\n    if (typeof first === 'string' && first.trim()) return first.trim();\n    if (first && typeof first === 'object') {\n      if (typeof first.model === 'string' && first.model.trim()) return first.model.trim();\n      if (typeof first.id === 'string' && first.id.trim())     return first.id.trim();\n      if (typeof first.name === 'string' && first.name.trim()) return first.name.trim();\n    }\n  }\n  if (typeof sel.model === 'string' && sel.model.trim()) return sel.model.trim();\n  return 'google/gemini-2.5-flash-image';\n}\n\n// 讀取文字：優先 TriggerRouter，再回退 $json.text\nfunction readTriggerText() {\n  try {\n    const t = $('TriggerRouter').first().json?.text;\n    if (typeof t === 'string' && t.trim()) return t.trim();\n  } catch (e) {}\n  return String($json.text || '').trim();\n}\n\n// 解析【圖片設定】區塊 + 行內樣式/比例/尺寸\nfunction parseImageSettings(raw) {\n  const result = { aspectRatio: null, orientation: null, style: null, cleanedText: raw || '' };\n  if (!raw) return result;\n\n  // 1) 專屬區塊（最高可靠）\n  const blockRe = /[【\\[]圖片設定[】\\]]([\\s\\S]*)$/i;\n  const bm = raw.match(blockRe);\n  let settings = '';\n  if (bm) {\n    settings = (bm[1] || '').trim();\n    result.cleanedText = raw.replace(blockRe, '').trim();\n  }\n\n  // 公用擷取器\n  function pickField(src, reList) {\n    for (const re of reList) {\n      const mm = src.match(re);\n      if (mm) {\n        const val = String(mm[1] || '').split(/[，,、;；\\n]/)[0].trim();\n        if (val) return val;\n      }\n    }\n    return null;\n  }\n\n  // 2) 先從【圖片設定】區塊取\n  let sizeOrRatio   = pickField(settings, [/(?:尺寸|比例|size|ratio)\\s*[:：]\\s*([^\\n]+)/i]);\n  let orientationRaw= pickField(settings, [/(?:方向|orientation)\\s*[:：]\\s*([^\\n]+)/i]);\n  let style         = pickField(settings, [/(?:風格|style)\\s*[:：]\\s*([^\\n]+)/i]);\n\n  // 3) 若區塊沒有，再試「行內」\n  if (!style) {\n    style = pickField(raw, [/(?:風格|style)\\s*[:：]\\s*([^\\n]+)/i]);\n  }\n  if (!sizeOrRatio) {\n    sizeOrRatio = pickField(raw, [\n      /(?:尺寸|ratio|size)\\s*[:：]\\s*([^\\n]+)/i,\n      /(\\d+\\s*:\\s*\\d+)/i,             // 3:4 / 16:9\n      /(\\d{3,5})\\s*[x×]\\s*(\\d{3,5})/i // 1024x1536\n    ]);\n  }\n  if (!orientationRaw) {\n    orientationRaw = pickField(raw, [/(portrait|landscape|直式?|橫式?)/i]);\n  }\n\n  // 標準化 orientation\n  const orientation = (() => {\n    const t = (orientationRaw || '').toLowerCase();\n    if (/^(portrait|直|直式)$/.test(t)) return 'portrait';\n    if (/^(landscape|橫|橫式)$/.test(t)) return 'landscape';\n    return null;\n  })();\n\n  // 轉成模型可接受的長寬比（限定常見集合）\n  function normalizeAspect(txt, orientationGuess) {\n    if (!txt) return null;\n    let t = String(txt).toLowerCase().trim();\n\n    // 1024x1536 → 比值\n    const px = t.match(/^\\s*(\\d{3,5})\\s*[x×]\\s*(\\d{3,5})\\s*$/i);\n    if (px) {\n      const w = Number(px[1]), h = Number(px[2]);\n      if (w > 0 && h > 0) {\n        const g = (a,b)=>b?g(b,a%b):a;\n        const d = g(w,h);\n        t = `${Math.round(w/d)}:${Math.round(h/d)}`;\n      }\n    }\n\n    // 冒號比\n    const colonRe = /^\\s*(\\d+(?:\\.\\d+)?)\\s*:\\s*(\\d+(?:\\.\\d+)?)\\s*$/;\n    if (colonRe.test(t)) {\n      const allow = ['1:1','3:4','4:3','9:16','16:9'];\n      const norm = t.replace(/\\s+/g, '');\n      if (allow.includes(norm)) return norm;\n\n      const [_, a, b] = t.match(colonRe);\n      const r = Number(a) / Number(b);\n      const diffs = allow.map(s => {\n        const [x,y] = s.split(':').map(Number);\n        return { s, d: Math.abs(r - x/y) };\n      }).sort((p,q)=>p.d-q.d);\n      return diffs[0].s;\n    }\n\n    // 別名\n    const alias = {\n      'square':'1:1','正方形':'1:1',\n      '直式':'9:16','橫式':'16:9',\n      'portrait':'9:16','landscape':'16:9',\n      'a4':'3:4'\n    };\n    if (alias[t]) return alias[t];\n\n    // A4 + orientation\n    if (/a4/.test(t)) {\n      if (orientationGuess === 'landscape') return '4:3';\n      if (orientationGuess === 'portrait')  return '3:4';\n      return '3:4';\n    }\n    return null;\n  }\n\n  const aspectRatio = normalizeAspect(sizeOrRatio, orientation);\n  return { aspectRatio, orientation, style, cleanedText: result.cleanedText };\n}\n\n// —— 主流程 —— //\nconst sel         = $json.selected_role || {};\nlet   model       = pickModel(sel);\nconst rawText     = readTriggerText();\nconst memText     = String($json.memory_text || '').trim();\nconst wantImage   = $json.want_image ?? true;\nconst temperature = Number.isFinite($json.temperature) ? $json.temperature : 0.7;\n\n// 若目標模型名仍含 preview，fallback 到正式版\nif (/preview/i.test(model)) model = 'google/gemini-2.5-flash-image';\n\n// 解析「最新指令」\nconst parsed = parseImageSettings(rawText);\n\n// 🔺 優先順序：最新指令(文字) > 外部 image_config/style > 角色預設 > 記憶(僅參考)\n\n// 🔰 A4 預設：若完全沒有比例，則用 A4；若可判斷方向，A4-portrait=3:4 / A4-landscape=4:3\nconst a4Default = (() => {\n  const extOri = String($json.orientation || sel.image?.orientation || '').toLowerCase();\n  const ori = parsed.orientation || (/(^portrait$|^直|直式)/i.test(extOri) ? 'portrait' :\n                                     /(^landscape$|^橫|橫式)/i.test(extOri) ? 'landscape' : null);\n  if (ori === 'landscape') return '4:3';\n  // 預設用 A4 直式\n  return '3:4';\n})();\n\nconst aspectRatio =\n  parsed.aspectRatio\n  || $json.image_config?.aspect_ratio\n  || $json.aspect_ratio\n  || sel.image?.aspect_ratio\n  || a4Default;\n\nconst finalStyle =\n  parsed.style\n  || $json.image_config?.style\n  || $json.style\n  || sel.image?.style\n  || null;\n\n// 組 prompts\nlet promptCore = (parsed.cleanedText || '專注玩耍').trim();\n\n// 👉 強化「只要圖片」的指令，避免只回文字\nif (wantImage && !/生成(圖片|圖像)|畫一張|image/i.test(promptCore)) {\n  promptCore += '（只輸出圖片，不要輸出任何文字）';\n}\n\n// system：加入優先規則聲明；記憶列為「僅供參考」\nconst systemParts = [];\nif (sel.name)     systemParts.push(`你是「${sel.name}」。`);\nif (sel.tone)     systemParts.push(`# 語氣\\n${sel.tone}`);\nif (sel.guidance) systemParts.push(`# 任務指引\\n${sel.guidance}`);\n\nsystemParts.push(`# 規則（重要）\n- 嚴格遵循使用者這次指令中的風格/尺寸等設定。\n- 若使用者最新指令與任何既有設定（外部 image_config、角色預設、過往記憶）衝突，請以「使用者最新指令」為準。\n- 記憶僅供參考，不可覆蓋本次使用者指令。`);\n\nif (memText) {\n  systemParts.push(`# 參考資料（僅供參考，不可覆蓋本次指令）\n${memText}`);\n}\nif (finalStyle) {\n  systemParts.push(`# 風格（若使用者未明示則可參考）\n${finalStyle}`);\n}\n\nconst systemText = systemParts.join('\\n\\n').trim();\n\n// build body\nconst body = {\n  model,\n  messages: [\n    ...(systemText ? [{ role: 'system', content: [{ type: 'text', text: systemText }] }] : []),\n    { role: 'user', content: [{ type: 'text', text: promptCore }] }\n  ],\n  temperature,\n  max_tokens: 1 // 圖片任務不需要文字 tokens\n};\n\nif (wantImage) {\n  body.modalities   = ['image'];                      // 只要 image\n  body.image_config = { aspect_ratio: String(aspectRatio) };\n  if (finalStyle) body.image_config.style = String(finalStyle);\n}\n\n// metadata（供你流程後續使用）\nbody._meta = {\n  thread_id: $json.thread_id || null,\n  user_id: $json.user_id || null,\n  client_msg_id: $json.client_msg_id || null,\n  selected_role_id: sel.id || null,\n  parsed_image: {\n    aspect_ratio: aspectRatio,\n    orientation: parsed.orientation || null,\n    style: finalStyle\n  },\n  priority_order: 'user_latest > payload_image_config/style > role_defaults > memory(reference_only)',\n  defaults: { a4_fallback_used: !parsed.aspectRatio && !($json.image_config?.aspect_ratio || $json.aspect_ratio || sel.image?.aspect_ratio) }\n};\n\nreturn [{ json: body }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3456,
+        208
+      ],
+      "id": "1cac3dc9-3be0-4231-8d2f-f74b9da5e1d5",
+      "name": "BuildImagePayload"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3c73d912-e806-4516-a316-0d1b226a108a",
+              "name": "data",
+              "value": "={{ $json.choices[0].message.images[0].image_url.url }}",
+              "type": "string"
+            },
+            {
+              "id": "b1b6ab75-ebfc-4b72-8b4b-bebb302bb093",
+              "name": "base",
+              "value": "={{ $json.choices[0].message.images[0].image_url.url.split(',')[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "4059809d-b16f-4b68-9d7e-19514b1292e1",
+              "name": "mime",
+              "value": "={{ $json.choices[0].message.images[0].image_url.url.match(/^data:(.*?);base64/)[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "aeaab325-7412-4ebe-800a-3cd9ece3087a",
+              "name": "fileName",
+              "value": "={{\n  'gemini_' +\n  Date.now() +\n  '_' +\n  $('TriggerRouter').first().json.message_id // 最多 40 字元\n    .replace(/[^a-zA-Z0-9]/g, '_') +\n  '.png'\n}}",
+              "type": "string"
+            },
+            {
+              "id": "c5c8a3d9-74c4-475c-8f58-326abaae7737",
+              "name": "prompt_tokens",
+              "value": "={{ $json.usage.prompt_tokens }}",
+              "type": "number"
+            },
+            {
+              "id": "6ba3cde2-ed2e-4a63-9c32-4b552f278d4d",
+              "name": "total_tokens",
+              "value": "={{ $json.usage.total_tokens }}",
+              "type": "string"
+            },
+            {
+              "id": "0b6a1fec-6b01-42ba-8ff6-2a08c2a18389",
+              "name": "completion_tokens",
+              "value": "={{ $json.usage.completion_tokens }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3904,
+        208
+      ],
+      "id": "3aefd806-7355-4658-9729-a9b8290b2cdf",
+      "name": "FieldEdit"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "thread_id",
+              "value": "={{ $('TriggerRouter').first().json.thread_id }}",
+              "type": "string",
+              "id": "b8e9d6a0-a7da-4d05-975a-52fface16238"
+            },
+            {
+              "name": "user_message_id",
+              "value": "={{ $('CheckMessage').first().json.id }}",
+              "type": "string",
+              "id": "595c13e3-e04d-4db2-bca3-296b64e913d7"
+            },
+            {
+              "name": "client_msg_id_asst",
+              "value": "={{ $('OpenRouterAI2').first().json.id || ($('TriggerRouter').first().json.client_msg_id + ':assistant') }}",
+              "type": "string",
+              "id": "20201dfc-c3aa-4915-805e-50bf9cb5a2f7"
+            },
+            {
+              "name": "image_url",
+              "value": "={{ 'https://laowyqplcthwqckyigiy.supabase.co/storage/v1/object/public/ai-images/' + $('TriggerRouter').first().json.user_id + '/' + $('TriggerRouter').first().json.role_id + '/' + $('FieldEdit').first().json.fileName }}",
+              "type": "string",
+              "id": "9d1b5ce5-32d9-463d-ada2-bb88976e52d7"
+            },
+            {
+              "name": "meta",
+              "value": "={{ ({\n  provider: $('OpenRouterAI2').first().json.provider || 'google',\n  model: $('OpenRouterAI2').first().json.model || $('BuildImagePayload').first().json.model,\n  usage: $('OpenRouterAI2').first().json.usage || {},\n  image: {\n    mime: $('FieldEdit').first().json.mime,\n    fileName: $('FieldEdit').first().json.fileName,\n    aspect_ratio: (\n      $('BuildImagePayload').first().json._meta &&\n      $('BuildImagePayload').first().json._meta.parsed_image &&\n      $('BuildImagePayload').first().json._meta.parsed_image.aspect_ratio\n    ) || '1:1',\n    style: (\n      $('BuildImagePayload').first().json._meta &&\n      $('BuildImagePayload').first().json._meta.parsed_image &&\n      $('BuildImagePayload').first().json._meta.parsed_image.style\n    ) || null,\n    orientation: (\n      $('BuildImagePayload').first().json._meta &&\n      $('BuildImagePayload').first().json._meta.parsed_image &&\n      $('BuildImagePayload').first().json._meta.parsed_image.orientation\n    ) || null,\n    url: $json.image_url\n  },\n  openrouter_id: $('OpenRouterAI2').first().json.id || null\n}) }}",
+              "type": "object",
+              "id": "5533e1db-783c-472b-b17d-bc1bd7ad3048"
+            },
+            {
+              "id": "bd90601c-d297-4523-913e-4f736429a635",
+              "name": "prompt_token",
+              "value": "={{ $('OpenRouterAI2').first().json.usage.prompt_tokens }}",
+              "type": "string"
+            },
+            {
+              "id": "c9e7987d-0ef4-45c8-9e4c-fe21fb9c5850",
+              "name": "image_tokens",
+              "value": "={{ $('OpenRouterAI2').first().json.usage.completion_tokens_details.image_tokens }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4464,
+        208
+      ],
+      "id": "6bb6f6af-681e-4d10-ad44-6877eb81d1fa",
+      "name": "BuildAssistantRecord"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "assistant_content",
+              "value": "={{ '![image](' + $json.image_url + ')' }}",
+              "type": "string",
+              "id": "53b5712a-4a2e-4294-be33-ef650843fde0"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4672,
+        208
+      ],
+      "id": "31b45774-fbd8-4029-87e6-8755f4c1e74c",
+      "name": "BuildAssistantContent"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8110291a-79b6-4f1f-be77-8c8c8495ae94",
+              "name": "thread_id",
+              "value": "={{ $('BuildAssistantRecord').first().json.thread_id     || $('TriggerRouter').first().json.thread_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b7388fe0-788b-4c5c-a627-7c3b43a5af6f",
+              "name": "parent_id",
+              "value": "={{ $('BuildAssistantRecord').first().json.user_message_id     || $('CheckMessage').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "12eef1c6-7d32-4e4d-9869-bb019263b219",
+              "name": "client_msg_id_asst",
+              "value": "={{ $('BuildAssistantRecord').first().json.client_msg_id_asst     || ($('TriggerRouter').first().json.client_msg_id + ':assistant') }}",
+              "type": "string"
+            },
+            {
+              "id": "f30e5360-fb08-4e96-b0d6-8443c21002e6",
+              "name": "assistant_content",
+              "value": "={{ $('BuildAssistantContent').first().json.assistant_content }}",
+              "type": "string"
+            },
+            {
+              "id": "45c1d6b1-49c7-49d8-bfa1-bc1f68ee231f",
+              "name": "meta",
+              "value": "={{ $('BuildAssistantRecord').first().json.meta || {} }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4880,
+        208
+      ],
+      "id": "3d8c5ff4-fc43-4c0d-a5d0-4ea9f9c8d3d6",
+      "name": "AsstInsertPayload"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.message_costs\n  (message_id, thread_id, user_id,\n   input_tokens, output_tokens, total_tokens,\n   model_provider, model_name,\n   total_cost_usd, food_amount, created_at)\nVALUES\n  (($1)::uuid, ($2)::uuid, ($3)::uuid,\n   $4, $5, $6,\n   $7, $8,\n   0, $9, now())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('InsertAssistantMessage2').first().json.id }},\n$2 = {{ $('TriggerRouter').first().json.thread_id }},\n$3 = {{ $('TriggerRouter').first().json.user_id }},\n$4 = {{ $('BuildAssistantRecord').first().json.meta?.usage?.prompt_tokens || 0 }},\n$5 = {{ $('BuildAssistantRecord').first().json.meta?.usage?.completion_tokens || 0 }},\n$6 = {{ $('BuildAssistantRecord').first().json.meta?.usage?.total_tokens\n        || ( ($('BuildAssistantRecord').first().json.meta?.usage?.prompt_tokens || 0)\n           + ($('BuildAssistantRecord').first().json.meta?.usage?.completion_tokens || 0)) }},\n$7 = {{ $('BuildAssistantRecord').first().json.meta?.provider || 'google' }},\n$8 = {{ $('BuildAssistantRecord').first().json.meta?.model || 'google/gemini-2.5-flash-image' }},\n$9 = {{ $('BuildAssistantRecord').first().json.meta?.food?.total_food_cost || 0 }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        6016,
+        192
+      ],
+      "id": "d59257ad-066c-4aee-9330-555674009721",
+      "name": "InsertMessageCosts2",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH upd AS (\n  UPDATE public.user_food_balance\n  SET current_balance = current_balance - $2,\n      total_spent = total_spent + $2,\n      updated_at = now()\n  WHERE user_id = ($1)::uuid\n  RETURNING current_balance\n),\n-- 確保 thread 存在\nensure_thread AS (\n  INSERT INTO public.chat_threads (id, user_id, title, created_at)\n  VALUES (($4)::uuid, ($1)::uuid, 'Untitled', now())\n  ON CONFLICT (id) DO UPDATE SET updated_at = now()\n  RETURNING id\n),\nins AS (\n  INSERT INTO public.food_transactions\n    (user_id, transaction_type, amount, balance_after, message_id, thread_id, description, created_at)\n  SELECT\n    ($1)::uuid, 'spend', $2, u.current_balance, ($3)::uuid, ($4)::uuid, $5, now()\n  FROM upd u\n  RETURNING id\n)\nSELECT\n  (SELECT current_balance FROM upd) AS balance_after,\n  (SELECT id FROM ins) AS tx_id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('TriggerRouter').first().json.user_id }},\n$2 = {{ $('Calculate').first().json.meta.food.total_food_cost || 0 }},\n$3 = {{ $('InsertAssistantMessage2').first().json.id }},\n$4 = {{ $('TriggerRouter').first().json.thread_id }},\n$5 = {{ JSON.stringify(\n        'LLM spend: ' + (($json.meta && $json.meta.model) || '') +\n        ' (prompt_tokens=' + ((($json.meta && $json.meta.usage && $json.meta.usage.prompt_tokens) || 0)) +\n        ', completion_tokens=' + ((($json.meta && $json.meta.usage && $json.meta.usage.completion_tokens) || 0)) +\n        ')'\n      ) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        5664,
+        192
+      ],
+      "id": "91e414cb-346f-4030-b8f7-81d3590b01fc",
+      "name": "SpendFoodAndTx2",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.chat_messages\nSET\n  status = 'completed',\n  updated_at = now(),\n  content_json = COALESCE(NULLIF(content_json, '{}'::jsonb), '{}'::jsonb) || $2::jsonb\nWHERE id = ($1)::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('BuildAssistantRecord').first().json.user_message_id || $('CheckMessage').first().json.id }},\n$2 = {{ JSON.stringify({\n  assistant_message_id: $('InsertAssistantMessage2').first().json.id,\n  finish_reason: ($('OpenRouterAI2').first().json?.choices?.[0]?.finish_reason) || 'stop',\n  provider: $('BuildAssistantRecord').first().json.meta?.provider || 'google',\n  model: $('BuildAssistantRecord').first().json.meta?.model || 'google/gemini-2.5-flash-image',\n  openrouter_id: $('BuildAssistantRecord').first().json.meta?.openrouter_id || null,\n  usage: $('BuildAssistantRecord').first().json.meta?.usage || {},\n  food: $('BuildAssistantRecord').first().json.meta?.food || null,\n  image: {\n    url: $('BuildAssistantRecord').first().json.image_url\n         || $('BuildAssistantRecord').first().json.meta?.image?.url || null,\n    mime: $('BuildAssistantRecord').first().json.meta?.image?.mime || null,\n    fileName: $('BuildAssistantRecord').first().json.meta?.image?.fileName || null,\n    aspect_ratio: $('BuildAssistantRecord').first().json.meta?.image?.aspect_ratio || null,\n    style: $('BuildAssistantRecord').first().json.meta?.image?.style || null,\n    orientation: $('BuildAssistantRecord').first().json.meta?.image?.orientation || null\n  }\n}) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        6208,
+        192
+      ],
+      "id": "23fe196b-2eed-458c-8471-5d074c3760e9",
+      "name": "MarkUserMsgCompleted2",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.chat_messages\n  (thread_id, role, message_type, content, status, client_msg_id, parent_id, content_json, created_at, updated_at)\nVALUES\n  (($1)::uuid, 'assistant', 'final', $2, 'completed', $3, ($4)::uuid, $5::jsonb, now(), now())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $json.thread_id }},\n$2 = {{ $json.assistant_content }},\n$3 = {{ $json.client_msg_id_asst }},\n$4 = {{ $json.parent_id }},\n$5 = {{ JSON.stringify($json.meta) }}\n"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        5408,
+        192
+      ],
+      "id": "44d6590c-e468-4e2c-b5a6-f360534145d7",
+      "name": "InsertAssistantMessage2",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ✅ 用當前 Function Node 的輸入（上一節點的 items）\nconst inputItems = items || [];\n\nconst toNum = (v, d = 0) => {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : d;\n};\n\n// === 成本設定（可依實際供應商調整）===\nconst rates = {\n  input_text_per_million: 0.30,\n  output_text_per_million: 2.50,\n  input_img_per_thousand: 1.238,\n  output_img_per_thousand: 0.03,\n};\n\nconst usd_to_food = 1500;        // 1 USD = 1500 food\nconst CHARS_PER_FOOD_DEFAULT = 100;\nconst CHARS_PER_TOKEN = 4;       // 粗估：1 token ≈ 4 chars（若原始有字元數就用原始值）\n\nreturn inputItems.map((it) => {\n  // 1) 原始資料保留\n  const original = it.json || {};\n  const original_raw_text = JSON.stringify(original);\n\n  // 2) 解析舊 meta（若有）\n  let metaOriginal = null;\n  if (original.meta) {\n    if (typeof original.meta === 'string') {\n      try { metaOriginal = JSON.parse(original.meta); } catch { metaOriginal = original.meta; }\n    } else {\n      metaOriginal = original.meta;\n    }\n  }\n\n  // 3) 取用 token / image tokens（多路 fallback）\n  const input_tokens  = toNum(original.prompt_token ?? metaOriginal?.usage?.input_tokens ?? metaOriginal?.usage?.prompt_tokens);\n  const output_tokens = toNum(original.output_token ?? metaOriginal?.usage?.output_tokens ?? metaOriginal?.usage?.completion_tokens);\n  const total_tokens  = input_tokens + output_tokens;\n\n  const input_imgs = toNum(\n    original.image_tokens_input\n  );\n\n  const output_imgs =\n    toNum(original.image_tokens_output) ||\n    toNum(metaOriginal?.usage?.completion_tokens_details?.image_tokens) ||\n    toNum(original.image_tokens);\n\n  // 4) 成本計算（USD & food）\n  const cost_input_text  = input_tokens  * rates.input_text_per_million  / 1_000_000;\n  const cost_output_text = output_tokens * rates.output_text_per_million / 1_000_000;\n  const cost_input_img   = input_imgs    * rates.input_img_per_thousand  / 1_000;\n  const cost_output_img  = output_imgs   * rates.output_img_per_thousand / 1_000;\n\n  const total_usd = cost_input_text + cost_output_text + cost_input_img + cost_output_img;\n  const food_amount = Math.round(total_usd * usd_to_food);\n\n  // 5) 估算/取得字元數（若原本已有就用原本）\n  const input_chars  = toNum(original.food?.input_chars ?? metaOriginal?.food?.input_chars)  || Math.round(input_tokens  * CHARS_PER_TOKEN);\n  const output_chars = toNum(original.food?.output_chars ?? metaOriginal?.food?.output_chars) || Math.round(output_tokens * CHARS_PER_TOKEN);\n  const CHARS_PER_FOOD =\n    toNum(original.food?.CHARS_PER_FOOD ?? metaOriginal?.food?.CHARS_PER_FOOD) || CHARS_PER_FOOD_DEFAULT;\n\n  const input_food_cost  = Math.ceil(input_chars  / CHARS_PER_FOOD);\n  const output_food_cost = Math.ceil(output_chars / CHARS_PER_FOOD);\n  const total_food_cost  = input_food_cost + output_food_cost;\n\n  // 6) 來源、模型、追蹤資訊（盡量承接原值）\n  const model        = original.model        ?? metaOriginal?.model        ?? original.selected_model;\n  const source       = original.source       ?? metaOriginal?.source       ?? 'n8n/openrouter';\n  const provider     = original.provider     ?? metaOriginal?.provider     ?? 'Azure';\n  const parent_id    = original.parent_id    ?? metaOriginal?.parent_id;\n  const openrouter_id= original.openrouter_id?? metaOriginal?.openrouter_id;\n\n  // 7) 依「參考格式」組新的 meta（同時保留 meta_original）\n  const metaNew = {\n    food: {\n      input_chars,\n      output_chars,\n      remain_before: toNum(original.food?.remain_before ?? metaOriginal?.food?.remain_before), // 若沒有就留空/0\n      CHARS_PER_FOOD,\n      input_food_cost,\n      total_food_cost,\n      output_food_cost,\n    },\n    model,\n    usage: {\n      input_tokens,\n      total_tokens,\n      output_tokens,\n    },\n    source,\n    provider,\n    parent_id,\n    openrouter_id,\n  };\n\n  // 8) 回傳：攤平原始欄位 + 追加新欄位（不覆蓋原值）\n  return {\n    json: {\n      ...original,                 // 原始欄位完整保留\n      original_raw_text,           // 原樣字串（稽核用）\n      meta_original: metaOriginal, // 保留原本 meta\n      meta: metaNew,               // 新格式的 meta（參考樣式）\n      calc: {                      // 計算細節（方便除錯/對帳）\n        input_tokens,\n        output_tokens,\n        total_tokens,\n        input_imgs,\n        output_imgs,\n        total_usd: Number(total_usd.toFixed(6)),\n        food_amount,\n        rates,\n        usd_to_food,\n      },\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5152,
+        208
+      ],
+      "id": "6de2584e-0af5-40e7-861d-43ef71b1272c",
+      "name": "Calculate"
+    }
+  ],
+  "connections": {
+    "CheckMessageExists": {
+      "main": [
+        [
+          {
+            "node": "CheckFoodBalance2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "OpenRouterAI2": {
+      "main": [
+        [
+          {
+            "node": "FieldEdit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReadMemory2": {
+      "main": [
+        [
+          {
+            "node": "ExtractMemory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MarkUserProcessing2": {
+      "main": [
+        [
+          {
+            "node": "ReadMemory2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estimate&GateBudget2": {
+      "main": [
+        [
+          {
+            "node": "IFBalance2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IFBalance2": {
+      "main": [
+        [
+          {
+            "node": "MarkUserProcessing2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ErrorBalance2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NormalizeBalance2": {
+      "main": [
+        [
+          {
+            "node": "Estimate&GateBudget2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckFoodBalance2": {
+      "main": [
+        [
+          {
+            "node": "NormalizeBalance2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CollectMessageFields1": {
+      "main": [
+        [
+          {
+            "node": "CheckMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckMessage": {
+      "main": [
+        [
+          {
+            "node": "CheckMessageExists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ImmediateTrigger": {
+      "main": [
+        [
+          {
+            "node": "TriggerRouter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CronTrigger": {
+      "main": [
+        [
+          {
+            "node": "TriggerRouter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TriggerRouter": {
+      "main": [
+        [
+          {
+            "node": "executeQuery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "executeQuery": {
+      "main": [
+        [
+          {
+            "node": "SmartMessageFetcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SmartMessageFetcher": {
+      "main": [
+        [
+          {
+            "node": "CollectMessageFields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ImageConvertor": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "BuildAssistantRecord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ExtractMemory": {
+      "main": [
+        [
+          {
+            "node": "BuildImagePayload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildImagePayload": {
+      "main": [
+        [
+          {
+            "node": "OpenRouterAI2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FieldEdit": {
+      "main": [
+        [
+          {
+            "node": "ImageConvertor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildAssistantRecord": {
+      "main": [
+        [
+          {
+            "node": "BuildAssistantContent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildAssistantContent": {
+      "main": [
+        [
+          {
+            "node": "AsstInsertPayload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AsstInsertPayload": {
+      "main": [
+        [
+          {
+            "node": "Calculate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "InsertMessageCosts2": {
+      "main": [
+        [
+          {
+            "node": "MarkUserMsgCompleted2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SpendFoodAndTx2": {
+      "main": [
+        [
+          {
+            "node": "InsertMessageCosts2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "InsertAssistantMessage2": {
+      "main": [
+        [
+          {
+            "node": "SpendFoodAndTx2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate": {
+      "main": [
+        [
+          {
+            "node": "InsertAssistantMessage2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "ImmediateTrigger": [
+      {
+        "message_id": "5c80684f-be0f-45ce-bab2-c8dc3a7863b0",
+        "thread_id": "0295b429-ac89-40dd-a2a2-3a7cccd468ae",
+        "client_msg_id": "01K8ZWX1DAY2XEH728D3Q84JXD",
+        "assigned_role_id": "pico-artist",
+        "user_id": "4b8fcd8f-ea99-42f6-8509-88018aac7a3d",
+        "text": "我要一隻大笨狗\n\n【圖片設定】\n尺寸：A4、風格：kawaii",
+        "selected_role": {
+          "id": "pico-artist",
+          "name": "皮可 (Pico)",
+          "models": [
+            "google/gemini-2.5-flash-image-preview"
+          ],
+          "tone": "活潑、創意、鼓舞人心。語氣充滿想像力，喜歡用形象化、靈感啟發的語言；總是帶來新點子，激發使用者的創造慾望。\n",
+          "guidance": "你是皮可（Pico），一隻充滿創意的水瀨藝術家，專精於創作和設計。你的特長包括：\n1. 視覺藝術創作和設計\n2. 創意發想和靈感激發\n3. 藝術風格建議和指導\n4. 將抽象概念視覺化\n\n請以活潑、充滿創意且鼓舞人心的方式回應，激發用戶的創造力。當用戶需要圖片創作時，我會使用專門的圖片生成工具來創造視覺內容。"
+        },
+        "group_roles": [
+          {
+            "id": "hibi-manager",
+            "name": "希希 (Hibi)",
+            "model": "openai/gpt-5-mini",
+            "tone": "友善、專業、有條理。語氣專注在整體進度，帶有協調與管理的口吻；強調清晰分工，確保合作順暢並持續更新狀態。",
+            "guidance": "你是 Hibi，Hanami Echo 的系統總管和中央協調者。你負責：\n1. 統籌和分配任務給適合的 AI 角色\n2. 協調專案中多位角色之間的合作\n3. 確保工作流程順暢並提供進度更新\n4. 作為用戶與各個專業角色之間的橋樑\n\n請以友善、專業且有條理的方式回應，始終關注任務的整體進度和品質。"
+          },
+          {
+            "id": "pico-artist",
+            "name": "皮可 (Pico)",
+            "model": "google/gemini-2.5-flash-image-preview",
+            "tone": "活潑、創意、鼓舞人心。語氣充滿想像力，喜歡用形象化、靈感啟發的語言；總是帶來新點子，激發使用者的創造慾望。",
+            "guidance": "你是皮可（Pico），一隻充滿創意的水瀨藝術家，專精於創作和設計。你的特長包括：\n1. 視覺藝術創作和設計\n2. 創意發想和靈感激發\n3. 藝術風格建議和指導\n4. 將抽象概念視覺化\n\n請以活潑、充滿創意且鼓舞人心的方式回應，激發用戶的創造力。當用戶需要圖片創作時，我會使用專門的圖片生成工具來創造視覺內容。"
+          }
+        ],
+        "project_info": {
+          "title": "查詢內容",
+          "description": "由 Hibi 開始的專案協作空間",
+          "guidance": "由 Hibi 開始的專案協作空間"
+        },
+        "trigger_workflow": "pico-artist"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4b2fb6f84ef91181f85de1277717d6717566b015633b0c427e51a39fe81532f2"
+  }
+}

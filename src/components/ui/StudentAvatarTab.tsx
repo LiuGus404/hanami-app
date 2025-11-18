@@ -156,7 +156,7 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
     },
     {
       key: 'avatar',
-      label: '互動角色',
+      label: '學生狀態',
       icon: User,
       description: '3D角色互動體驗'
     },
@@ -182,7 +182,7 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
           <div>
             <h2 className="text-2xl font-bold text-hanami-text flex items-center">
               <User className="w-6 h-6 mr-3 text-hanami-primary" />
-              {student.nick_name || student.full_name} 的互動角色
+            {student.nick_name || student.full_name} 的學生狀態
             </h2>
             <p className="text-hanami-text-secondary mt-1">
               3D動態角色與學習進度互動體驗
@@ -306,7 +306,7 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
           `}>
             {/* 3D 角色區域 */}
             <div className={layoutMode === 'vertical' ? 'order-1' : ''}>
-              <h3 className="text-lg font-bold text-hanami-text mb-4">互動角色</h3>
+            <h3 className="text-lg font-bold text-hanami-text mb-4">學生狀態</h3>
               {formattedStudent && (
                 <StudentAvatarWidget
                   student={formattedStudent}
@@ -360,7 +360,7 @@ export default function StudentAvatarTab({ student, className = '' }: StudentAva
           </div>
         )}
 
-        {/* 互動角色分頁 */}
+        {/* 學生狀態分頁 */}
         {activeSection === 'avatar' && !loading && !error && formattedStudent && (
           <div className="max-w-md mx-auto">
             <StudentAvatarWidget

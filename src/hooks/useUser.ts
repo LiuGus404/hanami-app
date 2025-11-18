@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-import { getUserSession, clearUserSession } from '@/lib/authUtils';
+import { getUserSession, clearUserSession, fallbackOrganization } from '@/lib/authUtils';
 
 export function useUser() {
   const [user, setUser] = useState<any>(null);
@@ -12,7 +12,9 @@ export function useUser() {
   const router = useRouter();
 
   useEffect(() => {
-    const fetch = async () => {
+    let isMounted = true;
+
+    const loadSession = async () => {
       try {
         console.log('useUser: 開始獲取會話...');
         
@@ -28,8 +30,10 @@ export function useUser() {
             email: session.user.email || '',
             role: 'parent' as const, // 默認角色，可以根據需要調整
             name: session.user.user_metadata?.full_name || session.user.email || '',
-            relatedIds: []
+            relatedIds: [],
+            organization: fallbackOrganization,
           };
+          if (!isMounted) return;
           setUser(userProfile);
           setRole(userProfile.role);
           console.log('useUser: Supabase 會話設置成功');
@@ -47,6 +51,7 @@ export function useUser() {
           console.log('useUser: 獲取到的自定義會話:', userSession);
           
           if (userSession) {
+            if (!isMounted) return;
             setUser(userSession);
             setRole(userSession.role);
             console.log('useUser: 自定義會話設置成功');
@@ -65,7 +70,19 @@ export function useUser() {
         console.log('useUser: 載入完成');
       }
     };
-    fetch();
+
+    const handleSessionChanged = () => {
+      loadSession();
+    };
+
+    loadSession();
+
+    window.addEventListener('hanami-user-session-changed', handleSessionChanged);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('hanami-user-session-changed', handleSessionChanged);
+    };
   }, []);
 
   const logout = async () => {

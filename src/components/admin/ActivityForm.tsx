@@ -3,6 +3,7 @@
 import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import Image from 'next/image';
 
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import HanamiInput from '@/components/ui/HanamiInput';
@@ -17,6 +18,8 @@ interface ActivityFormProps {
   onSubmit: (data: any) => void;
   onCancel: () => void;
   mode: 'create' | 'edit';
+  orgId?: string | null;
+  orgName?: string | null;
 }
 
 interface FormField {
@@ -122,7 +125,7 @@ function getFieldDefaultPlaceholder(field: any) {
   return '';
 }
 
-export default function ActivityForm({ activity, template, onSubmit, onCancel, mode }: ActivityFormProps) {
+export default function ActivityForm({ activity, template, onSubmit, onCancel, mode, orgId, orgName }: ActivityFormProps) {
   console.log('📝 ActivityForm 組件載入:', {
     mode: mode,
     hasActivity: !!activity,
@@ -227,8 +230,9 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   // 載入初始資料
   const loadInitialData = async () => {
     try {
-      // 載入範本 - 使用 API 路由
-      const response = await fetch('/api/activity-templates');
+      // 載入範本 - 使用 API 路由，根據 orgId 過濾
+      const url = orgId ? `/api/activity-templates?orgId=${orgId}` : '/api/activity-templates';
+      const response = await fetch(url);
       if (response.ok) {
         const templatesData = await response.json();
         setTemplates(templatesData);
@@ -245,21 +249,33 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         }
       }
 
-      // 載入分類
-      const { data: categoriesData } = await supabase
+      // 載入分類 - 根據 orgId 過濾
+      let categoriesQuery = supabase
         .from('hanami_resource_categories')
         .select('*')
         .eq('is_active', true);
+      
+      if (orgId) {
+        categoriesQuery = categoriesQuery.eq('org_id', orgId);
+      }
+      
+      const { data: categoriesData } = await categoriesQuery;
       
       if (categoriesData) {
         setCategories(categoriesData);
       }
 
-      // 載入標籤
-      const { data: tagsData } = await supabase
+      // 載入標籤 - 根據 orgId 過濾
+      let tagsQuery = supabase
         .from('hanami_resource_tags')
         .select('*')
         .eq('is_active', true);
+      
+      if (orgId) {
+        tagsQuery = tagsQuery.eq('org_id', orgId);
+      }
+      
+      const { data: tagsData } = await tagsQuery;
       
       if (tagsData) {
         setTags(tagsData);
@@ -275,57 +291,93 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   // 載入自訂選項
   const loadCustomOptions = async () => {
     try {
-      // 載入自訂活動類型
-      const { data: activityTypesData } = await supabase
+      // 載入自訂活動類型 - 根據 orgId 過濾
+      // 如果 orgId 存在，只顯示該機構的選項；如果不存在，不顯示任何自訂選項
+      let activityTypesQuery = supabase
         .from('hanami_custom_options')
         .select('*')
         .eq('option_type', 'activity_type')
         .eq('is_active', true)
         .order('sort_order');
-
-      if (activityTypesData) {
-        const defaultTypes = [
-          { id: 'game', name: '遊戲活動', is_default: true },
-          { id: 'training', name: '訓練活動', is_default: true },
-          { id: 'exercise', name: '練習活動', is_default: true },
-          { id: 'storybook', name: '繪本活動', is_default: true },
-          { id: 'performance', name: '表演活動', is_default: true },
-        ];
-        const customTypes = activityTypesData.map(item => ({
-          id: item.option_value,
-          name: item.option_name,
-          is_default: false,
-        }));
-        setCustomOptions(prev => ({
-          ...prev,
-          activity_types: [...defaultTypes, ...customTypes],
-        }));
+      
+      if (orgId) {
+        activityTypesQuery = activityTypesQuery.eq('org_id', orgId);
+      } else {
+        // 如果沒有 orgId，不載入任何自訂選項
+        activityTypesQuery = activityTypesQuery.eq('org_id', '00000000-0000-0000-0000-000000000000'); // 不存在的 ID，確保返回空結果
       }
+      
+      const { data: activityTypesData } = await activityTypesQuery;
 
-      // 載入自訂狀態
-      const { data: statusesData } = await supabase
+      // 總是包含預設選項
+      const defaultTypes = [
+        { id: 'game', name: '遊戲活動', is_default: true },
+        { id: 'training', name: '訓練活動', is_default: true },
+        { id: 'exercise', name: '練習活動', is_default: true },
+        { id: 'storybook', name: '繪本活動', is_default: true },
+        { id: 'performance', name: '表演活動', is_default: true },
+      ];
+      
+      // 只添加屬於當前機構的自訂選項
+      const customTypes = (activityTypesData || []).filter(item => {
+        // 確保只顯示屬於當前 orgId 的選項
+        if (orgId) {
+          return item.org_id === orgId;
+        }
+        return false; // 如果沒有 orgId，不顯示任何自訂選項
+      }).map(item => ({
+        id: item.option_value,
+        name: item.option_name,
+        is_default: false,
+      }));
+      
+      setCustomOptions(prev => ({
+        ...prev,
+        activity_types: [...defaultTypes, ...customTypes],
+      }));
+
+      // 載入自訂狀態 - 根據 orgId 過濾
+      // 如果 orgId 存在，只顯示該機構的選項；如果不存在，不顯示任何自訂選項
+      let statusesQuery = supabase
         .from('hanami_custom_options')
         .select('*')
         .eq('option_type', 'status')
         .eq('is_active', true)
         .order('sort_order');
-
-      if (statusesData) {
-        const defaultStatuses = [
-          { id: 'draft', name: '草稿', is_default: true },
-          { id: 'published', name: '已發布', is_default: true },
-          { id: 'archived', name: '已封存', is_default: true },
-        ];
-        const customStatuses = statusesData.map(item => ({
-          id: item.option_value,
-          name: item.option_name,
-          is_default: false,
-        }));
-        setCustomOptions(prev => ({
-          ...prev,
-          statuses: [...defaultStatuses, ...customStatuses],
-        }));
+      
+      if (orgId) {
+        statusesQuery = statusesQuery.eq('org_id', orgId);
+      } else {
+        // 如果沒有 orgId，不載入任何自訂選項
+        statusesQuery = statusesQuery.eq('org_id', '00000000-0000-0000-0000-000000000000'); // 不存在的 ID，確保返回空結果
       }
+      
+      const { data: statusesData } = await statusesQuery;
+
+      // 總是包含預設選項
+      const defaultStatuses = [
+        { id: 'draft', name: '草稿', is_default: true },
+        { id: 'published', name: '已發布', is_default: true },
+        { id: 'archived', name: '已封存', is_default: true },
+      ];
+      
+      // 只添加屬於當前機構的自訂選項
+      const customStatuses = (statusesData || []).filter(item => {
+        // 確保只顯示屬於當前 orgId 的選項
+        if (orgId) {
+          return item.org_id === orgId;
+        }
+        return false; // 如果沒有 orgId，不顯示任何自訂選項
+      }).map(item => ({
+        id: item.option_value,
+        name: item.option_name,
+        is_default: false,
+      }));
+      
+      setCustomOptions(prev => ({
+        ...prev,
+        statuses: [...defaultStatuses, ...customStatuses],
+      }));
     } catch (error) {
       console.error('載入自訂選項失敗:', error);
     }
@@ -337,14 +389,20 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
     try {
       // 儲存到資料庫
+      const insertData: any = {
+        category_name: newOptionName.trim(),
+        category_description: '',
+        sort_order: categories.length,
+        is_active: true,
+      };
+      
+      if (orgId) {
+        insertData.org_id = orgId;
+      }
+      
       const { error } = await supabase
         .from('hanami_resource_categories')
-        .insert({
-          category_name: newOptionName.trim(),
-          category_description: '',
-          sort_order: categories.length,
-          is_active: true,
-        });
+        .insert(insertData);
 
       if (error) throw error;
 
@@ -404,7 +462,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [orgId]);
 
   // 當有現有活動資料且包含 template_id 時，自動載入範本欄位
   useEffect(() => {
@@ -766,6 +824,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       delete cleanedData.categories;
       delete cleanedData.statuses;
 
+      // 確保包含 org_id
+      if (orgId) {
+        cleanedData.org_id = orgId;
+      }
+
       onSubmit(cleanedData);
     } catch (error) {
       console.error('提交失敗:', error);
@@ -843,14 +906,20 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     if (field === 'tag') {
       // 新增標籤
       try {
+        const insertData: any = {
+          tag_name: newOptionName.trim(),
+          tag_description: '',
+          tag_color: '#10B981', // 預設綠色
+          is_active: true,
+        };
+        
+        if (orgId) {
+          insertData.org_id = orgId;
+        }
+        
         const { error } = await supabase
           .from('hanami_resource_tags')
-          .insert({
-            tag_name: newOptionName.trim(),
-            tag_description: '',
-            tag_color: '#10B981', // 預設綠色
-            is_active: true,
-          });
+          .insert(insertData);
 
         if (error) throw error;
 
@@ -877,15 +946,21 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
       try {
         // 儲存到資料庫
+        const insertData: any = {
+          option_type: optionType,
+          option_name: newOptionName.trim(),
+          option_value: optionValue,
+          sort_order: customOptions[field === 'activity_type' ? 'activity_types' : 'statuses'].length,
+          is_active: true,
+        };
+        
+        if (orgId) {
+          insertData.org_id = orgId;
+        }
+        
         const { error } = await supabase
           .from('hanami_custom_options')
-          .insert({
-            option_type: optionType,
-            option_name: newOptionName.trim(),
-            option_value: optionValue,
-            sort_order: customOptions[field === 'activity_type' ? 'activity_types' : 'statuses'].length,
-            is_active: true,
-          });
+          .insert(insertData);
 
         if (error) throw error;
 
@@ -914,6 +989,16 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     if (!editingOption || !newOptionName.trim()) return;
 
     const field = showCustomManager.field;
+    
+    // 檢查是否為預設選項，如果是則不允許編輯
+    if (field === 'activity_type' || field === 'status') {
+      if (editingOption.is_default) {
+        toast.error('預設選項無法編輯');
+        setEditingOption(null);
+        setNewOptionName('');
+        return;
+      }
+    }
     
     if (field === 'tag') {
       // 編輯標籤
@@ -976,6 +1061,16 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   const handleDeleteCustomOption = async (optionId: string) => {
     const field = showCustomManager.field;
     
+    // 檢查是否為預設選項，如果是則不允許刪除
+    if (field === 'activity_type' || field === 'status') {
+      const options = field === 'activity_type' ? customOptions.activity_types : customOptions.statuses;
+      const option = options.find((opt: any) => opt.id === optionId);
+      if (option && option.is_default) {
+        toast.error('預設選項無法刪除');
+        return;
+      }
+    }
+    
     if (field === 'tag') {
       // 刪除標籤
       try {
@@ -1024,6 +1119,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   };
 
   const startEditOption = (option: any) => {
+    // 檢查是否為預設選項，如果是則不允許編輯
+    if (option.is_default && (showCustomManager.field === 'activity_type' || showCustomManager.field === 'status')) {
+      toast.error('預設選項無法編輯');
+      return;
+    }
     setEditingOption(option);
     setNewOptionName(option.name || option.category_name || option.tag_name);
   };
@@ -1202,14 +1302,14 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   const renderTemplateSelection = () => {
     return (
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-hanami-text mb-4">選擇範本</h3>
+        <h3 className="text-lg font-semibold text-[#4B4036] mb-4">選擇範本</h3>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <label className="block text-sm font-medium text-hanami-text mb-2">
+            <label className="block text-sm font-medium text-[#4B4036] mb-2">
               活動範本
             </label>
             <button
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent text-left bg-white"
+              className="w-full p-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] text-left bg-white/70 backdrop-blur-sm text-[#4B4036]"
               type="button"
               onClick={() => handlePopupOpen('template_id')}
             >
@@ -1755,37 +1855,32 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
                 {/* 處理 file_upload 欄位類型 */}
                 {fieldType === 'file_upload' && (
-                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm transition-all duration-300 opacity-60">
                     <div className="flex items-center gap-2 mb-4">
-                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                        <span className="text-[#4B4036] text-xs">📎</span>
+                      <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
+                        <span className="text-gray-500 text-xs">📎</span>
                       </div>
-                      <label className="text-base font-semibold text-[#4B4036]">
+                      <label className="text-base font-semibold text-gray-500">
                         {fieldName}{fieldRequired ? ' *' : ''}
                       </label>
                     </div>
                     <div className="relative">
                       <input
                         accept={field.allowed_types?.join(',') || '*'}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-not-allowed"
                         multiple={field.multiple_files || false}
                         type="file"
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []);
-                          handleInputChange(fieldName, files);
-                        }}
+                        disabled
+                        onChange={() => {}}
                       />
-                      <div className="p-6 border-2 border-dashed border-[#EADBC8] rounded-xl bg-white hover:border-[#FFD59A] transition-all duration-200 text-center">
-                        <div className="w-12 h-12 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center mx-auto mb-3">
-                          <span className="text-[#4B4036] text-lg">📎</span>
+                      <div className="p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-100 text-center cursor-not-allowed">
+                        <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <span className="text-gray-500 text-lg">📎</span>
                         </div>
-                        <p className="text-[#4B4036] font-medium mb-1">點擊上傳檔案</p>
-                        <p className="text-sm text-[#A68A64]">
-                          {field.allowed_types ? `支援格式: ${field.allowed_types.join(', ')}` : '支援所有格式'}
+                        <p className="text-gray-500 font-medium mb-1">暫未啟用</p>
+                        <p className="text-sm text-gray-400">
+                          檔案上傳功能暫時無法使用
                         </p>
-                        {field.multiple_files && (
-                          <p className="text-xs text-[#A68A64] mt-1">可選擇多個檔案</p>
-                        )}
                       </div>
                     </div>
                                          {fieldValue && fieldValue.length > 0 && (
@@ -2313,27 +2408,6 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     onChange={(value) => setNewOptionName(value)}
                   />
                   
-                  {/* 預設設定 */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      checked={editingOption?.is_default || false}
-                      className="rounded border-gray-300 text-hanami-primary focus:ring-hanami-primary"
-                      id="isDefault"
-                      type="checkbox"
-                      onChange={(e) => {
-                        if (editingOption) {
-                          setEditingOption({
-                            ...editingOption,
-                            is_default: e.target.checked,
-                          });
-                        }
-                      }}
-                    />
-                    <label className="text-sm text-hanami-text" htmlFor="isDefault">
-                      設為預設選項
-                    </label>
-                  </div>
-                  
                   <div className="flex gap-2">
                     <HanamiButton
                       className="bg-hanami-primary hover:bg-hanami-accent"
@@ -2376,33 +2450,39 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">預設</span>
                               )}
                             </div>
-                            <div className="flex gap-2">
-                              <HanamiButton
-                                className="text-xs px-3 py-1"
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => startEditOption(option)}
-                              >
-                                編輯
-                              </HanamiButton>
-                              <HanamiButton
-                                className="text-xs px-3 py-1"
-                                size="sm"
-                                variant="danger"
-                                onClick={() => {
-                                  if (confirm(`確定要刪除「${option.name || option.category_name || option.tag_name}」嗎？`)) {
-                                    if (showCustomManager.field === 'category') {
-                                      handleDeleteCategory(option.id);
-                                    } else if (showCustomManager.field === 'tag') {
-                                      handleDeleteCustomOption(option.id);
-                                    } else {
-                                      handleDeleteCustomOption(option.id);
-                                    }
-                                  }
-                                }}
-                              >
-                                刪除
-                              </HanamiButton>
+                            <div className="flex gap-2 items-center">
+                              {option.is_default ? (
+                                <span className="text-xs text-gray-500">系統預設，無法編輯</span>
+                              ) : (
+                                <>
+                                  <HanamiButton
+                                    className="text-xs px-3 py-1"
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => startEditOption(option)}
+                                  >
+                                    編輯
+                                  </HanamiButton>
+                                  <HanamiButton
+                                    className="text-xs px-3 py-1"
+                                    size="sm"
+                                    variant="danger"
+                                    onClick={() => {
+                                      if (confirm(`確定要刪除「${option.name || option.category_name || option.tag_name}」嗎？`)) {
+                                        if (showCustomManager.field === 'category') {
+                                          handleDeleteCategory(option.id);
+                                        } else if (showCustomManager.field === 'tag') {
+                                          handleDeleteCustomOption(option.id);
+                                        } else {
+                                          handleDeleteCustomOption(option.id);
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    刪除
+                                  </HanamiButton>
+                                </>
+                              )}
                             </div>
                           </div>
                   ))}
@@ -2423,39 +2503,72 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       )}
 
       {/* 主表單彈出視窗 */}
-      <div className="fixed inset-0 bg-transparent flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-xl w-full max-w-lg md:max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
-          <div className="p-4 md:p-6 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl md:text-2xl font-bold text-hanami-text">
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] rounded-2xl w-full max-w-lg md:max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl border-2 border-[#EADBC8] relative">
+          {/* 裝飾性圖案 */}
+          <div className="absolute top-4 right-4 opacity-20">
+            <Image src="/star-icon.png" alt="" width={60} height={60} className="animate-pulse" />
+          </div>
+          <div className="absolute top-20 right-8 opacity-10">
+            <Image src="/star-icon.png" alt="" width={40} height={40} className="animate-pulse" style={{ animationDelay: '0.5s' }} />
+          </div>
+          <div className="absolute bottom-20 left-8 opacity-15">
+            <Image src="/star-icon.png" alt="" width={50} height={50} className="animate-pulse" style={{ animationDelay: '1s' }} />
+          </div>
+          
+          <div className="p-4 md:p-6 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Image 
+                  src="/star-icon.png" 
+                  alt="教學活動" 
+                  width={40} 
+                  height={40} 
+                  className="drop-shadow-lg"
+                />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full animate-ping opacity-75"></div>
+              </div>
+              <h2 className="text-xl md:text-2xl font-bold text-[#4B4036]">
                 {mode === 'create' ? '新增教學活動' : '編輯教學活動'}
               </h2>
-              <HanamiButton
-                className="bg-gradient-to-r from-green-500 to-green-600"
-                variant="cute"
-                onClick={fillTestData}
-              >
-                <DocumentDuplicateIcon className="h-5 w-5 mr-2" />
-                插入測試資料
-              </HanamiButton>
             </div>
           </div>
 
-          <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+          <div className="p-4 md:p-6 space-y-4 md:space-y-6 bg-gradient-to-b from-transparent to-[#FFF9F2]/30 relative z-10">
+            {/* 機構資訊 */}
+            {(orgId || orgName) && (
+              <div className="bg-[#F8F5EC] border border-[#EADBC8] rounded-xl p-4 mb-4 shadow-sm">
+                <div className="flex flex-col gap-2">
+                  {orgName && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-[#4B4036]">機構名稱：</span>
+                      <span className="text-sm text-[#2B3A3B]">{orgName}</span>
+                    </div>
+                  )}
+                  {orgId && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-[#4B4036]">機構 ID：</span>
+                      <span className="text-sm text-[#2B3A3B] font-mono">{orgId}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* 範本選擇 */}
             {renderTemplateSelection()}
 
             {/* 基本欄位 */}
             <div>
-              <h3 className="text-lg font-semibold text-hanami-text mb-4">基本資訊</h3>
+              <h3 className="text-lg font-semibold text-[#4B4036] mb-4">基本資訊</h3>
               {renderBasicFields()}
             </div>
 
             {/* 活動描述 */}
             <div>
-              <h3 className="text-lg font-semibold text-hanami-text mb-4">活動描述</h3>
+              <h3 className="text-lg font-semibold text-[#4B4036] mb-4">活動描述</h3>
               <textarea
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
+                className="w-full p-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white/70 backdrop-blur-sm text-[#4B4036]"
                 placeholder="請描述活動內容、目標和流程..."
                 rows={4}
                 value={formData.activity_description || ''}
@@ -2474,9 +2587,9 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
             {/* 注意事項 */}
             <div>
-              <h3 className="text-lg font-semibold text-hanami-text mb-4">注意事項</h3>
+              <h3 className="text-lg font-semibold text-[#4B4036] mb-4">注意事項</h3>
               <textarea
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
+                className="w-full p-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white/70 backdrop-blur-sm text-[#4B4036]"
                 placeholder="請輸入活動注意事項、安全提醒等..."
                 rows={3}
                 value={formData.instructions || ''}
@@ -2485,22 +2598,21 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
             </div>
           </div>
 
-          <div className="p-4 md:p-6 border-t border-gray-200 flex flex-col md:flex-row justify-end gap-3">
-            <HanamiButton
-              className="w-full md:w-auto"
+          <div className="p-4 md:p-6 border-t border-[#EADBC8] bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] flex flex-col md:flex-row justify-end gap-3 relative z-10">
+            <button
+              className="px-6 py-3 bg-white/70 backdrop-blur-sm border border-[#EADBC8] text-[#4B4036] rounded-xl font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
               disabled={loading}
-              variant="secondary"
               onClick={onCancel}
             >
               取消
-            </HanamiButton>
-            <HanamiButton
-              className="bg-hanami-primary hover:bg-hanami-accent w-full md:w-auto"
+            </button>
+            <button
+              className="px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
               disabled={loading}
               onClick={handleSubmit}
             >
               {loading ? '處理中...' : (mode === 'create' ? '新增活動' : '更新活動')}
-            </HanamiButton>
+            </button>
           </div>
         </div>
       </div>

@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getUserSession, setUserSession, clearUserSession, UserProfile } from '@/lib/authUtils';
+import { getUserSession, setUserSession, clearUserSession, UserProfile, fallbackOrganization } from '@/lib/authUtils';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 
 export default function TestAutoRedirectPage() {
   const router = useRouter();
-  const [currentSession, setCurrentSession] = useState<any>(null);
+  const [currentSession, setCurrentSession] = useState<UserProfile | null>(null);
   const [testResults, setTestResults] = useState<string[]>([]);
 
   useEffect(() => {
@@ -63,7 +63,8 @@ export default function TestAutoRedirectPage() {
       email: 'admin@test.com',
       role: 'admin',
       name: '測試管理員',
-      relatedIds: []
+      relatedIds: [],
+      organization: fallbackOrganization,
     };
     
     setUserSession(mockAdminSession);
@@ -77,7 +78,8 @@ export default function TestAutoRedirectPage() {
       email: 'teacher@test.com',
       role: 'teacher',
       name: '測試教師',
-      relatedIds: []
+      relatedIds: [],
+      organization: fallbackOrganization,
     };
     
     setUserSession(mockTeacherSession);
@@ -91,7 +93,8 @@ export default function TestAutoRedirectPage() {
       email: 'parent@test.com',
       role: 'parent',
       name: '測試家長',
-      relatedIds: []
+      relatedIds: [],
+      organization: fallbackOrganization,
     };
     
     setUserSession(mockParentSession);
@@ -121,7 +124,7 @@ export default function TestAutoRedirectPage() {
               <p><strong>角色:</strong> {currentSession.role}</p>
               <p><strong>Email:</strong> {currentSession.email}</p>
               <p><strong>姓名:</strong> {currentSession.name}</p>
-              <p><strong>會話時間:</strong> {new Date(currentSession.timestamp).toLocaleString()}</p>
+              <p><strong>所屬機構:</strong> {currentSession.organization?.name}</p>
             </div>
           ) : (
             <div className="bg-[#FFE0E0] p-4 rounded-xl">

@@ -28,13 +28,31 @@ interface AddGrowthTreeModalProps {
   teachersOptions: { value: string; label: string }[];
   courseTypesOptions: { value: string; label: string }[];
   editingTree?: any;
+  organizationName?: string | null;
+  organizationId?: string | null;
 }
 
 export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const [treeName, setTreeName] = useState(props.editingTree?.tree_name || '');
   const [treeDescription, setTreeDescription] = useState(props.editingTree?.tree_description || '');
   const [treeColor, setTreeColor] = useState(props.editingTree?.tree_color || '#FFD59A');
-  const [treeIcon, setSparklesIcon] = useState(props.editingTree?.tree_icon || '🌳');
+  
+  // 新增和編輯模式都使用 /tree ui.png
+  const getInitialIcon = () => {
+    if (props.editingTree) {
+      const icon = props.editingTree?.tree_icon;
+      // 如果圖案為空、null、undefined 或者是 🌳，使用 /tree ui.png
+      if (!icon || (typeof icon === 'string' && icon.trim() === '') || icon === '🌳') {
+        return '/tree ui.png';
+      }
+      return icon;
+    }
+    // 新增模式也使用 /tree ui.png
+    return '/tree ui.png';
+  };
+  const [treeIcon, setSparklesIcon] = useState(getInitialIcon());
+  
+  const isEditing = !!props.editingTree;
   const [treeLevel, setTreeLevel] = useState(props.editingTree?.tree_level || 1);
   const [courseType, setCourseType] = useState(props.editingTree?.course_type || '');
   const [reviewTeachers, setReviewTeachers] = useState<string[]>(props.editingTree?.review_teachers || []);
@@ -64,25 +82,33 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const [goals, setGoals] = useState<GoalInput[]>(() => {
     if (props.editingTree?.goals) {
       // 編輯模式：載入現有目標，確保進度內容正確
-      return props.editingTree.goals.map((goal: any) => ({
-        ...goal,
-        progress_max: Number(goal.progress_max) || 5,
-        required_abilities: Array.isArray(goal.required_abilities) ? goal.required_abilities : [],
-        related_activities: Array.isArray(goal.related_activities) ? goal.related_activities : [],
-        progress_contents: Array.isArray(goal.progress_contents) 
-          ? goal.progress_contents.filter((content: string) => content && content.trim() !== '')
-          : [],
-        // 新增評估模式相關欄位
-        assessment_mode: goal.assessment_mode || 'progress',
-        multi_select_levels: Array.isArray(goal.multi_select_levels) ? goal.multi_select_levels : [],
-        multi_select_descriptions: Array.isArray(goal.multi_select_descriptions) ? goal.multi_select_descriptions : [],
-      }));
+      return props.editingTree.goals.map((goal: any) => {
+        // 如果圖案是 ⭐ 或空，使用 /apple-icon.svg
+        const goalIcon = (!goal.goal_icon || goal.goal_icon === '⭐') 
+          ? '/apple-icon.svg' 
+          : goal.goal_icon;
+        
+        return {
+          ...goal,
+          goal_icon: goalIcon,
+          progress_max: Number(goal.progress_max) || 5,
+          required_abilities: Array.isArray(goal.required_abilities) ? goal.required_abilities : [],
+          related_activities: Array.isArray(goal.related_activities) ? goal.related_activities : [],
+          progress_contents: Array.isArray(goal.progress_contents) 
+            ? goal.progress_contents.filter((content: string) => content && content.trim() !== '')
+            : [],
+          // 新增評估模式相關欄位
+          assessment_mode: goal.assessment_mode || 'progress',
+          multi_select_levels: Array.isArray(goal.multi_select_levels) ? goal.multi_select_levels : [],
+          multi_select_descriptions: Array.isArray(goal.multi_select_descriptions) ? goal.multi_select_descriptions : [],
+        };
+      });
     }
     // 新增模式：使用預設值
     return [{
       goal_name: '',
       goal_description: '',
-      goal_icon: '⭐',
+      goal_icon: '/apple-icon.svg',
       progress_max: 5,
       required_abilities: [],
       related_activities: [],
@@ -194,7 +220,7 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
   const addGoal = () => setGoals(goals => [...goals, { 
     goal_name: '', 
     goal_description: '', 
-    goal_icon: '⭐', 
+      goal_icon: '/apple-icon.svg',
     progress_max: 5, 
     required_abilities: [], 
     related_activities: [], 
@@ -348,6 +374,26 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
         {/* 表單內容 - 可滾動 */}
         <div className="flex-1 overflow-y-auto">
           <form className="p-6 space-y-6" onSubmit={handleSubmit}>
+            {/* 機構信息 */}
+            {(props.organizationName || props.organizationId) && (
+              <div className="bg-[#FFF9F2] border border-[#EADBC8] rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    {props.organizationName && (
+                      <div className="text-sm font-medium text-[#2B3A3B] mb-1">
+                        機構名稱：{props.organizationName}
+                      </div>
+                    )}
+                    {props.organizationId && (
+                      <div className="text-xs text-[#87704e]">
+                        機構 ID：{props.organizationId}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 成長樹名稱 */}
             <div>
               <label className="block text-sm font-medium text-[#2B3A3B] mb-2">成長樹名稱</label>
@@ -410,22 +456,37 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
               <div>
                 <label className="block text-sm font-medium text-[#2B3A3B] mb-2">主題色彩</label>
                 <input
-                  className="w-full h-12 border border-[#EADBC8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A64B2A]"
+                  className="w-full h-12 border border-[#EADBC8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A64B2A] opacity-60 cursor-not-allowed"
                   type="color"
                   value={treeColor}
                   onChange={e => setTreeColor(e.target.value)}
+                  disabled={true}
+                  readOnly={true}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#2B3A3B] mb-2">圖案</label>
-                <input
-                  className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A] text-center text-2xl"
-                  maxLength={2}
-                  placeholder="🌳"
-                  type="text"
-                  value={treeIcon}
-                  onChange={e => setSparklesIcon(e.target.value)}
-                />
+                {treeIcon === '/tree ui.png' ? (
+                  <div className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white flex items-center justify-center opacity-60">
+                    <img 
+                      src="/tree ui.png" 
+                      alt="成長樹圖案" 
+                      className="h-8 w-8 object-contain"
+                    />
+                    <span className="ml-2 text-xs text-[#87704e]">/tree ui.png</span>
+                  </div>
+                ) : (
+                  <input
+                    className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A] text-center text-2xl opacity-60 cursor-not-allowed"
+                    maxLength={2}
+                    placeholder="🌳"
+                    type="text"
+                    value={treeIcon}
+                    onChange={e => setSparklesIcon(e.target.value)}
+                    disabled={true}
+                    readOnly={true}
+                  />
+                )}
               </div>
             </div>
 
@@ -460,14 +521,27 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#2B3A3B] mb-2">圖案</label>
-                        <input
-                          className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A] text-center text-2xl"
-                          maxLength={2}
-                          placeholder="⭐"
-                          type="text"
-                          value={goal.goal_icon}
-                          onChange={e => handleGoalChange(idx, 'goal_icon', e.target.value)}
-                        />
+                        {goal.goal_icon === '/apple-icon.svg' ? (
+                          <div className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white flex items-center justify-center opacity-60">
+                            <img 
+                              src="/apple-icon.svg" 
+                              alt="目標圖案" 
+                              className="h-8 w-8 object-contain"
+                            />
+                            <span className="ml-2 text-xs text-[#87704e]">/apple-icon.svg</span>
+                          </div>
+                        ) : (
+                          <input
+                            className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#A64B2A] text-center text-2xl opacity-60 cursor-not-allowed"
+                            maxLength={2}
+                            placeholder="⭐"
+                            type="text"
+                            value={goal.goal_icon}
+                            onChange={e => handleGoalChange(idx, 'goal_icon', e.target.value)}
+                            disabled={true}
+                            readOnly={true}
+                          />
+                        )}
                       </div>
                     </div>
 

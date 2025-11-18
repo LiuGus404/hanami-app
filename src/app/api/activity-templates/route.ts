@@ -3,12 +3,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 // 獲取所有範本
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const orgId = searchParams.get('orgId');
+    
+    let query = supabase
       .from('hanami_resource_templates')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*');
+    
+    // 如果提供了 orgId，根據 org_id 過濾
+    if (orgId) {
+      query = query.eq('org_id', orgId);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
 
@@ -118,6 +127,11 @@ export async function POST(request: NextRequest) {
       insertData.is_active = body.is_active !== undefined ? Boolean(body.is_active) : true;
       insertData.is_public = body.is_public !== undefined ? Boolean(body.is_public) : false;
       insertData.created_by = (body.created_by && typeof body.created_by === 'string' && body.created_by.trim().length > 0) ? body.created_by : null;
+      
+      // 如果提供了 org_id，設置它
+      if (body.org_id) {
+        insertData.org_id = body.org_id;
+      }
       
       // 移除不需要的欄位
       delete insertData.created_at;

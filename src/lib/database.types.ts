@@ -16,6 +16,7 @@ export type Database = {
           contact_number: string
           course_type: string | null
           created_at: string | null
+          org_id: string
           duration_months: number | null
           full_name: string
           gender: string | null
@@ -46,6 +47,7 @@ export type Database = {
           contact_number: string
           course_type?: string | null
           created_at?: string | null
+          org_id: string
           duration_months?: number | null
           full_name: string
           gender?: string | null
@@ -76,6 +78,7 @@ export type Database = {
           contact_number?: string
           course_type?: string | null
           created_at?: string | null
+          org_id?: string
           duration_months?: number | null
           full_name?: string
           gender?: string | null
@@ -102,6 +105,83 @@ export type Database = {
         }
         Relationships: []
       }
+      hanami_organizations: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          org_name: string
+          org_slug: string
+          settings: Json | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          org_name: string
+          org_slug: string
+          settings?: Json | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          org_name?: string
+          org_slug?: string
+          settings?: Json | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hanami_user_organizations: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean | null
+          org_id: string
+          role: string | null
+          updated_at: string
+          user_email: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean | null
+          org_id: string
+          role?: string | null
+          updated_at?: string
+          user_email: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean | null
+          org_id?: string
+          role?: string | null
+          updated_at?: string
+          user_email?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hanami_user_organizations_org_id_fkey'
+            columns: ['org_id']
+            isOneToOne: false
+            referencedRelation: 'hanami_organizations'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       hanami_student_lesson: {
         Row: {
           access_role: string | null
@@ -117,6 +197,7 @@ export type Database = {
           lesson_teacher: string | null
           next_target: string | null
           notes: string | null
+          org_id: string
           package_id: string | null
           progress_notes: string | null
           regular_timeslot: string | null
@@ -142,6 +223,7 @@ export type Database = {
           lesson_teacher?: string | null
           next_target?: string | null
           notes?: string | null
+          org_id: string
           package_id?: string | null
           progress_notes?: string | null
           regular_timeslot?: string | null
@@ -167,6 +249,7 @@ export type Database = {
           lesson_teacher?: string | null
           next_target?: string | null
           notes?: string | null
+          org_id?: string
           package_id?: string | null
           progress_notes?: string | null
           regular_timeslot?: string | null
@@ -379,6 +462,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          org_id: string | null
           teacher_address: string | null
           teacher_background: string | null
           teacher_bankid: string | null
@@ -397,6 +481,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          org_id?: string | null
           teacher_address?: string | null
           teacher_background?: string | null
           teacher_bankid?: string | null
@@ -415,6 +500,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          org_id?: string | null
           teacher_address?: string | null
           teacher_background?: string | null
           teacher_bankid?: string | null
@@ -436,26 +522,38 @@ export type Database = {
         Row: {
           created_at: string;
           id: string;
+          org_id: string;
           name: string | null;
+          description: string | null;
           status: boolean | null;
           trial_limit: number | null;
           price_per_lesson: number | null;
+          difficulty_level: string | null;
+          images: Json | null;
         };
         Insert: {
           created_at?: string;
           id?: string;
+          org_id: string;
           name?: string | null;
+          description?: string | null;
           status?: boolean | null;
           trial_limit?: number | null;
           price_per_lesson?: number | null;
+          difficulty_level?: string | null;
+          images?: Json | null;
         };
         Update: {
           created_at?: string;
           id?: string;
+          org_id?: string;
           name?: string | null;
+          description?: string | null;
           status?: boolean | null;
           trial_limit?: number | null;
           price_per_lesson?: number | null;
+          difficulty_level?: string | null;
+          images?: Json | null;
         };
         Relationships: [];
       }
@@ -719,6 +817,7 @@ export type Database = {
           id: string
           admin_email: string
           admin_name: string
+          org_id: string | null
           role: string
           created_at: string | null
           updated_at: string | null
@@ -727,6 +826,7 @@ export type Database = {
           id?: string
           admin_email: string
           admin_name: string
+          org_id?: string | null
           role: string
           created_at?: string | null
           updated_at?: string | null
@@ -735,6 +835,7 @@ export type Database = {
           id?: string
           admin_email?: string
           admin_name?: string
+          org_id?: string | null
           role?: string
           created_at?: string | null
           updated_at?: string | null

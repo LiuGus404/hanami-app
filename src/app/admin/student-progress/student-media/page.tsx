@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -11,6 +12,7 @@ import {
   Cog6ToothIcon,
   HomeIcon,
   AcademicCapIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline';
 import {
   TreePine,
@@ -22,7 +24,7 @@ import {
   Gamepad2
 } from 'lucide-react';
 import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 
 import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
@@ -30,6 +32,17 @@ import { PopupSelect } from '@/components/ui/PopupSelect';
 import { StudentMediaModal, PlanUpgradeModal, MediaQuotaSettingsModal } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { StudentMediaQuota, StudentMedia } from '@/types/progress';
+
+type NavigationOverrides = Partial<{
+  dashboard: string;
+  growthTrees: string;
+  learningPaths: string;
+  abilities: string;
+  activities: string;
+  assessments: string;
+  media: string;
+  studentManagement: string;
+}>;
 
 interface StudentWithMedia {
   id: string;
@@ -43,7 +56,19 @@ interface StudentWithMedia {
   };
 }
 
-export default function StudentMediaPage() {
+type StudentMediaPageProps = {
+  navigationOverrides?: NavigationOverrides;
+  forcedOrgId?: string | null;
+  forcedOrgName?: string | null;
+  disableOrgFallback?: boolean;
+};
+
+export default function StudentMediaPage({
+  navigationOverrides,
+  forcedOrgId = null,
+  forcedOrgName = null,
+  disableOrgFallback = false,
+}: StudentMediaPageProps = {}) {
   const [students, setStudents] = useState<StudentWithMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,6 +78,68 @@ export default function StudentMediaPage() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showQuotaSettingsModal, setShowQuotaSettingsModal] = useState(false);
   const [courseTypes, setCourseTypes] = useState<Array<{id: string, name: string}>>([]);
+
+  const navigationPaths = useMemo(
+    () => ({
+      dashboard: '/admin/student-progress',
+      growthTrees: '/admin/student-progress/growth-trees',
+      learningPaths: '/admin/student-progress/learning-paths',
+      abilities: '/admin/student-progress/abilities',
+      activities: '/admin/student-progress/activities',
+      assessments: '/admin/student-progress/ability-assessments',
+      media: '/admin/student-progress/student-media',
+      studentManagement: '/admin/students',
+      ...(navigationOverrides ?? {}),
+    }),
+    [navigationOverrides],
+  );
+
+  const UUID_REGEX =
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const PLACEHOLDER_ORG_IDS = new Set([
+    'default-org',
+    'unassigned-org-placeholder',
+  ]);
+  const DEFAULT_COURSE_TYPES = [
+    { id: 'default-1', name: '鋼琴' },
+    { id: 'default-2', name: '小提琴' },
+    { id: 'default-3', name: '大提琴' },
+    { id: 'default-4', name: '長笛' },
+    { id: 'default-5', name: '吉他' },
+    { id: 'default-6', name: '鼓組' },
+    { id: 'default-7', name: '聲樂' },
+    { id: 'default-8', name: '音樂專注力' },
+  ];
+
+  const normalizedForcedOrgId =
+    forcedOrgId &&
+    UUID_REGEX.test(forcedOrgId) &&
+    !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
+      ? forcedOrgId
+      : null;
+  const invalidForcedId = forcedOrgId !== null && !normalizedForcedOrgId;
+  const validOrgId = normalizedForcedOrgId;
+  const orgDataDisabled =
+    (disableOrgFallback && !validOrgId) || invalidForcedId;
+  const organizationNameLabel = forcedOrgName ?? null;
+
+  const applyOrgFilter = <T extends { eq: (column: string, value: any) => T }>(
+    query: T,
+    column = 'org_id',
+  ) => {
+    if (validOrgId) {
+      return query.eq(column, validOrgId);
+    }
+    return query;
+  };
+
+  const ensureOrgAvailable = () => {
+    if (orgDataDisabled) {
+      toast.error('請先創建屬於您的機構');
+      return false;
+    }
+    return true;
+  };
   
   // 防止重複載入的標記
   const [isLoading, setIsLoading] = useState(false);
@@ -69,44 +156,41 @@ export default function StudentMediaPage() {
   const [popupSelected, setPopupSelected] = useState<string | string[]>([]);
 
   useEffect(() => {
-    console.log('學生媒體頁面 useEffect 執行');
+    console.log('學生媒體頁面 useEffect 執行，orgDataDisabled:', orgDataDisabled, 'validOrgId:', validOrgId);
+    if (orgDataDisabled) {
+      setStudents([]);
+      setCourseTypes(DEFAULT_COURSE_TYPES);
+      setLoading(false);
+      setIsLoading(false);
+      return;
+    }
     loadStudents();
     loadCourseTypes();
-  }, []);
+  }, [orgDataDisabled, validOrgId]);
 
   const loadCourseTypes = async () => {
+    if (orgDataDisabled) {
+      setCourseTypes(DEFAULT_COURSE_TYPES);
+      return;
+    }
+
     try {
-      const response = await fetch('/api/course-types');
-      if (response.ok) {
-        const data = await response.json();
+      let courseTypeQuery = supabase
+        .from('Hanami_CourseTypes')
+        .select('id, name')
+        .eq('status', true)
+        .order('name');
+      courseTypeQuery = applyOrgFilter(courseTypeQuery);
+      const { data, error } = await courseTypeQuery;
+      if (error) throw error;
+      if (data && data.length > 0) {
         setCourseTypes(data);
       } else {
-        console.error('載入課程類型失敗');
-        // 如果載入失敗，使用備用選項
-        setCourseTypes([
-          { id: '1', name: '鋼琴' },
-          { id: '2', name: '小提琴' },
-          { id: '3', name: '大提琴' },
-          { id: '4', name: '長笛' },
-          { id: '5', name: '吉他' },
-          { id: '6', name: '鼓組' },
-          { id: '7', name: '聲樂' },
-          { id: '8', name: '音樂專注力' },
-        ]);
+        setCourseTypes(DEFAULT_COURSE_TYPES);
       }
     } catch (error) {
       console.error('載入課程類型失敗:', error);
-      // 如果載入失敗，使用備用選項
-      setCourseTypes([
-        { id: '1', name: '鋼琴' },
-        { id: '2', name: '小提琴' },
-        { id: '3', name: '大提琴' },
-        { id: '4', name: '長笛' },
-        { id: '5', name: '吉他' },
-        { id: '6', name: '鼓組' },
-        { id: '7', name: '聲樂' },
-        { id: '8', name: '音樂專注力' },
-      ]);
+      setCourseTypes(DEFAULT_COURSE_TYPES);
     }
   };
 
@@ -114,6 +198,13 @@ export default function StudentMediaPage() {
     // 防止重複執行
     if (isLoading) {
       console.log('loadStudents 已在執行中，跳過重複調用');
+      return;
+    }
+    if (orgDataDisabled) {
+      console.log('orgDataDisabled 為 true，略過載入學生資料');
+      setStudents([]);
+      setIsLoading(false);
+      setLoading(false);
       return;
     }
     
@@ -124,10 +215,12 @@ export default function StudentMediaPage() {
       console.log('開始載入學生資料...');
       
       // 先載入學生基本資料
-      const { data: studentsData, error: studentsError } = await supabase
+      let studentsQuery = supabase
         .from('Hanami_Students')
         .select('id, full_name, nick_name, course_type')
         .order('full_name');
+      studentsQuery = applyOrgFilter(studentsQuery);
+      const { data: studentsData, error: studentsError } = await studentsQuery;
 
       if (studentsError) {
         console.error('學生資料載入失敗:', studentsError);
@@ -143,11 +236,20 @@ export default function StudentMediaPage() {
         return;
       }
 
+      const studentIds = studentsData.map(s => s.id);
+
       // 分別載入配額資料
       console.log('開始載入配額資料...');
-      const { data: quotaData, error: quotaError } = await supabase
-        .from('hanami_student_media_quota')
-        .select('*');
+      let quotaData: any[] | null = null;
+      let quotaError = null;
+      if (studentIds.length > 0) {
+        const { data, error } = await supabase
+          .from('hanami_student_media_quota')
+          .select('*')
+          .in('student_id', studentIds);
+        quotaData = data || [];
+        quotaError = error;
+      }
 
       if (quotaError) {
         console.warn('載入配額資料失敗，使用預設配額:', quotaError);
@@ -160,7 +262,6 @@ export default function StudentMediaPage() {
       
       if (studentsData.length > 0) {
         console.log('開始載入媒體統計...');
-        const studentIds = studentsData.map(s => s.id);
         console.log('學生ID列表:', studentIds);
         
         try {
@@ -333,16 +434,19 @@ export default function StudentMediaPage() {
   };
 
   const handleStudentClick = (student: StudentWithMedia) => {
+    if (!ensureOrgAvailable()) return;
     setSelectedStudent(student);
     setShowMediaModal(true);
   };
 
   const handleUploadClick = (student: StudentWithMedia) => {
+    if (!ensureOrgAvailable()) return;
     setSelectedStudent(student);
     setShowUploadModal(true);
   };
 
   const handleUpgradeClick = (student: StudentWithMedia) => {
+    if (!ensureOrgAvailable()) return;
     setSelectedStudent(student);
     setShowUpgradeModal(true);
   };
@@ -391,6 +495,7 @@ export default function StudentMediaPage() {
   };
 
   const handlePopupOpen = (field: string) => {
+    if (!ensureOrgAvailable()) return;
     setShowPopup({ field, open: true });
   };
 
@@ -478,43 +583,67 @@ export default function StudentMediaPage() {
                 {
                   icon: BarChart3,
                   label: "進度管理面板",
-                  href: "/admin/student-progress",
+                  href: navigationPaths.dashboard,
                   variant: "secondary"
                 },
                 {
                   icon: TreePine,
                   label: "成長樹管理",
-                  href: "/admin/student-progress/growth-trees",
+                  href: navigationPaths.growthTrees,
                   variant: "secondary"
                 },
+              {
+                icon: BookOpenIcon,
+                label: "學習路線管理",
+                href: navigationPaths.learningPaths,
+                variant: "secondary"
+              },
                 {
                   icon: TrendingUp,
                   label: "發展能力圖卡",
-                  href: "/admin/student-progress/abilities",
+                  href: navigationPaths.abilities,
                   variant: "secondary"
                 },
                 {
                   icon: Gamepad2,
                   label: "教學活動管理",
-                  href: "/admin/student-progress/activities",
+                  href: navigationPaths.activities,
+                  variant: "secondary"
+                },
+                {
+                  icon: AcademicCapIcon,
+                  label: "能力評估管理",
+                  href: navigationPaths.assessments,
                   variant: "secondary"
                 },
                 {
                   icon: Video,
                   label: "學生媒體管理",
-                  href: "/admin/student-progress/student-media",
+                  href: navigationPaths.media,
                   variant: "primary"
                 },
                 {
                   icon: Users,
                   label: "返回學生管理",
-                  href: "/admin/students",
+                  href: navigationPaths.studentManagement,
                   variant: "accent"
                 }
               ]}
-              currentPage="/admin/student-progress/student-media"
+              currentPage={navigationPaths.media}
             />
           </div>
+
+          {orgDataDisabled && (
+            <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
+              <Image alt="機構提示" className="mb-4" height={64} src="/tree ui.png" width={64} />
+              <h2 className="text-lg font-semibold text-hanami-text">尚未設定機構資料</h2>
+              <p className="mt-2 text-sm text-hanami-text-secondary">
+                請先創建屬於您的機構
+                {organizationNameLabel ? `（${organizationNameLabel}）` : ''}
+                ，並建立學生媒體資料後再查看內容。
+              </p>
+            </div>
+          )}
 
           {/* 標題和操作按鈕 */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -525,14 +654,22 @@ export default function StudentMediaPage() {
             <div className="flex gap-3 items-center">
               <HanamiButton 
                 variant="secondary"
-                onClick={() => setShowQuotaSettingsModal(true)}
+                disabled={orgDataDisabled}
+                onClick={() => {
+                  if (!ensureOrgAvailable()) return;
+                  setShowQuotaSettingsModal(true);
+                }}
               >
                 <Cog6ToothIcon className="h-5 w-5 mr-2" />
                 配額設定
               </HanamiButton>
               <HanamiButton 
                 variant="primary" 
-                onClick={() => setShowUploadModal(true)}
+                disabled={orgDataDisabled}
+                onClick={() => {
+                  if (!ensureOrgAvailable()) return;
+                  setShowUploadModal(true);
+                }}
               >
                 <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
                 批量上傳
@@ -557,6 +694,7 @@ export default function StudentMediaPage() {
             <div className="flex gap-2">
               <HanamiButton
                 variant="secondary"
+                disabled={orgDataDisabled}
                 onClick={() => handlePopupOpen('course_types')}
                 className="flex items-center gap-2"
               >
@@ -571,6 +709,7 @@ export default function StudentMediaPage() {
               
               <HanamiButton
                 variant="secondary"
+                disabled={orgDataDisabled}
                 onClick={() => handlePopupOpen('plan_types')}
                 className="flex items-center gap-2"
               >
@@ -585,6 +724,7 @@ export default function StudentMediaPage() {
               
               <HanamiButton
                 variant="secondary"
+                disabled={orgDataDisabled}
                 onClick={() => handlePopupOpen('usage_levels')}
                 className="flex items-center gap-2"
               >
@@ -827,6 +967,18 @@ export default function StudentMediaPage() {
               );
             })}
           </div>
+
+          {filteredStudents.length === 0 && !orgDataDisabled && (
+            <div className="mx-auto my-12 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
+              <Image alt="媒體提示" className="mb-4" height={72} src="/tree ui.png" width={72} />
+              <h3 className="text-lg font-semibold text-hanami-text">目前沒有符合條件的學生媒體資料</h3>
+              <p className="mt-2 text-sm text-hanami-text-secondary">
+                {searchQuery || filters.course_types.length > 0 || filters.plan_types.length > 0 || filters.usage_levels.length > 0
+                  ? '請調整搜尋或篩選條件'
+                  : '點擊「批量上傳」開始為學生新增媒體資料'}
+              </p>
+            </div>
+          )}
 
           {/* 空狀態 */}
           {filteredStudents.length === 0 && (

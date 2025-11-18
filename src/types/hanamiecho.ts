@@ -18,6 +18,7 @@ export interface SaasUser {
   last_login?: string;
   created_at: string;
   updated_at: string;
+  user_role?: string;
   // HanamiEcho 擴展欄位
   user_type?: 'child' | 'adult';
   age_group?: string;

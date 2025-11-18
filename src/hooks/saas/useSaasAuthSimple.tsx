@@ -71,15 +71,43 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
           console.log('找到 Supabase 會話，從資料庫獲取用戶數據');
           
           // 從 saas_users 表獲取真實的用戶資料
-          const { data: userData, error: userError } = await supabase
+          let { data: userData, error: userError } = await supabase
             .from('saas_users')
             .select('*')
             .eq('id', session.user.id)
-            .single();
+            .maybeSingle();
 
-          if (userError) {
-            console.error('獲取用戶資料失敗:', userError);
+          if ((!userData || userError) && session.user.email) {
+            console.log('以 ID 查無用戶，改以 email 查詢 saas_users');
+            const { data: byEmailData, error: byEmailError } = await supabase
+              .from('saas_users')
+              .select('*')
+              .eq('email', session.user.email)
+              .maybeSingle();
+
+            if (byEmailData && !byEmailError) {
+              userData = byEmailData;
+              userError = null;
+            } else if (byEmailError) {
+              userError = byEmailError;
+            }
+          }
+
+          if (!userData || userError) {
+            if (userError) {
+              console.error('獲取用戶資料失敗:', userError);
+            } else {
+              console.log('saas_users 沒有資料，使用備用用戶');
+            }
             // 如果資料庫中沒有用戶資料，使用 session 中的基本資料
+            const roleFromMetadata =
+              (session.user.user_metadata as any)?.user_role ||
+              (session.user.user_metadata as any)?.role ||
+              (session.user.app_metadata as any)?.user_role ||
+              (session.user.app_metadata as any)?.role ||
+              'member';
+            const normalizedRole = roleFromMetadata?.toString()?.trim()?.toLowerCase() || 'member';
+
             const fallbackUserData: SaasUser = {
               id: session.user.id,
               email: session.user.email || '',
@@ -96,7 +124,8 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
               verification_method: 'email',
               last_login: new Date().toISOString(),
               created_at: session.user.created_at,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              user_role: normalizedRole as any
             };
             console.log('使用備用用戶數據:', fallbackUserData);
             setUser(fallbackUserData);
@@ -159,6 +188,14 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
             console.log('開始從資料庫獲取用戶資料，用戶ID:', session.user.id);
             
             // 先設置一個基本的用戶對象，避免載入狀態卡住
+            const roleFromMetadata =
+              (session.user.user_metadata as any)?.user_role ||
+              (session.user.user_metadata as any)?.role ||
+              (session.user.app_metadata as any)?.user_role ||
+              (session.user.app_metadata as any)?.role ||
+              'member';
+            const normalizedRole = roleFromMetadata?.toString()?.trim()?.toLowerCase() || 'member';
+
             const basicUser: SaasUser = {
               id: session.user.id,
               email: session.user.email || '',
@@ -175,7 +212,8 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
               verification_method: 'email',
               last_login: new Date().toISOString(),
               created_at: session.user.created_at,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              user_role: normalizedRole as any
             };
             
             console.log('先設置基本用戶數據:', basicUser);
@@ -189,14 +227,34 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
             
             // 然後嘗試從資料庫獲取完整用戶資料
             try {
-              const { data: userData, error: userError } = await supabase
+              let { data: userData, error: userError } = await supabase
                 .from('saas_users')
                 .select('*')
                 .eq('id', session.user.id)
-                .single();
+                .maybeSingle();
 
-              if (userError) {
-                console.warn('認證事件載入用戶資料失敗，使用基本資料:', userError);
+              if ((!userData || userError) && session.user.email) {
+                console.log('認證事件以 ID 查無資料，改用 email 查詢 saas_users');
+                const { data: byEmailData, error: byEmailError } = await supabase
+                  .from('saas_users')
+                  .select('*')
+                  .eq('email', session.user.email)
+                  .maybeSingle();
+
+                if (byEmailData && !byEmailError) {
+                  userData = byEmailData;
+                  userError = null;
+                } else if (byEmailError) {
+                  userError = byEmailError;
+                }
+              }
+
+              if (!userData || userError) {
+                if (userError) {
+                  console.warn('認證事件載入用戶資料失敗，保留基本資料:', userError);
+                } else {
+                  console.log('認證事件未取得 saas_users 資料，保留基本資料');
+                }
                 // 已經設置了基本用戶數據，不需要再次設置
               } else {
                 console.log('認證事件設置真實用戶資料:', userData);
@@ -231,17 +289,48 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
   const loadUserData = async (userId: string) => {
     console.log('loadUserData 開始，userId:', userId);
     try {
-      const { data: userData, error } = await supabase
+      let { data: userData, error } = await supabase
         .from('saas_users')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
-      if (error) {
-        console.error('從 saas_users 表載入用戶數據失敗:', error);
-        // 如果用戶在 saas_users 表中不存在，創建一個基本的用戶對象
+      if ((!userData || error)) {
+        console.warn('以 ID 載入 saas_users 失敗，嘗試以 email 查詢');
         const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser?.email) {
+          const { data: byEmailData, error: byEmailError } = await supabase
+            .from('saas_users')
+            .select('*')
+            .eq('email', authUser.email)
+            .maybeSingle();
+
+          if (byEmailData && !byEmailError) {
+            userData = byEmailData;
+            error = null;
+          } else if (byEmailError) {
+            error = byEmailError;
+          }
+        }
+
+        if (!userData || error) {
+          if (error) {
+            console.error('從 saas_users 表載入用戶數據失敗:', error);
+          } else {
+            console.log('saas_users 查無資料，建立備用用戶');
+          }
+          // 如果用戶在 saas_users 表中不存在，創建一個基本的用戶對象
+        const { data: { user: latestAuthUser } } = await supabase.auth.getUser();
+        const authUser = latestAuthUser;
         if (authUser) {
+          const roleFromMetadata =
+            (authUser.user_metadata as any)?.user_role ||
+            (authUser.user_metadata as any)?.role ||
+            (authUser.app_metadata as any)?.user_role ||
+            (authUser.app_metadata as any)?.role ||
+            'member';
+          const normalizedRole = roleFromMetadata?.toString()?.trim()?.toLowerCase() || 'member';
+
           const fallbackUser: SaasUser = {
             id: authUser.id,
             email: authUser.email || '',
@@ -258,7 +347,8 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
             verification_method: 'email',
             last_login: new Date().toISOString(),
             created_at: authUser.created_at,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            user_role: normalizedRole as any,
           };
           console.log('使用備用用戶數據:', fallbackUser);
           setUser(fallbackUser);
@@ -266,6 +356,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         throw error;
+        }
       }
       
       console.log('設置用戶數據:', userData);
@@ -303,6 +394,14 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          const roleFromMetadata =
+            (session.user.user_metadata as any)?.user_role ||
+            (session.user.user_metadata as any)?.role ||
+            (session.user.app_metadata as any)?.user_role ||
+            (session.user.app_metadata as any)?.role ||
+            'member';
+          const normalizedRole = roleFromMetadata?.toString()?.trim()?.toLowerCase() || 'member';
+
           const immediateUser: SaasUser = {
             id: session.user.id,
             email: session.user.email || '',
@@ -319,7 +418,8 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
             verification_method: 'email',
             last_login: new Date().toISOString(),
             created_at: session.user.created_at,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            user_role: normalizedRole as any,
           };
           try {
             localStorage.setItem('saas_user_session', JSON.stringify({ user: immediateUser, timestamp: Date.now() }));

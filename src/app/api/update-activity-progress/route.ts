@@ -4,12 +4,13 @@ import { getServerSupabaseClient } from '@/lib/supabase';
 type UpdateProgressBody = {
   activityId: string;
   progress: number;
+  org_id?: string;
 };
 
 async function handleUpdate(request: NextRequest) {
   try {
     const supabase = getServerSupabaseClient();
-    const { activityId, progress } = (await request.json()) as UpdateProgressBody;
+    const { activityId, progress, org_id } = (await request.json()) as UpdateProgressBody;
 
     if (!activityId || typeof progress !== 'number') {
       return NextResponse.json(
@@ -25,18 +26,36 @@ async function handleUpdate(request: NextRequest) {
       );
     }
 
-    // 確保活動存在
-    const { data: existing, error: checkErr } = await supabase
+    // 確保活動存在，並獲取學生ID
+    const { data: existingData, error: checkErr } = await supabase
       .from('hanami_student_activities' as any)
-      .select('id')
+      .select('id, student_id')
       .eq('id', activityId)
       .single();
 
-    if (checkErr || !existing) {
+    if (checkErr || !existingData) {
       return NextResponse.json(
         { success: false, error: '指定的學生活動不存在' },
         { status: 404 }
       );
+    }
+
+    const existing = existingData as { id: string; student_id: string };
+
+    // 如果沒有提供 org_id，從學生記錄中獲取
+    let finalOrgId = org_id;
+    if (!finalOrgId && existing.student_id) {
+      const { data: studentDataRaw } = await supabase
+        .from('Hanami_Students')
+        .select('org_id')
+        .eq('id', existing.student_id)
+        .single();
+      
+      const studentData = studentDataRaw as { org_id: string } | null;
+      
+      if (studentData?.org_id) {
+        finalOrgId = studentData.org_id;
+      }
     }
 
     const shouldComplete = progress >= 100;
@@ -44,6 +63,11 @@ async function handleUpdate(request: NextRequest) {
       progress,
       updated_at: new Date().toISOString(),
     };
+
+    // 如果有 org_id，添加到更新數據中
+    if (finalOrgId) {
+      updateData.org_id = finalOrgId;
+    }
 
     if (shouldComplete) {
       updateData.completion_status = 'completed';

@@ -167,12 +167,14 @@ async function calculateRemainingLessonsFallback(
  */
 export async function calculateRemainingLessonsBatch(
   studentIds: string[],
-  today?: Date
+  today?: Date,
+  filters?: { organizationId?: string }
 ): Promise<Record<string, number>> {
   const supabase = getSupabaseClient();
   const now = today ? new Date(today) : getHongKongDate();
   const todayStr = now.toISOString().slice(0, 10);
   const results: Record<string, number> = {};
+  const organizationId = filters?.organizationId;
 
   console.log(`開始計算 ${studentIds.length} 個學生的剩餘堂數，今天日期: ${todayStr}`);
 
@@ -182,46 +184,48 @@ export async function calculateRemainingLessonsBatch(
   }
 
   try {
-    // 優先使用修復版 SQL 函數，確保包含剩餘堂數為 0 的學生
-    console.log('嘗試使用修復版 SQL 函數計算剩餘堂數');
-    const { data: remainingData, error: remainingError } = await (supabase as any)
-      .rpc('calculate_remaining_lessons_batch_fixed', {
-        student_ids: studentIds,
-        today_date: todayStr
+    // 使用 API 端點計算剩餘課程數（繞過 RLS）
+    // 如果沒有 organizationId，嘗試從環境變數或上下文獲取
+    if (!organizationId) {
+      console.warn('calculateRemainingLessonsBatch: 缺少 organizationId，將回退到直接查詢');
+      return await calculateRemainingLessonsBatchFallback(studentIds, today, organizationId);
+    }
+
+    console.log('嘗試使用 API 端點計算剩餘堂數');
+    
+    // 獲取用戶 email（如果可用）
+    // 注意：這裡可能需要從上下文獲取，暫時使用空字符串
+    const userEmail = ''; // TODO: 從上下文獲取用戶 email
+
+    const calculateResponse = await fetch('/api/students/calculate-remaining-lessons', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        studentIds,
+        todayDate: todayStr,
+        orgId: organizationId,
+        userEmail,
+      }),
+    });
+
+    if (!calculateResponse.ok) {
+      const errorData = await calculateResponse.json().catch(() => ({}));
+      console.error('API 計算剩餘課程數失敗，回退到原始方法:', errorData);
+      return await calculateRemainingLessonsBatchFallback(studentIds, today, organizationId);
+    }
+
+    const calculateData = await calculateResponse.json();
+    const remainingData = calculateData.data || [];
+
+    console.log('API 計算剩餘堂數結果:', remainingData);
+
+    // 將結果轉換為映射格式
+    if (remainingData && Array.isArray(remainingData)) {
+      remainingData.forEach((item: any) => {
+        results[item.student_id] = item.remaining_lessons || 0;
       });
-
-    if (remainingError) {
-      console.error('修復版 SQL 查詢失敗，嘗試使用原始函數:', remainingError);
-      
-      // 嘗試使用原始函數作為備用
-      const { data: originalData, error: originalError } = await (supabase as any)
-        .rpc('calculate_remaining_lessons_batch', {
-          student_ids: studentIds,
-          today_date: todayStr
-        });
-
-      if (originalError) {
-        console.error('原始 SQL 查詢也失敗，回退到原始計算方法:', originalError);
-        return await calculateRemainingLessonsBatchFallback(studentIds, today);
-      }
-
-      console.log('原始 SQL 查詢剩餘堂數結果:', originalData);
-
-      // 將結果轉換為映射格式
-      if (originalData && Array.isArray(originalData)) {
-        originalData.forEach((item: any) => {
-          results[item.student_id] = item.remaining_lessons || 0;
-        });
-      }
-    } else {
-      console.log('修復版 SQL 查詢剩餘堂數結果:', remainingData);
-
-      // 將結果轉換為映射格式
-      if (remainingData && Array.isArray(remainingData)) {
-        remainingData.forEach((item: any) => {
-          results[item.student_id] = item.remaining_lessons || 0;
-        });
-      }
     }
 
     console.log('剩餘堂數計算完成:', results);
@@ -229,14 +233,15 @@ export async function calculateRemainingLessonsBatch(
   } catch (error) {
     console.error('計算剩餘堂數時發生錯誤:', error);
     // 回退到原始方法
-    return await calculateRemainingLessonsBatchFallback(studentIds, today);
+    return await calculateRemainingLessonsBatchFallback(studentIds, today, organizationId);
   }
 }
 
 // 回退方法：原始的計算邏輯
 async function calculateRemainingLessonsBatchFallback(
   studentIds: string[],
-  today?: Date
+  today?: Date,
+  organizationId?: string
 ): Promise<Record<string, number>> {
   const supabase = getSupabaseClient();
   const now = today ? new Date(today) : getHongKongDate();
@@ -251,6 +256,10 @@ async function calculateRemainingLessonsBatchFallback(
     .select('id, student_id, lesson_date, actual_timeslot, lesson_duration')
     .gte('lesson_date', todayStr)
     .in('student_id', studentIds);
+
+  if (organizationId) {
+    query = query.eq('org_id', organizationId);
+  }
 
   const { data: lessonsData, error: lessonsError } = await query;
   if (lessonsError) {

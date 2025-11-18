@@ -52,15 +52,80 @@ export async function PUT(
   try {
     const body = await request.json();
     
+    // 先獲取現有的範本資料，以保留所有現有內容
+    const { data: existingTemplate, error: fetchError } = await supabase
+      .from('hanami_resource_templates')
+      .select('*')
+      .eq('id', params.id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!existingTemplate) {
+      return NextResponse.json(
+        { error: '範本不存在' },
+        { status: 404 },
+      );
+    }
+
+    // 準備更新資料，保留現有內容
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // 處理 template_name
+    if (body.template_name !== undefined) {
+      updateData.template_name = String(body.template_name);
+    } else if (body.name !== undefined) {
+      updateData.template_name = String(body.name);
+    }
+
+    // 處理 template_description
+    if (body.template_description !== undefined) {
+      updateData.template_description = String(body.template_description);
+    } else if (body.description !== undefined) {
+      updateData.template_description = String(body.description);
+    }
+
+    // 處理 template_type
+    if (body.template_type !== undefined) {
+      updateData.template_type = String(body.template_type);
+    } else if (body.type !== undefined || body.category !== undefined) {
+      updateData.template_type = String(body.type || body.category || 'custom');
+    }
+
+    // 處理 template_schema - 這是關鍵部分，要保留現有結構
+    if (body.template_schema) {
+      // 如果提供了完整的 template_schema，使用它
+      updateData.template_schema = body.template_schema;
+    } else if (body.fields) {
+      // 如果只提供了 fields，合併到現有的 template_schema 中
+      const existingSchema = existingTemplate.template_schema || {};
+      updateData.template_schema = {
+        ...existingSchema,
+        fields: Array.isArray(body.fields) ? body.fields : [],
+        metadata: {
+          ...(existingSchema.metadata || {}),
+          version: existingSchema.metadata?.version || "1.0",
+          last_updated: new Date().toISOString(),
+        },
+      };
+    }
+    // 如果沒有提供 template_schema 或 fields，保留現有的
+
+    // 處理 is_active
+    if (body.is_active !== undefined) {
+      updateData.is_active = Boolean(body.is_active);
+    }
+
+    // 處理 org_id（如果提供）
+    if (body.org_id !== undefined) {
+      updateData.org_id = body.org_id;
+    }
+
+    // 執行更新
     const { data, error } = await supabase
       .from('hanami_resource_templates')
-      .update({
-        template_name: body.name,
-        template_description: body.description,
-        template_schema: body.fields,
-        template_type: body.type || 'custom',
-        is_active: body.is_active !== undefined ? body.is_active : true,
-      })
+      .update(updateData)
       .eq('id', params.id)
       .select()
       .single();
@@ -71,7 +136,7 @@ export async function PUT(
   } catch (error) {
     console.error('更新範本失敗:', error);
     return NextResponse.json(
-      { error: '更新範本失敗' },
+      { error: '更新範本失敗', details: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }

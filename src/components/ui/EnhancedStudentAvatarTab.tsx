@@ -372,7 +372,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
     },
     {
       key: 'avatar',
-      label: '互動角色',
+      label: '學生狀態',
       icon: User,
       color: 'from-[#E8F5E8] to-[#E0F2E0]',
       iconColor: 'text-green-500'
@@ -438,7 +438,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
                 >
-                  {student.nick_name || student.full_name} 的互動角色
+                  {student.nick_name || student.full_name} 的學生狀態
                 </motion.h1>
                 <motion.p 
                   className="text-gray-600 flex items-center text-sm sm:text-base"
@@ -846,10 +846,10 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                 </div>
               )}
 
-              {/* 互動角色分頁 */}
+              {/* 學生狀態分頁 */}
               {activeSection === 'avatar' && formattedStudent && (
                 <div className="space-y-8">
-                  {/* 互動角色 */}
+                  {/* 學生狀態 */}
                   <DynamicCard className="max-w-2xl mx-auto p-8 text-center" delay={0.4}>
                     <StudentAvatarWidget
                       student={formattedStudent}
@@ -1309,7 +1309,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                           <h3 className="text-2xl font-bold text-gray-800 mb-2">
                             學習目標進度
                           </h3>
-                          <p className="text-gray-600 mb-4">幼兒鋼琴學習評估進度追蹤</p>
+                          <p className="text-gray-600 mb-4">學生學習進度追蹤</p>
                           <div className="flex items-center space-x-6">
                             <div className="text-center">
                               <div className="text-sm text-gray-500">總進度</div>

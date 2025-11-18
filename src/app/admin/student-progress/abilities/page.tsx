@@ -1,9 +1,10 @@
 
 'use client';
 
-import { 
-  ChartBarIcon, 
-  UserGroupIcon, 
+import Image from 'next/image';
+import {
+  ChartBarIcon,
+  UserGroupIcon,
   StarIcon,
   PlusIcon,
   EyeIcon,
@@ -14,10 +15,11 @@ import {
   FunnelIcon,
   AcademicCapIcon,
   VideoCameraIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 
 import { HanamiButton } from '@/components/ui/HanamiButton';
@@ -31,7 +33,52 @@ import { supabase } from '@/lib/supabase';
 import { DevelopmentAbility, StudentAbility, DEVELOPMENT_ABILITIES } from '@/types/progress';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 
-export default function AbilitiesPage() {
+type NavigationOverrides = Partial<{
+  dashboard: string;
+  growthTrees: string;
+  learningPaths: string;
+  abilities: string;
+  activities: string;
+  assessments: string;
+  media: string;
+  studentManagement: string;
+}>;
+
+type AbilitiesPageProps = {
+  navigationOverrides?: NavigationOverrides;
+  forcedOrgId?: string | null;
+  forcedOrgName?: string | null;
+  disableOrgFallback?: boolean;
+};
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const PLACEHOLDER_ORG_IDS = new Set([
+  'default-org',
+  'unassigned-org-placeholder',
+]);
+
+export default function AbilitiesPage({
+  navigationOverrides,
+  forcedOrgId = null,
+  forcedOrgName = null,
+  disableOrgFallback = false,
+}: AbilitiesPageProps = {}) {
+  const navigationPaths = useMemo(
+    () => ({
+      dashboard: '/admin/student-progress',
+      growthTrees: '/admin/student-progress/growth-trees',
+      learningPaths: '/admin/student-progress/learning-paths',
+      abilities: '/admin/student-progress/abilities',
+      activities: '/admin/student-progress/activities',
+      assessments: '/admin/student-progress/ability-assessments',
+      media: '/admin/student-progress/student-media',
+      studentManagement: '/admin/students',
+      ...(navigationOverrides ?? {}),
+    }),
+    [navigationOverrides],
+  );
+
   const [abilities, setAbilities] = useState<DevelopmentAbility[]>([]);
   const [studentAbilities, setStudentAbilities] = useState<StudentAbility[]>([]);
   const [students, setStudents] = useState<any[]>([]);
@@ -88,22 +135,90 @@ export default function AbilitiesPage() {
   const [newOptionName, setNewOptionName] = useState('');
   const [isDefaultOption, setIsDefaultOption] = useState(false);
 
+  const normalizedForcedOrgId =
+    forcedOrgId &&
+    UUID_REGEX.test(forcedOrgId) &&
+    !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
+      ? forcedOrgId
+      : null;
+
+  const invalidForcedId = forcedOrgId !== null && !normalizedForcedOrgId;
+  const validOrgId = normalizedForcedOrgId;
+  const orgDataDisabled =
+    (disableOrgFallback && !validOrgId) || invalidForcedId;
+
+  const applyOrgFilter = <T extends { eq: (column: string, value: any) => T }>(
+    query: T,
+    column = 'org_id',
+  ) => {
+    if (validOrgId) {
+      return query.eq(column, validOrgId);
+    }
+    return query;
+  };
+
+  const ensureOrgAvailable = () => {
+    if (orgDataDisabled) {
+      toast.error('請先創建屬於您的機構');
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
+    if (orgDataDisabled) {
+      setAbilities([]);
+      setStudents([]);
+      setStudentAbilities([]);
+      setGrowthTrees([]);
+      setCategories([
+        { id: 'physical', name: '身體發展' },
+        { id: 'cognitive', name: '認知發展' },
+        { id: 'emotional', name: '情緒發展' },
+        { id: 'language', name: '語言發展' },
+        { id: 'artistic', name: '藝術發展' },
+      ]);
+      setCustomOptions({
+        ability_categories: [
+          { id: 'physical', name: '身體發展', is_default: true },
+          { id: 'cognitive', name: '認知發展', is_default: true },
+          { id: 'emotional', name: '情緒發展', is_default: true },
+          { id: 'language', name: '語言發展', is_default: true },
+          { id: 'artistic', name: '藝術發展', is_default: true },
+        ],
+      });
+      setLoading(false);
+      return;
+    }
     loadData();
     loadCategories();
     loadCustomOptions();
-  }, []);
+  }, [orgDataDisabled, validOrgId]);
 
   const loadCategories = async () => {
+    if (orgDataDisabled) {
+      setCategories([
+        { id: 'physical', name: '身體發展' },
+        { id: 'cognitive', name: '認知發展' },
+        { id: 'emotional', name: '情緒發展' },
+        { id: 'language', name: '語言發展' },
+        { id: 'artistic', name: '藝術發展' },
+      ]);
+      return;
+    }
+
     try {
       // 載入自訂能力類別（使用 activity_type 並過濾發展相關）
-      const { data: customData } = await supabase
+      let categoryQuery = supabase
         .from('hanami_custom_options')
         .select('*')
         .eq('option_type', 'activity_type')
         .eq('is_active', true)
-        .like('option_name', '%發展%')
-        .order('sort_order');
+        .like('option_name', '%發展%');
+      if (validOrgId) {
+        categoryQuery = categoryQuery.eq('org_id', validOrgId);
+      }
+      const { data: customData } = await categoryQuery.order('sort_order');
 
       const defaultCategories = [
         { id: 'physical', name: '身體發展' },
@@ -125,15 +240,34 @@ export default function AbilitiesPage() {
   };
 
   const loadCustomOptions = async () => {
+    if (orgDataDisabled) {
+      setCustomOptions({
+        ability_categories: [
+          { id: 'physical', name: '身體發展', is_default: true },
+          { id: 'cognitive', name: '認知發展', is_default: true },
+          { id: 'emotional', name: '情緒發展', is_default: true },
+          { id: 'language', name: '語言發展', is_default: true },
+          { id: 'artistic', name: '藝術發展', is_default: true },
+        ],
+      });
+      return;
+    }
+
     try {
       console.log('能力頁面：開始載入自訂選項...');
-      // 載入自訂能力類別（移除過濾條件，載入所有 activity_type）
-      const { data: customData, error } = await supabase
+      // 載入自訂能力類別（根據 org_id 過濾）
+      let customQuery = supabase
         .from('hanami_custom_options')
         .select('*')
         .eq('option_type', 'activity_type')
-        .eq('is_active', true)
-        .order('sort_order');
+        .eq('is_active', true);
+      if (validOrgId) {
+        customQuery = customQuery.eq('org_id', validOrgId);
+      } else {
+        // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+        customQuery = customQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+      }
+      const { data: customData, error } = await customQuery.order('sort_order');
 
       if (error) {
         console.error('能力頁面：載入自訂選項錯誤:', error);
@@ -319,6 +453,8 @@ export default function AbilitiesPage() {
   const handleAddCustomOption = async () => {
     if (!newOptionName.trim()) return;
 
+    if (!isDefaultOption && !ensureOrgAvailable()) return;
+
     try {
       console.log('=== 開始新增操作 ===');
       console.log('新增類別名稱:', newOptionName.trim());
@@ -356,16 +492,21 @@ export default function AbilitiesPage() {
       } else {
         // 新增為自訂類別：保存到資料庫
         const optionValue = newOptionName.toLowerCase().replace(/\s+/g, '_');
-        
+
+        const insertPayload: Record<string, any> = {
+          option_type: 'activity_type',
+          option_name: newOptionName.trim(),
+          option_value: optionValue,
+          sort_order: customOptions.ability_categories.length + 100,
+          is_active: true,
+        };
+        if (validOrgId) {
+          insertPayload.org_id = validOrgId;
+        }
+
         const { error } = await supabase
           .from('hanami_custom_options')
-          .insert({
-            option_type: 'activity_type',
-            option_name: newOptionName.trim(),
-            option_value: optionValue,
-            sort_order: customOptions.ability_categories.length + 100,
-            is_active: true,
-          });
+          .insert(insertPayload);
 
         if (error) throw error;
 
@@ -432,13 +573,17 @@ export default function AbilitiesPage() {
       } else {
         // 自訂類別：更新資料庫
         console.log('編輯自訂類別:', editingOption.name);
-        const { error } = await supabase
+        let updateQuery = supabase
           .from('hanami_custom_options')
           .update({
             option_name: newOptionName.trim(),
           })
           .eq('option_type', 'activity_type')
           .eq('option_value', editingOption.id);
+        if (validOrgId) {
+          updateQuery = updateQuery.eq('org_id', validOrgId);
+        }
+        const { error } = await updateQuery;
 
         if (error) {
           console.error('資料庫更新錯誤:', error);
@@ -480,10 +625,14 @@ export default function AbilitiesPage() {
         return;
       }
 
+      // 預設類別不能刪除
+      if (optionToDelete.is_default) {
+        toast.error('預設類別無法刪除');
+        return;
+      }
+
       // 刪除確認對話框
-      const confirmMessage = optionToDelete.is_default 
-        ? `確定要刪除預設類別「${optionToDelete.name}」嗎？\n\n注意：此操作會將該類別從預設列表中移除，但可以通過「重置預設」按鈕恢復。`
-        : `確定要刪除類別「${optionToDelete.name}」嗎？\n\n此操作無法撤銷。`;
+      const confirmMessage = `確定要刪除類別「${optionToDelete.name}」嗎？\n\n此操作無法撤銷。`;
       
       const isConfirmed = confirm(confirmMessage);
       if (!isConfirmed) {
@@ -496,54 +645,37 @@ export default function AbilitiesPage() {
       console.log('當前所有類別:', customOptions.ability_categories);
       console.log('找到要刪除的選項:', optionToDelete);
       
-      if (optionToDelete.is_default) {
-        // 預設類別：保存到 localStorage
-        console.log('刪除預設類別:', optionToDelete.name);
-        
-        // 保存刪除操作到 localStorage
-        const userModifiedDefaults = JSON.parse(localStorage.getItem('hanami_modified_defaults') || '{}');
-        userModifiedDefaults[optionToDelete.id] = { deleted: true };
-        localStorage.setItem('hanami_modified_defaults', JSON.stringify(userModifiedDefaults));
-        console.log('已保存刪除操作到 localStorage:', userModifiedDefaults);
-        
-        setCustomOptions(prev => {
-          const newCategories = prev.ability_categories.filter(option => option.id !== optionId);
-          console.log('刪除後的類別列表:', newCategories);
-          return {
-            ...prev,
-            ability_categories: newCategories,
-          };
-        });
-        
-        console.log('預設類別刪除完成');
-        toast.success(`已刪除預設類別「${optionToDelete.name}」！`);
-      } else {
-        // 自訂類別：軟刪除（設為非活躍）
-        console.log('刪除自訂類別:', optionToDelete.name);
-        const { error } = await supabase
-          .from('hanami_custom_options')
-          .update({ is_active: false })
-          .eq('option_type', 'activity_type')
-          .eq('option_value', optionId);
+      // 自訂類別：軟刪除（設為非活躍）
+      console.log('刪除自訂類別:', optionToDelete.name);
+      if (!ensureOrgAvailable()) return;
 
-        if (error) {
-          console.error('資料庫刪除錯誤:', error);
-          throw error;
-        }
-
-        // 更新本地狀態
-        setCustomOptions(prev => {
-          const newCategories = prev.ability_categories.filter(option => option.id !== optionId);
-          console.log('刪除後的類別列表:', newCategories);
-          return {
-            ...prev,
-            ability_categories: newCategories,
-          };
-        });
-        
-        console.log('自訂類別刪除完成');
-        toast.success('刪除類別成功！');
+      let deleteOptionQuery = supabase
+        .from('hanami_custom_options')
+        .update({ is_active: false })
+        .eq('option_type', 'activity_type')
+        .eq('option_value', optionId);
+      if (validOrgId) {
+        deleteOptionQuery = deleteOptionQuery.eq('org_id', validOrgId);
       }
+      const { error } = await deleteOptionQuery;
+
+      if (error) {
+        console.error('資料庫刪除錯誤:', error);
+        throw error;
+      }
+
+      // 更新本地狀態
+      setCustomOptions(prev => {
+        const newCategories = prev.ability_categories.filter(option => option.id !== optionId);
+        console.log('刪除後的類別列表:', newCategories);
+        return {
+          ...prev,
+          ability_categories: newCategories,
+        };
+      });
+      
+      console.log('自訂類別刪除完成');
+      toast.success('刪除類別成功！');
       
       console.log('=== 能力頁面：刪除操作完成 ===');
     } catch (error) {
@@ -561,13 +693,23 @@ export default function AbilitiesPage() {
   };
 
   const loadData = async () => {
+    if (orgDataDisabled) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       // 載入發展能力
-      const { data: abilitiesData, error: abilitiesError } = await supabase
+      let abilitiesQuery = supabase
         .from('hanami_development_abilities')
-        .select('*')
-        .order('ability_name');
+        .select('*');
+      if (validOrgId) {
+        abilitiesQuery = abilitiesQuery.eq('org_id', validOrgId);
+      }
+      const { data: abilitiesData, error: abilitiesError } = await abilitiesQuery.order(
+        'ability_name',
+      );
 
       if (abilitiesError) throw abilitiesError;
       // 修正 null 欄位為 undefined
@@ -581,21 +723,33 @@ export default function AbilitiesPage() {
       setAbilities(fixedAbilities);
 
       // 載入學生
-      const { data: studentsData, error: studentsError } = await supabase
+      let studentsQuery = supabase
         .from('Hanami_Students')
-        .select('id, full_name, nick_name, student_age, course_type')
-        .order('full_name');
+        .select('id, full_name, nick_name, student_age, course_type');
+      if (validOrgId) {
+        studentsQuery = studentsQuery.eq('org_id', validOrgId);
+      }
+      const { data: studentsData, error: studentsError } = await studentsQuery.order(
+        'full_name',
+      );
 
       if (studentsError) throw studentsError;
       setStudents(studentsData || []);
 
       // 載入學生能力記錄
-      const { data: studentAbilitiesData, error: studentAbilitiesError } = await supabase
+      let studentAbilitiesQuery = supabase
         .from('hanami_student_abilities')
-        .select(`
+        .select(
+          `
           *,
           ability:hanami_development_abilities(*)
-        `);
+        `,
+        );
+      if (validOrgId) {
+        studentAbilitiesQuery = studentAbilitiesQuery.eq('org_id', validOrgId);
+      }
+      const { data: studentAbilitiesData, error: studentAbilitiesError } =
+        await studentAbilitiesQuery;
 
       if (studentAbilitiesError) throw studentAbilitiesError;
       // 修正欄位名稱與 null 欄位
@@ -607,22 +761,28 @@ export default function AbilitiesPage() {
       setStudentAbilities(fixedStudentAbilities);
 
       // 載入成長樹和成長目標
-      const { data: growthTreesData, error: growthTreesError } = await supabase
+      let growthTreesQuery = supabase
         .from('hanami_growth_trees')
-        .select(`
+        .select(
+          `
           *,
           goals:hanami_growth_goals(
             id,
             goal_name,
             required_abilities
           )
-        `)
-        .eq('is_active', true)
-        .order('tree_name');
+        `,
+        )
+        .eq('is_active', true);
+      if (validOrgId) {
+        growthTreesQuery = growthTreesQuery.eq('org_id', validOrgId);
+      }
+      const { data: growthTreesData, error: growthTreesError } = await growthTreesQuery.order(
+        'tree_name',
+      );
 
       if (growthTreesError) throw growthTreesError;
       setGrowthTrees(growthTreesData || []);
-
     } catch (err) {
       console.error('載入資料失敗：', err);
       setError('載入資料失敗');
@@ -632,13 +792,20 @@ export default function AbilitiesPage() {
   };
 
   const createAbility = async () => {
+    if (!ensureOrgAvailable()) return;
+
     try {
+      const payload: Record<string, any> = {
+        ...newAbility,
+        category: newAbility.category || null,
+      };
+      if (validOrgId) {
+        payload.org_id = validOrgId;
+      }
+
       const { data, error } = await supabase
         .from('hanami_development_abilities')
-        .insert([{
-          ...newAbility,
-          category: newAbility.category || null,
-        }])
+        .insert([payload])
         .select()
         .single();
 
@@ -669,13 +836,19 @@ export default function AbilitiesPage() {
 
   // 刪除能力函數
   const deleteAbility = async (ability: DevelopmentAbility) => {
+    if (!ensureOrgAvailable()) return;
+
     try {
       // 檢查是否有學生正在使用此能力
-      const { data: studentAbilitiesData, error: checkError } = await supabase
+      let studentAbilityCheck = supabase
         .from('hanami_student_abilities')
         .select('id')
         .eq('ability_id', ability.id)
         .limit(1);
+      if (validOrgId) {
+        studentAbilityCheck = studentAbilityCheck.eq('org_id', validOrgId);
+      }
+      const { data: studentAbilitiesData, error: checkError } = await studentAbilityCheck;
 
       if (checkError) throw checkError;
 
@@ -685,10 +858,14 @@ export default function AbilitiesPage() {
       }
 
       // 檢查是否有成長樹正在使用此能力
-      const { data: growthTreesData, error: treesError } = await supabase
+      let growthGoalsQuery = supabase
         .from('hanami_growth_goals')
         .select('id, goal_name')
         .contains('required_abilities', [ability.id]);
+      if (validOrgId) {
+        growthGoalsQuery = growthGoalsQuery.eq('org_id', validOrgId);
+      }
+      const { data: growthTreesData, error: treesError } = await growthGoalsQuery;
 
       if (treesError) throw treesError;
 
@@ -698,10 +875,14 @@ export default function AbilitiesPage() {
       }
 
       // 執行刪除
-      const { error: deleteError } = await supabase
+      let deleteQuery = supabase
         .from('hanami_development_abilities')
         .delete()
         .eq('id', ability.id);
+      if (validOrgId) {
+        deleteQuery = deleteQuery.eq('org_id', validOrgId);
+      }
+      const { error: deleteError } = await deleteQuery;
 
       if (deleteError) throw deleteError;
 
@@ -782,10 +963,10 @@ export default function AbilitiesPage() {
         <div>
           <h1 className="text-3xl font-bold text-hanami-text flex items-center gap-3">
             <ChartBarIcon className="h-8 w-8 text-hanami-primary" />
-            學生發展能力管理
+            學生能力管理
           </h1>
           <p className="text-hanami-text-secondary mt-2">
-            追蹤和管理學生的八大核心發展能力
+            追蹤和管理學生的核心能力
           </p>
         </div>
         <div className="flex gap-3">
@@ -815,49 +996,67 @@ export default function AbilitiesPage() {
             {
               icon: BarChart3,
               label: "進度管理面板",
-              href: "/admin/student-progress",
+              href: navigationPaths.dashboard,
               variant: "secondary"
             },
             {
               icon: TreePine,
               label: "成長樹管理",
-              href: "/admin/student-progress/growth-trees",
+              href: navigationPaths.growthTrees,
+              variant: "secondary"
+            },
+            {
+              icon: BookOpenIcon,
+              label: "學習路線管理",
+              href: navigationPaths.learningPaths,
               variant: "secondary"
             },
             {
               icon: TrendingUp,
               label: "發展能力圖卡",
-              href: "/admin/student-progress/abilities",
+              href: navigationPaths.abilities,
               variant: "primary"
             },
             {
               icon: Gamepad2,
               label: "教學活動管理",
-              href: "/admin/student-progress/activities",
-              variant: "secondary"
-            },
-            {
-              icon: VideoCameraIcon,
-              label: "學生媒體管理",
-              href: "/admin/student-progress/student-media",
+              href: navigationPaths.activities,
               variant: "secondary"
             },
             {
               icon: AcademicCapIcon,
               label: "能力評估管理",
-              href: "/admin/student-progress/ability-assessments",
+              href: navigationPaths.assessments,
+              variant: "secondary"
+            },
+            {
+              icon: VideoCameraIcon,
+              label: "學生媒體管理",
+              href: navigationPaths.media,
               variant: "secondary"
             },
             {
               icon: Users,
               label: "返回學生管理",
-              href: "/admin/students",
+              href: navigationPaths.studentManagement,
               variant: "accent"
             }
           ]}
-          currentPage="/admin/student-progress/abilities"
+          currentPage={navigationPaths.abilities}
         />
       </div>
+
+      {orgDataDisabled && (
+        <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
+          <div className="mb-4">
+            <Image alt="Hanami 提示" height={56} src="/rabbit.png" width={56} />
+          </div>
+          <h2 className="text-lg font-semibold text-hanami-text">尚未設定機構資料</h2>
+          <p className="mt-2 text-sm text-hanami-text-secondary">
+            請先創建屬於您的機構，並建立能力與學生資料後再查看內容。
+          </p>
+        </div>
+      )}
 
       {/* 錯誤訊息 */}
       {error && (
@@ -1284,15 +1483,22 @@ export default function AbilitiesPage() {
                             >
                               編輯
                             </button>
-                            <button
-                              className="text-red-600 hover:text-red-800 px-2 py-1 text-sm"
-                              onClick={() => {
-                                console.log('刪除按鈕被點擊！選項 ID:', option.id);
-                                handleDeleteCustomOption(option.id);
-                              }}
-                            >
-                              刪除
-                            </button>
+                            {!option.is_default && (
+                              <button
+                                className="text-red-600 hover:text-red-800 px-2 py-1 text-sm"
+                                onClick={() => {
+                                  console.log('刪除按鈕被點擊！選項 ID:', option.id);
+                                  handleDeleteCustomOption(option.id);
+                                }}
+                              >
+                                刪除
+                              </button>
+                            )}
+                            {option.is_default && (
+                              <span className="text-xs text-gray-500 px-2 py-1">
+                                系統預設，無法刪除
+                              </span>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1320,6 +1526,35 @@ export default function AbilitiesPage() {
               </h2>
               
               <div className="space-y-4">
+                {/* 機構資訊 */}
+                {(validOrgId || forcedOrgName) && (
+                  <div className="bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] rounded-xl p-4 border border-[#EADBC8] mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Image 
+                        src="/star-icon.png" 
+                        alt="機構" 
+                        width={20} 
+                        height={20} 
+                        className="animate-pulse"
+                      />
+                      <span className="text-sm font-semibold text-[#4B4036]">機構資訊</span>
+                    </div>
+                    <div className="space-y-1 text-xs text-[#2B3A3B]">
+                      {forcedOrgName && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">機構名稱：</span>
+                          <span>{forcedOrgName}</span>
+                        </div>
+                      )}
+                      {validOrgId && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">機構 ID：</span>
+                          <span className="font-mono text-[#87704e]">{validOrgId}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <HanamiInput
                   required
                   label="能力名稱"
@@ -1430,7 +1665,9 @@ export default function AbilitiesPage() {
           onClose={() => setShowCategoryManager(false)}
           onCategoryChange={() => {
             loadCategories();
+            loadCustomOptions();
           }}
+          orgId={validOrgId}
         />
       )}
 

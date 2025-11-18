@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import Image from 'next/image';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { MessageSquare } from 'lucide-react';
 
@@ -36,10 +36,12 @@ const generateUUID = () => {
 
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { getSupabaseClient } from '@/lib/supabase';
+import { createSaasClient } from '@/lib/supabase-saas';
 import { calculateRemainingLessons } from '@/lib/utils';
 import LessonEditorModal from './LessonEditorModal';
 import { Lesson, CourseType } from '@/types';
 import AIMessageModal from '@/components/ui/AIMessageModal';
+import { buildTeacherDisplayName, TeacherIdentity } from '@/lib/teacherUtils';
 
 
 interface StudentLessonPanelProps {
@@ -55,6 +57,8 @@ interface StudentLessonPanelProps {
   hideTeacherColumn?: boolean; // 是否隱藏負責老師欄位
   hideCareAlert?: boolean; // 是否隱藏特別照顧欄位
   disableSelection?: boolean; // 是否禁用勾選功能
+  orgId?: string | null; // 所屬機構 ID
+  organizationName?: string | null;
 }
 
 interface LessonData {
@@ -85,8 +89,35 @@ interface LessonData {
   remarks: string | null;
 }
 
-export default function StudentLessonPanel({ studentId, studentType, studentName, contactNumber, onCourseUpdate, studentData, showAIMessageButton = false, hideActionButtons = false, hideTeacherColumn = false, hideCareAlert = false, disableSelection = false }: StudentLessonPanelProps) {
+interface TeacherOption {
+  label: string;
+  value: string;
+}
+
+const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
+
+export default function StudentLessonPanel({
+  studentId,
+  studentType,
+  studentName,
+  contactNumber,
+  onCourseUpdate,
+  studentData,
+  showAIMessageButton = false,
+  hideActionButtons = false,
+  hideTeacherColumn = false,
+  hideCareAlert = false,
+  disableSelection = false,
+  orgId,
+  organizationName,
+}: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
+  const resolvedOrgName =
+    organizationName ??
+    (studentData && (studentData.organization_name ?? studentData.organizationName)) ??
+    null;
+  const allowAiFeatures = orgId === PREMIUM_AI_ORG_ID;
+  const aiFeatureMessage = '功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com';
   
   // 添加動畫樣式到 head
   useEffect(() => {
@@ -115,7 +146,8 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
   const [showCourseTypeSelect, setShowCourseTypeSelect] = useState(false);
   const [showTeacherSelect, setShowTeacherSelect] = useState(false);
   const [courseTypeOptions, setCourseTypeOptions] = useState<{ label: string; value: string }[]>([]);
-  const [teacherOptions, setTeacherOptions] = useState<{ label: string; value: string }[]>([]);
+  const [teacherOptions, setTeacherOptions] = useState<TeacherOption[]>([{ label: '未分配', value: '' }]);
+  const [teacherLabelMap, setTeacherLabelMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -529,6 +561,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
       'id',
       'student_id',
       'package_id',
+      'org_id',
       'lesson_date',
       'regular_timeslot',
       'actual_timeslot',
@@ -553,7 +586,11 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
     ];
     const filtered: any = {};
     allowedKeys.forEach((key) => {
-      filtered[key] = (data as any)[key] ?? (key === 'student_id' || key === 'course_type' ? '' : null);
+      if (key === 'org_id') {
+        filtered[key] = (data as any)[key] ?? orgId ?? null;
+      } else {
+        filtered[key] = (data as any)[key] ?? (key === 'student_id' || key === 'course_type' ? '' : null);
+      }
     });
     return filtered as Lesson;
   };
@@ -565,13 +602,19 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
     try {
       const { data } = await supabase
         .from('Hanami_Students')
-        .select('student_oid, regular_weekday, full_name')
+        .select('student_oid, regular_weekday, full_name, org_id')
         .eq('id', newLesson.student_id)
         .single();
       studentData = data;
     } catch (e) {
       // 可視情況處理錯誤
       studentData = null;
+    }
+
+    const resolvedOrgId = orgId || newLesson.org_id || studentData?.org_id || null;
+    if (!resolvedOrgId) {
+      toast.error('無法確認機構 ID，請重新整理或聯繫管理員。');
+      return;
     }
 
     const lessonId = editingLesson ? editingLesson.id : generateUUID();
@@ -615,6 +658,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
       student_oid: newLesson.student_oid || studentData?.student_oid || studentId,
       lesson_count: newLesson.lesson_count ?? 0,
       is_trial: newLesson.is_trial ?? false,
+      org_id: resolvedOrgId,
     };
 
     const requiredFields = ['student_id', 'lesson_date', 'course_type', 'regular_timeslot', 'regular_weekday', 'lesson_teacher'] as const;
@@ -787,6 +831,198 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
     toast.success(`已開啟WhatsApp，準備發送 ${selectedLessons.length} 筆課堂記錄`);
   };
 
+  useEffect(() => {
+    const baseOption: TeacherOption = { label: '未分配', value: '' };
+
+    if (!orgId) {
+      console.log('[StudentLessonPanel] 無 orgId，教師清單重置為預設');
+      setTeacherOptions([baseOption]);
+      setTeacherLabelMap(new Map());
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadTeachers = async () => {
+      console.log('[StudentLessonPanel] 載入教師名單，orgId =', orgId);
+      try {
+        const rolesForMembers = ['owner', 'admin', 'teacher'];
+        const [
+          { data: membersData, error: membersError },
+          { data: employeeData, error: employeeError }
+        ] = await Promise.all([
+          supabase
+            .from('hanami_user_organizations')
+            .select('id, user_id, user_email, role')
+            .eq('org_id', orgId)
+            .in('role', rolesForMembers),
+          supabase
+            .from('hanami_employee')
+            .select('id, teacher_nickname, teacher_fullname, teacher_email')
+            .eq('org_id', orgId),
+        ]);
+
+        console.log('[StudentLessonPanel] raw membersData:', membersData);
+        console.log('[StudentLessonPanel] raw membersData JSON:', JSON.stringify(membersData, null, 2));
+        console.log('[StudentLessonPanel] raw employeeData:', employeeData);
+        console.log('[StudentLessonPanel] raw employeeData JSON:', JSON.stringify(employeeData, null, 2));
+
+        if (membersError) {
+          console.warn('載入組織成員教師資料失敗：', membersError);
+        }
+        if (employeeError) {
+          console.warn('載入教師資料失敗（hanami_employee）：', employeeError);
+        }
+
+        const canonicalMembers = (membersData || []).filter((member: any) => {
+          const role = (member.role || '').toLowerCase();
+          const include = rolesForMembers.includes(role);
+          if (!include) {
+            console.log('[StudentLessonPanel] 忽略角色', member.role, '的成員', member.id);
+          }
+          return include;
+        });
+
+        console.log('[StudentLessonPanel] 成員筆數:', canonicalMembers.length);
+
+        const memberUserIds = Array.from(
+          new Set(
+            canonicalMembers
+              .map((member: any) => member.user_id)
+              .filter((id: string | null | undefined): id is string => Boolean(id)),
+          ),
+        );
+
+        const saasUserMap = new Map<string, { full_name: string | null; email: string | null }>();
+        if (memberUserIds.length > 0) {
+          try {
+            const saasClient = createSaasClient();
+            const { data: saasUsers, error: saasError } = await saasClient
+              .from('saas_users')
+              .select('id, email, full_name')
+              .in('id', memberUserIds);
+
+            if (saasError) {
+              console.warn('查詢 saas_users 失敗：', saasError);
+            } else {
+              (saasUsers || []).forEach((user: any) => {
+                saasUserMap.set(user.id, {
+                  full_name: user.full_name ?? null,
+                  email: user.email ?? null,
+                });
+              });
+            }
+          } catch (err) {
+            console.warn('連接 hanami_saas_system 失敗：', err);
+          }
+        }
+
+        const teacherMap = new Map<string, TeacherIdentity & { id: string }>();
+
+        canonicalMembers.forEach((member: any) => {
+          const canonicalId = member.user_id || member.user_email || member.id;
+          if (!canonicalId) return;
+          const saasInfo = member.user_id ? saasUserMap.get(member.user_id) : undefined;
+          const email = saasInfo?.email || member.user_email || null;
+          const fullName = saasInfo?.full_name || null;
+          const existing =
+            teacherMap.get(canonicalId) ||
+            ({
+              id: canonicalId,
+              nickname: null,
+              fullname: null,
+              userFullName: null,
+              email: null,
+            } as TeacherIdentity & { id: string });
+          teacherMap.set(canonicalId, {
+            ...existing,
+            id: canonicalId,
+            nickname: existing.nickname || fullName,
+            fullname: existing.fullname || fullName,
+            userFullName: existing.userFullName || fullName,
+            email: existing.email || email,
+          });
+          console.log('[StudentLessonPanel] 成員轉換 →', canonicalId, {
+            email,
+            fullName,
+            fromMember: member,
+            saasInfo,
+          });
+        });
+
+        (employeeData || []).forEach((teacher: any) => {
+          if (!teacher.id) return;
+          const existing =
+            teacherMap.get(teacher.id) ||
+            ({
+              id: teacher.id,
+              nickname: null,
+              fullname: null,
+              userFullName: null,
+              email: null,
+            } as TeacherIdentity & { id: string });
+          teacherMap.set(teacher.id, {
+            ...existing,
+            nickname: teacher.teacher_nickname || existing.nickname || teacher.teacher_fullname || null,
+            fullname: teacher.teacher_fullname || existing.fullname || null,
+            email: existing.email || teacher.teacher_email || null,
+          });
+          console.log('[StudentLessonPanel] 教師轉換 →', teacher.id, {
+            nickname: teacher.teacher_nickname,
+            fullname: teacher.teacher_fullname,
+            email: teacher.teacher_email,
+          });
+        });
+
+        console.log('[StudentLessonPanel] teacherMap 內容:', Array.from(teacherMap.entries()));
+        console.log('[StudentLessonPanel] teacherMap JSON:', JSON.stringify(Array.from(teacherMap.entries()), null, 2));
+
+        const teacherList = Array.from(teacherMap.entries())
+          .map(([teacherId, candidate]) => {
+            const label = buildTeacherDisplayName({
+              nickname: candidate.nickname,
+              fullname: candidate.fullname,
+              userFullName: candidate.userFullName,
+              email: candidate.email,
+            });
+            return {
+              value: teacherId,
+              label,
+            };
+          })
+          .filter((option) => option.value && option.label)
+          .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
+
+        console.log('[StudentLessonPanel] 教師選項數量:', teacherList.length, teacherList);
+        console.log('[StudentLessonPanel] 教師選項 JSON:', JSON.stringify(teacherList, null, 2));
+
+        if (!cancelled) {
+          setTeacherOptions([baseOption, ...teacherList]);
+          setTeacherLabelMap(new Map(teacherList.map((option) => [option.value, option.label])));
+          console.log('[StudentLessonPanel] 最終 teacherOptions:', [baseOption, ...teacherList]);
+          console.log('[StudentLessonPanel] teacherLabelMap keys:', Array.from(new Map(teacherList.map((option) => [option.value, option.label])).keys()));
+        }
+      } catch (error) {
+        console.error('載入教師名單時發生錯誤：', error);
+        if (!cancelled) {
+          setTeacherOptions([baseOption]);
+          setTeacherLabelMap(new Map());
+        }
+      }
+    };
+
+    loadTeachers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
+
+  const resolveTeacherLabel = (teacherValue: string | null | undefined) => {
+    if (!teacherValue) return '未分配';
+    return teacherLabelMap.get(teacherValue) || teacherValue;
+  };
+
   return (
     <div className="w-full px-2 sm:px-4">
       <div className="bg-[#FFFDF8] p-3 sm:p-6 rounded-xl shadow-inner max-w-5xl mx-auto">
@@ -826,14 +1062,25 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
               <span className="text-[10px] sm:text-[11px] text-[#4B4036]">刷新</span>
             </button>
             {showAIMessageButton && (
-              <button
-                onClick={() => setShowAIMessageModal(true)}
-                className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
-                title="AI 訊息"
-              >
-                <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5 text-[#4B4036]" />
-                <span className="text-[10px] sm:text-[11px] text-[#4B4036]">AI 訊息</span>
-              </button>
+              allowAiFeatures ? (
+                <button
+                  onClick={() => setShowAIMessageModal(true)}
+                  className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+                  title="AI 訊息"
+                >
+                  <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5 text-[#4B4036]" />
+                  <span className="text-[10px] sm:text-[11px] text-[#4B4036]">AI 訊息</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => toast(aiFeatureMessage)}
+                  className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F0ECE1] rounded-xl shadow text-[#8A7C70] cursor-not-allowed"
+                  type="button"
+                >
+                  <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" />
+                  <span className="text-[10px] sm:text-[11px]">AI 訊息</span>
+                </button>
+              )
             )}
             <button
               onClick={() => setCategorySelectOpen(true)}
@@ -1132,7 +1379,7 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
                   <td className="text-[15px] font-medium px-2 py-2">{typeof lesson.course_type === 'string' ? lesson.course_type : ''}</td>
                   <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>
                   {!hideTeacherColumn && (
-                    <td className="text-[15px] font-medium px-2 py-2">{lesson.lesson_teacher}</td>
+                    <td className="text-[15px] font-medium px-2 py-2">{resolveTeacherLabel(lesson.lesson_teacher)}</td>
                   )}
                   <td className="text-[15px] font-medium px-2 py-2">
                     {format(new Date(lesson.lesson_date), 'yyyy-MM-dd') === todayStr ? (
@@ -1238,6 +1485,13 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
           mode={editingLesson ? 'edit' : 'add'}
           open={isModalOpen}
           studentId={studentId}
+          orgId={orgId}
+          orgName={resolvedOrgName ?? undefined}
+          teacherOptions={teacherOptions}
+          teacherLabelMap={teacherLabelMap}
+          defaultRegularTimeslot={studentData?.regular_timeslot ?? null}
+          defaultActualTimeslot={studentData?.regular_timeslot ?? null}
+          defaultRegularWeekday={studentData?.regular_weekday ?? null}
           onClose={() => {
             setStatusPopupOpen(null);
             setIsModalOpen(false);
@@ -1345,7 +1599,14 @@ export default function StudentLessonPanel({ studentId, studentType, studentName
             lesson={null}
             studentId={studentId}
             mode="add"
+            orgId={orgId}
+            orgName={resolvedOrgName ?? undefined}
             initialLessonCount={availableLessons}
+            teacherOptions={teacherOptions}
+            teacherLabelMap={teacherLabelMap}
+            defaultRegularTimeslot={studentData?.regular_timeslot ?? null}
+            defaultActualTimeslot={studentData?.regular_timeslot ?? null}
+            defaultRegularWeekday={studentData?.regular_weekday ?? null}
             onSaved={() => {
               setShowLessonEditorModal(false);
               // 重新載入課程記錄

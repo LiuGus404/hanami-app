@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentId, lessonDate, timeslot, activityIds, assignmentType = 'current_lesson' } = body;
+    const { studentId, lessonDate, timeslot, activityIds, assignmentType = 'current_lesson', orgId } = body;
 
     if (!studentId || !activityIds || !Array.isArray(activityIds)) {
       return NextResponse.json(
@@ -60,15 +60,24 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const activityAssignments = activityIds.map((activityId: string) => ({
-        student_id: studentId,
-        activity_id: activityId,
-        activity_type: 'lesson',
-        lesson_date: lessonDate,
-        timeslot: timeslot,
-        completion_status: 'not_started',
-        assigned_at: new Date().toISOString()
-      }));
+      const activityAssignments = activityIds.map((activityId: string) => {
+        const assignment: any = {
+          student_id: studentId,
+          activity_id: activityId,
+          activity_type: 'lesson',
+          lesson_date: lessonDate,
+          timeslot: timeslot,
+          completion_status: 'not_started',
+          assigned_at: new Date().toISOString()
+        };
+        
+        // 如果提供了 orgId，則包含它
+        if (orgId) {
+          assignment.org_id = orgId;
+        }
+        
+        return assignment;
+      });
 
       console.log('準備插入的本次課堂活動:', activityAssignments);
 
@@ -125,13 +134,22 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const activityAssignments = activityIds.map((activityId: string) => ({
-        student_id: studentId,
-        activity_id: activityId,
-        activity_type: 'ongoing',
-        completion_status: 'not_started',
-        assigned_at: new Date().toISOString()
-      }));
+      const activityAssignments = activityIds.map((activityId: string) => {
+        const assignment: any = {
+          student_id: studentId,
+          activity_id: activityId,
+          activity_type: 'ongoing',
+          completion_status: 'not_started',
+          assigned_at: new Date().toISOString()
+        };
+        
+        // 如果提供了 orgId，則包含它
+        if (orgId) {
+          assignment.org_id = orgId;
+        }
+        
+        return assignment;
+      });
 
       console.log('準備插入的長期活動:', activityAssignments);
 

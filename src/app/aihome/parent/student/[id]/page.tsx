@@ -17,6 +17,9 @@ import { Lesson } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, BookOpen, UserCircle, Sparkles, Camera, Menu, X, Home, User as UserIcon, Settings, Calendar, LogOut, Building } from 'lucide-react';
 import AppSidebar from '@/components/AppSidebar';
+import { toast } from 'react-hot-toast';
+
+const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
 
 export default function ParentStudentDetailPage() {
   const { id } = useParams();
@@ -41,6 +44,26 @@ export default function ParentStudentDetailPage() {
   const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media'>('basic');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const handleTabChange = (tabKey: 'basic' | 'lessons' | 'avatar' | 'media') => {
+    // 檢查是否為需要 premium 的功能
+    const studentOrgId = student?.org_id ?? null;
+    if (tabKey === 'media' && studentOrgId !== PREMIUM_AI_ORG_ID) {
+      toast('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com');
+      return;
+    }
+    setActiveTab(tabKey);
+  };
+
+  // 如果當前在受限制的分頁但 orgId 不是 premium，自動切換回基本資料
+  useEffect(() => {
+    if (student) {
+      const studentOrgId = student.org_id ?? null;
+      if (activeTab === 'media' && studentOrgId !== PREMIUM_AI_ORG_ID) {
+        setActiveTab('basic');
+      }
+    }
+  }, [student, activeTab]);
   
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -450,27 +473,36 @@ export default function ParentStudentDetailPage() {
             {[
               { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
               { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
-              { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度' },
+              { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度' },
               { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' }
-            ].map(({ key, label, icon: Icon, description }) => (
+            ].map(({ key, label, icon: Icon, description }) => {
+              const studentOrgId = student?.org_id ?? null;
+              const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
+              const isDisabled = key === 'media' && !isPremiumOrg;
+              
+              return (
               <motion.button
                 key={key}
-                onClick={() => setActiveTab(key as any)}
+                onClick={() => handleTabChange(key as any)}
                 className={`
                   flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
-                  ${activeTab === key
-                    ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
-                    : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
+                  ${
+                    isDisabled
+                      ? 'opacity-50 cursor-pointer text-gray-400'
+                      : activeTab === key
+                        ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
+                        : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
                   }
                 `}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={isDisabled ? {} : { scale: 1.02 }}
+                whileTap={isDisabled ? {} : { scale: 0.98 }}
                 title={description}
               >
                 <Icon className="w-4 h-4 mr-2" />
                 {label}
               </motion.button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -528,6 +560,12 @@ export default function ParentStudentDetailPage() {
                     hideActionButtons={true}
                     hideTeacherColumn={true}
                     hideCareAlert={true}
+                    orgId={student.org_id ?? null}
+                    organizationName={
+                      (student as any)?.organization_name ??
+                      (student as any)?.organizationName ??
+                      null
+                    }
                   />
                 );
               })()}
@@ -563,6 +601,7 @@ export default function ParentStudentDetailPage() {
           mode={editingLesson ? 'edit' : 'add'}
           open={isModalOpen}
           studentId={student.id}
+          orgId={student.org_id ?? null}
           onClose={() => {
             setIsModalOpen(false);
             setEditingLesson(null);

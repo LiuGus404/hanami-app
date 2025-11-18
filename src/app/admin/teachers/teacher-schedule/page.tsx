@@ -1,11 +1,19 @@
 // /admin/teacher-schedule/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import TeacherSchedulePanel from '@/components/admin/TeacherSchedulePanel';
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { supabase } from '@/lib/supabase';
+import { getUserSession } from '@/lib/authUtils';
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const PLACEHOLDER_ORG_IDS = new Set([
+  'default-org',
+  'unassigned-org-placeholder',
+]);
 
 export default function TeacherSchedulePage() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -13,21 +21,58 @@ export default function TeacherSchedulePage() {
   const [showTeacherSelect, setShowTeacherSelect] = useState(false);
   const [tempTeacherId, setTempTeacherId] = useState<string>('*');
 
+  // 從會話中獲取機構信息（admin 頁面可能沒有 OrganizationProvider）
+  const session = getUserSession();
+  const currentOrganization = session?.organization || null;
+
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) {
+      console.log('🔍 [TeacherSchedule] 沒有 currentOrganization.id');
+      return null;
+    }
+    const isValid = UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id);
+    console.log('🔍 [TeacherSchedule] validOrgId 計算:', {
+      orgId: currentOrganization.id,
+      isValid,
+      isPlaceholder: PLACEHOLDER_ORG_IDS.has(currentOrganization.id),
+      sessionOrg: currentOrganization
+    });
+    return isValid ? currentOrganization.id : null;
+  }, [currentOrganization?.id]);
+
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
-        const { data, error } = await supabase.from('hanami_employee').select('id, teacher_nickname');
+        let teacherQuery = supabase
+          .from('hanami_employee')
+          .select('id, teacher_nickname');
+
+        // 根據 org_id 過濾老師
+        if (validOrgId) {
+          teacherQuery = teacherQuery.eq('org_id', validOrgId);
+          console.log('✅ [TeacherSchedule] 老師查詢已添加 org_id 過濾:', validOrgId);
+        } else {
+          // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+          teacherQuery = teacherQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+          console.warn('⚠️ [TeacherSchedule] validOrgId 為 null，老師查詢將返回空結果');
+        }
+
+        const { data, error } = await teacherQuery;
         if (error) {
           console.warn('Warning fetching teachers:', error.message);
         } else if (data) {
+          console.log('📊 [TeacherSchedule] 載入的老師數量:', data.length, 'validOrgId:', validOrgId);
+          console.log('📊 [TeacherSchedule] 載入的老師列表:', data.map((t: any) => ({ id: t.id, name: t.teacher_nickname })));
           setTeachers(data);
+        } else {
+          console.log('📊 [TeacherSchedule] 沒有載入到任何老師，validOrgId:', validOrgId);
         }
       } catch (error) {
         console.warn('Unexpected error fetching teachers:', error);
       }
     };
     fetchTeachers();
-  }, []);
+  }, [validOrgId]);
 
   return (
     <div className="p-6 bg-[#FFF9F2] min-h-screen">
@@ -70,6 +115,7 @@ export default function TeacherSchedulePage() {
                 ? teachers.map((t) => t.id)
                 : [selectedTeacherId]
             }
+            orgId={validOrgId}
           />
         </div>
       </div>

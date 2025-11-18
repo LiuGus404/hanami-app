@@ -1,318 +1,261 @@
 import { supabase } from './supabase';
 
-// 查詢快取介面
-interface QueryCache {
-  [key: string]: {
-    data: any;
-    timestamp: number;
-    ttl: number;
-  };
+// 簡單的內存快取
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_EXPIRY = 5 * 60 * 1000; // 5分鐘
+
+interface QueryOptions {
+  organizationId?: string;
 }
 
-// 全局快取實例
-const queryCache: QueryCache = {};
-
-// 快取配置
-const CACHE_TTL = {
-  SHORT: 30 * 1000, // 30秒
-  MEDIUM: 5 * 60 * 1000, // 5分鐘
-  LONG: 30 * 60 * 1000, // 30分鐘
-};
-
-// 生成快取鍵
-function generateCacheKey(table: string, query: any): string {
-  return `${table}:${JSON.stringify(query)}`;
-}
-
-// 檢查快取是否有效
-function isCacheValid(cacheKey: string, ttl: number): boolean {
-  const cached = queryCache[cacheKey];
-  if (!cached) return false;
+export async function getBaseDashboardData(
+  limit: number = 10,
+  options: QueryOptions = {}
+) {
+  const cacheKey = `base_dashboard_${limit}_${options.organizationId || 'all'}`;
+  const cached = cache.get(cacheKey);
   
-  const now = Date.now();
-  return now - cached.timestamp < ttl;
-}
+  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY) {
+    return cached.data;
+  }
 
-// 設置快取
-function setCache(cacheKey: string, data: any, ttl: number): void {
-  queryCache[cacheKey] = {
-    data,
-    timestamp: Date.now(),
-    ttl
-  };
-}
-
-// 獲取快取
-function getCache(cacheKey: string): any | null {
-  const cached = queryCache[cacheKey];
-  return cached ? cached.data : null;
-}
-
-// 清理過期快取
-function cleanupExpiredCache(): void {
-  const now = Date.now();
-  Object.keys(queryCache).forEach(key => {
-    const cached = queryCache[key];
-    if (now - cached.timestamp > cached.ttl) {
-      delete queryCache[key];
-    }
-  });
-}
-
-// 定期清理快取（每5分鐘）
-setInterval(cleanupExpiredCache, 5 * 60 * 1000);
-
-// 優化的批量查詢函數
-export async function batchQuery<T>(
-  queries: Array<{
-    table: string;
-    select?: string;
-    filters?: Record<string, any>;
-    orderBy?: { column: string; ascending?: boolean };
-    limit?: number;
-    cacheTTL?: number;
-  }>
-): Promise<any[]> {
   try {
-    // 更新性能監控
-    if ((window as any).performanceMonitor) {
-      (window as any).performanceMonitor.incrementQueryCount();
-    }
+    const queries = [];
 
-    const results: any[] = [];
+    // 查詢能力
+    let abilitiesQuery = supabase
+      .from('hanami_development_abilities')
+      .select('*')
+      .eq('is_active', true)
+      .order('ability_order', { ascending: true });
     
-    // 並行執行所有查詢
-    const queryPromises = queries.map(async (query, index) => {
-      const cacheKey = generateCacheKey(query.table, query);
-      const ttl = query.cacheTTL || CACHE_TTL.MEDIUM;
-      
-      // 檢查快取
-      if (isCacheValid(cacheKey, ttl)) {
-        console.log(`使用快取: ${query.table}`);
-        return getCache(cacheKey);
-      }
-      
-      // 執行查詢
-      let supabaseQuery = supabase.from(query.table as any).select(query.select || '*');
-      
-      // 應用過濾器
-      if (query.filters) {
-        Object.entries(query.filters).forEach(([key, value]) => {
-          if (Array.isArray(value)) {
-            supabaseQuery = supabaseQuery.in(key, value);
-          } else {
-            supabaseQuery = supabaseQuery.eq(key, value);
-          }
-        });
-      }
-      
-      // 應用排序
-      if (query.orderBy) {
-        supabaseQuery = supabaseQuery.order(query.orderBy.column, {
-          ascending: query.orderBy.ascending !== false
-        });
-      }
-      
-      // 應用限制
-      if (query.limit) {
-        supabaseQuery = supabaseQuery.limit(query.limit);
-      }
-      
-      const { data, error } = await supabaseQuery;
-      
-      if (error) {
-        console.error(`查詢錯誤 ${query.table}:`, error);
-        throw error;
-      }
-      
-      // 設置快取
-      setCache(cacheKey, data, ttl);
-      
-      return data;
-    });
+    if (options.organizationId) {
+      abilitiesQuery = abilitiesQuery.eq('org_id', options.organizationId);
+    }
+    queries.push(abilitiesQuery);
+
+    // 查詢成長樹
+    let treesQuery = supabase
+      .from('hanami_growth_trees')
+      .select('*')
+      .eq('is_active', true)
+      .order('tree_level', { ascending: true });
     
-    const queryResults = await Promise.all(queryPromises);
+    if (options.organizationId) {
+      treesQuery = treesQuery.eq('org_id', options.organizationId);
+    }
+    queries.push(treesQuery);
+
+    // 查詢教學活動
+    let activitiesQuery = supabase
+      .from('hanami_teaching_activities')
+      .select('*')
+      .eq('status', 'published')
+      .order('created_at', { ascending: false })
+      .limit(limit);
     
-    // 返回查詢結果陣列
-    return queryResults;
+    if (options.organizationId) {
+      activitiesQuery = activitiesQuery.eq('org_id', options.organizationId);
+    }
+    queries.push(activitiesQuery);
+
+    // 查詢最近的評估
+    let assessmentsQuery = supabase
+      .from('hanami_ability_assessments')
+      .select(`
+        *,
+        student:Hanami_Students(id, full_name, nick_name),
+        tree:hanami_growth_trees(id, tree_name)
+      `)
+      .order('assessment_date', { ascending: false })
+      .limit(limit);
+    
+    if (options.organizationId) {
+      assessmentsQuery = assessmentsQuery.eq('org_id', options.organizationId);
+    }
+    queries.push(assessmentsQuery);
+
+    const [abilitiesResult, treesResult, activitiesResult, assessmentsResult] = await Promise.all(queries);
+
+    const data = {
+      abilities: abilitiesResult.data || [],
+      trees: treesResult.data || [],
+      activities: activitiesResult.data || [],
+      assessments: assessmentsResult.data || [],
+    };
+
+    cache.set(cacheKey, { data, timestamp: Date.now() });
+    return data;
   } catch (error) {
-    console.error('批量查詢錯誤:', error);
-    throw error;
+    console.error('獲取基礎儀表板數據失敗:', error);
+    return {
+      abilities: [],
+      trees: [],
+      activities: [],
+      assessments: [],
+    };
   }
 }
 
-// 優化的學生評估狀態查詢
-export async function getStudentAssessmentStatus(date: string) {
-  const cacheKey = `student_assessment_status:${date}`;
-  const ttl = CACHE_TTL.SHORT;
+export async function getStudentAssessmentStatus(
+  date: string,
+  options: QueryOptions = {}
+) {
+  const cacheKey = `assessment_status_${date}_${options.organizationId || 'all'}`;
+  const cached = cache.get(cacheKey);
   
-  if (isCacheValid(cacheKey, ttl)) {
-    return getCache(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY) {
+    return cached.data;
   }
-  
-  const queries = [
-    {
-      table: 'hanami_student_lesson',
-      select: 'student_id, actual_timeslot',
-      filters: { lesson_date: date },
-      orderBy: { column: 'actual_timeslot', ascending: true },
-      cacheTTL: CACHE_TTL.SHORT
-    },
-    {
-      table: 'hanami_ability_assessments',
-      select: 'student_id, assessment_date',
-      filters: { assessment_date: date },
-      cacheTTL: CACHE_TTL.SHORT
-    },
-    {
-      table: 'Hanami_Students',
-      select: 'id, full_name, nick_name, course_type',
-      cacheTTL: CACHE_TTL.MEDIUM
-    },
-    {
-      table: 'hanami_student_trees',
-      select: 'student_id, tree_id, status',
-      filters: { status: 'active' },
-      cacheTTL: CACHE_TTL.MEDIUM
+
+  try {
+    // 查詢該日期的課程
+    let lessonsQuery = supabase
+      .from('hanami_student_lesson')
+      .select('*')
+      .eq('lesson_date', date);
+    
+    if (options.organizationId) {
+      lessonsQuery = lessonsQuery.eq('org_id', options.organizationId);
     }
-  ];
-  
-  const [lessonsData, assessmentsData, studentsData, treesData] = await batchQuery(queries);
-  
-  const result = {
-    lessons: lessonsData,
-    assessments: assessmentsData,
-    students: studentsData,
-    trees: treesData
-  };
-  
-  setCache(cacheKey, result, ttl);
-  return result;
-}
+    const { data: lessons } = await lessonsQuery;
 
-// 優化的學生媒體狀態查詢
-export async function getStudentMediaStatus(date: string) {
-  const cacheKey = `student_media_status:${date}`;
-  const ttl = CACHE_TTL.SHORT;
-  
-  if (isCacheValid(cacheKey, ttl)) {
-    return getCache(cacheKey);
-  }
-  
-  const queries = [
-    {
-      table: 'hanami_student_lesson',
-      select: 'student_id, lesson_date, actual_timeslot, full_name, course_type',
-      filters: { lesson_date: date },
-      cacheTTL: CACHE_TTL.SHORT
-    },
-    {
-      table: 'hanami_student_media',
-      select: 'student_id, created_at, media_type',
-      cacheTTL: CACHE_TTL.SHORT
+    // 查詢該日期的評估
+    let assessmentsQuery = supabase
+      .from('hanami_ability_assessments')
+      .select(`
+        *,
+        student:Hanami_Students(id, full_name, nick_name, course_type),
+        tree:hanami_growth_trees(id, tree_name)
+      `)
+      .eq('assessment_date', date);
+    
+    if (options.organizationId) {
+      assessmentsQuery = assessmentsQuery.eq('org_id', options.organizationId);
     }
-  ];
-  
-  const [lessonsData, mediaData] = await batchQuery(queries);
-  
-  // 過濾指定日期的媒體資料
-  const filteredMediaData = (mediaData as any[]).filter((media: any) => 
-    media.created_at.startsWith(date)
-  );
-  
-  const result = {
-    lessons: lessonsData,
-    media: filteredMediaData
-  };
-  
-  setCache(cacheKey, result, ttl);
-  return result;
-}
+    const { data: assessments } = await assessmentsQuery;
 
-// 優化的基礎資料查詢
-export async function getBaseDashboardData(assessmentLimit: number = 5) {
-  const cacheKey = `base_dashboard_data:${assessmentLimit}`;
-  const ttl = CACHE_TTL.MEDIUM;
-  
-  if (isCacheValid(cacheKey, ttl)) {
-    return getCache(cacheKey);
-  }
-  
-  const queries = [
-    {
-      table: 'hanami_development_abilities',
-      orderBy: { column: 'ability_name' },
-      cacheTTL: CACHE_TTL.LONG
-    },
-    {
-      table: 'hanami_growth_trees',
-      filters: { is_active: true },
-      orderBy: { column: 'tree_name' },
-      cacheTTL: CACHE_TTL.LONG
-    },
-    {
-      table: 'hanami_teaching_activities',
-      orderBy: { column: 'activity_name' },
-      cacheTTL: CACHE_TTL.LONG
-    },
-    {
-      table: 'hanami_ability_assessments',
-      select: '*, student:Hanami_Students(full_name, nick_name), tree:hanami_growth_trees(tree_name)',
-      orderBy: { column: 'created_at', ascending: false },
-      limit: assessmentLimit,
-      cacheTTL: CACHE_TTL.SHORT
+    // 獲取學生列表
+    const studentIds = new Set<string>();
+    lessons?.forEach((lesson: any) => {
+      if (lesson.student_id) studentIds.add(lesson.student_id);
+    });
+    assessments?.forEach((assessment: any) => {
+      if (assessment.student_id) studentIds.add(assessment.student_id);
+    });
+
+    let studentsQuery = supabase
+      .from('Hanami_Students')
+      .select('*')
+      .in('id', Array.from(studentIds));
+    
+    if (options.organizationId) {
+      studentsQuery = studentsQuery.eq('org_id', options.organizationId);
     }
-  ];
-  
-  const [abilities, trees, activities, assessments] = await batchQuery(queries);
-  
-  const result = {
-    abilities,
-    trees,
-    activities,
-    assessments
-  };
-  
-  setCache(cacheKey, result, ttl);
-  return result;
+    const { data: students } = await studentsQuery;
+
+    // 獲取成長樹列表
+    const treeIds = new Set<string>();
+    assessments?.forEach((assessment: any) => {
+      if (assessment.tree_id) treeIds.add(assessment.tree_id);
+    });
+
+    let treesQuery = supabase
+      .from('hanami_growth_trees')
+      .select('*')
+      .in('id', Array.from(treeIds));
+    
+    if (options.organizationId) {
+      treesQuery = treesQuery.eq('org_id', options.organizationId);
+    }
+    const { data: trees } = await treesQuery;
+
+    const data = {
+      lessons: lessons || [],
+      assessments: assessments || [],
+      students: students || [],
+      trees: trees || [],
+    };
+
+    cache.set(cacheKey, { data, timestamp: Date.now() });
+    return data;
+  } catch (error) {
+    console.error('獲取學生評估狀態失敗:', error);
+    return {
+      lessons: [],
+      assessments: [],
+      students: [],
+      trees: [],
+    };
+  }
 }
 
-// 清除特定快取
-export function clearCache(pattern?: string): void {
-  if (pattern) {
-    Object.keys(queryCache).forEach(key => {
-      if (key.includes(pattern)) {
-        delete queryCache[key];
+export async function getStudentMediaStatus(
+  date: string,
+  options: QueryOptions = {}
+) {
+  const cacheKey = `media_status_${date}_${options.organizationId || 'all'}`;
+  const cached = cache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY) {
+    return cached.data;
+  }
+
+  try {
+    // 查詢該日期的課程
+    let lessonsQuery = supabase
+      .from('hanami_student_lesson')
+      .select('*')
+      .eq('lesson_date', date);
+    
+    if (options.organizationId) {
+      lessonsQuery = lessonsQuery.eq('org_id', options.organizationId);
+    }
+    const { data: lessons } = await lessonsQuery;
+
+    // 查詢該日期的媒體（假設媒體存儲在課程記錄的 video_url 或其他字段中）
+    // 這裡需要根據實際的媒體表結構調整
+    const media: any[] = [];
+    lessons?.forEach((lesson: any) => {
+      if (lesson.video_url) {
+        media.push({
+          lesson_id: lesson.id,
+          student_id: lesson.student_id,
+          video_url: lesson.video_url,
+          lesson_date: lesson.lesson_date,
+        });
       }
     });
-  } else {
-    Object.keys(queryCache).forEach(key => {
-      delete queryCache[key];
-    });
+
+    const data = {
+      lessons: lessons || [],
+      media: media || [],
+    };
+
+    cache.set(cacheKey, { data, timestamp: Date.now() });
+    return data;
+  } catch (error) {
+    console.error('獲取學生媒體狀態失敗:', error);
+    return {
+      lessons: [],
+      media: [],
+    };
   }
 }
 
-// 獲取快取統計
-export function getCacheStats(): {
-  totalEntries: number;
-  totalSize: number;
-  hitRate: number;
-} {
-  const totalEntries = Object.keys(queryCache).length;
-  const totalSize = JSON.stringify(queryCache).length;
-  
-  return {
-    totalEntries,
-    totalSize,
-    hitRate: 0 // 需要實現命中率追蹤
-  };
-} 
- 
- 
- 
- 
- 
- 
- 
- 
- 
+export function clearCache(key?: string) {
+  if (key) {
+    // 清除特定快取鍵
+    const keysToDelete: string[] = [];
+    cache.forEach((value, cacheKey) => {
+      if (cacheKey.includes(key)) {
+        keysToDelete.push(cacheKey);
+      }
+    });
+    keysToDelete.forEach(k => cache.delete(k));
+  } else {
+    // 清除所有快取
+    cache.clear();
+  }
+}
+

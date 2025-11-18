@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { XMarkIcon, UserIcon, AcademicCapIcon, BookOpenIcon, StarIcon, PuzzlePieceIcon } from '@heroicons/react/24/outline';
 import { HanamiButton, GrowthTreeActivitiesPanel } from './index';
+import Image from 'next/image';
 
 interface GrowthTreeDetailModalProps {
   tree: any;
@@ -8,6 +9,7 @@ interface GrowthTreeDetailModalProps {
   abilitiesOptions: { value: string; label: string }[];
   activitiesOptions: { value: string; label: string }[];
   teachersOptions: { value: string; label: string }[];
+  courseTypesOptions?: { value: string; label: string }[];
   studentsInTree?: any[]; // 在此成長樹的學生
   onClose: () => void;
   onEdit?: () => void;
@@ -20,6 +22,7 @@ export default function GrowthTreeDetailModal({
   abilitiesOptions,
   activitiesOptions,
   teachersOptions,
+  courseTypesOptions = [],
   studentsInTree = [],
   onClose,
   onEdit,
@@ -71,7 +74,17 @@ export default function GrowthTreeDetailModal({
         <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{tree.tree_icon || '🌳'}</span>
+              {tree.tree_icon && tree.tree_icon !== '🌳' && tree.tree_icon !== '/tree ui.png' ? (
+                <span className="text-3xl">{tree.tree_icon}</span>
+              ) : (
+                <Image
+                  src="/tree ui.png"
+                  alt="成長樹圖示"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9"
+                />
+              )}
               <h2 className="text-2xl font-bold text-hanami-text">{tree.tree_name}</h2>
             </div>
             <div className="flex items-center gap-2">
@@ -135,7 +148,11 @@ export default function GrowthTreeDetailModal({
                 <div className="bg-hanami-surface p-4 rounded-lg border border-[#EADBC8] space-y-3">
                   <div className="flex justify-between">
                     <span className="text-hanami-text-secondary">課程類型:</span>
-                    <span className="text-hanami-text font-medium">{tree.course_type || '未指定'}</span>
+                    <span className="text-hanami-text font-medium">
+                      {tree.course_type 
+                        ? (courseTypesOptions.find(opt => opt.value === tree.course_type)?.label || tree.course_type)
+                        : '未指定'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-hanami-text-secondary">等級:</span>
@@ -220,7 +237,17 @@ export default function GrowthTreeDetailModal({
                       {goals.map((goal, index) => (
                         <div key={goal.id} className="border border-[#EADBC8] rounded-lg p-3 bg-white">
                           <div className="flex items-start gap-3 mb-2">
-                            <span className="text-xl">{goal.goal_icon || '⭐'}</span>
+                            {(goal.goal_icon === '/apple-icon.svg' || !goal.goal_icon || goal.goal_icon === '⭐') ? (
+                              <Image
+                                src="/apple-icon.svg"
+                                alt="目標圖案"
+                                width={24}
+                                height={24}
+                                className="h-6 w-6 flex-shrink-0"
+                              />
+                            ) : (
+                              <span className="text-xl">{goal.goal_icon}</span>
+                            )}
                             <div className="flex-1">
                               <h4 className="font-medium text-hanami-text">{goal.goal_name}</h4>
                               {goal.goal_description && (

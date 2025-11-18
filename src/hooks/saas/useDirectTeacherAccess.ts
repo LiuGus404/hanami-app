@@ -38,7 +38,7 @@ export function useDirectTeacherAccess() {
         .from('hanami_employee')
         .select('id, teacher_email, teacher_fullname, teacher_nickname, teacher_role, teacher_status')
         .eq('teacher_email', email)
-        .single();
+        .maybeSingle();
 
       console.log('Supabase 查詢結果:', { employeeData, employeeError });
       console.log('教師狀態檢查:', { 
@@ -48,7 +48,12 @@ export function useDirectTeacherAccess() {
       });
 
       if (employeeError) {
-        if (employeeError.code === 'PGRST116') {
+        const statusCode = (employeeError as any)?.code || (employeeError as any)?.details;
+        const statusText = typeof statusCode === 'string' ? statusCode : '';
+        const isNotFound = employeeError.code === 'PGRST116' || statusText.includes('PGRST116');
+        const isNotAcceptable = statusText.includes('406') || (employeeError as any)?.status === 406;
+
+        if (isNotFound || isNotAcceptable) {
           // 沒有找到記錄
           const noAccessData: TeacherAccessData = {
             success: false,

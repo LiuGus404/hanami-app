@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
-import { getUserSession, clearUserSession } from '@/lib/authUtils';
+import { getUserSession, clearUserSession, fallbackOrganization } from '@/lib/authUtils';
 import { supabase, getSaasSupabaseClient } from '@/lib/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [adminName, setAdminName] = useState('管理員');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [orgId, setOrgId] = useState<string | null>(null);
   const sessionChecked = useRef(false);
 
   // AI 專案對話紀錄 - 狀態
@@ -64,10 +65,13 @@ export default function AdminPage() {
 
     // 設置管理員名稱
     setAdminName(userSession.name || '管理員');
+    setOrgId(userSession.organization?.id || null);
     setIsLoading(false);
   }, []); // 移除 router 依賴
 
   useEffect(() => {
+    if (!orgId) return;
+
     const fetchData = async () => {
       try {
         setError(null);
@@ -78,7 +82,8 @@ export default function AdminPage() {
         const { data: regularStudents, error: regularError } = await supabase
           .from('Hanami_Students')
           .select('id, student_type')
-          .eq('student_type', '常規');
+          .eq('student_type', '常規')
+          .eq('org_id', orgId);
         
         if (regularError) {
           console.error('Error fetching regular students:', regularError);
@@ -91,7 +96,8 @@ export default function AdminPage() {
         const { data: trialStudents, error: trialError } = await supabase
           .from('hanami_trial_students')
           .select('id, lesson_date')
-          .gte('lesson_date', today);
+          .gte('lesson_date', today)
+          .eq('org_id', orgId);
         
         if (trialError) {
           console.error('Error fetching trial students:', trialError);
@@ -103,7 +109,8 @@ export default function AdminPage() {
         const { data: regularStudentsForLesson, error: regularStudentsError } = await supabase
           .from('Hanami_Students')
           .select('id')
-          .eq('student_type', '常規');
+          .eq('student_type', '常規')
+          .eq('org_id', orgId);
         
         if (regularStudentsError) {
           console.error('Error fetching regular students for lesson count:', regularStudentsError);
@@ -171,7 +178,7 @@ export default function AdminPage() {
     };
 
     fetchData();
-  }, []);
+  }, [orgId]);
 
   if (isLoading) {
     return (
@@ -312,7 +319,10 @@ export default function AdminPage() {
           {/* 簡化的日曆區 */}
           <div className="bg-white rounded-2xl p-4 mb-4 border border-[#EADBC8]">
             <h3 className="text-base font-semibold text-[#2B3A3B] mb-3">Hanami 日曆</h3>
-            <HanamiCalendar />
+            <HanamiCalendar
+              organizationId={orgId}
+              forceEmpty={!orgId || orgId === fallbackOrganization.id || orgId === 'default-org'}
+            />
           </div>
 
           {/* 管理按鈕區 */}

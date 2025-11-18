@@ -73,7 +73,7 @@ export default function TestAvatarIntegrationPage() {
     },
     {
       step: 3,
-      title: '點擊「互動角色」分頁',
+      title: '點擊「學生狀態」分頁',
       description: '查看3D動態角色和學習進度',
       link: null
     },
@@ -179,7 +179,7 @@ export default function TestAvatarIntegrationPage() {
               <div className="w-16 h-16 bg-[#FFD59A]/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <span className="text-2xl">🎭</span>
               </div>
-              <h3 className="font-bold text-[#2B3A3B] mb-2">3D互動角色</h3>
+            <h3 className="font-bold text-[#2B3A3B] mb-2">學生狀態</h3>
               <p className="text-sm text-[#2B3A3B]/70">
                 點擊觸發動畫、表情變化、音效回饋，根據性別自動調整角色外觀
               </p>

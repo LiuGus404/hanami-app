@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
+import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   ChevronLeftIcon, 
   ChevronRightIcon,
@@ -30,7 +31,12 @@ import {
 import { HanamiCard, HanamiButton, LessonPlanModal, GrowthTreeDetailModal, StudentActivitiesPanel, StudentMediaModal } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
+import { fallbackOrganization, type OrganizationProfile, getUserSession } from '@/lib/authUtils';
 import SimpleAbilityAssessmentModal from '@/components/ui/SimpleAbilityAssessmentModal';
+import BackButton from '@/components/ui/BackButton';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
+import { useContext } from 'react';
+import { TeacherLinkShellContext } from '@/app/aihome/teacher-link/create/TeacherLinkShell';
 
 interface Lesson {
   id: string;
@@ -155,8 +161,184 @@ interface ClassGroup {
   teacher_assist_name?: string; // 助教名字
 }
 
-export default function ClassActivitiesPage() {
+type ClassActivitiesPageProps = {
+  hideCalendarButton?: boolean;
+  forcedOrgId?: string | null;
+  forcedOrgName?: string | null;
+  disableOrgFallback?: boolean;
+};
+
+const EMPTY_TEACHER_LINK_ORG: OrganizationProfile = {
+  id: '',
+  name: '未設定機構',
+  slug: 'unassigned-org',
+  status: null,
+};
+
+export default function ClassActivitiesPage(
+  props: ClassActivitiesPageProps = {},
+) {
+  const {
+    hideCalendarButton = false,
+    forcedOrgId = null,
+    forcedOrgName = null,
+    disableOrgFallback = false,
+  } = props;
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const allowOrgData =
+    typeof process !== 'undefined' &&
+    process.env.NEXT_PUBLIC_ENABLE_ORG_DATA === 'true';
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const PLACEHOLDER_ORG_IDS = new Set([
+  fallbackOrganization.id,
+  'default-org',
+  'unassigned-org-placeholder',
+]);
+
+  const hasForcedOrg = useMemo(() => {
+    if (!forcedOrgId) return false;
+    return UUID_REGEX.test(forcedOrgId) && !PLACEHOLDER_ORG_IDS.has(forcedOrgId);
+  }, [forcedOrgId]);
+
+  const forcedOrganization = useMemo<OrganizationProfile | null>(() => {
+    if (!hasForcedOrg || !forcedOrgId) return null;
+    return {
+      id: forcedOrgId,
+      name: forcedOrgName || fallbackOrganization.name,
+      slug: fallbackOrganization.slug,
+      status: null,
+    };
+  }, [hasForcedOrg, forcedOrgId, forcedOrgName]);
+
+  const allowOrgDataEffective = useMemo(
+    () => (disableOrgFallback ? true : allowOrgData),
+    [disableOrgFallback, allowOrgData],
+  );
+
+  const [organization, setOrganization] = useState<OrganizationProfile>(
+    forcedOrganization ??
+      (disableOrgFallback ? EMPTY_TEACHER_LINK_ORG : fallbackOrganization),
+  );
+  const [organizationResolved, setOrganizationResolved] = useState(
+    hasForcedOrg ? true : disableOrgFallback ? true : !allowOrgData,
+  );
+
+  useEffect(() => {
+    if (hasForcedOrg && forcedOrganization) {
+      setOrganization(forcedOrganization);
+      setOrganizationResolved(true);
+      return;
+    }
+  }, [hasForcedOrg, forcedOrganization]);
+
+  useEffect(() => {
+    if (hasForcedOrg || disableOrgFallback) {
+      return;
+    }
+
+    if (!allowOrgDataEffective) {
+      setOrganization(fallbackOrganization);
+      setOrganizationResolved(true);
+      return;
+    }
+
+    let resolvedOrg: OrganizationProfile = fallbackOrganization;
+
+    const queryOrgId = searchParams?.get('orgId');
+    const queryOrgName = searchParams?.get('orgName');
+    const queryOrgSlug = searchParams?.get('orgSlug');
+
+    if (queryOrgId) {
+      resolvedOrg = {
+        id: queryOrgId,
+        name: queryOrgName || fallbackOrganization.name,
+        slug: queryOrgSlug || fallbackOrganization.slug,
+        status: null,
+      };
+    } else if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('hanami_current_org');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.id) {
+            resolvedOrg = {
+              id: parsed.id,
+              name: parsed.name || fallbackOrganization.name,
+              slug: parsed.slug || fallbackOrganization.slug,
+              status: parsed.status ?? null,
+            };
+          }
+        }
+      } catch (error) {
+        console.error('class-activities: failed to parse stored organization', error);
+      }
+    }
+
+    if (
+      (!resolvedOrg || !resolvedOrg.id || resolvedOrg.id === fallbackOrganization.id || resolvedOrg.id === 'default-org') &&
+      typeof window !== 'undefined'
+    ) {
+      try {
+        const session = getUserSession();
+        if (session?.organization?.id) {
+          resolvedOrg = session.organization;
+        }
+      } catch (error) {
+        console.error('class-activities: failed to get user session organization', error);
+      }
+    }
+
+    if (!resolvedOrg || !resolvedOrg.id) {
+      resolvedOrg = fallbackOrganization;
+    }
+
+    setOrganization(resolvedOrg);
+    setOrganizationResolved(true);
+  }, [allowOrgDataEffective, disableOrgFallback, hasForcedOrg, searchParams]);
+
+  const resolvedOrgId = organizationResolved ? organization?.id ?? null : null;
+  const hasValidOrgId = hasForcedOrg
+    ? Boolean(forcedOrganization?.id)
+    : !allowOrgDataEffective ||
+      (!!resolvedOrgId &&
+        UUID_REGEX.test(resolvedOrgId) &&
+        !PLACEHOLDER_ORG_IDS.has(resolvedOrgId));
+  const effectiveOrgId = hasForcedOrg
+    ? (forcedOrganization?.id as string | undefined)
+    : allowOrgDataEffective && hasValidOrgId
+      ? (resolvedOrgId as string)
+      : null;
+  const orgDataDisabled = hasForcedOrg
+    ? !forcedOrganization?.id
+    : allowOrgDataEffective
+      ? !hasValidOrgId
+      : false;
+
+  const validOrgId = hasValidOrgId && effectiveOrgId ? (effectiveOrgId as string) : null;
+  
+  // 檢查是否為允許使用媒體功能的機構
+  const allowedOrgId = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
+  const isAllowedOrg = validOrgId === allowedOrgId;
+  
+  // 獲取用戶角色（如果是在 TeacherLinkShell 內）
+  // 直接使用 useContext 來安全地獲取 context（如果不存在則返回 undefined）
+  const teacherLinkOrg = useContext(TeacherLinkShellContext);
+  
+  const userOrganizations = teacherLinkOrg?.userOrganizations || [];
+  const currentOrgRole = useMemo(() => {
+    if (!validOrgId || userOrganizations.length === 0) return null;
+    const currentOrg = userOrganizations.find((org: any) => org.orgId === validOrgId);
+    return currentOrg?.role || null;
+  }, [validOrgId, userOrganizations]);
+  
+  // 檢查是否為成員身份
+  const isMember = currentOrgRole === 'member';
+
+  const displayOrgWarning = organizationResolved && orgDataDisabled;
 
   // 使用香港時區的今天日期
   const getTodayInHongKong = () => {
@@ -295,6 +477,14 @@ export default function ClassActivitiesPage() {
     tree_description?: string;
     course_type: string;
   } | null>(null);
+  
+  // 當前教師信息（用於鎖定教師選擇）- 使用 SaaS 用戶信息
+  const { user: saasUser } = useSaasAuth();
+  const [currentTeacher, setCurrentTeacher] = useState<{
+    id: string;
+    teacher_fullname?: string;
+    teacher_nickname?: string;
+  } | null>(null);
 
   // 新增：學生媒體上傳狀態追蹤
   const [studentMediaStatus, setStudentMediaStatus] = useState<Record<string, boolean>>({});
@@ -342,12 +532,22 @@ export default function ClassActivitiesPage() {
   // 載入所有老師列表
   const loadAllTeachers = async () => {
     try {
+      if (orgDataDisabled) {
+        setAllTeachers([]);
+        return;
+      }
       setLoadingTeachers(true);
-      const { data: teachers, error } = await supabase
+      let teacherQuery = supabase
         .from('hanami_employee')
         .select('id, teacher_fullname, teacher_nickname, teacher_role, teacher_status')
         .eq('teacher_status', 'active')
         .order('teacher_fullname');
+
+      if (validOrgId) {
+        teacherQuery = teacherQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: teachers, error } = await teacherQuery;
 
       if (error) throw error;
       setAllTeachers(teachers || []);
@@ -370,26 +570,42 @@ export default function ClassActivitiesPage() {
     });
     setShowTeacherSelectionModal(true);
     
-    // 如果還沒有載入老師列表，則載入
-    if (allTeachers.length === 0) {
-      loadAllTeachers();
-    }
+    // 總是重新載入老師列表，以確保顯示最新的基於 org_id 的老師列表
+    loadAllTeachers();
   };
 
   // 更新班級老師
   const updateClassTeacher = async (teacherId: string | null, teacherName: string) => {
     if (!selectedClassForTeacher) return;
+    if (!validOrgId) {
+      toast.error('請先創建屬於您的機構後再更新課堂老師');
+      return;
+    }
 
     try {
-      const { error } = await supabase
-        .from('hanami_schedule_daily')
-        .update({
-          [selectedClassForTeacher.teacherRole === 'main' ? 'teacher_main_id' : 'teacher_assist_id']: teacherId
-        })
-        .eq('schedule_template_id', selectedClassForTeacher.classId)
-        .eq('lesson_date', selectedDate.toISOString().split('T')[0]);
+      // 使用 API 端點來更新，繞過 RLS 限制
+      const response = await fetch('/api/schedule-daily/update-teacher', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          scheduleTemplateId: selectedClassForTeacher.classId,
+          lessonDate: selectedDate.toISOString().split('T')[0],
+          teacherId: teacherId,
+          teacherRole: selectedClassForTeacher.teacherRole,
+          orgId: validOrgId,
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error('更新老師失敗:', result.error);
+        toast.error(`更新老師失敗: ${result.error || '未知錯誤'}`);
+        return;
+      }
 
       // 更新本地狀態
       setClassGroups(prev => prev.map(group => {
@@ -401,6 +617,9 @@ export default function ClassActivitiesPage() {
         }
         return group;
       }));
+
+      // 重新載入數據以確保顯示最新結果
+      await loadClassGroupData();
 
       const actionText = teacherId ? `為 ${teacherName}` : '為空';
       toast.success(`已更新${selectedClassForTeacher.teacherRole === 'main' ? '主教' : '助教'}${actionText}`);
@@ -415,6 +634,15 @@ export default function ClassActivitiesPage() {
   // 載入班別資料（根據 hanami_schedule）
   const loadClassGroupData = async () => {
     try {
+      if (!organizationResolved) {
+        return;
+      }
+
+    if (orgDataDisabled || !validOrgId) {
+        setClassGroups([]);
+        return;
+      }
+
       setLoadingText('載入班別資料中...');
       
       // 計算選中日期的星期幾
@@ -432,11 +660,16 @@ export default function ClassActivitiesPage() {
       const dateStr = formatLocalDate(selectedDate);
       
       // 查詢 hanami_schedule 表
-      const { data: schedules, error: scheduleError } = await supabase
+      let scheduleQuery = supabase
         .from('hanami_schedule')
         .select('*')
-        .eq('weekday', selectedWeekday)
-        .order('timeslot', { ascending: true });
+        .eq('weekday', selectedWeekday);
+
+      if (validOrgId) {
+        scheduleQuery = scheduleQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: schedules, error: scheduleError } = await scheduleQuery.order('timeslot', { ascending: true });
       
       if (scheduleError) {
         console.error('查詢班別資料失敗:', scheduleError);
@@ -473,53 +706,94 @@ export default function ClassActivitiesPage() {
           let teacherMainName = '';
           let teacherAssistName = '';
           
-          if (schedule.id) {
-            const { data: dailySchedule, error: dailyError } = await supabase
-              .from('hanami_schedule_daily')
-              .select('teacher_main_id, teacher_assist_id')
-              .eq('schedule_template_id', schedule.id)
-              .eq('lesson_date', dateStr)
-              .single();
-
-            if (!dailyError && dailySchedule) {
-              // 獲取主教資訊
-              if (dailySchedule.teacher_main_id) {
-                const { data: mainTeacher, error: mainError } = await supabase
-                  .from('hanami_employee')
-                  .select('teacher_fullname, teacher_nickname')
-                  .eq('id', dailySchedule.teacher_main_id)
-                  .single();
-                
-                if (!mainError && mainTeacher) {
-                  teacherMainName = mainTeacher.teacher_fullname || mainTeacher.teacher_nickname || '';
+          if (schedule.id && validOrgId) {
+            try {
+              // 使用 API 端點來查詢，繞過 RLS 限制
+              const response = await fetch(
+                `/api/schedule-daily/get?scheduleTemplateId=${encodeURIComponent(schedule.id)}&lessonDate=${encodeURIComponent(dateStr)}&orgId=${encodeURIComponent(validOrgId)}`,
+                {
+                  method: 'GET',
+                  credentials: 'include',
                 }
-              }
+              );
 
-              // 獲取助教資訊
-              if (dailySchedule.teacher_assist_id) {
-                const { data: assistTeacher, error: assistError } = await supabase
-                  .from('hanami_employee')
-                  .select('teacher_fullname, teacher_nickname')
-                  .eq('id', dailySchedule.teacher_assist_id)
-                  .single();
-                
-                if (!assistError && assistTeacher) {
-                  teacherAssistName = assistTeacher.teacher_fullname || assistTeacher.teacher_nickname || '';
+              if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data) {
+                  teacherMainName = result.data.teacher_main_name || '';
+                  teacherAssistName = result.data.teacher_assist_name || '';
+                  console.log(`✅ 載入老師信息成功: ${schedule.course_code} - 主教: ${teacherMainName}, 助教: ${teacherAssistName}`);
+                } else {
+                  console.warn(`⚠️ 查詢老師信息返回失敗: ${schedule.course_code}`, result);
                 }
+              } else {
+                const errorText = await response.text();
+                console.warn(`⚠️ 查詢老師信息失敗 (${response.status}): ${schedule.course_code}`, errorText);
               }
+            } catch (error) {
+              console.error(`❌ 查詢老師信息時發生錯誤: ${schedule.course_code}`, error);
             }
           }
           
           // 獲取該班級的所有常規學生
+          // 使用 API 端點繞過 RLS
           let assignedStudents: any[] = [];
           if (schedule.assigned_student_ids && schedule.assigned_student_ids.length > 0) {
-            const { data: studentData, error: studentError } = await supabase
-              .from('Hanami_Students')
-              .select('*')
-              .in('id', schedule.assigned_student_ids);
+            try {
+              // 獲取 userEmail
+              const session = getUserSession();
+              const userEmail = session?.email || null;
+              
+              // 使用 API 端點獲取所有學生
+              const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+              
+              const response = await fetch(apiUrl, {
+                credentials: 'include',
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                const allStudents = result.students || result.data || [];
+                // 過濾出該班級分配的學生
+                assignedStudents = allStudents.filter((s: any) => 
+                  schedule.assigned_student_ids.includes(s.id)
+                );
+                console.log(`通過 API 載入班級 ${schedule.course_code || schedule.id} 的常規學生數量:`, assignedStudents.length);
+              } else {
+                console.error('⚠️ 無法載入常規學生，API 返回錯誤:', response.status);
+                // Fallback 到直接查詢（可能也會失敗）
+                let studentQuery = supabase
+                  .from('Hanami_Students')
+                  .select('*')
+                  .in('id', schedule.assigned_student_ids);
 
-            if (!studentError && studentData) {
-              assignedStudents = studentData || [];
+                if (validOrgId) {
+                  studentQuery = studentQuery.eq('org_id', validOrgId);
+                }
+
+                const { data: studentData, error: studentError } = await studentQuery;
+
+                if (!studentError && studentData) {
+                  assignedStudents = studentData || [];
+                }
+              }
+            } catch (apiError) {
+              console.error('⚠️ API 調用異常，嘗試直接查詢:', apiError);
+              // Fallback 到直接查詢
+              let studentQuery = supabase
+                .from('Hanami_Students')
+                .select('*')
+                .in('id', schedule.assigned_student_ids);
+
+              if (validOrgId) {
+                studentQuery = studentQuery.eq('org_id', validOrgId);
+              }
+
+              const { data: studentData, error: studentError } = await studentQuery;
+
+              if (!studentError && studentData) {
+                assignedStudents = studentData || [];
+              }
             }
           }
         
@@ -538,10 +812,16 @@ export default function ClassActivitiesPage() {
             const trialStudentIds = trialLessonsForThisSlot.map(lesson => lesson.id);
             
             if (trialStudentIds.length > 0) {
-              const { data: trialStudentsData, error: trialStudentsError } = await supabase
+              let trialQuery = supabase
                 .from('hanami_trial_students')
                 .select('*')
                 .in('id', trialStudentIds);
+
+          if (validOrgId) {
+            trialQuery = trialQuery.eq('org_id', validOrgId);
+              }
+
+              const { data: trialStudentsData, error: trialStudentsError } = await trialQuery;
               
               if (!trialStudentsError && trialStudentsData) {
                 trialStudents = trialStudentsData || [];
@@ -623,6 +903,19 @@ export default function ClassActivitiesPage() {
   // 載入課堂資料
   const loadClassData = async () => {
     try {
+      if (!organizationResolved) {
+        return;
+      }
+
+      if (orgDataDisabled) {
+        setLessons([]);
+        setTrialLessons([]);
+        setTreeActivities([]);
+        setAssignedActivities([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setLoadingText('載入課堂資料中...');
       
@@ -651,7 +944,7 @@ export default function ClassActivitiesPage() {
         return `${year}-${month}-${day}`;
       };
       
-      const cacheKey = `${formatLocalDateInLoad(startDate)}-${formatLocalDateInLoad(endDate)}`;
+      const cacheKey = `${validOrgId}:${formatLocalDateInLoad(startDate)}-${formatLocalDateInLoad(endDate)}`;
       
       // 檢查快取
       if (dataCache.has(cacheKey)) {
@@ -686,7 +979,17 @@ export default function ClassActivitiesPage() {
       
       // 發送 API 請求
       setLoadingText('查詢資料庫中...');
-      const response = await fetch(`/api/class-activities?weekStart=${formatLocalDateInLoad(startDate)}&weekEnd=${formatLocalDateInLoad(endDate)}`);
+      const query = new URLSearchParams({
+        weekStart: formatLocalDateInLoad(startDate),
+        weekEnd: formatLocalDateInLoad(endDate),
+      });
+      
+      // 只在 validOrgId 存在時才添加 orgId 參數
+      if (validOrgId) {
+        query.set('orgId', validOrgId);
+      }
+
+      const response = await fetch(`/api/class-activities?${query.toString()}`);
       const result = await response.json();
       
       if (!response.ok) {
@@ -728,23 +1031,59 @@ export default function ClassActivitiesPage() {
       
       // 載入學生關注狀態
       try {
-        const allStudents = [
+        const allStudentIds = [
           ...(result.data.lessons || []).map((lesson: any) => lesson.student_id),
           ...(result.data.trialLessons || []).map((lesson: any) => lesson.student_id)
         ];
         
-        if (allStudents.length > 0) {
-          const { data: studentsData, error: studentsError } = await supabase
-            .from('Hanami_Students')
-            .select('id, care_alert')
-            .in('id', allStudents);
+        if (allStudentIds.length > 0 && validOrgId) {
+          // 使用 API 端點獲取學生關注狀態
+          const session = getUserSession();
+          const userEmail = session?.email || null;
           
-          if (!studentsError && studentsData) {
+          const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+          
+          const response = await fetch(apiUrl, {
+            credentials: 'include',
+          });
+          
+          if (response.ok) {
+            const apiResult = await response.json();
+            const allStudents = apiResult.students || apiResult.data || [];
+            
+            // 過濾出相關學生並建立關注狀態映射
             const careAlertMap: Record<string, boolean> = {};
-            studentsData.forEach((student: any) => {
-              careAlertMap[student.id] = student.care_alert || false;
+            const filteredIds = new Set(allStudentIds.filter((id): id is string => id !== null));
+            
+            allStudents.forEach((student: any) => {
+              if (filteredIds.has(student.id)) {
+                careAlertMap[student.id] = student.care_alert || false;
+              }
             });
+            
             setStudentCareAlertStatus(careAlertMap);
+            console.log('通過 API 載入學生關注狀態成功:', Object.keys(careAlertMap).length);
+          } else {
+            console.error('⚠️ 無法載入學生關注狀態，API 返回錯誤:', response.status);
+            // Fallback 到直接查詢
+            let studentCareQuery = supabase
+              .from('Hanami_Students')
+              .select('id, care_alert')
+              .in('id', allStudentIds.filter((id): id is string => id !== null));
+
+            if (validOrgId) {
+              studentCareQuery = studentCareQuery.eq('org_id', validOrgId);
+            }
+
+            const { data: studentsData, error: studentsError } = await studentCareQuery;
+            
+            if (!studentsError && studentsData) {
+              const careAlertMap: Record<string, boolean> = {};
+              studentsData.forEach((student: any) => {
+                careAlertMap[student.id] = student.care_alert || false;
+              });
+              setStudentCareAlertStatus(careAlertMap);
+            }
           }
         }
       } catch (error) {
@@ -757,7 +1096,14 @@ export default function ClassActivitiesPage() {
         setTimeout(async () => {
           try {
             setLoadingText('載入活動資料中...');
-            const activitiesResponse = await fetch('/api/tree-activities');
+        const treeActivitiesParams = new URLSearchParams();
+        if (validOrgId) {
+          treeActivitiesParams.set('orgId', validOrgId);
+        }
+
+        const activitiesResponse = await fetch(
+          `/api/tree-activities${treeActivitiesParams.toString() ? `?${treeActivitiesParams.toString()}` : ''}`,
+        );
             const activitiesResult = await activitiesResponse.json();
             
             if (activitiesResponse.ok && activitiesResult.success) {
@@ -777,16 +1123,59 @@ export default function ClassActivitiesPage() {
     }
   };
 
+  // 獲取當前用戶的教師信息（使用 SaaS 用戶信息）
   useEffect(() => {
+    if (!saasUser) {
+      setCurrentTeacher(null);
+      return;
+    }
+
+    // 直接使用 SaaS 用戶的 id 和 full_name
+    setCurrentTeacher({
+      id: saasUser.id, // 使用 SaaS 用戶的 UUID
+      teacher_fullname: saasUser.full_name || saasUser.email || undefined,
+      teacher_nickname: saasUser.full_name || saasUser.email || undefined,
+    });
+  }, [saasUser]);
+
+  // 如果是成員身份，確保日期始終是今天
+  useEffect(() => {
+    if (isMember) {
+      const today = getTodayInHongKong();
+      const todayStr = today.toISOString().split('T')[0];
+      const selectedDateStr = selectedDate.toISOString().split('T')[0];
+      
+      if (selectedDateStr !== todayStr) {
+        setSelectedDate(today);
+        setSelectedDates([today]);
+      }
+    }
+  }, [isMember, selectedDate]);
+
+  useEffect(() => {
+    if (!organizationResolved) {
+      return;
+    }
+
+    if (orgDataDisabled) {
+      setLessons([]);
+      setTrialLessons([]);
+      setTreeActivities([]);
+      setAssignedActivities([]);
+      setLoading(false);
+      return;
+    }
+
     console.log('🔄 useEffect 觸發，載入課堂資料');
     console.log('📅 當前選中日期:', selectedDate.toISOString().split('T')[0]);
     console.log('📅 當前選中日期數組:', selectedDates.map(d => d.toISOString().split('T')[0]));
     console.log('🌏 確認今天日期:', getTodayInHongKong().toISOString().split('T')[0]);
     loadClassData();
-  }, [selectedDate, selectedDates]);
+  }, [selectedDate, selectedDates, organizationResolved, orgDataDisabled, validOrgId]);
 
-  // 新增：自動切換到有課程的日期（僅在課程載入完成後執行一次）
+  // 新增：自動切換到有課程的日期（僅在課程載入完成後執行一次，成員身份不自動切換）
   useEffect(() => {
+    if (isMember) return; // 成員身份不自動切換日期
     if (lessons.length === 0 || hasAutoSwitched) return; // 等待課程資料載入或已經自動切換過
     
     const todayHK = getTodayInHongKong();
@@ -814,18 +1203,26 @@ export default function ClassActivitiesPage() {
         setHasAutoSwitched(true); // 標記已經自動切換過
       }
     }
-  }, [lessons, hasAutoSwitched]); // 依賴 lessons 和 hasAutoSwitched
+  }, [lessons, hasAutoSwitched, isMember]); // 依賴 lessons 和 hasAutoSwitched
 
 
 
   // 切換日期
   const goToPreviousDay = () => {
+    if (isMember) {
+      toast.error('未開通權限');
+      return;
+    }
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() - 1);
     setSelectedDate(newDate);
   };
 
   const goToNextDay = () => {
+    if (isMember) {
+      toast.error('未開通權限');
+      return;
+    }
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + 1);
     setSelectedDate(newDate);
@@ -855,7 +1252,17 @@ export default function ClassActivitiesPage() {
   const getStudentAssignedActivities = async (lessonId: string, studentId: string) => {
     try {
       // 使用 API 獲取學生的所有活動，包括跨多個課堂的長期活動
-      const response = await fetch(`/api/student-activities?studentId=${studentId}&lessonDate=${new Date().toISOString().split('T')[0]}&timeslot=`);
+      const params = new URLSearchParams({
+        studentId,
+        lessonDate: new Date().toISOString().split('T')[0],
+        timeslot: '',
+      });
+
+      if (validOrgId) {
+        params.set('orgId', validOrgId);
+      }
+
+      const response = await fetch(`/api/student-activities?${params.toString()}`);
       
       if (!response.ok) {
         console.error('獲取學生活動失敗:', response.status);
@@ -907,6 +1314,10 @@ export default function ClassActivitiesPage() {
 
   // 載入所有學生的活動
   useEffect(() => {
+    if (!organizationResolved || orgDataDisabled) {
+      return;
+    }
+
     if (lessons.length > 0) {
       const studentIds = lessons
         .filter(lesson => 'student_id' in lesson)
@@ -918,7 +1329,7 @@ export default function ClassActivitiesPage() {
         }
       });
     }
-  }, [lessons]);
+  }, [lessons, organizationResolved, orgDataDisabled]);
 
   // 檢查學生今天的評估狀態
   const checkStudentAssessmentStatus = async () => {
@@ -942,11 +1353,17 @@ export default function ClassActivitiesPage() {
       }).filter((id): id is string => id !== null);
       
       // 批量檢查學生今天的評估記錄
-      const { data: assessments, error } = await supabase
+      let assessmentQuery = supabase
         .from('hanami_ability_assessments')
         .select('student_id')
         .in('student_id', studentIds)
         .eq('assessment_date', today);
+
+      if (validOrgId) {
+        assessmentQuery = assessmentQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: assessments, error } = await assessmentQuery;
 
       if (error) {
         console.error('檢查評估狀態失敗:', error);
@@ -992,7 +1409,9 @@ export default function ClassActivitiesPage() {
         .map(lesson => lesson.student_id);
       
       if (studentIds.length > 0) {
-        const remainingLessons = await calculateRemainingLessonsBatch(studentIds, new Date());
+        const remainingLessons = await calculateRemainingLessonsBatch(studentIds, new Date(), {
+          organizationId: validOrgId || undefined,
+        });
         setRemainingLessonsMap(remainingLessons);
         console.log('剩餘堂數載入完成:', remainingLessons);
       }
@@ -1005,17 +1424,25 @@ export default function ClassActivitiesPage() {
 
   // 載入剩餘堂數和評估狀態
   useEffect(() => {
+    if (!organizationResolved || orgDataDisabled) {
+      return;
+    }
+
     loadRemainingLessons();
     checkStudentAssessmentStatus(); // 檢查評估狀態
     checkStudentMediaStatus(); // 檢查媒體上傳狀態
-  }, [lessons]);
+  }, [lessons, organizationResolved, orgDataDisabled]);
 
   // 當切換到班別顯示模式或課程資料更新時，重新載入班別資料
   useEffect(() => {
+    if (!organizationResolved || orgDataDisabled) {
+      return;
+    }
+
     if (displayMode === 'class' && (lessons.length > 0 || trialLessons.length > 0)) {
       loadClassGroupData();
     }
-  }, [displayMode, lessons, trialLessons, selectedDate]);
+  }, [displayMode, lessons, trialLessons, selectedDate, organizationResolved, orgDataDisabled, validOrgId]);
 
   // 載入班別學生的活動、剩餘堂數和評估狀態
   useEffect(() => {
@@ -1031,7 +1458,9 @@ export default function ClassActivitiesPage() {
       
       // 載入剩餘堂數
       if (allStudentIds.length > 0 && !loadingRemainingLessons) {
-        calculateRemainingLessonsBatch(allStudentIds, new Date()).then(remainingLessons => {
+        calculateRemainingLessonsBatch(allStudentIds, new Date(), {
+          organizationId: validOrgId || undefined,
+        }).then(remainingLessons => {
           setRemainingLessonsMap(remainingLessons);
         });
       }
@@ -1043,11 +1472,17 @@ export default function ClassActivitiesPage() {
             setLoadingAssessmentStatus(true);
             const today = new Date().toISOString().split('T')[0];
             
-            const { data: assessments, error } = await supabase
+            let classAssessmentQuery = supabase
               .from('hanami_ability_assessments')
               .select('student_id')
               .in('student_id', allStudentIds)
               .eq('assessment_date', today);
+
+            if (validOrgId) {
+              classAssessmentQuery = classAssessmentQuery.eq('org_id', validOrgId);
+            }
+
+            const { data: assessments, error } = await classAssessmentQuery;
 
             if (!error && assessments) {
               const statusMap: Record<string, boolean> = {};
@@ -1107,12 +1542,18 @@ export default function ClassActivitiesPage() {
 
       if (allStudentIds.length > 0) {
         // 查詢今天是否有媒體上傳記錄
-        const { data: todayMedia, error } = await supabase
+        let mediaQuery = supabase
           .from('hanami_student_media')
           .select('student_id')
           .in('student_id', allStudentIds)
           .gte('created_at', todayStart.toISOString())
           .lte('created_at', todayEnd.toISOString());
+
+        if (validOrgId) {
+          mediaQuery = mediaQuery.eq('org_id', validOrgId);
+        }
+
+        const { data: todayMedia, error } = await mediaQuery;
 
         if (!error && todayMedia) {
           const statusMap: Record<string, boolean> = {};
@@ -1138,17 +1579,28 @@ export default function ClassActivitiesPage() {
   const getStudentMediaData = async (studentId: string) => {
     try {
       // 獲取學生配額
-      const { data: quotaData, error: quotaError } = await supabase
+      let quotaQuery = supabase
         .from('hanami_student_media_quota')
         .select('*')
-        .eq('student_id', studentId)
-        .single();
+        .eq('student_id', studentId);
+
+      if (validOrgId) {
+        quotaQuery = quotaQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: quotaData, error: quotaError } = await quotaQuery.single();
 
       // 獲取媒體計數
-      const { data: mediaCount, error: mediaError } = await supabase
+      let mediaCountQuery = supabase
         .from('hanami_student_media')
         .select('media_type')
         .eq('student_id', studentId);
+
+      if (validOrgId) {
+        mediaCountQuery = mediaCountQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: mediaCount, error: mediaError } = await mediaCountQuery;
 
       if (quotaError && quotaError.code !== 'PGRST116') {
         console.error('獲取配額錯誤:', quotaError);
@@ -1214,6 +1666,24 @@ export default function ClassActivitiesPage() {
 
   // 開啟學生媒體管理頁面
   const openStudentMediaModal = async (student: any) => {
+    if (!isAllowedOrg) {
+      // 功能未開放，顯示提示信息
+      toast.error('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com', {
+        duration: 4000,
+        style: {
+          background: '#fff',
+          color: '#4B4036',
+          border: '1px solid #EADBC8',
+          borderRadius: '12px',
+          padding: '16px',
+          fontSize: '14px',
+          maxWidth: '400px',
+        },
+      });
+      return;
+    }
+    
+    // 啟用功能
     const studentId = student.student_id || student.id;
     const studentName = getStudentName(student);
     const studentNickname = getStudentNickname(student);
@@ -1267,14 +1737,40 @@ export default function ClassActivitiesPage() {
   // 切換學生關注狀態
   const toggleCareAlert = async (studentId: string, currentStatus: boolean) => {
     try {
+      if (!validOrgId) {
+        toast.error('請先創建屬於您的機構後再更新學生關注狀態');
+        return;
+      }
       setUpdatingCareAlert(prev => new Set(prev).add(studentId));
       
-      const { error } = await supabase
-        .from('Hanami_Students')
-        .update({ care_alert: !currentStatus })
-        .eq('id', studentId);
+      // 獲取 userEmail
+      const session = getUserSession();
+      const userEmail = session?.email || null;
+      
+      // 使用 API 端點更新關注狀態
+      const response = await fetch(`/api/students/${studentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          updates: { care_alert: !currentStatus },
+          orgId: validOrgId,
+          userEmail: userEmail,
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API 返回錯誤: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || '更新失敗');
+      }
 
       // 更新本地狀態
       setStudentCareAlertStatus(prev => ({
@@ -1285,7 +1781,7 @@ export default function ClassActivitiesPage() {
       toast.success(!currentStatus ? '已標記為需關注' : '已取消關注標記');
     } catch (error) {
       console.error('更新關注狀態失敗:', error);
-      toast.error('更新關注狀態失敗');
+      toast.error(`更新關注狀態失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
       setUpdatingCareAlert(prev => {
         const newSet = new Set(prev);
@@ -1331,11 +1827,16 @@ export default function ClassActivitiesPage() {
           console.log('提取 tree_activity ID:', { nodeId: node.id, treeActivityId });
           
           // 查詢 hanami_tree_activities 表來獲取真正的 activity_id
-          const { data: treeActivity, error: treeActivityError } = await supabase
+          let treeActivityQuery = supabase
             .from('hanami_tree_activities')
             .select('activity_id')
-            .eq('id', treeActivityId)
-            .single();
+            .eq('id', treeActivityId);
+
+          if (validOrgId) {
+            treeActivityQuery = treeActivityQuery.eq('org_id', validOrgId);
+          }
+
+          const { data: treeActivity, error: treeActivityError } = await treeActivityQuery.single();
 
           if (treeActivityError) {
             console.error('查詢 hanami_tree_activities 失敗:', treeActivityError);
@@ -1378,7 +1879,8 @@ export default function ClassActivitiesPage() {
           activityIds,
           assignmentType: 'current_lesson',
           lessonDate: selectedLesson?.lesson_date,
-          timeslot: selectedLesson?.actual_timeslot
+          timeslot: selectedLesson?.actual_timeslot,
+          organizationId: validOrgId,
         }),
       });
 
@@ -1417,7 +1919,8 @@ export default function ClassActivitiesPage() {
           lessonDate: lesson.lesson_date,
           timeslot: lesson.actual_timeslot,
           activityIds: [treeActivityId], // 轉換為數組格式
-          assignmentType: 'current_lesson'
+          assignmentType: 'current_lesson',
+          organizationId: validOrgId,
         }),
       });
 
@@ -1436,25 +1939,30 @@ export default function ClassActivitiesPage() {
     }
   };
 
-  // 處理時段卡片點擊 - 開啟教案編輯
-  const handleTimeSlotClick = (date: string, timeSlot: string, courseType: string) => {
-    setSelectedTimeSlot({
-      date,
-      timeSlot,
-      courseType
-    });
-    setShowLessonPlanModal(true);
-  };
+  // 處理時段卡片點擊 - 已禁用編輯教案功能
+  // const handleTimeSlotClick = (date: string, timeSlot: string, courseType: string) => {
+  //   setSelectedTimeSlot({
+  //     date,
+  //     timeSlot,
+  //     courseType
+  //   });
+  //   setShowLessonPlanModal(true);
+  // };
 
   // 載入學習路徑資料
   const loadLearningPaths = async (courseType: string) => {
     try {
       // 首先根據課程類型獲取成長樹
-      const { data: courseTypeData, error: courseTypeError } = await supabase
+      let courseTypeQuery = supabase
         .from('Hanami_CourseTypes')
         .select('id')
-        .eq('name', courseType)
-        .single();
+        .eq('name', courseType);
+
+      if (validOrgId) {
+        courseTypeQuery = courseTypeQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: courseTypeData, error: courseTypeError } = await courseTypeQuery.single();
 
       if (courseTypeError) {
         console.error('獲取課程類型失敗:', courseTypeError);
@@ -1463,12 +1971,18 @@ export default function ClassActivitiesPage() {
       }
 
       // 根據課程類型ID獲取成長樹
-      const { data: growthTrees, error: treesError } = await supabase
+      let growthTreeQuery = supabase
         .from('hanami_growth_trees')
         .select('id, tree_name')
         .eq('course_type_id', courseTypeData.id)
         .eq('is_active', true)
         .order('tree_level', { ascending: true });
+
+      if (validOrgId) {
+        growthTreeQuery = growthTreeQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: growthTrees, error: treesError } = await growthTreeQuery;
 
       if (treesError) {
         console.error('獲取成長樹失敗:', treesError);
@@ -1484,7 +1998,12 @@ export default function ClassActivitiesPage() {
 
       // 獲取第一個成長樹的學習路徑
       const treeId = growthTrees[0].id;
-      const response = await fetch(`/api/learning-paths?treeId=${treeId}`);
+      const learningParams = new URLSearchParams({ treeId });
+      if (validOrgId) {
+        learningParams.set('orgId', validOrgId);
+      }
+
+      const response = await fetch(`/api/learning-paths?${learningParams.toString()}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
@@ -1513,20 +2032,31 @@ export default function ClassActivitiesPage() {
       });
 
       // 首先根據課程類型名稱獲取課程類型ID
-      const { data: courseTypeData, error: courseTypeError } = await supabase
+      let courseTypeByNameQuery = supabase
         .from('Hanami_CourseTypes')
         .select('id')
-        .eq('name', courseType)
-        .single();
+        .eq('name', courseType);
+
+      if (validOrgId) {
+        courseTypeByNameQuery = courseTypeByNameQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: courseTypeData, error: courseTypeError } = await courseTypeByNameQuery.single();
 
       if (courseTypeError) {
         console.error('獲取課程類型失敗:', courseTypeError);
         // 如果找不到對應的課程類型，使用第一個成長樹
-        const { data: fallbackTrees, error: fallbackError } = await supabase
+        let fallbackTreeQuery = supabase
           .from('hanami_growth_trees')
           .select('*')
           .order('tree_level', { ascending: true })
           .limit(1);
+
+        if (validOrgId) {
+          fallbackTreeQuery = fallbackTreeQuery.eq('org_id', validOrgId);
+        }
+
+        const { data: fallbackTrees, error: fallbackError } = await fallbackTreeQuery;
 
         if (fallbackError || !fallbackTrees || fallbackTrees.length === 0) {
           console.error('沒有找到任何成長樹');
@@ -1539,11 +2069,17 @@ export default function ClassActivitiesPage() {
       }
 
       // 根據課程類型ID獲取成長樹
-      const { data: trees, error: treesError } = await supabase
+      let treesQuery = supabase
         .from('hanami_growth_trees')
         .select('*')
         .eq('course_type_id', courseTypeData.id)
         .order('tree_level', { ascending: true });
+
+      if (validOrgId) {
+        treesQuery = treesQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: trees, error: treesError } = await treesQuery;
 
       if (treesError) {
         console.error('獲取成長樹失敗:', treesError);
@@ -1553,11 +2089,17 @@ export default function ClassActivitiesPage() {
       if (!trees || trees.length === 0) {
         console.log('沒有找到適合的成長樹，使用預設成長樹');
         // 如果沒有找到對應的成長樹，使用第一個成長樹
-        const { data: fallbackTrees, error: fallbackError } = await supabase
+        let fallbackTreesQuery = supabase
           .from('hanami_growth_trees')
           .select('*')
           .order('tree_level', { ascending: true })
           .limit(1);
+
+        if (validOrgId) {
+          fallbackTreesQuery = fallbackTreesQuery.eq('org_id', validOrgId);
+        }
+
+        const { data: fallbackTrees, error: fallbackError } = await fallbackTreesQuery;
 
         if (fallbackError || !fallbackTrees || fallbackTrees.length === 0) {
           console.error('沒有找到任何成長樹');
@@ -1582,11 +2124,17 @@ export default function ClassActivitiesPage() {
   const loadTreeData = async (selectedTree: any, courseType: string) => {
     try {
       // 獲取成長樹的目標
-      const { data: goals, error: goalsError } = await supabase
+      let goalsQuery = supabase
         .from('hanami_growth_goals')
         .select('*')
         .eq('tree_id', selectedTree.id)
         .order('goal_order', { ascending: true });
+
+      if (validOrgId) {
+        goalsQuery = goalsQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: goals, error: goalsError } = await goalsQuery;
 
       if (goalsError) {
         console.error('獲取成長目標失敗:', goalsError);
@@ -1594,10 +2142,16 @@ export default function ClassActivitiesPage() {
       }
 
       // 獲取能力選項
-      const { data: abilities, error: abilitiesError } = await supabase
+      let abilitiesQuery = supabase
         .from('hanami_development_abilities')
         .select('id, ability_name')
         .order('ability_name');
+
+      if (validOrgId) {
+        abilitiesQuery = abilitiesQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: abilities, error: abilitiesError } = await abilitiesQuery;
 
       if (abilitiesError) {
         console.error('獲取能力選項失敗:', abilitiesError);
@@ -1605,21 +2159,74 @@ export default function ClassActivitiesPage() {
       }
 
       // 獲取活動選項
-      const { data: activities, error: activitiesError } = await supabase
-        .from('hanami_teaching_activities')
-        .select('id, activity_name')
-        .order('activity_name');
+      let activities: any[] = [];
+      
+      if (validOrgId) {
+        // 使用 API 端點查詢教學活動（繞過 RLS）
+        try {
+          // 嘗試從 session 獲取用戶 email
+          const session = getUserSession();
+          const userEmail = session?.email || '';
+          
+          const activitiesResponse = await fetch(
+            `/api/teaching-activities/list?orgId=${encodeURIComponent(validOrgId)}&userEmail=${encodeURIComponent(userEmail)}&status=published`
+          );
 
-      if (activitiesError) {
-        console.error('獲取活動選項失敗:', activitiesError);
-        return;
+          if (activitiesResponse.ok) {
+            const activitiesData = await activitiesResponse.json();
+            activities = (activitiesData.data || []).map((a: any) => ({
+              id: a.id,
+              activity_name: a.activity_name,
+            }));
+          } else {
+            console.error('獲取活動選項失敗: API 調用失敗');
+            // 回退到直接查詢
+            const { data: fallbackActivities, error: fallbackError } = await supabase
+              .from('hanami_teaching_activities')
+              .select('id, activity_name')
+              .eq('org_id', validOrgId)
+              .order('activity_name');
+            
+            if (!fallbackError && fallbackActivities) {
+              activities = fallbackActivities;
+            }
+          }
+        } catch (error) {
+          console.error('獲取活動選項異常:', error);
+          // 回退到直接查詢
+          const { data: fallbackActivities, error: fallbackError } = await supabase
+            .from('hanami_teaching_activities')
+            .select('id, activity_name')
+            .eq('org_id', validOrgId)
+            .order('activity_name');
+          
+          if (!fallbackError && fallbackActivities) {
+            activities = fallbackActivities;
+          }
+        }
+      } else {
+        // 沒有 orgId，使用直接查詢（可能會有 RLS 問題）
+        const { data: fallbackActivities, error: fallbackError } = await supabase
+          .from('hanami_teaching_activities')
+          .select('id, activity_name')
+          .order('activity_name');
+        
+        if (!fallbackError && fallbackActivities) {
+          activities = fallbackActivities;
+        }
       }
 
       // 獲取教師選項
-      const { data: teachers, error: teachersError } = await supabase
+      let teachersQuery = supabase
         .from('hanami_employee')
         .select('id, teacher_fullname')
         .order('teacher_fullname');
+
+      if (validOrgId) {
+        teachersQuery = teachersQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: teachers, error: teachersError } = await teachersQuery;
 
       if (teachersError) {
         console.error('獲取教師選項失敗:', teachersError);
@@ -1627,10 +2234,16 @@ export default function ClassActivitiesPage() {
       }
 
       // 獲取在此成長樹的學生（根據課程類型）
-      const { data: studentsInTree, error: studentsError } = await supabase
+      let studentsInTreeQuery = supabase
         .from('Hanami_Students')
         .select('*')
         .eq('course_type', courseType);
+
+      if (validOrgId) {
+        studentsInTreeQuery = studentsInTreeQuery.eq('org_id', validOrgId);
+      }
+
+      const { data: studentsInTree, error: studentsError } = await studentsInTreeQuery;
 
       if (studentsError) {
         console.error('獲取學生資料失敗:', studentsError);
@@ -1665,7 +2278,8 @@ export default function ClassActivitiesPage() {
         },
         body: JSON.stringify({ 
           activityId,
-          progress
+          progress,
+          org_id: validOrgId,
         }),
       });
 
@@ -1993,6 +2607,8 @@ export default function ClassActivitiesPage() {
 
   const timeSlotGroups = groupLessonsByTimeSlot();
 
+  const showOrgBanner = organizationResolved && orgDataDisabled;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
@@ -2011,9 +2627,29 @@ export default function ClassActivitiesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-3 sm:p-4 md:p-6">
       <div className="container mx-auto px-2 sm:px-3 md:px-4 py-3 sm:py-4 md:py-6 max-w-7xl">
+        {showOrgBanner && (
+          <div className="mb-4 sm:mb-6 rounded-3xl border border-hanami-border bg-white px-6 py-6 text-center shadow-sm">
+            <div className="mb-3 flex justify-center">
+              <Image
+                src="/rabbit.png"
+                alt="Hanami 機構提醒"
+                width={56}
+                height={56}
+                className="h-14 w-14"
+              />
+            </div>
+            <h2 className="text-lg font-semibold text-hanami-text">尚未設定機構</h2>
+            <p className="mt-2 text-sm text-hanami-text-secondary">
+              請先創建屬於您的機構，並建立課程與課堂資料後再查看活動。
+            </p>
+          </div>
+        )}
         {/* 頁面標題 */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-hanami-text">課堂活動管理</h1>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <BackButton href="/aihome/teacher-link/create" label="返回老師主頁" />
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-hanami-text">課堂活動管理</h1>
+          </div>
           <div className="flex items-center space-x-2 sm:space-x-4 flex-wrap gap-2 sm:gap-0">
             {/* iOS 風格顯示模式切換開關 */}
             <div className="flex items-center space-x-2 sm:space-x-3 bg-white rounded-full p-1 sm:p-1.5 shadow-md border border-hanami-border">
@@ -2041,14 +2677,25 @@ export default function ClassActivitiesPage() {
               </button>
             </div>
             
-            <button
-              onClick={() => {
-                router.push('/admin/hanami-tc');
-              }}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg font-medium transition-colors bg-white text-hanami-text border border-hanami-border hover:bg-hanami-surface hover:border-hanami-primary"
-            >
-              日曆檢視
-            </button>
+            {!hideCalendarButton && (
+              <button
+                onClick={() => {
+                  if (isMember) {
+                    toast.error('未開通權限');
+                    return;
+                  }
+                  router.push('/admin/hanami-tc');
+                }}
+                disabled={isMember}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg font-medium transition-colors ${
+                  isMember
+                    ? 'bg-gray-100 text-gray-400 border border-gray-300 cursor-not-allowed'
+                    : 'bg-white text-hanami-text border border-hanami-border hover:bg-hanami-surface hover:border-hanami-primary'
+                }`}
+              >
+                日曆檢視
+              </button>
+            )}
           </div>
         </div>
 
@@ -2058,7 +2705,12 @@ export default function ClassActivitiesPage() {
             <div className="flex items-center space-x-2 sm:space-x-4">
               <button
                 onClick={goToPreviousDay}
-                className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-hanami-surface rounded-lg border border-hanami-border hover:bg-hanami-primary/10 transition-colors"
+                disabled={isMember}
+                className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg border transition-colors ${
+                  isMember
+                    ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+                    : 'bg-hanami-surface border-hanami-border hover:bg-hanami-primary/10'
+                }`}
               >
                 <ChevronLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="text-xs sm:text-sm hidden sm:inline">前一天</span>
@@ -2078,7 +2730,12 @@ export default function ClassActivitiesPage() {
               
               <button
                 onClick={goToNextDay}
-                className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-hanami-surface rounded-lg border border-hanami-border hover:bg-hanami-primary/10 transition-colors"
+                disabled={isMember}
+                className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg border transition-colors ${
+                  isMember
+                    ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+                    : 'bg-hanami-surface border-hanami-border hover:bg-hanami-primary/10'
+                }`}
               >
                 <span className="text-xs sm:text-sm hidden sm:inline">後一天</span>
                 <ChevronRightIcon className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -2093,10 +2750,19 @@ export default function ClassActivitiesPage() {
                   type="date"
                   value={formatDateForInput(selectedDate)}
                   onChange={(e) => {
+                    if (isMember) {
+                      toast.error('未開通權限');
+                      return;
+                    }
                     const newDate = new Date(e.target.value);
                     setSelectedDate(newDate);
                   }}
-                  className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-hanami-border rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
+                  disabled={isMember}
+                  className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent ${
+                    isMember
+                      ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+                      : 'border-hanami-border'
+                  }`}
                 />
               </div>
               
@@ -2144,10 +2810,17 @@ export default function ClassActivitiesPage() {
               const isToday = dayDate.toDateString() === new Date().toDateString();
               const isSelected = selectedDates.some(date => date.toDateString() === dayDate.toDateString());
               
+              // 如果是成員且不是今天，則禁用
+              const isDisabled = isMember && !isToday;
+              
               return (
                 <button
                   key={day}
                   onClick={() => {
+                    if (isDisabled) {
+                      toast.error('未開通權限');
+                      return;
+                    }
                     const dayDateStr = dayDate.toDateString();
                     const isAlreadySelected = selectedDates.some(date => date.toDateString() === dayDateStr);
                     
@@ -2164,8 +2837,11 @@ export default function ClassActivitiesPage() {
                     // 更新主要選中的日期
                   setSelectedDate(dayDate);
                 }}
+                disabled={isDisabled}
                 className={`w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg font-medium transition-all duration-200 flex items-center justify-center text-xs sm:text-sm md:text-base flex-shrink-0 ${
-                  isToday 
+                  isDisabled
+                    ? 'bg-gray-100 text-gray-400 border-2 border-gray-300 cursor-not-allowed'
+                    : isToday 
                     ? 'bg-white border-2 border-hanami-primary text-hanami-primary shadow-lg'
                     : isSelected
                     ? 'bg-hanami-primary/20 text-hanami-primary border-2 border-hanami-primary'
@@ -2205,8 +2881,7 @@ export default function ClassActivitiesPage() {
               >
                 {/* 時段標題卡片 */}
                 <div 
-                  className="time-slot-header hanami-card-glow rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
-                  onClick={() => handleTimeSlotClick(group.date, group.timeSlot, group.lessons.map(lesson => getCourseType(lesson) || '未設定').filter((value, index, self) => self.indexOf(value) === index).join(' + '))}
+                  className="time-slot-header hanami-card-glow rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-8 w-full sm:w-auto">
@@ -2232,7 +2907,7 @@ export default function ClassActivitiesPage() {
                           {group.lessons.map(lesson => getCourseType(lesson) || '未設定').filter((value, index, self) => self.indexOf(value) === index).join(' + ')}
                         </h2>
                         <p className="text-white/80 font-medium text-sm sm:text-base md:text-lg">
-                          <span className="animate-pulse">{group.lessons.length}</span> 位可愛的小音樂家
+                          <span className="animate-pulse">{group.lessons.length}</span> 位學生
                         </p>
                       </div>
                     </div>
@@ -2243,7 +2918,6 @@ export default function ClassActivitiesPage() {
                         <MusicalNoteIcon className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white/90" />
                         <div className="text-xs sm:text-sm text-white/70 font-medium">音樂時光</div>
                       </div>
-                      <div className="text-xs text-white/50 mt-0 sm:mt-1 hidden md:block">點擊編輯教案</div>
                     </div>
                   </div>
                 </div>
@@ -2397,42 +3071,48 @@ export default function ClassActivitiesPage() {
                                 };
                                 openStudentMediaModal(student);
                               }}
-                              className="group/media relative cursor-pointer"
+                              className={`group/media relative ${isAllowedOrg ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                              disabled={!isAllowedOrg}
                             >
-                              <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
-                                (() => {
-                                  const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
-                                  const hasUploadedToday = studentMediaStatus[studentId] || false;
-                                  return hasUploadedToday 
-                                    ? 'bg-gradient-to-br from-emerald-400 to-teal-500' 
-                                    : 'bg-gradient-to-br from-orange-400 to-amber-500';
-                                })()
-                              }`}>
-                                <VideoCameraIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                              </div>
-                              
-                              {/* 狀態指示器 */}
                               {(() => {
                                 const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
-                                const hasUploadedToday = studentMediaStatus[studentId] || false;
-                                return hasUploadedToday && (
-                                  <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white"></div>
-                                  </div>
-                                );
-                              })()}
-                              
-                              {/* 懸停提示 - 在手機上隱藏 */}
-                              {(() => {
-                                const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
-                                const hasUploadedToday = studentMediaStatus[studentId] || false;
-                                const tooltipColor = hasUploadedToday ? 'bg-emerald-600/90' : 'bg-orange-600/90';
+                                const hasMedia = studentMediaStatus[studentId] || false;
+                                
+                                let buttonBgClass = '';
+                                let tooltipBgClass = '';
+                                let tooltipText = '';
+                                
+                                if (!isAllowedOrg) {
+                                  buttonBgClass = 'bg-gray-400 opacity-60';
+                                  tooltipBgClass = 'bg-gray-600/90';
+                                  tooltipText = '上傳/編輯媒體（功能未開放）';
+                                } else if (hasMedia) {
+                                  buttonBgClass = 'bg-gradient-to-br from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600';
+                                  tooltipBgClass = 'bg-purple-600/90';
+                                  tooltipText = '已上傳媒體 / 編輯媒體';
+                                } else {
+                                  buttonBgClass = 'bg-gradient-to-br from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600';
+                                  tooltipBgClass = 'bg-orange-600/90';
+                                  tooltipText = '上傳媒體';
+                                }
                                 
                                 return (
-                                        <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
-                                          {hasUploadedToday ? '今日已上傳 - 查看媒體' : '上傳/編輯媒體'}
-                                          <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipColor} transform rotate-45`}></div>
-                                        </div>
+                                  <>
+                                    <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${buttonBgClass}`}>
+                                      <VideoCameraIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                                    </div>
+                                    
+                                    {/* 狀態指示器 - 未上傳時顯示橙色動畫點 */}
+                                    {isAllowedOrg && !hasMedia && (
+                                      <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-2 h-2 sm:w-3 sm:h-3 bg-orange-400 rounded-full animate-ping opacity-75"></div>
+                                    )}
+                                    
+                                    {/* 懸停提示 - 在手機上隱藏 */}
+                                    <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipBgClass} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
+                                      {tooltipText}
+                                      <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipBgClass} transform rotate-45`}></div>
+                                    </div>
+                                  </>
                                 );
                               })()}
                             </button>
@@ -2990,39 +3670,47 @@ export default function ClassActivitiesPage() {
                                       };
                                       openStudentMediaModal(studentForMedia);
                                     }}
-                                    className="group/media relative cursor-pointer"
+                                    className={`group/media relative ${isAllowedOrg ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                                    disabled={!isAllowedOrg}
                                   >
-                                    <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${
-                                      (() => {
-                                        const hasUploadedToday = studentMediaStatus[studentId] || false;
-                                        return hasUploadedToday 
-                                          ? 'bg-gradient-to-br from-emerald-400 to-teal-500' 
-                                          : 'bg-gradient-to-br from-orange-400 to-amber-500';
-                                      })()
-                                    }`}>
-                                      <VideoCameraIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                                    </div>
-                                    
-                                    {/* 狀態指示器 */}
                                     {(() => {
-                                      const hasUploadedToday = studentMediaStatus[studentId] || false;
-                                      return hasUploadedToday && (
-                                        <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                                          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white"></div>
-                                        </div>
-                                      );
-                                    })()}
-                                    
-                                    {/* 懸停提示 - 在手機上隱藏 */}
-                                    {(() => {
-                                      const hasUploadedToday = studentMediaStatus[studentId] || false;
-                                      const tooltipColor = hasUploadedToday ? 'bg-emerald-600/90' : 'bg-orange-600/90';
+                                      const hasMedia = studentMediaStatus[studentId] || false;
+                                      
+                                      let buttonBgClass = '';
+                                      let tooltipBgClass = '';
+                                      let tooltipText = '';
+                                      
+                                      if (!isAllowedOrg) {
+                                        buttonBgClass = 'bg-gray-400 opacity-60';
+                                        tooltipBgClass = 'bg-gray-600/90';
+                                        tooltipText = '上傳/編輯媒體（功能未開放）';
+                                      } else if (hasMedia) {
+                                        buttonBgClass = 'bg-gradient-to-br from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600';
+                                        tooltipBgClass = 'bg-purple-600/90';
+                                        tooltipText = '已上傳媒體 / 編輯媒體';
+                                      } else {
+                                        buttonBgClass = 'bg-gradient-to-br from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600';
+                                        tooltipBgClass = 'bg-orange-600/90';
+                                        tooltipText = '上傳媒體';
+                                      }
                                       
                                       return (
-                                        <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
-                                          {hasUploadedToday ? '今日已上傳 - 查看媒體' : '上傳/編輯媒體'}
-                                          <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipColor} transform rotate-45`}></div>
-                                        </div>
+                                        <>
+                                          <div className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 transform hover:rotate-12 ${buttonBgClass}`}>
+                                            <VideoCameraIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                                          </div>
+                                          
+                                          {/* 狀態指示器 - 未上傳時顯示橙色動畫點 */}
+                                          {isAllowedOrg && !hasMedia && (
+                                            <div className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 w-2 h-2 sm:w-3 sm:h-3 bg-orange-400 rounded-full animate-ping opacity-75"></div>
+                                          )}
+                                          
+                                          {/* 懸停提示 - 在手機上隱藏 */}
+                                          <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipBgClass} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
+                                            {tooltipText}
+                                            <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipBgClass} transform rotate-45`}></div>
+                                          </div>
+                                        </>
                                       );
                                     })()}
                                   </button>
@@ -3377,23 +4065,16 @@ export default function ClassActivitiesPage() {
                                       console.log('📝 準備打開模態框，學生數據:', studentData);
                                       openStudentMediaModal(studentData);
                                     }}
-                                    className="group/media relative cursor-pointer p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-hanami-primary/10 text-hanami-primary hover:bg-hanami-primary/20"
+                                    className="group/media relative cursor-pointer p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-gray-200 text-gray-500 hover:bg-gray-300 opacity-60"
                                   >
                                     <div className="flex items-center space-x-1">
                                       {/* 移除圖標顯示 */}
                                     </div>
                                     {/* 懸停提示 */}
-                                    {(() => {
-                                      const hasUploadedToday = studentMediaStatus[student.id] || false;
-                                      const tooltipColor = hasUploadedToday ? 'bg-emerald-600/90' : 'bg-orange-600/90';
-                                      
-                                      return (
-                                        <div className={`hidden sm:block absolute top-10 sm:top-12 right-0 ${tooltipColor} text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20`}>
-                                          {hasUploadedToday ? '今日已上傳 - 查看媒體' : '上傳/編輯媒體'}
-                                          <div className={`absolute -top-1 right-3 w-2 h-2 ${tooltipColor} transform rotate-45`}></div>
-                                        </div>
-                                      );
-                                    })()}
+                                    <div className="hidden sm:block absolute top-10 sm:top-12 right-0 bg-gray-600/90 text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20">
+                                      上傳/編輯媒體（功能未開放）
+                                      <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-600/90 transform rotate-45"></div>
+                                    </div>
                                   </button>
                                 </div>
                               </div>
@@ -3785,6 +4466,9 @@ export default function ClassActivitiesPage() {
           <SimpleAbilityAssessmentModal
             defaultStudent={selectedStudentForAssessment}
             defaultAssessmentDate={new Date().toISOString().split('T')[0]}
+            lockStudent={true}
+            lockTeacher={true}
+            defaultTeacher={currentTeacher || undefined}
             onClose={() => {
               setShowAbilityAssessmentModal(false);
               setSelectedStudentForAssessment(null);
@@ -3805,7 +4489,8 @@ export default function ClassActivitiesPage() {
                   overall_performance_rating: assessment.overall_performance_rating || 3,
                   general_notes: assessment.general_notes || '',
                   next_lesson_focus: assessment.next_lesson_focus || '',
-                  goals: assessment.goals || []
+                  goals: assessment.goals || [],
+                  org_id: validOrgId || null,
                 };
 
                 console.log('準備的 API 資料:', apiData);
@@ -3890,6 +4575,12 @@ export default function ClassActivitiesPage() {
                   <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-hanami-primary"></div>
                   <span className="ml-2 text-xs sm:text-sm text-hanami-text-secondary">載入老師列表中...</span>
                 </div>
+              ) : !validOrgId ? (
+                <div className="text-center py-6 sm:py-8 text-hanami-text-secondary">
+                  <ExclamationTriangleIcon className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-yellow-500" />
+                  <p className="text-xs sm:text-sm font-medium mb-1">請先創建屬於您的機構</p>
+                  <p className="text-xs text-gray-500">創建機構後才能選擇老師</p>
+                </div>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {/* 設為空選項 */}
@@ -3938,10 +4629,11 @@ export default function ClassActivitiesPage() {
                     </button>
                   ))}
                   
-                  {allTeachers.length === 0 && (
+                  {allTeachers.length === 0 && validOrgId && (
                     <div className="text-center py-6 sm:py-8 text-hanami-text-secondary">
                       <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-400" />
                       <p className="text-xs sm:text-sm">暫無可用老師</p>
+                      <p className="text-xs text-gray-500 mt-1">該機構下暫無活躍的老師</p>
                     </div>
                   )}
                 </div>

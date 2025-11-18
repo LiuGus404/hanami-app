@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { XMarkIcon, StarIcon, UserIcon, CalendarIcon, CheckCircleIcon, AcademicCapIcon, PencilIcon, TrashIcon, ArrowPathIcon, BookOpenIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { HanamiButton, HanamiCard, HanamiInput } from './index';
 import { supabase } from '@/lib/supabase';
@@ -8,6 +8,9 @@ import ActivitySelectionModal from './ActivitySelectionModal';
 import GrowthTreePathManager from './GrowthTreePathManager';
 import MinimalStudentGrowthTreeManager from './MinimalStudentGrowthTreeManager';
 import { toast } from 'react-hot-toast';
+import Image from 'next/image';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { getUserSession } from '@/lib/authUtils';
 
 interface Student {
   id: string;
@@ -131,6 +134,18 @@ export default function SimpleAbilityAssessmentModal({
   lockTeacher = false,
   defaultTeacher
 }: SimpleAbilityAssessmentModalProps) {
+  const { currentOrganization } = useOrganization();
+  
+  const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const PLACEHOLDER_ORG_IDS = new Set(['default-org', 'unassigned-org-placeholder']);
+  
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) return null;
+    return UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id)
+      ? currentOrganization.id
+      : null;
+  }, [currentOrganization?.id]);
+  
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [trees, setTrees] = useState<GrowthTree[]>([]);
@@ -468,50 +483,176 @@ export default function SimpleAbilityAssessmentModal({
             console.log('最近7天也沒有學生課程');
             studentsData = [];
           } else {
-                      // 根據學生ID獲取學生詳細資訊
-          const { data: recentStudentsData, error: studentsError } = await supabase
-            .from('Hanami_Students')
-            .select('id, full_name, nick_name')
-            .in('id', recentStudentIds.filter((id): id is string => id !== null))
-            .order('full_name');
+            // 根據學生ID獲取學生詳細資訊
+            // 使用 API 端點繞過 RLS
+            try {
+              const session = getUserSession();
+              const userEmail = session?.email || null;
+              
+              if (!validOrgId) {
+                throw new Error('缺少機構ID');
+              }
+              
+              // 使用 API 端點獲取所有學生
+              const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+              
+              const response = await fetch(apiUrl, {
+                credentials: 'include',
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                const allStudents = result.students || result.data || [];
+                // 過濾出最近7天的學生
+                const filteredIds = recentStudentIds.filter((id): id is string => id !== null);
+                studentsData = allStudents
+                  .filter((s: any) => filteredIds.includes(s.id))
+                  .map((s: any) => ({
+                    id: s.id,
+                    full_name: s.full_name,
+                    nick_name: s.nick_name
+                  }))
+                  .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
+                console.log('通過 API 載入最近7天學生資料成功:', studentsData.length);
+              } else {
+                console.error('⚠️ 無法載入最近學生，API 返回錯誤:', response.status);
+                throw new Error(`API 返回錯誤: ${response.status}`);
+              }
+            } catch (apiError) {
+              console.error('⚠️ API 調用異常，嘗試直接查詢:', apiError);
+              // Fallback 到直接查詢
+              let recentStudentsQuery = supabase
+                .from('Hanami_Students')
+                .select('id, full_name, nick_name')
+                .in('id', recentStudentIds.filter((id): id is string => id !== null));
+              
+              if (validOrgId) {
+                recentStudentsQuery = recentStudentsQuery.eq('org_id', validOrgId);
+              }
+              
+              const { data: recentStudentsData, error: studentsError } = await recentStudentsQuery.order('full_name');
 
-            if (studentsError) {
-              console.error('載入最近學生失敗:', studentsError);
-              throw studentsError;
+              if (studentsError) {
+                console.error('載入最近學生失敗:', studentsError);
+                throw studentsError;
+              }
+              
+              studentsData = recentStudentsData || [];
             }
-            
-            studentsData = recentStudentsData;
             console.log('最近7天學生資料載入成功:', studentsData);
           }
         } else {
           // 根據學生ID獲取學生詳細資訊
-          const { data: todayStudentsData, error: studentsError } = await supabase
-            .from('Hanami_Students')
-            .select('id, full_name, nick_name')
-            .in('id', uniqueStudentIds.filter((id): id is string => id !== null))
-            .order('full_name');
+          // 使用 API 端點繞過 RLS
+          try {
+            const session = getUserSession();
+            const userEmail = session?.email || null;
+            
+            if (!validOrgId) {
+              throw new Error('缺少機構ID');
+            }
+            
+            // 使用 API 端點獲取所有學生
+            const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+            
+            const response = await fetch(apiUrl, {
+              credentials: 'include',
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              const allStudents = result.students || result.data || [];
+              // 過濾出當日學生
+              const filteredIds = uniqueStudentIds.filter((id): id is string => id !== null);
+              studentsData = allStudents
+                .filter((s: any) => filteredIds.includes(s.id))
+                .map((s: any) => ({
+                  id: s.id,
+                  full_name: s.full_name,
+                  nick_name: s.nick_name
+                }))
+                .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
+              console.log('通過 API 載入當日學生資料成功:', studentsData.length);
+            } else {
+              console.error('⚠️ 無法載入當日學生，API 返回錯誤:', response.status);
+              throw new Error(`API 返回錯誤: ${response.status}`);
+            }
+          } catch (apiError) {
+            console.error('⚠️ API 調用異常，嘗試直接查詢:', apiError);
+            // Fallback 到直接查詢
+            let todayStudentsQuery = supabase
+              .from('Hanami_Students')
+              .select('id, full_name, nick_name')
+              .in('id', uniqueStudentIds.filter((id): id is string => id !== null));
+            
+            if (validOrgId) {
+              todayStudentsQuery = todayStudentsQuery.eq('org_id', validOrgId);
+            }
+            
+            const { data: todayStudentsData, error: studentsError } = await todayStudentsQuery.order('full_name');
 
-          if (studentsError) {
-            console.error('載入當日學生失敗:', studentsError);
-            throw studentsError;
+            if (studentsError) {
+              console.error('載入當日學生失敗:', studentsError);
+              throw studentsError;
+            }
+            
+            studentsData = todayStudentsData || [];
           }
-          
-          studentsData = todayStudentsData;
           console.log('當日學生資料載入成功:', studentsData);
         }
       } else {
         // 載入所有學生
-        const { data: allStudentsData, error: studentsError } = await supabase
-          .from('Hanami_Students')
-          .select('id, full_name, nick_name')
-          .order('full_name');
+        // 使用 API 端點繞過 RLS
+        try {
+          const session = getUserSession();
+          const userEmail = session?.email || null;
+          
+          if (!validOrgId) {
+            throw new Error('缺少機構ID');
+          }
+          
+          // 使用 API 端點獲取所有學生
+          const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+          
+          const response = await fetch(apiUrl, {
+            credentials: 'include',
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            const allStudents = result.students || result.data || [];
+            studentsData = allStudents
+              .map((s: any) => ({
+                id: s.id,
+                full_name: s.full_name,
+                nick_name: s.nick_name
+              }))
+              .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
+            console.log('通過 API 載入所有學生資料成功:', studentsData.length);
+          } else {
+            console.error('⚠️ 無法載入所有學生，API 返回錯誤:', response.status);
+            throw new Error(`API 返回錯誤: ${response.status}`);
+          }
+        } catch (apiError) {
+          console.error('⚠️ API 調用異常，嘗試直接查詢:', apiError);
+          // Fallback 到直接查詢
+          let allStudentsQuery = supabase
+            .from('Hanami_Students')
+            .select('id, full_name, nick_name');
+          
+          if (validOrgId) {
+            allStudentsQuery = allStudentsQuery.eq('org_id', validOrgId);
+          }
+          
+          const { data: allStudentsData, error: studentsError } = await allStudentsQuery.order('full_name');
 
-        if (studentsError) {
-          console.error('載入學生失敗:', studentsError);
-          throw studentsError;
+          if (studentsError) {
+            console.error('載入學生失敗:', studentsError);
+            throw studentsError;
+          }
+          
+          studentsData = allStudentsData || [];
         }
-        
-        studentsData = allStudentsData;
         console.log('所有學生資料載入成功:', studentsData);
       }
       
@@ -530,12 +671,20 @@ export default function SimpleAbilityAssessmentModal({
       
       setStudents(studentsData || []);
 
-      // 載入成長樹列表
-      const { data: treesData, error: treesError } = await supabase
+      // 載入成長樹列表（根據 org_id 過濾）
+      let treesQuery = supabase
         .from('hanami_growth_trees')
         .select('id, tree_name, tree_description')
-        .eq('is_active', true)
-        .order('tree_name');
+        .eq('is_active', true);
+      
+      if (validOrgId) {
+        treesQuery = treesQuery.eq('org_id', validOrgId);
+      } else {
+        // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+        treesQuery = treesQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+      }
+      
+      const { data: treesData, error: treesError } = await treesQuery.order('tree_name');
 
       if (treesError) throw treesError;
       
@@ -589,19 +738,25 @@ export default function SimpleAbilityAssessmentModal({
       console.log('管理員數量:', adminTeachers.length);
       setTeachers(allTeachers);
 
-      // 設置預設教師為現時登入者
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          // 在教師列表中尋找當前用戶
-          const currentUserTeacher = allTeachers.find(teacher => teacher.id === user.id);
-          if (currentUserTeacher) {
-            setSelectedTeacherId(user.id);
-            console.log('設置預設教師為當前登入者:', currentUserTeacher);
+      // 設置預設教師為現時登入者（僅當沒有提供 defaultTeacher 時）
+      if (!defaultTeacher?.id) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            // 在教師列表中尋找當前用戶
+            const currentUserTeacher = allTeachers.find(teacher => teacher.id === user.id);
+            if (currentUserTeacher) {
+              setSelectedTeacherId(user.id);
+              console.log('設置預設教師為當前登入者:', currentUserTeacher);
+            }
           }
+        } catch (authError) {
+          console.warn('無法獲取當前用戶資訊:', authError);
         }
-      } catch (authError) {
-        console.warn('無法獲取當前用戶資訊:', authError);
+      } else if (defaultTeacher.id) {
+        // 如果提供了 defaultTeacher，確保 selectedTeacherId 被設置
+        setSelectedTeacherId(defaultTeacher.id);
+        console.log('使用傳入的 defaultTeacher:', defaultTeacher);
       }
 
       // 設置預設值 - 優先選擇有分配成長樹的學生
@@ -634,12 +789,29 @@ export default function SimpleAbilityAssessmentModal({
     try {
       console.log('載入學生的成長樹:', studentId);
       
+      // 先查詢符合 org_id 的成長樹ID列表
+      let validTreeIds: string[] = [];
+      if (validOrgId) {
+        const { data: validTreesData, error: validTreesError } = await supabase
+          .from('hanami_growth_trees')
+          .select('id')
+          .eq('is_active', true)
+          .eq('org_id', validOrgId);
+        
+        if (validTreesError) {
+          console.error('查詢符合 org_id 的成長樹失敗:', validTreesError);
+        } else {
+          validTreeIds = (validTreesData || []).map(t => t.id);
+        }
+      }
+      
       // 載入學生在 hanami_student_trees 表中的所有成長樹
-      const { data: studentTreesData, error: studentTreesError } = await supabase
+      let studentTreesQuery = supabase
         .from('hanami_student_trees')
         .select(`
           start_date,
           status,
+          tree_id,
           hanami_growth_trees(
             id,
             tree_name,
@@ -648,6 +820,16 @@ export default function SimpleAbilityAssessmentModal({
         `)
         .eq('student_id', studentId)
         .or('status.eq.active,tree_status.eq.active');
+      
+      // 如果有限制的成長樹ID列表，則過濾
+      if (validOrgId && validTreeIds.length > 0) {
+        studentTreesQuery = studentTreesQuery.in('tree_id', validTreeIds);
+      } else if (validOrgId && validTreeIds.length === 0) {
+        // 如果沒有符合的成長樹，查詢一個不存在的 ID 以確保不返回任何結果
+        studentTreesQuery = studentTreesQuery.eq('tree_id', '00000000-0000-0000-0000-000000000000');
+      }
+      
+      const { data: studentTreesData, error: studentTreesError } = await studentTreesQuery;
 
       if (studentTreesError) {
         console.error('載入學生成長樹失敗:', studentTreesError);
@@ -839,6 +1021,11 @@ export default function SimpleAbilityAssessmentModal({
         lessonDate: lessonDate
       });
       
+      // 添加 orgId 參數
+      if (validOrgId) {
+        params.append('orgId', validOrgId);
+      }
+      
       // 添加 timeslot 參數（如果有的話）
       // 這裡我們先不傳 timeslot，讓 API 處理沒有 timeslot 的情況
       
@@ -990,12 +1177,20 @@ export default function SimpleAbilityAssessmentModal({
     try {
       setLoading(true);
       
-      // 載入成長樹的目標
-      const { data: goalsData, error: goalsError } = await supabase
+      // 載入成長樹的目標（根據 org_id 過濾）
+      let goalsQuery = supabase
         .from('hanami_growth_goals')
         .select('*')
-        .eq('tree_id', treeId)
-        .order('goal_order');
+        .eq('tree_id', treeId);
+      
+      if (validOrgId) {
+        goalsQuery = goalsQuery.eq('org_id', validOrgId);
+      } else {
+        // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+        goalsQuery = goalsQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+      }
+      
+      const { data: goalsData, error: goalsError } = await goalsQuery.order('goal_order');
 
       if (goalsError) throw goalsError;
 
@@ -1970,7 +2165,8 @@ export default function SimpleAbilityAssessmentModal({
             activityIds: activityIds,
             assignmentType: 'current_lesson',
             lessonDate: lessonDate,
-            timeslot: '12:00:00'
+            timeslot: '12:00:00',
+            ...(validOrgId ? { orgId: validOrgId } : {})
           }),
         });
 
@@ -1989,7 +2185,8 @@ export default function SimpleAbilityAssessmentModal({
             studentId: selectedStudentId,
             activityIds: activityIds,
             assignmentType: 'ongoing',
-            lessonDate: lessonDate
+            lessonDate: lessonDate,
+            ...(validOrgId ? { orgId: validOrgId } : {})
           }),
         });
 
@@ -2013,7 +2210,8 @@ export default function SimpleAbilityAssessmentModal({
             studentId: selectedStudentId,
             activityIds: activityIds,
             assignmentType: 'ongoing',
-            lessonDate: lessonDate
+            lessonDate: lessonDate,
+            ...(validOrgId ? { orgId: validOrgId } : {})
           }),
         });
 
@@ -3020,6 +3218,19 @@ export default function SimpleAbilityAssessmentModal({
                     {selectedTeacherId ? (
                       (() => {
                         const selectedTeacher = teachers.find(t => t.id === selectedTeacherId);
+                        // 如果教師不在列表中，但提供了 defaultTeacher，使用 defaultTeacher 的信息
+                        if (!selectedTeacher && defaultTeacher && defaultTeacher.id === selectedTeacherId) {
+                          return (
+                            <div>
+                              <div className="font-medium text-[#2B3A3B]">
+                                {defaultTeacher.teacher_nickname || defaultTeacher.teacher_fullname || '當前用戶'}
+                              </div>
+                              <div className="text-sm text-[#A68A64]">
+                                {defaultTeacher.teacher_fullname || defaultTeacher.teacher_nickname || '教師'} • 當前帳戶
+                              </div>
+                            </div>
+                          );
+                        }
                         return (
                           <div>
                             <div className="font-medium text-[#2B3A3B]">
@@ -3100,7 +3311,15 @@ export default function SimpleAbilityAssessmentModal({
               ) : studentTrees.length === 0 ? (
                 /* 學生未分配成長樹 */
                 <div className="text-center py-12">
-                  <div className="text-6xl mb-4">🌳</div>
+                  <div className="mb-4 flex justify-center">
+                    <Image
+                      src="/tree ui.png"
+                      alt="成長樹"
+                      width={96}
+                      height={96}
+                      className="h-24 w-24"
+                    />
+                  </div>
                   <h4 className="text-lg font-medium text-[#2B3A3B] mb-2">學生未分配成長樹</h4>
                   <p className="text-[#87704e] mb-4">
                     無法進行能力評估，因為學生尚未分配任何成長樹。
@@ -3119,7 +3338,15 @@ export default function SimpleAbilityAssessmentModal({
               ) : !selectedTree ? (
                 /* 未選擇成長樹 */
                 <div className="text-center py-12">
-                  <div className="text-4xl mb-4">🌳</div>
+                  <div className="mb-4 flex justify-center">
+                    <Image
+                      src="/tree ui.png"
+                      alt="成長樹"
+                      width={64}
+                      height={64}
+                      className="h-16 w-16"
+                    />
+                  </div>
                   <h4 className="text-lg font-medium text-[#2B3A3B] mb-2">請選擇本次評估的成長樹</h4>
                   <p className="text-[#87704e]">
                     請在左側選擇要評估的成長樹。

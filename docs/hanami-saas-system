@@ -141,6 +141,58 @@ CREATE TABLE public.chat_threads (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT chat_threads_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.content_library (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  source_type text NOT NULL,
+  media_type text NOT NULL,
+  title text,
+  source_url text,
+  source_platform_id text,
+  language text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  api_owner_username text,
+  api_owner_fullname text,
+  api_caption text,
+  api_timestamp timestamp with time zone,
+  api_likes integer,
+  api_comments integer,
+  api_video_views integer,
+  api_video_plays integer,
+  api_hashtags jsonb,
+  api_raw jsonb,
+  metrics_extra jsonb,
+  main_text text,
+  excerpt_short text,
+  text_blocks jsonb,
+  category text,
+  sub_category text,
+  target_audience text,
+  summary_short text,
+  topic text,
+  tags_ai jsonb,
+  tags_manual jsonb,
+  analysis jsonb,
+  section_summary text,
+  section_structure text,
+  section_hook text,
+  section_cta text,
+  section_script_outline text,
+  section_subtitles_raw text,
+  subtitle_lines jsonb,
+  subtitle_lines_count integer,
+  analysis_model text,
+  analysis_version integer,
+  analysis_created_at timestamp with time zone,
+  status text DEFAULT 'raw'::text,
+  my_rating smallint,
+  my_priority smallint,
+  my_notes text,
+  my_idea_links jsonb,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT content_library_pkey PRIMARY KEY (id),
+  CONSTRAINT content_library_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
 CREATE TABLE public.custom_roles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -205,6 +257,18 @@ CREATE TABLE public.hanami_children (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT hanami_children_pkey PRIMARY KEY (id),
   CONSTRAINT hanami_children_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.saas_users(id)
+);
+CREATE TABLE public.hanami_organizations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  org_name text NOT NULL,
+  org_slug text NOT NULL UNIQUE,
+  status text DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text, 'suspended'::text])),
+  contact_email text,
+  contact_phone text,
+  settings jsonb DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT hanami_organizations_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.hanami_payme_fps_accounts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -292,6 +356,18 @@ CREATE TABLE public.hanami_task_list (
   follow_up_content text,
   assigned_to ARRAY,
   CONSTRAINT hanami_task_list_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.hanami_user_organizations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_email text NOT NULL,
+  user_id uuid,
+  org_id uuid NOT NULL,
+  role text DEFAULT 'member'::text CHECK (role = ANY (ARRAY['owner'::text, 'admin'::text, 'teacher'::text, 'member'::text])),
+  is_primary boolean DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT hanami_user_organizations_pkey PRIMARY KEY (id),
+  CONSTRAINT hanami_user_organizations_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.hanami_organizations(id)
 );
 CREATE TABLE public.memory_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -973,6 +1049,7 @@ CREATE TABLE public.saas_users (
   last_login timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  user_role USER-DEFINED NOT NULL DEFAULT 'user'::saas_user_role CHECK (user_role = ANY (ARRAY['super_admin'::saas_user_role, 'admin'::saas_user_role, 'user'::saas_user_role, 'staff'::saas_user_role, 'moderator'::saas_user_role, 'billing_manager'::saas_user_role, 'auditor'::saas_user_role])),
   CONSTRAINT saas_users_pkey PRIMARY KEY (id),
   CONSTRAINT saas_users_subscription_plan_id_fkey FOREIGN KEY (subscription_plan_id) REFERENCES public.saas_subscription_plans(id)
 );

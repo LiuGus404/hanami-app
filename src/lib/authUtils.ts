@@ -4,11 +4,19 @@ import { checkPermission, PermissionCheck } from './permissionUtils';
 
 export type UserRole = 'admin' | 'teacher' | 'parent' | 'student';
 
+export interface OrganizationProfile {
+  id: string;
+  name: string;
+  slug: string;
+  status?: string | null;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
   role: UserRole;
   name: string;
+  organization: OrganizationProfile;
   relatedIds?: string[]; // 老師的學生ID列表或家長的學生ID列表
 }
 
@@ -16,6 +24,102 @@ export interface LoginResult {
   success: boolean;
   user?: UserProfile;
   error?: string;
+}
+
+const DEFAULT_ORG_ID =
+  process.env.NEXT_PUBLIC_DEFAULT_ORG_ID || 'unassigned-org-placeholder';
+const DEFAULT_ORG_SLUG = process.env.NEXT_PUBLIC_DEFAULT_ORG_SLUG || 'unassigned-org';
+const DEFAULT_ORG_NAME = process.env.NEXT_PUBLIC_DEFAULT_ORG_NAME || '未設定機構';
+
+const FALLBACK_ORG: OrganizationProfile = {
+  id: DEFAULT_ORG_ID,
+  name: DEFAULT_ORG_NAME,
+  slug: DEFAULT_ORG_SLUG,
+};
+
+export const fallbackOrganization: OrganizationProfile = FALLBACK_ORG;
+
+function normalizeUserProfile(raw: any): UserProfile {
+  if (!raw) {
+    throw new Error('無法正規化空的使用者資料');
+  }
+
+  const organization = raw.organization || {};
+
+  return {
+    id: raw.id,
+    email: raw.email,
+    role: raw.role,
+    name: raw.name,
+    relatedIds: raw.relatedIds || [],
+    organization: {
+      id: organization.id || FALLBACK_ORG.id,
+      name: organization.name || FALLBACK_ORG.name,
+      slug: organization.slug || FALLBACK_ORG.slug,
+      status: organization.status ?? FALLBACK_ORG.status,
+    },
+  };
+}
+
+async function resolveOrganization(
+  supabase: ReturnType<typeof createClientComponentClient<Database>>,
+  orgId?: string | null,
+  userEmail?: string | null,
+): Promise<OrganizationProfile> {
+  let targetOrgId = orgId || null;
+
+  if (!targetOrgId && userEmail) {
+    const { data: membership, error: membershipError } = await (supabase as any)
+      .from('hanami_user_organizations')
+      .select('org_id, hanami_organizations ( id, org_name, org_slug, status ), is_primary, created_at')
+      .eq('user_email', userEmail)
+      .order('is_primary', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!membershipError && membership) {
+      targetOrgId = membership.org_id || null;
+
+      if (membership.hanami_organizations) {
+        const org = membership.hanami_organizations;
+        return {
+          id: org.id,
+          name: org.org_name,
+          slug: org.org_slug,
+          status: org.status,
+        };
+      }
+    }
+  }
+
+  const finalOrgId = targetOrgId || DEFAULT_ORG_ID;
+
+  if (!finalOrgId || finalOrgId === 'default-org') {
+    return FALLBACK_ORG;
+  }
+
+  const { data, error } = await supabase
+    .from('hanami_organizations')
+    .select('id, org_name, org_slug, status')
+    .eq('id', finalOrgId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('resolveOrganization: 無法取得組織資料，改用預設值', error);
+    return FALLBACK_ORG;
+  }
+
+  if (!data) {
+    return FALLBACK_ORG;
+  }
+
+  return {
+    id: data.id,
+    name: data.org_name,
+    slug: data.org_slug,
+    status: data.status,
+  };
 }
 
 // 新的函數：驗證用戶憑證並返回用戶資料
@@ -46,13 +150,15 @@ export async function validateUserCredentials(email: string, password: string): 
         // 檢查管理員表
         const { data: adminData, error: adminError } = await supabase
           .from('hanami_admin')
-          .select('id, admin_name, admin_email')
+          .select('id, admin_name, admin_email, org_id')
           .eq('admin_email', email)
           .single();
 
         if (adminData && !adminError) {
           // 這裡可以添加密碼驗證邏輯
           // 暫時跳過密碼檢查，直接返回成功
+          const organization = await resolveOrganization(supabase, adminData.org_id, adminData.admin_email || email);
+
           return {
             success: true,
             user: {
@@ -60,6 +166,7 @@ export async function validateUserCredentials(email: string, password: string): 
               email: adminData.admin_email || email,
               role: 'admin',
               name: adminData.admin_name || '管理員',
+              organization,
             },
           };
         }
@@ -67,7 +174,7 @@ export async function validateUserCredentials(email: string, password: string): 
         // 檢查教師表
         const { data: teacherData, error: teacherError } = await supabase
           .from('hanami_employee')
-          .select('id, teacher_fullname, teacher_email, teacher_password, teacher_nickname')
+          .select('id, teacher_fullname, teacher_email, teacher_password, teacher_nickname, org_id')
           .eq('teacher_email', email)
           .eq('teacher_password', password)
           .single();
@@ -79,6 +186,8 @@ export async function validateUserCredentials(email: string, password: string): 
             .select('id')
             .eq('student_teacher', teacherData.id);
 
+          const organization = await resolveOrganization(supabase, teacherData.org_id, teacherData.teacher_email || email);
+
           return {
             success: true,
             user: {
@@ -86,6 +195,7 @@ export async function validateUserCredentials(email: string, password: string): 
               email: teacherData.teacher_email || email,
               role: 'teacher',
               name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
+              organization,
               relatedIds: students?.map(s => s.id) || [],
             },
           };
@@ -94,7 +204,7 @@ export async function validateUserCredentials(email: string, password: string): 
         // 檢查家長表（新的家長帳戶系統）
         const { data: parentData, error: parentError } = await supabase
           .from('hanami_parents')
-          .select('id, parent_name, parent_email, parent_password, parent_status')
+          .select('id, parent_name, parent_email, parent_password, parent_status, org_id')
           .eq('parent_email', email)
           .eq('parent_password', password)
           .eq('parent_status', 'active')
@@ -107,6 +217,8 @@ export async function validateUserCredentials(email: string, password: string): 
             .select('student_id')
             .eq('parent_id', parentData.id);
 
+          const organization = await resolveOrganization(supabase, parentData.org_id, parentData.parent_email || email);
+
           return {
             success: true,
             user: {
@@ -114,6 +226,7 @@ export async function validateUserCredentials(email: string, password: string): 
               email: parentData.parent_email || email,
               role: 'parent',
               name: parentData.parent_name || '家長',
+              organization,
               relatedIds: linkedStudents?.map(s => s.student_id) || [],
             },
           };
@@ -125,13 +238,15 @@ export async function validateUserCredentials(email: string, password: string): 
     // 檢查管理員
     const { data: adminData, error: adminError } = await supabase
       .from('hanami_admin')
-      .select('id, admin_name, admin_email, admin_password')
+      .select('id, admin_name, admin_email, admin_password, org_id')
       .eq('admin_email', email)
       .eq('admin_password', password)
       .single();
 
     if (adminData && !adminError && typeof adminData === 'object' && 'id' in adminData) {
-      const admin = adminData as { id: string; admin_email?: string; admin_name?: string };
+      const admin = adminData as { id: string; admin_email?: string; admin_name?: string; org_id?: string };
+      const organization = await resolveOrganization(supabase, admin.org_id, admin.admin_email || email);
+
       return {
         success: true,
         user: {
@@ -139,6 +254,7 @@ export async function validateUserCredentials(email: string, password: string): 
           email: admin.admin_email || email,
           role: 'admin',
           name: admin.admin_name || '管理員',
+          organization,
         },
       };
     }
@@ -146,7 +262,7 @@ export async function validateUserCredentials(email: string, password: string): 
     // 檢查老師
     const { data: teacherData, error: teacherError } = await supabase
       .from('hanami_employee')
-      .select('id, teacher_fullname, teacher_email, teacher_password, teacher_nickname')
+      .select('id, teacher_fullname, teacher_email, teacher_password, teacher_nickname, org_id')
       .eq('teacher_email', email)
       .eq('teacher_password', password)
       .single();
@@ -158,6 +274,8 @@ export async function validateUserCredentials(email: string, password: string): 
         .select('id')
         .eq('student_teacher', teacherData.id);
 
+      const organization = await resolveOrganization(supabase, teacherData.org_id, teacherData.teacher_email || email);
+
       return {
         success: true,
         user: {
@@ -165,6 +283,7 @@ export async function validateUserCredentials(email: string, password: string): 
           email: teacherData.teacher_email || email,
           role: 'teacher',
           name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
+          organization,
           relatedIds: students?.map(s => s.id) || [],
         },
       };
@@ -173,12 +292,14 @@ export async function validateUserCredentials(email: string, password: string): 
     // 檢查學生/家長 (通過學生資料的 student_email 和 student_password)
     const { data: studentData, error: studentError } = await supabase
       .from('Hanami_Students')
-      .select('id, full_name, student_email, student_password, parent_email')
+      .select('id, full_name, student_email, student_password, parent_email, org_id')
       .eq('student_email', email)
       .eq('student_password', password)
       .single();
 
     if (studentData && !studentError) {
+      const organization = await resolveOrganization(supabase, studentData.org_id, studentData.student_email || studentData.parent_email || email);
+
       return {
         success: true,
         user: {
@@ -186,6 +307,7 @@ export async function validateUserCredentials(email: string, password: string): 
           email: studentData.student_email || email,
           role: 'parent',
           name: `${studentData.full_name}的家長`,
+          organization,
           relatedIds: [studentData.id],
         },
       };
@@ -194,12 +316,14 @@ export async function validateUserCredentials(email: string, password: string): 
     // 檢查家長 (通過學生資料的 parent_email 和 student_password)
     const { data: parentData, error: parentError } = await supabase
       .from('Hanami_Students')
-      .select('id, full_name, parent_email, student_password')
+      .select('id, full_name, parent_email, student_password, org_id')
       .eq('parent_email', email)
       .eq('student_password', password)
       .single();
 
     if (parentData && !parentError) {
+      const organization = await resolveOrganization(supabase, parentData.org_id, parentData.parent_email || email);
+
       return {
         success: true,
         user: {
@@ -207,6 +331,7 @@ export async function validateUserCredentials(email: string, password: string): 
           email: parentData.parent_email || email,
           role: 'parent',
           name: `${parentData.full_name}的家長`,
+          organization,
           relatedIds: [parentData.id],
         },
       };
@@ -281,16 +406,19 @@ export async function getUserProfile(): Promise<UserProfile | null> {
       case 'admin': {
         const { data: adminData } = await supabase
           .from('hanami_admin')
-          .select('id, admin_name, admin_email')
+          .select('id, admin_name, admin_email, org_id')
           .eq('admin_email', user.email)
           .single();
         
         if (adminData) {
+          const organization = await resolveOrganization(supabase, adminData.org_id, adminData.admin_email || user.email);
+
           return {
             id: adminData.id,
             email: adminData.admin_email || user.email,
             role: 'admin',
             name: adminData.admin_name || '管理員',
+            organization,
           };
         }
         break;
@@ -299,7 +427,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
       case 'teacher': {
         const { data: teacherData } = await supabase
           .from('hanami_employee')
-          .select('id, teacher_fullname, teacher_email, teacher_nickname')
+          .select('id, teacher_fullname, teacher_email, teacher_nickname, org_id')
           .eq('teacher_email', user.email)
           .single();
         
@@ -310,11 +438,14 @@ export async function getUserProfile(): Promise<UserProfile | null> {
             .select('id')
             .eq('student_teacher', teacherData.id);
 
+          const organization = await resolveOrganization(supabase, teacherData.org_id, teacherData.teacher_email || user.email);
+
           return {
             id: teacherData.id,
             email: teacherData.teacher_email || user.email,
             role: 'teacher',
             name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
+            organization,
             relatedIds: students?.map(s => s.id) || [],
           };
         }
@@ -325,7 +456,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
         // 取得家長資料（新的家長帳戶系統）
         const { data: parentData } = await supabase
           .from('hanami_parents')
-          .select('id, parent_name, parent_email')
+          .select('id, parent_name, parent_email, org_id')
           .eq('parent_email', user.email)
           .single();
 
@@ -336,11 +467,14 @@ export async function getUserProfile(): Promise<UserProfile | null> {
             .select('student_id')
             .eq('parent_id', parentData.id);
 
+          const organization = await resolveOrganization(supabase, parentData.org_id, parentData.parent_email || user.email);
+
           return {
             id: parentData.id,
             email: parentData.parent_email || user.email,
             role: 'parent',
             name: parentData.parent_name || '家長',
+            organization,
             relatedIds: linkedStudents?.map(s => s.student_id) || [],
           };
         }
@@ -384,8 +518,9 @@ export function getLoginPath(role: UserRole): string {
 // 會話管理函數
 export function setUserSession(user: UserProfile) {
   if (typeof window !== 'undefined') {
+    const normalizedUser = normalizeUserProfile(user);
     const sessionData = {
-      user,
+      user: normalizedUser,
       timestamp: Date.now(),
     };
     
@@ -395,6 +530,8 @@ export function setUserSession(user: UserProfile) {
     // 設置 cookie（供 middleware 使用）
     const cookieValue = encodeURIComponent(JSON.stringify(sessionData));
     document.cookie = `hanami_user_session=${cookieValue}; path=/; max-age=${24 * 60 * 60}; SameSite=Lax`;
+
+    window.dispatchEvent(new Event('hanami-user-session-changed'));
   }
 }
 
@@ -407,7 +544,7 @@ export function getUserSession(): UserProfile | null {
         const data = JSON.parse(session);
         // 檢查會話是否過期 (24小時)
         if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
-          return data.user;
+          return normalizeUserProfile(data.user);
         } else {
           // 會話過期，清除
           localStorage.removeItem('hanami_user_session');
@@ -431,7 +568,7 @@ export function getUserSession(): UserProfile | null {
         if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
           // 同步到 localStorage
           localStorage.setItem('hanami_user_session', JSON.stringify(data));
-          return data.user;
+          return normalizeUserProfile(data.user);
         } else {
           // 會話過期，清除
           document.cookie = 'hanami_user_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
@@ -465,6 +602,8 @@ export function clearUserSession() {
     console.log('已清除其他會話相關數據');
     
     console.log('用戶會話清除完成');
+
+    window.dispatchEvent(new Event('hanami-user-session-changed'));
   }
 }
 

@@ -17,6 +17,9 @@ import { useUser } from '@/lib/useUser';
 import { Lesson } from '@/types';
 import { motion } from 'framer-motion';
 import { User, BookOpen, UserCircle, Sparkles, Camera, Phone, Wand2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+
+const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
 
 export default function StudentDetailPage() {
   const { id } = useParams();
@@ -38,6 +41,26 @@ export default function StudentDetailPage() {
   const [courseUpdateTrigger, setCourseUpdateTrigger] = useState(0); // 課程更新觸發器
   const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media' | 'phone'>('basic'); // 分頁狀態
   const [showTooltip, setShowTooltip] = useState<string | null>(null); // 工具提示狀態
+
+  const handleTabChange = (tabKey: 'basic' | 'lessons' | 'avatar' | 'media' | 'phone') => {
+    // 檢查是否為需要 premium 的功能
+    const studentOrgId = student?.org_id ?? null;
+    if ((tabKey === 'media' || tabKey === 'phone') && studentOrgId !== PREMIUM_AI_ORG_ID) {
+      toast('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com');
+      return;
+    }
+    setActiveTab(tabKey);
+  };
+
+  // 如果當前在受限制的分頁但 orgId 不是 premium，自動切換回基本資料
+  useEffect(() => {
+    if (student) {
+      const studentOrgId = student.org_id ?? null;
+      if ((activeTab === 'media' || activeTab === 'phone') && studentOrgId !== PREMIUM_AI_ORG_ID) {
+        setActiveTab('basic');
+      }
+    }
+  }, [student, activeTab]);
   
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -372,25 +395,32 @@ export default function StudentDetailPage() {
             {[
               { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
               { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
-              { key: 'avatar', label: '互動角色', icon: Sparkles, description: '3D角色與學習進度' },
+              { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度' },
               { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' },
               { key: 'phone', label: 'AI分析', icon: Wand2, description: 'AI智能分析與個人化洞察' }
-            ].map(({ key, label, icon: Icon, description }) => (
+            ].map(({ key, label, icon: Icon, description }) => {
+              const studentOrgId = student?.org_id ?? null;
+              const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
+              const isDisabled = (key === 'media' || key === 'phone') && !isPremiumOrg;
+              
+              return (
               <div key={key} className="relative">
                 <motion.button
-                  onClick={() => setActiveTab(key as any)}
+                  onClick={() => handleTabChange(key as any)}
                   onMouseEnter={() => setShowTooltip(key)}
                   onMouseLeave={() => setShowTooltip(null)}
                   className={`
                     flex items-center rounded-lg text-sm font-medium transition-colors whitespace-nowrap
-                    ${activeTab === key
-                      ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
-                      : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
+                    ${isDisabled
+                      ? 'opacity-50 cursor-pointer text-gray-400'
+                      : activeTab === key
+                        ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
+                        : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
                     }
                     px-2 py-3 sm:px-4
                   `}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={isDisabled ? {} : { scale: 1.02 }}
+                  whileTap={isDisabled ? {} : { scale: 0.98 }}
                 >
                   <Icon className="w-4 h-4 sm:mr-2" />
                   {/* 小螢幕隱藏文字，大螢幕顯示 */}
@@ -414,7 +444,8 @@ export default function StudentDetailPage() {
                   </motion.div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -465,6 +496,12 @@ export default function StudentDetailPage() {
                     }}
                     studentData={student}
                     showAIMessageButton={true}
+                    orgId={student.org_id ?? null}
+                    organizationName={
+                      (student as any)?.organization_name ??
+                      (student as any)?.organizationName ??
+                      null
+                    }
                   />
                 );
               })()}
@@ -510,6 +547,7 @@ export default function StudentDetailPage() {
           mode={editingLesson ? 'edit' : 'add'}
           open={isModalOpen}
           studentId={student.id}
+          orgId={student.org_id ?? null}
           onClose={() => {
             setIsModalOpen(false);
             setEditingLesson(null);

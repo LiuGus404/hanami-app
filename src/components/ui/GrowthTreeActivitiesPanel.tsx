@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PlusIcon, TrashIcon, EyeIcon, PuzzlePieceIcon, MapIcon } from '@heroicons/react/24/outline';
 import { HanamiButton, HanamiCard } from '@/components/ui';
 import HanamiInput from '@/components/ui/HanamiInput';
@@ -11,11 +11,13 @@ import { LearningPathBuilder } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { TreeActivity, CreateTreeActivityRequest, ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, DIFFICULTY_LEVELS, DIFFICULTY_LEVEL_LABELS } from '@/types/progress';
 import toast from 'react-hot-toast';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface GrowthTreeActivitiesPanelProps {
   treeId: string;
   treeName: string;
   onClose?: () => void;
+  initialShowPathList?: boolean;
 }
 
 interface TeachingActivity {
@@ -32,8 +34,21 @@ interface TeachingActivity {
 export default function GrowthTreeActivitiesPanel({ 
   treeId, 
   treeName,
-  onClose 
+  onClose,
+  initialShowPathList = false
 }: GrowthTreeActivitiesPanelProps) {
+  const { currentOrganization } = useOrganization();
+  
+  const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const PLACEHOLDER_ORG_IDS = new Set(['default-org', 'unassigned-org-placeholder']);
+  
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) return null;
+    return UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id)
+      ? currentOrganization.id
+      : null;
+  }, [currentOrganization?.id]);
+  
   const [activities, setActivities] = useState<TreeActivity[]>([]);
   const [teachingActivities, setTeachingActivities] = useState<TeachingActivity[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,7 +79,14 @@ export default function GrowthTreeActivitiesPanel({
       loadActivities();
       loadTeachingActivities();
     }
-  }, [treeId]);
+  }, [treeId, validOrgId]);
+
+  // 如果 initialShowPathList 為 true，在載入學習路線數據後顯示活動流程
+  useEffect(() => {
+    if (initialShowPathList && learningPathData) {
+      setShowPathList(true);
+    }
+  }, [initialShowPathList, learningPathData]);
 
   // 載入成長樹活動
   const loadActivities = useCallback(async () => {
@@ -284,12 +306,18 @@ export default function GrowthTreeActivitiesPanel({
 
   const loadTeachingActivities = async () => {
     try {
-      console.log('開始載入教學活動...');
-      const { data, error } = await supabase
+      console.log('開始載入教學活動...', { validOrgId });
+      let query = supabase
         .from('hanami_teaching_activities')
         .select('*')
-        .eq('is_active', true)
-        .order('activity_name');
+        .eq('is_active', true);
+      
+      // 根據 org_id 過濾
+      if (validOrgId) {
+        query = query.eq('org_id', validOrgId);
+      }
+      
+      const { data, error } = await query.order('activity_name');
 
       if (error) {
         console.error('載入教學活動錯誤:', error);
@@ -472,7 +500,8 @@ export default function GrowthTreeActivitiesPanel({
           totalDuration: path.totalDuration || 0,
           difficulty: path.difficulty || 1,
           tags: path.tags || []
-        }
+        },
+        orgId: validOrgId // 包含 org_id
       };
       
       console.log('發送到 API 的數據:', apiData);
@@ -776,6 +805,7 @@ export default function GrowthTreeActivitiesPanel({
                 treeId={treeId}
                 activities={activities}
                 initialPath={learningPathData}
+                orgId={validOrgId}
                 onSave={handleLearningPathSave}
                 onPreview={handleLearningPathPreview}
                 onClose={() => setShowLearningPathBuilder(false)}
@@ -795,7 +825,7 @@ export default function GrowthTreeActivitiesPanel({
                   <svg className="h-6 w-6 text-hanami-text" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                   </svg>
-                  <h3 className="text-lg font-bold text-hanami-text">活動流程</h3>
+                  <h3 className="text-lg font-bold text-hanami-text">{treeName}</h3>
                 </div>
                 <button
                   className="text-hanami-text hover:text-hanami-text-secondary transition-colors"

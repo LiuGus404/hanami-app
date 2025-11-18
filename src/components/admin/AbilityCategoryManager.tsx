@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 interface AbilityCategoryManagerProps {
   onClose: () => void;
   onCategoryChange: () => void;
+  orgId?: string | null;
 }
 
 interface CategoryOption {
@@ -23,7 +24,8 @@ interface CategoryOption {
 
 export default function AbilityCategoryManager({ 
   onClose, 
-  onCategoryChange 
+  onCategoryChange,
+  orgId = null
 }: AbilityCategoryManagerProps) {
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,20 +35,29 @@ export default function AbilityCategoryManager({
 
   useEffect(() => {
     loadCategories();
-  }, []);
+  }, [orgId]);
 
   const loadCategories = async () => {
     try {
       setLoading(true);
       
       // 載入自訂能力類別（使用 activity_type 並過濾發展相關）
-      const { data: customData } = await supabase
+      let query = supabase
         .from('hanami_custom_options')
         .select('*')
         .eq('option_type', 'activity_type')
         .eq('is_active', true)
-        .like('option_name', '%發展%')
-        .order('sort_order');
+        .like('option_name', '%發展%');
+      
+      // 根據 org_id 過濾
+      if (orgId) {
+        query = query.eq('org_id', orgId);
+      } else {
+        // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+        query = query.eq('org_id', '00000000-0000-0000-0000-000000000000');
+      }
+      
+      const { data: customData } = await query.order('sort_order');
 
       const defaultCategories = [
         { id: 'physical', name: '身體發展', is_default: true, sort_order: 1 },
@@ -79,15 +90,22 @@ export default function AbilityCategoryManager({
       const optionValue = newCategoryName.toLowerCase().replace(/\s+/g, '_');
       
       // 儲存到資料庫（使用 activity_type）
+      const insertData: any = {
+        option_type: 'activity_type',
+        option_name: newCategoryName.trim(),
+        option_value: optionValue,
+        sort_order: categories.length + 100, // 使用較高的排序值避免衝突
+        is_active: true,
+      };
+      
+      // 如果提供了 orgId，則包含它
+      if (orgId) {
+        insertData.org_id = orgId;
+      }
+      
       const { error } = await supabase
         .from('hanami_custom_options')
-        .insert({
-          option_type: 'activity_type',
-          option_name: newCategoryName.trim(),
-          option_value: optionValue,
-          sort_order: categories.length + 100, // 使用較高的排序值避免衝突
-          is_active: true,
-        });
+        .insert(insertData);
 
       if (error) throw error;
 
@@ -115,13 +133,27 @@ export default function AbilityCategoryManager({
         toast.success('更新預設類別成功！');
       } else {
         // 自訂類別：更新資料庫
-        const { error } = await supabase
+        const updateData: any = {
+          option_name: newCategoryName.trim(),
+        };
+        
+        // 如果提供了 orgId，確保更新時也包含 org_id（如果原本沒有）
+        if (orgId) {
+          updateData.org_id = orgId;
+        }
+        
+        let updateQuery = supabase
           .from('hanami_custom_options')
-          .update({
-            option_name: newCategoryName.trim(),
-          })
+          .update(updateData)
           .eq('option_type', 'activity_type')
           .eq('option_value', editingCategory.id);
+        
+        // 如果提供了 orgId，則也過濾 org_id
+        if (orgId) {
+          updateQuery = updateQuery.eq('org_id', orgId);
+        }
+        
+        const { error } = await updateQuery;
 
         if (error) throw error;
 
@@ -144,24 +176,30 @@ export default function AbilityCategoryManager({
       const categoryToDelete = categories.find(cat => cat.id === categoryId);
       
       if (categoryToDelete?.is_default) {
-        // 預設類別：只更新本地狀態，不更新資料庫
-        setCategories(prev => prev.filter(cat => cat.id !== categoryId));
-        toast.success('刪除預設類別成功！');
-      } else {
-        // 自訂類別：軟刪除（設為非活躍）
-        const { error } = await supabase
-          .from('hanami_custom_options')
-          .update({ is_active: false })
-          .eq('option_type', 'activity_type')
-          .eq('option_value', categoryId);
-
-        if (error) throw error;
-
-        // 重新載入類別
-        await loadCategories();
-        toast.success('刪除類別成功！');
+        // 預設類別不能刪除
+        toast.error('預設類別無法刪除');
+        return;
       }
+      
+      // 自訂類別：軟刪除（設為非活躍）
+      let deleteQuery = supabase
+        .from('hanami_custom_options')
+        .update({ is_active: false })
+        .eq('option_type', 'activity_type')
+        .eq('option_value', categoryId);
+      
+      // 如果提供了 orgId，則也過濾 org_id
+      if (orgId) {
+        deleteQuery = deleteQuery.eq('org_id', orgId);
+      }
+      
+      const { error } = await deleteQuery;
 
+      if (error) throw error;
+
+      // 重新載入類別
+      await loadCategories();
+      toast.success('刪除類別成功！');
       onCategoryChange();
     } catch (err) {
       console.error('刪除類別失敗：', err);
@@ -256,13 +294,20 @@ export default function AbilityCategoryManager({
                       >
                         <PencilIcon className="h-4 w-4" />
                       </HanamiButton>
-                      <HanamiButton
-                        size="sm"
-                        variant="danger"
-                        onClick={() => deleteCategory(category.id)}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </HanamiButton>
+                      {!category.is_default && (
+                        <HanamiButton
+                          size="sm"
+                          variant="danger"
+                          onClick={() => deleteCategory(category.id)}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </HanamiButton>
+                      )}
+                      {category.is_default && (
+                        <span className="text-xs text-gray-500 px-2 py-1">
+                          系統預設，無法刪除
+                        </span>
+                      )}
                     </div>
                   </div>
                   <h3 className="font-semibold text-hanami-text">

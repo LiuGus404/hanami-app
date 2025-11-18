@@ -74,9 +74,10 @@ interface DragSchedule {
 
 type TeacherSchedulePanelProps = {
   teacherIds?: string[]
+  orgId?: string | null
 }
 
-export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePanelProps) {
+export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSchedulePanelProps) {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -159,25 +160,53 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       // Fetch schedules for the month
       let scheduleQuery = supabase
         .from('teacher_schedule')
-        .select('id, teacher_id, scheduled_date, start_time, end_time, created_at, updated_at')
+        .select('id, teacher_id, scheduled_date, start_time, end_time, created_at, updated_at, org_id')
         .gte('scheduled_date', monthStartStr)
         .lte('scheduled_date', monthEndStr);
+
+      // 根據 org_id 過濾排班記錄
+      console.log('🔍 [TeacherSchedulePanel] fetchData - orgId:', orgId);
+      if (orgId) {
+        scheduleQuery = scheduleQuery.eq('org_id', orgId);
+        console.log('✅ [TeacherSchedulePanel] 排班記錄查詢已添加 org_id 過濾:', orgId);
+      } else {
+        // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+        scheduleQuery = scheduleQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+        console.warn('⚠️ [TeacherSchedulePanel] orgId 為 null，排班記錄查詢將返回空結果');
+      }
 
       // Fetch teachers
       let teacherQuery = supabase
         .from('hanami_employee')
         .select('id, teacher_fullname, teacher_nickname');
 
+      // 根據 org_id 過濾老師
+      if (orgId) {
+        teacherQuery = teacherQuery.eq('org_id', orgId);
+        console.log('✅ [TeacherSchedulePanel] 老師查詢已添加 org_id 過濾:', orgId);
+      } else {
+        // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+        teacherQuery = teacherQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+        console.warn('⚠️ [TeacherSchedulePanel] orgId 為 null，老師查詢將返回空結果');
+      }
+
       if (teacherIds && teacherIds.length > 0 && teacherIds[0] !== '*') {
         scheduleQuery = scheduleQuery.in('teacher_id', teacherIds);
         teacherQuery = teacherQuery.in('id', teacherIds);
       }
 
+      console.log('🔍 [TeacherSchedulePanel] 執行並行查詢，orgId:', orgId);
       const [lessonResult, scheduleResult, teacherResult] = await Promise.all([
         lessonQuery,
         scheduleQuery,
         teacherQuery,
       ]);
+      
+      console.log('📊 [TeacherSchedulePanel] 查詢結果:', {
+        schedulesCount: scheduleResult.data?.length || 0,
+        teachersCount: teacherResult.data?.length || 0,
+        orgId
+      });
 
       // Handle lesson data
       if (lessonResult.error) {
@@ -197,14 +226,31 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       if (scheduleResult.error) {
         console.warn('Warning fetching schedules:', scheduleResult.error.message);
       } else if (scheduleResult.data) {
+        console.log('📊 [TeacherSchedulePanel] 載入的排班記錄數量:', scheduleResult.data.length, 'orgId:', orgId);
+        if (scheduleResult.data.length > 0) {
+          // 檢查排班記錄的 org_id（如果查詢中包含）
+          const sampleSchedule = scheduleResult.data[0] as any;
+          console.log('📊 [TeacherSchedulePanel] 排班記錄示例:', {
+            id: sampleSchedule.id,
+            teacher_id: sampleSchedule.teacher_id,
+            scheduled_date: sampleSchedule.scheduled_date,
+            org_id: sampleSchedule.org_id
+          });
+        }
         setSchedules(scheduleResult.data as Schedule[]);
+      } else {
+        console.log('📊 [TeacherSchedulePanel] 沒有載入到任何排班記錄，orgId:', orgId);
       }
 
       // Handle teacher data
       if (teacherResult.error) {
         console.warn('Warning fetching teachers:', teacherResult.error.message);
       } else if (teacherResult.data) {
+        console.log('📊 [TeacherSchedulePanel] 載入的老師數量:', teacherResult.data.length, 'orgId:', orgId);
+        console.log('📊 [TeacherSchedulePanel] 載入的老師列表:', teacherResult.data.map((t: any) => ({ id: t.id, name: t.teacher_nickname || t.teacher_fullname })));
         setTeachers(teacherResult.data as Teacher[]);
+      } else {
+        console.log('📊 [TeacherSchedulePanel] 沒有載入到任何老師，orgId:', orgId);
       }
 
     } catch (error) {
@@ -215,7 +261,7 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
 
   useEffect(() => {
     fetchData();
-  }, [currentMonth, teacherIds]);
+  }, [currentMonth, teacherIds, orgId]);
 
   const daysInMonth = eachDayOfInterval({
     start: startOfMonth(currentMonth),
@@ -291,14 +337,21 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       setLoading(true);
       setErrorMsg(null);
 
+      const insertData: any = {
+        teacher_id: selectedTeacher.teacher_id,
+        scheduled_date: format(selectedDetail.date, 'yyyy-MM-dd'),
+        start_time: selectedTeacher.start_time,
+        end_time: selectedTeacher.end_time,
+      };
+
+      // 如果提供了 orgId，則包含它
+      if (orgId) {
+        insertData.org_id = orgId;
+      }
+
       const { error } = await supabase
         .from('teacher_schedule')
-        .insert({
-          teacher_id: selectedTeacher.teacher_id,
-          scheduled_date: format(selectedDetail.date, 'yyyy-MM-dd'),
-          start_time: selectedTeacher.start_time,
-          end_time: selectedTeacher.end_time,
-        });
+        .insert(insertData);
 
       if (error) {
         console.warn('Error saving teacher schedule:', error.message);
@@ -307,10 +360,17 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       }
 
       // Refresh schedules
-      const { data: scheduleData, error: refreshError } = await supabase
+      let refreshQuery = supabase
         .from('teacher_schedule')
         .select('*')
         .eq('scheduled_date', format(selectedDetail.date, 'yyyy-MM-dd'));
+
+      // 根據 org_id 過濾
+      if (orgId) {
+        refreshQuery = refreshQuery.eq('org_id', orgId);
+      }
+
+      const { data: scheduleData, error: refreshError } = await refreshQuery;
 
       if (refreshError) {
         console.warn('Error refreshing schedules:', refreshError.message);
@@ -337,11 +397,18 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
     try {
       setErrorMsg(null);
 
-      const { error } = await supabase
+      let deleteQuery = supabase
         .from('teacher_schedule')
         .delete()
         .eq('teacher_id', teacherId)
         .eq('scheduled_date', format(selectedDetail.date, 'yyyy-MM-dd'));
+
+      // 根據 org_id 過濾
+      if (orgId) {
+        deleteQuery = deleteQuery.eq('org_id', orgId);
+      }
+
+      const { error } = await deleteQuery;
 
       if (error) {
         console.warn('Error deleting teacher schedule:', error.message);
@@ -350,10 +417,17 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       }
 
       // Refresh schedules
-      const { data: scheduleData, error: refreshError } = await supabase
+      let refreshQuery = supabase
         .from('teacher_schedule')
         .select('*')
         .eq('scheduled_date', format(selectedDetail.date, 'yyyy-MM-dd'));
+
+      // 根據 org_id 過濾
+      if (orgId) {
+        refreshQuery = refreshQuery.eq('org_id', orgId);
+      }
+
+      const { data: scheduleData, error: refreshError } = await refreshQuery;
 
       if (refreshError) {
         console.warn('Error refreshing schedules:', refreshError.message);
@@ -587,24 +661,35 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       setErrorMsg(null);
 
       // 準備排班資料
-      const scheduleData = {
+      const scheduleData: any = {
         teacher_id: selectedSingleTeacher.id,
         scheduled_date: selectedScheduleDate,
         start_time: selectedScheduleTime.start_time,
         end_time: selectedScheduleTime.end_time,
       };
 
+      // 如果提供了 orgId，則包含它
+      if (orgId) {
+        scheduleData.org_id = orgId;
+      }
+
       // 先檢查是否已有該日期的排班
-      const { data: existingSchedule } = await supabase
+      let checkQuery = supabase
         .from('teacher_schedule')
         .select('*')
         .eq('teacher_id', selectedSingleTeacher.id)
-        .eq('scheduled_date', selectedScheduleDate)
-        .single();
+        .eq('scheduled_date', selectedScheduleDate);
+
+      // 根據 org_id 過濾
+      if (orgId) {
+        checkQuery = checkQuery.eq('org_id', orgId);
+      }
+
+      const { data: existingSchedule } = await checkQuery.single();
 
       if (existingSchedule) {
         // 更新現有排班
-        const { error: updateError } = await supabase
+        let updateQuery = supabase
           .from('teacher_schedule')
           .update({
             start_time: selectedScheduleTime.start_time,
@@ -612,6 +697,13 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
           })
           .eq('teacher_id', selectedSingleTeacher.id)
           .eq('scheduled_date', selectedScheduleDate);
+
+        // 根據 org_id 過濾
+        if (orgId) {
+          updateQuery = updateQuery.eq('org_id', orgId);
+        }
+
+        const { error: updateError } = await updateQuery;
 
         if (updateError) {
           console.warn('Error updating schedule:', updateError.message);
@@ -686,10 +778,17 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       setErrorMsg(null);
 
       // 刪除該老師的所有排班記錄
-      const { error: deleteError } = await supabase
+      let deleteQuery = supabase
         .from('teacher_schedule')
         .delete()
         .eq('teacher_id', teacherId);
+
+      // 根據 org_id 過濾
+      if (orgId) {
+        deleteQuery = deleteQuery.eq('org_id', orgId);
+      }
+
+      const { error: deleteError } = await deleteQuery;
 
       if (deleteError) {
         console.warn('Error deleting teacher schedules:', deleteError.message);
@@ -725,10 +824,17 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       setErrorMsg(null);
 
       // 刪除指定的排班記錄
-      const { error: deleteError } = await supabase
+      let deleteQuery = supabase
         .from('teacher_schedule')
         .delete()
         .eq('id', scheduleId);
+
+      // 根據 org_id 過濾
+      if (orgId) {
+        deleteQuery = deleteQuery.eq('org_id', orgId);
+      }
+
+      const { error: deleteError } = await deleteQuery;
 
       if (deleteError) {
         console.warn('Error deleting single schedule:', deleteError.message);
@@ -770,20 +876,34 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       }));
 
       // 先刪除該日期現有的排班（可選）
-      const { error: deleteError } = await supabase
+      let deleteQuery = supabase
         .from('teacher_schedule')
         .delete()
         .eq('scheduled_date', selectedDate)
         .in('teacher_id', selectedTeachersForDate);
 
+      // 根據 org_id 過濾
+      if (orgId) {
+        deleteQuery = deleteQuery.eq('org_id', orgId);
+      }
+
+      const { error: deleteError } = await deleteQuery;
+
       if (deleteError) {
         console.warn('Warning deleting existing schedules:', deleteError.message);
       }
 
-      // 插入新的排班
+      // 插入新的排班（添加 org_id）
+      const schedulesWithOrgId = schedulesToInsert.map((schedule: any) => {
+        if (orgId) {
+          return { ...schedule, org_id: orgId };
+        }
+        return schedule;
+      });
+
       const { error: insertError } = await supabase
         .from('teacher_schedule')
-        .insert(schedulesToInsert);
+        .insert(schedulesWithOrgId);
 
       if (insertError) {
         console.warn('Error inserting schedules:', insertError.message);
@@ -828,12 +948,19 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       const teacherIdsToUpdate = Array.from(allTeacherIds);
       
       if (teacherIdsToUpdate.length > 0) {
-        const { error: deleteError } = await supabase
+        let deleteQuery = supabase
           .from('teacher_schedule')
           .delete()
           .in('teacher_id', teacherIdsToUpdate)
           .gte('scheduled_date', format(startOfMonth(currentMonth), 'yyyy-MM-dd'))
           .lte('scheduled_date', format(endOfMonth(currentMonth), 'yyyy-MM-dd'));
+
+        // 根據 org_id 過濾
+        if (orgId) {
+          deleteQuery = deleteQuery.eq('org_id', orgId);
+        }
+
+        const { error: deleteError } = await deleteQuery;
 
         if (deleteError) {
           console.warn('Error deleting schedules:', deleteError.message);
@@ -842,16 +969,25 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
         }
       }
 
-      // 插入新排班
+      // 插入新排班（添加 org_id）
       if (dragSchedules.length > 0) {
-        const { error: insertError } = await supabase
-          .from('teacher_schedule')
-          .insert(dragSchedules.map(s => ({
+        const schedulesToInsert = dragSchedules.map(s => {
+          const schedule: any = {
             teacher_id: s.teacher_id,
             scheduled_date: s.scheduled_date,
             start_time: s.start_time,
             end_time: s.end_time,
-          })));
+          };
+          // 如果提供了 orgId，則包含它
+          if (orgId) {
+            schedule.org_id = orgId;
+          }
+          return schedule;
+        });
+
+        const { error: insertError } = await supabase
+          .from('teacher_schedule')
+          .insert(schedulesToInsert);
 
         if (insertError) {
           console.warn('Error inserting schedules:', insertError.message);
@@ -861,11 +997,18 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
       }
 
       // 重新載入資料
-      const { data: newSchedules } = await supabase
+      let reloadQuery = supabase
         .from('teacher_schedule')
         .select('*')
         .gte('scheduled_date', format(startOfMonth(currentMonth), 'yyyy-MM-dd'))
         .lte('scheduled_date', format(endOfMonth(currentMonth), 'yyyy-MM-dd'));
+
+      // 根據 org_id 過濾
+      if (orgId) {
+        reloadQuery = reloadQuery.eq('org_id', orgId);
+      }
+
+      const { data: newSchedules } = await reloadQuery;
 
       if (newSchedules) {
         setSchedules(newSchedules as Schedule[]);
@@ -897,6 +1040,14 @@ export default function TeacherShiftCalendar({ teacherIds }: TeacherSchedulePane
 
   // 過濾 teachers, schedules, lessons 根據 teacherIds
   const filteredTeachers = teacherIds && teacherIds.length > 0 && teacherIds[0] !== '*' ? teachers.filter(t => teacherIds.includes(t.id)) : teachers;
+  
+  // 調試：檢查 filteredTeachers
+  useEffect(() => {
+    if (filteredTeachers.length > 0) {
+      console.log('📊 [TeacherSchedulePanel] filteredTeachers 數量:', filteredTeachers.length, 'orgId:', orgId);
+      console.log('📊 [TeacherSchedulePanel] filteredTeachers 列表:', filteredTeachers.map(t => ({ id: t.id, name: t.teacher_nickname || t.teacher_fullname })));
+    }
+  }, [filteredTeachers, orgId]);
   const filteredSchedules = teacherIds && teacherIds.length > 0 && teacherIds[0] !== '*' ? schedules.filter(s => teacherIds.includes(s.teacher_id)) : schedules;
   const filteredLessons = teacherIds && teacherIds.length > 0 && teacherIds[0] !== '*' ? lessons.filter(l => {
     // 只顯示該老師有排班的課堂

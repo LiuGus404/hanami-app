@@ -32,7 +32,15 @@ export function HanamiInput({
   max,
 }: HanamiInputProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange?.(e.target.value);
+    try {
+      if (!e || !e.target) {
+        console.warn('[HanamiInput] handleChange: event or target is null/undefined');
+        return;
+      }
+      onChange?.(e.target.value);
+    } catch (error) {
+      console.error('[HanamiInput] handleChange error:', error);
+    }
   };
 
   return (

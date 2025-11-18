@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { Puzzle, BookOpen, StickyNote } from 'lucide-react';
 
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import TimePicker from '@/components/ui/TimePicker';
 import { supabase } from '@/lib/supabase';
-import { CourseType, Teacher } from '@/types';
+import { createSaasClient } from '@/lib/supabase-saas';
 import { useSearchParams } from 'next/navigation';
+
+interface AddRegularStudentFormProps {
+  redirectPath?: string;
+  orgId?: string | null;
+  orgName?: string | null;
+}
 
 // UUID 生成函數（兼容性版本）
 const generateUUID = () => {
@@ -22,7 +29,11 @@ const generateUUID = () => {
   });
 };
 
-export default function AddRegularStudentForm() {
+export default function AddRegularStudentForm({
+  redirectPath = '/admin/students',
+  orgId = null,
+  orgName = null,
+}: AddRegularStudentFormProps) {
   const searchParams = useSearchParams();
   const typeParam = searchParams.get('type');
   const [loading, setLoading] = useState(false);
@@ -77,17 +88,61 @@ export default function AddRegularStudentForm() {
     { label: '常規', value: '常規' },
     { label: '試堂', value: '試堂' },
   ];
+  const WEEKDAY_LABEL_MAP: Record<string, string> = {
+    '1': '星期一',
+    '2': '星期二',
+    '3': '星期三',
+    '4': '星期四',
+    '5': '星期五',
+    '6': '星期六',
+    '0': '星期日',
+  };
   const weekdayOptions = [
-    { label: 'Mon', value: '1' },
-    { label: 'Tue', value: '2' },
-    { label: 'Wed', value: '3' },
-    { label: 'Thu', value: '4' },
-    { label: 'Fri', value: '5' },
-    { label: 'Sat', value: '6' },
-    { label: 'Sun', value: '0' },
+    { label: '星期一', value: '1' },
+    { label: '星期二', value: '2' },
+    { label: '星期三', value: '3' },
+    { label: '星期四', value: '4' },
+    { label: '星期五', value: '5' },
+    { label: '星期六', value: '6' },
+    { label: '星期日', value: '0' },
   ];
   const [courseOptions, setCourseOptions] = useState<{ label: string, value: string }[]>([]);
-  const [teacherOptions, setTeacherOptions] = useState<{ label: string, value: string }[]>([]);
+  const [teacherOptions, setTeacherOptions] = useState<{ label: string; value: string }[]>([
+    { label: '未分配', value: '' },
+  ]);
+  const [scheduleOptions, setScheduleOptions] = useState<Array<{
+    id: string;
+    weekday: number | null;
+    timeslot: string | null;
+    course_code: string | null;
+    course_type: string | null;
+    assigned_teachers: string | null;
+  }>>([]);
+  const [selectedScheduleIds, setSelectedScheduleIds] = useState<string[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+
+  const teacherLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    teacherOptions.forEach((opt) => {
+      map.set(opt.value ?? '', opt.label);
+    });
+    return map;
+  }, [teacherOptions]);
+
+  const resolveTeacherName = (teacherValue: string | null) => {
+    if (teacherValue === '') return '未分配';
+    if (!teacherValue) return '未分配';
+    return teacherLabelMap.get(teacherValue) ?? '未分配';
+  };
+
+  const teacherButtonLabel = useMemo(() => {
+    const value = formData.student_teacher;
+    if (!value) {
+      return selectedScheduleIds.length > 0 ? '未分配' : '請選擇';
+    }
+    if (value === '') return '未分配';
+    return teacherLabelMap.get(value) ?? '未分配';
+  }, [formData.student_teacher, selectedScheduleIds.length, teacherLabelMap]);
 
   useEffect(() => {
     setFormData(prev => ({
@@ -97,24 +152,177 @@ export default function AddRegularStudentForm() {
     }));
   }, [formData.student_dob, formData.student_oid]);
 
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      if (!orgId || !formData.course_type || !formData.regular_weekday) {
+        setScheduleLoading(false);
+        setScheduleOptions([]);
+        setSelectedScheduleIds([]);
+        return;
+      }
+
+      setScheduleLoading(true);
+      try {
+        const weekdayNumber = parseInt(formData.regular_weekday, 10);
+        const { data, error } = await supabase
+          .from('hanami_schedule')
+          .select('id, weekday, timeslot, course_code, course_type, assigned_teachers')
+          .eq('org_id', orgId)
+          .eq('weekday', isNaN(weekdayNumber) ? formData.regular_weekday : weekdayNumber)
+          .eq('course_type', formData.course_type)
+          .order('timeslot', { ascending: true });
+
+        if (error) {
+          console.error('載入時間表選項失敗：', error);
+          setScheduleOptions([]);
+          return;
+        }
+
+        setScheduleOptions(data || []);
+        setSelectedScheduleIds([]);
+      } catch (err) {
+        console.error('取得時間表選項發生錯誤：', err);
+        setScheduleOptions([]);
+      } finally {
+        setScheduleLoading(false);
+      }
+    };
+
+    fetchSchedules();
+  }, [orgId, formData.course_type, formData.regular_weekday]);
+
   // fetch options for course_type and teacher
   useEffect(() => {
-    // fetch Hanami_CourseTypes
-    supabase.from('Hanami_CourseTypes').select('name').then(({ data }) => {
-      if (data) {
-        setCourseOptions(data.map((item: { name: string | null }) => ({ label: item.name || '', value: item.name || '' })));
+    let cancelled = false;
+    const rolesForMembers = ['owner', 'admin', 'teacher'];
+
+    const loadOptions = async () => {
+      try {
+        let courseQuery = supabase.from('Hanami_CourseTypes').select('name');
+        let employeeQuery = supabase.from('hanami_employee').select('id, teacher_nickname, teacher_fullname');
+        let memberQuery = supabase
+          .from('hanami_user_organizations')
+          .select('id, user_id, user_email, role')
+          .in('role', rolesForMembers);
+
+        if (orgId) {
+          courseQuery = courseQuery.eq('org_id', orgId);
+          employeeQuery = employeeQuery.eq('org_id', orgId);
+          memberQuery = memberQuery.eq('org_id', orgId);
+        }
+
+        const [
+          { data: courseData, error: courseError },
+          { data: employeeData, error: employeeError },
+          { data: memberData, error: memberError }
+        ] = await Promise.all([courseQuery, employeeQuery, memberQuery]);
+
+        if (courseError) throw courseError;
+        if (employeeError) throw employeeError;
+        if (memberError) throw memberError;
+        if (cancelled) return;
+
+        setCourseOptions(
+          (courseData || []).map((item: { name: string | null }) => ({
+            label: item?.name || '',
+            value: item?.name || '',
+          })),
+        );
+
+        const canonicalMembers = (memberData || []).filter((member: any) => {
+          const role = (member.role || '').toLowerCase();
+          return rolesForMembers.includes(role);
+        });
+
+        const memberUserIds = Array.from(
+          new Set(
+            canonicalMembers
+              .map((member: any) => member.user_id)
+              .filter((id: string | null | undefined): id is string => Boolean(id))
+          )
+        );
+
+        const saasUserMap = new Map<string, { full_name: string | null; email: string | null }>();
+        if (memberUserIds.length > 0) {
+          try {
+            const saasClient = createSaasClient();
+            const { data: saasUsers, error: saasError } = await saasClient
+              .from('saas_users')
+              .select('id, email, full_name')
+              .in('id', memberUserIds);
+
+            if (saasError) {
+              console.warn('載入 saas_users 失敗：', saasError);
+            } else {
+              (saasUsers || []).forEach((user: any) => {
+                saasUserMap.set(user.id, {
+                  full_name: user.full_name ?? null,
+                  email: user.email ?? null,
+                });
+              });
+            }
+          } catch (error) {
+            console.warn('連接 hanami_saas_system 失敗：', error);
+          }
+        }
+
+        const teacherMap = new Map<string, { label: string; value: string }>();
+
+        canonicalMembers.forEach((member: any) => {
+          const canonicalId = member.user_id || member.user_email || member.id;
+          if (!canonicalId) return;
+          const saasInfo = member.user_id ? saasUserMap.get(member.user_id) : undefined;
+          const email = saasInfo?.email || member.user_email || null;
+          const displayName =
+            (saasInfo?.full_name || '') ||
+            (member.user_email ? member.user_email.split('@')[0] : '') ||
+            '未命名教師';
+          teacherMap.set(canonicalId, {
+            value: canonicalId,
+            label: displayName,
+          });
+          if (email) {
+            teacherMap.set(email, {
+              value: canonicalId,
+              label: displayName,
+            });
+          }
+        });
+
+        (employeeData || []).forEach((teacher: any) => {
+          if (!teacher.id) return;
+          if (teacherMap.has(teacher.id)) return;
+          const displayName =
+            teacher.teacher_nickname ||
+            teacher.teacher_fullname ||
+            '未命名教師';
+          teacherMap.set(teacher.id, {
+            value: teacher.id,
+            label: displayName,
+          });
+        });
+
+        const teacherList = Array.from(
+          new Map(
+            Array.from(teacherMap.values()).map((entry) => [entry.value, entry]),
+          ).values(),
+        ).sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
+
+        setTeacherOptions([{ label: '未分配', value: '' }, ...teacherList]);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('載入課程或老師資料發生錯誤：', error);
+          setCourseOptions([]);
+          setTeacherOptions([{ label: '未分配', value: '' }]);
+        }
       }
-    });
-    // fetch hanami_employee
-    supabase.from('hanami_employee').select('teacher_nickname').then(({ data }) => {
-      if (data) {
-        setTeacherOptions([
-          { label: '未分配', value: '未分配' },
-          ...data.map((item: { teacher_nickname: string }) => ({ label: item.teacher_nickname, value: item.teacher_nickname })),
-        ]);
-      }
-    });
-  }, []);
+    };
+
+    loadOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -133,6 +341,26 @@ export default function AddRegularStudentForm() {
 
   const handlePopupCancel = () => {
     setShowPopup({ field: '', open: false });
+  };
+
+  const handleScheduleToggle = (scheduleId: string) => {
+    setSelectedScheduleIds((prev) => {
+      const isSelected = prev.includes(scheduleId);
+      const next = isSelected ? prev.filter((id) => id !== scheduleId) : [...prev, scheduleId];
+
+      if (!isSelected) {
+        const matched = scheduleOptions.find((option) => option.id === scheduleId);
+        if (matched) {
+          setFormData((prevForm) => ({
+            ...prevForm,
+            regular_timeslot: matched.timeslot || prevForm.regular_timeslot,
+            student_teacher: matched.assigned_teachers ?? prevForm.student_teacher,
+          }));
+        }
+      }
+
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -191,6 +419,7 @@ export default function AddRegularStudentForm() {
           access_role: formData.access_role,
           student_email: formData.student_email,
           student_password: formData.student_password,
+          ...(orgId ? { org_id: orgId } : {}),
           lesson_date: formData.trial_date || null,
           actual_timeslot: formData.trial_time || null,
           trial_remarks: formData.trial_remarks || '',
@@ -223,6 +452,7 @@ export default function AddRegularStudentForm() {
           student_email: formData.student_email,
           student_password: formData.student_password,
           student_remarks: formData.student_remarks || '',
+          ...(orgId ? { org_id: orgId } : {}),
         };
       }
       
@@ -253,7 +483,7 @@ export default function AddRegularStudentForm() {
         alert(`新增或更新失敗：${error.message}`);
       } else {
         alert(`${formData.student_type === '試堂' ? '試堂學生' : '常規學生'}已成功新增或更新！`);
-        window.location.href = '/admin/students';
+        window.location.href = redirectPath;
         setFormData({
           id: generateUUID(),
           student_oid: generateUUID().slice(0, 8),
@@ -322,42 +552,26 @@ export default function AddRegularStudentForm() {
         <h2 className="text-2xl font-bold text-center text-[#4B4036]">
           {formData.student_type === '試堂' ? '新增試堂學生' : '新增常規學生'}
         </h2>
-        {/* 一鍵填入測試資料按鈕 */}
-        <div className="flex justify-center mb-2">
-          <button
-            className="px-4 py-1 bg-[#EBC9A4] text-[#2B3A3B] rounded-full hover:bg-[#e5ba8e] text-sm"
-            type="button"
-            onClick={() => {
-              setFormData(prev => ({
-                ...prev,
-                full_name: '測試學生',
-                nick_name: '小測',
-                gender: '女',
-                contact_number: '98765432',
-                student_dob: '2018-05-01',
-                student_age: '6',
-                parent_email: 'parent@example.com',
-                health_notes: '無',
-                student_preference: '喜歡畫畫',
-                address: '九龍測試路1號',
-                school: '測試小學',
-                course_type: courseOptions[0]?.value || '鋼琴',
-                regular_weekday: '2',
-                regular_timeslot: '15:00',
-                student_type: '常規',
-                student_teacher: teacherOptions[0]?.value || '未分配',
-                student_remarks: '這是測試用學生',
-                trial_remarks: '',
-              }));
-            }}
-          >
-            一鍵填入測試資料
-          </button>
-        </div>
 
         {/* 🧩 基本資料與聯絡資訊 */}
         <fieldset className="space-y-3">
-          <legend className="font-semibold">🧩 基本資料與聯絡資訊</legend>
+          <legend className="flex items-center gap-2 font-semibold text-[#4B4036]">
+            <Puzzle className="h-5 w-5 text-[#D48347]" />
+            基本資料與聯絡資訊
+          </legend>
+          {orgId && (
+            <div className="w-full mb-3">
+              <label className="block mb-1 text-sm font-medium text-[#4B4036]">機構資訊</label>
+              <div className="rounded-lg border border-[#EADBC8] bg-[#FFF4DF] px-3 py-2 text-[#2B3A3B] shadow-sm">
+                <div className="font-semibold text-sm">
+                  {orgName?.trim() || '未命名機構'}
+                </div>
+                <div className="mt-1 text-xs text-[#8A7C70] break-all">
+                  ID：{orgId}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="w-full mb-3">
             <label className="block mb-1 text-sm font-medium text-[#4B4036]">學生ID</label>
             <div className="bg-gray-100 px-3 py-2 w-full rounded-lg">{formData.id}</div>
@@ -488,7 +702,10 @@ export default function AddRegularStudentForm() {
 
         {/* 📚 學習狀態與課程資訊 */}
         <fieldset className="space-y-3">
-          <legend className="font-semibold">📚 學習狀態與課程資訊</legend>
+          <legend className="flex items-center gap-2 font-semibold text-[#4B4036]">
+            <BookOpen className="h-5 w-5 text-[#D48347]" />
+            學習狀態與課程資訊
+          </legend>
           {/* --- 試堂學生欄目 --- */}
           {formData.student_type === '試堂' ? (
             <>
@@ -544,7 +761,7 @@ export default function AddRegularStudentForm() {
                   type="button"
                   onClick={() => handlePopupOpen('student_teacher')}
                 >
-                  {formData.student_teacher || '請選擇'}
+                  {teacherButtonLabel}
                 </button>
               </div>
             </>
@@ -568,7 +785,7 @@ export default function AddRegularStudentForm() {
                   type="button"
                   onClick={() => handlePopupOpen('regular_weekday')}
                 >
-                  {formData.regular_weekday || '請選擇'}
+                  {formData.regular_weekday ? WEEKDAY_LABEL_MAP[formData.regular_weekday] ?? '請選擇' : '請選擇'}
                 </button>
               </div>
               <div className="w-full mb-3">
@@ -577,9 +794,68 @@ export default function AddRegularStudentForm() {
                   value={formData.regular_timeslot}
                   onChange={(val) =>
                     setFormData((prev) => ({ ...prev, regular_timeslot: val }))
-                }
+                  }
                 />
               </div>
+              {(formData.course_type && formData.regular_weekday) && (
+                <div className="w-full mb-3">
+                  <div className="rounded-2xl border border-[#EADBC8] bg-white/80 p-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-[#4B4036]">套用既有多課程時間表</p>
+                        <p className="text-xs text-[#8A7C70] mt-1">
+                          您可以勾選既有的課堂時段快速載入資料，也可以自行修改。
+                        </p>
+                      </div>
+                      {scheduleLoading && (
+                        <span className="text-xs text-[#A68A64]">載入中...</span>
+                      )}
+                    </div>
+
+                    {!scheduleLoading && scheduleOptions.length === 0 && (
+                      <div className="mt-3 rounded-xl bg-[#FFF9F2] px-4 py-3 text-xs text-[#8A7C70]">
+                        尚未建立符合條件的時間表，您可以手動輸入時段。
+                      </div>
+                    )}
+
+                    {!scheduleLoading && scheduleOptions.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {scheduleOptions.map((schedule) => {
+                          const isChecked = selectedScheduleIds.includes(schedule.id);
+                          const weekdayLabel = schedule.weekday !== null
+                            ? WEEKDAY_LABEL_MAP[String(schedule.weekday)] || '星期'
+                            : '星期';
+                          return (
+                            <label
+                              key={schedule.id}
+                              className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition hover:shadow-sm ${
+                                isChecked
+                                  ? 'border-[#F59BB5] bg-gradient-to-r from-[#FFF4DF] via-[#FFE8F4] to-[#FFF6E6]'
+                                  : 'border-[#F1E4D3] bg-white'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-1 h-4 w-4 rounded border-[#EADBC8] text-[#F59BB5] focus:ring-[#F59BB5]"
+                                checked={isChecked}
+                                onChange={() => handleScheduleToggle(schedule.id)}
+                              />
+                              <div className="flex flex-col gap-1 text-[#4B4036]">
+                                <span className="font-semibold">
+                                  {weekdayLabel} · {schedule.timeslot || '未設定'}
+                                </span>
+                                <span className="text-xs text-[#8A7C70]">
+                                  課程代碼：{schedule.course_code || '未設定'} · 教師：{resolveTeacherName(schedule.assigned_teachers)}
+                                </span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="w-full mb-3">
                 <label className="block mb-1 text-sm font-medium text-[#4B4036]">學生類型（常規/試堂）</label>
                 <button
@@ -597,7 +873,7 @@ export default function AddRegularStudentForm() {
                   type="button"
                   onClick={() => handlePopupOpen('student_teacher')}
                 >
-                  {formData.student_teacher || '請選擇'}
+                  {teacherButtonLabel}
                 </button>
               </div>
             </>
@@ -606,7 +882,10 @@ export default function AddRegularStudentForm() {
 
         {/* 備註（可修改，輸入框） */}
         <div className="w-full mb-3">
-          <label className="block mb-1 text-sm font-medium text-[#4B4036]">備註</label>
+          <label className="mb-1 flex items-center gap-2 text-sm font-medium text-[#4B4036]">
+            <StickyNote className="h-4 w-4 text-[#D48347]" />
+            備註
+          </label>
           <textarea
             className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A68A64] focus:border-transparent"
             name={formData.student_type === '試堂' ? 'trial_remarks' : 'student_remarks'}

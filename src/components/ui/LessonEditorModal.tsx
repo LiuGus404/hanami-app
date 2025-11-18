@@ -1,10 +1,13 @@
+'use client';
+
 import { Dialog } from '@headlessui/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import TimePicker from '@/components/ui/TimePicker';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Lesson, CourseType, Teacher } from '@/types';
+import { createSaasClient } from '@/lib/supabase-saas';
+import { Lesson } from '@/types';
 
 interface LessonEditorModalProps {
   open: boolean;
@@ -14,6 +17,13 @@ interface LessonEditorModalProps {
   onSaved: () => void;
   mode?: 'edit' | 'add';
   initialLessonCount?: number; // 新增：初始堂數
+  teacherOptions?: { label: string; value: string }[];
+  teacherLabelMap?: Map<string, string>;
+  defaultRegularTimeslot?: string | null;
+  defaultActualTimeslot?: string | null;
+  defaultRegularWeekday?: number | null;
+  orgId?: string | null;
+  orgName?: string | null;
 }
 
 interface CourseTypeOption {
@@ -43,6 +53,13 @@ export default function LessonEditorModal({
   onSaved,
   mode = 'add',
   initialLessonCount,
+  teacherOptions: externalTeacherOptions = [],
+  teacherLabelMap: externalTeacherLabelMap,
+  defaultRegularTimeslot,
+  defaultActualTimeslot,
+  defaultRegularWeekday,
+  orgId,
+  orgName,
 }: LessonEditorModalProps) {
   const supabase = getSupabaseClient();
   const [form, setForm] = useState<Partial<Lesson>>({
@@ -71,6 +88,7 @@ export default function LessonEditorModal({
     access_role: lesson?.access_role || null,
     remarks: lesson?.remarks || null,
     lesson_activities: lesson?.lesson_activities || null,
+    org_id: lesson?.org_id || orgId || null,
   });
 
   // 當 initialLessonCount 改變時，更新相關狀態
@@ -95,12 +113,39 @@ export default function LessonEditorModal({
     }
   }, [initialLessonCount, mode]);
 
+  useEffect(() => {
+    if (orgId) {
+      setForm((prev) => (prev.org_id === orgId ? prev : { ...prev, org_id: orgId }));
+    }
+  }, [orgId]);
+
   const [initialFormState, setInitialFormState] = useState<Lesson | null>(null);
   const [pendingCourseType, setPendingCourseType] = useState('');
   const [pendingLessonCount, setPendingLessonCount] = useState('1');
   const [pendingStatus, setPendingStatus] = useState('');
-  const [pendingTeacher, setPendingTeacher] = useState('');
-  const [teacherOptions, setTeacherOptions] = useState<{ label: string; value: string; }[]>([]);
+  const [pendingTeacher, setPendingTeacher] = useState<string>('');
+  const baseTeacherOption = { label: '未分配', value: '' } as const;
+  const [teacherOptions, setTeacherOptions] = useState<{ label: string; value: string }[]>(
+    externalTeacherOptions.length > 0 ? externalTeacherOptions : [baseTeacherOption],
+  );
+  const teachersLoadedRef = useRef(false);
+
+  useEffect(() => {
+    teachersLoadedRef.current = externalTeacherOptions.length > 0;
+    if (externalTeacherOptions.length > 0) {
+      setTeacherOptions(externalTeacherOptions);
+    } else {
+      setTeacherOptions([baseTeacherOption]);
+    }
+  }, [externalTeacherOptions]);
+
+  useEffect(() => {
+    if (orgId && externalTeacherOptions.length === 0) {
+      teachersLoadedRef.current = false;
+      setTeacherOptions([baseTeacherOption]);
+    }
+  }, [orgId, externalTeacherOptions.length]);
+
   const [courseTypeOptions, setCourseTypeOptions] = useState<CourseTypeOption[]>([]);
 
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -128,9 +173,13 @@ export default function LessonEditorModal({
   }, [lesson]);
 
   useEffect(() => {
-    fetchCourseTypes();
-    fetchTeachers();
-  }, []);
+    if (open) {
+      fetchCourseTypes();
+      if (externalTeacherOptions.length === 0) {
+        fetchTeachers();
+      }
+    }
+  }, [open, orgId, externalTeacherOptions.length]);
 
   // 從 Supabase 撈取該學生最近一筆課堂記錄的 regular_timeslot、actual_timeslot 及 lesson_date
   const fetchRegularTimeslot = async () => {
@@ -173,15 +222,194 @@ export default function LessonEditorModal({
   };
 
   const fetchTeachers = async () => {
-    const { data, error } = await supabase
-      .from('hanami_employee')
-      .select('teacher_nickname');
-    if (data) {
-      const options = data.map((item: { teacher_nickname: string }) => ({
-        label: item.teacher_nickname,
-        value: item.teacher_nickname,
-      }));
+    if (externalTeacherOptions.length > 0) {
+      teachersLoadedRef.current = true;
+      setTeacherOptions(externalTeacherOptions);
+      return;
+    }
+    if (teachersLoadedRef.current && teacherOptions.length > 0) {
+      return;
+    }
+    const baseOptions = [{ label: '未分配', value: '' }];
+    try {
+      if (orgId) {
+        const rolesForMembers = ['owner', 'admin', 'teacher'];
+        const [{ data: membersData, error: membersError }, { data: employeeData, error: employeeError }] = await Promise.all([
+          supabase
+            .from('hanami_user_organizations')
+            .select('id, user_id, user_email, role')
+            .eq('org_id', orgId)
+            .in('role', rolesForMembers),
+          supabase
+            .from('hanami_employee')
+            .select('id, teacher_nickname, teacher_fullname, teacher_email')
+            .eq('org_id', orgId),
+        ]);
+
+        if (membersError) {
+          console.warn('載入組織成員教師資料失敗：', membersError);
+        }
+        if (employeeError) {
+          console.warn('載入教師資料失敗（hanami_employee）：', employeeError);
+        }
+
+        const canonicalMembers = (membersData || []).filter((member: any) => {
+          const role = (member.role || '').toLowerCase();
+          return rolesForMembers.includes(role);
+        });
+
+        const memberUserIds = Array.from(
+          new Set(
+            canonicalMembers
+              .map((member: any) => member.user_id)
+              .filter((id: string | null | undefined): id is string => Boolean(id)),
+          ),
+        );
+
+        const saasUserMap = new Map<string, { full_name: string | null; email: string | null }>();
+        if (memberUserIds.length > 0) {
+          try {
+            const saasClient = createSaasClient();
+            const { data: saasUsers, error: saasError } = await saasClient
+              .from('saas_users')
+              .select('id, email, full_name')
+              .in('id', memberUserIds);
+
+            if (saasError) {
+              console.warn('查詢 saas_users 失敗：', saasError);
+            } else {
+              (saasUsers || []).forEach((user: any) => {
+                saasUserMap.set(user.id, {
+                  full_name: user.full_name ?? null,
+                  email: user.email ?? null,
+                });
+              });
+            }
+          } catch (err) {
+            console.warn('連接 hanami_saas_system 失敗：', err);
+          }
+        }
+
+        type TeacherCandidate = {
+          id: string;
+          teacher_nickname?: string | null;
+          teacher_fullname?: string | null;
+          user_full_name?: string | null;
+          user_email?: string | null;
+        };
+
+        const teacherMap = new Map<string, TeacherCandidate>();
+
+        canonicalMembers.forEach((member: any) => {
+          const canonicalId = member.user_id || member.user_email || member.id;
+          if (!canonicalId) return;
+          const saasInfo = member.user_id ? saasUserMap.get(member.user_id) : undefined;
+          const email = saasInfo?.email || member.user_email || null;
+          const fullName = saasInfo?.full_name || null;
+          const existing = teacherMap.get(canonicalId) || { id: canonicalId };
+          const existingData = existing as any;
+          teacherMap.set(canonicalId, {
+            ...existing,
+            id: canonicalId,
+            teacher_nickname: fullName || existingData.teacher_nickname || null,
+            teacher_fullname: fullName || existingData.teacher_fullname || null,
+            user_full_name: fullName || existingData.user_full_name || null,
+            user_email: email || existingData.user_email || null,
+          });
+        });
+
+        (employeeData || []).forEach((teacher: any) => {
+          if (!teacher.id) return;
+          const existing = teacherMap.get(teacher.id) || { id: teacher.id };
+          const existingData = existing as any;
+          teacherMap.set(teacher.id, {
+            ...existing,
+            teacher_nickname: teacher.teacher_nickname || existingData.teacher_nickname || teacher.teacher_fullname || null,
+            teacher_fullname: teacher.teacher_fullname || existingData.teacher_fullname || null,
+            user_email: existingData.user_email || teacher.teacher_email || null,
+          });
+        });
+
+        const buildDisplayName = (candidate: TeacherCandidate) => {
+          const email = candidate.user_email || '';
+          const baseName =
+            candidate.teacher_nickname ||
+            candidate.teacher_fullname ||
+            candidate.user_full_name ||
+            (email ? email.split('@')[0] : '');
+
+          if (!email) {
+            return baseName || '未分配';
+          }
+
+          if (baseName && baseName.toLowerCase() !== email.toLowerCase() && !baseName.includes('@')) {
+            return `${baseName} (${email})`;
+          }
+          return email;
+        };
+
+        const teacherOptionList = Array.from(teacherMap.values())
+          .map((candidate) => {
+            const label = buildDisplayName(candidate);
+            if (!label) return null;
+            return { label, value: candidate.id };
+          })
+          .filter((option): option is { label: string; value: string } => Boolean(option?.value));
+
+        const uniqueOptionMap = new Map<string, { label: string; value: string }>();
+        teacherOptionList.forEach((option) => {
+          if (!uniqueOptionMap.has(option.value)) {
+            uniqueOptionMap.set(option.value, option);
+          }
+        });
+
+        const sortedOptions = Array.from(uniqueOptionMap.values()).sort((a, b) =>
+          a.label.localeCompare(b.label, 'zh-Hant'),
+        );
+
+        const finalOptions = [...baseOptions, ...sortedOptions];
+        if (form.lesson_teacher && !finalOptions.some((option) => option.value === form.lesson_teacher)) {
+          const fallbackCandidate = teacherMap.get(form.lesson_teacher);
+          const fallbackLabel = fallbackCandidate ? buildDisplayName(fallbackCandidate) : externalTeacherLabelMap?.get(form.lesson_teacher) || form.lesson_teacher;
+          finalOptions.push({ label: fallbackLabel, value: form.lesson_teacher });
+        }
+        setTeacherOptions(finalOptions);
+        teachersLoadedRef.current = true;
+        return;
+      }
+
+      const { data, error } = await supabase.from('hanami_employee').select('id, teacher_nickname, teacher_fullname');
+      if (error) {
+        console.warn('載入教師資料失敗：', error);
+        setTeacherOptions(baseOptions);
+        teachersLoadedRef.current = true;
+        return;
+      }
+      const fallbackOptions = (data || [])
+        .map((item: { teacher_nickname?: string | null; teacher_fullname?: string | null; id?: string | null }) => {
+          if (!item?.id) return null;
+          const label = item.teacher_nickname || item.teacher_fullname || '';
+          if (!label) return null;
+          return { label, value: item.id };
+        })
+        .filter((option): option is { label: string; value: string } => Boolean(option?.value))
+        .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
+
+      const finalOptions = [...baseOptions, ...fallbackOptions];
+      if (form.lesson_teacher && !finalOptions.some((option) => option.value === form.lesson_teacher)) {
+        const fallback = fallbackOptions.find((opt) => opt.value === form.lesson_teacher);
+        finalOptions.push({ label: fallback?.label || externalTeacherLabelMap?.get(form.lesson_teacher) || form.lesson_teacher, value: form.lesson_teacher });
+      }
+      setTeacherOptions(finalOptions);
+      teachersLoadedRef.current = true;
+    } catch (error) {
+      console.error('載入教師選項時發生錯誤：', error);
+      const options = [...baseOptions];
+      if (form.lesson_teacher && !options.some((option) => option.value === form.lesson_teacher)) {
+        options.push({ label: externalTeacherLabelMap?.get(form.lesson_teacher) || form.lesson_teacher, value: form.lesson_teacher });
+      }
       setTeacherOptions(options);
+      teachersLoadedRef.current = true;
     }
   };
 
@@ -192,8 +420,8 @@ export default function LessonEditorModal({
         id: '',
         student_id: '',
         lesson_date: today,
-        regular_timeslot: '',
-        actual_timeslot: '',
+        regular_timeslot: defaultRegularTimeslot || '',
+        actual_timeslot: defaultActualTimeslot || '',
         course_type: '',
         lesson_status: '',
         lesson_teacher: '',
@@ -201,7 +429,7 @@ export default function LessonEditorModal({
         video_url: '',
         lesson_count: initialLessonCount || 1,
         lesson_duration: null,
-        regular_weekday: null,
+        regular_weekday: defaultRegularWeekday ?? null,
         is_trial: false,
         package_id: null,
         status: null,
@@ -213,23 +441,38 @@ export default function LessonEditorModal({
         access_role: null,
         remarks: null,
         student_oid: null,
+        org_id: orgId || null,
       };
       setForm(defaultForm);
       setInitialFormState(defaultForm);
-      fetchRegularTimeslot();
+      if (!defaultRegularTimeslot) {
+        fetchRegularTimeslot();
+      }
       fetchHistoricalCourseType();
       fetchCourseTypeFromStudent();
     }
-  }, [open, studentId, lesson]);
+  }, [open, studentId, lesson, defaultRegularTimeslot, defaultRegularWeekday, defaultActualTimeslot]);
 
   const fetchCourseTypes = async () => {
-    const { data, error } = await supabase.from('Hanami_CourseTypes').select('*');
-    if (data) {
-      const options = data.map((item: { name: string | null }) => ({
+    try {
+      let query = supabase.from('Hanami_CourseTypes').select('*').order('name', { ascending: true });
+      if (orgId) {
+        query = query.eq('org_id', orgId);
+      }
+      const { data, error } = await query;
+      if (error) {
+        console.warn('載入課程類型失敗：', error);
+        setCourseTypeOptions([]);
+        return;
+      }
+      const options = (data || []).map((item: { name: string | null }) => ({
         label: item.name || '',
         value: item.name || '',
       }));
       setCourseTypeOptions(options);
+    } catch (err) {
+      console.error('載入課程類型時發生錯誤：', err);
+      setCourseTypeOptions([]);
     }
   };
 
@@ -290,12 +533,26 @@ export default function LessonEditorModal({
       try {
         const { data } = await supabase
           .from('Hanami_Students')
-          .select('student_oid, regular_weekday, full_name')
+          .select('student_oid, regular_weekday, full_name, org_id')
           .eq('id', studentId)
           .single();
         studentData = data;
       } catch (e) {
         console.error('Error fetching student data:', e);
+      }
+
+      const resolvedOrgId =
+        (orgId && orgId !== '' ? orgId : null) ||
+        (typeof form.org_id === 'string' && form.org_id ? form.org_id : null) ||
+        (studentData?.org_id ?? null);
+
+      if (!resolvedOrgId) {
+        alert('無法確認機構 ID，請先建立或選擇機構後再新增課堂。');
+        return;
+      }
+
+      if (form.org_id !== resolvedOrgId) {
+        setForm((prev) => ({ ...prev, org_id: resolvedOrgId }));
       }
 
       // 自動設置 lesson_duration
@@ -330,6 +587,7 @@ export default function LessonEditorModal({
         access_role: form.access_role ?? null,
         remarks: form.remarks ?? null,
         lesson_activities: form.lesson_activities ?? null,
+        org_id: resolvedOrgId,
       };
 
       if (lesson) {
@@ -380,6 +638,7 @@ export default function LessonEditorModal({
             access_role: form.access_role ?? null,
             remarks: form.remarks ?? null,
             lesson_activities: form.lesson_activities ?? null,
+            org_id: resolvedOrgId,
           }));
           const { data, error } = await supabase
             .from('hanami_student_lesson')
@@ -403,6 +662,7 @@ export default function LessonEditorModal({
             ...payload,
             created_at: nowISOString,
             updated_at: nowISOString,
+            org_id: resolvedOrgId,
           };
           const { data, error } = await supabase
             .from('hanami_student_lesson')
@@ -477,6 +737,16 @@ export default function LessonEditorModal({
     }
   };
 
+  const normalizedPropOrgId =
+    typeof orgId === 'string' && orgId.trim() !== '' ? orgId.trim() : undefined;
+  const normalizedFormOrgId =
+    typeof form.org_id === 'string' && form.org_id.trim() !== '' ? form.org_id.trim() : undefined;
+  const displayOrgId = normalizedPropOrgId ?? normalizedFormOrgId ?? '';
+  const displayOrgName =
+    typeof orgName === 'string' && orgName.trim() !== ''
+      ? orgName.trim()
+      : '未設定';
+
   if (!open) return null;
 
   return (
@@ -485,7 +755,7 @@ export default function LessonEditorModal({
       open={open}
       onClose={handleCancel}
     >
-      <div className="flex items-center justify-center min-h-screen px-4">
+      <div className="flex items-center justify-center min-h-screen px-4 py-12">
         <Dialog.Panel className="bg-[#FFFDF8] p-6 rounded-2xl shadow-xl w-full max-w-md border border-[#F3EAD9]">
             <div className="flex justify-between items-center mb-4">
               <Dialog.Title className="text-lg font-bold">
@@ -514,6 +784,13 @@ export default function LessonEditorModal({
           </div>
 
           <div className="space-y-3">
+            <div className="rounded-2xl border border-[#EADBC8] bg-[#FFF9F2] px-4 py-3 text-sm text-[#4B4036] shadow-sm">
+              <div className="font-semibold text-[#2B3A3B]">機構資訊</div>
+              <div className="mt-1 text-[#8A7C70]">名稱：{displayOrgName}</div>
+              <div className="mt-0.5 text-[#8A7C70]">
+                ID：{displayOrgId || '尚未設定'}
+              </div>
+            </div>
             <div className="mb-3">
               <button
                 className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] text-left bg-white"
@@ -668,11 +945,16 @@ export default function LessonEditorModal({
               <button
                 className="w-full border border-[#EADBC8] rounded-full px-4 py-2 text-sm text-[#2B3A3B] text-left bg-white"
                 onClick={() => {
+                  if (!teachersLoadedRef.current) {
+                    fetchTeachers();
+                  }
                   setPendingTeacher(form.lesson_teacher || '');
                   setTeacherDropdownOpen(true);
                 }}
               >
-                {form.lesson_teacher ? `負責老師：${form.lesson_teacher}` : '請選擇負責老師'}
+                {form.lesson_teacher
+                  ? `負責老師：${externalTeacherLabelMap?.get(form.lesson_teacher) || teacherOptions.find((opt) => opt.value === form.lesson_teacher)?.label || form.lesson_teacher}`
+                  : '請選擇負責老師'}
               </button>
               {teacherDropdownOpen && (
                 <PopupSelect
@@ -681,9 +963,9 @@ export default function LessonEditorModal({
                   selected={pendingTeacher}
                   title="選擇負責老師"
                   onCancel={() => setTeacherDropdownOpen(false)}
-                  onChange={(val) => setPendingTeacher(Array.isArray(val) ? val[0] : val || '')}
+                  onChange={(val) => setPendingTeacher(Array.isArray(val) ? (val[0] as string) : ((val as string) || ''))}
                   onConfirm={() => {
-                    setForm({ ...form, lesson_teacher: pendingTeacher });
+                    setForm({ ...form, lesson_teacher: pendingTeacher || null });
                     setTeacherDropdownOpen(false);
                   }}
                 />

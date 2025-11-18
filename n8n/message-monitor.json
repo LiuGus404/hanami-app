@@ -1,0 +1,201 @@
+{
+  "name": "Message Monitor (補漏機制)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "cronExpression", "expression": "*/2 * * * *"}]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-400, 400],
+      "id": "cron-trigger",
+      "name": "CronTrigger_Every2Min"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 掃描卡住的訊息（超時 5 分鐘）\nSELECT * FROM scan_stuck_messages(5);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [-200, 400],
+      "id": "scan-stuck",
+      "name": "ScanStuckMessages",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-stuck-messages",
+              "leftValue": "={{ $('ScanStuckMessages').all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [0, 400],
+      "id": "check-has-stuck",
+      "name": "CheckHasStuckMessages"
+    },
+    {
+      "parameters": {
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [200, 300],
+      "id": "foreach-stuck-message",
+      "name": "ForEachStuckMessage"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 釋放鎖並增加重試計數\nUPDATE public.chat_messages\nSET \n  processing_lock_id = NULL,\n  processing_started_at = NULL,\n  processing_worker_id = NULL,\n  retry_count = retry_count + 1,\n  last_retry_at = now(),\n  status = 'queued'\nWHERE id = ($1)::uuid\nRETURNING id, assigned_role_id, retry_count;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $json.message_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [400, 300],
+      "id": "release-lock",
+      "name": "ReleaseLock",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 記錄補漏操作\nINSERT INTO public.message_processing_logs (\n  message_id, workflow_name, event_type, event_data\n) VALUES (\n  ($1)::uuid, 'monitor', 'retry', \n  jsonb_build_object(\n    'reason', 'timeout',\n    'retry_count', $2,\n    'stuck_duration_seconds', $3\n  )\n) RETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('ForEachStuckMessage').first().json.message_id }}, $2 = {{ $('ReleaseLock').first().json.retry_count }}, $3 = {{ Math.floor(new Date($('ForEachStuckMessage').first().json.stuck_duration).getTime() / 1000) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [600, 300],
+      "id": "log-recovery",
+      "name": "LogRecovery",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// PrepareRetryInfo - 準備重試資訊\nconst msgData = $('ForEachStuckMessage').first().json;\nconst releaseResult = $('ReleaseLock').first().json;\n\nreturn [{\n  json: {\n    message_id: msgData.message_id,\n    thread_id: msgData.thread_id,\n    assigned_role_id: releaseResult.assigned_role_id,\n    retry_count: releaseResult.retry_count,\n    action: 'retry_queued',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300],
+      "id": "prepare-retry",
+      "name": "PrepareRetryInfo"
+    },
+    {
+      "parameters": {
+        "jsCode": "// GenerateReport - 生成監控報告\nconst stuckCount = $('ScanStuckMessages').all().length;\nconst recoveredCount = $('LogRecovery').all().length;\n\nconst report = {\n  scan_time: new Date().toISOString(),\n  stuck_messages_found: stuckCount,\n  messages_recovered: recoveredCount,\n  recovery_rate: stuckCount > 0 ? (recoveredCount / stuckCount * 100).toFixed(2) + '%' : 'N/A',\n  next_scan: new Date(Date.now() + 2 * 60 * 1000).toISOString()\n};\n\nconsole.log('📊 監控報告:', JSON.stringify(report, null, 2));\n\nreturn [{ json: report }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "id": "generate-report",
+      "name": "GenerateReport"
+    },
+    {
+      "parameters": {
+        "jsCode": "// NoStuckMessages - 無卡住訊息\nconst report = {\n  scan_time: new Date().toISOString(),\n  stuck_messages_found: 0,\n  status: 'healthy',\n  message: '✅ 所有訊息處理正常',\n  next_scan: new Date(Date.now() + 2 * 60 * 1000).toISOString()\n};\n\nconsole.log('✅ 監控報告: 所有訊息處理正常');\n\nreturn [{ json: report }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 500],
+      "id": "no-stuck",
+      "name": "NoStuckMessages"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 查詢當前佇列統計\nSELECT * FROM v_message_queue_stats;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1200, 400],
+      "id": "queue-stats",
+      "name": "QueryQueueStats",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "CronTrigger_Every2Min": {
+      "main": [[{"node": "ScanStuckMessages", "type": "main", "index": 0}]]
+    },
+    "ScanStuckMessages": {
+      "main": [[{"node": "CheckHasStuckMessages", "type": "main", "index": 0}]]
+    },
+    "CheckHasStuckMessages": {
+      "main": [
+        [{"node": "ForEachStuckMessage", "type": "main", "index": 0}],
+        [{"node": "NoStuckMessages", "type": "main", "index": 0}]
+      ]
+    },
+    "ForEachStuckMessage": {
+      "main": [[{"node": "ReleaseLock", "type": "main", "index": 0}], [{"node": "GenerateReport", "type": "main", "index": 0}]]
+    },
+    "ReleaseLock": {
+      "main": [[{"node": "LogRecovery", "type": "main", "index": 0}]]
+    },
+    "LogRecovery": {
+      "main": [[{"node": "PrepareRetryInfo", "type": "main", "index": 0}]]
+    },
+    "PrepareRetryInfo": {
+      "main": [[{"node": "ForEachStuckMessage", "type": "main", "index": 0}]]
+    },
+    "GenerateReport": {
+      "main": [[{"node": "QueryQueueStats", "type": "main", "index": 0}]]
+    },
+    "NoStuckMessages": {
+      "main": [[{"node": "QueryQueueStats", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "4b2fb6f84ef91181f85de1277717d6717566b015633b0c427e51a39fe81532f2"
+  }
+}
+

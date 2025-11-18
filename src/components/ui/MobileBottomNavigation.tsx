@@ -24,6 +24,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
   const [userRole, setUserRole] = useState<string | null>(null);
   const [hasTeacherAccess, setHasTeacherAccess] = useState(false);
   const [hasLegacyAdminAccess, setHasLegacyAdminAccess] = useState(false);
+  const [hasOrgIdentity, setHasOrgIdentity] = useState(false);
 
   // 檢查是否應該顯示底部導航（手機/平板/窄螢幕）
   useEffect(() => {
@@ -151,6 +152,50 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
     };
   }, []);
 
+  // 檢查用戶是否有機構身份
+  useEffect(() => {
+    const checkOrgIdentity = async () => {
+      try {
+        // 獲取用戶信息
+        const saasSession = localStorage.getItem('saas_user_session');
+        if (!saasSession) {
+          setHasOrgIdentity(false);
+          return;
+        }
+
+        const saasData = JSON.parse(saasSession);
+        const userId = saasData.user?.id;
+        const userEmail = saasData.user?.email;
+
+        if (!userId && !userEmail) {
+          setHasOrgIdentity(false);
+          return;
+        }
+
+        // 調用 API 獲取機構身份
+        const response = await fetch(
+          `/api/organizations/user-organizations?${userId ? `userId=${encodeURIComponent(userId)}` : ''}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const organizations = data.data || [];
+          // 如果有任何機構身份，設置為 true
+          setHasOrgIdentity(organizations.length > 0);
+        } else {
+          setHasOrgIdentity(false);
+        }
+      } catch (error) {
+        console.log('❌ 檢查機構身份失敗:', error);
+        setHasOrgIdentity(false);
+      }
+    };
+
+    // 延遲檢查，避免與其他認證檢查衝突
+    const timeoutId = setTimeout(checkOrgIdentity, 1500);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
   // 智能主頁導航邏輯
   const getHomeNavigation = () => {
     // 檢查用戶登入狀態
@@ -211,30 +256,14 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       }
     ];
 
-    // 如果有教師權限，添加教師專區按鈕
-    if (hasTeacherAccess) {
-      // 根據當前頁面決定導航目標
-      const isInTeacherZone = pathname.startsWith('/aihome/teacher-zone');
-      const isInTaskManagement = pathname.startsWith('/aihome/task-management');
-      
-      let teacherNavItem;
-      if (isInTeacherZone) {
-        // 如果在老師專區，導航到工作提示系統
-        teacherNavItem = {
-          id: 'mobile-nav-teacher-task',
-          icon: ClipboardDocumentListIcon,
-          href: '/aihome/task-management',
-          label: '工作提示'
-        };
-      } else {
-        // 在其他頁面，導航到老師專區
-        teacherNavItem = {
-          id: 'mobile-nav-teacher-zone',
-          icon: AcademicCapIcon,
-          href: '/aihome/teacher-zone',
-          label: '老師專區'
-        };
-      }
+    // 如果有機構身份，添加花見老師專區按鈕（跳轉到老師連結）
+    if (hasOrgIdentity) {
+      const teacherNavItem = {
+        id: 'mobile-nav-teacher-link',
+        icon: AcademicCapIcon,
+        href: '/aihome/teacher-link',
+        label: '花見老師專區'
+      };
       
       // 插入到設定按鈕之前
       baseItems.splice(3, 0, teacherNavItem);
@@ -249,8 +278,8 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
         label: '舊系統管理'
       };
       
-      // 計算插入位置：如果有教師權限，插入到教師按鈕之後，否則插入到設定之前
-      const insertIndex = hasTeacherAccess ? 4 : 3;
+      // 計算插入位置：如果有機構身份，插入到花見老師專區按鈕之後，否則插入到設定之前
+      const insertIndex = hasOrgIdentity ? 4 : 3;
       baseItems.splice(insertIndex, 0, legacyAdminItem);
     }
 
@@ -281,9 +310,9 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       };
 
       if (hasValidAdminSession()) {
-        // 計算插入位置：考慮教師權限和舊系統管理員權限
+        // 計算插入位置：考慮機構身份和舊系統管理員權限
         let insertIndex = 3; // 默認插入到設定之前
-        if (hasTeacherAccess) insertIndex++;
+        if (hasOrgIdentity) insertIndex++;
         if (hasLegacyAdminAccess) insertIndex++;
         
         baseItems.splice(insertIndex, 0, {
@@ -392,8 +421,8 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
               const isActive = pathname.startsWith(item.href);
               // 中間的按鈕（AI夥伴）稍微高一些
               const isCenter = index === 1;
-              // 檢查是否為教師專區按鈕
-              const isTeacherButton = item.id.includes('teacher');
+              // 檢查是否為花見老師專區按鈕（老師連結）
+              const isTeacherButton = item.id.includes('teacher-link') || item.id.includes('teacher-zone');
               // 檢查是否為舊系統管理員按鈕
               const isLegacyAdminButton = item.id.includes('legacy-admin');
               

@@ -18,9 +18,11 @@ interface StudentIDCardProps {
   };
   isOpen: boolean;
   onClose: () => void;
+  organizationName?: string;
+  organizationEnglishName?: string;
 }
 
-export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCardProps) {
+export default function StudentIDCard({ student, isOpen, onClose, organizationName, organizationEnglishName }: StudentIDCardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
 
   // 格式化年齡顯示
@@ -283,7 +285,7 @@ export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCar
             >
               {/* 標題 */}
               <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold text-[#4B4036] mb-2">Hanami 音樂教育</h3>
+                <h3 className="text-2xl font-bold text-[#4B4036] mb-2">{organizationName || 'Hanami 音樂教育'}</h3>
                 <p className="text-[#2B3A3B] text-sm">學生證 Student ID Card</p>
               </div>
 
@@ -368,7 +370,7 @@ export default function StudentIDCard({ student, isOpen, onClose }: StudentIDCar
               <div className="text-center">
                 <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{ backgroundColor: 'rgba(255, 255, 255, 0.6)' }}>
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FFB6C1' }}></div>
-                  <span className="text-xs font-medium" style={{ color: '#2B3A3B' }}>Hanami Music Education</span>
+                  <span className="text-xs font-medium" style={{ color: '#2B3A3B' }}>{organizationEnglishName || organizationName || 'Hanami Music Education'}</span>
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FFB6C1' }}></div>
                 </div>
               </div>

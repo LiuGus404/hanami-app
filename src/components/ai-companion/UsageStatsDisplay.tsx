@@ -19,6 +19,7 @@ import { getSaasSupabaseClient } from '@/lib/supabase';
 interface UsageStats {
   id: string;
   room_id: string;
+  thread_id?: string;
   provider: string;
   model: string;
   input_tokens: number;
@@ -31,6 +32,11 @@ interface UsageStats {
   created_at: string;
   request_data: any;
   response_data: any;
+  roleSlug?: string;
+  food_cost?: number;
+  role_hint?: string | null;
+  message_content?: string;
+  message_json?: any;
 }
 
 interface RoleUsage {
@@ -42,6 +48,26 @@ interface RoleUsage {
   totalFood: number;
   requests: number;
   avgTokens: number;
+}
+
+interface MessageCostRecord {
+  id?: string;
+  thread_id?: string | null;
+  message_id?: string | null;
+  model_provider?: string | null;
+  model_name?: string | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  total_tokens?: number | null;
+  total_cost_usd?: number | null;
+  food_amount?: number | null;
+  created_at?: string | null;
+  request_data?: any;
+  response_data?: any;
+  assigned_role_id?: string | null;
+  agent_id?: string | null;
+  ai_role_slug?: string | null;
+  ai_role_id?: string | null;
 }
 
 interface UsageStatsDisplayProps {
@@ -57,11 +83,162 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [showDetails, setShowDetails] = useState(false);
+  const [roleMetadata, setRoleMetadata] = useState<Record<string, RoleUsage>>({});
 
   // 將成本轉換為食物
   const costToFood = (costUsd: number): number => {
     // 1 USD ≈ 3 HKD ≈ 300 食物點數
     return Math.ceil(costUsd * 300);
+  };
+
+  const extractFoodCost = (data: unknown): number => {
+    if (!data) return 0;
+
+    if (typeof data === 'string') {
+      try {
+        return extractFoodCost(JSON.parse(data));
+      } catch (error) {
+        return 0;
+      }
+    }
+
+    if (Array.isArray(data)) {
+      return data.reduce((sum, item) => sum + extractFoodCost(item), 0);
+    }
+
+    if (typeof data === 'object') {
+      const obj = data as Record<string, unknown>;
+      let total = 0;
+
+      const food = obj.food as any;
+      if (food && typeof food.total_food_cost === 'number') {
+        total += food.total_food_cost;
+      }
+
+      if (typeof obj.total_food_cost === 'number') {
+        total += obj.total_food_cost as number;
+      }
+
+      for (const value of Object.values(obj)) {
+        if (value && value !== food && typeof value === 'object') {
+          total += extractFoodCost(value);
+        }
+      }
+
+      return total;
+    }
+
+    return 0;
+  };
+
+  const detectRoleClue = (value: unknown): string | null => {
+    if (!value) return null;
+    const str = String(value).toLowerCase();
+    if (!str) return null;
+    if (str.includes('pico-artist') || str.includes('pico-processor')) return 'pico-artist';
+    if (str.includes('image_generation') || str.includes('image-generation') || str.includes(' image')) return 'pico-artist';
+    if (str.includes('mori') || str.includes('research')) return 'mori-researcher';
+    if (str.includes('hibi') || str.includes('manager')) return 'hibi-manager';
+    return null;
+  };
+
+  const detectRoleFromAny = (value: unknown): string | null => {
+    if (!value) return null;
+    const clue = detectRoleClue(value);
+    if (clue) return clue;
+
+    if (typeof value === 'object') {
+      try {
+        const entries = Array.isArray(value) ? value : Object.values(value as Record<string, unknown>);
+        for (const entry of entries) {
+          const detected = detectRoleFromAny(entry);
+          if (detected) return detected;
+        }
+      } catch (error) {
+        return null;
+      }
+    }
+
+    return null;
+  };
+
+  const detectRoleSlugFromMessage = (message: any): string | null => {
+    if (!message) return null;
+
+    let contentJson = message.content_json;
+    if (typeof contentJson === 'string') {
+      try {
+        contentJson = JSON.parse(contentJson);
+      } catch (error) {
+        contentJson = null;
+      }
+    }
+
+    const clues = [
+      contentJson?.role_hint,
+      contentJson?.assigned_role_slug,
+      message.assigned_role_id,
+      message.processing_worker_id,
+      message.agent_id,
+    ];
+
+    for (const clue of clues) {
+      const detected = detectRoleClue(clue);
+      if (detected) return detected;
+    }
+
+    if (contentJson && typeof contentJson === 'object') {
+      if ((contentJson as any).image || (contentJson as any).image_url) {
+        return 'pico-artist';
+      }
+    }
+
+    const nestedDetected = detectRoleFromAny(contentJson);
+    if (nestedDetected) return nestedDetected;
+
+    const contentStr = typeof message.content === 'string' ? message.content : '';
+    if (contentStr.includes('![image]') || contentStr.includes('![Image]') || contentStr.includes('![圖片]')) return 'pico-artist';
+    if (contentStr.includes('皮可')) return 'pico-artist';
+    if (contentStr.includes('墨墨')) return 'mori-researcher';
+    if (contentStr.includes('hibi') || contentStr.includes('Hibi')) return 'hibi-manager';
+
+    return null;
+  };
+
+  const resolveRoleSlug = (record: any, message: any): string => {
+    const messageDetected = detectRoleSlugFromMessage(message);
+    if (messageDetected) return messageDetected;
+
+    const directClues = [
+      record.assigned_role_id,
+      (record as any)?.chat_messages?.assigned_role_id,
+      record.model_name,
+      record.model_provider,
+      record.processing_worker_id,
+      message?.processing_worker_id,
+      message?.role,
+    ];
+
+    for (const clue of directClues) {
+      const detected = detectRoleClue(clue);
+      if (detected) return detected;
+    }
+
+    if (message?.message_type === 'final' && typeof message?.content === 'string' && message.content.includes('![image]')) {
+      return 'pico-artist';
+    }
+
+    if (message?.content_json && (message.content_json.image || message.content_json.image_url)) {
+      return 'pico-artist';
+    }
+
+    const requestClue = detectRoleFromAny(record.request_data);
+    if (requestClue) return requestClue;
+
+    const responseClue = detectRoleFromAny(record.response_data);
+    if (responseClue) return responseClue;
+
+    return 'hibi-manager';
   };
 
   // 從訊息中提取角色資訊
@@ -96,25 +273,59 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
     setIsLoading(true);
     try {
       const saasSupabase = getSaasSupabaseClient();
+
+      const baseRoles = [
+        {
+          slug: 'hibi-manager',
+          name: 'Hibi',
+          imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
+          icon: CpuChipIcon,
+          color: 'from-orange-400 to-red-500',
+        },
+        {
+          slug: 'mori-researcher',
+          name: '墨墨',
+          imagePath: '/3d-character-backgrounds/studio/Mori/Mori.png',
+          icon: AcademicCapIcon,
+          color: 'from-amber-400 to-orange-500',
+        },
+        {
+          slug: 'pico-artist',
+          name: '皮可',
+          imagePath: '/3d-character-backgrounds/studio/Pico/Pico.png',
+          icon: PaintBrushIcon,
+          color: 'from-blue-400 to-cyan-500',
+        },
+      ];
       
       // 首先獲取房間中的活躍角色
       const rolesMap = new Map<string, { name: string; imagePath: string; icon: any; color: string }>();
+      baseRoles.forEach((role) => {
+        rolesMap.set(role.slug, {
+          name: role.name,
+          imagePath: role.imagePath,
+          icon: role.icon,
+          color: role.color,
+        });
+      });
+
+      const usageRecords: UsageStats[] = [];
       
-      // 從 chat_threads 查詢 thread_id (room_id)
-      let threadId = roomId;
+      const threadIds = new Set<string>();
+
       if (roomId) {
-        // 嘗試將 roomId 作為 thread_id 使用，因為它們應該是同一個 ID
         const { data: thread } = await saasSupabase
           .from('chat_threads')
           .select('id')
           .eq('id', roomId)
-          .single();
-        
-        if (thread) {
-          threadId = (thread as any)?.id;
+          .maybeSingle();
+        const threadData = thread as { id?: string } | null;
+        if (threadData?.id) {
+          threadIds.add(threadData.id);
+        } else {
+          threadIds.add(roomId);
         }
 
-        // 查詢房間角色
         const { data: roomRoles } = await saasSupabase
           .from('room_roles')
           .select(`
@@ -131,10 +342,9 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
             const roleInstance = (roomRole as any).role_instances;
             const aiRole = roleInstance?.ai_roles;
             if (aiRole) {
-              // 根據角色設置對應的圖標和顏色
               let icon = CpuChipIcon;
               let color = 'from-orange-400 to-red-500';
-              let imagePath = '/3d-character-backgrounds/studio/Hibi/lulu(front).png';
+              let imagePath = '/3d-character-backgrounds/studio/lulu(front).png';
               
               if (aiRole.slug?.includes('mori')) {
                 icon = AcademicCapIcon;
@@ -150,12 +360,26 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                 name: aiRole.name,
                 imagePath,
                 icon,
-                color
+                color,
               });
             }
           }
         }
       }
+
+      if (!roomId && userId) {
+        const { data: userThreads } = await saasSupabase
+          .from('chat_threads')
+          .select('id')
+          .eq('user_id', userId);
+        if (userThreads) {
+          userThreads.forEach((thread: any) => {
+            if (thread?.id) threadIds.add(thread.id);
+          });
+        }
+      }
+
+      const resolvedThreadIds = Array.from(threadIds);
 
       // 從 message_costs 查詢使用記錄（包含準確的 food_amount）
       let costQuery = saasSupabase
@@ -163,7 +387,11 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (threadId) costQuery = costQuery.eq('thread_id', threadId);
+      if (resolvedThreadIds.length === 1) {
+        costQuery = costQuery.eq('thread_id', resolvedThreadIds[0]);
+      } else if (resolvedThreadIds.length > 1) {
+        costQuery = costQuery.in('thread_id', resolvedThreadIds);
+      }
 
       // 根據時間期間篩選
       const now = new Date();
@@ -187,46 +415,62 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         costQuery = costQuery.gte('created_at', startDate.toISOString());
       }
 
-      const { data: costRecords, error: costError } = await costQuery.limit(100);
+      const { data: costRecordsRaw, error: costError } = await costQuery.limit(100);
+      const costRecords = (costRecordsRaw ?? []) as MessageCostRecord[];
 
       if (costError) {
         console.error('❌ 載入成本記錄失敗:', costError);
         return;
       }
 
-      console.log('📊 載入到的成本記錄:', costRecords?.length || 0, '條');
+      console.log('📊 載入到的成本記錄:', costRecords.length, '條');
 
       // 如果有成本記錄，獲取對應的訊息資料
       let messageRecords: any[] = [];
-      if (costRecords && costRecords.length > 0) {
-        const messageIds = costRecords.map((record: any) => record.message_id).filter(Boolean);
+      if (costRecords.length > 0) {
+        const messageIds = costRecords.map((record) => record.message_id).filter(Boolean) as string[];
         if (messageIds.length > 0) {
           const { data: messages, error: messageError } = await saasSupabase
             .from('chat_messages')
-            .select('id, thread_id, content, content_json, created_at')
+            .select('id, thread_id, content, content_json, created_at, assigned_role_id, processing_worker_id, agent_id, status')
             .in('id', messageIds);
 
           if (messageError) {
             console.error('❌ 載入訊息記錄失敗:', messageError);
           } else {
-            messageRecords = messages || [];
+            messageRecords = (messages || []).map((msg: any) => {
+              let parsedJson = msg.content_json;
+              if (typeof parsedJson === 'string') {
+                try {
+                  parsedJson = JSON.parse(parsedJson);
+                } catch (error) {
+                  parsedJson = null;
+                }
+              }
+              return {
+                ...msg,
+                content_json: parsedJson,
+              };
+            });
           }
         }
       }
 
-      // 創建訊息 ID 到訊息資料的映射
-      const messageMap = new Map();
-      messageRecords.forEach(msg => {
+      const messageMap = new Map<string, any>();
+      messageRecords.forEach((msg) => {
+        if (msg?.id) {
         messageMap.set(msg.id, msg);
+        }
       });
       
       // 轉換 message_costs 為 usage 格式
-      const convertedUsage = (costRecords || []).map((record: any) => {
-        const message = messageMap.get(record.message_id);
+      const convertedUsage = costRecords.map((record) => {
+        const messageId = record.message_id ?? undefined;
+        const message = messageId ? messageMap.get(messageId) : undefined;
         return {
-          id: record.id,
+          id: record.id ?? '',
           room_id: roomId || '',
-          thread_id: record.thread_id,
+          thread_id: record.thread_id ?? roomId ?? '',
           provider: record.model_provider || 'OpenRouter',
           model: record.model_name || 'unknown',
           input_tokens: record.input_tokens || 0,
@@ -236,89 +480,312 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
           audio_seconds: 0,
           cost_usd: record.total_cost_usd || 0,
           latency_ms: 0,
-          created_at: record.created_at,
+          created_at: record.created_at ?? new Date().toISOString(),
           request_data: record.request_data,
           response_data: record.response_data,
           food_cost: record.food_amount || 0, // 使用 food_amount 欄位
           role_hint: message?.content_json?.role_hint || null,
           message_content: message?.content || '',
-          message_json: message?.content_json || {}
+          message_json: message?.content_json || {},
+          roleSlug: resolveRoleSlug(record, message),
         };
       });
+      usageRecords.push(...convertedUsage);
 
-      setUsageData(convertedUsage);
+      setUsageData(usageRecords);
       
       // 統計每個角色的食用情況
       const roleStats = new Map<string, RoleUsage>();
-      let totalFoodConsumed = 0;
 
-      if (costRecords && costRecords.length > 0) {
+      const ensureRoleEntry = (slug: string) => {
+        if (!roleStats.has(slug)) {
+          const info = rolesMap.get(slug) || rolesMap.get('hibi-manager')!;
+          roleStats.set(slug, {
+            roleId: slug,
+            roleName: info.name,
+            imagePath: info.imagePath,
+            icon: info.icon,
+            color: info.color,
+            totalFood: 0,
+            requests: 0,
+            avgTokens: 0,
+          });
+        }
+        const entry = roleStats.get(slug)!;
+        return entry;
+      };
+
+      baseRoles.forEach((role) => ensureRoleEntry(role.slug));
+
+      let totalFoodConsumed = 0;
+      const countedMessageIds = new Set<string>();
+      const countedRequestIds = new Set<string>();
+
+      if (costRecords.length > 0) {
         for (const record of costRecords) {
           // 直接使用 food_amount 欄位（已經從 message_costs 表獲取）
-          const food = (record as any)?.food_amount || 0;
+          const food = record.food_amount || 0;
+ 
+          const messageKey = record.message_id ?? undefined;
+          const message = messageKey ? messageMap.get(messageKey) : undefined;
+          const roleSlug = resolveRoleSlug(record, message);
+          if (record.message_id) {
+            countedMessageIds.add(record.message_id);
+          }
+ 
+          const entry = ensureRoleEntry(roleSlug);
+
+          entry.requests += 1;
+          const totalTokens = record.total_tokens || 0;
+          entry.avgTokens = Math.round((entry.avgTokens * (entry.requests - 1) + totalTokens) / entry.requests);
+
+          if (food > 0) {
+            entry.totalFood += food;
           totalFoodConsumed += food;
-
-          // 從關聯的 chat_messages 提取角色資訊
-          const msg = (record as any)?.chat_messages;
-          let roleSlug = 'hibi-manager'; // 默認為 Hibi
-          
-          // 嘗試從 role_hint 提取
-          if (msg && msg.content_json && msg.content_json.role_hint) {
-            const roleHint = msg.content_json.role_hint;
-            if (roleHint === 'mori' || roleHint.includes('mori')) {
-              roleSlug = 'mori-researcher';
-            } else if (roleHint === 'pico' || roleHint.includes('pico')) {
-              roleSlug = 'pico-artist';
-            } else if (roleHint === 'hibi' || roleHint.includes('hibi')) {
-              roleSlug = 'hibi-manager';
-            }
-          }
-
-          // 查找角色資訊
-          let roleInfo = rolesMap.get(roleSlug);
-          if (!roleInfo) {
-            // 如果找不到，使用預設值
-            roleInfo = {
-              name: roleSlug.includes('mori') ? '墨墨' : roleSlug.includes('pico') ? '皮可' : 'Hibi',
-              imagePath: roleSlug.includes('mori') 
-                ? '/3d-character-backgrounds/studio/Mori/Mori.png'
-                : roleSlug.includes('pico')
-                  ? '/3d-character-backgrounds/studio/Pico/Pico.png'
-                  : '/3d-character-backgrounds/studio/Hibi/lulu(front).png',
-              icon: roleSlug.includes('mori') ? AcademicCapIcon : roleSlug.includes('pico') ? PaintBrushIcon : CpuChipIcon,
-              color: roleSlug.includes('mori') 
-                ? 'from-amber-400 to-orange-500'
-                : roleSlug.includes('pico')
-                  ? 'from-blue-400 to-cyan-500'
-                  : 'from-orange-400 to-red-500'
-            };
-          }
-
-          const totalTokens = (record as any)?.total_tokens || 0;
-
-          const existing = roleStats.get(roleSlug);
-          if (existing) {
-            existing.totalFood += food;
-            existing.requests += 1;
-            existing.avgTokens = Math.round((existing.avgTokens * (existing.requests - 1) + totalTokens) / existing.requests);
-          } else {
-            roleStats.set(roleSlug, {
-              roleId: roleSlug,
-              roleName: roleInfo.name,
-              imagePath: roleInfo.imagePath,
-              icon: roleInfo.icon,
-              color: roleInfo.color,
-              totalFood: food,
-              requests: 1,
-              avgTokens: totalTokens
-            });
           }
         }
       }
 
+      if (messageRecords.length > 0) {
+        for (const message of messageRecords) {
+          if (!message?.id || countedMessageIds.has(message.id)) continue;
+
+          const roleSlug = detectRoleSlugFromMessage(message) || 'hibi-manager';
+          const entry = ensureRoleEntry(roleSlug);
+
+          const foodFromMessage = extractFoodCost(message.content_json);
+          if (foodFromMessage > 0) {
+            entry.totalFood += foodFromMessage;
+            totalFoodConsumed += foodFromMessage;
+          }
+
+          entry.requests += 1;
+
+          countedMessageIds.add(message.id);
+        }
+      }
+
+      try {
+        let foodQuery = saasSupabase
+          .from('food_transactions')
+          .select('id, user_id, transaction_type, amount, balance_after, message_id, thread_id, description, created_at')
+          .eq('transaction_type', 'spend')
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        if (resolvedThreadIds.length === 1) {
+          foodQuery = foodQuery.eq('thread_id', resolvedThreadIds[0]);
+        } else if (resolvedThreadIds.length > 1) {
+          foodQuery = foodQuery.in('thread_id', resolvedThreadIds);
+        } else if (userId) {
+          foodQuery = foodQuery.eq('user_id', userId);
+        }
+
+        if (selectedPeriod !== 'all') {
+          foodQuery = foodQuery.gte('created_at', startDate.toISOString());
+        }
+
+        const { data: foodRows, error: foodError } = await foodQuery;
+        if (foodError) {
+          console.error('⚠️ 載入 food_transactions 失敗:', foodError);
+        } else if (foodRows && foodRows.length > 0) {
+          const missingMessageIds = new Set<string>();
+
+          foodRows.forEach((tx: any) => {
+            if (tx.message_id && !messageMap.has(tx.message_id)) {
+              missingMessageIds.add(tx.message_id);
+            }
+          });
+
+          if (missingMessageIds.size > 0) {
+            const { data: txMessages, error: txMessageError } = await saasSupabase
+              .from('chat_messages')
+              .select('id, thread_id, content, content_json, created_at, assigned_role_id, processing_worker_id, agent_id, status')
+              .in('id', Array.from(missingMessageIds));
+
+            if (txMessageError) {
+              console.error('⚠️ 交易訊息載入失敗:', txMessageError);
+            } else if (txMessages) {
+              txMessages.forEach((raw: any) => {
+                let parsedJson = raw.content_json;
+                if (typeof parsedJson === 'string') {
+                  try {
+                    parsedJson = JSON.parse(parsedJson);
+                  } catch (error) {
+                    parsedJson = null;
+                  }
+                }
+                const message = {
+                  ...raw,
+                  content_json: parsedJson,
+                };
+                messageRecords.push(message);
+                messageMap.set(message.id, message);
+              });
+            }
+          }
+
+          foodRows.forEach((tx: any) => {
+            const food = Math.abs(Number(tx.amount) || 0);
+            const message = tx.message_id ? messageMap.get(tx.message_id) : null;
+
+            const pseudoRecord = {
+              assigned_role_id: message?.assigned_role_id,
+              model_name: message?.message_type,
+              model_provider: message?.agent_id,
+              request_data: message?.content_json,
+              response_data: null,
+              processing_worker_id: message?.processing_worker_id,
+            };
+
+            let roleSlug = resolveRoleSlug(pseudoRecord, message);
+            if (!roleSlug && tx.description) {
+              const descClue = detectRoleClue(tx.description);
+              if (descClue) roleSlug = descClue;
+            }
+
+            const entry = ensureRoleEntry(roleSlug);
+
+            if (food > 0) {
+              entry.totalFood += food;
+              totalFoodConsumed += food;
+            }
+
+            entry.requests += 1;
+
+            usageRecords.push({
+              id: tx.id,
+              room_id: tx.thread_id || '',
+              thread_id: tx.thread_id,
+              provider: 'food_transactions',
+              model: tx.transaction_type,
+              input_tokens: 0,
+              output_tokens: 0,
+              total_tokens: 0,
+              image_count: 0,
+              audio_seconds: 0,
+              cost_usd: 0,
+              latency_ms: 0,
+              created_at: tx.created_at,
+              request_data: tx.description,
+              response_data: null,
+              food_cost: food,
+              role_hint: message?.content_json?.role_hint || null,
+              message_content: message?.content || '',
+              message_json: message?.content_json || {},
+              roleSlug,
+            });
+          });
+        }
+      } catch (txError) {
+        console.error('⚠️ 食量交易載入失敗:', txError);
+      }
+
+      const shouldLoadUsageFallback = totalFoodConsumed === 0;
+
+      if (shouldLoadUsageFallback) {
+        try {
+          let usageQuery = saasSupabase
+            .from('ai_usage')
+            .select('id, room_id, user_id, role_instance_id, total_tokens, cost_usd, created_at')
+            .order('created_at', { ascending: false })
+            .limit(500);
+
+          if (resolvedThreadIds.length === 1) {
+            usageQuery = usageQuery.eq('room_id', resolvedThreadIds[0]);
+          } else if (resolvedThreadIds.length > 1) {
+            usageQuery = usageQuery.in('room_id', resolvedThreadIds);
+          } else if (userId) {
+            usageQuery = usageQuery.eq('user_id', userId);
+          }
+
+          if (selectedPeriod !== 'all') {
+            usageQuery = usageQuery.gte('created_at', startDate.toISOString());
+          }
+
+          const { data: usageRows, error: usageError } = await usageQuery;
+          if (usageError) {
+            console.error('⚠️ 載入 ai_usage 失敗:', usageError);
+          } else if (usageRows && usageRows.length > 0) {
+            const roleInstanceIds = usageRows
+              .map((row: any) => row.role_instance_id)
+              .filter((id: string | null | undefined) => !!id);
+
+            const roleInstanceMap = new Map<string, string>();
+
+            if (roleInstanceIds.length > 0) {
+              const { data: roleInstanceRows, error: roleInstanceError } = await saasSupabase
+                .from('role_instances')
+                .select('id, ai_roles(name, slug)')
+                .in('id', roleInstanceIds);
+
+              if (roleInstanceError) {
+                console.error('⚠️ 載入 role_instances 失敗:', roleInstanceError);
+              } else if (roleInstanceRows) {
+                roleInstanceRows.forEach((row: any) => {
+                  const slug = row?.ai_roles?.slug;
+                  if (row?.id && slug) {
+                    roleInstanceMap.set(row.id, slug);
+                  }
+                });
+              }
+            }
+
+            usageRows.forEach((usage: any) => {
+              const roleSlug = roleInstanceMap.get(usage.role_instance_id) || 'hibi-manager';
+              const entry = ensureRoleEntry(roleSlug);
+
+              const food = usage.cost_usd ? costToFood(Number(usage.cost_usd)) : 0;
+              if (food > 0) {
+                entry.totalFood += food;
+                totalFoodConsumed += food;
+              }
+
+              entry.requests += 1;
+              const tokens = Number(usage.total_tokens) || 0;
+              entry.avgTokens = Math.round((entry.avgTokens * (entry.requests - 1) + tokens) / entry.requests);
+
+              usageRecords.push({
+                id: usage.id,
+                room_id: usage.room_id || '',
+                thread_id: usage.room_id,
+                provider: 'ai_usage',
+                model: 'usage-backfill',
+                input_tokens: 0,
+                output_tokens: 0,
+                total_tokens: usage.total_tokens || 0,
+                image_count: 0,
+                audio_seconds: 0,
+                cost_usd: usage.cost_usd || 0,
+                latency_ms: 0,
+                created_at: usage.created_at,
+                request_data: null,
+                response_data: null,
+                food_cost: food,
+                role_hint: null,
+                message_content: '',
+                message_json: {},
+                roleSlug,
+              });
+            });
+          }
+        } catch (fallbackError) {
+          console.error('⚠️ ai_usage 後備載入失敗:', fallbackError);
+        }
+      }
+ 
+      baseRoles.forEach((role) => ensureRoleEntry(role.slug));
+
       console.log('🍔 統計結果:', { totalFood: totalFoodConsumed, roleCount: roleStats.size });
       
-      setRoleUsage(Array.from(roleStats.values()).sort((a, b) => b.totalFood - a.totalFood));
+      const sortedRoles = Array.from(roleStats.values())
+        .sort((a, b) => b.totalFood - a.totalFood || a.roleName.localeCompare(b.roleName, 'zh-Hant'));
+      setRoleUsage(sortedRoles);
+      const metadata: Record<string, RoleUsage> = {};
+      sortedRoles.forEach((role) => {
+        metadata[role.roleId] = role;
+      });
+      setRoleMetadata(metadata);
       setTotalFood(totalFoodConsumed);
 
     } catch (error) {
@@ -343,7 +810,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center">
-              <img src="/3d-character-backgrounds/studio/food/food.png" alt="食物" className="w-5 h-5" />
+              <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-[#4B4036]">AI 食用統計</h3>
@@ -396,7 +863,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         <div className="bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <img src="/3d-character-backgrounds/studio/food/food.png" alt="總食物" className="w-12 h-12" />
+              <img src="/apple-icon.svg" alt="總食量" className="w-12 h-12" />
               <div>
                 <div className="text-sm text-white/90">總共食用</div>
                 <div className="text-3xl font-bold text-white">{formatNumber(totalFood)}</div>
@@ -459,7 +926,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                       
                       <div className="text-right">
                         <div className="flex items-center space-x-2">
-                          <img src="/3d-character-backgrounds/studio/food/food.png" alt="食物" className="w-8 h-8" />
+                          <img src="/apple-icon.svg" alt="食量" className="w-8 h-8" />
                           <div>
                             <div className="text-xl font-bold text-[#4B4036]">
                               {formatNumber(role.totalFood)}
@@ -489,7 +956,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
             </div>
           ) : (
             <div className="text-center py-12">
-              <img src="/3d-character-backgrounds/studio/food/food.png" alt="空盤" className="w-20 h-20 mx-auto mb-4 opacity-50" />
+              <img src="/apple-icon.svg" alt="沒有食量" className="w-20 h-20 mx-auto mb-4 opacity-50" />
               <p className="text-[#2B3A3B]">此期間內沒有食用記錄</p>
               <p className="text-xs text-[#2B3A3B]/60 mt-2">開始使用 AI 後，食用記錄將顯示在這裡</p>
             </div>
@@ -531,8 +998,14 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
               {usageData.length > 0 ? (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {usageData.map((usage, index) => {
-                    // 使用 food_cost 而不是轉換 cost_usd
-                    const food = (usage as any).food_cost || costToFood(usage.cost_usd || 0);
+                    const food = (() => {
+                      if (usage.food_cost && usage.food_cost > 0) return usage.food_cost;
+                      const fromMessage = extractFoodCost(usage.message_json);
+                      if (fromMessage > 0) return fromMessage;
+                      return costToFood(usage.cost_usd || 0);
+                    })();
+                    const inputTokens = usage.input_tokens || usage.total_tokens || 0;
+                    const outputTokens = usage.output_tokens || 0;
                     return (
                       <motion.div
                         key={usage.id}
@@ -544,11 +1017,16 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-3">
                             <div className="w-8 h-8 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center">
-                              <img src="/3d-character-backgrounds/studio/food/food.png" alt="食物" className="w-5 h-5" />
+                              <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
                             </div>
                             <div>
-                              <div className="font-medium text-[#4B4036]">
-                                {usage.provider} - {usage.model}
+                              <div className="font-medium text-[#4B4036] flex items-center space-x-2">
+                                <span>{usage.provider} - {usage.model}</span>
+                                {usage.roleSlug && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-[#FFF4E0] text-[#4B4036]">
+                                    {roleMetadata[usage.roleSlug]?.roleName || usage.roleSlug}
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-[#2B3A3B]">
                                 {new Date(usage.created_at).toLocaleString('zh-TW')}
@@ -558,7 +1036,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                           
                           <div className="text-right">
                             <div className="flex items-center space-x-1">
-                              <img src="/3d-character-backgrounds/studio/food/food.png" alt="食物" className="w-5 h-5" />
+                              <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
                               <div className="font-medium text-[#4B4036]">{formatNumber(food)}</div>
                             </div>
                             <div className="text-xs text-[#2B3A3B]">食物點數</div>
@@ -568,19 +1046,19 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                         <div className="grid grid-cols-3 gap-3 text-xs">
                           <div className="bg-blue-50 rounded-lg p-2 text-center">
                             <div className="font-medium text-blue-700">
-                              {formatNumber(usage.input_tokens)}
+                              {formatNumber(inputTokens)}
                             </div>
                             <div className="text-blue-500">輸入 tokens</div>
                           </div>
                           <div className="bg-green-50 rounded-lg p-2 text-center">
                             <div className="font-medium text-green-700">
-                              {formatNumber(usage.output_tokens)}
+                              {formatNumber(outputTokens)}
                             </div>
                             <div className="text-green-500">輸出 tokens</div>
                           </div>
                           <div className="bg-purple-50 rounded-lg p-2 text-center">
                             <div className="font-medium text-purple-700">
-                              {formatNumber(usage.image_count)}
+                              {formatNumber(usage.image_count || (usage.message_json?.image ? 1 : 0))}
                             </div>
                             <div className="text-purple-500">圖片</div>
                           </div>

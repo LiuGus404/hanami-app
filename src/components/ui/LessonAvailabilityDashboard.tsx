@@ -2,13 +2,20 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import TrialLimitSettingsModal from './TrialLimitSettingsModal';
 
 import { supabase } from '@/lib/supabase';
+import { useUser } from '@/hooks/useUser';
+import { toast } from 'react-hot-toast';
+import { getUserSession, type OrganizationProfile } from '@/lib/authUtils';
+import { useTeacherLinkOrganization } from '@/app/aihome/teacher-link/create/TeacherLinkShell';
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 // 固定香港時區的 Date 產生器
 const getHongKongDate = (date = new Date()) => {
@@ -73,6 +80,30 @@ interface TrialStudent {
 
 
 export default function LessonAvailabilityDashboard() {
+  const { user } = useUser();
+  
+  // 嘗試從 TeacherLinkShell context 獲取組織信息（如果可用）
+  let teacherLinkOrg: { orgId: string | null; organization: OrganizationProfile | null } | null = null;
+  try {
+    teacherLinkOrg = useTeacherLinkOrganization();
+  } catch (e) {
+    // 不在 TeacherLinkShell 上下文中，繼續使用其他方法
+  }
+  
+  // 從會話中獲取機構信息（可能沒有 OrganizationProvider）
+  const session = getUserSession();
+  const currentOrganization = session?.organization || null;
+  
+  const effectiveOrgId = useMemo(
+    () => teacherLinkOrg?.orgId || teacherLinkOrg?.organization?.id || currentOrganization?.id || user?.organization?.id || null,
+    [teacherLinkOrg?.orgId, teacherLinkOrg?.organization?.id, currentOrganization?.id, user?.organization?.id]
+  );
+  const validOrgId = useMemo(
+    () => (effectiveOrgId && UUID_REGEX.test(effectiveOrgId) ? effectiveOrgId : null),
+    [effectiveOrgId]
+  );
+  const hasValidOrg = Boolean(validOrgId);
+  const isAllowedOrg = validOrgId === 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +118,13 @@ export default function LessonAvailabilityDashboard() {
   const [trialLimitSettings, setTrialLimitSettings] = useState<{[courseTypeId: string]: number}>({});
   const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!hasValidOrg) {
+      setSlots([]);
+      setQueueByDay({});
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -95,7 +132,8 @@ export default function LessonAvailabilityDashboard() {
       const { data: courseTypesData, error: courseTypesError } = await supabase
         .from('Hanami_CourseTypes')
         .select('id, name')
-        .eq('status', true);
+        .eq('status', true)
+        .eq('org_id', validOrgId as string);
         
       if (courseTypesError) {
         console.error('無法載入課程類型：', courseTypesError);
@@ -119,6 +157,7 @@ export default function LessonAvailabilityDashboard() {
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('hanami_schedule')
         .select('*')
+        .eq('org_id', validOrgId as string)
         .order('weekday', { ascending: true })
         .order('timeslot', { ascending: true });
         
@@ -135,18 +174,62 @@ export default function LessonAvailabilityDashboard() {
       console.log('時段資料星期六：', scheduleData?.filter(s => s.weekday === 6));
         
       // 3. 取得所有常規學生（只計算 active 學生）
-      const { data: regularData, error: regularError } = await supabase
-        .from('Hanami_Students')
-        .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
-        .in('student_type', ['常規', '試堂']) // 只包含常規和試堂學生
-        .not('regular_weekday', 'is', null) // 確保有設定上課日
-        .not('regular_timeslot', 'is', null); // 確保有設定上課時間
+      // 使用 API 端點繞過 RLS
+      const userEmail = session?.email || user?.email || null;
+      let regularData: any[] = [];
+      
+      try {
+        const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId as string)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
         
-
+        const response = await fetch(apiUrl, {
+          credentials: 'include',
+        });
         
-      if (regularError) {
-        setError(`無法載入常規學生：${regularError.message}`);
-        return;
+        if (response.ok) {
+          const result = await response.json();
+          const allStudents = result.students || result.data || [];
+          // 過濾：只包含常規和試堂學生，且有設定上課日和時間
+          regularData = allStudents.filter((s: any) => 
+            ['常規', '試堂'].includes(s.student_type) &&
+            s.regular_weekday != null &&
+            s.regular_timeslot != null
+          );
+          console.log('通過 API 載入常規學生數量:', regularData.length);
+        } else {
+          console.error('⚠️ 無法載入常規學生，API 返回錯誤:', response.status);
+          // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
+          const { data, error: regularError } = await supabase
+            .from('Hanami_Students')
+            .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
+            .eq('org_id', validOrgId as string)
+            .in('student_type', ['常規', '試堂'])
+            .not('regular_weekday', 'is', null)
+            .not('regular_timeslot', 'is', null);
+          
+          if (regularError) {
+            setError(`無法載入常規學生：${regularError.message}`);
+            return;
+          }
+          
+          regularData = data || [];
+        }
+      } catch (apiError) {
+        console.error('⚠️ API 調用異常，嘗試直接查詢:', apiError);
+        // Fallback 到直接查詢
+        const { data, error: regularError } = await supabase
+          .from('Hanami_Students')
+          .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
+          .eq('org_id', validOrgId as string)
+          .in('student_type', ['常規', '試堂'])
+          .not('regular_weekday', 'is', null)
+          .not('regular_timeslot', 'is', null);
+        
+        if (regularError) {
+          setError(`無法載入常規學生：${regularError.message}`);
+          return;
+        }
+        
+        regularData = data || [];
       }
         
       // 調試信息：檢查常規學生資料
@@ -158,6 +241,7 @@ export default function LessonAvailabilityDashboard() {
       const { data: trialData, error: trialError } = await supabase
         .from('hanami_trial_students')
         .select('id, full_name, student_age, lesson_date, actual_timeslot, weekday, course_type')
+        .eq('org_id', validOrgId as string)
         .gte('lesson_date', todayISO)
         .not('actual_timeslot', 'is', null) // 確保有設定試堂時間
         .not('weekday', 'is', null); // 確保有設定試堂日
@@ -177,6 +261,7 @@ export default function LessonAvailabilityDashboard() {
       const { data: lessonData, error: lessonError } = await supabase
         .from('hanami_student_lesson')
         .select('lesson_date, actual_timeslot, course_type, student_id')
+        .eq('org_id', validOrgId as string)
         .gte('lesson_date', todayISO)
         .order('lesson_date', { ascending: true });
         
@@ -455,6 +540,7 @@ export default function LessonAvailabilityDashboard() {
       const { data: queueData, error: queueError } = await supabase
         .from('hanami_trial_queue')
         .select('id, full_name, student_age, phone_no, prefer_time, notes, course_types, created_at')
+        .eq('org_id', validOrgId as string)
         .order('created_at', { ascending: true }); // 按舊到新排序
         
 
@@ -565,11 +651,11 @@ export default function LessonAvailabilityDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [hasValidOrg, validOrgId]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // 依據 slots 動態產生每一天的時段
   // 以 weekday 為主，時段內可有多班（course_type），每班可有多筆記錄
@@ -621,14 +707,10 @@ export default function LessonAvailabilityDashboard() {
           <h2 className="text-lg font-bold text-[#4B4036]">課堂空缺情況</h2>
           <Image alt="icon" height={24} src="/rabbit.png" width={24} />
         </div>
-        <div className="text-center p-8 bg-[#FFFDF7] border border-[#EADBC8] rounded-xl">
-          <div className="text-[#4B4036] mb-2">目前沒有課堂資料</div>
-          <div className="text-sm text-[#87704e] mb-4">請確認以下項目：</div>
-          <div className="text-sm text-[#87704e] text-left space-y-1">
-            <div>• hanami_schedule 表中有設定課堂空缺情況</div>
-            <div>• Hanami_Students 表中有常規學生且設定了 regular_weekday 和 regular_timeslot</div>
-            <div>• hanami_trial_students 表中有試堂學生且設定了 weekday 和 actual_timeslot</div>
-
+        <div className="text-center p-8 bg-[#FFFDF7] border border-[#EADBC8] rounded-xl space-y-2">
+          <div className="text-[#4B4036]">目前沒有課堂資料</div>
+          <div className="text-sm text-[#87704e]">
+            請先創建屬於您的機構，並建立課程與學生資料。
           </div>
         </div>
       </div>
@@ -698,9 +780,19 @@ export default function LessonAvailabilityDashboard() {
                         {queueByDay[dayIdx].map((q: any, i: number) => (
                           <button
                             key={`${q.id}-${i}`}
-                            className="inline-block px-2 py-1 rounded bg-[#F0F6FF] text-xs text-[#2B4B6F] hover:bg-[#E0EDFF] transition leading-snug text-left"
+                            className={`inline-block px-2 py-1 rounded text-xs transition leading-snug text-left ${
+                              isAllowedOrg
+                                ? 'bg-[#F0F6FF] text-[#2B4B6F] hover:bg-[#E0EDFF]'
+                                : 'bg-gray-300 opacity-60 text-gray-600'
+                            }`}
                             style={{ cursor: 'pointer' }}
-                            onClick={() => router.push(`/admin/add-trial-students?id=${q.id}`)}
+                            onClick={() => {
+                              if (!isAllowedOrg) {
+                                toast.error('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com');
+                                return;
+                              }
+                              router.push(`/admin/add-trial-students?id=${q.id}`);
+                            }}
                           >
                             <div>{q.phone_no || q.full_name || '未命名'}</div>
                             <div className="flex items-center gap-2 text-[10px] text-[#4B5A6F] mt-0.5">

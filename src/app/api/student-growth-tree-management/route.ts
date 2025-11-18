@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentId, treeId, startDate, teacherNotes } = body;
+    const { studentId, treeId, startDate, teacherNotes, org_id } = body;
 
     if (!studentId || !treeId) {
       return NextResponse.json(
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('為學生新增成長樹:', { studentId, treeId, startDate, teacherNotes });
+    console.log('為學生新增成長樹:', { studentId, treeId, startDate, teacherNotes, org_id });
 
     // 檢查學生是否已經有此成長樹
     const { data: existingTree, error: checkError } = await supabase
@@ -106,18 +106,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 如果沒有提供 org_id，從學生記錄中獲取
+    let finalOrgId = org_id;
+    if (!finalOrgId) {
+      const { data: studentData } = await supabase
+        .from('Hanami_Students')
+        .select('org_id')
+        .eq('id', studentId)
+        .single();
+      
+      if (studentData?.org_id) {
+        finalOrgId = studentData.org_id;
+      }
+    }
+
     // 新增成長樹給學生
+    const insertData: any = {
+      student_id: studentId,
+      tree_id: treeId,
+      start_date: startDate || new Date().toISOString().split('T')[0],
+      status: 'active',
+      tree_status: 'active',
+      enrollment_date: new Date().toISOString().split('T')[0],
+      teacher_notes: teacherNotes || null
+    };
+
+    // 如果有 org_id，添加到插入數據中
+    if (finalOrgId) {
+      insertData.org_id = finalOrgId;
+    }
+
     const { data, error } = await supabase
       .from('hanami_student_trees')
-      .insert({
-        student_id: studentId,
-        tree_id: treeId,
-        start_date: startDate || new Date().toISOString().split('T')[0],
-        status: 'active',
-        tree_status: 'active',
-        enrollment_date: new Date().toISOString().split('T')[0],
-        teacher_notes: teacherNotes || null
-      })
+      .insert(insertData)
       .select(`
         id,
         student_id,
@@ -168,7 +189,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentTreeId, status, teacherNotes } = body;
+    const { studentTreeId, status, teacherNotes, org_id } = body;
 
     if (!studentTreeId) {
       return NextResponse.json(
@@ -177,11 +198,38 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    console.log('更新學生成長樹狀態:', { studentTreeId, status, teacherNotes });
+    console.log('更新學生成長樹狀態:', { studentTreeId, status, teacherNotes, org_id });
+
+    // 如果沒有提供 org_id，從學生成長樹記錄中獲取學生ID，然後從學生記錄中獲取 org_id
+    let finalOrgId = org_id;
+    if (!finalOrgId) {
+      const { data: studentTreeData } = await supabase
+        .from('hanami_student_trees')
+        .select('student_id')
+        .eq('id', studentTreeId)
+        .single();
+      
+      if (studentTreeData?.student_id) {
+        const { data: studentData } = await supabase
+          .from('Hanami_Students')
+          .select('org_id')
+          .eq('id', studentTreeData.student_id)
+          .single();
+        
+        if (studentData?.org_id) {
+          finalOrgId = studentData.org_id;
+        }
+      }
+    }
 
     const updateData: any = {
       updated_at: new Date().toISOString()
     };
+
+    // 如果有 org_id，添加到更新數據中
+    if (finalOrgId) {
+      updateData.org_id = finalOrgId;
+    }
 
     if (status !== undefined) {
       updateData.status = status;
@@ -289,6 +337,11 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+
+
+
+
 
 
 

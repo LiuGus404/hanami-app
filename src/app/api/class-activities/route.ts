@@ -1,6 +1,6 @@
-
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabaseClient } from '@/lib/supabase';
+import { fallbackOrganization } from '@/lib/authUtils';
 
 // 檢查課程是否在教師排程時間內
 function isLessonInTeacherSchedule(lesson: any, teacherSchedule: any[]): boolean {
@@ -57,6 +57,11 @@ export async function GET(request: NextRequest) {
     const weekStart = searchParams.get('weekStart'); // YYYY-MM-DD 格式
     const weekEnd = searchParams.get('weekEnd'); // YYYY-MM-DD 格式
     const teacherId = searchParams.get('teacherId'); // 教師ID
+    const orgId = searchParams.get('orgId');
+    const disableOrgData =
+      !orgId ||
+      orgId === 'default-org' ||
+      orgId === fallbackOrganization.id;
 
     if (!weekStart || !weekEnd) {
       return NextResponse.json(
@@ -65,13 +70,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Fetching lessons between:', { weekStart, weekEnd, teacherId });
+    if (disableOrgData) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          lessons: [],
+          trialLessons: [],
+          treeActivities: [],
+          assignedActivities: [],
+        },
+      });
+    }
+
+    const organizationId = orgId as string;
+
+    console.log('Fetching lessons between:', { weekStart, weekEnd, teacherId, orgId: organizationId });
+
+    // 使用服務角色客戶端以繞過 RLS
+    const supabase = getServerSupabaseClient();
 
     // 如果提供了教師ID，先查詢教師排程
     let teacherSchedule: any[] = [];
     if (teacherId) {
       console.log('查詢教師排程，教師ID:', teacherId);
-      const { data: scheduleData, error: scheduleError } = await supabase
+      let teacherScheduleQuery = supabase
         .from('teacher_schedule')
         .select('scheduled_date, start_time, end_time, note')
         .eq('teacher_id', teacherId)
@@ -79,6 +101,10 @@ export async function GET(request: NextRequest) {
         .lte('scheduled_date', weekEnd)
         .order('scheduled_date', { ascending: true })
         .order('start_time', { ascending: true });
+
+      teacherScheduleQuery = teacherScheduleQuery.eq('org_id', organizationId);
+
+      const { data: scheduleData, error: scheduleError } = await teacherScheduleQuery;
 
       if (scheduleError) {
         console.error('查詢教師排程失敗:', scheduleError);
@@ -121,6 +147,7 @@ export async function GET(request: NextRequest) {
         `)
         .gte('lesson_date', weekStart)
         .lte('lesson_date', weekEnd)
+        .eq('org_id', organizationId)
         .order('lesson_date', { ascending: true })
         .order('actual_timeslot', { ascending: true }),
       
@@ -142,6 +169,7 @@ export async function GET(request: NextRequest) {
         .not('lesson_date', 'is', null)
         .gte('lesson_date', weekStart)
         .lte('lesson_date', weekEnd)
+        .eq('org_id', organizationId)
         .order('lesson_date', { ascending: true })
         .order('actual_timeslot', { ascending: true })
     ]);
@@ -236,6 +264,7 @@ export async function GET(request: NextRequest) {
 // 為學生分配活動
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getServerSupabaseClient();
     const body = await request.json();
     const { lesson_id, student_id, tree_activity_id, assigned_by } = body;
 
@@ -315,6 +344,7 @@ export async function POST(request: NextRequest) {
 // 更新活動分配狀態
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = getServerSupabaseClient();
     const body = await request.json();
     const { id, completion_status, performance_rating, student_notes, teacher_notes, time_spent, attempts_count, is_favorite } = body;
 
@@ -367,6 +397,7 @@ export async function PUT(request: NextRequest) {
 // 移除活動分配
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getServerSupabaseClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBatchConversationDays } from '@/hooks/useBatchConversationDays';
 import { Calendar, Clock, Users, Plus, Trash2, Edit, Settings, Sparkles, Camera, Phone, Wand2 } from 'lucide-react';
@@ -10,6 +10,9 @@ import { Calendar, Clock, Users, Plus, Trash2, Edit, Settings, Sparkles, Camera,
 import TrialLimitSettingsModal from './TrialLimitSettingsModal';
 
 import { supabase } from '@/lib/supabase';
+import { useUser } from '@/hooks/useUser';
+import { getUserSession, type OrganizationProfile } from '@/lib/authUtils';
+import { useTeacherLinkOrganization } from '@/app/aihome/teacher-link/create/TeacherLinkShell';
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -18,6 +21,9 @@ const getHongKongDate = (date = new Date()) => {
   const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
   return new Date(utc + (8 * 3600000)); // 香港是 UTC+8
 };
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 function getTodayISO(): string {
   const today = getHongKongDate();
@@ -146,6 +152,42 @@ function calculateAgeRange(students: { student_age: number | null | undefined }[
 }
 
 export default function MultiCourseAvailabilityDashboard() {
+  const { user } = useUser();
+  
+  // 嘗試從 TeacherLinkShell context 獲取組織信息（如果可用）
+  let teacherLinkOrg: { orgId: string | null; organization: OrganizationProfile | null } | null = null;
+  try {
+    teacherLinkOrg = useTeacherLinkOrganization();
+  } catch (e) {
+    // 不在 TeacherLinkShell 上下文中，繼續使用其他方法
+  }
+  
+  // 從會話中獲取機構信息（可能沒有 OrganizationProvider）
+  const session = getUserSession();
+  const currentOrganization = session?.organization || null;
+  
+  const effectiveOrgId = useMemo(
+    () => teacherLinkOrg?.orgId || teacherLinkOrg?.organization?.id || currentOrganization?.id || user?.organization?.id || null,
+    [teacherLinkOrg?.orgId, teacherLinkOrg?.organization?.id, currentOrganization?.id, user?.organization?.id]
+  );
+  const validOrgId = useMemo(
+    () => (effectiveOrgId && UUID_REGEX.test(effectiveOrgId) ? effectiveOrgId : null),
+    [effectiveOrgId]
+  );
+  const hasValidOrg = Boolean(validOrgId);
+  
+  // 調試日誌
+  useEffect(() => {
+    console.log('[MultiCourseAvailabilityDashboard] 組織狀態:', {
+      effectiveOrgId,
+      validOrgId,
+      hasValidOrg,
+      teacherLinkOrgId: teacherLinkOrg?.orgId,
+      teacherLinkOrgName: teacherLinkOrg?.organization?.name,
+      currentOrganization: currentOrganization?.id,
+      userOrg: user?.organization?.id
+    });
+  }, [effectiveOrgId, validOrgId, hasValidOrg, teacherLinkOrg?.orgId, teacherLinkOrg?.organization?.name, currentOrganization?.id, user?.organization?.id]);
   const [slots, setSlots] = useState<MultiCourseSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,18 +258,26 @@ export default function MultiCourseAvailabilityDashboard() {
   // 切換試堂開放狀態
   const toggleTrialOpen = async () => {
     if (!selectedSlotDetail || trialToggleLoading) return;
+    if (!hasValidOrg) {
+      alert('尚未選擇機構，無法切換試堂狀態');
+      return;
+    }
     
     setTrialToggleLoading(true);
     try {
       const newTrialStatus = !selectedSlotDetail.is_trial_open;
       
-      // 更新資料庫
+      // 更新資料庫，確保 org_id 被記錄
       const { error } = await supabase
         .from('hanami_schedule')
-        .update({ is_trial_open: newTrialStatus })
+        .update({ 
+          is_trial_open: newTrialStatus,
+          org_id: validOrgId as string
+        })
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
-        .eq('course_code', selectedSlotDetail.course_code);
+        .eq('course_code', selectedSlotDetail.course_code)
+        .eq('org_id', validOrgId as string);
       
       if (error) throw error;
       
@@ -252,18 +302,26 @@ export default function MultiCourseAvailabilityDashboard() {
   // 切換報名開放狀態
   const toggleRegistrationOpen = async () => {
     if (!selectedSlotDetail || registrationToggleLoading) return;
+    if (!hasValidOrg) {
+      alert('尚未選擇機構，無法切換報名狀態');
+      return;
+    }
     
     setRegistrationToggleLoading(true);
     try {
       const newRegistrationStatus = !selectedSlotDetail.is_registration_open;
       
-      // 更新資料庫
+      // 更新資料庫，確保 org_id 被記錄
       const { error } = await supabase
         .from('hanami_schedule')
-        .update({ is_registration_open: newRegistrationStatus })
+        .update({ 
+          is_registration_open: newRegistrationStatus,
+          org_id: validOrgId as string
+        })
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
-        .eq('course_code', selectedSlotDetail.course_code);
+        .eq('course_code', selectedSlotDetail.course_code)
+        .eq('org_id', validOrgId as string);
       
       if (error) throw error;
       
@@ -331,12 +389,17 @@ export default function MultiCourseAvailabilityDashboard() {
   // 刪除等候區學生
   const deleteQueueStudent = async (studentId: string) => {
     if (!confirm('確定要刪除此等候區學生嗎？')) return;
+    if (!hasValidOrg) {
+      alert('尚未選擇機構，無法刪除等候區學生');
+      return;
+    }
     
     try {
       const { error } = await supabase
         .from('hanami_trial_queue')
         .delete()
-        .eq('id', studentId);
+        .eq('id', studentId)
+        .eq('org_id', validOrgId as string);
       
       if (error) throw error;
       
@@ -453,6 +516,10 @@ ${timeSlot}有一個位 ^^
   // 保存學生編輯
   const saveStudentEdit = async () => {
     if (!editingStudent) return;
+    if (!hasValidOrg) {
+      alert('尚未選擇機構，無法更新學生資料');
+      return;
+    }
     
     try {
       const { error } = await supabase
@@ -463,7 +530,8 @@ ${timeSlot}有一個位 ^^
           course_types: editFormData.course_types,
           prefer_time: editFormData.prefer_time
         })
-        .eq('id', editingStudent.id);
+        .eq('id', editingStudent.id)
+        .eq('org_id', validOrgId as string);
       
       if (error) throw error;
       
@@ -506,10 +574,15 @@ ${timeSlot}有一個位 ^^
   const loadQueueStudentsForSlot = async (slot: any) => {
     setQueueStudentsLoading(true);
     try {
+      if (!hasValidOrg) {
+        setQueueStudentsLoading(false);
+        return;
+      }
       // 取得等候區學生
       const { data: queueStudentsData, error: queueStudentsError } = await supabase
         .from('hanami_trial_queue')
-        .select('*');
+        .select('*')
+        .eq('org_id', validOrgId as string);
 
       if (queueStudentsError) {
         console.error('無法載入等候區學生：', queueStudentsError);
@@ -586,6 +659,10 @@ ${timeSlot}有一個位 ^^
   // 處理添加學生按鈕點擊
   const handleAddStudentClick = async () => {
     if (!selectedSlotDetail) return;
+    if (!hasValidOrg) {
+      alert('尚未選擇機構，無法載入學生資料');
+      return;
+    }
     
     try {
       console.log('開始載入可用學生，當前時段信息:', {
@@ -594,14 +671,43 @@ ${timeSlot}有一個位 ^^
         course_code: selectedSlotDetail.course_code
       });
 
-      // 獲取所有學生數據
-      const { data: allStudents, error: studentsError } = await supabase
-        .from('Hanami_Students')
-        .select('*')
-        .eq('student_type', '常規')
-        .order('full_name', { ascending: true });
-
-      if (studentsError) throw studentsError;
+      // 獲取所有學生數據（使用 API 端點繞過 RLS）
+      let allStudents: any[] = [];
+      try {
+        // 獲取用戶 email（優先從 session，然後從 user）
+        const userEmail = session?.email || user?.email || null;
+        const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId as string)}&studentType=常規${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+        
+        const response = await fetch(apiUrl, {
+          credentials: 'include',
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          allStudents = result.students || [];
+          // 按姓名排序
+          allStudents.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+          console.log('通過 API 載入所有學生數量:', allStudents.length);
+        } else {
+          console.error('無法載入學生，API 返回錯誤:', response.status);
+          // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
+          const { data, error: studentsError } = await supabase
+            .from('Hanami_Students')
+            .select('*')
+            .eq('org_id', validOrgId as string)
+            .eq('student_type', '常規')
+            .order('full_name', { ascending: true });
+          
+          if (!studentsError && data) {
+            allStudents = data;
+          } else {
+            throw studentsError || new Error('無法載入學生數據');
+          }
+        }
+      } catch (error) {
+        console.error('載入學生數據時發生錯誤:', error);
+        throw error;
+      }
 
       console.log('載入的所有學生數量:', allStudents?.length || 0);
       
@@ -701,6 +807,10 @@ ${timeSlot}有一個位 ^^
   // 處理添加學生到課程
   const handleAddStudentsToCourse = async () => {
     if (!selectedSlotDetail || selectedStudents.length === 0) return;
+    if (!hasValidOrg) {
+      alert('尚未選擇機構，無法添加學生到課程');
+      return;
+    }
 
     try {
       console.log('開始添加學生到課程:', {
@@ -715,7 +825,8 @@ ${timeSlot}有一個位 ^^
         .update({
           primary_course_code: selectedSlotDetail.course_code
         })
-        .in('id', selectedStudents);
+        .in('id', selectedStudents)
+        .eq('org_id', validOrgId as string);
 
       if (studentError) throw studentError;
 
@@ -725,7 +836,8 @@ ${timeSlot}有一個位 ^^
         .select('id, assigned_student_ids')
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
-        .eq('course_code', selectedSlotDetail.course_code);
+        .eq('course_code', selectedSlotDetail.course_code)
+        .eq('org_id', validOrgId as string);
 
       if (scheduleQueryError) throw scheduleQueryError;
 
@@ -748,7 +860,8 @@ ${timeSlot}有一個位 ^^
           .update({
             assigned_student_ids: updatedStudentIds
           })
-          .eq('id', scheduleId);
+          .eq('id', scheduleId)
+          .eq('org_id', validOrgId as string);
 
         if (scheduleError) throw scheduleError;
       }
@@ -771,6 +884,10 @@ ${timeSlot}有一個位 ^^
   // 處理移除學生從課程
   const handleRemoveStudentsFromCourse = async () => {
     if (!selectedSlotDetail || studentsToRemove.length === 0) return;
+    if (!hasValidOrg) {
+      alert('尚未選擇機構，無法移除學生');
+      return;
+    }
 
     try {
       console.log('開始移除學生從課程:', {
@@ -788,7 +905,8 @@ ${timeSlot}有一個位 ^^
         .select('id, assigned_student_ids')
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
-        .eq('course_code', selectedSlotDetail.course_code);
+        .eq('course_code', selectedSlotDetail.course_code)
+        .eq('org_id', validOrgId as string);
 
       if (scheduleQueryError) throw scheduleQueryError;
 
@@ -812,7 +930,8 @@ ${timeSlot}有一個位 ^^
           .update({
             assigned_student_ids: updatedStudentIds
           })
-          .eq('id', scheduleId);
+          .eq('id', scheduleId)
+          .eq('org_id', validOrgId as string);
 
         if (scheduleError) throw scheduleError;
         
@@ -838,7 +957,8 @@ ${timeSlot}有一個位 ^^
         .select('assigned_student_ids')
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
-        .eq('course_code', selectedSlotDetail.course_code);
+        .eq('course_code', selectedSlotDetail.course_code)
+        .eq('org_id', validOrgId as string);
       
       if (!verifyError && verifyData && verifyData.length > 0) {
         const currentIds = verifyData[0].assigned_student_ids || [];
@@ -869,7 +989,16 @@ ${timeSlot}有一個位 ^^
     setShowRemoveStudentModal(true);
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    console.log('[MultiCourseAvailabilityDashboard] fetchData 被調用', { hasValidOrg, validOrgId });
+    if (!hasValidOrg) {
+      console.log('[MultiCourseAvailabilityDashboard] 沒有有效的組織，設置 loading 為 false');
+      setSlots([]);
+      setQueueByDay({});
+      setLoading(false);
+      return;
+    }
+    console.log('[MultiCourseAvailabilityDashboard] 開始載入數據...');
     setLoading(true);
     setError(null);
     try {
@@ -886,11 +1015,13 @@ ${timeSlot}有一個位 ^^
           is_active,
           course_type_id
         `)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('org_id', validOrgId as string);
 
       if (courseCodesError) {
         console.error('無法載入課程代碼：', courseCodesError);
         setError(`無法載入課程代碼：${courseCodesError.message}`);
+        setLoading(false);
         return;
       }
 
@@ -915,7 +1046,8 @@ ${timeSlot}有一個位 ^^
       // 2. 載入教師資訊
       const { data: teachersData } = await supabase
         .from('hanami_employee')
-        .select('id, teacher_nickname');
+        .select('id, teacher_nickname')
+        .eq('org_id', validOrgId as string);
 
       const teachersMap: {[id: string]: string} = {};
       teachersData?.forEach(teacher => {
@@ -925,7 +1057,8 @@ ${timeSlot}有一個位 ^^
       // 3. 載入課程類型資訊
       const { data: courseTypesData } = await supabase
         .from('Hanami_CourseTypes')
-        .select('id, name');
+        .select('id, name')
+        .eq('org_id', validOrgId as string);
 
       const courseTypesMap: {[id: string]: string} = {};
       courseTypesData?.forEach(courseType => {
@@ -961,28 +1094,57 @@ ${timeSlot}有一個位 ^^
         .from('hanami_schedule')
         .select('*, is_trial_open, is_registration_open')
         .not('course_code', 'is', null)
+        .eq('org_id', validOrgId as string)
         .order('weekday', { ascending: true })
         .order('timeslot', { ascending: true });
 
       if (scheduleError) {
         setError(`無法載入時間表：${scheduleError.message}`);
+        setLoading(false);
         return;
       }
 
-      // 4. 取得所有常規學生
-      const { data: regularStudentsData, error: regularStudentsError } = await supabase
-        .from('Hanami_Students')
-        .select('*')
-        .not('primary_course_code', 'is', null);
-
-      if (regularStudentsError) {
-        console.error('無法載入常規學生：', regularStudentsError);
+      // 4. 取得所有常規學生（使用 API 端點繞過 RLS）
+      let regularStudentsData: any[] = [];
+      try {
+        // 獲取用戶 email（優先從 session，然後從 user）
+        const userEmail = session?.email || user?.email || null;
+        const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId as string)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+        
+        const response = await fetch(apiUrl, {
+          credentials: 'include',
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          regularStudentsData = result.students || [];
+          // 過濾掉 primary_course_code 為 null 的學生
+          regularStudentsData = regularStudentsData.filter((s: any) => s.primary_course_code != null);
+          console.log('通過 API 載入常規學生數量:', regularStudentsData.length);
+        } else {
+          console.error('無法載入常規學生，API 返回錯誤:', response.status);
+          // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
+          const { data, error: regularStudentsError } = await supabase
+            .from('Hanami_Students')
+            .select('*')
+            .eq('org_id', validOrgId as string)
+            .not('primary_course_code', 'is', null);
+          
+          if (!regularStudentsError && data) {
+            regularStudentsData = data;
+          } else {
+            console.error('直接查詢也失敗:', regularStudentsError);
+          }
+        }
+      } catch (error) {
+        console.error('載入常規學生時發生錯誤:', error);
       }
 
       // 5. 取得試聽學生
       const { data: trialStudentsData, error: trialStudentsError } = await supabase
         .from('hanami_trial_students')
         .select('*')
+        .eq('org_id', validOrgId as string)
         .not('trial_course_code', 'is', null);
 
       if (trialStudentsError) {
@@ -1168,18 +1330,29 @@ ${timeSlot}有一個位 ^^
         }
       });
       setQueueByDay(queueData);
+      console.log('[MultiCourseAvailabilityDashboard] 數據載入完成');
 
     } catch (err) {
-      console.error('載入數據時發生錯誤：', err);
+      console.error('[MultiCourseAvailabilityDashboard] 載入數據時發生錯誤：', err);
       setError('載入數據時發生錯誤，請稍後再試');
     } finally {
+      console.log('[MultiCourseAvailabilityDashboard] 設置 loading 為 false');
       setLoading(false);
     }
-  };
+  }, [hasValidOrg, validOrgId]);
 
   useEffect(() => {
+    console.log('[MultiCourseAvailabilityDashboard] useEffect 觸發，調用 fetchData');
     fetchData();
-  }, []);
+  }, [fetchData]);
+  
+  // 額外檢查：如果沒有有效組織且 loading 為 true，確保設置為 false
+  useEffect(() => {
+    if (!hasValidOrg && loading) {
+      console.log('[MultiCourseAvailabilityDashboard] 額外檢查：沒有有效組織但 loading 為 true，設置為 false');
+      setLoading(false);
+    }
+  }, [hasValidOrg, loading]);
 
   const handleExpandCourse = (weekday: number, courseCode: string) => {
     setExpandedCourses(prev => ({
@@ -1305,13 +1478,7 @@ ${timeSlot}有一個位 ^^
         });
       });
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="text-[#4B4036] animate-pulse">載入中...</div>
-      </div>
-    );
-  }
+  // 移除重複的 loading 檢查，已在上面處理
 
   if (error) {
     return (
@@ -1363,40 +1530,13 @@ ${timeSlot}有一個位 ^^
           >
             目前沒有多課程資料
           </motion.div>
-          <div className="text-sm text-[#87704e] mb-6">請確認以下項目：</div>
-          <motion.div 
-            className="text-sm text-[#87704e] text-left space-y-2 max-w-md mx-auto"
+          <motion.div
+            className="text-sm text-[#87704e]"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 }}
           >
-            <motion.div 
-              className="flex items-center gap-2"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.8 }}
-            >
-              <div className="w-2 h-2 bg-[#FFD59A] rounded-full"></div>
-              <span>hanami_schedule 表中有設定課程代碼</span>
-            </motion.div>
-            <motion.div 
-              className="flex items-center gap-2"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.9 }}
-            >
-              <div className="w-2 h-2 bg-[#FFD59A] rounded-full"></div>
-              <span>hanami_course_codes 表中有課程資料</span>
-            </motion.div>
-            <motion.div 
-              className="flex items-center gap-2"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 1.0 }}
-            >
-              <div className="w-2 h-2 bg-[#FFD59A] rounded-full"></div>
-              <span>學生已分配到對應的課程代碼</span>
-            </motion.div>
+            請先創建屬於您的機構，並建立課程與學生資料。
           </motion.div>
         </motion.div>
       </motion.div>

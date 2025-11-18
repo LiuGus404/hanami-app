@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import ScheduleManagementPanel from '@/components/ui/ScheduleManagementPanel';
 import MultiCourseScheduleManagementPanel from '@/components/ui/MultiCourseScheduleManagementPanel';
+import BackButton from '@/components/ui/BackButton';
 
 export default function ScheduleManagementPage() {
   const [viewMode, setViewMode] = useState<'traditional' | 'multi-course'>('multi-course');
@@ -14,7 +15,11 @@ export default function ScheduleManagementPage() {
         <div className="p-6">
           <div className="mb-6">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-[#4B4036]">管理課堂面板</h1>
+              <div className="flex items-center gap-3">
+                <BackButton href="/aihome/teacher-link/create" label="返回老師主頁" />
+                <BackButton href="/admin/teachers" label="返回老師管理頁面" />
+                <h1 className="text-2xl font-bold text-[#4B4036]">管理課堂面板</h1>
+              </div>
               <div className="flex gap-2">
                 <button
                   className={`px-4 py-2 rounded-full font-semibold transition-colors duration-200 ${

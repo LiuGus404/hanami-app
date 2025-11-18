@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { setUserSession } from '@/lib/authUtils';
+import { setUserSession, fallbackOrganization } from '@/lib/authUtils';
 
 export default function CreateTestSessionPage() {
   const [created, setCreated] = useState(false);
@@ -12,7 +12,8 @@ export default function CreateTestSessionPage() {
       email: 'test@example.com',
       role: 'parent' as const,
       name: '測試用戶',
-      relatedIds: [] // 可選的相關ID列表
+      relatedIds: [], // 可選的相關ID列表
+      organization: fallbackOrganization
     };
 
     setUserSession(testUser);

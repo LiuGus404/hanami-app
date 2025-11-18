@@ -18,9 +18,29 @@ import StudentTypeSelector from '@/components/ui/StudentTypeSelector';
 import { useUser } from '@/hooks/useUser';
 import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessonsBatch } from '@/lib/utils';
+import { getUserSession } from '@/lib/authUtils';
 import HanamiInput from '@/components/ui/HanamiInput';
 import Calendarui from '@/components/ui/Calendarui';
 import { usePageState } from '@/hooks/usePageState';
+import { useOrganization } from '@/contexts/OrganizationContext';
+
+type NavigationOverrides = Partial<{
+  dashboard: string;
+  growthTrees: string;
+  learningPaths: string;
+  abilities: string;
+  activities: string;
+  assessments: string;
+  media: string;
+  studentManagement: string;
+  newRegularStudent: string;
+  newTrialStudent: string;
+  editStudent: (studentId: string) => string;
+}>;
+
+type StudentManagementPageProps = {
+  navigationOverrides?: NavigationOverrides;
+};
 
 // 新增一個 hook：useStudentRemainingLessons
 function useStudentRemainingLessons(studentId: string | undefined) {
@@ -56,11 +76,37 @@ const fetchStudentsWithLessons = async (body: any) => {
   return res.json();
 };
 
-export default function StudentManagementPage() {
+export default function StudentManagementPage({
+  navigationOverrides,
+}: StudentManagementPageProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterParam = searchParams.get('filter');
   
+  const navigationPaths = useMemo(
+    () => ({
+      dashboard: '/admin/student-progress',
+      growthTrees: '/admin/student-progress/growth-trees',
+      learningPaths: '/admin/student-progress/learning-paths',
+      abilities: '/admin/student-progress/abilities',
+      activities: '/admin/student-progress/activities',
+      assessments: '/admin/student-progress/ability-assessments',
+      media: '/admin/student-progress/student-media',
+      studentManagement: '/admin/students',
+      newRegularStudent: '/admin/students/new?type=regular',
+      newTrialStudent: '/admin/students/new?type=trial',
+      ...(navigationOverrides ?? {}),
+    }),
+    [navigationOverrides],
+  );
+
+  const getEditStudentPath = useMemo(
+    () =>
+      navigationOverrides?.editStudent ??
+      ((studentId: string) => `/admin/students/${studentId}`),
+    [navigationOverrides],
+  );
+
   // 使用 usePageState 管理頁面狀態
   const { state: pageState, updateState: updatePageState } = usePageState<{
     selectedCourses: string[];
@@ -193,12 +239,16 @@ export default function StudentManagementPage() {
 
   // 處理導航到學生詳細資料
   const handleNavigateToStudent = useCallback((studentId: string) => {
-    // 導航到學生詳細資料頁面
-    router.push(`/admin/students/${studentId}`);
-  }, [router]);
+    router.push(getEditStudentPath(studentId));
+  }, [router, getEditStudentPath]);
 
   const { user, loading: userLoading } = useUser();
   const { id } = useParams();
+  const { currentOrganization } = useOrganization();
+  const effectiveOrgId = useMemo(
+    () => currentOrganization?.id || user?.organization?.id || null,
+    [currentOrganization?.id, user?.organization?.id]
+  );
 
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -252,6 +302,7 @@ export default function StudentManagementPage() {
     selectedCourses: string[];
     selectedWeekdays: string[];
     searchTerm: string;
+    orgId: string | null;
   };
 
   const [apiFilter, setApiFilter] = useState<ApiFilter>({
@@ -259,6 +310,7 @@ export default function StudentManagementPage() {
     selectedCourses: selectedCourses,
     selectedWeekdays: selectedWeekdays,
     searchTerm: searchTerm,
+    orgId: effectiveOrgId,
   });
 
   // 當用戶變化時重置防抖狀態
@@ -279,16 +331,27 @@ export default function StudentManagementPage() {
     }));
   }, [selectedCourses, selectedWeekdays, searchTerm]);
 
+  useEffect(() => {
+    setApiFilter(prev => {
+      if (prev.orgId === effectiveOrgId) return prev;
+      return {
+        ...prev,
+        orgId: effectiveOrgId,
+      };
+    });
+  }, [effectiveOrgId]);
+
   // 使用 SWR 進行資料獲取
+  const shouldFetch = Boolean(effectiveOrgId);
   const { data: apiData, error: apiError, isValidating } = useSWR(
-    ['students-with-lessons', JSON.stringify(apiFilter)],
+    shouldFetch ? ['students-with-lessons', JSON.stringify(apiFilter)] : null,
     () => fetchStudentsWithLessons(apiFilter),
     { revalidateOnFocus: false }
   );
 
   // 取回的學生資料
   const students = useMemo(() => apiData?.students || [], [apiData?.students]);
-  const isLoading = !apiData; // 只有在沒有資料時才認為是載入中
+  const isLoading = shouldFetch ? !apiData : true; // 只有在沒有資料時才認為是載入中
 
   // 檢查用戶權限
   useEffect(() => {
@@ -379,20 +442,54 @@ export default function StudentManagementPage() {
         const regularIds = regularStudents.map((s: any) => s.id);
         console.log('要停用的常規學生ID:', regularIds);
         
-        // 直接更新學生類型為已停用
-        console.log('直接更新學生類型為已停用');
+        // 使用 API 端點更新學生類型為已停用
+        console.log('使用 API 端點更新學生類型為已停用');
         
-        const { error: updateError } = await supabase
-          .from('Hanami_Students')
-          .update({ 
-            student_type: '已停用'
-          })
-          .in('id', regularIds);
-        
-        if (updateError) {
-          console.error('更新學生類型失敗:', updateError);
-          alert(`停用常規學生失敗: ${updateError.message}`);
+        if (!effectiveOrgId) {
+          alert('缺少機構ID，無法停用學生');
           return;
+        }
+        
+        const session = getUserSession();
+        const userEmail = session?.email || null;
+        
+        try {
+          const response = await fetch('/api/students/batch-update', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              studentIds: regularIds,
+              updates: { student_type: '已停用' },
+              orgId: effectiveOrgId,
+              userEmail: userEmail,
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `API 返回錯誤: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          console.log('成功停用常規學生:', result);
+        } catch (apiError: any) {
+          console.error('API 調用失敗，嘗試使用直接查詢:', apiError);
+          // Fallback 到直接查詢（可能也會失敗）
+          const { error: updateError } = await supabase
+            .from('Hanami_Students')
+            .update({ 
+              student_type: '已停用'
+            })
+            .in('id', regularIds);
+          
+          if (updateError) {
+            console.error('更新學生類型失敗:', updateError);
+            alert(`停用常規學生失敗: ${updateError.message}`);
+            return;
+          }
         }
         
         console.log('成功停用常規學生');
@@ -561,16 +658,49 @@ export default function StudentManagementPage() {
         // }
         // 註：hanami_trial_queue 表不存在，略過刪除
 
-        // 5. 最後刪除學生記錄
-        const { error: regularError } = await supabase
-          .from('Hanami_Students')
-          .delete()
-          .in('id', regularIds);
-        
-        if (regularError) {
-          console.error('Error deleting regular students:', regularError);
-          alert(`刪除常規學生時發生錯誤: ${regularError.message}`);
+        // 5. 最後刪除學生記錄（使用 API 端點）
+        if (!effectiveOrgId) {
+          alert('缺少機構ID，無法刪除學生');
           return;
+        }
+        
+        const session = getUserSession();
+        const userEmail = session?.email || null;
+        
+        try {
+          const response = await fetch('/api/students/batch-delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              studentIds: regularIds,
+              orgId: effectiveOrgId,
+              userEmail: userEmail,
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `API 返回錯誤: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          console.log('成功刪除常規學生:', result);
+        } catch (apiError: any) {
+          console.error('API 調用失敗，嘗試使用直接查詢:', apiError);
+          // Fallback 到直接查詢（可能也會失敗）
+          const { error: regularError } = await supabase
+            .from('Hanami_Students')
+            .delete()
+            .in('id', regularIds);
+          
+          if (regularError) {
+            console.error('Error deleting regular students:', regularError);
+            alert(`刪除常規學生時發生錯誤: ${regularError.message}`);
+            return;
+          }
         }
       }
 
@@ -671,18 +801,51 @@ export default function StudentManagementPage() {
           student_remarks: s.student_remarks,
         }));
 
-        // 使用 upsert 而不是 insert，這樣如果 ID 已存在會更新而不是報錯
-        const { error: regularError } = await supabase
-          .from('Hanami_Students')
-          .upsert(regularData, { 
-            onConflict: 'id',
-            ignoreDuplicates: false, 
-          });
-        
-        if (regularError) {
-          console.error('Error restoring regular students:', regularError);
-          alert(`回復常規學生時發生錯誤: ${regularError.message}`);
+        // 使用 API 端點 upsert 學生（使用服務角色 key 繞過 RLS）
+        if (!effectiveOrgId) {
+          alert('缺少機構ID，無法回復學生');
           return;
+        }
+        
+        const session = getUserSession();
+        const userEmail = session?.email || null;
+        
+        try {
+          const response = await fetch('/api/students/batch-upsert', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              students: regularData,
+              orgId: effectiveOrgId,
+              userEmail: userEmail,
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `API 返回錯誤: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          console.log('成功回復常規學生:', result);
+        } catch (apiError: any) {
+          console.error('API 調用失敗，嘗試使用直接查詢:', apiError);
+          // Fallback 到直接查詢（可能也會失敗）
+          const { error: regularError } = await supabase
+            .from('Hanami_Students')
+            .upsert(regularData, { 
+              onConflict: 'id',
+              ignoreDuplicates: false, 
+            });
+          
+          if (regularError) {
+            console.error('Error restoring regular students:', regularError);
+            alert(`回復常規學生時發生錯誤: ${regularError.message}`);
+            return;
+          }
         }
       }
 
@@ -1348,42 +1511,48 @@ export default function StudentManagementPage() {
             items={[
               {
                 icon: BarChart3,
-                label: "進度管理面板",
-                href: "/admin/student-progress",
-                variant: "secondary"
+                label: '進度管理面板',
+                href: navigationPaths.dashboard,
+                variant: 'secondary',
               },
               {
                 icon: TreePine,
-                label: "成長樹管理",
-                href: "/admin/student-progress/growth-trees",
-                variant: "secondary"
+                label: '成長樹管理',
+                href: navigationPaths.growthTrees,
+                variant: 'secondary',
+              },
+              {
+                icon: BookOpen,
+                label: '學習路線管理',
+                href: navigationPaths.learningPaths,
+                variant: 'secondary',
               },
               {
                 icon: TrendingUp,
-                label: "發展能力圖卡",
-                href: "/admin/student-progress/abilities",
-                variant: "secondary"
+                label: '發展能力圖卡',
+                href: navigationPaths.abilities,
+                variant: 'secondary',
               },
               {
                 icon: Gamepad2,
-                label: "教學活動管理",
-                href: "/admin/student-progress/activities",
-                variant: "secondary"
+                label: '教學活動管理',
+                href: navigationPaths.activities,
+                variant: 'secondary',
               },
               {
                 icon: AcademicCapIcon,
-                label: "能力評估管理",
-                href: "/admin/student-progress/ability-assessments",
-                variant: "secondary"
+                label: '能力評估管理',
+                href: navigationPaths.assessments,
+                variant: 'secondary',
               },
               {
                 icon: VideoCameraIcon,
-                label: "學生媒體管理",
-                href: "/admin/student-progress/student-media",
-                variant: "secondary"
-              }
+                label: '學生媒體管理',
+                href: navigationPaths.media,
+                variant: 'secondary',
+              },
             ]}
-            currentPage="/admin/students"
+            currentPage={navigationPaths.studentManagement}
           />
         </div>
 
@@ -1689,6 +1858,7 @@ export default function StudentManagementPage() {
                       selectedCourses: [],
                       selectedWeekdays: [],
                       searchTerm: '',
+                      orgId: effectiveOrgId,
                     });
                   }}
                 >
@@ -2443,6 +2613,8 @@ export default function StudentManagementPage() {
         <StudentTypeSelector
           isOpen={showStudentTypeSelector}
           onClose={() => setShowStudentTypeSelector(false)}
+          regularPath={navigationPaths.newRegularStudent}
+          trialPath={navigationPaths.newTrialStudent}
         />
 
         {/* AI 訊息模態框 */}

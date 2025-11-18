@@ -1,12 +1,17 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import { PopupSelect } from './PopupSelect';
 import TimePicker from './TimePicker';
 
 import { supabase } from '@/lib/supabase';
+import { useUser } from '@/hooks/useUser';
+import { useOrganization } from '@/contexts/OrganizationContext';
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 interface ScheduleSlot {
   id: string
@@ -33,6 +38,17 @@ interface Teacher {
 }
 
 export default function ScheduleManagementPanel() {
+  const { user } = useUser();
+  const { currentOrganization } = useOrganization();
+  const effectiveOrgId = useMemo(
+    () => currentOrganization?.id || user?.organization?.id || null,
+    [currentOrganization?.id, user?.organization?.id]
+  );
+  const validOrgId = useMemo(
+    () => (effectiveOrgId && UUID_REGEX.test(effectiveOrgId) ? effectiveOrgId : null),
+    [effectiveOrgId]
+  );
+  const hasValidOrg = Boolean(validOrgId);
   const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]);
   const [courseTypes, setCourseTypes] = useState<ClassType[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -107,12 +123,20 @@ export default function ScheduleManagementPanel() {
   };
 
   const fetchData = async () => {
+    if (!hasValidOrg) {
+      setScheduleSlots([]);
+      setCourseTypes([]);
+      setTeachers([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       // 取得課堂時段
       const { data: slotData, error: slotError } = await supabase
         .from('hanami_schedule')
         .select('*')
+        .eq('org_id', validOrgId as string)
         .order('weekday')
         .order('timeslot');
       
@@ -124,6 +148,7 @@ export default function ScheduleManagementPanel() {
       const { data: classData, error: classError } = await supabase
         .from('Hanami_CourseTypes')
         .select('*')
+        .eq('org_id', validOrgId as string)
         .order('name');
       
       if (classError) throw classError;
@@ -132,6 +157,7 @@ export default function ScheduleManagementPanel() {
       const { data: teacherData, error: teacherError } = await supabase
         .from('hanami_employee')
         .select('id, teacher_nickname')
+        .eq('org_id', validOrgId as string)
         .order('teacher_nickname');
       
       if (teacherError) throw teacherError;
@@ -158,11 +184,16 @@ export default function ScheduleManagementPanel() {
   };
 
   const handleAddSlot = async () => {
+    if (!hasValidOrg) {
+      alert('請先創建屬於您的機構後再新增課堂時段');
+      return;
+    }
     try {
       const { error } = await supabase
         .from('hanami_schedule')
         .insert([{ 
           ...newSlot,
+          org_id: validOrgId,
           weekday: newSlot.weekday ?? 1,
           timeslot: newSlot.timeslot || '09:00:00',
           max_students: newSlot.max_students ?? 10,
@@ -191,12 +222,17 @@ export default function ScheduleManagementPanel() {
 
   const handleDeleteSlot = async (id: string) => {
     if (!confirm('確定要刪除此課堂嗎？')) return;
+    if (!hasValidOrg) {
+      alert('請先創建屬於您的機構後再刪除課堂時段');
+      return;
+    }
     
     try {
       const { error } = await supabase
         .from('hanami_schedule')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('org_id', validOrgId as string);
       
       if (error) throw error;
       
@@ -218,6 +254,10 @@ export default function ScheduleManagementPanel() {
   };
 
   const handleUpdateSlot = async () => {
+    if (!hasValidOrg || !editSlot.id) {
+      alert('請先創建屬於您的機構後再更新課堂時段');
+      return;
+    }
     try {
       const { error } = await supabase
         .from('hanami_schedule')
@@ -230,7 +270,8 @@ export default function ScheduleManagementPanel() {
           course_type: editSlot.course_type || null,
           duration: editSlot.duration || null,
         })
-        .eq('id', editSlot.id!);
+        .eq('id', editSlot.id!)
+        .eq('org_id', validOrgId as string);
       
       if (error) throw error;
       
@@ -272,6 +313,10 @@ export default function ScheduleManagementPanel() {
       alert('請選擇要刪除的課堂時段');
       return;
     }
+    if (!hasValidOrg) {
+      alert('請先創建屬於您的機構後再刪除課堂時段');
+      return;
+    }
     
     if (!confirm(`確定要刪除選中的 ${selectedSlots.length} 個課堂時段況嗎？`)) return;
     
@@ -279,7 +324,8 @@ export default function ScheduleManagementPanel() {
       const { error } = await supabase
         .from('hanami_schedule')
         .delete()
-        .in('id', selectedSlots);
+        .in('id', selectedSlots)
+        .eq('org_id', validOrgId as string);
       
       if (error) throw error;
       
@@ -294,7 +340,7 @@ export default function ScheduleManagementPanel() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [hasValidOrg, validOrgId]);
 
   const sortedScheduleSlots = sortScheduleSlots(scheduleSlots);
 
@@ -305,20 +351,29 @@ export default function ScheduleManagementPanel() {
   const [editingCourseName, setEditingCourseName] = useState('');
 
   const fetchCourses = async () => {
+    if (!hasValidOrg) {
+      setCourses([]);
+      return;
+    }
     const { data, error } = await supabase
       .from('Hanami_CourseTypes')
       .select('*')
+      .eq('org_id', validOrgId as string)
       .order('created_at');
     if (!error) setCourses(data || []);
   };
 
-  useEffect(() => { fetchCourses(); }, []);
+  useEffect(() => { fetchCourses(); }, [hasValidOrg, validOrgId]);
 
   const handleAddCourse = async () => {
     if (!newCourseName.trim()) return;
+    if (!hasValidOrg) {
+      alert('請先創建屬於您的機構後再新增課程');
+      return;
+    }
     const { error } = await supabase
       .from('Hanami_CourseTypes')
-      .insert({ name: newCourseName.trim(), status: true });
+      .insert({ name: newCourseName.trim(), status: true, org_id: validOrgId });
     if (!error) {
       setNewCourseName('');
       fetchCourses();
@@ -332,10 +387,15 @@ export default function ScheduleManagementPanel() {
 
   const handleUpdateCourse = async () => {
     if (!editingCourseId || !editingCourseName.trim()) return;
+    if (!hasValidOrg) {
+      alert('請先創建屬於您的機構後再更新課程');
+      return;
+    }
     const { error } = await supabase
       .from('Hanami_CourseTypes')
       .update({ name: editingCourseName.trim() })
-      .eq('id', editingCourseId);
+      .eq('id', editingCourseId)
+      .eq('org_id', validOrgId as string);
     if (!error) {
       setEditingCourseId(null);
       setEditingCourseName('');
@@ -345,12 +405,27 @@ export default function ScheduleManagementPanel() {
 
   const handleDeleteCourse = async (id: string) => {
     if (!confirm('確定要刪除此課程？')) return;
+    if (!hasValidOrg) {
+      alert('請先創建屬於您的機構後再刪除課程');
+      return;
+    }
     const { error } = await supabase
       .from('Hanami_CourseTypes')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', validOrgId as string);
     if (!error) fetchCourses();
   };
+
+  if (!hasValidOrg) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-[#4B4036] bg-[#FFFDF7] border border-[#EADBC8] px-6 py-4 rounded-xl">
+          請先創建屬於您的機構，並建立課程與課堂資料。
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

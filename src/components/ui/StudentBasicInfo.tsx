@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { calculateRemainingLessons } from '@/lib/utils';
 import { Student, Teacher } from '@/types';
 import { QrCode, MessageCircle, Calendar } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { useBatchContactDays } from '@/hooks/useBatchContactDays';
 import { ContactChatDialog } from './ContactChatDialog';
 
@@ -25,6 +26,8 @@ let courseOptionsCache: string[] | null = null;
 let teacherOptionsCache: { label: string, value: string }[] | null = null;
 let courseOptionsLoading = false;
 let teacherOptionsLoading = false;
+
+const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
 
 interface StudentFormData {
   id: string;
@@ -76,9 +79,13 @@ type Props = {
   hideSensitiveInfo?: boolean; // 是否隱藏敏感資訊（備註、Email、密碼、時間戳）
   readonlyFields?: string[]; // 只讀欄位列表（即使編輯模式也不可編輯）
   hideContactDays?: boolean; // 是否隱藏聯繫天數顯示
+  organizationName?: string;
+  organizationEnglishName?: string;
+  orgId?: string;
 }
 
-export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false, hideTeacherInfo = false, hideSensitiveInfo = false, readonlyFields = [], hideContactDays = false }: Props) {
+export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false, hideTeacherInfo = false, hideSensitiveInfo = false, readonlyFields = [], hideContactDays = false, organizationName, organizationEnglishName, orgId }: Props) {
+  const allowAiFeatures = orgId === PREMIUM_AI_ORG_ID;
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState<StudentFormData>({
     id: student?.id || '',
@@ -513,28 +520,54 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         <div className="flex items-center gap-2">
           {/* 聯繫天數顯示 */}
           {!hideContactDays && !loadingContactDays && contactDays !== null && (
-            <button
-              onClick={() => setChatDialogOpen(true)}
-              className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm hover:shadow-md transition-all cursor-pointer"
-              title="點擊聯繫家長"
-            >
-              <MessageCircle className="w-3 h-3" />
-              <span>
-                {contactDays === 0 ? '今天有聯繫' : 
-                 contactDays === 1 ? '1天未聯繫' : 
-                 `${contactDays}天未聯繫`}
-              </span>
-            </button>
+            allowAiFeatures ? (
+              <button
+                onClick={() => setChatDialogOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full text-xs font-medium text-[#2B3A3B] shadow-sm hover:shadow-md transition-all cursor-pointer"
+                title="點擊聯繫家長"
+              >
+                <MessageCircle className="w-3 h-3" />
+                <span>
+                  {contactDays === 0 ? '今天有聯繫' : 
+                   contactDays === 1 ? '1天未聯繫' : 
+                   `${contactDays}天未聯繫`}
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={() => toast('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com')}
+                className="flex items-center gap-1 px-2 py-1 bg-gray-200 rounded-full text-xs font-medium text-gray-600 cursor-not-allowed"
+                type="button"
+              >
+                <MessageCircle className="w-3 h-3" />
+                <span>
+                  {contactDays === 0 ? '今天有聯繫' : 
+                   contactDays === 1 ? '1天未聯繫' : 
+                   `${contactDays}天未聯繫`}
+                </span>
+              </button>
+            )
           )}
           {!hideContactDays && !loadingContactDays && contactDays === null && (
-            <button
-              onClick={() => setChatDialogOpen(true)}
-              className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer"
-              title="點擊聯繫家長"
-            >
-              <MessageCircle className="w-3 h-3" />
-              <span>無聯繫記錄</span>
-            </button>
+            allowAiFeatures ? (
+              <button
+                onClick={() => setChatDialogOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer"
+                title="點擊聯繫家長"
+              >
+                <MessageCircle className="w-3 h-3" />
+                <span>無聯繫記錄</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => toast('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com')}
+                className="flex items-center gap-1 px-2 py-1 bg-gray-200 rounded-full text-xs font-medium text-gray-600 cursor-not-allowed"
+                type="button"
+              >
+                <MessageCircle className="w-3 h-3" />
+                <span>無聯繫記錄</span>
+              </button>
+            )
           )}
           {!hideContactDays && loadingContactDays && (
             <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
@@ -1210,6 +1243,8 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         student={formData}
         isOpen={showStudentIDCard}
         onClose={() => setShowStudentIDCard(false)}
+        organizationName={organizationName}
+        organizationEnglishName={organizationEnglishName}
       />
 
       {/* 聯繫對話框 */}

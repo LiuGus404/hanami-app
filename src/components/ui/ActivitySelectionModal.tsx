@@ -5,6 +5,7 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon
 } from '@heroicons/react/24/outline';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const getDifficultyColor = (level: number) => {
   switch (level) {
@@ -57,6 +58,18 @@ const ActivitySelectionModal: React.FC<ActivitySelectionModalProps> = ({
   activityType = 'current',
   studentId
 }) => {
+  const { currentOrganization } = useOrganization();
+  
+  const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const PLACEHOLDER_ORG_IDS = new Set(['default-org', 'unassigned-org-placeholder']);
+  
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) return null;
+    return UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id)
+      ? currentOrganization.id
+      : null;
+  }, [currentOrganization?.id]);
+  
   const [activities, setActivities] = useState<TreeActivity[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -88,6 +101,11 @@ const ActivitySelectionModal: React.FC<ActivitySelectionModalProps> = ({
         try {
           const params = new URLSearchParams();
           params.append('is_active', 'true');
+          
+          // 添加 orgId 參數
+          if (validOrgId) {
+            params.append('orgId', validOrgId);
+          }
 
           console.log('Fetching activities with params:', params.toString());
           const response = await fetch(`/api/teaching-activities?${params.toString()}`);
@@ -122,7 +140,7 @@ const ActivitySelectionModal: React.FC<ActivitySelectionModalProps> = ({
       };
       updateActivities();
     }
-  }, [open]); // 只在打開時獲取
+  }, [open, validOrgId]); // 在打開時或 orgId 變化時獲取
 
   // 移除成長樹載入邏輯，因為我們直接使用教學活動
 

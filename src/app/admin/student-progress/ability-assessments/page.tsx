@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   StarIcon, 
   AcademicCapIcon, 
@@ -13,7 +14,8 @@ import {
   PencilIcon,
   TrashIcon,
   XMarkIcon,
-  VideoCameraIcon
+  VideoCameraIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
 import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
@@ -21,6 +23,9 @@ import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigati
 import { HanamiButton, HanamiCard, SimpleAbilityAssessmentModal, PopupSelect } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { VersionDisplay } from '@/components/ui/VersionDisplay';
+import { getUserSession } from '@/lib/authUtils';
+import { useSearchParams } from 'next/navigation';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 
 interface Student {
   id: string;
@@ -59,7 +64,40 @@ interface AbilityAssessment {
   tree?: GrowthTree;
 }
 
-export default function AbilityAssessmentsPage() {
+type NavigationOverrides = Partial<{
+  dashboard: string;
+  growthTrees: string;
+  learningPaths: string;
+  abilities: string;
+  activities: string;
+  assessments: string;
+  media: string;
+  studentManagement: string;
+}>;
+
+type AbilityAssessmentsPageProps = {
+  navigationOverrides?: NavigationOverrides;
+  forcedOrgId?: string | null;
+  forcedOrgName?: string | null;
+  disableOrgFallback?: boolean;
+};
+
+const UUID_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+const PLACEHOLDER_ORG_IDS = new Set([
+  'default-org',
+  'unassigned-org-placeholder',
+]);
+
+export default function AbilityAssessmentsPage({
+  navigationOverrides,
+  forcedOrgId = null,
+  forcedOrgName = null,
+  disableOrgFallback = false,
+}: AbilityAssessmentsPageProps = {}) {
+  const searchParams = useSearchParams();
+  const { user: saasUser } = useSaasAuth();
   const [assessments, setAssessments] = useState<AbilityAssessment[]>([]);
   const [filteredAssessments, setFilteredAssessments] = useState<AbilityAssessment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,15 +124,186 @@ export default function AbilityAssessmentsPage() {
   // 新增：獲取版本資訊
   const [versionInfo, setVersionInfo] = useState<any>(null);
   const [loadingVersion, setLoadingVersion] = useState(false);
+  
+  // 獲取 URL 參數中的學生 ID
+  const selectedStudentId = searchParams?.get('studentId');
+  const [selectedStudent, setSelectedStudent] = useState<{ id: string; full_name: string; nick_name?: string } | null>(null);
+  const [currentTeacher, setCurrentTeacher] = useState<{ id: string; teacher_fullname?: string; teacher_nickname?: string } | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  const navigationPaths = useMemo(
+    () => ({
+      dashboard: '/admin/student-progress',
+      growthTrees: '/admin/student-progress/growth-trees',
+      learningPaths: '/admin/student-progress/learning-paths',
+      abilities: '/admin/student-progress/abilities',
+      activities: '/admin/student-progress/activities',
+      assessments: '/admin/student-progress/ability-assessments',
+      media: '/admin/student-progress/student-media',
+      studentManagement: '/admin/students',
+      ...(navigationOverrides ?? {}),
+    }),
+    [navigationOverrides],
+  );
+
+  const normalizedForcedOrgId =
+    forcedOrgId &&
+    UUID_REGEX.test(forcedOrgId) &&
+    !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
+      ? forcedOrgId
+      : null;
+
+  const invalidForcedId = forcedOrgId !== null && !normalizedForcedOrgId;
+  const validOrgId = normalizedForcedOrgId;
+  const orgDataDisabled =
+    (disableOrgFallback && !validOrgId) || invalidForcedId;
+  const organizationNameLabel = forcedOrgName ?? null;
+
+  const applyOrgFilter = <T extends { eq: (column: string, value: any) => T }>(
+    query: T,
+    column = 'org_id',
+  ) => {
+    if (validOrgId) {
+      return query.eq(column, validOrgId);
+    }
+    return query;
+  };
+
+  const ensureOrgAvailable = () => {
+    if (orgDataDisabled) {
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
+    if (orgDataDisabled) {
+      setAssessments([]);
+      setFilteredAssessments([]);
+      setCourseTypes([]);
+      setTreeAbilities({});
+      setTreeGoals({});
+      setLoading(false);
+      return;
+    }
     loadData();
     loadCourseTypes();
-  }, []);
+  }, [orgDataDisabled, validOrgId]);
 
   useEffect(() => {
     applyFilters();
   }, [assessments, searchQuery, dateRange, selectedGrowthTrees, selectedCourses]);
+
+  // 獲取選中的學生信息（如果 URL 中有 studentId）
+  useEffect(() => {
+    const fetchSelectedStudent = async () => {
+      if (!selectedStudentId || !validOrgId) {
+        setSelectedStudent(null);
+        return;
+      }
+
+      try {
+        const session = getUserSession();
+        const userEmail = session?.email || null;
+        
+        const params = new URLSearchParams();
+        params.append('orgId', validOrgId);
+        params.append('studentId', selectedStudentId);
+        if (userEmail) {
+          params.append('userEmail', userEmail);
+        }
+
+        const response = await fetch(`/api/students/list?${params.toString()}`, {
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const students = result.students || result.data || [];
+          const student = students.find((s: any) => s.id === selectedStudentId);
+          if (student) {
+            setSelectedStudent({
+              id: student.id,
+              full_name: student.full_name,
+              nick_name: student.nick_name || null,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('獲取選中學生信息失敗:', error);
+      }
+    };
+
+    fetchSelectedStudent();
+  }, [selectedStudentId, validOrgId]);
+
+  // 獲取用戶角色和教師信息
+  useEffect(() => {
+    const fetchUserRoleAndTeacher = async () => {
+      if (!validOrgId || !saasUser?.email) {
+        setUserRole(null);
+        setCurrentTeacher(null);
+        return;
+      }
+
+      try {
+        // 獲取用戶在機構中的角色
+        const { data: identityData } = await supabase
+          .from('hanami_org_identities')
+          .select('role_type')
+          .eq('org_id', validOrgId)
+          .eq('user_email', saasUser.email)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (identityData) {
+          setUserRole(identityData.role_type);
+        } else {
+          // 如果沒有在 hanami_org_identities 中找到，檢查 hanami_employee
+          const { data: employeeData } = await supabase
+            .from('hanami_employee')
+            .select('id, teacher_fullname, teacher_nickname, teacher_role')
+            .eq('org_id', validOrgId)
+            .eq('teacher_email', saasUser.email)
+            .eq('teacher_status', 'active')
+            .maybeSingle();
+
+          if (employeeData) {
+            setUserRole(employeeData.teacher_role || 'teacher');
+            setCurrentTeacher({
+              id: employeeData.id,
+              teacher_fullname: employeeData.teacher_fullname || null,
+              teacher_nickname: employeeData.teacher_nickname || null,
+            });
+          }
+        }
+
+        // 如果角色是 member 或 teacher，獲取教師信息
+        if (identityData && (identityData.role_type === 'member' || identityData.role_type === 'teacher')) {
+          // 嘗試從 hanami_employee 獲取教師信息
+          const { data: employeeData } = await supabase
+            .from('hanami_employee')
+            .select('id, teacher_fullname, teacher_nickname')
+            .eq('org_id', validOrgId)
+            .eq('teacher_email', saasUser.email)
+            .eq('teacher_status', 'active')
+            .maybeSingle();
+
+          if (employeeData) {
+            setCurrentTeacher({
+              id: employeeData.id,
+              teacher_fullname: employeeData.teacher_fullname || null,
+              teacher_nickname: employeeData.teacher_nickname || null,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('獲取用戶角色和教師信息失敗:', error);
+      }
+    };
+
+    fetchUserRoleAndTeacher();
+  }, [validOrgId, saasUser?.email]);
 
   // 當打開詳細資訊視窗時載入成長樹能力
   useEffect(() => {
@@ -117,6 +326,11 @@ export default function AbilityAssessmentsPage() {
     console.log('treeId:', treeId);
     console.log('已快取的能力:', treeAbilities[treeId]);
     
+    if (orgDataDisabled) {
+      console.log('orgDataDisabled 為 true，跳過載入成長樹能力');
+      return [];
+    }
+
     if (treeAbilities[treeId]) {
       console.log('使用快取的能力資料');
       return treeAbilities[treeId];
@@ -126,10 +340,12 @@ export default function AbilityAssessmentsPage() {
       console.log('開始載入能力資料...');
       // 載入成長樹的目標
       console.log('查詢目標資料，treeId:', treeId);
-      const { data: goalsData, error: goalsError } = await supabase
+      let goalsQuery = supabase
         .from('hanami_growth_goals')
         .select('required_abilities')
         .eq('tree_id', treeId);
+      goalsQuery = applyOrgFilter(goalsQuery);
+      const { data: goalsData, error: goalsError } = await goalsQuery;
 
       console.log('目標查詢結果:', { goalsData, goalsError });
       if (goalsError) throw goalsError;
@@ -150,11 +366,13 @@ export default function AbilityAssessmentsPage() {
       
       if (abilityIds.size > 0) {
         console.log('查詢能力詳細資訊...');
-        const { data: abilitiesResult, error: abilitiesError } = await supabase
+        let abilitiesQuery = supabase
           .from('hanami_development_abilities')
           .select('*')
           .in('id', Array.from(abilityIds))
           .order('ability_name');
+        abilitiesQuery = applyOrgFilter(abilitiesQuery);
+        const { data: abilitiesResult, error: abilitiesError } = await abilitiesQuery;
 
         console.log('能力查詢結果:', { abilitiesResult, abilitiesError });
         if (abilitiesError) throw abilitiesError;
@@ -184,6 +402,11 @@ export default function AbilityAssessmentsPage() {
     console.log('treeId:', treeId);
     console.log('已快取的目標:', treeGoals[treeId]);
     
+    if (orgDataDisabled) {
+      console.log('orgDataDisabled 為 true，跳過載入成長樹目標');
+      return [];
+    }
+
     if (treeGoals[treeId]) {
       console.log('使用快取的目標資料');
       return treeGoals[treeId];
@@ -192,11 +415,13 @@ export default function AbilityAssessmentsPage() {
     try {
       console.log('開始載入目標資料...');
       console.log('查詢目標詳細資料，treeId:', treeId);
-      const { data: goalsData, error: goalsError } = await supabase
+      let goalsQuery = supabase
         .from('hanami_growth_goals')
         .select('*')
         .eq('tree_id', treeId)
         .order('goal_order');
+      goalsQuery = applyOrgFilter(goalsQuery);
+      const { data: goalsData, error: goalsError } = await goalsQuery;
 
       console.log('目標詳細查詢結果:', { goalsData, goalsError });
       if (goalsError) throw goalsError;
@@ -385,12 +610,19 @@ export default function AbilityAssessmentsPage() {
 
   // 載入課程類型資料
   const loadCourseTypes = async () => {
+    if (orgDataDisabled && disableOrgFallback) {
+      setCourseTypes([]);
+      return;
+    }
+
     try {
-      const { data, error } = await supabase
+      let courseTypeQuery = supabase
         .from('Hanami_CourseTypes')
         .select('id, name')
         .eq('status', true)
         .order('name');
+      courseTypeQuery = applyOrgFilter(courseTypeQuery);
+      const { data, error } = await courseTypeQuery;
 
       if (error) {
         console.error('載入課程類型失敗:', error);
@@ -405,42 +637,121 @@ export default function AbilityAssessmentsPage() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
-      setError('');
-      console.log('🔄 開始載入評估記錄...');
-
-      const { data: assessmentsData, error: assessmentsError } = await supabase
-        .from('hanami_ability_assessments')
-        .select(`
-          *,
-          student:Hanami_Students(id, full_name, nick_name, course_type),
-          tree:hanami_growth_trees(id, tree_name, tree_description)
-        `)
-        .order('created_at', { ascending: false });
-
-      console.log('📊 查詢結果:', {
-        data: assessmentsData,
-        error: assessmentsError,
-        count: assessmentsData?.length || 0
-      });
-
-      if (assessmentsError) {
-        console.error('❌ 載入評估記錄失敗:', assessmentsError);
-        setError('載入評估記錄失敗: ' + assessmentsError.message);
+      if (orgDataDisabled && disableOrgFallback) {
+        console.log('orgDataDisabled 為 true，略過載入能力評估資料');
+        setAssessments([]);
+        setFilteredAssessments([]);
+        setLoading(false);
         return;
       }
 
-      console.log('✅ 成功載入評估記錄:', assessmentsData?.length || 0, '個記錄');
-      console.log('📋 評估記錄詳細:', assessmentsData);
-      
-      // 確保資料格式正確
-      const normalizedData = (assessmentsData || []).map(assessment => ({
-        ...assessment,
-        updated_at: assessment.updated_at || assessment.created_at,
-        selected_goals: assessment.selected_goals || []
-      }));
-      
-      setAssessments(normalizedData);
+      setLoading(true);
+      setError(null);
+      console.log('🔄 開始載入評估記錄...');
+
+      // 使用 API 端點繞過 RLS
+      try {
+        const session = getUserSession();
+        const userEmail = session?.email || null;
+        
+        const params = new URLSearchParams();
+        if (validOrgId) {
+          params.append('orgId', validOrgId);
+        }
+        if (userEmail) {
+          params.append('userEmail', userEmail);
+        }
+        params.append('orderBy', 'created_at');
+        params.append('ascending', 'false');
+
+        const response = await fetch(`/api/ability-assessments/list?${params.toString()}`, {
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ API 返回錯誤:', response.status, errorText);
+          throw new Error(`API 返回錯誤: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const assessmentsData = result.data || [];
+
+        console.log('📊 查詢結果:', {
+          data: assessmentsData,
+          count: assessmentsData.length
+        });
+
+        console.log('✅ 成功載入評估記錄:', assessmentsData.length, '個記錄');
+        console.log('📋 評估記錄詳細:', assessmentsData);
+        
+        // 確保資料格式正確
+        const normalizedData = assessmentsData.map((assessment: any) => ({
+          ...assessment,
+          updated_at: assessment.updated_at || assessment.created_at,
+          selected_goals: assessment.selected_goals || [],
+          // 處理關聯資料（API 返回的格式）
+          student: assessment.student || null,
+          tree: assessment.tree || null,
+        }));
+        
+        setAssessments(normalizedData);
+        setError(null);
+      } catch (apiError: any) {
+        console.error('❌ API 調用失敗，嘗試使用直接查詢:', apiError);
+        // Fallback 到直接查詢（可能也會失敗）
+        let assessmentsQuery = supabase
+          .from('hanami_ability_assessments')
+          .select('*')
+          .order('created_at', { ascending: false });
+        assessmentsQuery = applyOrgFilter(assessmentsQuery);
+
+        const { data: assessmentsData, error: assessmentsError } = await assessmentsQuery;
+
+        if (assessmentsError) {
+          console.error('❌ 載入評估記錄失敗:', assessmentsError);
+          setError('載入評估記錄失敗: ' + assessmentsError.message);
+          return;
+        }
+
+        // 手動組合關聯資料
+        const studentIds = [...new Set((assessmentsData || []).map((a: any) => a.student_id).filter(Boolean))];
+        const treeIds = [...new Set((assessmentsData || []).map((a: any) => a.tree_id).filter(Boolean))];
+
+        const [studentResults, treeResults] = await Promise.all([
+          studentIds.length > 0
+            ? supabase
+                .from('Hanami_Students')
+                .select('id, full_name, nick_name, course_type')
+                .in('id', studentIds)
+                .then(({ data }) => {
+                  const studentMap = new Map((data || []).map((s: any) => [s.id, s]));
+                  return studentMap;
+                })
+            : Promise.resolve(new Map()),
+          treeIds.length > 0
+            ? supabase
+                .from('hanami_growth_trees')
+                .select('id, tree_name, tree_description')
+                .in('id', treeIds)
+                .then(({ data }) => {
+                  const treeMap = new Map((data || []).map((t: any) => [t.id, t]));
+                  return treeMap;
+                })
+            : Promise.resolve(new Map())
+        ]);
+
+        const normalizedData = (assessmentsData || []).map((assessment: any) => ({
+          ...assessment,
+          updated_at: assessment.updated_at || assessment.created_at,
+          selected_goals: assessment.selected_goals || [],
+          student: studentResults.get(assessment.student_id) || null,
+          tree: treeResults.get(assessment.tree_id) || null,
+        }));
+        
+        setAssessments(normalizedData);
+        setError(null);
+      }
     } catch (error) {
       console.error('💥 載入資料失敗:', error);
       setError('載入資料失敗: ' + (error as Error).message);
@@ -450,6 +761,11 @@ export default function AbilityAssessmentsPage() {
   };
 
   const applyFilters = () => {
+    if (orgDataDisabled) {
+      setFilteredAssessments([]);
+      return;
+    }
+
     console.log('🔍 開始應用篩選:', {
       originalCount: assessments.length,
       searchQuery,
@@ -544,6 +860,11 @@ export default function AbilityAssessmentsPage() {
     console.log('=== handleCreateAssessment 函數被調用 ===');
     console.log('傳入的 assessment 參數:', assessment);
     
+    if (disableOrgFallback && !validOrgId) {
+      alert('請先創建屬於您的機構');
+      return;
+    }
+
     try {
       console.log('=== 開始處理新增評估提交 ===');
       console.log('新增的評估資料:', assessment);
@@ -563,7 +884,8 @@ export default function AbilityAssessmentsPage() {
         general_notes: assessmentData.general_notes || '',
         next_lesson_focus: assessmentData.next_lesson_focus || null,
         notes: assessmentData.general_notes || '',  // 保持向後兼容
-        goals: goals || []
+        goals: goals || [],
+        ...(validOrgId ? { org_id: validOrgId } : {}),
       };
 
       console.log('準備的 API 資料:', apiData);
@@ -627,6 +949,11 @@ export default function AbilityAssessmentsPage() {
       console.log('❌ editingAssessment 為空，函數提前返回');
       return;
     }
+
+    if (disableOrgFallback && !validOrgId) {
+      alert('請先創建屬於您的機構');
+      return;
+    }
     
     try {
       console.log('=== 開始處理編輯評估提交 ===');
@@ -648,7 +975,8 @@ export default function AbilityAssessmentsPage() {
         general_notes: assessmentData.general_notes || '',
         next_lesson_focus: assessmentData.next_lesson_focus || null,
         notes: assessmentData.general_notes || '',  // 保持向後兼容
-        goals: goals || []
+        goals: goals || [],
+        ...(validOrgId ? { org_id: validOrgId } : {}),
       };
 
       console.log('準備的 API 資料:', apiData);
@@ -712,11 +1040,19 @@ export default function AbilityAssessmentsPage() {
       return;
     }
 
+    if (disableOrgFallback && !validOrgId) {
+      alert('請先創建屬於您的機構');
+      return;
+    }
+
     try {
-      const { error } = await supabase
+      let deleteQuery = supabase
         .from('hanami_ability_assessments')
         .delete()
         .eq('id', assessmentId);
+      deleteQuery = applyOrgFilter(deleteQuery);
+
+      const { error } = await deleteQuery;
 
       if (error) {
         console.error('刪除評估失敗:', error);
@@ -866,49 +1202,69 @@ export default function AbilityAssessmentsPage() {
               {
                 icon: BarChart3,
                 label: "進度管理面板",
-                href: "/admin/student-progress",
+                href: navigationPaths.dashboard,
                 variant: "secondary"
               },
               {
                 icon: TreePine,
                 label: "成長樹管理",
-                href: "/admin/student-progress/growth-trees",
+                href: navigationPaths.growthTrees,
                 variant: "secondary"
               },
+            {
+              icon: BookOpenIcon,
+              label: "學習路線管理",
+              href: navigationPaths.learningPaths,
+              variant: "secondary"
+            },
               {
                 icon: TrendingUp,
                 label: "發展能力圖卡",
-                href: "/admin/student-progress/abilities",
+                href: navigationPaths.abilities,
                 variant: "secondary"
               },
               {
                 icon: Gamepad2,
                 label: "教學活動管理",
-                href: "/admin/student-progress/activities",
+                href: navigationPaths.activities,
                 variant: "secondary"
               },
               {
                 icon: VideoCameraIcon,
                 label: "學生媒體管理",
-                href: "/admin/student-progress/student-media",
+                href: navigationPaths.media,
                 variant: "secondary"
               },
               {
                 icon: AcademicCapIcon,
                 label: "能力評估管理",
-                href: "/admin/student-progress/ability-assessments",
+                href: navigationPaths.assessments,
                 variant: "primary"
               },
               {
                 icon: Users,
                 label: "返回學生管理",
-                href: "/admin/students",
+                href: navigationPaths.studentManagement,
                 variant: "accent"
               }
             ]}
-            currentPage="/admin/student-progress/ability-assessments"
+            currentPage={navigationPaths.assessments}
           />
         </div>
+
+        {orgDataDisabled && (
+          <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
+            <div className="mb-4">
+              <Image alt="機構提示" height={64} src="/tree ui.png" width={64} />
+            </div>
+            <h2 className="text-lg font-semibold text-hanami-text">尚未設定機構資料</h2>
+            <p className="mt-2 text-sm text-hanami-text-secondary">
+              請先創建屬於您的機構
+              {organizationNameLabel ? `（${organizationNameLabel}）` : ''}
+              ，並建立能力評估資料後再查看內容。
+            </p>
+          </div>
+        )}
 
         {/* 錯誤提示 */}
         {error && (
@@ -939,7 +1295,7 @@ export default function AbilityAssessmentsPage() {
               <button
                 className="bg-[#A64B2A] text-white px-4 py-2 rounded-lg hover:bg-[#8B3A1F] transition-colors flex items-center gap-2"
                 onClick={() => setShowAssessmentModal(true)}
-                disabled={!!error}
+                disabled={!!error || orgDataDisabled}
               >
                 <PlusIcon className="w-4 h-4" />
                 <span>新增能力評估</span>
@@ -1048,18 +1404,30 @@ export default function AbilityAssessmentsPage() {
 
         {/* 評估記錄列表 */}
         {filteredAssessments.length === 0 ? (
-          <div className="text-center py-10">
-            <AcademicCapIcon className="h-16 w-16 text-[#A68A64] mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-[#2B3A3B] mb-2">
-              {error ? '功能設置中' : '暫無評估記錄'}
-            </h3>
-            <p className="text-[#87704e]">
-              {error 
-                ? '請先完成資料庫設置' 
-                : '點擊「新增能力評估」開始記錄學生的能力發展'
-              }
-            </p>
-          </div>
+          orgDataDisabled ? (
+            <div className="text-center py-10">
+              <Image alt="機構提示" className="mx-auto mb-4" height={64} src="/tree ui.png" width={64} />
+              <h3 className="text-lg font-medium text-[#2B3A3B] mb-2">尚未設定機構資料</h3>
+              <p className="text-[#87704e]">
+                請先創建屬於您的機構
+                {organizationNameLabel ? `（${organizationNameLabel}）` : ''}
+                ，並建立能力評估資料後再查看內容。
+              </p>
+            </div>
+          ) : (
+            <div className="text-center py-10">
+              <AcademicCapIcon className="h-16 w-16 text-[#A68A64] mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-[#2B3A3B] mb-2">
+                {error ? '功能設置中' : '暫無評估記錄'}
+              </h3>
+              <p className="text-[#87704e]">
+                {error 
+                  ? '請先完成資料庫設置' 
+                  : '點擊「新增能力評估」開始記錄學生的能力發展'
+                }
+              </p>
+            </div>
+          )
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {filteredAssessments.map((assessment) => (
@@ -1182,6 +1550,10 @@ export default function AbilityAssessmentsPage() {
           <SimpleAbilityAssessmentModal
             onClose={() => setShowAssessmentModal(false)}
             onSubmit={handleCreateAssessment}
+            defaultStudent={selectedStudent || undefined}
+            lockStudent={(userRole === 'member' || userRole === 'teacher') && !!selectedStudent}
+            lockTeacher={userRole === 'member' || userRole === 'teacher'}
+            defaultTeacher={currentTeacher || undefined}
           />
         )}
 

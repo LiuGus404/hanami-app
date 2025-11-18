@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { setUserSession, clearUserSession } from '@/lib/authUtils';
+import { setUserSession, clearUserSession, fallbackOrganization } from '@/lib/authUtils';
 
 const EmergencyAuthFixPage = () => {
   const [isFixing, setIsFixing] = useState(false);
@@ -39,8 +39,7 @@ const EmergencyAuthFixPage = () => {
         email: 'vicky@hanami.com',
         role: 'admin' as const,
         name: '管理員',
-        phone: '',
-        timestamp: Date.now()
+        organization: fallbackOrganization
       };
 
       setUserSession(adminSession);

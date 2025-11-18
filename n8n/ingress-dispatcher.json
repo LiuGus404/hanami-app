@@ -1,0 +1,332 @@
+{
+  "name": "Ingress Dispatcher (主分流層)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingress",
+        "authentication": "jwtAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-400, 400],
+      "id": "webhook-receiver",
+      "name": "AiReceiver",
+      "webhookId": "356e95d5-dcc9-44d8-b988-0f2f0bb2414f",
+      "credentials": {
+        "jwtAuth": {
+          "id": "5tFZ5ySabMadgSCE",
+          "name": "JWTHANAMIECHO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format_Input - 解析並標準化輸入\nconst body  = $json.body ?? {};\nconst extra = body?.payload?.extra ?? {};\n\n// 取原始 group_roles\nconst rolesRaw = Array.isArray(extra.group_roles) ? extra.group_roles : [];\n\n// 產出精簡角色清單\nconst group_roles_compact = rolesRaw.map(r => {\n  const id   = (r?.id || '').trim();\n  const name = (r?.name || '').trim();\n  \n  // 取第一個可用 model\n  let model = '';\n  if (typeof r?.model === 'string' && r.model.trim()) {\n    model = r.model.trim();\n  } else if (Array.isArray(r?.models) && r.models.length > 0) {\n    const m = r.models[0];\n    if (typeof m === 'string') model = m;\n    else if (m?.model) model = m.model;\n  }\n\n  return {\n    id,\n    name,\n    model,\n    tone: (r?.tone || '').trim(),\n    guidance: (r?.guidance || '').trim()\n  };\n});\n\nreturn [{\n  json: {\n    // Thread 基本\n    thread_id: body.thread_id ?? extra.room_id ?? null,\n    room_id:   extra.room_id  ?? body.thread_id ?? null,\n    user_id:   extra.user_id  ?? null,\n\n    // 關鍵欄位\n    client_msg_id: extra.client_msg_id ?? body.client_msg_id ?? null,\n    role_hint:     body.role_hint     ?? 'auto',\n    message_type:  body.message_type  ?? 'user_request',\n    text:          body?.payload?.text ?? '',\n\n    // 輔助欄位\n    companions:    extra.companions    ?? [],\n    group_roles:   rolesRaw,\n    group_roles_compact,\n    selected_role: extra.selected_role ?? {},\n    project_info:  extra.project_info  ?? {},\n    source:        extra.source        ?? null,\n    session_id:    extra.session_id    ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-200, 400],
+      "id": "format-input",
+      "name": "Format_Input"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO chat_threads (id, user_id, title, created_at)\nVALUES (\n  ($1)::uuid, \n  ($2)::uuid, \n  COALESCE($3, 'Untitled'), \n  now()\n)\nON CONFLICT (id) DO UPDATE\nSET updated_at = now()\nRETURNING id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $json.room_id }}, $2 = {{ $json.user_id }}, $3 = {{ $json.project_info.title }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [0, 400],
+      "id": "ensure-thread",
+      "name": "EnsureThread",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 插入訊息，狀態為 queued，記錄分配的角色 ID\nINSERT INTO public.chat_messages (\n  thread_id, \n  role, \n  message_type, \n  content, \n  status, \n  client_msg_id,\n  assigned_role_id,\n  assigned_workflow,\n  content_json,\n  created_at, \n  updated_at\n) VALUES (\n  ($1)::uuid,\n  'user',\n  'user_request',\n  $2,\n  'queued',\n  $3,\n  $4,\n  $5,\n  $6::jsonb,\n  now(),\n  now()\n)\nRETURNING id, thread_id, client_msg_id, assigned_role_id;",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('Format_Input').first().json.thread_id }}, $2 = {{ $('Format_Input').first().json.text }}, $3 = {{ $('Format_Input').first().json.client_msg_id }}, $4 = {{ $('Format_Input').first().json.selected_role.id || 'hibi-manager' }}, $5 = {{ ($('Format_Input').first().json.selected_role.id || 'hibi-manager') + '-processor' }}, $6 = {{ JSON.stringify({ role_name: $('Format_Input').first().json.selected_role.name || 'Hibi', role_id: $('Format_Input').first().json.selected_role.id || 'hibi-manager' }) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [200, 400],
+      "id": "insert-message-queued",
+      "name": "InsertMessage_Queued",
+      "credentials": {
+        "postgres": {
+          "id": "UrO5b3fCBNg43wlC",
+          "name": "HanamiEcho"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Format_Input').first().json.selected_role.id }}",
+                    "rightValue": "hibi-manager",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "hibi-condition"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "hibi"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "mori-condition",
+                    "leftValue": "={{ $('Format_Input').first().json.selected_role.id }}",
+                    "rightValue": "mori-researcher",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "mori"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "pico-condition",
+                    "leftValue": "={{ $('Format_Input').first().json.selected_role.id }}",
+                    "rightValue": "pico-artist",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pico"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [400, 400],
+      "id": "route-by-role",
+      "name": "RouteByRole"
+    },
+    {
+      "parameters": {
+        "jsCode": "// TriggerHibiWorkflow - 準備觸發 Hibi 處理器\nconst insertResult = $('InsertMessage_Queued').first().json;\nconst formatInput = $('Format_Input').first().json;\n\nreturn [{\n  json: {\n    message_id: insertResult.id,\n    thread_id: insertResult.thread_id,\n    client_msg_id: insertResult.client_msg_id,\n    assigned_role_id: insertResult.assigned_role_id,\n    user_id: formatInput.user_id,\n    text: formatInput.text,\n    selected_role: formatInput.selected_role,\n    group_roles: formatInput.group_roles_compact,\n    project_info: formatInput.project_info,\n    trigger_workflow: 'hibi-processor'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 200],
+      "id": "prepare-hibi",
+      "name": "PrepareHibiTrigger"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "otp0OKdO2lUIAhCI",
+          "mode": "list",
+          "cachedResultName": "hibi-processor"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message_id": "={{ $json.message_id }}",
+            "thread_id": "={{ $json.thread_id }}",
+            "client_msg_id": "={{ $json.client_msg_id }}",
+            "user_id": "={{ $json.user_id }}",
+            "text": "={{ $json.text }}",
+            "selected_role": "={{ $json.selected_role }}",
+            "group_roles": "={{ $json.group_roles }}",
+            "project_info": "={{ $json.project_info }}",
+            "trigger_type": "immediate"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [800, 200],
+      "id": "execute-hibi-processor",
+      "name": "ExecuteHibiProcessor"
+    },
+    {
+      "parameters": {
+        "jsCode": "// TriggerMoriWorkflow - 準備觸發 Mori 處理器\nconst insertResult = $('InsertMessage_Queued').first().json;\nconst formatInput = $('Format_Input').first().json;\n\nreturn [{\n  json: {\n    message_id: insertResult.id,\n    thread_id: insertResult.thread_id,\n    client_msg_id: insertResult.client_msg_id,\n    assigned_role_id: insertResult.assigned_role_id,\n    user_id: formatInput.user_id,\n    text: formatInput.text,\n    selected_role: formatInput.selected_role,\n    group_roles: formatInput.group_roles_compact,\n    project_info: formatInput.project_info,\n    trigger_workflow: 'mori-processor',\n    trigger_type: 'immediate'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 400],
+      "id": "prepare-mori",
+      "name": "PrepareMoriTrigger"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id",
+          "cachedResultName": "mori-processor"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message_id": "={{ $json.message_id }}",
+            "thread_id": "={{ $json.thread_id }}",
+            "client_msg_id": "={{ $json.client_msg_id }}",
+            "user_id": "={{ $json.user_id }}",
+            "text": "={{ $json.text }}",
+            "selected_role": "={{ $json.selected_role }}",
+            "group_roles": "={{ $json.group_roles }}",
+            "project_info": "={{ $json.project_info }}",
+            "trigger_type": "={{ $json.trigger_type }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [800, 400],
+      "id": "execute-mori-processor",
+      "name": "ExecuteMoriProcessor"
+    },
+    {
+      "parameters": {
+        "jsCode": "// TriggerPicoWorkflow - 準備觸發 Pico 處理器\nconst insertResult = $('InsertMessage_Queued').first().json;\nconst formatInput = $('Format_Input').first().json;\n\nreturn [{\n  json: {\n    message_id: insertResult.id,\n    thread_id: insertResult.thread_id,\n    client_msg_id: insertResult.client_msg_id,\n    assigned_role_id: insertResult.assigned_role_id,\n    user_id: formatInput.user_id,\n    text: formatInput.text,\n    selected_role: formatInput.selected_role,\n    group_roles: formatInput.group_roles_compact,\n    project_info: formatInput.project_info,\n    trigger_workflow: 'pico-processor'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 600],
+      "id": "prepare-pico",
+      "name": "PreparePicoTrigger"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  ok: true,\n  code: 202,\n  message: 'Message queued for processing',\n  data: {\n    message_id: $('InsertMessage_Queued').first().json.id,\n    thread_id: $('InsertMessage_Queued').first().json.thread_id,\n    client_msg_id: $('InsertMessage_Queued').first().json.client_msg_id,\n    assigned_role_id: $('InsertMessage_Queued').first().json.assigned_role_id,\n    status: 'queued'\n  }\n} }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [800, 400],
+      "id": "respond-accepted",
+      "name": "RespondAccepted"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  ok: false,\n  code: 400,\n  error: 'INVALID_REQUEST',\n  message: '請求格式不正確',\n  details: {\n    missing_fields: [\n      $('Format_Input').first().json.thread_id ? null : 'thread_id',\n      $('Format_Input').first().json.user_id ? null : 'user_id',\n      $('Format_Input').first().json.client_msg_id ? null : 'client_msg_id'\n    ].filter(Boolean)\n  }\n} }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [200, 600],
+      "id": "respond-error",
+      "name": "RespondError"
+    }
+  ],
+  "connections": {
+    "AiReceiver": {
+      "main": [[{"node": "Format_Input", "type": "main", "index": 0}]]
+    },
+    "Format_Input": {
+      "main": [[{"node": "EnsureThread", "type": "main", "index": 0}]]
+    },
+    "EnsureThread": {
+      "main": [[{"node": "InsertMessage_Queued", "type": "main", "index": 0}]]
+    },
+    "InsertMessage_Queued": {
+      "main": [[{"node": "RouteByRole", "type": "main", "index": 0}]]
+    },
+    "RouteByRole": {
+      "main": [
+        [{"node": "PrepareHibiTrigger", "type": "main", "index": 0}],
+        [{"node": "PrepareMoriTrigger", "type": "main", "index": 0}],
+        [{"node": "PreparePicoTrigger", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "PrepareHibiTrigger": {
+      "main": [[{"node": "ExecuteHibiProcessor", "type": "main", "index": 0}]]
+    },
+    "ExecuteHibiProcessor": {
+      "main": [[{"node": "RespondAccepted", "type": "main", "index": 0}]]
+    },
+    "PrepareMoriTrigger": {
+      "main": [[{"node": "ExecuteMoriProcessor", "type": "main", "index": 0}]]
+    },
+    "ExecuteMoriProcessor": {
+      "main": [[{"node": "RespondAccepted", "type": "main", "index": 0}]]
+    },
+    "PreparePicoTrigger": {
+      "main": [[{"node": "RespondAccepted", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "4b2fb6f84ef91181f85de1277717d6717566b015633b0c427e51a39fe81532f2"
+  }
+}
+

@@ -2,8 +2,8 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { 
+import { useEffect, useMemo, useState } from 'react';
+import {
   HomeIcon,
   CalendarDaysIcon,
   UsersIcon,
@@ -11,11 +11,13 @@ import {
   Cog6ToothIcon,
   XMarkIcon,
   SparklesIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+  BriefcaseIcon,
 } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useTeacherAccess } from '@/hooks/saas/useTeacherAccess';
 import { useDirectTeacherAccess } from '@/hooks/saas/useDirectTeacherAccess';
+import { getSaasSupabaseClient } from '@/lib/supabase';
 
 interface SidebarItem {
   icon: any;
@@ -42,6 +44,9 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
     teacherAccess: directTeacherAccess,
     loading: directLoading
   } = useDirectTeacherAccess();
+  const saasSupabase = useMemo(() => getSaasSupabaseClient(), []);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(true);
 
 
   useEffect(() => {
@@ -55,28 +60,62 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // 當用戶登入時，自動檢查教師權限
   useEffect(() => {
-    if (user?.email) {
-      console.log('AppSidebar: 用戶已登入，檢查權限狀態:', {
-        email: user.email,
-        hasTeacherAccess,
-        loading,
-        teacherAccess: teacherAccess ? '有數據' : '無數據',
-        directHasTeacherAccess,
-        directLoading,
-        directTeacherAccess: directTeacherAccess ? '有數據' : '無數據'
+    if (user?.email && !directLoading && !directTeacherAccess) {
+      directCheckTeacherAccess(user.email).catch((error) => {
+        console.error('AppSidebar: 直接 Supabase 檢查失敗:', error);
       });
-      
-      // 簡化權限檢查邏輯，避免重複查詢
-      if (!directTeacherAccess && !directLoading) {
-        console.log('AppSidebar: 開始直接 Supabase 檢查教師權限，用戶:', user.email);
-        directCheckTeacherAccess(user.email).catch((error) => {
-          console.error('AppSidebar: 直接 Supabase 檢查失敗:', error);
-        });
-      }
     }
-  }, [user?.email]); // 簡化依賴，只在用戶 email 變化時檢查
+  }, [user?.email, directLoading, directTeacherAccess, directCheckTeacherAccess]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const resolveRole = async () => {
+      if (!user?.id) {
+        setIsSuperAdmin(false);
+        setRoleLoading(false);
+        return;
+      }
+
+      if (user.user_role) {
+        setIsSuperAdmin(user.user_role === 'super_admin');
+        setRoleLoading(false);
+        return;
+      }
+
+      try {
+        const { data: userData, error } = await saasSupabase
+          .from('saas_users')
+          .select('user_role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const data = userData as { user_role: string } | null;
+
+        if (!cancelled) {
+          if (error) {
+            console.error('AppSidebar: 讀取 user_role 失敗:', error.message);
+            setIsSuperAdmin(false);
+          } else {
+            const role = data?.user_role || 'user';
+            setIsSuperAdmin(role === 'super_admin');
+          }
+          setRoleLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('AppSidebar: 查詢 user_role 發生錯誤:', err);
+          setIsSuperAdmin(false);
+          setRoleLoading(false);
+        }
+      }
+    };
+
+    resolveRole();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.user_role, saasSupabase]);
 
   const sidebarMenuItems: SidebarItem[] = [
     { 
@@ -97,18 +136,30 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       href: '/aihome/parent/bound-students', 
       description: '查看孩子的學習' 
     },
+  {
+    icon: BriefcaseIcon,
+    label: '老師連結',
+    href: '/aihome/teacher-link',
+    description: '建立與管理您的課程機構',
+  },
     { 
       icon: SparklesIcon, 
       label: 'AI伙伴', 
       href: '/aihome/ai-companions', 
       description: '您的工作和學習伙伴' 
     },
-    // 條件顯示花見老師專區
-    ...(user && (hasTeacherAccess || directHasTeacherAccess) ? [{
-      icon: AcademicCapIcon, 
-      label: '花見老師專區', 
-      href: '/aihome/teacher-zone', 
-      description: '教師專用功能和工具' 
+    // 花見老師專區已隱藏
+    // ...(user && (hasTeacherAccess || directHasTeacherAccess) ? [{
+    //   icon: AcademicCapIcon, 
+    //   label: '花見老師專區', 
+    //   href: '/aihome/teacher-zone', 
+    //   description: '教師專用功能和工具' 
+    // }] : []),
+    ...(isSuperAdmin ? [{
+      icon: Cog6ToothIcon,
+      label: '管理員控制室',
+      href: '/aihome/admin/control-center',
+      description: '調整 AI 角色模型與系統設定'
     }] : []),
     { 
       icon: UserIcon, 

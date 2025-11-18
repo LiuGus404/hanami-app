@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, Calendar } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 interface Option {
   value: string;
@@ -35,10 +35,25 @@ export function HanamiSelect({
   icon,
 }: HanamiSelectProps) {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onChange?.(e.target.value);
+    try {
+      if (!e) {
+        console.warn('[HanamiSelect] handleChange: event is null or undefined');
+        return;
+      }
+      
+      if (!e.target) {
+        console.warn('[HanamiSelect] handleChange: event.target is null or undefined', e);
+        return;
+      }
+      
+      const newValue = e.target.value;
+      if (newValue !== undefined && newValue !== null && onChange) {
+        onChange(newValue);
+      }
+    } catch (error) {
+      console.error('[HanamiSelect] handleChange error:', error, { event: e });
+    }
   };
-
-  const selectedOption = options.find(option => option.value === value);
 
   return (
     <div className="space-y-2">
@@ -69,8 +84,8 @@ export function HanamiSelect({
             ${error ? 'border-red-400 focus:ring-red-400' : ''}
             ${className}
           `}
-          whileHover={{ scale: disabled ? 1 : 1.02 }}
-          whileTap={{ scale: disabled ? 1 : 0.98 }}
+          whileHover={{ scale: disabled ? 1 : 1.01 }}
+          whileTap={{ scale: disabled ? 1 : 0.99 }}
           transition={{ type: "spring", stiffness: 400, damping: 17 }}
         >
           {placeholder && (
