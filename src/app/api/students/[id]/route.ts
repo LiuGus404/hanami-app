@@ -51,14 +51,15 @@ export async function GET(
         .maybeSingle();
 
       if (inactiveData) {
+        const inactiveDataTyped = inactiveData as any;
         const convertedStudent = {
-          ...inactiveData,
-          id: inactiveData.original_id,
-          original_id: inactiveData.original_id,
-          student_type: inactiveData.student_type === 'regular' ? '常規' : '試堂',
+          ...(inactiveDataTyped as Record<string, any>),
+          id: inactiveDataTyped.original_id,
+          original_id: inactiveDataTyped.original_id,
+          student_type: inactiveDataTyped.student_type === 'regular' ? '常規' : '試堂',
           is_inactive: true,
-          inactive_date: inactiveData.inactive_date,
-          inactive_reason: inactiveData.inactive_reason,
+          inactive_date: inactiveDataTyped.inactive_date,
+          inactive_reason: inactiveDataTyped.inactive_reason,
         };
         return NextResponse.json({
           success: true,
