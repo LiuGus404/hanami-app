@@ -11,8 +11,9 @@ import { supabase } from '@/lib/supabase';
 import { useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { OrganizationProfile } from '@/lib/authUtils';
+import { TeacherLinkShell } from '../TeacherLinkShell';
 
-export default function SelectOrganizationPage() {
+function SelectOrganizationContent() {
   const router = useRouter();
   const { user: saasUser, loading: authLoading } = useSaasAuth();
   const { setCurrentOrganization, setCurrentOrganizationId } = useOrganization();
@@ -104,7 +105,7 @@ export default function SelectOrganizationPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
+      <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#FFD59A]" />
           <p className="text-[#2B3A3B]">載入機構列表...</p>
@@ -115,7 +116,7 @@ export default function SelectOrganizationPage() {
 
   if (showCreatePanel) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
+      <div className="p-6">
         <CreateOrganizationPanel
           userEmail={saasUser?.email ?? null}
           userId={saasUser?.id ?? null}
@@ -127,7 +128,7 @@ export default function SelectOrganizationPage() {
 
   if (userOrganizations.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
+      <div className="p-6">
         <OrganizationOnboardingPage
           onCreateOrganization={handleCreateNew}
           onJoinOrganization={handleJoinExisting}
@@ -137,7 +138,7 @@ export default function SelectOrganizationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
+    <div className="p-6">
       <OrganizationSelectorPanel
         organizations={userOrganizations}
         onSelect={handleOrganizationSelect}
@@ -146,6 +147,17 @@ export default function SelectOrganizationPage() {
         currentOrgId={null}
       />
     </div>
+  );
+}
+
+export default function SelectOrganizationPage() {
+  return (
+    <TeacherLinkShell
+      currentPath="/aihome/teacher-link/create/select-organization"
+      contentClassName="bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]"
+    >
+      <SelectOrganizationContent />
+    </TeacherLinkShell>
   );
 }
 

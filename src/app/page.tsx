@@ -13,7 +13,9 @@ import {
   PlayIcon,
   Bars3Icon,
   Cog6ToothIcon,
-  XMarkIcon
+  XMarkIcon,
+  ArrowRightOnRectangleIcon,
+  UserPlusIcon
 } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { HanamiButton } from '@/components/ui/HanamiButton';
@@ -196,7 +198,7 @@ export default function AIHomePage() {
                             <span>探索課程</span>
                           </button>
                           
-                          {saasUser && (
+                          {saasUser ? (
                             <>
                               <button
                                 onClick={() => {
@@ -218,6 +220,30 @@ export default function AIHomePage() {
                               >
                                 <HeartIcon className="w-5 h-5" />
                                 <span>訂閱管理</span>
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  handleLoginClick();
+                                  setShowMobileMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-[#4B4036] hover:bg-[#FFD59A]/20 transition-colors flex items-center space-x-2"
+                              >
+                                <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                                <span>登入</span>
+                              </button>
+                              
+                              <button
+                                onClick={() => {
+                                  router.push('/aihome/auth/register');
+                                  setShowMobileMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-[#4B4036] hover:bg-[#FFD59A]/20 transition-colors flex items-center space-x-2"
+                              >
+                                <UserPlusIcon className="w-5 h-5" />
+                                <span>註冊</span>
                               </button>
                             </>
                           )}

@@ -58,7 +58,6 @@ export async function calculateRemainingLessons(
 
   try {
     // 優先使用修復版 SQL 函數，確保包含剩餘堂數為 0 的學生
-    console.log('嘗試使用修復版 SQL 函數計算單個學生剩餘堂數');
     const { data: remainingData, error: remainingError } = await (supabase as any)
       .rpc('calculate_remaining_lessons_batch_fixed', {
         student_ids: [studentId],
@@ -66,8 +65,6 @@ export async function calculateRemainingLessons(
       });
 
     if (remainingError) {
-      console.error('修復版 SQL 查詢失敗，嘗試使用原始函數:', remainingError);
-      
       // 嘗試使用原始函數作為備用
       const { data: originalData, error: originalError } = await (supabase as any)
         .rpc('calculate_remaining_lessons_batch', {
@@ -76,11 +73,9 @@ export async function calculateRemainingLessons(
         });
 
       if (originalError) {
-        console.error('原始 SQL 查詢也失敗，回退到原始方法:', originalError);
+        // 兩個 RPC 函數都失敗，回退到原始方法
         return await calculateRemainingLessonsFallback(studentId, today);
       }
-
-      console.log('原始 SQL 查詢剩餘堂數結果:', originalData);
 
       // 返回結果
       if (originalData && Array.isArray(originalData) && originalData.length > 0) {
@@ -90,8 +85,6 @@ export async function calculateRemainingLessons(
       return 0;
     }
 
-    console.log('修復版 SQL 查詢剩餘堂數結果:', remainingData);
-
     // 返回結果
     if (remainingData && Array.isArray(remainingData) && remainingData.length > 0) {
       return remainingData[0].remaining_lessons || 0;
@@ -99,7 +92,6 @@ export async function calculateRemainingLessons(
 
     return 0;
   } catch (error) {
-    console.error('計算剩餘堂數時發生錯誤:', error);
     // 回退到原始方法
     return await calculateRemainingLessonsFallback(studentId, today);
   }

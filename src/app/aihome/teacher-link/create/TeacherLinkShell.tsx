@@ -355,7 +355,16 @@ export function TeacherLinkShell({
                 setShowOnboardingPage(false);
                 setShowCreatePanel(false);
                 setShowOrganizationSelector(false);
+              } else {
+                // 機構已經正確設置
+                console.log('TeacherLinkShell: 機構已正確設置，不跳轉到選擇頁面');
+                setShowOnboardingPage(false);
+                setShowCreatePanel(false);
+                setShowOrganizationSelector(false);
               }
+              // 如果 localStorage 中有有效的機構，直接返回，不執行後續的跳轉檢查
+              console.log('TeacherLinkShell: localStorage 中有有效機構，跳過跳轉檢查');
+              return;
             } else {
               console.warn('TeacherLinkShell: localStorage 中的機構不在列表中，清除 localStorage');
               // 如果 localStorage 中的機構不在列表中，清除它
@@ -667,8 +676,15 @@ export function TeacherLinkShell({
               })()}
               {(() => {
             // 優先級：選擇面板 > 介紹頁面 > 創建面板 > 主內容
-            // 但如果當前路徑是 join-organization，則不顯示選擇面板或介紹頁面
+            // 但如果當前路徑是 join-organization 或 select-organization，則不顯示選擇面板或介紹頁面，直接渲染 children
             const isJoinPage = currentPath?.includes('/join-organization');
+            const isSelectPage = currentPath?.includes('/select-organization');
+            
+            // 如果在選擇機構頁面或加入機構頁面，直接渲染 children
+            if (isSelectPage || isJoinPage) {
+              console.log('TeacherLinkShell: 在選擇/加入機構頁面，直接渲染 children');
+              return children;
+            }
             
             if (showOrganizationSelector && !isJoinPage) {
               console.log('TeacherLinkShell: 渲染選擇面板');

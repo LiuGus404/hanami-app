@@ -109,67 +109,45 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
 
     const fetchStudent = async () => {
       try {
-        const { data: inactiveData } = await supabase
-          .from('inactive_student_list')
-          .select('*')
-          .eq('id', studentId)
-          .eq('org_id', orgId)
-          .maybeSingle();
+        // 使用 API 端點獲取學生資料（繞過 RLS）
+        const response = await fetch(
+          `/api/students/${studentId}?orgId=${encodeURIComponent(orgId || '')}`
+        );
 
-        if (inactiveData) {
-          const convertedStudent = {
-            ...inactiveData,
-            id: inactiveData.original_id,
-            original_id: inactiveData.original_id,
-            student_type: inactiveData.student_type === 'regular' ? '常規' : '試堂',
-            is_inactive: true,
-            inactive_date: inactiveData.inactive_date,
-            inactive_reason: inactiveData.inactive_reason,
-          };
-          setStudent(convertedStudent);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error || '找不到學生資料或您沒有權限存取。';
+          setError(errorMessage);
+          setStudent(null);
+          setPageLoading(false);
+          loadingRef.current = false;
+          return;
+        }
+
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+          setError('找不到學生資料或您沒有權限存取。');
+          setStudent(null);
+          setPageLoading(false);
+          loadingRef.current = false;
+          return;
+        }
+
+        const studentData = result.data;
+        
+        // 檢查是否為停用學生
+        if (result.isInactive) {
           setIsInactiveStudent(true);
-          setPageLoading(false);
-          dataFetchedRef.current = true;
-          loadingRef.current = false;
-          await checkLessonData(convertedStudent.original_id || convertedStudent.id);
-          return;
+          await checkLessonData(studentData.original_id || studentData.id);
+        } else {
+          setIsInactiveStudent(false);
+          await checkLessonData(studentData.id);
         }
 
-        const { data: regularStudent } = await supabase
-          .from('Hanami_Students')
-          .select('*')
-          .eq('id', studentId)
-          .eq('org_id', orgId)
-          .maybeSingle();
-
-        if (regularStudent) {
-          setStudent(regularStudent);
-          setPageLoading(false);
-          dataFetchedRef.current = true;
-          loadingRef.current = false;
-          await checkLessonData(regularStudent.id);
-          return;
-        }
-
-        const { data: trialStudent } = await supabase
-          .from('hanami_trial_students')
-          .select('*')
-          .eq('id', studentId)
-          .eq('org_id', orgId)
-          .maybeSingle();
-
-        if (trialStudent) {
-          setStudent(trialStudent);
-          setPageLoading(false);
-          dataFetchedRef.current = true;
-          loadingRef.current = false;
-          await checkLessonData(trialStudent.id);
-          return;
-        }
-
-        setError('找不到學生資料或您沒有權限存取。');
-        setStudent(null);
+        setStudent(studentData);
         setPageLoading(false);
+        dataFetchedRef.current = true;
         loadingRef.current = false;
       } catch (err) {
         console.error('Teacher Link: 載入學生資料時發生錯誤', err);

@@ -12,6 +12,8 @@ export async function GET(
 ) {
   try {
     const studentId = params.id;
+    const { searchParams } = new URL(request.url);
+    const orgId = searchParams.get('orgId');
 
     if (!studentId) {
       return NextResponse.json(
@@ -39,15 +41,70 @@ export async function GET(
       }
     });
 
-    // 獲取學生資訊
-    const { data: student, error } = await supabase
+    // 如果提供了 orgId，先檢查停用學生列表
+    if (orgId) {
+      const { data: inactiveData } = await supabase
+        .from('inactive_student_list')
+        .select('*')
+        .eq('id', studentId)
+        .eq('org_id', orgId)
+        .maybeSingle();
+
+      if (inactiveData) {
+        const convertedStudent = {
+          ...inactiveData,
+          id: inactiveData.original_id,
+          original_id: inactiveData.original_id,
+          student_type: inactiveData.student_type === 'regular' ? '常規' : '試堂',
+          is_inactive: true,
+          inactive_date: inactiveData.inactive_date,
+          inactive_reason: inactiveData.inactive_reason,
+        };
+        return NextResponse.json({
+          success: true,
+          data: convertedStudent,
+          isInactive: true
+        });
+      }
+
+      // 檢查試堂學生
+      const { data: trialStudent } = await supabase
+        .from('hanami_trial_students')
+        .select('*')
+        .eq('id', studentId)
+        .eq('org_id', orgId)
+        .maybeSingle();
+
+      if (trialStudent) {
+        return NextResponse.json({
+          success: true,
+          data: trialStudent,
+          isTrial: true
+        });
+      }
+    }
+
+    // 獲取常規學生資訊
+    let query = supabase
       .from('Hanami_Students')
       .select('*')
-      .eq('id', studentId)
-      .single();
+      .eq('id', studentId);
+
+    if (orgId) {
+      query = query.eq('org_id', orgId);
+    }
+
+    const { data: student, error } = await query.single();
 
     if (error) {
       console.error('獲取學生資訊失敗:', error);
+      // 如果提供了 orgId 但找不到，返回 404
+      if (orgId) {
+        return NextResponse.json(
+          { error: '找不到學生資料或您沒有權限存取。' },
+          { status: 404 }
+        );
+      }
       return NextResponse.json(
         { error: '獲取學生資訊失敗' },
         { status: 500 }
@@ -56,7 +113,7 @@ export async function GET(
 
     if (!student) {
       return NextResponse.json(
-        { error: '找不到學生' },
+        { error: orgId ? '找不到學生資料或您沒有權限存取。' : '找不到學生' },
         { status: 404 }
       );
     }
