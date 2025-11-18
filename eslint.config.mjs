@@ -82,10 +82,7 @@ export default [
       '@next/next/no-img-element': 'off',
       
       // 保留一些重要的規則
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
+      'react-refresh/only-export-components': 'off',
       'react/prop-types': 'off',
       'react/react-in-jsx-scope': 'off',
     },

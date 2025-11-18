@@ -281,7 +281,7 @@ export function TeacherLinkShell({
                 const storedOrg = JSON.parse(stored);
                 localStorageOrgId = storedOrg.id || null;
                 // 檢查 localStorage 中的機構是否在列表中
-                hasValidLocalStorageOrg = localStorageOrgId && allOrgs.some(org => org.orgId === localStorageOrgId);
+                hasValidLocalStorageOrg = !!(localStorageOrgId && allOrgs.some(org => org.orgId === localStorageOrgId));
                 console.log('TeacherLinkShell: 從 localStorage 讀取機構 ID:', localStorageOrgId, '是否有效:', hasValidLocalStorageOrg);
               }
             } catch (error) {
