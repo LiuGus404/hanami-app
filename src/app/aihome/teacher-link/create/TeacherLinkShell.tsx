@@ -157,6 +157,23 @@ export function TeacherLinkShell({
     const isSelectPage = currentPath?.includes('/select-organization');
     const isJoinPage = currentPath?.includes('/join-organization');
     
+    // 檢查 localStorage 中是否有有效的機構（在開始解析之前）
+    let hasValidLocalStorageOrgEarly = false;
+    if (typeof window !== 'undefined' && isCreatePage) {
+      try {
+        const stored = localStorage.getItem('hanami_current_org');
+        if (stored) {
+          const storedOrg = JSON.parse(stored);
+          const storedOrgId = storedOrg.id || null;
+          // 如果 localStorage 中有機構 ID，標記為有效（稍後會驗證是否在列表中）
+          hasValidLocalStorageOrgEarly = Boolean(storedOrgId) && storedOrgId !== UNASSIGNED_ORG.id && storedOrgId !== 'default-org';
+          console.log('TeacherLinkShell: 提前檢查 localStorage 機構:', storedOrgId, '是否有效:', hasValidLocalStorageOrgEarly);
+        }
+      } catch (error) {
+        console.error('TeacherLinkShell: 提前讀取 localStorage 失敗', error);
+      }
+    }
+    
     // 如果路徑變化且不是主創建頁面，重置跳轉標記（允許用戶之後回到主創建頁面時可以跳轉）
     if (lastResolvedPathRef.current && lastResolvedPathRef.current !== currentPath && !isCreatePage) {
       redirectingToSelectRef.current = false;
@@ -164,8 +181,35 @@ export function TeacherLinkShell({
     
     // 如果已經完成機構解析，且當前路徑與上次解析的路徑相同，且不是主創建頁面，則不重新執行
     // 這樣可以避免在子頁面中點擊按鈕時觸發重新解析
+    // 如果是主創建頁面，但 localStorage 中有有效的機構，也跳過重新執行（避免不必要的跳轉）
     if (orgResolvedRef.current && lastResolvedPathRef.current === currentPath && !isCreatePage && !isSelectPage && !isJoinPage) {
       console.log('TeacherLinkShell: 已在子頁面完成機構解析，跳過重新執行');
+      return;
+    }
+    
+    // 如果是主創建頁面，且已經完成過解析，且 localStorage 中有有效的機構，跳過重新執行
+    if (orgResolvedRef.current && isCreatePage && hasValidLocalStorageOrgEarly && !isSelectPage && !isJoinPage) {
+      console.log('TeacherLinkShell: 在主創建頁面，已解析過且 localStorage 中有有效機構，跳過重新執行');
+      // 確保機構狀態已設置（如果還沒設置）
+      if (organization?.id === UNASSIGNED_ORG.id || !organization?.id) {
+        try {
+          const stored = localStorage.getItem('hanami_current_org');
+          if (stored) {
+            const storedOrg = JSON.parse(stored);
+            setOrganization({
+              id: storedOrg.id,
+              name: storedOrg.name,
+              slug: storedOrg.slug,
+              status: storedOrg.status === 'active' ? 'active' : null,
+            });
+            setShowOnboardingPage(false);
+            setShowCreatePanel(false);
+            setShowOrganizationSelector(false);
+          }
+        } catch (error) {
+          console.error('TeacherLinkShell: 恢復機構狀態失敗', error);
+        }
+      }
       return;
     }
 
@@ -227,12 +271,32 @@ export function TeacherLinkShell({
           const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
           const urlOrgId = urlParams?.get('orgId');
           
+          // 優先從 localStorage 讀取機構 ID（在檢查跳轉條件之前）
+          let localStorageOrgId: string | null = null;
+          let hasValidLocalStorageOrg = false;
+          if (typeof window !== 'undefined') {
+            try {
+              const stored = localStorage.getItem('hanami_current_org');
+              if (stored) {
+                const storedOrg = JSON.parse(stored);
+                localStorageOrgId = storedOrg.id || null;
+                // 檢查 localStorage 中的機構是否在列表中
+                hasValidLocalStorageOrg = localStorageOrgId && allOrgs.some(org => org.orgId === localStorageOrgId);
+                console.log('TeacherLinkShell: 從 localStorage 讀取機構 ID:', localStorageOrgId, '是否有效:', hasValidLocalStorageOrg);
+              }
+            } catch (error) {
+              console.error('TeacherLinkShell: read stored org failed', error);
+            }
+          }
+          
           console.log('TeacherLinkShell: 路徑檢查', {
             isSelectPage,
             isJoinPage,
             isCreatePage,
             currentPath,
             urlOrgId,
+            localStorageOrgId,
+            hasValidLocalStorageOrg,
             redirectingToSelectRef: redirectingToSelectRef.current,
           });
           
@@ -274,55 +338,49 @@ export function TeacherLinkShell({
             }
           }
           
-          // 如果沒有 URL 參數，嘗試從 localStorage 恢復機構
-          if (!urlOrgId) {
-            let preferredOrgId: string | null = null;
-            if (typeof window !== 'undefined') {
-              try {
-                const stored = localStorage.getItem('hanami_current_org');
-                if (stored) {
-                  const storedOrg = JSON.parse(stored);
-                  preferredOrgId = storedOrg.id;
-                }
-              } catch (error) {
-                console.error('TeacherLinkShell: read stored org failed', error);
+          // 如果沒有 URL 參數，但 localStorage 中有有效的機構，優先恢復它
+          if (!urlOrgId && hasValidLocalStorageOrg && localStorageOrgId) {
+            const preferredOrg = allOrgs.find(org => org.orgId === localStorageOrgId);
+            if (preferredOrg) {
+              const currentOrgId = organization?.id ?? null;
+              // 只有當前機構與 localStorage 不一致時才更新
+              if (currentOrgId !== localStorageOrgId) {
+                console.log('TeacherLinkShell: 從 localStorage 恢復機構', preferredOrg);
+                setOrganization({
+                  id: preferredOrg.orgId,
+                  name: preferredOrg.orgName,
+                  slug: preferredOrg.orgSlug,
+                  status: preferredOrg.status === 'active' ? 'active' : null,
+                });
+                setShowOnboardingPage(false);
+                setShowCreatePanel(false);
+                setShowOrganizationSelector(false);
               }
-            }
-            
-            // 如果找到上次選擇的機構且在列表中，使用它
-            if (preferredOrgId) {
-              const preferredOrg = allOrgs.find(org => org.orgId === preferredOrgId);
-              if (preferredOrg) {
-                const currentOrgId = organization?.id ?? null;
-                // 只有當前機構與 localStorage 不一致時才更新
-                if (currentOrgId !== preferredOrgId) {
-                  console.log('TeacherLinkShell: 從 localStorage 恢復機構', preferredOrg);
-                  setOrganization({
-                    id: preferredOrg.orgId,
-                    name: preferredOrg.orgName,
-                    slug: preferredOrg.orgSlug,
-                    status: preferredOrg.status === 'active' ? 'active' : null,
-                  });
-                  setShowOnboardingPage(false);
-                  setShowCreatePanel(false);
-                  setShowOrganizationSelector(false);
-                }
+            } else {
+              console.warn('TeacherLinkShell: localStorage 中的機構不在列表中，清除 localStorage');
+              // 如果 localStorage 中的機構不在列表中，清除它
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('hanami_current_org');
               }
+              hasValidLocalStorageOrg = false;
+              localStorageOrgId = null;
             }
-            // 注意：即使只有一個機構，也應該顯示選擇面板，讓用戶可以選擇使用該機構、加入其他機構或創建新機構
-            // 不再自動選擇單一機構
           }
           
-          // 檢查當前是否有有效的機構 ID（從 localStorage 或已設置的 organization）
-          // 注意：這裡需要檢查設置後的 organization 狀態，而不是依賴 hasValidOrgId（它在組件頂部計算，可能還沒更新）
-          const currentOrgId = organization?.id ?? null;
-          const hasCurrentValidOrgId = Boolean(currentOrgId) && currentOrgId !== UNASSIGNED_ORG.id && currentOrgId !== 'default-org';
+          // 檢查當前是否有有效的機構 ID（優先使用 localStorage 的值，因為狀態可能還沒更新）
+          const effectiveOrgId = localStorageOrgId || organization?.id || null;
+          const hasCurrentValidOrgId = Boolean(effectiveOrgId) && effectiveOrgId !== UNASSIGNED_ORG.id && effectiveOrgId !== 'default-org';
           
           // 只有在主創建頁面時才跳轉到選擇機構頁面
           // 子頁面（如 /student-progress）不應該觸發跳轉
-          const hasLocalStorageOrg = typeof window !== 'undefined' && localStorage.getItem('hanami_current_org');
-          if (isCreatePage && !isSelectPage && !isJoinPage && !redirectingToSelectRef.current && !hasCurrentValidOrgId && !urlOrgId && !hasLocalStorageOrg) {
-            console.log('TeacherLinkShell: 在主創建頁面，有機構身份但未選中機構，跳轉到選擇機構頁面');
+          // 如果 localStorage 中有有效的機構，也不跳轉（即使當前狀態還沒更新）
+          if (isCreatePage && !isSelectPage && !isJoinPage && !redirectingToSelectRef.current && !hasCurrentValidOrgId && !urlOrgId && !hasValidLocalStorageOrg) {
+            console.log('TeacherLinkShell: 在主創建頁面，有機構身份但未選中機構，跳轉到選擇機構頁面', {
+              hasCurrentValidOrgId,
+              urlOrgId,
+              hasValidLocalStorageOrg,
+              effectiveOrgId,
+            });
             // 先重置狀態，避免顯示介紹頁面
             setShowOnboardingPage(false);
             setShowCreatePanel(false);
@@ -330,6 +388,14 @@ export function TeacherLinkShell({
             redirectingToSelectRef.current = true;
             router.replace('/aihome/teacher-link/create/select-organization');
             return; // 提前返回，不設置其他狀態
+          }
+          
+          // 如果有 localStorage 中的機構但當前狀態還沒更新，確保不顯示選擇面板
+          if (hasValidLocalStorageOrg && !hasCurrentValidOrgId) {
+            console.log('TeacherLinkShell: localStorage 中有有效機構，等待狀態更新，不顯示選擇面板');
+            setShowOrganizationSelector(false);
+            setShowOnboardingPage(false);
+            setShowCreatePanel(false);
           }
           
           // 如果在選擇機構頁面，設置選擇面板狀態

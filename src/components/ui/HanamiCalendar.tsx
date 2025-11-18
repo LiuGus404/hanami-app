@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import { Spinner } from '@/components/ui/spinner';
@@ -110,6 +111,7 @@ interface HanamiCalendarProps {
 }
 
 const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail = null }: HanamiCalendarProps = {}) => {
+  const router = useRouter();
   const [view, setView] = useState<'day' | 'week' | 'month'>('day');
   const [currentDate, setCurrentDate] = useState(getHongKongDate());
   const supabase = getSupabaseClient();
@@ -1067,7 +1069,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             minWidth: '60px',
             backgroundColor: bgColor,
           }}
-          onClick={() => window.location.href = `/admin/students/${nameObj.student_id}`}
+          onClick={() => router.push(`/aihome/teacher-link/create/students/${nameObj.student_id}`)}
         >
           {nameObj.name}
           {nameObj.age ? (
