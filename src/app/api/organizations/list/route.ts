@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     // 構建查詢
     let query = supabase
       .from('hanami_organizations')
-      .select('id, org_name, org_slug, contact_phone, contact_email, settings, created_at')
+      .select('id, org_name, org_slug, status, contact_phone, contact_email, settings, created_at')
       .order('org_name', { ascending: true });
 
     if (status && status !== 'all') {

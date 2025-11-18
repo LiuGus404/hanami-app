@@ -1,30 +1,51 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   SparklesIcon,
   UserGroupIcon,
   AcademicCapIcon,
   HeartIcon,
   ArrowRightIcon,
-  PlayIcon
+  PlayIcon,
+  Bars3Icon,
+  Cog6ToothIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import LuLuCharacterWithBubble from '@/components/3d/LuLuCharacterWithBubble';
-import MobileBottomNavigation from '@/components/ui/MobileBottomNavigation';
+import AppSidebar from '@/components/AppSidebar';
 
-export default function Home() {
-  const { user, loading } = useSaasAuth();
+export default function AIHomePage() {
+  const { user: saasUser, loading } = useSaasAuth();
   const router = useRouter();
   const [isLoaded, setIsLoaded] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
+
+  // 處理登入按鈕點擊
+  const handleLoginClick = () => {
+    console.log('登入按鈕被點擊，當前用戶狀態:', { user: !!saasUser, loading });
+    
+    if (saasUser) {
+      // 用戶已登入，直接跳轉到儀表板
+      console.log('🎯 用戶已登入，直接跳轉到儀表板');
+      router.push('/aihome/dashboard');
+    } else {
+      // 用戶未登入，跳轉到登入頁面
+      console.log('🔐 用戶未登入，跳轉到登入頁面');
+      router.push('/aihome/auth/login?redirect=/aihome/dashboard');
+    }
+  };
 
   if (loading) {
     return (
@@ -39,67 +60,174 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
-      {/* 導航欄 */}
-      <nav className="relative z-10 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 relative">
-              <img 
-                src="/@hanami.png" 
-                alt="HanamiEcho Logo" 
-                className="w-full h-full object-contain"
-              />
+      <AppSidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)}
+        currentPath="/aihome"
+      />
+      
+      {/* 頂部導航欄 - 參考 ai-companions 設計 */}
+      <nav className="bg-transparent border-b border-[#EADBC8]/50 sticky top-0 z-50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-1 min-w-0">
+              {/* 選單按鈕 */}
+              <motion.button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors relative z-40 flex-shrink-0"
+                title={sidebarOpen ? "關閉選單" : "開啟選單"}
+              >
+                <Bars3Icon className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
+              </motion.button>
+              
+              <div className="w-8 h-8 sm:w-10 sm:h-10 relative flex-shrink-0">
+                <Image
+                  src="/@hanami.png"
+                  alt="HanamiEcho Logo"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              
+              <div className="min-w-0 flex-1">
+                {/* 桌面版：顯示完整標題 */}
+                <div className="hidden sm:block">
+                  <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
+                  <p className="text-sm text-[#2B3A3B]">兒童與成人的智能夥伴</p>
+                </div>
+                
+                {/* 移動端：只顯示標題 */}
+                <div className="block sm:hidden">
+                  <h1 className="text-lg font-bold text-[#4B4036]">
+                    HanamiEcho
+                  </h1>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-              <p className="text-sm text-[#2B3A3B]">兒童與成人的智能伙伴</p>
+
+            <div className="flex items-center space-x-4">
+              {/* 桌面版：顯示完整的導航按鈕 */}
+              <div className="hidden md:flex items-center space-x-4">
+                <button
+                  onClick={() => router.push('/aihome/course-activities')}
+                  className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors font-medium"
+                >
+                  探索課程
+                </button>
+                {saasUser ? (
+                  <>
+                    <button
+                      onClick={() => router.push('/aihome/dashboard')}
+                      className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors font-medium"
+                    >
+                      管理面板
+                    </button>
+                    <button
+                      onClick={() => router.push('/aihome/subscription')}
+                      className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors font-medium"
+                    >
+                      訂閱管理
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleLoginClick}
+                      className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors font-medium"
+                    >
+                      登入
+                    </button>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => router.push('/aihome/auth/register')}
+                      className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                    >
+                      開始使用
+                    </motion.button>
+                  </>
+                )}
+              </div>
+
+              {/* 移動端：齒輪圖標按鈕 + 下拉選單 */}
+              <div className="flex md:hidden items-center space-x-2 relative">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowMobileMenu(!showMobileMenu)}
+                  className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                >
+                  <Cog6ToothIcon className="w-6 h-6 text-[#4B4036]" />
+                </motion.button>
+                
+                {/* 下拉選單 */}
+                <AnimatePresence>
+                  {showMobileMenu && (
+                    <>
+                      {/* 背景遮罩 */}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+                        onClick={() => setShowMobileMenu(false)}
+                      />
+                      
+                      {/* 選單內容 */}
+                      <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-[#EADBC8] z-50 overflow-hidden"
+                      >
+                        <div className="py-2">
+                          <button
+                            onClick={() => {
+                              router.push('/aihome/course-activities');
+                              setShowMobileMenu(false);
+                            }}
+                            className="w-full px-4 py-3 text-left text-[#4B4036] hover:bg-[#FFD59A]/20 transition-colors flex items-center space-x-2"
+                          >
+                            <AcademicCapIcon className="w-5 h-5" />
+                            <span>探索課程</span>
+                          </button>
+                          
+                          {saasUser && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  router.push('/aihome/dashboard');
+                                  setShowMobileMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-[#4B4036] hover:bg-[#FFD59A]/20 transition-colors flex items-center space-x-2"
+                              >
+                                <SparklesIcon className="w-5 h-5" />
+                                <span>管理面板</span>
+                              </button>
+                              
+                              <button
+                                onClick={() => {
+                                  router.push('/aihome/subscription');
+                                  setShowMobileMenu(false);
+                                }}
+                                className="w-full px-4 py-3 text-left text-[#4B4036] hover:bg-[#FFD59A]/20 transition-colors flex items-center space-x-2"
+                              >
+                                <HeartIcon className="w-5 h-5" />
+                                <span>訂閱管理</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.push('/admin')}
-              className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
-            >
-              花見音樂
-            </button>
-            <button
-              onClick={() => router.push('/aihome/course-activities')}
-              className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
-            >
-              探索課程
-            </button>
-            {user ? (
-              <>
-                <button
-                  onClick={() => router.push('/aihome/dashboard')}
-                  className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
-                >
-                  儀表板
-                </button>
-                <button
-                  onClick={() => router.push('/aihome/subscription')}
-                  className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
-                >
-                  訂閱管理
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => router.push('/aihome/auth/login')}
-                  className="text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
-                >
-                  登入
-                </button>
-                <button
-                  onClick={() => router.push('/aihome/auth/register')}
-                  className="bg-[#FFD59A] hover:bg-[#EBC9A4] text-[#2B3A3B] px-6 py-2 rounded-full font-medium transition-colors"
-                >
-                  開始使用
-                </button>
-              </>
-            )}
           </div>
         </div>
       </nav>
@@ -122,11 +250,11 @@ export default function Home() {
                   <span className="text-[#FFD59A] block">HanamiEcho</span>
                 </h1>
                 <p className="text-xl text-[#2B3A3B] mb-8 max-w-2xl">
-                  您的智能 AI 助手，為兒童和成人提供個性化的協作體驗和情感支持
+                  您的智能 AI 助手，您和孩子專屬的學習和工作夥伴
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                  {user ? (
+                  {saasUser ? (
                     <HanamiButton
                       onClick={() => router.push('/aihome/dashboard')}
                       size="lg"
@@ -261,7 +389,7 @@ export default function Home() {
                   開始使用
                   <ArrowRightIcon className="w-6 h-6 ml-2" />
                 </HanamiButton>
-                {!user && (
+                {!saasUser && (
                   <HanamiButton
                     onClick={() => router.push('/aihome/auth/register')}
                     variant="secondary"
@@ -276,9 +404,6 @@ export default function Home() {
           </div>
         </section>
       </main>
-      
-      {/* 響應式底部導航 - 只在手機/平板/窄螢幕時顯示 */}
-      <MobileBottomNavigation />
     </div>
   );
 }

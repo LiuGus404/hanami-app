@@ -165,28 +165,80 @@ export default function CourseActivitiesPage() {
         setLoadingCourses(true);
         const institutions: Institution[] = [];
         
+        console.log('📥 開始載入機構和課程數據...');
+        
         // 使用 API 端點獲取機構列表（繞過 RLS）
-        const orgResponse = await fetch('/api/organizations/list?status=active');
+        // 先獲取所有機構（包括 inactive），因為課程可能屬於 inactive 機構
+        // 但在顯示時會過濾掉 inactive 的機構
+        const orgResponse = await fetch('/api/organizations/list?status=all', {
+          credentials: 'include',
+        });
         let orgList: any[] = [];
+        let allOrgList: any[] = []; // 保存所有機構（用於課程分配）
         
         if (orgResponse.ok) {
           const orgData = await orgResponse.json();
-          orgList = orgData.data || [];
+          console.log('✅ 機構 API 響應:', { success: orgData.success, count: orgData.count, hasData: !!orgData.data });
+          allOrgList = orgData.data || [];
+          
+          // 調試：顯示每個機構的狀態
+          console.log('🔍 機構狀態檢查:', allOrgList.map((org: any) => ({ 
+            id: org.id, 
+            name: org.org_name, 
+            status: org.status,
+            statusType: typeof org.status,
+            statusValue: JSON.stringify(org.status)
+          })));
+          
+          // 過濾掉 inactive 的機構，只保留 active 和 suspended 的機構用於顯示
+          orgList = allOrgList.filter((org: any) => {
+            // 確保 status 存在且不為 'inactive'
+            const status = org.status;
+            // 轉換為字符串並轉小寫進行比較，處理可能的類型問題
+            const statusStr = String(status || '').toLowerCase().trim();
+            const isActive = statusStr !== 'inactive' && statusStr !== '' && status !== null && status !== undefined;
+            
+            if (!isActive) {
+              console.log(`🚫 過濾掉機構: ${org.org_name} (status: ${JSON.stringify(status)}, statusStr: ${statusStr})`);
+            } else {
+              console.log(`✅ 保留機構: ${org.org_name} (status: ${JSON.stringify(status)}, statusStr: ${statusStr})`);
+            }
+            return isActive;
+          });
+          console.log(`📋 載入 ${allOrgList.length} 個機構 (所有狀態)，顯示 ${orgList.length} 個機構 (過濾掉 inactive)`);
+          console.log('✅ 顯示的機構:', orgList.map((org: any) => ({ name: org.org_name, status: org.status })));
+          console.log('🚫 被過濾的機構:', allOrgList.filter((org: any) => {
+            const statusStr = String(org.status || '').toLowerCase().trim();
+            return statusStr === 'inactive' || org.status === null || org.status === undefined;
+          }).map((org: any) => ({ name: org.org_name, status: org.status })));
+          
+          // 創建機構 ID 到機構對象的映射（使用所有機構，確保課程能正確分配）
+          const orgMap = new Map(allOrgList.map((org: any) => [org.id, org]));
+          console.log('🗺️ 機構映射表:', Array.from(orgMap.keys()));
         } else {
-          console.error('獲取機構列表失敗:', await orgResponse.json().catch(() => ({})));
+          const errorData = await orgResponse.json().catch(() => ({ error: '無法解析錯誤響應' }));
+          console.error('❌ 獲取機構列表失敗:', orgResponse.status, errorData);
         }
 
         // 使用 API 端點獲取課程列表（繞過 RLS）
-        const coursesResponse = await fetch('/api/courses/list?status=true');
+        const coursesResponse = await fetch('/api/courses/list?status=true', {
+          credentials: 'include',
+        });
         let courseTypes: any[] = [];
         
         if (coursesResponse.ok) {
           const coursesData = await coursesResponse.json();
+          console.log('✅ 課程 API 響應:', { success: coursesData.success, count: coursesData.count, hasData: !!coursesData.data });
           courseTypes = coursesData.data || [];
+          console.log(`📚 載入 ${courseTypes.length} 個課程`);
         } else {
-          console.error('獲取課程列表失敗:', await coursesResponse.json().catch(() => ({})));
+          const errorData = await coursesResponse.json().catch(() => ({ error: '無法解析錯誤響應' }));
+          console.error('❌ 獲取課程列表失敗:', coursesResponse.status, errorData);
         }
 
+        // 創建機構 ID 到機構對象的映射（使用所有機構，包括 inactive，確保課程能正確分配）
+        const orgMap = new Map((allOrgList.length > 0 ? allOrgList : orgList).map((org: any) => [org.id, org]));
+        
         const orgIdToCourses: Record<string, Course[]> = {};
         const buildCourse = (ct: any, orgSettings: any): Course => {
                 const images = Array.isArray(ct.images) ? ct.images : [];
@@ -226,12 +278,35 @@ export default function CourseActivitiesPage() {
           } as Course;
         };
 
+        // 將課程分配到對應的機構
         if (courseTypes && courseTypes.length > 0) {
-          // 先初始化 map
           courseTypes.forEach((ct: any) => {
-            const key = ct.org_id || 'unknown';
-            if (!orgIdToCourses[key]) orgIdToCourses[key] = [];
+            const orgId = ct.org_id;
+            if (orgId && orgMap.has(orgId)) {
+              const org = orgMap.get(orgId);
+              const orgStatus = org?.status;
+              
+              // 只將課程分配給 active 或 suspended 的機構（不分配給 inactive 機構）
+              if (orgStatus && orgStatus !== 'inactive') {
+                if (!orgIdToCourses[orgId]) {
+                  orgIdToCourses[orgId] = [];
+                }
+                const orgSettings = (org?.settings as any) || {};
+                orgIdToCourses[orgId].push(buildCourse(ct, orgSettings));
+                console.log(`✅ 課程 "${ct.name}" 分配給機構 "${org?.org_name}" (status: ${orgStatus})`);
+              } else {
+                console.log(`🚫 課程 "${ct.name}" 屬於 inactive 機構 "${org?.org_name}"，不分配`);
+              }
+            } else {
+              // 課程沒有 org_id 或機構不存在，記錄警告
+              console.warn(`⚠️ 課程 "${ct.name}" (${ct.id}) 沒有有效的 org_id 或機構不存在:`, orgId);
+            }
           });
+          
+          console.log('📊 課程分配統計（只包含 active/suspended 機構）:', Object.keys(orgIdToCourses).map(orgId => {
+            const org = orgMap.get(orgId);
+            return `${org?.org_name || orgId} (${org?.status}): ${orgIdToCourses[orgId].length} 個課程`;
+          }));
         }
 
         if (orgList && orgList.length > 0) {
@@ -239,7 +314,8 @@ export default function CourseActivitiesPage() {
           const orgIds = orgList.map((org: any) => org.id);
           
           const statsResponse = await fetch(
-            `/api/organizations/stats?orgIds=${orgIds.join(',')}`
+            `/api/organizations/stats?orgIds=${orgIds.join(',')}`,
+            { credentials: 'include' }
           );
           
           const likeCountMap: Record<string, number> = {};
@@ -257,12 +333,14 @@ export default function CourseActivitiesPage() {
             console.error('獲取機構統計失敗:', await statsResponse.json().catch(() => ({})));
           }
           
+          // 顯示所有 active/suspended 的機構，即使沒有課程
           for (const org of orgList as any[]) {
             const settings = (org.settings as any) || {};
-            const coursesForOrg: Course[] = (courseTypes || [])
-              .filter((ct: any) => ct.org_id === org.id)
-              .map((ct: any) => buildCourse(ct, settings));
+            const coursesForOrg: Course[] = orgIdToCourses[org.id] || [];
+            
+            console.log(`📝 處理機構: ${org.org_name} (status: ${org.status}), 課程數: ${coursesForOrg.length}`);
 
+            // 顯示所有機構，即使沒有課程
             institutions.push({
               id: org.id,
               name: org.org_name,
@@ -286,11 +364,19 @@ export default function CourseActivitiesPage() {
               }
             });
           }
+        } else {
+          console.warn('⚠️ orgList 為空，無法構建機構列表');
         }
 
         // 不再添加默認的「花見音樂」課程，完全依賴資料庫中的機構與課程
 
         console.log('📋 最終機構列表:', institutions.map(i => ({ id: i.id, name: i.name, hasOrgData: !!i.orgData, coursesCount: i.courses.length })));
+        console.log(`✅ 總共載入 ${institutions.length} 個機構，${institutions.reduce((sum, inst) => sum + inst.courses.length, 0)} 個課程`);
+        
+        if (institutions.length === 0) {
+          console.warn('⚠️ 沒有載入到任何機構，可能的原因：1) 資料庫中沒有機構 2) API 端點錯誤 3) RLS 策略問題');
+        }
+        
         setCourseActivities(institutions);
       } catch (error) {
         console.error('載入課程活動失敗:', error);

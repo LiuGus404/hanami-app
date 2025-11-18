@@ -431,6 +431,12 @@ export async function getUserOrganizations(
   const orgMap = new Map<string, UserOrganizationIdentity>();
 
   for (const identity of allIdentities) {
+    // 過濾掉 inactive 的機構
+    if (identity.status === 'inactive') {
+      console.log(`getUserOrganizations: 過濾掉 inactive 機構 ${identity.orgName} (${identity.orgId})`);
+      continue;
+    }
+
     const existing = orgMap.get(identity.orgId);
 
     if (!existing) {
