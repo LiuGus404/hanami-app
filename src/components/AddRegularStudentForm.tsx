@@ -456,31 +456,25 @@ export default function AddRegularStudentForm({
         };
       }
       
-      // 先檢查是否已存在
-      const { data: existingData } = await supabase
-        .from(table)
-        .select('id')
-        .eq('id', formData.id)
-        .single();
+      // 使用 API 路由創建/更新學生（繞過 RLS）
+      const response = await fetch('/api/students', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentData: payload,
+          orgId: orgId || null,
+          table: table,
+        }),
+      });
 
-      let error;
-      if (existingData) {
-        // 如果存在，則更新
-        const { error: updateError } = await supabase
-          .from(table)
-          .update(payload)
-          .eq('id', formData.id);
-        error = updateError;
-      } else {
-        // 如果不存在，則插入
-        const { error: insertError } = await supabase
-          .from(table)
-          .insert([payload]);
-        error = insertError;
-      }
+      const result = await response.json();
 
-      if (error) {
-        alert(`新增或更新失敗：${error.message}`);
+      if (!response.ok || !result.success) {
+        const errorMessage = result.error || '新增或更新失敗';
+        console.error('❌ 創建學生失敗:', result);
+        alert(`新增或更新失敗：${errorMessage}`);
       } else {
         alert(`${formData.student_type === '試堂' ? '試堂學生' : '常規學生'}已成功新增或更新！`);
         window.location.href = redirectPath;
