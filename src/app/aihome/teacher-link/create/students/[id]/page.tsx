@@ -19,7 +19,7 @@ const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
 
 function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
   const router = useRouter();
-  const { organization, orgId, orgDataDisabled } = useTeacherLinkOrganization();
+  const { organization, orgId, orgDataDisabled, organizationResolved } = useTeacherLinkOrganization();
 
   const organizationSettings =
     organization && 'settings' in organization
@@ -68,6 +68,14 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
       return;
     }
 
+    // 如果機構還在解析中，保持載入狀態，不顯示錯誤
+    if (!organizationResolved) {
+      setPageLoading(true);
+      setError(null);
+      return;
+    }
+
+    // 只有在機構解析完成且確實沒有 orgId 時，才顯示錯誤
     if (!orgId) {
       setError('請先建立您的機構後再管理學生資料。');
       setStudent(null);
@@ -159,7 +167,7 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
     };
 
     fetchStudent();
-  }, [studentId, orgId, orgDataDisabled]);
+  }, [studentId, orgId, orgDataDisabled, organizationResolved]);
 
   const handleRestoreStudent = async () => {
     if (!student || !isInactiveStudent || !orgId) return;
@@ -226,8 +234,35 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-b-2 border-[#FCD58B]" />
-          <p className="text-[#2B3A3B]">載入中...</p>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+            className="mb-4"
+          >
+            <div className="relative mx-auto w-20 h-20">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-4 border-[#FFD59A] border-t-transparent"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img
+                  src="/owlui.png"
+                  alt="載入中"
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
+            </div>
+          </motion.div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-[#2B3A3B] font-medium"
+          >
+            載入學生資料中...
+          </motion.p>
         </div>
       </div>
     );

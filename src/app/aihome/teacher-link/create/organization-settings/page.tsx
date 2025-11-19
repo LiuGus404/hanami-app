@@ -10,6 +10,7 @@ import { HanamiButton } from '@/components/ui/HanamiButton';
 import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiSelect from '@/components/ui/HanamiSelect';
 import OrganizationPreviewCard from '@/components/ui/OrganizationPreviewCard';
+import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
 import {
   CATEGORY_GROUPS,
@@ -464,14 +465,7 @@ function OrganizationSettingsContent() {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-full min-h-[320px] items-center justify-center p-8">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#FFD59A]" />
-          <p className="text-[#2B3A3B]">載入機構資料...</p>
-        </div>
-      </div>
-    );
+    return <CuteLoadingSpinner message="載入機構資料..." className="h-full min-h-[320px] p-8" />;
   }
 
   return (

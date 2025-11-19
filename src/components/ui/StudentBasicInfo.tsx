@@ -457,11 +457,28 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           trialPayload[key] = formData[key] === null ? null : formData[key];
         }
       });
-      const { error: trialError } = await supabase
-        .from('hanami_trial_students')
-        .update(trialPayload)
-        .eq('id', formData.id);
-      error = trialError;
+      
+      // 總是使用 API 端點更新（繞過 RLS）
+      // 即使沒有 orgId，也使用 API 端點，因為直接更新會觸發 RLS 無限遞迴
+      try {
+        const response = await fetch(`/api/students/${formData.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            updates: trialPayload,
+            orgId: orgId || null,
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          error = { message: errorData.error || '更新失敗' };
+        }
+      } catch (fetchError) {
+        error = { message: fetchError instanceof Error ? fetchError.message : '更新失敗' };
+      }
     } else {
       // 只傳 Hanami_Students 有的欄位
       const hanamiStudentFields: (keyof StudentFormData)[] = [
@@ -485,11 +502,28 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           studentPayload[key] = formData[key] === null ? null : formData[key];
         }
       });
-      const { error: studentError } = await supabase
-        .from('Hanami_Students')
-        .update(studentPayload)
-        .eq('id', formData.id);
-      error = studentError;
+      
+      // 總是使用 API 端點更新（繞過 RLS）
+      // 即使沒有 orgId，也使用 API 端點，因為直接更新會觸發 RLS 無限遞迴
+      try {
+        const response = await fetch(`/api/students/${formData.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            updates: studentPayload,
+            orgId: orgId || null,
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          error = { message: errorData.error || '更新失敗' };
+        }
+      } catch (fetchError) {
+        error = { message: fetchError instanceof Error ? fetchError.message : '更新失敗' };
+      }
     }
 
     if (error) {

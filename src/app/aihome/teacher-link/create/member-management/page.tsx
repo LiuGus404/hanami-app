@@ -12,6 +12,7 @@ import BackButton from '@/components/ui/BackButton';
 import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiButton from '@/components/ui/HanamiButton';
 import { HanamiSelect } from '@/components/ui/HanamiSelect';
+import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 
 type RoleType = 'owner' | 'admin' | 'teacher' | 'member';
 
@@ -613,27 +614,24 @@ export default function MemberManagementPage() {
 
   // 初始化中或沒有 orgId 時顯示載入狀態
   if (saasAuthLoading || initializing || !orgId) {
+    if (saasAuthLoading || initializing) {
+      return (
+        <CuteLoadingSpinner 
+          message={saasAuthLoading ? '檢查登入狀態...' : '載入中...'} 
+          className="min-h-screen"
+        />
+      );
+    }
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] flex items-center justify-center">
-        <div className="text-center">
-          {(saasAuthLoading || initializing) ? (
-            <div className="space-y-4">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-[#FFD59A] border-t-transparent"></div>
-              <p className="text-[#4B4036] font-medium">
-                {saasAuthLoading ? '檢查登入狀態...' : '載入中...'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-[#4B4036] font-medium">請先選擇機構</p>
-              <HanamiButton
-                onClick={() => router.push('/aihome/teacher-link/create')}
-                variant="primary"
-              >
-                返回選擇機構
-              </HanamiButton>
-            </div>
-          )}
+        <div className="text-center space-y-4">
+          <p className="text-[#4B4036] font-medium">請先選擇機構</p>
+          <HanamiButton
+            onClick={() => router.push('/aihome/teacher-link/create')}
+            variant="primary"
+          >
+            返回選擇機構
+          </HanamiButton>
         </div>
       </div>
     );
@@ -845,7 +843,25 @@ export default function MemberManagementPage() {
 
           {/* 邀請列表 */}
           {loading ? (
-            <div className="text-center py-8 text-[#6E5A4A]">載入中...</div>
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="relative mx-auto w-16 h-16 mb-3">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-3 border-[#FFD59A] border-t-transparent"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <img
+                      src="/owlui.png"
+                      alt="載入中"
+                      className="w-10 h-10 object-contain"
+                    />
+                  </div>
+                </div>
+                <p className="text-[#6E5A4A] text-sm">載入中...</p>
+              </div>
+            </div>
           ) : invitations.length === 0 ? (
             <div className="text-center py-8 text-[#6E5A4A]">暫無邀請ID</div>
           ) : (
@@ -926,7 +942,25 @@ export default function MemberManagementPage() {
           </h2>
 
           {loading ? (
-            <div className="text-center py-8 text-[#6E5A4A]">載入中...</div>
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="relative mx-auto w-16 h-16 mb-3">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-3 border-[#FFD59A] border-t-transparent"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <img
+                      src="/owlui.png"
+                      alt="載入中"
+                      className="w-10 h-10 object-contain"
+                    />
+                  </div>
+                </div>
+                <p className="text-[#6E5A4A] text-sm">載入中...</p>
+              </div>
+            </div>
           ) : identities.length === 0 ? (
             <div className="text-center py-8 text-[#6E5A4A]">暫無成員</div>
           ) : (

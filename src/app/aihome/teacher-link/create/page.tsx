@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { TeacherLinkShell, useTeacherLinkOrganization } from './TeacherLinkShell';
 import { toast } from 'react-hot-toast';
+import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 
 function CreatePageContent() {
   const router = useRouter();
@@ -416,14 +417,7 @@ function CreatePageContent() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex h-full min-h-[320px] items-center justify-center p-8">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#FFD59A]" />
-          <p className="text-[#2B3A3B]">載入管理面板...</p>
-        </div>
-      </div>
-    );
+    return <CuteLoadingSpinner message="載入管理面板..." className="h-full min-h-[320px] p-8" />;
   }
 
   return (
@@ -619,7 +613,25 @@ function CreatePageContent() {
               </div>
 
               {logsLoading ? (
-                <div className="py-10 text-center text-[#2B3A3B]">載入中...</div>
+                <div className="py-10 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="relative mx-auto w-16 h-16 mb-3">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        className="absolute inset-0 rounded-full border-3 border-[#FFD59A] border-t-transparent"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <img
+                          src="/owlui.png"
+                          alt="載入中"
+                          className="w-10 h-10 object-contain"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[#2B3A3B] text-sm">載入中...</p>
+                  </div>
+                </div>
               ) : (
                 <div className="max-h-[70vh] overflow-auto">
                   {activeTab === 'rooms' && (

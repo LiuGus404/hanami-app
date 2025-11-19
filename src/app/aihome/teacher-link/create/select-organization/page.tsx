@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { OrganizationProfile } from '@/lib/authUtils';
 import { TeacherLinkShell } from '../TeacherLinkShell';
+import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 
 function SelectOrganizationContent() {
   const router = useRouter();
@@ -104,14 +105,7 @@ function SelectOrganizationContent() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#FFD59A]" />
-          <p className="text-[#2B3A3B]">載入機構列表...</p>
-        </div>
-      </div>
-    );
+    return <CuteLoadingSpinner message="載入機構列表..." />;
   }
 
   if (showCreatePanel) {
