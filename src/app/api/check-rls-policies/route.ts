@@ -96,19 +96,25 @@ export async function GET(request: NextRequest) {
     }
 
     // 檢查 RLS 是否啟用
-    const { data: rlsStatus, error: rlsError } = await supabase.rpc('exec_sql', {
-      sql: `
-        SELECT 
-          relname,
-          relforcerowsecurity as rls_enabled
-        FROM pg_class
-        WHERE relname = '${tableName}'
-        AND relnamespace = 'public'::regnamespace;
-      `
-    }).catch(async () => {
+    let rlsStatus: any = null;
+    let rlsError: any = null;
+    try {
+      const result = await supabase.rpc('exec_sql', {
+        sql: `
+          SELECT 
+            relname,
+            relforcerowsecurity as rls_enabled
+          FROM pg_class
+          WHERE relname = '${tableName}'
+          AND relnamespace = 'public'::regnamespace;
+        `
+      });
+      rlsStatus = result.data;
+      rlsError = result.error;
+    } catch (err) {
       // 備用查詢
-      return { data: null, error: { message: '無法查詢 RLS 狀態' } };
-    });
+      rlsError = { message: '無法查詢 RLS 狀態' };
+    }
 
     // 分析政策中可能導致遞迴的關鍵字
     const policiesArray = Array.isArray(policies) ? policies : [];
