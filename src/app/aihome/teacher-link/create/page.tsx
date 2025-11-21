@@ -168,12 +168,6 @@ function CreatePageContent() {
       onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/member-management')),
     },
     {
-      key: 'accounts',
-      title: '帳戶管理',
-      icon: <div className="w-12 h-12 rounded-full bg-[#FFF7D6] flex items-center justify-center text-3xl">👥</div>,
-      onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/permission-management')),
-    },
-    {
       key: 'class',
       title: '課堂管理',
       icon: <img alt="課堂管理" className="w-12 h-12 object-contain" src="/foxcat.png" />,
@@ -184,18 +178,6 @@ function CreatePageContent() {
       title: '老師管理',
       icon: <img alt="老師管理" className="w-12 h-12 object-contain" src="/teacher.png" />,
       onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/teachers')),
-    },
-    {
-      key: 'aiAssistant',
-      title: 'AI 助理',
-      icon: <img alt="AI 助理" className="w-12 h-12 object-contain" src="/polarbear.png" />,
-      onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/ai-select')),
-    },
-    {
-      key: 'aiTools',
-      title: 'AI 工具',
-      icon: <img alt="AI 工具" className="w-12 h-12 object-contain" src="/owlui.png" />,
-      onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/ai-tools')),
     },
     {
       key: 'aiLogs',

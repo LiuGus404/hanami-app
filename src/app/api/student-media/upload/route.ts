@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File;
     const studentId = formData.get('studentId') as string;
     const mediaType = formData.get('mediaType') as string;
+    const orgId = formData.get('orgId') as string | null;
 
     if (!file || !studentId || !mediaType) {
       return NextResponse.json(
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(fileName);
 
     // 準備資料庫資料
-    const mediaData = {
+    const mediaData: any = {
       student_id: studentId,
       media_type: mediaType,
       file_name: newFileName, // 使用新的文件名
@@ -194,6 +195,11 @@ export async function POST(request: NextRequest) {
       uploaded_by: null, // 設為 null 而不是字串
       lesson_id: todayLesson?.id || null // 關聯到今天的課堂
     };
+
+    // 如果有 org_id，添加到資料中
+    if (orgId) {
+      mediaData.org_id = orgId;
+    }
 
     // 儲存到資料庫
     const { data: dbData, error: dbError } = await supabase

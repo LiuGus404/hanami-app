@@ -45,6 +45,7 @@ import {
   getUserSession,
   type OrganizationProfile,
 } from '@/lib/authUtils';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 
 interface AbilityAssessment {
   id: string;
@@ -190,6 +191,11 @@ export default function StudentProgressDashboard(
   const [studentsWithMedia, setStudentsWithMedia] = useState<StudentMediaStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 獲取用戶 email（優先使用 useSaasAuth，回退到 getUserSession）
+  const { user: saasUser } = useSaasAuth();
+  const sessionUser = getUserSession();
+  const userEmail = saasUser?.email || sessionUser?.email || null;
+
   const allowOrgDataEffective = useMemo(
     () => (disableOrgFallback ? true : allowOrgData),
     [disableOrgFallback],
@@ -313,8 +319,10 @@ export default function StudentProgressDashboard(
         (window as any).performanceMonitor.startDataLoad();
       }
 
+      // 使用組件級別的 userEmail（從 useSaasAuth 或 getUserSession 獲取）
       const baseData = await getBaseDashboardData(assessmentLimit, {
         organizationId: effectiveOrgId,
+        userEmail: userEmail || undefined,
       });
 
       const abilitiesData = Array.isArray(baseData.abilities)
@@ -371,7 +379,7 @@ export default function StudentProgressDashboard(
       console.error('載入基礎資料時發生錯誤:', error);
       throw error;
     }
-  }, [assessmentLimit, effectiveOrgId, organizationResolved, orgDataDisabled]);
+  }, [assessmentLimit, effectiveOrgId, organizationResolved, orgDataDisabled, userEmail]);
 
   // 優化的學生評估狀態載入函數
   const loadStudentsWithoutAssessment = useCallback(async () => {
@@ -386,8 +394,18 @@ export default function StudentProgressDashboard(
     try {
       setLoadingStudents(true);
 
+      // 使用組件級別的 userEmail（從 useSaasAuth 或 getUserSession 獲取）
+      console.log('🔍 loadStudentsWithoutAssessment 調用:', {
+        selectedAssessmentDate,
+        effectiveOrgId,
+        userEmail,
+        hasSaasUser: !!saasUser,
+        hasSession: !!sessionUser,
+      });
+
       const data = await getStudentAssessmentStatus(selectedAssessmentDate, {
         organizationId: effectiveOrgId,
+        userEmail: userEmail || undefined,
       });
       
       const lessonsData = Array.isArray(data.lessons) ? data.lessons : [];
@@ -420,26 +438,98 @@ export default function StudentProgressDashboard(
 
       let lastAssessmentMap = new Map();
       if (studentIds.length > 0) {
-        let lastAssessmentsQuery = supabase
-          .from('hanami_ability_assessments')
-          .select('student_id, assessment_date')
-          .in('student_id', studentIds)
-          .order('assessment_date', { ascending: false });
+        // 使用 API 端點獲取最後一次評估日期（繞過 RLS）
+        const isBrowser = typeof window !== 'undefined';
+        const shouldUseApi = isBrowser && effectiveOrgId && userEmail;
 
-        if (effectiveOrgId) {
-          lastAssessmentsQuery = lastAssessmentsQuery.eq('org_id', effectiveOrgId);
-        }
+        if (shouldUseApi) {
+          try {
+            const params = new URLSearchParams();
+            params.append('orgId', effectiveOrgId);
+            params.append('studentIds', studentIds.join(','));
+            params.append('orderBy', 'assessment_date');
+            params.append('ascending', 'false');
+            if (userEmail) {
+              params.append('userEmail', userEmail);
+            }
 
-        const { data: lastAssessmentsData } = await lastAssessmentsQuery;
+            const response = await fetch(`/api/ability-assessments/list?${params.toString()}`, {
+              credentials: 'include',
+            });
 
-        lastAssessmentsData?.forEach((assessment: any) => {
-          if (!lastAssessmentMap.has(assessment.student_id)) {
-            lastAssessmentMap.set(
-              assessment.student_id,
-              assessment.assessment_date,
-            );
+            if (response.ok) {
+              const result = await response.json();
+              const lastAssessmentsData = result.data || [];
+
+              lastAssessmentsData.forEach((assessment: any) => {
+                if (!lastAssessmentMap.has(assessment.student_id)) {
+                  lastAssessmentMap.set(
+                    assessment.student_id,
+                    assessment.assessment_date,
+                  );
+                }
+              });
+            } else {
+              console.warn('⚠️ 無法通過 API 載入最後一次評估日期，回退到直接查詢');
+              throw new Error('API call failed');
+            }
+          } catch (apiError) {
+            console.error('⚠️ API 調用異常，嘗試直接查詢最後一次評估日期:', apiError);
+            // 回退到直接查詢（可能失敗，但不影響主要功能）
+            try {
+              let lastAssessmentsQuery = supabase
+                .from('hanami_ability_assessments')
+                .select('student_id, assessment_date')
+                .in('student_id', studentIds)
+                .order('assessment_date', { ascending: false });
+
+              if (effectiveOrgId) {
+                lastAssessmentsQuery = lastAssessmentsQuery.eq('org_id', effectiveOrgId);
+              }
+
+              const { data: lastAssessmentsData } = await lastAssessmentsQuery;
+
+              lastAssessmentsData?.forEach((assessment: any) => {
+                if (!lastAssessmentMap.has(assessment.student_id)) {
+                  lastAssessmentMap.set(
+                    assessment.student_id,
+                    assessment.assessment_date,
+                  );
+                }
+              });
+            } catch (directQueryError) {
+              console.error('直接查詢最後一次評估日期也失敗:', directQueryError);
+              // 如果查詢失敗，lastAssessmentMap 保持為空，不影響主要功能
+            }
           }
-        });
+        } else {
+          // 服務端或沒有 API 選項時，使用直接查詢
+          try {
+            let lastAssessmentsQuery = supabase
+              .from('hanami_ability_assessments')
+              .select('student_id, assessment_date')
+              .in('student_id', studentIds)
+              .order('assessment_date', { ascending: false });
+
+            if (effectiveOrgId) {
+              lastAssessmentsQuery = lastAssessmentsQuery.eq('org_id', effectiveOrgId);
+            }
+
+            const { data: lastAssessmentsData } = await lastAssessmentsQuery;
+
+            lastAssessmentsData?.forEach((assessment: any) => {
+              if (!lastAssessmentMap.has(assessment.student_id)) {
+                lastAssessmentMap.set(
+                  assessment.student_id,
+                  assessment.assessment_date,
+                );
+              }
+            });
+          } catch (directQueryError) {
+            console.error('直接查詢最後一次評估日期失敗:', directQueryError);
+            // 如果查詢失敗，lastAssessmentMap 保持為空，不影響主要功能
+          }
+        }
       }
 
       const categorizedStudents = {
@@ -657,6 +747,9 @@ export default function StudentProgressDashboard(
     orgDataDisabled,
     selectedAssessmentDate,
     selectedMediaDate,
+    userEmail,
+    saasUser,
+    sessionUser,
   ]);
 
   useEffect(() => {

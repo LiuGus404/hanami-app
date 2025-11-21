@@ -1026,6 +1026,7 @@ export default function StudentMediaPage({
             isOpen={showMediaModal}
             onClose={() => setShowMediaModal(false)}
             student={selectedStudent}
+            orgId={validOrgId}
             onQuotaChanged={handleUpgradeSuccess}
           />
 

@@ -8,8 +8,9 @@ import React, {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import { Bars3Icon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
+import { motion } from 'framer-motion';
 
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
@@ -589,6 +590,13 @@ export function TeacherLinkShell({
     setShowOnboardingPage(true);
   };
 
+  // 登出處理
+  const handleLogout = () => {
+    console.log('登出按鈕被點擊，使用直接登出邏輯...');
+    // 直接跳轉到登出頁面，確保完全清除所有狀態
+    window.location.href = '/aihome/logout';
+  };
+
   const contextValue = useMemo(
     () => ({
       organization,
@@ -654,6 +662,22 @@ export function TeacherLinkShell({
                         {displayInitial}
                       </span>
                     </div>
+                    <motion.button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('登出按鈕被點擊，事件:', e);
+                        handleLogout();
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
+                      title="登出"
+                      type="button"
+                    >
+                      <ArrowRightOnRectangleIcon className="w-4 h-4" />
+                      <span>登出</span>
+                    </motion.button>
                   </div>
                 </div>
               </div>

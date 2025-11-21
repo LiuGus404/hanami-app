@@ -1431,7 +1431,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
     loadRemainingLessons();
     checkStudentAssessmentStatus(); // 檢查評估狀態
     checkStudentMediaStatus(); // 檢查媒體上傳狀態
-  }, [lessons, organizationResolved, orgDataDisabled]);
+  }, [lessons, organizationResolved, orgDataDisabled, selectedDate]);
 
   // 當切換到班別顯示模式或課程資料更新時，重新載入班別資料
   useEffect(() => {
@@ -1518,7 +1518,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
     }
   };
 
-  // 檢查學生今天是否上傳媒體
+  // 檢查學生在所選日期是否上傳媒體
   const checkStudentMediaStatus = async () => {
     if (loadingMediaStatus || lessons.length === 0) {
       return;
@@ -1527,12 +1527,12 @@ const PLACEHOLDER_ORG_IDS = new Set([
     try {
       setLoadingMediaStatus(true);
       
-      // 獲取今天香港時區的開始和結束時間
-      const today = getTodayInHongKong();
-      const todayStart = new Date(today);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(today);
-      todayEnd.setHours(23, 59, 59, 999);
+      // 獲取所選日期香港時區的開始和結束時間
+      const selectedDateHK = new Date(selectedDate.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+      const dateStart = new Date(selectedDateHK);
+      dateStart.setHours(0, 0, 0, 0);
+      const dateEnd = new Date(selectedDateHK);
+      dateEnd.setHours(23, 59, 59, 999);
 
       // 獲取所有學生ID
       const allStudentIds = Array.from(new Set([
@@ -1541,30 +1541,37 @@ const PLACEHOLDER_ORG_IDS = new Set([
       ]));
 
       if (allStudentIds.length > 0) {
-        // 查詢今天是否有媒體上傳記錄
+        // 查詢所選日期是否有媒體上傳記錄
         let mediaQuery = supabase
           .from('hanami_student_media')
           .select('student_id')
           .in('student_id', allStudentIds)
-          .gte('created_at', todayStart.toISOString())
-          .lte('created_at', todayEnd.toISOString());
+          .gte('created_at', dateStart.toISOString())
+          .lte('created_at', dateEnd.toISOString());
 
         if (validOrgId) {
           mediaQuery = mediaQuery.eq('org_id', validOrgId);
         }
 
-        const { data: todayMedia, error } = await mediaQuery;
+        const { data: dateMedia, error } = await mediaQuery;
 
-        if (!error && todayMedia) {
+        if (!error && dateMedia) {
           const statusMap: Record<string, boolean> = {};
           allStudentIds.forEach(id => { 
             statusMap[id] = false; 
           });
           
-          todayMedia.forEach(media => {
+          dateMedia.forEach(media => {
             statusMap[media.student_id] = true;
           });
           
+          setStudentMediaStatus(statusMap);
+        } else {
+          // 如果沒有找到任何媒體，將所有學生標記為未上傳
+          const statusMap: Record<string, boolean> = {};
+          allStudentIds.forEach(id => { 
+            statusMap[id] = false; 
+          });
           setStudentMediaStatus(statusMap);
         }
       }
@@ -3087,8 +3094,8 @@ const PLACEHOLDER_ORG_IDS = new Set([
                                   tooltipBgClass = 'bg-gray-600/90';
                                   tooltipText = '上傳/編輯媒體（功能未開放）';
                                 } else if (hasMedia) {
-                                  buttonBgClass = 'bg-gradient-to-br from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600';
-                                  tooltipBgClass = 'bg-purple-600/90';
+                                  buttonBgClass = 'bg-gradient-to-br from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600';
+                                  tooltipBgClass = 'bg-emerald-600/90';
                                   tooltipText = '已上傳媒體 / 編輯媒體';
                                 } else {
                                   buttonBgClass = 'bg-gradient-to-br from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600';
@@ -3685,8 +3692,8 @@ const PLACEHOLDER_ORG_IDS = new Set([
                                         tooltipBgClass = 'bg-gray-600/90';
                                         tooltipText = '上傳/編輯媒體（功能未開放）';
                                       } else if (hasMedia) {
-                                        buttonBgClass = 'bg-gradient-to-br from-purple-400 to-pink-500 hover:from-purple-500 hover:to-pink-600';
-                                        tooltipBgClass = 'bg-purple-600/90';
+                                        buttonBgClass = 'bg-gradient-to-br from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600';
+                                        tooltipBgClass = 'bg-emerald-600/90';
                                         tooltipText = '已上傳媒體 / 編輯媒體';
                                       } else {
                                         buttonBgClass = 'bg-gradient-to-br from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600';
@@ -4394,6 +4401,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
               setSelectedStudentForMedia(null);
             }}
             student={selectedStudentForMedia}
+            orgId={validOrgId}
             onQuotaChanged={() => {
               // 重新檢查媒體狀態
               checkStudentMediaStatus();

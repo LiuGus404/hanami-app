@@ -4037,6 +4037,7 @@ export default function TeacherZonePage() {
           <StudentMediaModal
             isOpen={showStudentMediaModal}
             student={selectedStudentForMedia}
+            orgId={null}
             onClose={() => {
               setShowStudentMediaModal(false);
               setSelectedStudentForMedia(null);

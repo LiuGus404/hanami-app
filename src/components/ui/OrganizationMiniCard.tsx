@@ -123,7 +123,7 @@ export default function OrganizationMiniCard({
       whileHover={{ y: -6, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="w-[280px] flex-shrink-0 text-left bg-white rounded-2xl overflow-hidden border border-[#EADBC8] shadow-sm hover:shadow-lg transition-all relative cursor-pointer"
+      className="w-full text-left bg-white rounded-2xl overflow-hidden border border-[#EADBC8] shadow-sm hover:shadow-lg transition-all relative cursor-pointer"
     >
       <div className="relative w-full" style={{ aspectRatio: '4/3' }}>
         <Image
@@ -157,20 +157,20 @@ export default function OrganizationMiniCard({
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-[#8A7C70]">{likeCount} 人喜歡</span>
+        <div className="mt-3 flex items-center justify-end">
           <motion.button
             type="button"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleToggle}
             disabled={!isUuid || loading}
-            className={`inline-flex items-center justify-center w-9 h-9 rounded-full border ${
+            className={`inline-flex items-center justify-center gap-1 px-3 py-2 rounded-full border ${
               liked ? 'bg-[#FFB6C1]/20 border-[#FFB6C1]' : 'bg-white border-[#EADBC8]'
             }`}
             aria-label="like"
           >
-            <HeartIcon className={`w-5 h-5 ${liked ? 'text-[#FF6B8A]' : 'text-[#4B4036]'}`} />
+            <HeartIcon className={`w-4 h-4 ${liked ? 'text-[#FF6B8A]' : 'text-[#4B4036]'}`} />
+            <span className="text-sm font-semibold text-[#4B4036]">{likeCount}</span>
           </motion.button>
         </div>
       </div>

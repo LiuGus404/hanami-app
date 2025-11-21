@@ -69,7 +69,7 @@ export default function PermissionManagementPanel() {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'permissions' | 'teachers' | 'students' | 'accounts'>('permissions');
+  const [activeTab, setActiveTab] = useState<'permissions' | 'teachers' | 'students'>('permissions');
   const [selectedUser, setSelectedUser] = useState<UserPermission | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   
@@ -459,16 +459,6 @@ export default function PermissionManagementPanel() {
         >
           學生管理 ({students.length})
         </button>
-        <button
-          className={`px-4 py-2 font-medium rounded-t-lg ${
-            activeTab === 'accounts'
-              ? 'bg-[#FDE6B8] text-[#A64B2A] border-b-2 border-[#A64B2A]'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-          onClick={() => setActiveTab('accounts')}
-        >
-          帳戶管理
-        </button>
       </div>
 
       {/* 權限管理內容 */}
@@ -647,143 +637,6 @@ export default function PermissionManagementPanel() {
         </div>
       )}
 
-      {/* 帳戶管理內容 */}
-      {activeTab === 'accounts' && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-[#2B3A3B]">帳戶管理</h3>
-            <HanamiButton variant="primary" onClick={() => loadData()}>
-              重新載入
-            </HanamiButton>
-          </div>
-
-          {/* 帳戶類型標籤 */}
-          <HanamiCard>
-            <nav className="flex space-x-4">
-              {[
-                { id: 'teacher', name: '老師帳戶', type: 'teacher' as const, count: teachers.length },
-                { id: 'student', name: '學生帳戶', type: 'student' as const, count: students.length },
-                { id: 'admin', name: '管理員帳戶', type: 'admin' as const, count: admins.length },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  className={`flex items-center px-3 py-2 rounded-xl font-medium text-sm transition-all ${
-                    accountActiveTab === tab.id
-                      ? 'bg-[#FDE6B8] text-[#A64B2A]'
-                      : 'text-[#666] hover:bg-[#FFF3E0]'
-                  }`}
-                  onClick={() => setAccountActiveTab(tab.id as UserType)}
-                >
-                  <AccountIcon className="mr-2" size="sm" type={tab.type} />
-                  {tab.name}
-                  <span className="ml-2 bg-white text-[#666] px-2 py-1 rounded-full text-xs">
-                    {tab.count}
-                  </span>
-                </button>
-              ))}
-            </nav>
-          </HanamiCard>
-
-          {/* 搜尋和篩選 */}
-          <HanamiCard>
-            <div className="space-y-4">
-              <HanamiInput
-                placeholder="搜尋姓名、電子郵件..."
-                type="text"
-                value={searchTerm}
-                onChange={(value) => setSearchTerm(value)}
-              />
-              <div className="flex gap-3">
-                <HanamiSelect
-                  className="flex-1"
-                  options={[
-                    { value: 'all', label: '所有狀態' },
-                    { value: 'active', label: '啟用' },
-                    { value: 'inactive', label: '停用' },
-                  ]}
-                  value={statusFilter}
-                  onChange={(value) => setStatusFilter(value as AccountStatus)}
-                />
-                <HanamiButton
-                  className="whitespace-nowrap"
-                  onClick={handleAddAccount}
-                >
-                  新增帳戶
-                </HanamiButton>
-              </div>
-            </div>
-          </HanamiCard>
-
-          {/* 帳戶列表 */}
-          <HanamiCard>
-            <div className="space-y-3">
-              {getFilteredData().map((user) => (
-                <div key={user.id} className="bg-[#FFF9F2] rounded-xl p-4 border border-[#EADBC8]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <AccountIcon 
-                        size="md" 
-                        type={accountActiveTab} 
-                      />
-                      <div>
-                        <h3 className="font-semibold text-[#2B3A3B]">
-                          {user.teacher_fullname || user.full_name || user.admin_name || '未設定'}
-                        </h3>
-                        <p className="text-sm text-[#666]">
-                          {user.teacher_email || user.student_email || user.admin_email || '未設定'}
-                        </p>
-                        <p className="text-sm text-[#666]">
-                          {user.teacher_phone || user.contact_number || '未設定'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(user.teacher_status || user.student_type || user.role)}
-                      <div className="flex space-x-1">
-                        <HanamiButton
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleEditAccount(user)}
-                        >
-                          編輯
-                        </HanamiButton>
-                        <HanamiButton
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleStatusChange(
-                            user.id, 
-                            accountActiveTab, 
-                            (user.teacher_status || user.student_type || user.role) === 'active' ? 'inactive' : 'active',
-                          )}
-                        >
-                          {(user.teacher_status || user.student_type || user.role) === 'active' ? '停用' : '啟用'}
-                        </HanamiButton>
-                        <HanamiButton
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleDeleteUser(user.id, accountActiveTab)}
-                        >
-                          刪除
-                        </HanamiButton>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-[#999]">
-                    建立日期：{user.created_at ? new Date(user.created_at).toLocaleDateString('zh-TW') : '未知'}
-                  </div>
-                </div>
-              ))}
-              
-              {getFilteredData().length === 0 && (
-                <div className="text-center py-8">
-                  <AccountIcon className="mx-auto mb-3 opacity-50" size="lg" type="all" />
-                  <p className="text-[#666]">沒有找到符合條件的帳戶</p>
-                </div>
-              )}
-            </div>
-          </HanamiCard>
-        </div>
-      )}
 
       {/* 編輯權限模態框 */}
       {showEditModal && selectedUser && (

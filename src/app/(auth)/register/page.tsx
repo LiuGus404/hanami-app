@@ -35,11 +35,14 @@ const registerSchema = z.object({
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<string | null>(null);
+  const [errorEmail, setErrorEmail] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<UserRole>('parent');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [formData, setFormData] = useState<RegisterFormData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [isButtonAnimating, setIsButtonAnimating] = useState(false);
   const [captchaText, setCaptchaText] = useState('');
   const [captchaImage, setCaptchaImage] = useState<string>('');
@@ -279,7 +282,25 @@ export default function RegisterPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || '註冊失敗');
+        // 提供更具體的錯誤訊息
+        let errorMessage = result.error || '註冊失敗';
+        
+        // 保存錯誤類型和相關信息
+        setErrorType(result.errorType || null);
+        setErrorEmail(result.email || result.existingEmail || formData.email || null);
+        
+        // 解析常見的錯誤類型
+        if (errorMessage.includes('已經存在')) {
+          errorMessage = result.error; // 保持 API 返回的詳細訊息
+        } else if (errorMessage.includes('缺少')) {
+          errorMessage = result.error; // 保持 API 返回的詳細訊息
+        } else if (errorMessage.includes('檢查重複郵箱失敗')) {
+          errorMessage = '系統暫時無法驗證郵箱，請稍後再試';
+        } else if (errorMessage.includes('創建註冊申請失敗')) {
+          errorMessage = '無法提交註冊申請，請檢查您的網路連線後重試';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       console.log('註冊成功:', result);
@@ -297,16 +318,87 @@ export default function RegisterPage() {
 
     } catch (err) {
       console.error('註冊錯誤詳情:', err);
-      setError(err instanceof Error ? err.message : '註冊過程中發生錯誤');
+      // 提供更具體的錯誤訊息
+      let errorMessage = '註冊過程中發生錯誤';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        
+        // 進一步解析錯誤訊息
+        if (err.message.includes('network') || err.message.includes('fetch')) {
+          errorMessage = '網路連線錯誤，請檢查您的網路連線後重試';
+          setErrorType(null); // 清除錯誤類型
+        } else if (err.message.includes('timeout')) {
+          errorMessage = '連線逾時，請稍後再試';
+          setErrorType(null); // 清除錯誤類型
+        } else if (err.message.includes('已經存在')) {
+          errorMessage = err.message; // 保持詳細的錯誤訊息
+          // 如果沒有設置錯誤類型，嘗試從錯誤訊息推斷
+          if (!errorType) {
+            if (err.message.includes('電子郵件')) {
+              setErrorType('email_exists');
+            } else if (err.message.includes('電話')) {
+              setErrorType('phone_exists');
+            }
+          }
+        } else if (err.message.includes('缺少')) {
+          errorMessage = err.message; // 保持詳細的錯誤訊息
+          setErrorType(null); // 清除錯誤類型
+        }
+      }
+      
+      setError(errorMessage);
       setShowConfirmation(false);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // 處理重新發送註冊郵件
+  const handleResendEmail = async () => {
+    const emailToResend = errorEmail || formData?.email;
+    
+    if (!emailToResend) {
+      setError('無法重新發送郵件：缺少電子郵件地址');
+      return;
+    }
+
+    try {
+      setIsResendingEmail(true);
+      setError(null);
+
+      const response = await fetch('/api/auth/resend-registration-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: emailToResend })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSuccess('已重新發送註冊提醒郵件！請檢查您的郵箱（包括垃圾郵件文件夾）。');
+        setError(null);
+        setErrorType(null);
+        setErrorEmail(null);
+      } else {
+        setError(result.error || '重新發送郵件失敗，請稍後再試');
+      }
+    } catch (err) {
+      console.error('重新發送郵件錯誤:', err);
+      setError('重新發送郵件時發生錯誤，請稍後再試');
+    } finally {
+      setIsResendingEmail(false);
+    }
+  };
+
   const handleBackToForm = () => {
     setShowConfirmation(false);
     setFormData(null);
+    setError(null);
+    setErrorType(null);
+    setErrorEmail(null);
   };
 
   const handleSubmitClick = () => {
@@ -344,11 +436,39 @@ export default function RegisterPage() {
         
           {error && (
           <div className="mb-4 bg-[#FFE0E0] border border-[#FF6B6B] text-[#A64B2A] px-4 py-3 rounded-xl text-sm animate-pulse">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
-              {error}
+              <div className="flex-1">
+                <p className="mb-2">{error}</p>
+                
+                {/* Email 已存在、待審核或電話已存在 - 顯示重新發送郵件按鈕 */}
+                {(errorType === 'email_exists' || errorType === 'email_pending' || errorType === 'phone_exists') && errorEmail && (
+                  <button
+                    onClick={handleResendEmail}
+                    disabled={isResendingEmail}
+                    className="mt-2 px-4 py-2 bg-[#A64B2A] text-white rounded-lg hover:bg-[#8B3A1F] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isResendingEmail ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        發送中...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        重新發送註冊郵件
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           )}
@@ -785,6 +905,25 @@ export default function RegisterPage() {
                     <span className="text-sm text-brown-700 ml-2">{formData.parentStudentDob}</span>
                   </div>
                 )}
+              </div>
+
+              {/* 垃圾郵件提醒 */}
+              <div className="mb-6 bg-gradient-to-r from-[#FFF9F2] to-[#FFE0E0] border border-[#EBC9A4] rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg className="w-5 h-5 text-[#A64B2A]" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-brown-700 mb-1">
+                      重要提醒
+                    </p>
+                    <p className="text-xs text-brown-600 leading-relaxed">
+                      註冊成功後，我們會發送驗證郵件到您的電子郵箱。如果沒有收到郵件，請檢查您的<strong className="text-brown-700">垃圾郵件</strong>或<strong className="text-brown-700">促銷郵件</strong>文件夾。
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex space-x-3">

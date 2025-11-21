@@ -11,12 +11,18 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('student_id'); // 可選：學生ID參數
+    const orgId = searchParams.get('orgId'); // 可選：機構ID參數
 
     let query = supabase
       .from('hanami_growth_trees')
       .select('*')
       .eq('is_active', true)
       .order('tree_name', { ascending: true });
+
+    // 如果提供了機構ID，過濾該機構的成長樹
+    if (orgId) {
+      query = query.eq('org_id', orgId);
+    }
 
     // 如果提供了學生ID，只獲取學生所在的成長樹
     if (studentId) {

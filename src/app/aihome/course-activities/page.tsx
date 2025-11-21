@@ -255,7 +255,7 @@ export default function CourseActivitiesPage() {
                 return {
                   id: ct.id,
                   name: ct.name || '未命名課程',
-                  description: ct.description || '專業音樂教育課程',
+                  description: ct.description || '',
                   duration: ct.duration_minutes ? `${ct.duration_minutes} 分鐘` : '靈活安排',
                   level: ct.difficulty_level === 'beginner' ? '初級' : 
                          ct.difficulty_level === 'intermediate' ? '中級' :
@@ -899,11 +899,10 @@ export default function CourseActivitiesPage() {
           {/* 機構 Carousell（左） */}
           {activeTab === 'orgs' && (
             <div className="mb-10">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-bold text-[#4B4036]">機構</h2>
-                      </div>
-            <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex gap-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-bold text-[#4B4036]">機構</h2>
+              </div>
+              <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {sortInstitutions(
                   courseActivities.filter((inst) => {
                     const q = searchQuery.trim().toLowerCase();
@@ -965,19 +964,17 @@ export default function CourseActivitiesPage() {
                       />
                     );
                   })}
-                        </div>
-                        </div>
-                      </div>
-                    )}
+              </div>
+            </div>
+          )}
 
           {/* 課程 Carousell（右，預設） */}
           {activeTab === 'courses' && (
             <div className="mb-12">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xl font-bold text-[#4B4036]">課程</h2>
-                        </div>
-            <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex gap-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-bold text-[#4B4036]">課程</h2>
+              </div>
+              <div className="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {courseActivities
                   .flatMap((inst) =>
                     inst.courses.map((c) => ({ ...c, _inst: inst }))
@@ -1036,11 +1033,10 @@ export default function CourseActivitiesPage() {
                       />
                     );
                   })}
-                        </div>
-                        </div>
-                          </div>
-                        )}
-                      </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* 空狀態 */}
         {courseActivities.length === 0 && (

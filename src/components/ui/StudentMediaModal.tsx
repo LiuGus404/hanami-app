@@ -61,9 +61,10 @@ interface StudentMediaModalProps {
   onClose: () => void;
   student: StudentWithMedia | null;
   onQuotaChanged?: () => void; // 新增：配額更改回調
+  orgId?: string | null; // 新增：機構 ID
 }
 
-export default function StudentMediaModal({ isOpen, onClose, student, onQuotaChanged }: StudentMediaModalProps) {
+export default function StudentMediaModal({ isOpen, onClose, student, onQuotaChanged, orgId }: StudentMediaModalProps) {
   // 自定義關閉函數，重置所有狀態
   const handleClose = () => {
     // 重置所有上傳相關狀態
@@ -413,10 +414,50 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     }
 
     try {
-      // 使用 quotaLevel 狀態變數，確保與 UI 顯示一致
-      const videoLimit = quotaLevel?.video_limit || 5;
-      const photoLimit = quotaLevel?.photo_limit || 10;
-      const storageLimitMB = quotaLevel?.storage_limit_mb || 250; // 儲存空間限制
+      // 優先使用 quotaLevel 中的設定，如果沒有則從 student.quota 獲取，最後才使用預設值
+      const videoLimit = quotaLevel?.video_limit || student?.quota?.video_limit || 5;
+      const photoLimit = quotaLevel?.photo_limit || student?.quota?.photo_limit || 10;
+      // 儲存空間限制：必須從 quotaLevel 獲取，因為這個值只在 hanami_media_quota_levels 表中
+      // 如果 quotaLevel 未載入，嘗試重新載入一次（但由於狀態更新是異步的，我們需要直接查詢）
+      let storageLimitMB = quotaLevel?.storage_limit_mb;
+      if (!storageLimitMB && student) {
+        // 如果 quotaLevel 未載入，直接查詢資料庫獲取配額等級
+        try {
+          const { data: studentQuota } = await supabase
+            .from('hanami_student_media_quota')
+            .select('plan_type')
+            .eq('student_id', student.id)
+            .single();
+          
+          if (studentQuota) {
+            const planTypeToLevelName = (planType: string) => {
+              const mapping: { [key: string]: string } = {
+                'free': '基礎版',
+                'basic': '標準版',
+                'premium': '進階版',
+                'professional': '專業版'
+              };
+              return mapping[planType] || '基礎版';
+            };
+            
+            let levelQuery = supabase
+              .from('hanami_media_quota_levels')
+              .select('storage_limit_mb')
+              .eq('level_name', planTypeToLevelName(studentQuota.plan_type))
+              .eq('is_active', true);
+            
+            if (orgId) {
+              levelQuery = levelQuery.eq('org_id', orgId);
+            }
+            
+            const { data: level } = await levelQuery.single();
+            storageLimitMB = level?.storage_limit_mb;
+          }
+        } catch (error) {
+          console.error('獲取儲存空間限制失敗:', error);
+        }
+      }
+      storageLimitMB = storageLimitMB || 250; // 如果仍然沒有，使用預設 250MB
 
       // 檢查當前影片和相片數量
       const currentVideoCount = media.filter(m => m.media_type === 'video').length;
@@ -495,10 +536,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     const videoCount = media.filter(m => m.media_type === 'video').length;
     const photoCount = media.filter(m => m.media_type === 'photo').length;
     
-    // 使用實際的配額限制（從 quotaLevel 或預設值）
-    const videoLimit = quotaLevel?.video_limit || 5;
-    const photoLimit = quotaLevel?.photo_limit || 10;
-    const storageLimitMB = quotaLevel?.storage_limit_mb || 250;
+    // 優先使用 quotaLevel 中的設定，如果沒有則從 student.quota 獲取，最後才使用預設值
+    const videoLimit = quotaLevel?.video_limit || student?.quota?.video_limit || 5;
+    const photoLimit = quotaLevel?.photo_limit || student?.quota?.photo_limit || 10;
+    // 儲存空間限制：必須從 quotaLevel 獲取，因為這個值只在 hanami_media_quota_levels 表中
+    const storageLimitMB = quotaLevel?.storage_limit_mb || 250; // 如果沒有配額等級，使用預設 250MB
     
     // 計算當前使用的儲存空間
     const currentStorageUsedMB = media.reduce((total, item) => {
@@ -655,6 +697,9 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           formData.append('file', compressedFile);
           formData.append('studentId', student.id);
           formData.append('mediaType', mediaType);
+          if (orgId) {
+            formData.append('orgId', orgId);
+          }
 
           const response = await fetch('/api/student-media/upload', {
             method: 'POST',
@@ -708,7 +753,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           .getPublicUrl(fileName);
 
         // 準備資料庫資料
-        const mediaData = {
+        const mediaData: any = {
           student_id: student.id,
           media_type: mediaType,
           file_name: newFileName, // 使用新的文件名
@@ -718,6 +763,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           uploaded_by: null, // 設為 null 而不是字串
           lesson_id: todayLesson?.id || null // 關聯到今天的課堂
         };
+
+        // 如果有 org_id，添加到資料中
+        if (orgId) {
+          mediaData.org_id = orgId;
+        }
 
         console.log('準備插入的資料:', mediaData);
         console.log('學生 ID 類型:', typeof student.id);
@@ -1062,22 +1112,32 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     if (!student) return;
     
     try {
-      // 獲取學生的配額設定
-      const { data: studentQuota, error: quotaError } = await supabase
+      // 獲取學生的配額設定（如果有 org_id，添加過濾條件）
+      let quotaQuery = supabase
         .from('hanami_student_media_quota')
         .select('*')
-        .eq('student_id', student.id)
-        .single();
+        .eq('student_id', student.id);
+      
+      if (orgId) {
+        quotaQuery = quotaQuery.eq('org_id', orgId);
+      }
+      
+      const { data: studentQuota, error: quotaError } = await quotaQuery.single();
 
       if (quotaError) {
         console.error('獲取學生配額失敗:', quotaError);
-        // 如果沒有配額設定，使用預設的基礎版配額
-        const { data: defaultLevel, error: defaultLevelError } = await supabase
+        // 如果沒有配額設定，使用預設的基礎版配額（如果有 org_id，添加過濾條件）
+        let defaultLevelQuery = supabase
           .from('hanami_media_quota_levels')
           .select('*')
           .eq('level_name', '基礎版')
-          .eq('is_active', true)
-          .single();
+          .eq('is_active', true);
+        
+        if (orgId) {
+          defaultLevelQuery = defaultLevelQuery.eq('org_id', orgId);
+        }
+        
+        const { data: defaultLevel, error: defaultLevelError } = await defaultLevelQuery.single();
 
         if (defaultLevelError) {
           console.error('獲取預設配額等級失敗:', defaultLevelError);
@@ -1107,22 +1167,33 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         return mapping[planType] || '基礎版';
       };
 
-      const { data: level, error: levelError } = await supabase
+      // 獲取配額等級設定（如果有 org_id，添加過濾條件）
+      let levelQuery = supabase
         .from('hanami_media_quota_levels')
         .select('*')
         .eq('level_name', planTypeToLevelName(studentQuota.plan_type))
-        .eq('is_active', true)
-        .single();
+        .eq('is_active', true);
+      
+      if (orgId) {
+        levelQuery = levelQuery.eq('org_id', orgId);
+      }
+      
+      const { data: level, error: levelError } = await levelQuery.single();
 
       if (levelError) {
         console.error('獲取配額等級失敗:', levelError);
-        // 如果無法獲取指定等級，使用基礎版
-        const { data: defaultLevel, error: defaultLevelError } = await supabase
+        // 如果無法獲取指定等級，使用基礎版（如果有 org_id，添加過濾條件）
+        let defaultLevelQuery = supabase
           .from('hanami_media_quota_levels')
           .select('*')
           .eq('level_name', '基礎版')
-          .eq('is_active', true)
-          .single();
+          .eq('is_active', true);
+        
+        if (orgId) {
+          defaultLevelQuery = defaultLevelQuery.eq('org_id', orgId);
+        }
+        
+        const { data: defaultLevel, error: defaultLevelError } = await defaultLevelQuery.single();
 
         if (defaultLevelError) {
           console.error('獲取預設配額等級失敗:', defaultLevelError);

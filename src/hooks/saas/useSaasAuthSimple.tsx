@@ -381,11 +381,37 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
 
       if (authError) {
         console.error('登入失敗:', authError);
-        return { success: false, error: authError.message || '登入失敗' };
+        // 提供更具體的錯誤訊息
+        const emailExists = await checkEmailExistsInSaas(supabase, email);
+        
+        if (!emailExists) {
+          return { 
+            success: false, 
+            error: '此電子郵件地址尚未註冊。請確認您輸入的郵箱是否正確，或前往註冊頁面創建新帳號。' 
+          };
+        } else {
+          return { 
+            success: false, 
+            error: '密碼錯誤。請確認您輸入的密碼是否正確，注意大小寫。如果忘記密碼，請使用忘記密碼功能。' 
+          };
+        }
       }
 
       if (!authData.user) {
-        return { success: false, error: '登入失敗' };
+        // 提供更具體的錯誤訊息
+        const emailExists = await checkEmailExistsInSaas(supabase, email);
+        
+        if (!emailExists) {
+          return { 
+            success: false, 
+            error: '此電子郵件地址尚未註冊。請確認您輸入的郵箱是否正確，或前往註冊頁面創建新帳號。' 
+          };
+        } else {
+          return { 
+            success: false, 
+            error: '密碼錯誤。請確認您輸入的密碼是否正確，注意大小寫。如果忘記密碼，請使用忘記密碼功能。' 
+          };
+        }
       }
 
       console.log('登入成功:', authData.user.id);
@@ -561,3 +587,27 @@ export function useSaasAuth() {
 }
 
 export { SaasAuthProvider };
+
+// 檢查郵箱是否在 SAAS 系統中存在的輔助函數
+async function checkEmailExistsInSaas(supabase: any, email: string): Promise<boolean> {
+  try {
+    // 檢查 saas_users 表
+    const { data: userData, error } = await supabase
+      .from('saas_users')
+      .select('id')
+      .eq('email', email)
+      .limit(1);
+
+    if (error) {
+      console.error('檢查郵箱存在性時發生錯誤:', error);
+      // 如果檢查失敗，返回 false 以顯示郵箱未註冊的錯誤
+      return false;
+    }
+
+    return userData && userData.length > 0;
+  } catch (error) {
+    console.error('檢查郵箱存在性時發生錯誤:', error);
+    // 如果檢查失敗，返回 false 以顯示郵箱未註冊的錯誤
+    return false;
+  }
+}

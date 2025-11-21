@@ -552,52 +552,6 @@ export default function ProfilePage() {
                       </div>
                     </div>
                   </div>
-
-                  {/* 帳戶管理 */}
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-[#EADBC8] p-6">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-gradient-to-br from-[#EBC9A4] to-[#FFD59A] rounded-full flex items-center justify-center">
-                        <Settings className="w-5 h-5 text-[#4B4036]" />
-                      </div>
-                      <h3 className="text-xl font-bold text-[#4B4036]">帳戶管理</h3>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium text-[#4B4036]">匯出資料</h4>
-                          <p className="text-sm text-[#4B4036]/70">下載您的個人資料副本</p>
-                        </div>
-                        <motion.button
-                          onClick={() => alert('資料匯出功能開發中...')}
-                          className="px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-lg hover:bg-[#EBC9A4] transition-colors"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Download className="w-4 h-4 mr-2 inline" />
-                          匯出
-                        </motion.button>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium text-[#4B4036]">刪除帳戶</h4>
-                          <p className="text-sm text-[#4B4036]/70">永久刪除您的帳戶和所有資料</p>
-                        </div>
-                        <motion.button
-                          onClick={() => {
-                            if (confirm('確定要刪除帳戶嗎？此操作無法復原。')) {
-                              alert('帳戶刪除功能開發中...');
-                            }
-                          }}
-                          className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2 inline" />
-                          刪除帳戶
-                        </motion.button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </motion.div>

@@ -2,6 +2,8 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
+import { ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { motion } from 'framer-motion';
 
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import Breadcrumb from '@/components/ui/Breadcrumb';
@@ -18,7 +20,6 @@ const setPageTitle = (pathname: string) => {
     '/admin/teachers': '老師管理 - Hanami 教育管理系統',
     '/admin/permission-management': '權限管理 - Hanami 教育管理系統',
     '/admin/hanami-tc': '課堂管理 - Hanami 教育管理系統',
-    '/admin/ai-select': 'AI 助理 - Hanami 教育管理系統',
     '/admin/lesson-availability': '課堂空缺 - Hanami 教育管理系統',
     '/admin/pending-students': '待審核學生 - Hanami 教育管理系統',
   };
@@ -116,8 +117,59 @@ export default function AdminLayout({
   }
 
   // 顯示管理員頁面內容
+  const adminName = userSession?.name || '管理員';
+  const displayInitial = adminName ? adminName.trim().charAt(0).toUpperCase() : 'A';
+
+  // 登出處理
+  const handleLogout = () => {
+    console.log('登出按鈕被點擊，使用直接登出邏輯...');
+    try {
+      clearUserSession();
+      window.location.href = '/admin/login';
+    } catch (error) {
+      console.error('登出過程中發生錯誤:', error);
+      window.location.href = '/admin/login';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#FFF9F2]">
+      {/* 頂部導航欄 */}
+      <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <div>
+                <h1 className="text-xl font-bold text-[#4B4036]">Hanami 管理系統</h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                <span className="text-sm font-medium text-[#4B4036]">
+                  {displayInitial}
+                </span>
+              </div>
+              <motion.button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('登出按鈕被點擊，事件:', e);
+                  handleLogout();
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
+                title="登出"
+                type="button"
+              >
+                <ArrowRightOnRectangleIcon className="w-4 h-4" />
+                <span>登出</span>
+              </motion.button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       {/* 麵包屑導航 */}
       <div className="pt-4">
         <Breadcrumb />

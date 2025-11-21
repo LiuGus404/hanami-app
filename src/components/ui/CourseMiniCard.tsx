@@ -221,7 +221,7 @@ export default function CourseMiniCard({
       whileHover={{ y: -6, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="w-[280px] flex-shrink-0 text-left bg-white rounded-2xl overflow-hidden border border-[#EADBC8] shadow-sm hover:shadow-lg transition-all relative cursor-pointer"
+      className="w-full text-left bg-white rounded-2xl overflow-hidden border border-[#EADBC8] shadow-sm hover:shadow-lg transition-all relative cursor-pointer"
     >
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4/3', backgroundColor: '#FFF9F2' }}>
         <div className="relative w-full h-full">
@@ -307,9 +307,9 @@ export default function CourseMiniCard({
           <div className="mt-1 text-xs text-[#8A7C70]">適合 {ageText}</div>
         )}
         
-        {/* 類別徽章（若有）或簡述 */}
-        {displayCategories.length > 0 ? (
-          <div className="mt-1 flex flex-wrap gap-1">
+        {/* 類別徽章（只在大螢幕顯示） */}
+        {displayCategories.length > 0 && (
+          <div className="mt-1 hidden flex-wrap gap-1 lg:flex">
             {displayCategories.map((cat, idx) => (
               <span
                 key={idx}
@@ -324,9 +324,8 @@ export default function CourseMiniCard({
               </span>
             )}
           </div>
-        ) : (
-          shortDesc && <div className="text-sm text-[#2B3A3B] mt-1 line-clamp-2">{shortDesc}</div>
         )}
+        {shortDesc && <div className="text-sm text-[#2B3A3B] mt-1 line-clamp-2">{shortDesc}</div>}
         
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -340,7 +339,6 @@ export default function CourseMiniCard({
             {typeof trialPrice !== 'number' && typeof packagePrice !== 'number' && typeof price === 'number' && price > 0 && (
               <div className="text-[#4B4036] font-bold">${price}</div>
             )}
-            <span className="text-xs text-[#8A7C70]">{likeCount} 人喜歡</span>
           </div>
           <motion.button
             type="button"
@@ -348,12 +346,13 @@ export default function CourseMiniCard({
             whileTap={{ scale: 0.95 }}
             onClick={handleToggle}
             disabled={!isUuid || loading}
-            className={`inline-flex items-center justify-center w-9 h-9 rounded-full border ${
+            className={`inline-flex items-center justify-center gap-1 px-3 py-2 rounded-full border ${
               liked ? 'bg-[#FFB6C1]/20 border-[#FFB6C1]' : 'bg-white border-[#EADBC8]'
             }`}
             aria-label="like"
           >
-            <HeartIcon className={`w-5 h-5 ${liked ? 'text-[#FF6B8A]' : 'text-[#4B4036]'}`} />
+            <HeartIcon className={`w-4 h-4 ${liked ? 'text-[#FF6B8A]' : 'text-[#4B4036]'}`} />
+            <span className="text-sm font-semibold text-[#4B4036]">{likeCount}</span>
           </motion.button>
         </div>
       </div>

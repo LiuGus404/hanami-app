@@ -337,17 +337,116 @@ export async function validateUserCredentials(email: string, password: string): 
       };
     }
 
-    return {
-      success: false,
-      error: '帳號或密碼錯誤',
-    };
+    // 如果所有檢查都失敗，提供更具體的錯誤訊息
+    // 先檢查郵箱是否存在
+    const emailExists = await checkEmailExistsInAllTables(supabase, email);
+    
+    if (!emailExists) {
+      return {
+        success: false,
+        error: '此電子郵件地址尚未註冊。請確認您輸入的郵箱是否正確，或前往註冊頁面創建新帳號。',
+      };
+    } else {
+      return {
+        success: false,
+        error: '密碼錯誤。請確認您輸入的密碼是否正確，注意大小寫。如果忘記密碼，請使用忘記密碼功能。',
+      };
+    }
 
   } catch (error) {
     console.error('Error validating credentials:', error);
+    // 提供更具體的錯誤訊息
+    let errorMessage = '登入驗證失敗';
+    if (error instanceof Error) {
+      if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage = '網路連線錯誤，請檢查您的網路連線後重試';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = '連線逾時，請稍後再試';
+      } else {
+        errorMessage = `登入驗證失敗：${error.message}`;
+      }
+    }
     return {
       success: false,
-      error: '登入驗證失敗',
+      error: errorMessage,
     };
+  }
+}
+
+// 檢查郵箱是否在所有表中存在的輔助函數
+async function checkEmailExistsInAllTables(supabase: any, email: string): Promise<boolean> {
+  try {
+    // 1. 檢查新權限系統
+    const { data: permissionData } = await supabase
+      .from('hanami_user_permissions_v2')
+      .select('id')
+      .eq('user_email', email)
+      .limit(1);
+
+    if (permissionData && permissionData.length > 0) {
+      return true;
+    }
+
+    // 2. 檢查管理員表
+    const { data: adminData } = await supabase
+      .from('hanami_admin')
+      .select('id')
+      .eq('admin_email', email)
+      .limit(1);
+
+    if (adminData && adminData.length > 0) {
+      return true;
+    }
+
+    // 3. 檢查教師表
+    const { data: teacherData } = await supabase
+      .from('hanami_employee')
+      .select('id')
+      .eq('teacher_email', email)
+      .limit(1);
+
+    if (teacherData && teacherData.length > 0) {
+      return true;
+    }
+
+    // 4. 檢查家長表
+    const { data: parentData } = await supabase
+      .from('hanami_parents')
+      .select('id')
+      .eq('parent_email', email)
+      .limit(1);
+
+    if (parentData && parentData.length > 0) {
+      return true;
+    }
+
+    // 5. 檢查學生表（通過student_email）
+    const { data: studentData } = await supabase
+      .from('Hanami_Students')
+      .select('id')
+      .eq('student_email', email)
+      .limit(1);
+
+    if (studentData && studentData.length > 0) {
+      return true;
+    }
+
+    // 6. 檢查學生表（通過parent_email）
+    const { data: parentStudentData } = await supabase
+      .from('Hanami_Students')
+      .select('id')
+      .eq('parent_email', email)
+      .limit(1);
+
+    if (parentStudentData && parentStudentData.length > 0) {
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('檢查郵箱存在性時發生錯誤:', error);
+    // 如果檢查失敗，返回 false 以顯示郵箱未註冊的錯誤
+    return false;
   }
 }
 

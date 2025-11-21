@@ -197,14 +197,27 @@ export default function LoginPage() {
             setError('未知的用戶角色');
         }
       } else {
-        setError(result.error || '登入失敗');
+        // 顯示更具體的錯誤訊息
+        const errorMessage = result.error || '登入失敗，請重試';
+        setError(errorMessage);
         generateCaptcha(); // 登入失敗時更新驗證碼
         setCaptchaAnswer(''); // 清空驗證碼輸入
       }
 
     } catch (err) {
       console.error('登入錯誤:', err);
-      setError('登入過程中發生錯誤，請重試');
+      // 提供更具體的錯誤訊息
+      let errorMessage = '登入過程中發生錯誤，請重試';
+      if (err instanceof Error) {
+        if (err.message.includes('network') || err.message.includes('fetch')) {
+          errorMessage = '網路連線錯誤，請檢查您的網路連線後重試';
+        } else if (err.message.includes('timeout')) {
+          errorMessage = '連線逾時，請稍後再試';
+        } else {
+          errorMessage = `登入失敗：${err.message}`;
+        }
+      }
+      setError(errorMessage);
       generateCaptcha(); // 發生錯誤時更新驗證碼
       setCaptchaAnswer(''); // 清空驗證碼輸入
     } finally {
@@ -250,12 +263,25 @@ export default function LoginPage() {
             setError('未知的用戶角色');
         }
       } else {
-        setError(result.error || '登入失敗');
+        // 顯示更具體的錯誤訊息
+        const errorMessage = result.error || '登入失敗，請重試';
+        setError(errorMessage);
       }
 
     } catch (err) {
       console.error('登入錯誤:', err);
-      setError('登入過程中發生錯誤，請重試');
+      // 提供更具體的錯誤訊息
+      let errorMessage = '登入過程中發生錯誤，請重試';
+      if (err instanceof Error) {
+        if (err.message.includes('network') || err.message.includes('fetch')) {
+          errorMessage = '網路連線錯誤，請檢查您的網路連線後重試';
+        } else if (err.message.includes('timeout')) {
+          errorMessage = '連線逾時，請稍後再試';
+        } else {
+          errorMessage = `登入失敗：${err.message}`;
+        }
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
       setShowAccountSelection(false);

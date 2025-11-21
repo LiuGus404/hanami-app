@@ -18,6 +18,34 @@ export async function POST(request: NextRequest) {
 
     console.log('開始處理簡化註冊:', { email, role });
 
+    // 檢查電話號碼是否已被使用
+    const { data: existingPhone, error: phoneCheckError } = await supabase
+      .from('hanami_employee')
+      .select('id, teacher_email, teacher_fullname')
+      .eq('teacher_phone', phone)
+      .maybeSingle();
+
+    if (phoneCheckError) {
+      console.error('檢查電話號碼失敗:', phoneCheckError);
+      return NextResponse.json({
+        error: '檢查電話號碼時發生錯誤'
+      }, { status: 500 });
+    }
+
+    if (existingPhone) {
+      console.error('電話號碼已被使用:', { 
+        phone, 
+        existingUser: existingPhone.teacher_email,
+        existingName: existingPhone.teacher_fullname 
+      });
+      return NextResponse.json({
+        error: '該電話號碼已註冊過，如需要請按忘記密碼',
+        errorType: 'phone_exists',
+        phone: phone,
+        existingEmail: existingPhone.teacher_email
+      }, { status: 400 });
+    }
+
     // 檢查是否已經存在任何類型的帳戶
     const existingAccounts = [];
 
@@ -91,7 +119,9 @@ export async function POST(request: NextRequest) {
     // 如果已經存在任何帳戶，拒絕註冊
     if (existingAccounts.length > 0) {
       return NextResponse.json({
-        error: `此電子郵件已經存在以下帳戶：${existingAccounts.join('、')}。每個電子郵件只能建立一個帳戶。`
+        error: `此電子郵件已經存在以下帳戶：${existingAccounts.join('、')}。每個電子郵件只能建立一個帳戶。`,
+        errorType: 'email_exists',
+        email: email
       }, { status: 400 });
     }
 
@@ -110,7 +140,10 @@ export async function POST(request: NextRequest) {
 
     if (existingRequests && existingRequests.length > 0) {
       return NextResponse.json({
-        error: '此電子郵件已經有註冊申請，請等待審核或使用其他郵箱'
+        error: '此電子郵件已經有註冊申請，請等待審核或使用其他郵箱',
+        errorType: 'email_pending',
+        email: email,
+        existingRequest: existingRequests[0]
       }, { status: 400 });
     }
 
