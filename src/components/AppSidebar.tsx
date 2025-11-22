@@ -18,6 +18,7 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useTeacherAccess } from '@/hooks/saas/useTeacherAccess';
 import { useDirectTeacherAccess } from '@/hooks/saas/useDirectTeacherAccess';
 import { getSaasSupabaseClient } from '@/lib/supabase';
+import toast from 'react-hot-toast';
 
 interface SidebarItem {
   icon: any;
@@ -169,8 +170,18 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
     }
   ];
 
-  const handleItemClick = (href: string) => {
+  const handleNavigation = (href: string) => {
+    if (href === '/aihome/parent/bound-students' && !user) {
+      toast('請先登入才能查看家長連結');
+      router.push('/aihome/auth/login');
+      return;
+    }
+
     router.push(href);
+  };
+
+  const handleItemClick = (href: string) => {
+    handleNavigation(href);
     // 在移動端自動收起側邊欄，桌面端保持展開
     if (!isDesktop) {
       onClose();

@@ -1,5 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/lib/database.types';
+
+type AssessmentRow = Database['public']['Tables']['hanami_ability_assessments']['Row'] & {
+  student?: {
+    full_name?: string | null;
+    nick_name?: string | null;
+  };
+  tree?: {
+    tree_name?: string | null;
+    tree_description?: string | null;
+  };
+};
+
+const supabaseAdmin = createClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  },
+);
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +40,7 @@ export async function GET(request: NextRequest) {
     console.log('載入學生評估進度:', { studentId, assessmentDate });
 
     // 獲取學生的最新評估記錄
-    let query = supabase
+    let query = supabaseAdmin
       .from('hanami_ability_assessments')
       .select(`
         *,
@@ -34,6 +57,9 @@ export async function GET(request: NextRequest) {
 
     const { data: assessments, error: assessmentsError } = await query;
 
+    const typedAssessments =
+      (assessments as AssessmentRow[] | null) ?? null;
+
     if (assessmentsError) {
       console.error('載入評估記錄失敗:', assessmentsError);
       return NextResponse.json({
@@ -43,7 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 如果沒有評估記錄，返回空資料
-    if (!assessments || assessments.length === 0) {
+    if (!typedAssessments || typedAssessments.length === 0) {
       return NextResponse.json({
         success: true,
         data: {
@@ -57,24 +83,34 @@ export async function GET(request: NextRequest) {
     }
 
     // 獲取所有可用的評估日期
-    const { data: allDates, error: datesError } = await supabase
+    const { data: allDates, error: datesError } = await supabaseAdmin
       .from('hanami_ability_assessments')
       .select('assessment_date')
       .eq('student_id', studentId)
       .order('assessment_date', { ascending: false });
 
-    const availableDates = allDates?.map(d => d.assessment_date) || [];
+    const availableDates =
+      (allDates as { assessment_date: string }[] | null | undefined)
+        ?.map((d) => d.assessment_date) || [];
 
     // 使用最新的評估記錄
-    const latestAssessment = assessments[0];
+    const latestAssessment = typedAssessments[0];
     const abilityAssessments = latestAssessment.ability_assessments || {};
 
     // 載入成長目標資料
-    const { data: goals, error: goalsError } = await supabase
+    const { data: goals, error: goalsError } = await supabaseAdmin
       .from('hanami_growth_goals')
       .select('*')
       .eq('tree_id', latestAssessment.tree_id)
       .order('goal_order');
+
+    type GrowthGoalRow = Database['public']['Tables']['hanami_growth_goals']['Row'] & {
+      tree_color?: string;
+      assessment_mode?: string;
+    };
+
+    const typedGoals =
+      (goals as GrowthGoalRow[] | null) ?? [];
 
     if (goalsError) {
       console.error('載入成長目標失敗:', goalsError);
@@ -85,14 +121,14 @@ export async function GET(request: NextRequest) {
     let currentLevel = 1;
     const abilityProgress: any[] = [];
 
-    if (goals && goals.length > 0) {
+    if (typedGoals.length > 0) {
       let totalAbilityProgress = 0;
       let abilityCount = 0;
 
       // 處理 selected_goals 資料
       const selectedGoals = latestAssessment.selected_goals || [];
       
-      goals.forEach(goal => {
+      typedGoals.forEach(goal => {
         // 從 selected_goals 中找到對應的評估資料
         const goalAssessment = selectedGoals.find((g: any) => g.goal_id === goal.id);
         
@@ -159,7 +195,7 @@ export async function GET(request: NextRequest) {
 
     // 生成進度趨勢資料（最近5天）
     const trendData: any[] = [];
-    const recentAssessments = assessments.slice(0, 5);
+    const recentAssessments = typedAssessments.slice(0, 5);
     
     recentAssessments.forEach((assessment, index) => {
       const assessmentProgress = assessment.overall_performance_rating 

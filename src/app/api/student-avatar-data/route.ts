@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/lib/database.types';
+
+const supabaseAdmin = createClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  },
+);
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,14 +37,14 @@ export async function GET(request: NextRequest) {
       studentActivitiesResult
     ] = await Promise.all([
       // 學生基本資料
-      supabase
+      supabaseAdmin
         .from('Hanami_Students')
         .select('*')
         .eq('id', studentId)
         .single(),
 
       // 學生的成長樹資料 - 查詢學生實際參與的成長樹
-      supabase
+      supabaseAdmin
         .from('hanami_student_trees')
         .select(`
           *,
@@ -56,7 +68,7 @@ export async function GET(request: NextRequest) {
         .eq('tree.is_active', true),
 
       // 學生能力資料
-      supabase
+      supabaseAdmin
         .from('hanami_student_abilities')
         .select(`
           *,
@@ -68,14 +80,14 @@ export async function GET(request: NextRequest) {
         .eq('student_id', studentId),
 
       // 近期教學活動
-      supabase
+      supabaseAdmin
         .from('hanami_teaching_activities')
         .select('*')
         .limit(10)
         .order('created_at', { ascending: false }),
 
       // 即將到來的課程
-      supabase
+      supabaseAdmin
         .from('hanami_student_lesson')
         .select('*')
         .eq('student_id', studentId)
@@ -87,13 +99,13 @@ export async function GET(request: NextRequest) {
       Promise.resolve({ data: [], error: null }),
 
       // 學生的能力評估記錄
-      supabase
+      supabaseAdmin
         .from('hanami_ability_assessments')
         .select('id, assessment_date, tree_id')
         .eq('student_id', studentId),
 
       // 學生的學習活動記錄
-      supabase
+      supabaseAdmin
         .from('hanami_student_activities')
         .select('id, activity_id, completion_status')
         .eq('student_id', studentId)

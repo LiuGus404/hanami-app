@@ -108,6 +108,8 @@ const FloatingIcon: React.FC<{
 };
 
 export default function EnhancedStudentAvatarTab({ student, className = '' }: EnhancedStudentAvatarTabProps) {
+  const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
+  const isPremiumOrg = student?.org_id === PREMIUM_AI_ORG_ID;
   const [activeSection, setActiveSection] = useState<'overview' | 'avatar' | 'progress' | 'growth'>('overview');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -151,7 +153,8 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
     isDataStale
   } = useStudentAvatarData(student?.id, {
     enableAutoRefresh: true,
-    refreshInterval: 60000
+    refreshInterval: 60000,
+    enabled: isPremiumOrg
   });
 
   // 成長樹互動
@@ -163,8 +166,12 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
 
   // 載入學生活動
   useEffect(() => {
-    const loadStudentActivities = async () => {
-      if (!student?.id) return;
+      const loadStudentActivities = async () => {
+      if (!student?.id || !isPremiumOrg) {
+        setStudentActivities([]);
+        setLoadingActivities(false);
+        return;
+      }
       
       setLoadingActivities(true);
       try {
@@ -211,12 +218,18 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
     };
 
     loadStudentActivities();
-  }, [student?.id]);
+  }, [student?.id, isPremiumOrg]);
 
   // 載入可用的評估日期
   useEffect(() => {
     const loadAvailableDates = async () => {
-      if (!student?.id) return;
+      if (!student?.id || !isPremiumOrg) {
+        const currentDate = new Date().toISOString().split('T')[0];
+        setAvailableDates([currentDate]);
+        setSelectedDate(currentDate);
+        setChartData([]);
+        return;
+      }
       try {
         // 從 API 載入真實的評估日期
         const response = await fetch(`/api/student-assessment-progress?student_id=${student.id}`);
@@ -270,12 +283,15 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
       }
     };
     loadAvailableDates();
-  }, [student?.id]);
+  }, [student?.id, isPremiumOrg]);
 
   // 根據選中日期載入評估數據
   useEffect(() => {
     const loadAssessmentData = async () => {
-      if (!student?.id) return;
+      if (!student?.id || !isPremiumOrg) {
+        setCurrentProgress({ totalProgress: 0, currentLevel: 1 });
+        return;
+      }
       try {
         console.log(`載入學生 ${student.id} 的評估數據`);
         
@@ -330,7 +346,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
       }
     };
     loadAssessmentData();
-  }, [selectedDate, student?.id]);
+  }, [selectedDate, student?.id, isPremiumOrg]);
 
   // 處理刷新動畫
   const handleRefresh = async () => {
@@ -357,6 +373,24 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
         <DynamicCard className="text-center p-8">
           <AlertCircle className="w-12 h-12 mx-auto text-gray-400 mb-4" />
           <p className="text-gray-600">無法載入學生資料</p>
+        </DynamicCard>
+      </div>
+    );
+  }
+
+  if (!isPremiumOrg) {
+    return (
+      <div className={`p-6 ${className}`}>
+        <DynamicCard className="text-center p-8">
+          <Lock className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">功能暫未開放</h3>
+          <p className="text-sm text-gray-600">
+            若需啟用學生狀態模組，請讓貴單位聯繫{' '}
+            <a className="underline text-hanami-accent" href="mailto:BuildThink@lingumiai.com">
+              BuildThink@lingumiai.com
+            </a>
+            ，我們會優先為您開通。
+          </p>
         </DynamicCard>
       </div>
     );

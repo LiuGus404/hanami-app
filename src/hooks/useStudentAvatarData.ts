@@ -91,6 +91,7 @@ interface StudentAvatarData {
 interface UseStudentAvatarDataOptions {
   refreshInterval?: number; // 自動刷新間隔（毫秒）
   enableAutoRefresh?: boolean; // 是否啟用自動刷新
+  enabled?: boolean; // 是否允許載入數據
 }
 
 export function useStudentAvatarData(
@@ -99,7 +100,8 @@ export function useStudentAvatarData(
 ) {
   const {
     refreshInterval = 30000, // 預設30秒刷新一次
-    enableAutoRefresh = false
+    enableAutoRefresh = false,
+    enabled = true,
   } = options;
 
   // 狀態管理
@@ -110,9 +112,10 @@ export function useStudentAvatarData(
 
   // 載入資料的函數
   const loadData = useCallback(async (showLoading: boolean = true) => {
-    if (!studentId) {
+    if (!studentId || enabled === false) {
       setData(null);
       setError(null);
+      setLoading(false);
       return;
     }
 
@@ -120,7 +123,7 @@ export function useStudentAvatarData(
       if (showLoading) setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/student-avatar-data?studentId=${studentId}`, {
+    const response = await fetch(`/api/student-avatar-data?studentId=${studentId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +145,7 @@ export function useStudentAvatarData(
     } finally {
       setLoading(false);
     }
-  }, [studentId]);
+  }, [studentId, enabled]);
 
   // 記錄學生互動
   const recordInteraction = useCallback(async (interactionType: string) => {
@@ -183,7 +186,7 @@ export function useStudentAvatarData(
 
   // 自動刷新
   useEffect(() => {
-    if (!enableAutoRefresh || !studentId) return;
+    if (!enableAutoRefresh || !studentId || enabled === false) return;
 
     const interval = setInterval(() => {
       silentRefresh();

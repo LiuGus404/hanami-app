@@ -12,6 +12,8 @@ import {
   AcademicCapIcon,
   ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
+import toast from 'react-hot-toast';
 
 interface MobileBottomNavigationProps {
   className?: string;
@@ -20,6 +22,7 @@ interface MobileBottomNavigationProps {
 export default function MobileBottomNavigation({ className = '' }: MobileBottomNavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { user } = useSaasAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [hasTeacherAccess, setHasTeacherAccess] = useState(false);
@@ -338,6 +341,12 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
 
   // 處理導航點擊
   const handleNavigation = (href: string) => {
+    if (href === '/aihome/parent/bound-students' && !user) {
+      toast('請先登入才能查看家長連結');
+      router.push('/aihome/auth/login');
+      return;
+    }
+
     // 添加觸覺反饋
     if ('vibrate' in navigator) {
       navigator.vibrate(50);
