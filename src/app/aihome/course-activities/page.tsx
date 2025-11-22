@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
   CalendarDaysIcon,
@@ -11,12 +11,6 @@ import {
   AcademicCapIcon,
   StarIcon,
   ChevronRightIcon,
-  Bars3Icon,
-  XMarkIcon,
-  HomeIcon,
-  UserIcon,
-  Cog6ToothIcon,
-  ArrowRightOnRectangleIcon,
   TrophyIcon,
   SparklesIcon,
   MusicalNoteIcon,
@@ -28,6 +22,7 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import AppSidebar from '@/components/AppSidebar';
 import CourseMiniCard from '@/components/ui/CourseMiniCard';
 import OrganizationMiniCard from '@/components/ui/OrganizationMiniCard';
+import UnifiedNavbar from '@/components/UnifiedNavbar';
 import { supabase } from '@/lib/supabase';
 import { getUserSession } from '@/lib/authUtils';
 import { CATEGORY_GROUPS } from '@/app/aihome/teacher-link/create/CreateOrganizationPanel';
@@ -45,7 +40,6 @@ export default function CourseActivitiesPage() {
   const { user, loading, logout } = useSaasAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'courses' | 'orgs'>('courses'); // 預設右滑：課程
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -64,14 +58,6 @@ export default function CourseActivitiesPage() {
   // 排序
   const [sortBy, setSortBy] = useState<'likes' | 'created_at' | 'reviews' | 'none'>('none');
   const [sortOpen, setSortOpen] = useState(false);
-
-  // 更新時間
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -502,114 +488,24 @@ export default function CourseActivitiesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] flex flex-col">
-      {/* 頂部導航欄 */}
-      <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              {/* 返回主頁按鈕 */}
-              <motion.button
-                onClick={() => router.push('/aihome')}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                title="返回主頁"
-              >
-                <HomeIcon className="w-6 h-6 text-[#4B4036]" />
-              </motion.button>
-
-              {/* 選單按鈕 - 只在登入時顯示 */}
-              {user && (
-                <motion.button
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                      className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors relative z-40"
-                  title="開啟選單"
-                >
-                  <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
-                </motion.button>
-              )}
-              
-              <div className="w-10 h-10 relative">
-                <img 
-                  src="/@hanami.png" 
-                  alt="HanamiEcho Logo" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-                <p className="text-sm text-[#2B3A3B]">課程活動</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-[#2B3A3B]">
-                {currentTime.toLocaleTimeString('zh-TW', { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </div>
-              
-              {user ? (
-                <>
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-[#4B4036]">
-                      {user.full_name?.charAt(0).toUpperCase() || 'U'}
-                    </span>
-                  </div>
-                  <motion.button
-                    onClick={handleLogout}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                    title="登出"
-                  >
-                    <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                    <span>登出</span>
-                  </motion.button>
-                </>
-              ) : (
-                <>
-                  <motion.button
-                    onClick={() => router.push('/aihome/auth/login')}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-4 py-2 text-sm text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
-                  >
-                    登入
-                  </motion.button>
-                  <motion.button
-                    onClick={() => router.push('/aihome/auth/register')}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-4 py-2 text-sm bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-lg font-medium transition-all duration-200"
-                  >
-                    註冊
-                  </motion.button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <UnifiedNavbar
+        onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+        user={user}
+        onLogout={handleLogout}
+        onLogin={() => router.push('/aihome/auth/login')}
+        onRegister={() => router.push('/aihome/auth/register')}
+      />
 
       {/* 主內容區域 */}
       <div className="flex-1 flex">
-        {/* 側邊欄選單 - 只在登入時顯示 */}
-        {user && (
-          <AppSidebar 
-            isOpen={sidebarOpen} 
-            onClose={() => setSidebarOpen(false)}
-            currentPath="/aihome/course-activities"
-          />
-        )}
-
-        {/* 主內容 */}
+        <AppSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          currentPath="/aihome/course-activities"
+        />
         <div className="flex-1 flex flex-col">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
-        {/* 頁面標題 */}
+            {/* 頁面標題 */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={isLoaded ? { opacity: 1, y: 0 } : {}}
@@ -902,7 +798,7 @@ export default function CourseActivitiesPage() {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-bold text-[#4B4036]">機構</h2>
               </div>
-              <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid w-full gap-5 grid-cols-2">
                 {sortInstitutions(
                   courseActivities.filter((inst) => {
                     const q = searchQuery.trim().toLowerCase();
@@ -974,7 +870,7 @@ export default function CourseActivitiesPage() {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-bold text-[#4B4036]">課程</h2>
               </div>
-              <div className="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid w-full gap-6 grid-cols-2">
                 {courseActivities
                   .flatMap((inst) =>
                     inst.courses.map((c) => ({ ...c, _inst: inst }))
@@ -1038,8 +934,8 @@ export default function CourseActivitiesPage() {
           )}
         </div>
 
-        {/* 空狀態 */}
-        {courseActivities.length === 0 && (
+            {/* 空狀態 */}
+            {courseActivities.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={isLoaded ? { opacity: 1, y: 0 } : {}}
@@ -1061,7 +957,7 @@ export default function CourseActivitiesPage() {
               <ChevronRightIcon className="w-5 h-5 ml-2" />
             </motion.button>
           </motion.div>
-        )}
+            )}
           </div>
         </div>
       </div>

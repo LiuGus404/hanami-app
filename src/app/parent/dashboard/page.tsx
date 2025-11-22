@@ -9,6 +9,7 @@ import { HanamiButton } from '@/components/ui/HanamiButton';
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import HanamiDashboardLayout from '@/components/ui/HanamiDashboardLayout';
+import UnifiedNavbar from '@/components/UnifiedNavbar';
 import { getUserSession, clearUserSession } from '@/lib/authUtils';
 import { Database } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
@@ -56,6 +57,7 @@ export default function ParentDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const supabase = createClientComponentClient<Database>();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [studentCount, setStudentCount] = useState(0);
   const [upcomingLessonCount, setUpcomingLessonCount] = useState(0);
   const [parentName, setParentName] = useState('家長');
@@ -412,21 +414,30 @@ export default function ParentDashboard() {
   }
 
   return (
-    <HanamiDashboardLayout
-      activeTab={activeTab}
-      tabs={[
-        { id: 'overview', name: '概覽', icon: '📊' },
-        { id: 'progress', name: '學習進度', icon: '📈' },
-        { id: 'videos', name: '課堂影片', icon: '🎥' },
-        { id: 'certificates', name: '證書', icon: '🏆' },
-        { id: 'comments', name: '評語', icon: '💬' },
-        { id: 'packages', name: '課程包', icon: '📦' },
-      ]}
-      title={`${parentName}的儀表板`}
-      onLogout={handleLogout}
-      onTabChange={setActiveTab}
-    >
-      {renderContent()}
-    </HanamiDashboardLayout>
+    <>
+      <UnifiedNavbar
+        onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+        user={{ full_name: parentName }}
+        onLogout={handleLogout}
+        onLogin={() => router.push('/parent/login')}
+        onRegister={() => router.push('/parent/login')}
+      />
+      <HanamiDashboardLayout
+        activeTab={activeTab}
+        tabs={[
+          { id: 'overview', name: '概覽', icon: '📊' },
+          { id: 'progress', name: '學習進度', icon: '📈' },
+          { id: 'videos', name: '課堂影片', icon: '🎥' },
+          { id: 'certificates', name: '證書', icon: '🏆' },
+          { id: 'comments', name: '評語', icon: '💬' },
+          { id: 'packages', name: '課程包', icon: '📦' },
+        ]}
+        title={`${parentName}的儀表板`}
+        onLogout={handleLogout}
+        onTabChange={setActiveTab}
+      >
+        {renderContent()}
+      </HanamiDashboardLayout>
+    </>
   );
 } 

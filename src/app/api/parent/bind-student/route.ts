@@ -33,9 +33,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingBinding) {
-      return NextResponse.json({ 
-        error: '此孩子已經綁定到您的帳戶' 
-      }, { status: 400 });
+      return NextResponse.json({
+        success: false,
+        error: '此孩子已經綁定到您的帳戶'
+      });
     }
 
     // 創建綁定記錄

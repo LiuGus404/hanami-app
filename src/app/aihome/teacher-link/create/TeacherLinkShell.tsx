@@ -13,6 +13,7 @@ import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 
 import AppSidebar from '@/components/AppSidebar';
+import UnifiedNavbar from '@/components/UnifiedNavbar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import {
   fallbackOrganization,
@@ -625,63 +626,29 @@ export function TeacherLinkShell({
           />
 
           <div className="flex-1 flex flex-col">
-            <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
+            <UnifiedNavbar
+              onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+              user={saasUser}
+              onLogout={handleLogout}
+              onLogin={() => router.push('/aihome/auth/login')}
+              onRegister={() => router.push('/aihome/auth/register')}
+            />
+            <div className="bg-white/80 border-b border-[#EADBC8]">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center h-16">
-                  <div className="flex items-center space-x-4">
-                    <button
-                      type="button"
-                      onClick={() => setSidebarOpen((prev) => !prev)}
-                      className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                      title={sidebarOpen ? '關閉選單' : '開啟選單'}
-                    >
-                      <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
-                    </button>
-                    <div className="w-10 h-10 relative">
-                      <img
-                        src="/@hanami.png"
-                        alt="HanamiEcho Logo"
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                    <div>
-                      <h1 className="text-xl font-bold text-[#4B4036]">
-                        HanamiEcho
-                      </h1>
-                      <p className="text-sm text-[#2B3A3B]">老師專屬入口</p>
-                    </div>
+                <div className="py-2 flex flex-wrap items-center gap-2">
+                  <div className="rounded-full bg-[#FFF9F2] px-3 py-1 text-xs text-[#4B4036]">
+                    {organizationResolved
+                      ? organization?.name || fallbackOrganization.name
+                      : '載入中…'}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-full bg-[#FFF9F2] px-3 py-1 text-xs text-[#4B4036]">
-                      {organizationResolved
-                        ? organization?.name || fallbackOrganization.name
-                        : '載入中…'}
-                    </div>
-                    <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-[#4B4036]">
-                        {displayInitial}
-                      </span>
-                    </div>
-                    <motion.button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log('登出按鈕被點擊，事件:', e);
-                        handleLogout();
-                      }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                      title="登出"
-                      type="button"
-                    >
-                      <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                      <span>登出</span>
-                    </motion.button>
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-[#4B4036]">
+                      {displayInitial}
+                    </span>
                   </div>
                 </div>
               </div>
-            </nav>
+            </div>
 
             <main className={mainClassName}>
               {(() => {
