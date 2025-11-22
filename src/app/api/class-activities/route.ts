@@ -2,7 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabaseClient } from '@/lib/supabase';
 import { fallbackOrganization } from '@/lib/authUtils';
 
-// 檢查課程是否在教師排程時間內
+// 將時間字符串（HH:MM）轉換為分鐘數，便於計算
+function timeToMinutes(timeStr: string): number {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+// 將分鐘數轉換回時間字符串（HH:MM）
+function minutesToTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
+
+// 檢查課程是否在教師排程時間內（準確匹配 hanami_schedule 時間）
 function isLessonInTeacherSchedule(lesson: any, teacherSchedule: any[]): boolean {
   // 如果沒有排程記錄，表示教師沒有被安排工作，不顯示任何課程
   if (teacherSchedule.length === 0) {
@@ -26,18 +39,21 @@ function isLessonInTeacherSchedule(lesson: any, teacherSchedule: any[]): boolean
     return false;
   }
 
-  // 檢查課程時間是否在任何一個排程時間段內
+  // 檢查課程時間是否在任何一個排程時間段內（準確匹配，不擴展）
   const isInSchedule = daySchedule.some(schedule => {
     const startTime = schedule.start_time;
     const endTime = schedule.end_time;
     
-    // 簡單的時間比較（假設時間格式為 HH:MM）
-    const lessonTimeStr = lessonTime.toString().padStart(5, '0'); // 確保格式為 HH:MM
+    // 將時間轉換為分鐘數
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+    const lessonMinutes = timeToMinutes(lessonTime.toString().padStart(5, '0'));
     
-    const isInTimeRange = lessonTimeStr >= startTime && lessonTimeStr <= endTime;
+    // 準確匹配時間範圍（不擴展）
+    const isInTimeRange = lessonMinutes >= startMinutes && lessonMinutes <= endMinutes;
     
     if (isInTimeRange) {
-      console.log(`課程時間 ${lessonTimeStr} 在排程時間內 ${startTime}-${endTime}`);
+      console.log(`課程時間 ${lessonTime} 在排程時間內 ${startTime}-${endTime}`);
     }
     
     return isInTimeRange;

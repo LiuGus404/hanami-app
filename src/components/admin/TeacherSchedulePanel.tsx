@@ -2,6 +2,22 @@
 
 import { startOfMonth, endOfMonth, eachDayOfInterval, format } from 'date-fns';
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ChevronLeftIcon, 
+  ChevronRightIcon, 
+  CalendarIcon, 
+  UserIcon, 
+  PencilIcon,
+  TrashIcon,
+  DocumentArrowDownIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
+  XMarkIcon,
+  ListBulletIcon,
+  Squares2X2Icon,
+  SparklesIcon
+} from '@heroicons/react/24/outline';
 
 import { PopupSelect } from '@/components/ui/PopupSelect';
 import TimePicker from '@/components/ui/TimePicker';
@@ -1057,46 +1073,84 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
 
   return (
     <>
-      <div className="p-4 bg-[#FFFDF8] rounded-xl shadow border border-[#EADBC8] max-w-6xl mx-auto font-['Quicksand',_sans-serif]">
-        <div className="flex justify-between items-center mb-4">
+      <div className="p-6 bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl shadow-xl border-2 border-[#EADBC8] max-w-7xl mx-auto font-['Quicksand',_sans-serif]">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
           <div className="flex gap-2">
-            <button
-              className={`px-3 py-1 rounded-l-full border border-[#EADBC8] ${viewMode === 'calendar' ? 'bg-[#FFE8C2] text-[#4B4036]' : 'bg-white text-[#A68A64]'}`}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={`px-4 py-2 rounded-l-xl border-2 transition-all flex items-center gap-2 ${
+                viewMode === 'calendar' 
+                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-[#FFB6C1] shadow-lg' 
+                  : 'bg-white/70 text-[#4B4036] border-[#EADBC8] hover:bg-white'
+              }`}
               onClick={() => setViewMode('calendar')}
-            >日曆顯示
-            </button>
-            <button
-              className={`px-3 py-1 rounded-r-full border border-[#EADBC8] border-l-0 ${viewMode === 'list' ? 'bg-[#FFE8C2] text-[#4B4036]' : 'bg-white text-[#A68A64]'}`}
+            >
+              <Squares2X2Icon className="w-4 h-4" />
+              日曆顯示
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={`px-4 py-2 rounded-r-xl border-2 border-l-0 transition-all flex items-center gap-2 ${
+                viewMode === 'list' 
+                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-[#FFB6C1] shadow-lg' 
+                  : 'bg-white/70 text-[#4B4036] border-[#EADBC8] hover:bg-white'
+              }`}
               onClick={() => setViewMode('list')}
-            >列表顯示
-            </button>
+            >
+              <ListBulletIcon className="w-4 h-4" />
+              列表顯示
+            </motion.button>
           </div>
         
           {viewMode === 'calendar' && (
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             {editMode ? (
               <>
-                <button
-                  className="px-4 py-2 bg-[#A68A64] text-white rounded-lg hover:bg-[#937654] disabled:opacity-50 transition-colors"
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   disabled={loading}
                   onClick={handleSaveEditMode}
+                  className="px-5 py-2.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg disabled:opacity-50 transition-all flex items-center gap-2 font-medium shadow-md"
                 >
-                  {loading ? '儲存中...' : '儲存'}
-                </button>
-                <button
-                  className="px-4 py-2 bg-[#EADBC8] text-[#4B4036] rounded-lg hover:bg-[#D8CDBF] transition-colors"
+                  {loading ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                      儲存中...
+                    </>
+                  ) : (
+                    <>
+                      <CheckIcon className="w-4 h-4" />
+                      儲存
+                    </>
+                  )}
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={handleCancelEditMode}
+                  className="px-5 py-2.5 bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm"
                 >
+                  <XMarkIcon className="w-4 h-4" />
                   取消
-                </button>
+                </motion.button>
               </>
             ) : (
-              <button
-                className="px-4 py-2 bg-[#A68A64] text-white rounded-lg hover:bg-[#937654] transition-colors"
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleEditModeToggle}
+                className="px-5 py-2.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium shadow-md"
               >
+                <PencilIcon className="w-4 h-4" />
                 編輯模式
-              </button>
+              </motion.button>
             )}
           </div>
           )}
@@ -1104,34 +1158,46 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
 
         {/* 編輯模式老師列表 */}
         {editMode && viewMode === 'calendar' && (
-        <div className="mb-4 p-4 bg-[#FFF9F2] rounded-lg border border-[#EADBC8] shadow-sm">
-          <h3 className="text-lg font-bold mb-3 text-[#4B4036] flex items-center gap-2">
-            <span className="flex items-center gap-1">
-              <img alt="calendar" className="w-4 h-4" src="/calendar.png" />
-              拖拽老師到日期安排排班
-            </span>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-6 bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] rounded-2xl border-2 border-[#EADBC8] shadow-lg"
+        >
+          <h3 className="text-lg font-bold mb-4 text-[#4B4036] flex items-center gap-3">
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <CalendarIcon className="w-5 h-5 text-[#FFB6C1]" />
+            </motion.div>
+            <span>拖拽老師到日期安排排班</span>
             <span className="text-sm font-normal text-[#A68A64]">(拖拽後可調整時間)</span>
           </h3>
           <div className="flex flex-wrap gap-3">
-            {filteredTeachers.map(teacher => (
-              <div
+            {filteredTeachers.map((teacher, index) => (
+              <motion.div
                 key={teacher.id}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileDrag={{ scale: 1.1, rotate: 5 }}
                 draggable
-                className="px-4 py-3 bg-[#FFE8C2] text-[#4B4036] rounded-lg cursor-move hover:bg-[#EADBC8] border-2 border-[#EADBC8] hover:border-[#A68A64] transition-all duration-200 shadow-sm hover:shadow-md font-medium"
+                className="px-4 py-3 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-xl cursor-move hover:shadow-lg border-2 border-[#EADBC8] hover:border-[#FFB6C1] transition-all duration-200 shadow-md font-medium flex items-center gap-2"
                 onDragEnd={handleTeacherDragEnd}
                 onDragStart={() => handleTeacherDragStart(teacher)}
               >
-                <img alt="teacher" className="w-4 h-4" src="/teacher.png" />
+                <UserIcon className="w-4 h-4" />
                 {teacher.teacher_nickname}
-              </div>
+              </motion.div>
             ))}
           </div>
-        </div>
+        </motion.div>
         )}
 
         {viewMode === 'list' ? (
-          <div className="overflow-x-auto mt-4">
-            {filteredTeachers.map(teacher => {
+          <div className="overflow-x-auto mt-4 space-y-6">
+            {filteredTeachers.map((teacher, teacherIndex) => {
               const teacherSchedules = filteredSchedules.filter(s => s.teacher_id === teacher.id);
               if (teacherSchedules.length === 0) return null;
               
@@ -1141,110 +1207,179 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
               );
               
               return (
-                <div key={teacher.id} className="mb-6">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="font-bold text-[#4B4036] text-lg">{teacher.teacher_nickname || teacher.teacher_fullname}</div>
-                    <button
-                      className="px-3 py-1 text-xs bg-[#EADBC8] text-[#4B4036] rounded hover:bg-[#FFE8C2] border border-[#EADBC8] transition-colors flex items-center gap-1"
-                      onClick={() => handleTeacherScheduleClick(teacher)}
-                      title="安排老師排班"
-                    >
-                      <img src="/calendar.png" alt="calendar" className="w-3 h-3" />
-                      安排排班
-                    </button>
-                    <button
-                      className="px-3 py-1 text-xs bg-red-200 text-red-700 rounded hover:bg-red-300 border border-red-200 transition-colors flex items-center gap-1"
-                      onClick={() => handleTeacherScheduleDelete(teacher)}
-                      title="刪除老師排班"
-                    >
-                      <img src="/close.png" alt="delete" className="w-3 h-3" />
-                      刪除排班
-                    </button>
-                    <button
-                      className="px-2 py-1 text-xs bg-[#EADBC8] rounded hover:bg-[#FFE8C2] border border-[#EADBC8]"
-                      onClick={() => exportTeacherCSV(teacher)}
-                    >匯出 CSV
-                    </button>
-                    <button
-                      className="px-2 py-1 text-xs bg-[#EADBC8] rounded hover:bg-[#FFE8C2] border border-[#EADBC8]"
-                      onClick={() => copyTeacherMarkdown(teacher)}
-                    >複製 Markdown
-                    </button>
+                <motion.div
+                  key={teacher.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: teacherIndex * 0.1 }}
+                  className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 border-[#EADBC8]"
+                >
+                  <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] p-1 shadow-md">
+                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                          <UserIcon className="w-5 h-5 text-[#4B4036]" />
+                        </div>
+                      </div>
+                      <div className="font-bold text-xl text-[#4B4036]">{teacher.teacher_nickname || teacher.teacher_fullname}</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 ml-auto">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-4 py-2 text-sm bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium shadow-md"
+                        onClick={() => handleTeacherScheduleClick(teacher)}
+                        title="安排老師排班"
+                      >
+                        <CalendarIcon className="w-4 h-4" />
+                        安排排班
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-4 py-2 text-sm bg-gradient-to-r from-red-400 to-red-500 text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium shadow-md"
+                        onClick={() => handleTeacherScheduleDelete(teacher)}
+                        title="刪除老師排班"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                        刪除排班
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-4 py-2 text-sm bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm"
+                        onClick={() => exportTeacherCSV(teacher)}
+                      >
+                        <DocumentArrowDownIcon className="w-4 h-4" />
+                        匯出 CSV
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-4 py-2 text-sm bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm"
+                        onClick={() => copyTeacherMarkdown(teacher)}
+                      >
+                        <ClipboardDocumentIcon className="w-4 h-4" />
+                        複製 Markdown
+                      </motion.button>
+                    </div>
                   </div>
-                  <table className="w-full min-w-max border border-[#EADBC8] rounded-xl">
-                    <thead className="bg-[#FFF9F2]">
-                      <tr>
-                        <th className="p-2 border-b border-[#EADBC8] text-left">日期</th>
-                        <th className="p-2 border-b border-[#EADBC8] text-left">老師</th>
-                        <th className="p-2 border-b border-[#EADBC8] text-left">上班時間</th>
-                        <th className="p-2 border-b border-[#EADBC8] text-left">下班時間</th>
-                        <th className="p-2 border-b border-[#EADBC8] text-left">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedSchedules.map(sch => (
-                        <tr key={sch.id} className="hover:bg-[#FFFCF5]">
-                          <td className="p-2 border-b border-[#EADBC8] font-medium">{sch.scheduled_date}</td>
-                          <td className="p-2 border-b border-[#EADBC8]">{teacher.teacher_nickname || teacher.teacher_fullname}</td>
-                          <td className="p-2 border-b border-[#EADBC8]">{sch.start_time?.slice(0, 5) || ''}</td>
-                          <td className="p-2 border-b border-[#EADBC8]">{sch.end_time?.slice(0, 5) || ''}</td>
-                          <td className="p-2 border-b border-[#EADBC8]">
-                            <button
-                              className="px-2 py-1 text-xs bg-red-200 text-red-700 rounded hover:bg-red-300 border border-red-200 transition-colors flex items-center justify-center"
-                              onClick={() => handleSingleScheduleDelete(sch.id || '', teacher.teacher_nickname || teacher.teacher_fullname || '', sch.scheduled_date || '')}
-                              title="刪除此排班"
-                            >
-                              <img src="/close.png" alt="delete" className="w-3 h-3" />
-                            </button>
-                          </td>
+                  <div className="bg-white/50 rounded-xl overflow-hidden border border-[#EADBC8]">
+                    <table className="w-full min-w-max">
+                      <thead className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8]">
+                        <tr>
+                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">日期</th>
+                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">老師</th>
+                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">上班時間</th>
+                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">下班時間</th>
+                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">操作</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {sortedSchedules.map((sch, index) => (
+                          <motion.tr
+                            key={sch.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="hover:bg-gradient-to-r hover:from-[#FFF9F2]/50 hover:to-[#FFFDF8]/50 transition-colors"
+                          >
+                            <td className="p-4 border-b border-[#EADBC8] font-medium text-[#4B4036]">{sch.scheduled_date}</td>
+                            <td className="p-4 border-b border-[#EADBC8] text-[#2B3A3B]">{teacher.teacher_nickname || teacher.teacher_fullname}</td>
+                            <td className="p-4 border-b border-[#EADBC8]">
+                              <span className="px-3 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full text-sm font-medium">
+                                {sch.start_time?.slice(0, 5) || ''}
+                              </span>
+                            </td>
+                            <td className="p-4 border-b border-[#EADBC8]">
+                              <span className="px-3 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full text-sm font-medium">
+                                {sch.end_time?.slice(0, 5) || ''}
+                              </span>
+                            </td>
+                            <td className="p-4 border-b border-[#EADBC8]">
+                              <motion.button
+                                whileHover={{ scale: 1.1, rotate: 5 }}
+                                whileTap={{ scale: 0.9 }}
+                                className="px-3 py-1.5 bg-gradient-to-r from-red-400 to-red-500 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-1.5 text-xs font-medium shadow-md"
+                                onClick={() => handleSingleScheduleDelete(sch.id || '', teacher.teacher_nickname || teacher.teacher_fullname || '', sch.scheduled_date || '')}
+                                title="刪除此排班"
+                              >
+                                <TrashIcon className="w-3.5 h-3.5" />
+                                刪除
+                              </motion.button>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </motion.div>
               );
             })}
           </div>
         ) : (
-          <div className="flex items-center justify-between mb-4">
-            <button
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-between mb-6 bg-white/70 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-[#EADBC8]"
+          >
+            <motion.button
+              whileHover={{ scale: 1.1, x: -2 }}
+              whileTap={{ scale: 0.95 }}
               aria-label="Previous Month"
-              className="px-3 py-1 bg-[#EADBC8] rounded hover:bg-[#d4c1a1]"
               onClick={handlePrevMonth}
+              className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center justify-center"
             >
-              &lt;
-            </button>
-            <h2 className="text-xl font-bold text-[#2B3A3B]">
-              {format(currentMonth, 'yyyy年MM月')}
-            </h2>
-            <button
+              <ChevronLeftIcon className="w-5 h-5" />
+            </motion.button>
+            <motion.div
+              key={format(currentMonth, 'yyyy-MM')}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center gap-3"
+            >
+              <CalendarIcon className="w-6 h-6 text-[#FFB6C1]" />
+              <h2 className="text-2xl font-bold text-[#4B4036]">
+                {format(currentMonth, 'yyyy年MM月')}
+              </h2>
+            </motion.div>
+            <motion.button
+              whileHover={{ scale: 1.1, x: 2 }}
+              whileTap={{ scale: 0.95 }}
               aria-label="Next Month"
-              className="px-3 py-1 bg-[#EADBC8] rounded hover:bg-[#d4c1a1]"
               onClick={handleNextMonth}
+              className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center justify-center"
             >
-              &gt;
-            </button>
-          </div>
+              <ChevronRightIcon className="w-5 h-5" />
+            </motion.button>
+          </motion.div>
         )}
 
         {viewMode === 'calendar' ? (
           <div 
-            className="grid grid-cols-7 gap-2 text-center text-sm text-[#2B3A3B]"
+            className="grid grid-cols-7 gap-3 text-center"
             onDragOver={editMode ? (e) => {
               e.preventDefault();
               handleAutoScroll(e);
             } : undefined}
           >
-            {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-              <div key={day} className="font-semibold border-b border-[#EADBC8] pb-1">
+            {['日', '一', '二', '三', '四', '五', '六'].map((day, index) => (
+              <motion.div
+                key={day}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="font-bold text-[#4B4036] pb-2 text-sm bg-gradient-to-br from-[#FFD59A]/20 to-[#FFB6C1]/20 rounded-lg px-2 py-2 border border-[#EADBC8]/50"
+              >
                 {day}
-              </div>
+              </motion.div>
             ))}
             {/* Empty slots for days before the first of the month */}
             {Array(daysInMonth[0].getDay()).fill(null).map((_, i) => (
               <div key={`empty-start-${i}`} />
             ))}
-            {daysInMonth.map(day => {
+            {daysInMonth.map((day, dayIndex) => {
               const dateStr = format(day, 'yyyy-MM-dd');
               const currentSchedules = editMode ? dragSchedules : filteredSchedules;
               const scheduledTeachers = currentSchedules
@@ -1252,16 +1387,31 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                 .map(s => filteredTeachers.find(t => t.id === s.teacher_id))
                 .filter(Boolean) as Teacher[];
               const lessonCount = lessonsCountByDate[dateStr] || 0;
+              const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
             
               return (
-                <div
+                <motion.div
                   key={dateStr}
-                  className={`relative border border-[#EADBC8] rounded p-1 flex flex-col justify-between min-h-[130px] transition-all duration-300 ${
-                    editMode ? 'cursor-default' : 'cursor-pointer hover:bg-[#FFFCF5] hover:shadow-md'
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: dayIndex * 0.02 }}
+                  whileHover={editMode ? {} : { 
+                    y: -4, 
+                    scale: 1.02,
+                    boxShadow: "0 10px 25px rgba(255, 182, 193, 0.2)"
+                  }}
+                  className={`relative bg-gradient-to-br ${
+                    scheduledTeachers.length > 0 
+                      ? 'from-white/90 to-white/70' 
+                      : 'from-white/50 to-white/30'
+                  } backdrop-blur-sm rounded-xl p-2 flex flex-col justify-between min-h-[140px] transition-all duration-300 border-2 ${
+                    isToday 
+                      ? 'border-[#FFB6C1] shadow-lg ring-2 ring-[#FFB6C1]/30' 
+                      : 'border-[#EADBC8]'
                   } ${
-                    dragOverDate === dateStr ? 'bg-[#FFE8C2] border-[#A68A64] shadow-lg transform scale-105' : ''
+                    editMode ? 'cursor-default' : 'cursor-pointer'
                   } ${
-                    scheduledTeachers.length > 0 ? 'bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] shadow-sm' : ''
+                    dragOverDate === dateStr ? 'bg-gradient-to-br from-[#FFE8C2] to-[#FFD59A] border-[#FFB6C1] shadow-xl scale-105' : ''
                   }`}
                   style={{ overflow: 'hidden' }}
                   onClick={editMode ? undefined : () => handleDateClick(day)}
@@ -1275,138 +1425,239 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                     handleDateDrop(dateStr);
                   } : undefined}
                 >
-                  <div className="absolute top-0 left-1 text-xs font-semibold text-[#2B3A3B]">{day.getDate()}</div>
-                  <div className="flex flex-col gap-0.5 mt-4 w-full">
-                    {scheduledTeachers.length > 0 ? scheduledTeachers.map(t => {
-                      if (!t) return null;
-                      const schedule = currentSchedules.find(s => s.teacher_id === t.id && s.scheduled_date === dateStr);
-                      return (
-                        <div
-                          key={t.id}
-                          className={`w-full max-w-full bg-gradient-to-br from-[#FFE8C2] to-[#FFD59A] rounded-md shadow-lg flex flex-col items-center p-1 overflow-hidden border border-[#EADBC8] min-w-0 transform hover:scale-105 transition-all duration-300 hover:shadow-xl ${
-                          editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-300 shadow-green-200' : ''
-                        } ${editMode ? 'p-1.5' : 'p-1'}`}
-                          style={{ zIndex: 10, marginBottom: 2 }}
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <div className="flex flex-col items-center w-full gap-1">
-                            {/* 老師名字 */}
-                            <span
-                              className={`text-xs font-bold w-full text-center bg-white bg-opacity-80 rounded-full px-2 py-0.5 shadow-sm transform hover:scale-110 transition-all duration-200 ${
-                                editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? 'text-green-700 bg-green-50' : 'text-[#4B4036]'
-                              }`}
-                            >
-                              {editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? (
-                                <img alt="confirmed" className="w-3 h-3 inline mr-1 animate-pulse" src="/leaf-sprout.png" />
-                              ) : null}
-                              {t.teacher_nickname}
-                            </span>
+                  {/* 動態背景裝飾 */}
+                  {scheduledTeachers.length > 0 && (
+                    <motion.div
+                      animate={{ 
+                        background: [
+                          "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)",
+                          "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.1) 0%, transparent 50%)",
+                          "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)"
+                        ]
+                      }}
+                      transition={{ duration: 8, repeat: Infinity }}
+                      className="absolute inset-0 rounded-xl"
+                    />
+                  )}
+                  
+                  <div className="relative z-10">
+                    {/* 日期數字 */}
+                    <div className="flex items-center justify-between mb-2">
+                      <motion.span
+                        whileHover={{ scale: 1.1 }}
+                        className={`text-sm font-bold ${
+                          isToday 
+                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white px-2 py-0.5 rounded-full' 
+                            : 'text-[#4B4036]'
+                        }`}
+                      >
+                        {day.getDate()}
+                      </motion.span>
+                      {isToday && (
+                        <motion.div
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                          className="w-2 h-2 bg-[#FFB6C1] rounded-full"
+                        />
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 w-full">
+                      {scheduledTeachers.length > 0 ? scheduledTeachers.map((t, teacherIndex) => {
+                        if (!t) return null;
+                        const schedule = currentSchedules.find(s => s.teacher_id === t.id && s.scheduled_date === dateStr);
+                        return (
+                          <motion.div
+                            key={t.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: teacherIndex * 0.1 }}
+                            whileHover={{ scale: 1.05, y: -2 }}
+                            className={`w-full max-w-full bg-gradient-to-br ${
+                              editMode && schedule && 'confirmed' in schedule && schedule.confirmed 
+                                ? 'from-[#FFB6C1] to-[#FFD59A] border-[#FFB6C1] ring-2 ring-[#FFB6C1]/50 shadow-lg' 
+                                : 'from-[#FFE8C2] to-[#FFD59A] border-[#EADBC8]'
+                            } rounded-lg shadow-md flex flex-col items-center p-1.5 overflow-hidden border-2 min-w-0 transition-all duration-300 hover:shadow-xl ${
+                              editMode ? 'p-2' : 'p-1.5'
+                            }`}
+                            style={{ zIndex: 10, marginBottom: 2 }}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <div className="flex flex-col items-center w-full gap-1">
+                              {/* 老師名字 */}
+                              <motion.span
+                                whileHover={{ scale: 1.1 }}
+                                className={`text-xs font-bold w-full text-center bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 shadow-sm transition-all duration-200 ${
+                                  editMode && schedule && 'confirmed' in schedule && schedule.confirmed 
+                                    ? 'text-[#4B4036] bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 ring-2 ring-[#FFB6C1]' 
+                                    : 'text-[#4B4036]'
+                                }`}
+                              >
+                                {editMode && schedule && 'confirmed' in schedule && schedule.confirmed ? (
+                                  <motion.img
+                                    animate={{ rotate: [0, 10, -10, 0] }}
+                                    transition={{ duration: 1, repeat: Infinity }}
+                                    alt="confirmed" 
+                                    className="w-3 h-3 inline mr-1" 
+                                    src="/leaf-sprout.png" 
+                                  />
+                                ) : null}
+                                {t.teacher_nickname}
+                              </motion.span>
                             
-                            {/* 編輯模式按鈕 */}
-                            {editMode && (
-                              <div className="flex gap-1 pointer-events-auto">
-                                <button
-                                  className="w-5 h-5 text-green-600 hover:text-green-800 flex items-center justify-center rounded-full border border-green-200 bg-white text-xs shadow-sm transform hover:scale-125 hover:shadow-md transition-all duration-200 hover:bg-green-50"
-                                  title="確認"
-                                  type="button"
-                                  onClick={e => { e.preventDefault(); e.stopPropagation(); handleScheduleConfirm(t.id, dateStr); }}
-                                >
-                                  <img src="/leaf-sprout.png" alt="confirm" className="w-3 h-3 animate-pulse" />
-                                </button>
-                                <button
-                                  className="w-5 h-5 text-[#A68A64] hover:text-red-600 flex items-center justify-center rounded-full border border-[#EADBC8] bg-white text-xs shadow-sm transform hover:scale-125 hover:shadow-md transition-all duration-200 hover:bg-red-50"
-                                  title="取消"
-                                  type="button"
-                                  onClick={e => { e.preventDefault(); e.stopPropagation(); handleScheduleCancel(t.id, dateStr); }}
-                                >
-                                  <img src="/close.png" alt="cancel" className="w-3 h-3 hover:animate-bounce" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          {/* 時間顯示區域 */}
-                          <div className="flex flex-col items-center gap-1 mt-1 w-full px-1">
-                                                         {/* 編輯模式：24小時制時間輸入框 */}
-                             {editMode && (
-                               <div className="flex flex-col items-center gap-1 w-full">
-                                 {/* 起始時間 */}
-                                 <div className="w-full relative">
-                                   <input
-                                     className="w-full text-[9px] sm:text-[10px] px-1 py-1 bg-white border border-[#EADBC8] rounded text-center flex-shrink-0 min-w-[50px]"
-                                     type="text"
-                                     pattern="[0-9]{2}:[0-9]{2}"
-                                     placeholder="HH:MM"
-                                     value={schedule?.start_time?.slice(0, 5) || '09:00'}
-                                     onChange={e => {
-                                       const value = e.target.value;
-                                       // 格式化輸入為 HH:MM
-                                       let formatted = value.replace(/[^\d:]/g, '');
-                                       if (formatted.length === 4 && !formatted.includes(':')) {
-                                         formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
-                                       }
-                                       handleScheduleTimeChange(t.id, dateStr, 'start_time', formatted);
-                                     }}
-                                     onBlur={e => {
-                                       const value = e.target.value;
-                                       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-                                       if (!timeRegex.test(value)) {
-                                         handleScheduleTimeChange(t.id, dateStr, 'start_time', '09:00');
-                                       }
-                                     }}
-                                   />
-                                 </div>
-                                 {/* 分隔符號 */}
-                                 <span className="text-[9px] sm:text-[10px] text-[#A68A64] flex-shrink-0">-</span>
-                                 {/* 結束時間 */}
-                                 <div className="w-full relative">
-                                   <input
-                                     className="w-full text-[9px] sm:text-[10px] px-1 py-1 bg-white border border-[#EADBC8] rounded text-center flex-shrink-0 min-w-[50px]"
-                                     type="text"
-                                     pattern="[0-9]{2}:[0-9]{2}"
-                                     placeholder="HH:MM"
-                                     value={schedule?.end_time?.slice(0, 5) || '18:00'}
-                                     onChange={e => {
-                                       const value = e.target.value;
-                                       // 格式化輸入為 HH:MM
-                                       let formatted = value.replace(/[^\d:]/g, '');
-                                       if (formatted.length === 4 && !formatted.includes(':')) {
-                                         formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
-                                       }
-                                       handleScheduleTimeChange(t.id, dateStr, 'end_time', formatted);
-                                     }}
-                                     onBlur={e => {
-                                       const value = e.target.value;
-                                       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-                                       if (!timeRegex.test(value)) {
-                                         handleScheduleTimeChange(t.id, dateStr, 'end_time', '18:00');
-                                       }
-                                     }}
-                                   />
-                                 </div>
-                               </div>
-                             )}
-                            {/* 美化時間文字顯示 - 編輯和非編輯模式都顯示 */}
-                            <div className="text-[8px] sm:text-[9px] text-center w-full mt-1">
-                              <div className="bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] rounded-full px-2 py-0.5 shadow-sm border border-[#EADBC8] transform hover:scale-105 transition-all duration-200">
-                                <span className="text-[#4B4036] font-medium">
-                                  {schedule?.start_time?.slice(0, 5) || '09:00'}
-                                </span>
-                                <span className="text-[#A68A64] mx-1">→</span>
-                                <span className="text-[#4B4036] font-medium">
-                                  {schedule?.end_time?.slice(0, 5) || '18:00'}
-                                </span>
-                              </div>
+                              {/* 編輯模式按鈕 */}
+                              {editMode && (
+                                <div className="flex gap-1 pointer-events-auto">
+                                  <motion.button
+                                    whileHover={{ scale: 1.2, rotate: 5 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    className="w-6 h-6 text-[#4B4036] hover:text-[#FFB6C1] flex items-center justify-center rounded-full border-2 border-[#FFB6C1] bg-white text-xs shadow-md hover:shadow-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-[#FFB6C1]/20 hover:to-[#FFD59A]/20"
+                                    title="確認"
+                                    type="button"
+                                    onClick={e => { e.preventDefault(); e.stopPropagation(); handleScheduleConfirm(t.id, dateStr); }}
+                                  >
+                                    <motion.img
+                                      animate={{ rotate: [0, 360] }}
+                                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                      src="/leaf-sprout.png" 
+                                      alt="confirm" 
+                                      className="w-3 h-3" 
+                                    />
+                                  </motion.button>
+                                  <motion.button
+                                    whileHover={{ scale: 1.2, rotate: -5 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    className="w-6 h-6 text-[#A68A64] hover:text-red-600 flex items-center justify-center rounded-full border-2 border-[#EADBC8] bg-white text-xs shadow-md hover:shadow-lg transition-all duration-200 hover:bg-red-50"
+                                    title="取消"
+                                    type="button"
+                                    onClick={e => { e.preventDefault(); e.stopPropagation(); handleScheduleCancel(t.id, dateStr); }}
+                                  >
+                                    <motion.img
+                                      animate={{ rotate: [0, 180] }}
+                                      transition={{ duration: 0.5 }}
+                                      src="/close.png" 
+                                      alt="cancel" 
+                                      className="w-3 h-3" 
+                                    />
+                                  </motion.button>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        </div>
-                      );
-                    }) : <span className="text-[#aaa] text-xs">無</span>}
+                            {/* 時間顯示區域 */}
+                            <div className="flex flex-col items-center gap-1 mt-1 w-full px-1">
+                              {/* 編輯模式：24小時制時間輸入框 */}
+                              {editMode && (
+                                <div className="flex flex-col items-center gap-1 w-full">
+                                  {/* 起始時間 */}
+                                  <div className="w-full relative">
+                                    <input
+                                      className="w-full text-[10px] sm:text-[11px] px-2 py-1 bg-white/90 backdrop-blur-sm border-2 border-[#EADBC8] rounded-lg text-center flex-shrink-0 min-w-[60px] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] transition-all"
+                                      type="text"
+                                      pattern="[0-9]{2}:[0-9]{2}"
+                                      placeholder="HH:MM"
+                                      value={schedule?.start_time?.slice(0, 5) || '09:00'}
+                                      onChange={e => {
+                                        const value = e.target.value;
+                                        // 格式化輸入為 HH:MM
+                                        let formatted = value.replace(/[^\d:]/g, '');
+                                        if (formatted.length === 4 && !formatted.includes(':')) {
+                                          formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
+                                        }
+                                        handleScheduleTimeChange(t.id, dateStr, 'start_time', formatted);
+                                      }}
+                                      onBlur={e => {
+                                        const value = e.target.value;
+                                        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                                        if (!timeRegex.test(value)) {
+                                          handleScheduleTimeChange(t.id, dateStr, 'start_time', '09:00');
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  {/* 分隔符號 */}
+                                  <motion.span
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                    className="text-[10px] sm:text-[11px] text-[#FFB6C1] font-bold flex-shrink-0"
+                                  >
+                                    →
+                                  </motion.span>
+                                  {/* 結束時間 */}
+                                  <div className="w-full relative">
+                                    <input
+                                      className="w-full text-[10px] sm:text-[11px] px-2 py-1 bg-white/90 backdrop-blur-sm border-2 border-[#EADBC8] rounded-lg text-center flex-shrink-0 min-w-[60px] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] transition-all"
+                                      type="text"
+                                      pattern="[0-9]{2}:[0-9]{2}"
+                                      placeholder="HH:MM"
+                                      value={schedule?.end_time?.slice(0, 5) || '18:00'}
+                                      onChange={e => {
+                                        const value = e.target.value;
+                                        // 格式化輸入為 HH:MM
+                                        let formatted = value.replace(/[^\d:]/g, '');
+                                        if (formatted.length === 4 && !formatted.includes(':')) {
+                                          formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
+                                        }
+                                        handleScheduleTimeChange(t.id, dateStr, 'end_time', formatted);
+                                      }}
+                                      onBlur={e => {
+                                        const value = e.target.value;
+                                        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                                        if (!timeRegex.test(value)) {
+                                          handleScheduleTimeChange(t.id, dateStr, 'end_time', '18:00');
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              {/* 美化時間文字顯示 - 編輯和非編輯模式都顯示 */}
+                              <motion.div
+                                whileHover={{ scale: 1.05 }}
+                                className="text-center w-full mt-1"
+                              >
+                                <div className="bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] rounded-full px-2 py-1.5 shadow-md border-2 border-[#EADBC8] transition-all duration-200">
+                                  <span className="text-[#4B4036] font-bold text-xs sm:text-sm">
+                                    {schedule?.start_time?.slice(0, 5) || schedule?.start_time || '09:00'}
+                                  </span>
+                                  <motion.span
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                    className="text-[#FFB6C1] mx-1 font-bold"
+                                  >
+                                    →
+                                  </motion.span>
+                                  <span className="text-[#4B4036] font-bold text-xs sm:text-sm">
+                                    {schedule?.end_time?.slice(0, 5) || schedule?.end_time || '18:00'}
+                                  </span>
+                                </div>
+                              </motion.div>
+                            </div>
+                          </motion.div>
+                        );
+                      }) : (
+                        <motion.span
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-[#aaa] text-xs italic"
+                        >
+                          無排班
+                        </motion.span>
+                      )}
+                    </div>
+                    
+                    {/* 課程數量 */}
+                    {lessonCount > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        whileHover={{ scale: 1.1 }}
+                        className="mt-2 flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFB6C1]/30 to-[#FFD59A]/30 rounded-full px-3 py-1.5 border border-[#EADBC8]"
+                      >
+                        <SparklesIcon className="w-3.5 h-3.5 text-[#FFB6C1]" />
+                        <span className="text-xs font-bold text-[#4B4036]">{lessonCount} 課程</span>
+                      </motion.div>
+                    )}
                   </div>
-                  <div className="text-xs mt-2 flex items-center justify-center gap-1">
-                    <img alt="girl icon" className="w-4 h-4" src="/icons/penguin-face.PNG" />
-                    {lessonCount}
-                  </div>
-                </div>
+                </motion.div>
               );
             })}
             {/* Empty slots for days after the last of the month */}
@@ -1417,90 +1668,187 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
         ) : null}
       </div>
 
-      {/* Popup for daily schedule (Hanami style) */}
-      {selectedDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="relative bg-[#FFFDF8] rounded-2xl shadow-2xl p-6 w-[380px] max-h-[90vh] overflow-y-auto border border-[#EADBC8]">
-            {/* 關閉按鈕 */}
-            <button
-              aria-label="關閉"
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-xl text-[#A68A64] hover:bg-[#F3F0E5] shadow"
-              onClick={() => setSelectedDetail(null)}
-            >×
-            </button>
-            {/* 日期標題 */}
-            <div className="text-lg font-bold mb-2 text-[#4B4036]">
-              {format(selectedDetail.date, 'yyyy年MM月dd日')} 課堂安排
-            </div>
-            {/* 老師區塊 */}
-            <div className="mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-[#A68A64]">當日老師：</span>
-                <button
-                  className="text-xs text-[#A68A64] hover:underline flex items-center gap-1"
-                  onClick={() => setShowArrangeTeacher(true)}
+      {/* Popup for daily schedule (Modern style) */}
+      <AnimatePresence>
+        {selectedDetail && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+            onClick={() => setSelectedDetail(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative bg-gradient-to-br from-white/95 to-white/90 backdrop-blur-md rounded-3xl shadow-2xl p-8 w-[420px] max-h-[90vh] overflow-y-auto border-2 border-[#EADBC8]"
+            >
+              {/* 動態背景裝飾 */}
+              <motion.div
+                animate={{ 
+                  background: [
+                    "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)",
+                    "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.1) 0%, transparent 50%)",
+                    "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)"
+                  ]
+                }}
+                transition={{ duration: 8, repeat: Infinity }}
+                className="absolute inset-0 rounded-3xl"
+              />
+              
+              <div className="relative z-10">
+                {/* 關閉按鈕 */}
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  aria-label="關閉"
+                  className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm border-2 border-[#EADBC8] text-xl text-[#4B4036] hover:bg-[#FFB6C1] hover:text-white hover:border-[#FFB6C1] shadow-lg transition-all"
+                  onClick={() => setSelectedDetail(null)}
                 >
-                  <img alt="編輯" className="w-4 h-4" src="/icons/edit-pencil.png" /> 安排老師
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {selectedDetail.teachers.length > 0 ? selectedDetail.teachers.map(teacher => {
-                  const schedule = schedules.find(
-                    s => s.teacher_id === teacher.id && s.scheduled_date === format(selectedDetail.date, 'yyyy-MM-dd'),
-                  );
-                  return (
-                    <div key={teacher.id} className="flex items-center gap-1">
-                      <span className="bg-[#FFE8C2] text-[#4B4036] rounded-full px-2 py-0.5 text-xs font-medium flex items-center gap-1">
-                        {teacher.teacher_nickname}
-                        {schedule && (
-                          <span className="ml-1 text-[10px] text-[#A68A64] flex items-center gap-1">
-                            <span>({schedule.start_time?.slice(0, 5) || ''}</span>
-                            <img src="/arrow-right.png" alt="to" className="w-2 h-2" />
-                            <span>{schedule.end_time?.slice(0, 5) || ''})</span>
-                          </span>
-                        )}
-                      </span>
-                      <button
-                        className="text-red-500 hover:text-red-700 text-base font-bold w-6 h-6 flex items-center justify-center"
-                        title="移除"
-                        onClick={() => {
-                          const confirmed = window.confirm('確定要移除此老師的排班嗎？');
-                          if (confirmed) handleDeleteTeacherSchedule(teacher.id);
-                        }}
-                      >
-                        <img src="/close.png" alt="remove" className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                }) : <span className="text-[#aaa]">無</span>}
-              </div>
-            </div>
-            {/* 課堂安排 */}
-            <div>
-              <div className="font-semibold text-[#A68A64] mb-1">課堂安排：</div>
-              <div className="space-y-2">
-                {selectedDetail.groups.map((group, idx) => (
-                  <div key={idx} className="border-l-2 border-[#EADBC8] pl-3">
-                    <div className="text-[#4B4036] font-bold">
-                      {group.time?.slice(0, 5) || ''} {group.course || ''} ({group.students.length})
-                    </div>
-                    <div className="ml-2 text-sm text-[#4B4036] flex flex-col gap-1">
-                      {group.students.map((student, j) => (
-                        <div key={j} className="flex flex-col">
-                          <span>{student.name}</span>
-                          {student.age && (
-                            <span className="text-[10px] text-[#87704e] ml-2">（{Math.floor(parseInt(student.age) / 12)}Y{parseInt(student.age) % 12}M ）</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                  ×
+                </motion.button>
+                {/* 日期標題 */}
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 mb-6"
+                >
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <CalendarIcon className="w-6 h-6 text-[#FFB6C1]" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-[#4B4036]">
+                      {format(selectedDetail.date, 'yyyy年MM月dd日')}
+                    </h3>
+                    <p className="text-sm text-[#2B3A3B]">課堂安排</p>
                   </div>
-                ))}
+                </motion.div>
+                {/* 老師區塊 */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-bold text-[#4B4036] flex items-center gap-2">
+                      <UserIcon className="w-5 h-5 text-[#FFB6C1]" />
+                      當日老師
+                    </span>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="text-xs px-3 py-1.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-lg font-medium shadow-sm hover:shadow-md transition-all flex items-center gap-1"
+                      onClick={() => setShowArrangeTeacher(true)}
+                    >
+                      <PencilIcon className="w-3 h-3" />
+                      安排老師
+                    </motion.button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedDetail.teachers.length > 0 ? selectedDetail.teachers.map((teacher, index) => {
+                      const schedule = schedules.find(
+                        s => s.teacher_id === teacher.id && s.scheduled_date === format(selectedDetail.date, 'yyyy-MM-dd'),
+                      );
+                      return (
+                        <motion.div
+                          key={teacher.id}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: index * 0.1 }}
+                          whileHover={{ scale: 1.05 }}
+                          className="flex items-center gap-2 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] rounded-full px-3 py-1.5 shadow-md border border-[#EADBC8]"
+                        >
+                          <span className="text-xs font-bold text-[#4B4036]">
+                            {teacher.teacher_nickname}
+                            {schedule && (
+                              <span className="ml-2 text-[10px] text-[#A68A64] font-medium">
+                                ({schedule.start_time?.slice(0, 5) || ''} → {schedule.end_time?.slice(0, 5) || ''})
+                              </span>
+                            )}
+                          </span>
+                          <motion.button
+                            whileHover={{ scale: 1.2, rotate: 90 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="text-red-500 hover:text-red-700 w-5 h-5 flex items-center justify-center rounded-full hover:bg-red-50 transition-all"
+                            title="移除"
+                            onClick={() => {
+                              const confirmed = window.confirm('確定要移除此老師的排班嗎？');
+                              if (confirmed) handleDeleteTeacherSchedule(teacher.id);
+                            }}
+                          >
+                            <XMarkIcon className="w-3.5 h-3.5" />
+                          </motion.button>
+                        </motion.div>
+                      );
+                    }) : (
+                      <span className="text-[#aaa] text-sm italic">無老師排班</span>
+                    )}
+                  </div>
+                </div>
+                {/* 課堂安排 */}
+                <div>
+                  <div className="font-bold text-[#4B4036] mb-3 flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5 text-[#FFD59A]" />
+                    課堂安排
+                  </div>
+                  <div className="space-y-3">
+                    {selectedDetail.groups.length > 0 ? selectedDetail.groups.map((group, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] rounded-xl p-4 border-l-4 border-[#FFB6C1] shadow-sm hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <motion.span
+                            animate={{ scale: [1, 1.1, 1] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                            className="text-sm font-bold text-[#4B4036] bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white px-3 py-1 rounded-full"
+                          >
+                            {group.time?.slice(0, 5) || ''}
+                          </motion.span>
+                          <span className="text-sm font-bold text-[#4B4036]">
+                            {group.course || '未命名課程'}
+                          </span>
+                          <span className="text-xs text-[#2B3A3B] bg-white/70 px-2 py-0.5 rounded-full">
+                            {group.students.length} 位學生
+                          </span>
+                        </div>
+                        <div className="ml-2 space-y-1">
+                          {group.students.map((student, j) => (
+                            <motion.div
+                              key={j}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: idx * 0.1 + j * 0.05 }}
+                              className="flex items-center gap-2 text-sm text-[#4B4036]"
+                            >
+                              <div className="w-2 h-2 bg-[#FFB6C1] rounded-full" />
+                              <span className="font-medium">{student.name}</span>
+                              {student.age && (
+                                <span className="text-xs text-[#A68A64] bg-white/50 px-2 py-0.5 rounded-full">
+                                  {Math.floor(parseInt(student.age) / 12)}Y{parseInt(student.age) % 12}M
+                                </span>
+                              )}
+                            </motion.div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )) : (
+                      <div className="text-center py-4 text-[#aaa] text-sm italic">
+                        當日無課程安排
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 安排老師彈窗 */}
       {showArrangeTeacher && (

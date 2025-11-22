@@ -485,6 +485,49 @@ const PLACEHOLDER_ORG_IDS = new Set([
     teacher_fullname?: string;
     teacher_nickname?: string;
   } | null>(null);
+  
+  // 檢查是否為 member 或 teacher，並獲取對應的 teacher_id
+  const isMemberOrTeacher = currentOrgRole === 'member' || currentOrgRole === 'teacher';
+  const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
+  
+  // 獲取當前用戶對應的 teacher_id（通過 linked_user_id）
+  useEffect(() => {
+    const fetchTeacherId = async () => {
+      if (!isMemberOrTeacher || !saasUser?.id || !validOrgId) {
+        setCurrentTeacherId(null);
+        return;
+      }
+      
+      try {
+        // 查詢 hanami_employee 表，找到 linked_user_id 匹配的記錄
+        const { data: employeeData, error } = await supabase
+          .from('hanami_employee')
+          .select('id')
+          .eq('linked_user_id', saasUser.id)
+          .eq('org_id', validOrgId)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('查詢 teacher_id 失敗:', error);
+          setCurrentTeacherId(null);
+          return;
+        }
+        
+        if (employeeData) {
+          console.log('找到對應的 teacher_id:', employeeData.id);
+          setCurrentTeacherId(employeeData.id);
+        } else {
+          console.log('未找到對應的 teacher_id，用戶可能未鏈接到教師記錄');
+          setCurrentTeacherId(null);
+        }
+      } catch (error) {
+        console.error('獲取 teacher_id 時發生錯誤:', error);
+        setCurrentTeacherId(null);
+      }
+    };
+    
+    fetchTeacherId();
+  }, [isMemberOrTeacher, saasUser?.id, validOrgId]);
 
   // 新增：學生媒體上傳狀態追蹤
   const [studentMediaStatus, setStudentMediaStatus] = useState<Record<string, boolean>>({});
@@ -659,6 +702,29 @@ const PLACEHOLDER_ORG_IDS = new Set([
       
       const dateStr = formatLocalDate(selectedDate);
       
+      // 如果是 member/teacher，先查詢 teacher_schedule 獲取上班時間
+      let teacherSchedule: any[] = [];
+      if (isMemberOrTeacher && currentTeacherId && validOrgId) {
+        try {
+          const { data: scheduleData, error: scheduleError } = await supabase
+            .from('teacher_schedule')
+            .select('scheduled_date, start_time, end_time')
+            .eq('teacher_id', currentTeacherId)
+            .eq('scheduled_date', dateStr)
+            .eq('org_id', validOrgId)
+            .order('start_time', { ascending: true });
+          
+          if (scheduleError) {
+            console.error('查詢教師排程失敗:', scheduleError);
+          } else {
+            teacherSchedule = scheduleData || [];
+            console.log('🔍 [ClassActivities] 教師排程:', teacherSchedule);
+          }
+        } catch (error) {
+          console.error('查詢教師排程時發生錯誤:', error);
+        }
+      }
+      
       // 查詢 hanami_schedule 表
       let scheduleQuery = supabase
         .from('hanami_schedule')
@@ -679,9 +745,49 @@ const PLACEHOLDER_ORG_IDS = new Set([
       
       console.log('查詢到的班別資料:', schedules);
       
+      // 如果是 member/teacher 且有排程，根據排程時間過濾班別
+      let filteredSchedules = schedules || [];
+      if (isMemberOrTeacher && currentTeacherId && teacherSchedule.length > 0) {
+        // 將時間字符串（HH:MM）轉換為分鐘數
+        const timeToMinutes = (timeStr: string): number => {
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          return hours * 60 + minutes;
+        };
+        
+        // 過濾 hanami_schedule，只保留 timeslot 在 teacher_schedule 時間範圍內的班別
+        filteredSchedules = (schedules || []).filter((schedule: any) => {
+          const scheduleTimeslot = schedule.timeslot || '';
+          if (!scheduleTimeslot) return false;
+          
+          const scheduleMinutes = timeToMinutes(scheduleTimeslot.padStart(5, '0'));
+          
+          // 檢查是否在任何一個排程時間段內（準確匹配）
+          const isInSchedule = teacherSchedule.some((ts: any) => {
+            const startMinutes = timeToMinutes(ts.start_time);
+            const endMinutes = timeToMinutes(ts.end_time);
+            return scheduleMinutes >= startMinutes && scheduleMinutes <= endMinutes;
+          });
+          
+          if (!isInSchedule) {
+            console.log(`班別 ${schedule.course_code || schedule.id} 的時段 ${scheduleTimeslot} 不在教師排程時間內`);
+          }
+          
+          return isInSchedule;
+        });
+        
+        console.log(`🔍 [ClassActivities] 根據教師排程過濾班別: ${(schedules || []).length} -> ${filteredSchedules.length}`);
+      } else if (isMemberOrTeacher && currentTeacherId && teacherSchedule.length === 0) {
+        // 如果沒有排程記錄，不顯示任何班別
+        console.log('教師沒有排程記錄，過濾掉所有班別');
+        filteredSchedules = [];
+      }
+      
+      // 使用過濾後的班別列表
+      const schedulesToProcess = filteredSchedules;
+      
         // 建立時段到班級的映射，用於判斷是否為該時段的第一個班級
         const timeslotToFirstClass = new Map<string, string>();
-        (schedules || []).forEach((schedule: any) => {
+        schedulesToProcess.forEach((schedule: any) => {
           const timeslot = schedule.timeslot || '';
           if (!timeslotToFirstClass.has(timeslot)) {
             timeslotToFirstClass.set(timeslot, schedule.id);
@@ -689,7 +795,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
         });
       
         // 結合課程資料和學生資料
-        const groupsWithStudents: ClassGroup[] = await Promise.all((schedules || []).map(async (schedule: any, scheduleIndex: number) => {
+        const groupsWithStudents: ClassGroup[] = await Promise.all(schedulesToProcess.map(async (schedule: any, scheduleIndex: number) => {
           // 找到該班級在選中日期的課程記錄
           const matchedLessons = [
             ...lessons.filter(lesson => 
@@ -944,9 +1050,12 @@ const PLACEHOLDER_ORG_IDS = new Set([
         return `${year}-${month}-${day}`;
       };
       
-      const cacheKey = `${validOrgId}:${formatLocalDateInLoad(startDate)}-${formatLocalDateInLoad(endDate)}`;
+      // 構建緩存鍵，如果是 member/teacher 則包含 teacherId
+      const cacheKey = isMemberOrTeacher && currentTeacherId
+        ? `${validOrgId}:${currentTeacherId}:${formatLocalDateInLoad(startDate)}-${formatLocalDateInLoad(endDate)}`
+        : `${validOrgId}:${formatLocalDateInLoad(startDate)}-${formatLocalDateInLoad(endDate)}`;
       
-      // 檢查快取
+      // 檢查快取（注意：member/teacher 的緩存與管理員的緩存是分開的）
       if (dataCache.has(cacheKey)) {
         console.log('使用快取資料:', cacheKey);
         setLoadingText('處理快取資料中...');
@@ -987,6 +1096,12 @@ const PLACEHOLDER_ORG_IDS = new Set([
       // 只在 validOrgId 存在時才添加 orgId 參數
       if (validOrgId) {
         query.set('orgId', validOrgId);
+      }
+      
+      // 如果是 member 或 teacher，且找到了對應的 teacher_id，則傳遞 teacherId 參數
+      if (isMemberOrTeacher && currentTeacherId) {
+        query.set('teacherId', currentTeacherId);
+        console.log('🔍 [ClassActivities] 使用 teacher_id 過濾課堂活動:', currentTeacherId);
       }
 
       const response = await fetch(`/api/class-activities?${query.toString()}`);

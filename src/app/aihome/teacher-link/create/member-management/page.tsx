@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserPlus, Copy, Check, X, Edit2, Trash2, Clock, Users } from 'lucide-react';
+import { Search, UserPlus, Copy, Check, X, Edit2, Trash2, Clock, Users, Link2, Unlink, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { getUserSession } from '@/lib/authUtils';
 import { getAccessToken } from '@/lib/getAccessToken';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
@@ -13,6 +13,8 @@ import HanamiInput from '@/components/ui/HanamiInput';
 import HanamiButton from '@/components/ui/HanamiButton';
 import { HanamiSelect } from '@/components/ui/HanamiSelect';
 import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
+import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
+import TeacherManagementNavBar from '@/components/ui/TeacherManagementNavBar';
 
 type RoleType = 'owner' | 'admin' | 'teacher' | 'member';
 
@@ -69,10 +71,11 @@ const roleDescriptions: Record<RoleType, string> = {
   member: '機構成員，基本查看權限',
 };
 
-export default function MemberManagementPage() {
+function MemberManagementContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user: saasUser, loading: saasAuthLoading } = useSaasAuth();
+  const { orgId: contextOrgId } = useTeacherLinkOrganization();
   const [searchEmail, setSearchEmail] = useState('');
   const [searching, setSearching] = useState(false);
   const [foundUser, setFoundUser] = useState<User | null>(null);
@@ -86,6 +89,13 @@ export default function MemberManagementPage() {
   const [editingIdentity, setEditingIdentity] = useState<Identity | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [linkStatuses, setLinkStatuses] = useState<Record<string, any>>({});
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkingIdentity, setLinkingIdentity] = useState<Identity | null>(null);
+  const [availableTeachers, setAvailableTeachers] = useState<any[]>([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  const [linking, setLinking] = useState(false);
+  const [showInvitationSection, setShowInvitationSection] = useState(false); // 預設收起
 
   // 調試：追蹤 SaaS 認證狀態
   useEffect(() => {
@@ -154,6 +164,31 @@ export default function MemberManagementPage() {
     console.log('開始載入數據，orgId:', orgId, 'saasUser:', saasUser.email);
     loadData();
   }, [orgId, initializing, saasAuthLoading, saasUser, router]);
+
+  // 載入每個成員的鏈接狀態
+  useEffect(() => {
+    if (!orgId || identities.length === 0) return;
+    
+    const loadLinkStatuses = async () => {
+      const statuses: Record<string, any> = {};
+      for (const identity of identities) {
+        try {
+          const response = await fetch(
+            `/api/members/link-teacher?identityId=${encodeURIComponent(identity.id)}&orgId=${encodeURIComponent(orgId)}`
+          );
+          const result = await response.json();
+          if (result.success) {
+            statuses[identity.id] = result.data;
+          }
+        } catch (error) {
+          console.error(`載入身份 ${identity.id} 的鏈接狀態失敗:`, error);
+        }
+      }
+      setLinkStatuses(statuses);
+    };
+    
+    loadLinkStatuses();
+  }, [identities, orgId]);
 
   const loadData = async () => {
     if (!orgId) {
@@ -598,6 +633,122 @@ export default function MemberManagementPage() {
     return `剩餘 ${hours} 小時 ${minutes} 分鐘`;
   };
 
+  // 載入可用的老師列表
+  const loadAvailableTeachers = async () => {
+    if (!orgId) return;
+    
+    try {
+      const { supabase: supabaseClient } = await import('@/lib/supabase');
+      const { data, error } = await supabaseClient
+        .from('hanami_employee')
+        .select('id, teacher_fullname, teacher_nickname, teacher_email, linked_user_id')
+        .eq('org_id', orgId)
+        .order('teacher_fullname');
+      
+      if (error) throw error;
+      setAvailableTeachers(data || []);
+    } catch (error) {
+      console.error('載入老師列表失敗:', error);
+      toast.error('載入老師列表失敗');
+    }
+  };
+
+  // 打開鏈接模態框
+  const handleOpenLinkModal = async (identity: Identity) => {
+    setLinkingIdentity(identity);
+    setSelectedTeacherId('');
+    await loadAvailableTeachers();
+    setShowLinkModal(true);
+  };
+
+  // 執行鏈接
+  const handleLinkTeacher = async () => {
+    if (!linkingIdentity || !selectedTeacherId || !orgId) {
+      toast.error('請選擇要鏈接的老師');
+      return;
+    }
+
+    console.log('[handleLinkTeacher] 開始鏈接:', {
+      identityId: linkingIdentity.id,
+      teacherId: selectedTeacherId,
+      orgId,
+      linkingIdentity,
+    });
+
+    setLinking(true);
+    try {
+      const response = await fetch('/api/members/link-teacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identityId: linkingIdentity.id,
+          teacherId: selectedTeacherId,
+          orgId,
+        }),
+      });
+
+      const result = await response.json();
+      console.log('[handleLinkTeacher] API 響應:', result);
+
+      if (result.success) {
+        toast.success('成功鏈接到老師資料');
+        setShowLinkModal(false);
+        setLinkingIdentity(null);
+        setSelectedTeacherId('');
+        // 重新載入鏈接狀態
+        const statusResponse = await fetch(
+          `/api/members/link-teacher?identityId=${encodeURIComponent(linkingIdentity.id)}&orgId=${encodeURIComponent(orgId)}`
+        );
+        const statusResult = await statusResponse.json();
+        if (statusResult.success) {
+          setLinkStatuses(prev => ({
+            ...prev,
+            [linkingIdentity.id]: statusResult.data,
+          }));
+        }
+      } else {
+        throw new Error(result.error || '鏈接失敗');
+      }
+    } catch (error) {
+      console.error('鏈接失敗:', error);
+      toast.error(error instanceof Error ? error.message : '鏈接失敗');
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  // 取消鏈接
+  const handleUnlinkTeacher = async (identity: Identity) => {
+    if (!confirm('確定要取消鏈接嗎？這不會刪除任何數據，只是移除關聯關係。')) {
+      return;
+    }
+
+    const linkedTeacher = linkStatuses[identity.id];
+    if (!linkedTeacher || !orgId) return;
+
+    try {
+      const response = await fetch(
+        `/api/members/link-teacher?teacherId=${encodeURIComponent(linkedTeacher.id)}&orgId=${encodeURIComponent(orgId)}`,
+        { method: 'DELETE' }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('成功取消鏈接');
+        setLinkStatuses(prev => ({
+          ...prev,
+          [identity.id]: null,
+        }));
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('取消鏈接失敗:', error);
+      toast.error(error instanceof Error ? error.message : '取消鏈接失敗');
+    }
+  };
+
   // 檢查 SaaS 認證狀態
   useEffect(() => {
     if (!saasAuthLoading && !saasUser) {
@@ -657,10 +808,18 @@ export default function MemberManagementPage() {
     );
   }
 
+  // 使用 context 中的 orgId 或本地狀態的 orgId
+  const effectiveOrgId = contextOrgId || orgId;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] px-4 py-6">
       <div className="max-w-6xl mx-auto">
-        <BackButton href="/aihome/teacher-link/create" label="返回管理面板" />
+        <div className="mb-6">
+          <BackButton href="/aihome/teacher-link/create" label="返回管理面板" />
+        </div>
+
+        {/* 導航欄 */}
+        <TeacherManagementNavBar orgId={effectiveOrgId} />
 
         {/* 標題 */}
         <motion.div
@@ -780,149 +939,116 @@ export default function MemberManagementPage() {
           </div>
         </motion.div>
 
-        {/* 邀請ID管理 */}
+        {/* 邀請ID管理 - 已禁用 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="relative overflow-hidden rounded-[28px] border border-white/60 bg-gradient-to-br from-white/80 via-[#FFEFE2] to-[#FFE4F5] shadow-[0_24px_60px_rgba(231,200,166,0.28)] p-6 mb-6"
+          className="relative overflow-hidden rounded-[28px] border border-gray-300 bg-gradient-to-br from-gray-100 via-gray-200 to-gray-300 shadow-[0_24px_60px_rgba(0,0,0,0.1)] p-6 mb-6 opacity-60"
         >
-          <div className="absolute -right-14 top-10 h-48 w-48 rounded-full bg-white/40 blur-2xl" aria-hidden="true" />
-          <div className="absolute -bottom-16 left-10 h-40 w-40 rounded-full bg-[#FFD6E7]/60 blur-3xl" aria-hidden="true" />
+          <div className="absolute -right-14 top-10 h-48 w-48 rounded-full bg-gray-200/40 blur-2xl" aria-hidden="true" />
+          <div className="absolute -bottom-16 left-10 h-40 w-40 rounded-full bg-gray-300/60 blur-3xl" aria-hidden="true" />
           <div className="relative">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-[#4B4036] flex items-center gap-2">
+            <h2 className="text-xl font-semibold text-gray-500 flex items-center gap-2">
               <UserPlus className="w-5 h-5" />
               邀請ID管理
+              <span className="text-sm font-normal text-gray-400 ml-2">(已禁用)</span>
             </h2>
-            <HanamiButton
-              onClick={() => setShowCreateInvitation(true)}
-              variant="primary"
-            >
-              創建邀請ID
-            </HanamiButton>
+            <div className="flex items-center gap-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowInvitationSection(!showInvitationSection)}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition"
+                title={showInvitationSection ? "收起" : "展開"}
+              >
+                {showInvitationSection ? (
+                  <ChevronUp className="w-5 h-5" />
+                ) : (
+                  <ChevronDown className="w-5 h-5" />
+                )}
+              </motion.button>
+              <HanamiButton
+                onClick={() => {}}
+                variant="primary"
+                disabled={true}
+                className="opacity-50 cursor-not-allowed"
+              >
+                創建邀請ID
+              </HanamiButton>
+            </div>
           </div>
 
-          {/* 創建邀請表單 */}
+          {/* 可展開/收起的內容區域 */}
           <AnimatePresence>
-            {showCreateInvitation && (
+            {showInvitationSection && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="mb-4 p-4 bg-[#FFFDF8] rounded-xl border border-[#EADBC8]"
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-[#4B4036]">創建新邀請</h3>
-                  <button
-                    onClick={() => setShowCreateInvitation(false)}
-                    className="text-[#6E5A4A] hover:text-[#4B4036]"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                {/* 創建邀請表單 - 已禁用 */}
+                <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-300 opacity-50">
+                  <div className="text-center py-4 text-gray-400">
+                    <p className="text-sm">此功能已暫時禁用</p>
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <HanamiSelect
-                    label="身份類型"
-                    value={newInvitationRole}
-                    onChange={(value) => setNewInvitationRole(value as RoleType)}
-                    options={(Object.keys(roleLabels) as RoleType[]).map((role) => ({
-                      value: role,
-                      label: `${roleLabels[role]} - ${roleDescriptions[role]}`,
-                    }))}
-                    placeholder="請選擇身份類型"
-                    required
-                  />
-                  <HanamiButton onClick={handleCreateInvitation} variant="primary" className="w-full">
-                    創建邀請ID
-                  </HanamiButton>
+
+                {/* 邀請列表 - 已禁用 */}
+                <div className="space-y-2 opacity-50 pointer-events-none">
+                  {invitations.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">暫無邀請ID</div>
+                  ) : (
+                    invitations.map((invitation) => (
+                      <div
+                        key={invitation.id}
+                        className="p-4 rounded-xl border bg-gray-100 border-gray-300"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-400 text-white">
+                                {roleLabels[invitation.role_type]}
+                              </span>
+                              <code className="px-3 py-1 bg-gray-200 border border-gray-300 rounded-lg text-sm font-mono text-gray-500">
+                                {invitation.invitation_code}
+                              </code>
+                              <div className="p-1 text-gray-400">
+                                <Copy className="w-4 h-4" />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs text-gray-400">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatExpiresAt(invitation.expires_at)}
+                              </span>
+                              {invitation.is_used && invitation.used_by_email && (
+                                <span>已使用：{invitation.used_by_email}</span>
+                              )}
+                              <span>創建時間：{new Date(invitation.created_at).toLocaleString('zh-TW')}</span>
+                            </div>
+                          </div>
+                          {invitation.is_used && (
+                            <span className="px-3 py-1 bg-gray-300 text-gray-500 rounded-full text-xs font-semibold">
+                              已使用
+                            </span>
+                          )}
+                          {!invitation.is_used && new Date(invitation.expires_at) < new Date() && (
+                            <span className="px-3 py-1 bg-gray-300 text-gray-500 rounded-full text-xs font-semibold">
+                              已過期
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* 邀請列表 */}
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-center">
-                <div className="relative mx-auto w-16 h-16 mb-3">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 rounded-full border-3 border-[#FFD59A] border-t-transparent"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <img
-                      src="/owlui.png"
-                      alt="載入中"
-                      className="w-10 h-10 object-contain"
-                    />
-                  </div>
-                </div>
-                <p className="text-[#6E5A4A] text-sm">載入中...</p>
-              </div>
-            </div>
-          ) : invitations.length === 0 ? (
-            <div className="text-center py-8 text-[#6E5A4A]">暫無邀請ID</div>
-          ) : (
-            <div className="space-y-2">
-              {invitations.map((invitation) => (
-                <div
-                  key={invitation.id}
-                  className={`p-4 rounded-xl border ${
-                    invitation.is_used
-                      ? 'bg-gray-50 border-gray-200'
-                      : new Date(invitation.expires_at) < new Date()
-                      ? 'bg-red-50 border-red-200'
-                      : 'bg-[#FFFDF8] border-[#EADBC8]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${roleColors[invitation.role_type]}`}>
-                          {roleLabels[invitation.role_type]}
-                        </span>
-                        <code className="px-3 py-1 bg-white border border-[#EADBC8] rounded-lg text-sm font-mono text-[#4B4036]">
-                          {invitation.invitation_code}
-                        </code>
-                        <button
-                          onClick={() => handleCopyInvitationCode(invitation.invitation_code)}
-                          className="p-1 text-[#6E5A4A] hover:text-[#4B4036] transition"
-                        >
-                          {copiedCode === invitation.invitation_code ? (
-                            <Check className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-[#6E5A4A]">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatExpiresAt(invitation.expires_at)}
-                        </span>
-                        {invitation.is_used && invitation.used_by_email && (
-                          <span>已使用：{invitation.used_by_email}</span>
-                        )}
-                        <span>創建時間：{new Date(invitation.created_at).toLocaleString('zh-TW')}</span>
-                      </div>
-                    </div>
-                    {invitation.is_used && (
-                      <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-xs font-semibold">
-                        已使用
-                      </span>
-                    )}
-                    {!invitation.is_used && new Date(invitation.expires_at) < new Date() && (
-                      <span className="px-3 py-1 bg-red-200 text-red-600 rounded-full text-xs font-semibold">
-                        已過期
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
           </div>
         </motion.div>
 
@@ -993,23 +1119,67 @@ export default function MemberManagementPage() {
                       <p className="text-xs text-[#6E5A4A] mt-1">
                         加入時間：{new Date(identity.created_at).toLocaleString('zh-TW')}
                       </p>
+                      {/* 鏈接狀態顯示 */}
+                      {linkStatuses[identity.id] && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="px-2 py-1 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-full text-xs font-semibold flex items-center gap-1">
+                            <Link2 className="w-3 h-3" />
+                            已鏈接：{linkStatuses[identity.id].teacher_fullname || linkStatuses[identity.id].teacher_nickname}
+                          </span>
+                          {linkStatuses[identity.id].last_synced_at && (
+                            <span className="text-xs text-[#6E5A4A]">
+                              最後同步：{new Date(linkStatuses[identity.id].last_synced_at).toLocaleString('zh-TW')}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
-                      <button
+                      {/* 鏈接/取消鏈接按鈕 */}
+                      {linkStatuses[identity.id] ? (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleUnlinkTeacher(identity)}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-orange-400 text-orange-600 hover:bg-orange-50 hover:border-orange-500 rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow-md"
+                          title="取消鏈接"
+                        >
+                          <Unlink className="w-4 h-4" />
+                          <span>取消鏈接</span>
+                        </motion.button>
+                      ) : (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleOpenLinkModal(identity)}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-[#FFB6C1] text-[#FFB6C1] hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 hover:border-[#FFD59A] rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow-md"
+                          title="鏈接到老師資料"
+                        >
+                          <Link2 className="w-4 h-4" />
+                          <span>鏈接</span>
+                        </motion.button>
+                      )}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setEditingIdentity(identity)}
-                        className="p-2 text-[#6E5A4A] hover:text-[#4B4036] hover:bg-[#FFF9F2] rounded-lg transition"
+                        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600 rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow-md"
                         title="編輯"
                       >
                         <Edit2 className="w-4 h-4" />
-                      </button>
+                        <span>編輯</span>
+                      </motion.button>
                       {identity.role_type !== 'owner' && (
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => handleDeleteIdentity(identity.id)}
-                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition"
+                          className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-red-400 text-red-600 hover:bg-red-50 hover:border-red-500 rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow-md"
                           title="刪除"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </button>
+                          <span>刪除</span>
+                        </motion.button>
                       )}
                     </div>
                   </div>
@@ -1132,8 +1302,135 @@ export default function MemberManagementPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* 鏈接老師模態框 */}
+        <AnimatePresence>
+          {showLinkModal && linkingIdentity && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => {
+                setShowLinkModal(false);
+                setLinkingIdentity(null);
+                setSelectedTeacherId('');
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative overflow-hidden bg-gradient-to-br from-white/90 via-[#FFEFE2] to-[#FFE4F5] rounded-[28px] p-6 max-w-md w-full shadow-[0_32px_80px_rgba(228,192,155,0.35)] border border-white/60"
+              >
+                <div className="absolute -right-8 top-8 h-32 w-32 rounded-full bg-white/40 blur-2xl" aria-hidden="true" />
+                <div className="absolute -bottom-8 left-8 h-24 w-24 rounded-full bg-[#FFD6E7]/60 blur-2xl" aria-hidden="true" />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold text-[#4B4036] flex items-center gap-2">
+                      <Link2 className="w-5 h-5 text-[#FFB6C1]" />
+                      鏈接到老師資料
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowLinkModal(false);
+                        setLinkingIdentity(null);
+                        setSelectedTeacherId('');
+                      }}
+                      className="text-[#6E5A4A] hover:text-[#4B4036]"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-[#4B4036] mb-2">成員信息</p>
+                      <div className="p-3 bg-white/50 rounded-xl border border-[#EADBC8]">
+                        <p className="text-sm text-[#4B4036] font-medium">{linkingIdentity.user_email}</p>
+                        <p className="text-xs text-[#6E5A4A] mt-1">身份：{roleLabels[linkingIdentity.role_type]}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-[#4B4036] mb-2">選擇老師</p>
+                      <div className="max-h-60 overflow-y-auto space-y-2">
+                        {availableTeachers.length === 0 ? (
+                          <p className="text-sm text-[#6E5A4A] text-center py-4">暫無可用老師</p>
+                        ) : (
+                          availableTeachers.map((teacher) => (
+                            <motion.button
+                              key={teacher.id}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setSelectedTeacherId(teacher.id)}
+                              className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
+                                selectedTeacherId === teacher.id
+                                  ? 'border-[#FFB6C1] bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20'
+                                  : 'border-[#EADBC8] bg-white/50 hover:border-[#FFD59A]'
+                              } ${teacher.linked_user_id ? 'opacity-60 cursor-not-allowed' : ''}`}
+                              disabled={!!teacher.linked_user_id}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-[#4B4036]">
+                                    {teacher.teacher_fullname || teacher.teacher_nickname}
+                                  </p>
+                                  <p className="text-xs text-[#6E5A4A] mt-1">
+                                    {teacher.teacher_email || '無郵箱'}
+                                  </p>
+                                </div>
+                                {teacher.linked_user_id && (
+                                  <span className="text-xs text-[#6E5A4A]">已鏈接</span>
+                                )}
+                              </div>
+                            </motion.button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <HanamiButton
+                        onClick={handleLinkTeacher}
+                        disabled={!selectedTeacherId || linking}
+                        variant="primary"
+                        className="flex-1"
+                      >
+                        {linking ? '鏈接中...' : '確認鏈接'}
+                      </HanamiButton>
+                      <HanamiButton
+                        onClick={() => {
+                          setShowLinkModal(false);
+                          setLinkingIdentity(null);
+                          setSelectedTeacherId('');
+                        }}
+                        variant="secondary"
+                        className="flex-1"
+                      >
+                        取消
+                      </HanamiButton>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+export default function MemberManagementPage() {
+  return (
+    <TeacherLinkShell
+      currentPath="/aihome/teacher-link/create/member-management"
+      contentClassName="bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0]"
+    >
+      <MemberManagementContent />
+    </TeacherLinkShell>
   );
 }
 
