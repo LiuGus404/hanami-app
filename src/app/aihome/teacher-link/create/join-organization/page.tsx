@@ -299,108 +299,76 @@ function JoinOrganizationContent() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setConnectionMethod('id')}
-              className={`
-                group relative overflow-hidden rounded-2xl border-2 p-6 text-left transition-all
-                ${
-                  connectionMethod === 'id'
-                    ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-white shadow-md'
-                    : 'border-[#F1E4D3] bg-white/90 hover:border-[#FFD59A]/50 hover:shadow-sm'
-                }
-              `}
+              disabled
+              className="group relative overflow-hidden rounded-2xl border-2 p-6 text-left transition-all border-gray-300 bg-gray-100 cursor-not-allowed opacity-60"
             >
-              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#FFD59A]/10 blur-2xl" aria-hidden="true" />
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gray-200/10 blur-2xl" aria-hidden="true" />
               <div className="relative flex flex-col items-center text-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] flex items-center justify-center flex-shrink-0 shadow-md">
-                  <BuildingOfficeIcon className="w-6 h-6 text-[#4B4036]" />
+                <div className="w-12 h-12 rounded-xl bg-gray-300 flex items-center justify-center flex-shrink-0 shadow-md">
+                  <BuildingOfficeIcon className="w-6 h-6 text-gray-500" />
                 </div>
-                <h3 className="text-base font-semibold text-[#4B4036]">機構 ID</h3>
-                <p className="text-xs text-[#786355]">輸入機構的唯一識別碼</p>
+                <h3 className="text-base font-semibold text-gray-500">機構 ID</h3>
+                <p className="text-xs text-gray-400">輸入機構的唯一識別碼</p>
               </div>
             </motion.button>
 
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setConnectionMethod('invite')}
-              className={`
-                group relative overflow-hidden rounded-2xl border-2 p-6 text-left transition-all
-                ${
-                  connectionMethod === 'invite'
-                    ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-white shadow-md'
-                    : 'border-[#F1E4D3] bg-white/90 hover:border-[#FFD59A]/50 hover:shadow-sm'
-                }
-              `}
+              disabled
+              className="group relative overflow-hidden rounded-2xl border-2 p-6 text-left transition-all border-gray-300 bg-gray-100 cursor-not-allowed opacity-60"
             >
-              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-200/10 blur-2xl" aria-hidden="true" />
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gray-200/10 blur-2xl" aria-hidden="true" />
               <div className="relative flex flex-col items-center text-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-300 to-purple-300 flex items-center justify-center flex-shrink-0 shadow-md">
-                  <KeyIcon className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 rounded-xl bg-gray-300 flex items-center justify-center flex-shrink-0 shadow-md">
+                  <KeyIcon className="w-6 h-6 text-gray-500" />
                 </div>
-                <h3 className="text-base font-semibold text-[#4B4036]">邀請碼</h3>
-                <p className="text-xs text-[#786355]">輸入機構提供的邀請碼</p>
+                <h3 className="text-base font-semibold text-gray-500">邀請碼</h3>
+                <p className="text-xs text-gray-400">輸入機構提供的邀請碼</p>
               </div>
             </motion.button>
 
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                setConnectionMethod('qr');
-                setShowQRScanner(true);
-              }}
-              className={`
-                group relative overflow-hidden rounded-2xl border-2 p-6 text-left transition-all
-                ${
-                  connectionMethod === 'qr'
-                    ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-white shadow-md'
-                    : 'border-[#F1E4D3] bg-white/90 hover:border-[#FFD59A]/50 hover:shadow-sm'
-                }
-              `}
+              disabled
+              className="group relative overflow-hidden rounded-2xl border-2 p-6 text-left transition-all border-gray-300 bg-gray-100 cursor-not-allowed opacity-60"
             >
-              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-green-200/10 blur-2xl" aria-hidden="true" />
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gray-200/10 blur-2xl" aria-hidden="true" />
               <div className="relative flex flex-col items-center text-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-300 to-teal-300 flex items-center justify-center flex-shrink-0 shadow-md">
-                  <QrCodeIcon className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 rounded-xl bg-gray-300 flex items-center justify-center flex-shrink-0 shadow-md">
+                  <QrCodeIcon className="w-6 h-6 text-gray-500" />
                 </div>
-                <h3 className="text-base font-semibold text-[#4B4036]">掃描 QR 碼</h3>
-                <p className="text-xs text-[#786355]">使用相機掃描機構 QR 碼</p>
+                <h3 className="text-base font-semibold text-gray-500">掃描 QR 碼</h3>
+                <p className="text-xs text-gray-400">使用相機掃描機構 QR 碼</p>
               </div>
             </motion.button>
           </div>
+          
+          {/* 提示訊息 */}
+          <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-200">
+            <p className="text-sm text-gray-600 text-center">
+              如需加入機構，請聯繫該機構管理員，並以當前email向其申請加入機構
+            </p>
+          </div>
 
-          {/* 輸入表單 */}
+          {/* 輸入表單 - 已禁用 */}
           {connectionMethod === 'id' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
+              className="space-y-4 opacity-60"
             >
               <div>
-                <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">
                   機構 ID
                 </label>
                 <div className="flex gap-3">
                   <input
                     type="text"
-                    value={orgId}
-                    onChange={(e) => setOrgId(e.target.value)}
+                    disabled
                     placeholder="請輸入機構 ID（UUID）"
-                    className="flex-1 px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all bg-white"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleOrgIdInput(orgId);
-                      }
-                    }}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed"
                   />
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleOrgIdInput(orgId)}
-                    disabled={isConnecting || !orgId.trim()}
-                    className="px-6 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] font-semibold rounded-xl hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    disabled
+                    className="px-6 py-3 bg-gray-300 text-gray-500 font-semibold rounded-xl cursor-not-allowed flex items-center gap-2"
                   >
                     <MagnifyingGlassIcon className="w-5 h-5" />
                     查詢
@@ -414,31 +382,22 @@ function JoinOrganizationContent() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
+              className="space-y-4 opacity-60"
             >
               <div>
-                <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">
                   邀請碼
                 </label>
                 <div className="flex gap-3">
                   <input
                     type="text"
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value)}
+                    disabled
                     placeholder="請輸入機構提供的邀請碼"
-                    className="flex-1 px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all bg-white"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleInviteCodeInput(inviteCode);
-                      }
-                    }}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed"
                   />
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleInviteCodeInput(inviteCode)}
-                    disabled={isConnecting || !inviteCode.trim()}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-300 to-purple-300 text-white font-semibold rounded-xl hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    disabled
+                    className="px-6 py-3 bg-gray-300 text-gray-500 font-semibold rounded-xl cursor-not-allowed flex items-center gap-2"
                   >
                     <KeyIcon className="w-5 h-5" />
                     驗證

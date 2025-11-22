@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
     const description = formData.get('description') as string;
     const metadataStr = formData.get('metadata') as string;
     const userId = formData.get('userId') as string;
+    const orgId = formData.get('orgId') as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -59,7 +60,9 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2);
     const fileExt = file.name.split('.').pop();
-    const fileName = `payment-screenshots/${dateFolder}/${timestamp}-${randomId}.${fileExt}`;
+    // 如果有 orgId，將檔案上傳到該機構的資料夾
+    const orgFolder = orgId ? `org-${orgId}` : 'default';
+    const fileName = `payment-screenshots/${orgFolder}/${dateFolder}/${timestamp}-${randomId}.${fileExt}`;
 
     // 上傳檔案到 Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -102,27 +105,39 @@ export async function POST(request: NextRequest) {
     }
 
     // 記錄付款資訊到資料庫
+    const insertData: any = {
+      payment_method: 'screenshot',
+      amount: amount,
+      currency: 'HKD',
+      description: description,
+      screenshot_url: urlData.publicUrl,
+      file_name: fileName,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      metadata: {
+        ...metadata,
+        date_folder: dateFolder,
+        upload_date: dateFolder,
+        original_filename: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        org_folder: orgFolder
+      }
+    };
+
+    // 添加用戶 ID（如果有的話）
+    if (userId) {
+      insertData.user_id = userId;
+    }
+
+    // 添加機構 ID（如果有的話）
+    if (orgId) {
+      insertData.org_id = orgId;
+    }
+
     const { data: recordData, error: dbError } = await (supabase as any)
       .from('payment_records')
-      .insert({
-        payment_method: 'screenshot',
-        amount: amount,
-        currency: 'HKD',
-        description: description,
-        screenshot_url: urlData.publicUrl,
-        file_name: fileName,
-        status: 'pending',
-        user_id: userId, // 添加用戶 ID
-        created_at: new Date().toISOString(),
-        metadata: {
-          ...metadata,
-          date_folder: dateFolder,
-          upload_date: dateFolder,
-          original_filename: file.name,
-          file_size: file.size,
-          file_type: file.type
-        }
-      })
+      .insert(insertData)
       .select()
       .single();
 

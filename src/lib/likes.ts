@@ -36,55 +36,31 @@ export async function getOrgLikeState(orgId: string, userId?: string): Promise<O
     }
   }
   
-  console.log('📋 getOrgLikeState', { orgId, userId: finalUserId ? '有' : '無' });
-  
-  // 使用舊系統的客戶端（hanami-ai-system）
-  const oldSupabase = getSupabaseClient();
-  
-  // 獲取總 Like 數量
-  let totalLikes = 0;
+  const params = new URLSearchParams();
+  params.set('orgId', orgId);
+  if (finalUserId) params.set('userId', finalUserId);
+
   try {
-    const { count, error } = await oldSupabase
-      .from('hanami_org_likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId);
-    
-    if (error) {
-      console.error('❌ 獲取 Like 數量失敗:', error);
-      throw error;
+    const response = await fetch(`/api/organizations/like?${params.toString()}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const message = errorData?.error || `Like API 回傳 ${response.status}`;
+      console.error('❌ getOrgLikeState API 失敗:', message);
+      throw new Error(message);
     }
-    totalLikes = count ?? 0;
-    console.log('📊 Like 總數:', totalLikes);
+
+    const payload: { totalLikes: number; likedByMe: boolean } = await response.json();
+    return {
+      likedByMe: payload.likedByMe,
+      totalLikes: payload.totalLikes ?? 0,
+    };
   } catch (error) {
-    console.warn('⚠️ 獲取 Like 數量時發生錯誤，使用預設值 0:', error);
-    totalLikes = 0;
-  }
-  
-  if (!finalUserId) {
-    console.log('👤 用戶未登入，返回預設狀態');
-    return { likedByMe: false, totalLikes };
-  }
-  
-  // 檢查當前用戶是否已 like
-  try {
-    const { data, error } = await oldSupabase
-      .from('hanami_org_likes')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('user_id', finalUserId)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('❌ 檢查用戶 Like 狀態失敗:', error);
-      throw error;
-    }
-    
-    const likedByMe = !!data;
-    console.log('❤️ 用戶 Like 狀態:', likedByMe);
-    return { likedByMe, totalLikes };
-  } catch (error) {
-    console.warn('⚠️ 檢查用戶 Like 狀態時發生錯誤，返回預設狀態:', error);
-    return { likedByMe: false, totalLikes };
+    console.warn('⚠️ getOrgLikeState fallback:', error);
+    return { likedByMe: false, totalLikes: 0 };
   }
 }
 
@@ -121,70 +97,30 @@ export async function toggleOrgLike(orgId: string, userId?: string): Promise<Org
     console.error('❌ 用戶未認證');
     throw new Error('NOT_AUTHENTICATED');
   }
-  
-  // 使用舊系統的客戶端（hanami-ai-system）
-  const oldSupabase = getSupabaseClient();
-  
-  // 檢查當前狀態（傳遞 userId 確保一致性）
-  const current = await getOrgLikeState(orgId, finalUserId);
-  console.log('📊 當前 Like 狀態:', current);
-  
+
   try {
-    if (current.likedByMe) {
-      // 移除 Like
-      console.log('🗑️ 移除 Like');
-      const { data, error } = await oldSupabase
-        .from('hanami_org_likes')
-        .delete()
-        .eq('org_id', orgId)
-        .eq('user_id', finalUserId)
-        .select();
-      
-      console.log('🗑️ 刪除結果:', { data, error });
-      
-      if (error) {
-        console.error('❌ 刪除 Like 失敗:', error);
-        throw error;
-      }
-      
-      const newState = { likedByMe: false, totalLikes: Math.max(0, current.totalLikes - 1) };
-      console.log('✅ 移除 Like 成功:', newState);
-      return newState;
-    } else {
-      // 添加 Like
-      console.log('➕ 添加 Like');
-      const { data, error } = await oldSupabase
-        .from('hanami_org_likes')
-        .insert({ org_id: orgId, user_id: finalUserId })
-        .select();
-      
-      console.log('➕ 插入結果:', { data, error });
-      
-      if (error) {
-        console.error('❌ 插入 Like 失敗:', error);
-        // 如果是唯一約束錯誤，表示已經存在，重新獲取狀態
-        if (error.code === '23505') {
-          console.warn('⚠️ 唯一約束錯誤，重新獲取狀態');
-          return await getOrgLikeState(orgId, finalUserId);
-        }
-        throw error;
-      }
-      
-      const newState = { likedByMe: true, totalLikes: current.totalLikes + 1 };
-      console.log('✅ 添加 Like 成功:', newState);
-      return newState;
+    const response = await fetch('/api/organizations/like', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId, userId: finalUserId }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const message = errorData?.error || `Like API 回傳 ${response.status}`;
+      throw new Error(message);
     }
+
+    const payload: { likedByMe: boolean; totalLikes: number } = await response.json();
+    return {
+      likedByMe: payload.likedByMe,
+      totalLikes: payload.totalLikes ?? 0,
+    };
   } catch (e) {
     console.error('❌ toggleOrgLike 發生錯誤:', e);
     const errorMessage = e instanceof Error ? e.message : String(e);
-    console.error('❌ 錯誤詳情:', {
-      message: errorMessage,
-      orgId,
-      userId: finalUserId,
-      currentState: current
-    });
-    // 重新拋出錯誤，讓上層處理
-    throw e;
+    throw new Error(errorMessage);
   }
 }
 

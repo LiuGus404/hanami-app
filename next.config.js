@@ -34,7 +34,7 @@ const nextConfig = {
       },
       {
         source: '/hanami-music',
-        destination: '/aihome/course-activities/hanami-music',
+        destination: '/aihome/hanami-music',
         permanent: true,
       },
     ];

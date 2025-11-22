@@ -4,9 +4,7 @@
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
 
-import BackButton from '@/components/ui/BackButton';
 import LessonEditorModal from '@/components/ui/LessonEditorModal';
-import { PopupSelect } from '@/components/ui/PopupSelect';
 import StudentBasicInfo from '@/components/ui/StudentBasicInfo';
 import StudentLessonPanel from '@/components/ui/StudentLessonPanel';
 import EnhancedStudentAvatarTab from '@/components/ui/EnhancedStudentAvatarTab';
@@ -15,13 +13,29 @@ import { BindingStatusIndicator } from '@/components/ui/StudentBindingButton';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useParentId } from '@/hooks/useParentId';
-import { Lesson } from '@/types';
-import { motion, AnimatePresence } from 'framer-motion';
-import { User, BookOpen, UserCircle, Sparkles, Camera, Menu, X, Home, User as UserIcon, Settings, Calendar, LogOut, Building } from 'lucide-react';
-import AppSidebar from '@/components/AppSidebar';
+import { motion } from 'framer-motion';
+import { BookOpen, UserCircle, Sparkles, Camera, Building } from 'lucide-react';
+import ParentShell from '@/components/ParentShell';
 import { toast } from 'react-hot-toast';
 
 const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
+
+const fetchStudentDetail = async (studentId: string) => {
+  if (!studentId) {
+    throw new Error('缺少學生 ID');
+  }
+
+  const response = await fetch(`/api/students/${encodeURIComponent(studentId)}`, {
+    cache: 'no-store',
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload.success) {
+    throw new Error(payload?.error || '無法獲取學生資料');
+  }
+
+  return payload;
+};
 
 export default function SimpleStudentDetailPage() {
   const { id } = useParams();
@@ -33,20 +47,10 @@ export default function SimpleStudentDetailPage() {
   const [student, setStudent] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
-  const [showPopup, setShowPopup] = useState(false);
-  const [statusPopupOpen, setStatusPopupOpen] = useState<string | null>(null);
-  const [showCategoryPopup, setShowCategoryPopup] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<string[]>(['all']);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<any>(null);
-  const [tempCategoryFilter, setTempCategoryFilter] = useState<string[]>(['all']);
-  const [categorySelectOpen, setCategorySelectOpen] = useState(false);
   const [isInactiveStudent, setIsInactiveStudent] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const [courseUpdateTrigger, setCourseUpdateTrigger] = useState(0);
   const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media'>('basic');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [isStudentBound, setIsStudentBound] = useState(false);
 
   const handleTabChange = (tabKey: 'basic' | 'lessons' | 'avatar' | 'media') => {
@@ -73,20 +77,6 @@ export default function SimpleStudentDetailPage() {
   const dataFetchedRef = useRef(false);
   const currentIdRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
-  
-  // 課程更新回調函數
-  const handleCourseUpdate = useCallback(() => {
-    // 觸發課程更新
-    setCourseUpdateTrigger(prev => prev + 1);
-  }, []);
-
-  // 更新時間
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // 登出處理
   const handleLogout = async () => {
@@ -98,12 +88,6 @@ export default function SimpleStudentDetailPage() {
     }
   };
 
-  // 側邊欄選單項目
-  const sidebarMenuItems = [
-    { icon: Home, label: '首頁', href: '/aihome', description: '返回主頁' },
-    { icon: Calendar, label: '課程活動', href: '/aihome/course-activities', description: '查看所有報讀的機構和課程活動' },
-    { icon: UserIcon, label: '設定', href: '/aihome/profile', description: '管理您的個人信息和系統設定' }
-  ];
 
   // 處理返回按鈕
   const handleBack = () => {
@@ -129,119 +113,38 @@ export default function SimpleStudentDetailPage() {
     setError(null);
     setIsInactiveStudent(false);
 
-    const checkAuth = async () => {
+    const fetchStudent = async () => {
       try {
-        const supabase = getSupabaseClient();
-        
-        // 先檢查是否為停用學生
-        const { data: inactiveData, error: inactiveError } = await supabase
-          .from('inactive_student_list')
-          .select('*')
-          .eq('id', id as string)
-          .single();
+        const payload = await fetchStudentDetail(id as string);
 
-        if (inactiveData) {
-          console.log('找到停用學生:', inactiveData);
-
-          // 將停用學生資料轉換為標準格式
-          const convertedStudent = {
-            ...inactiveData,
-            id: inactiveData.original_id,
-            original_id: inactiveData.original_id,
-            student_type: inactiveData.student_type === 'regular' ? '常規' : '試堂',
-            is_inactive: true,
-            inactive_date: inactiveData.inactive_date,
-            inactive_reason: inactiveData.inactive_reason,
-            institution: inactiveData.institution
-          };
-          setStudent(convertedStudent);
-          setIsInactiveStudent(true);
-          setPageLoading(false);
-          dataFetchedRef.current = true;
-          loadingRef.current = false;
-          
-          // 記錄訪問日誌
-          await logAccess(convertedStudent.id, institution, 'view');
-          
-          // 檢查課堂資料
-          await checkLessonData(convertedStudent.id);
-          return;
-        }
-
-        // 檢查是否為試堂學生
-        const { data: trialData, error: trialError } = await supabase
-          .from('hanami_trial_students')
-          .select('*')
-          .eq('id', id as string)
-          .single();
-
-        if (trialData) {
-          console.log('找到試堂學生:', trialData);
-
-          setStudent(trialData);
-          setPageLoading(false);
-          dataFetchedRef.current = true;
-          loadingRef.current = false;
-          
-          // 記錄訪問日誌
-          await logAccess(trialData.id, institution, 'view');
-          
-          // 檢查課堂資料
-          await checkLessonData(trialData.id);
-          return;
-        }
-
-        // 如果不是試堂學生，則從常規學生表中獲取數據
-        const { data: studentData, error: studentError } = await supabase
-          .from('Hanami_Students')
-          .select('*')
-          .eq('id', id as string)
-          .single();
-
-        if (studentError) {
-          console.error('Error fetching student:', studentError);
-          setError('無法獲取學生資料，請檢查學生 ID 或聯繫機構獲取正確 ID');
-          setPageLoading(false);
-          loadingRef.current = false;
-          return;
-        }
-
-        if (!studentData) {
+        if (!payload.data) {
           setError('找不到學生資料，請檢查學生 ID 或聯繫機構獲取正確 ID');
           setPageLoading(false);
           loadingRef.current = false;
           return;
         }
 
-        setStudent(studentData);
+        setStudent(payload.data);
+        setIsInactiveStudent(Boolean(payload.isInactive));
         setPageLoading(false);
         dataFetchedRef.current = true;
         loadingRef.current = false;
         
-        // 記錄訪問日誌
-        await logAccess(studentData.id, institution, 'view');
-        
-        // 檢查綁定狀態
-        await checkBindingStatus(studentData.id);
-        
-        // 檢查課堂資料
-        await checkLessonData(studentData.id);
-      } catch (err) {
-        console.error('Error:', err);
-        setError('發生錯誤，請稍後再試');
+        await logAccess(payload.data.id, institution, 'view');
+        await checkBindingStatus(payload.data.id);
+        await checkLessonData(payload.data.id);
+      } catch (err: any) {
+        console.error('Error fetching student:', err);
+        setError(err?.message || '發生錯誤，請稍後再試');
         setPageLoading(false);
         loadingRef.current = false;
       }
     };
 
-    // 檢查課堂資料的輔助函數
     const checkLessonData = async (studentId: string) => {
       try {
         console.log('🔍 檢查課堂資料表...');
-        
         const supabase = getSupabaseClient();
-        
-        // 檢查表是否存在資料
         const { data: allLessons, error: allError } = await supabase
           .from('hanami_student_lesson')
           .select('*')
@@ -250,11 +153,14 @@ export default function SimpleStudentDetailPage() {
         console.log('📊 課堂資料表檢查:', { 
           hasData: allLessons && allLessons.length > 0,
           totalRecords: allLessons?.length || 0,
-          sampleData: allLessons?.slice(0, 2).map(l => ({ id: l.id, student_id: l.student_id, lesson_date: l.lesson_date })),
+          sampleData: allLessons?.slice(0, 2).map((l) => ({
+            id: l.id,
+            student_id: l.student_id,
+            lesson_date: l.lesson_date,
+          })),
           error: allError?.message || '無錯誤',
         });
         
-        // 檢查特定學生的課堂資料
         const { data: studentLessons, error: studentError } = await supabase
           .from('hanami_student_lesson')
           .select('id, lesson_date, course_type, student_id')
@@ -264,16 +170,20 @@ export default function SimpleStudentDetailPage() {
         console.log('📋 學生課堂資料檢查:', {
           studentId,
           lessonCount: studentLessons?.length || 0,
-          lessons: studentLessons?.map(l => ({ id: l.id, date: l.lesson_date, type: l.course_type, student_id: l.student_id })),
+          lessons: studentLessons?.map((l) => ({
+            id: l.id,
+            date: l.lesson_date,
+            type: l.course_type,
+            student_id: l.student_id,
+          })),
           error: studentError?.message || '無錯誤',
         });
-        
       } catch (err) {
         console.error('❌ 檢查課堂資料失敗:', err);
       }
     };
 
-    checkAuth();
+    fetchStudent();
   }, [user, loading, id, institution]);
 
   // 當 ID 變化時重置防抖狀態
@@ -380,89 +290,8 @@ export default function SimpleStudentDetailPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
-      <div className="flex">
-        {/* 側邊欄選單 */}
-        <AppSidebar 
-          isOpen={sidebarOpen} 
-          onClose={() => setSidebarOpen(false)}
-          currentPath="/aihome/parent/student-simple/[id]"
-        />
-
-        {/* 主內容區域 */}
-        <div className="flex-1 flex flex-col bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] min-h-full">
-          {/* 頂部導航欄 */}
-          <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14 sm:h-16">
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              {/* 選單按鈕 */}
-              <motion.button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-1.5 sm:p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                title="開啟選單"
-              >
-                <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
-              </motion.button>
-              
-              <div className="w-8 h-8 sm:w-10 sm:h-10 relative">
-                <img 
-                  src="/@hanami.png" 
-                  alt="HanamiEcho Logo" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-                <p className="text-xs sm:text-sm text-[#2B3A3B]">家長查看</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              {/* 桌面版：顯示時間 */}
-              <div className="hidden sm:block text-sm text-[#2B3A3B]">
-                {currentTime.toLocaleTimeString('zh-TW', { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </div>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                <span className="text-xs sm:text-sm font-medium text-[#4B4036]">
-                  {user?.full_name?.charAt(0).toUpperCase() || 'U'}
-                </span>
-              </div>
-              {/* 桌面版：完整登出按鈕 */}
-              <motion.button
-                onClick={handleLogout}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="hidden sm:flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                title="登出"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>登出</span>
-              </motion.button>
-              {/* 移動版：只顯示登出圖標 */}
-              <motion.button
-                onClick={handleLogout}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="sm:hidden flex items-center justify-center w-8 h-8 text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                title="登出"
-              >
-                <LogOut className="w-4 h-4" />
-              </motion.button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-
-      <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {/* 返回按鈕和機構信息 */}
+  const detailContent = (
+    <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6">
         <div className="mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
             <motion.button
@@ -477,19 +306,15 @@ export default function SimpleStudentDetailPage() {
             </motion.button>
             
             <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4">
-              {/* 綁定狀態指示器 */}
               <BindingStatusIndicator isBound={isStudentBound} />
-              
               <div className="flex items-center space-x-2 px-2 py-1.5 sm:px-3 sm:py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8]">
                 <Building className="w-3 h-3 sm:w-4 sm:h-4 text-[#4B4036]" />
                 <span className="text-xs sm:text-sm font-medium text-[#4B4036]">{institution}</span>
               </div>
             </div>
           </div>
-          
         </div>
 
-        {/* 停用學生警告 */}
         {isInactiveStudent && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center">
@@ -499,9 +324,7 @@ export default function SimpleStudentDetailPage() {
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">
-                  此學生已停用
-                </h3>
+              <h3 className="text-sm font-medium text-yellow-800">此學生已停用</h3>
                 <div className="mt-2 text-sm text-yellow-700">
                   <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
                   <p>停用原因：{student.inactive_reason}</p>
@@ -511,7 +334,6 @@ export default function SimpleStudentDetailPage() {
           </div>
         )}
 
-        {/* 分頁導航 */}
         <div className="mb-4 sm:mb-6">
           <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1 overflow-x-auto">
             {[
@@ -535,7 +357,7 @@ export default function SimpleStudentDetailPage() {
                       ? 'opacity-50 cursor-pointer text-gray-400'
                       : activeTab === key
                         ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
-                        : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
+                        : 'text-[#2B3A3B]/70 hover:text-[#4B4036] hover:bg-white/50'
                   }
                 `}
                 whileHover={isDisabled ? {} : { scale: 1.02 }}
@@ -551,7 +373,6 @@ export default function SimpleStudentDetailPage() {
           </div>
         </div>
 
-        {/* 分頁內容 */}
         <motion.div
           key={activeTab}
           initial={{ opacity: 0, y: 20 }}
@@ -559,27 +380,21 @@ export default function SimpleStudentDetailPage() {
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
         >
-          {/* 基本資料分頁 */}
           {activeTab === 'basic' && (
             <StudentBasicInfo 
               isInactive={isInactiveStudent} 
               student={student}
-              hideTeacherInfo={true}
-              hideSensitiveInfo={true}
-              hideContactDays={true}
+              hideTeacherInfo
+              hideSensitiveInfo
+              hideContactDays
               readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
               visibleFields={['full_name', 'nick_name', 'student_age', 'gender', 'course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'duration_months', 'school', 'address', 'health_notes', 'student_remarks']}
               onUpdate={(newData) => {
                 setStudent(newData);
-                // 如果是試堂學生且課程有更新，觸發課堂資料重新載入
-                if (newData.student_type === '試堂' && newData.course_type !== student.course_type) {
-                  setCourseUpdateTrigger(prev => prev + 1);
-                }
               }}
             />
           )}
 
-          {/* 課程記錄分頁 */}
           {activeTab === 'lessons' && student && (
             <div className="mt-2 sm:mt-4">
               {(() => {
@@ -597,12 +412,11 @@ export default function SimpleStudentDetailPage() {
                     studentId={lessonStudentId}
                     studentName={student.full_name}
                     studentType={student.student_type}
-                    onCourseUpdate={handleCourseUpdate}
                     studentData={student}
-                    hideActionButtons={true}
-                    hideTeacherColumn={true}
-                    hideCareAlert={true}
-                    disableSelection={true}
+                    hideActionButtons
+                    hideTeacherColumn
+                    hideCareAlert
+                    disableSelection
                     orgId={student.org_id ?? null}
                     organizationName={
                       (student as any)?.organization_name ??
@@ -615,7 +429,6 @@ export default function SimpleStudentDetailPage() {
             </div>
           )}
 
-          {/* 互動角色分頁 */}
           {activeTab === 'avatar' && student && (
             <EnhancedStudentAvatarTab 
               student={student}
@@ -623,7 +436,6 @@ export default function SimpleStudentDetailPage() {
             />
           )}
 
-          {/* 媒體庫分頁 */}
           {activeTab === 'media' && student && (
             <>
               {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', { 
@@ -655,8 +467,19 @@ export default function SimpleStudentDetailPage() {
           }}
         />
           </div>
-        </div>
-      </div>
-    </div>
+  );
+
+  return (
+    <ParentShell
+      currentPath={`/aihome/parent/student-simple/${id}`}
+      pageTitle={student.full_name}
+      pageSubtitle="查看孩子的完整資料與課程記錄"
+      user={user}
+      onLogout={handleLogout}
+      onLogin={() => router.push('/aihome/auth/login')}
+      onRegister={() => router.push('/aihome/auth/register')}
+    >
+      {detailContent}
+    </ParentShell>
   );
 }

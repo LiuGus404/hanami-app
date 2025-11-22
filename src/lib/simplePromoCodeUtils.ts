@@ -13,14 +13,16 @@ export const validateSimplePromoCode = async (
   code: string,
   orderAmount: number,
   userId?: string,
-  userEmail?: string
+  userEmail?: string,
+  orgId?: string
 ): Promise<SimplePromoCodeValidationResponse> => {
   try {
     const request: SimplePromoCodeValidationRequest = {
       code: code.toUpperCase().trim(),
       order_amount: orderAmount,
       user_id: userId,
-      user_email: userEmail
+      user_email: userEmail,
+      org_id: orgId
     };
 
     const response = await fetch('/api/promo-codes/simple/validate-direct', {

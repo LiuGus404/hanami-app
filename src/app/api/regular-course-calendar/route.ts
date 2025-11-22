@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
-    const { courseType, startDate, endDate } = await request.json();
+    const { courseType, startDate, endDate, orgId } = await request.json();
 
     if (!courseType) {
       return NextResponse.json({ 
@@ -31,13 +31,19 @@ export async function POST(request: Request) {
     console.log('📚 課程類型資訊:', { maxStudents });
 
     // 獲取常規課程排程資料
-    const { data: scheduleData, error: scheduleError } = await supabase
+    let scheduleQuery = supabase
       .from('hanami_schedule')
       .select('*')
       .eq('course_type', courseType)
-      .eq('is_primary_schedule', true)
+      .eq('is_primary_schedule', true);
+    
+    // 如果有 org_id，根據 org_id 過濾
+    if (orgId) {
+      scheduleQuery = scheduleQuery.eq('org_id', orgId);
+    }
+    
+    const { data: scheduleData, error: scheduleError } = await scheduleQuery
       // 移除 is_registration_open 的篩選，因為我們需要在 API 中檢查這個狀態
-      .neq('weekday', 1) // 排除星期一（休息日）
       .order('weekday', { ascending: true })
       .order('timeslot', { ascending: true });
 

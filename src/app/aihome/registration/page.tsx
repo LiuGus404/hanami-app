@@ -519,7 +519,7 @@ export default function WaitingListRegistrationPage() {
 
   // 返回課程報名頁面
   const handleBack = () => {
-    router.push('/aihome/course-activities/hanami-music/register');
+    router.push('/aihome/course-activities/register');
   };
 
   // 顯示載入狀態

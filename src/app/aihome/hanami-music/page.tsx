@@ -1132,7 +1132,7 @@ export default function HanamiMusicHomePage() {
                     {/* 行動按鈕 */}
                     <div className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start">
                       <motion.button
-                        onClick={() => router.push('/aihome/course-activities/hanami-music/register')}
+                        onClick={() => router.push('/aihome/course-activities/register')}
                         whileHover={{ scale: 1.05, y: -2 }}
                         whileTap={{ scale: 0.95 }}
                         className="group px-10 py-4 bg-white text-[#4B4036] rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center space-x-3"
@@ -1201,7 +1201,7 @@ export default function HanamiMusicHomePage() {
                         </div>
                         <p className="text-lg text-[#2B3A3B] mb-4">立即預約試堂課程，體驗專業音樂教學</p>
                         <motion.button
-                          onClick={() => router.push('/aihome/course-activities/hanami-music/register')}
+                          onClick={() => router.push('/aihome/course-activities/register')}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2"
@@ -1603,7 +1603,7 @@ export default function HanamiMusicHomePage() {
                       <ChevronRightIcon className="w-4 h-4" />
                     </motion.button>
                     <motion.button
-                      onClick={() => router.push('/aihome/course-activities/hanami-music/register')}
+                      onClick={() => router.push('/aihome/course-activities/register')}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="w-full px-6 py-3 bg-white border-2 border-[#FFB6C1] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2"
@@ -1673,7 +1673,7 @@ export default function HanamiMusicHomePage() {
                       <ChevronRightIcon className="w-4 h-4" />
                     </motion.button>
                     <motion.button
-                      onClick={() => router.push('/aihome/course-activities/hanami-music/register')}
+                      onClick={() => router.push('/aihome/course-activities/register')}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="w-full px-6 py-3 bg-white border-2 border-[#FFB6C1] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2"

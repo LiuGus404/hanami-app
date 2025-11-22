@@ -36,6 +36,7 @@ export interface SimplePromoCodeValidationRequest {
   user_id?: string;
   user_email?: string;
   order_amount: number;
+  org_id?: string; // 機構 ID，用於過濾優惠碼
 }
 
 export interface SimplePromoCodeValidationResponse {

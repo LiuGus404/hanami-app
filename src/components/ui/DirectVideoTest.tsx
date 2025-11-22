@@ -1,19 +1,26 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { BrowserQRCodeReader } from '@zxing/browser';
+import { NotFoundException } from '@zxing/library';
 
 interface DirectVideoTestProps {
   onScanSuccess: (result: string) => void;
   onScanError?: (error: string) => void;
   onClose: () => void;
   isActive: boolean;
+  /**
+   * 模擬掃描時外部提供的 QR 資料（已經是 JSON 字串）
+   */
+  simulatedQrData?: string;
 }
 
 export default function DirectVideoTest({ 
   onScanSuccess, 
   onScanError, 
   onClose, 
-  isActive 
+  isActive, 
+  simulatedQrData,
 }: DirectVideoTestProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -24,10 +31,10 @@ export default function DirectVideoTest({
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [streamReady, setStreamReady] = useState(false);
 
-  const addDebugInfo = (info: string) => {
+  const addDebugInfo = useCallback((info: string) => {
     console.log(`[DirectVideoTest] ${info}`);
     setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${info}`]);
-  };
+  }, []);
 
   // 組件加載時立即顯示調試信息
   useEffect(() => {
@@ -123,7 +130,7 @@ export default function DirectVideoTest({
     }
   };
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
         track.stop();
@@ -138,7 +145,7 @@ export default function DirectVideoTest({
     setIsScanning(false);
     setIsInitializing(false);
     setStreamReady(false);
-  };
+  }, []);
 
   const handleClose = () => {
     stopCamera();
@@ -158,20 +165,131 @@ export default function DirectVideoTest({
   };
 
   // 模擬 QR 碼掃描（點擊視頻區域）
-  const handleVideoClick = () => {
-    if (isScanning) {
+  const processScanData = useCallback((data: string) => {
+    stopCamera();
+    onScanSuccess(data);
+  }, [onScanSuccess, stopCamera]);
+
+  const handleVideoClick = useCallback(() => {
+    if (isScanning && simulatedQrData) {
       addDebugInfo('模擬掃描成功');
-      // 使用真實的學生 ID 進行測試
-      const mockQRData = JSON.stringify({
-        studentId: '38a1f68d-864c-4216-a20a-d053fc4f49bf', // Helia 的 ID
-        institution: 'Hanami Music',
-        timestamp: new Date().toISOString()
-      });
-      
-      stopCamera();
-      onScanSuccess(mockQRData);
+      processScanData(simulatedQrData);
+    } else if (isScanning) {
+      setError('尚未偵測到 QR 碼，請將 QR 對準框內');
     }
-  };
+  }, [isScanning, simulatedQrData, processScanData, addDebugInfo]);
+
+  useEffect(() => {
+    if (!isScanning || !simulatedQrData) return undefined;
+    const autoTimer = window.setTimeout(() => {
+      processScanData(simulatedQrData);
+    }, 400);
+    return () => clearTimeout(autoTimer);
+  }, [isScanning, simulatedQrData, processScanData]);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const detectionIntervalRef = useRef<number | null>(null);
+  const zxingReaderRef = useRef<BrowserQRCodeReader | null>(null);
+
+  const stopZXingReader = useCallback(() => {
+    if (!zxingReaderRef.current) return;
+    const reader = zxingReaderRef.current as BrowserQRCodeReader & {
+      stopContinuousDecode?: () => void;
+      reset?: () => void;
+    };
+    if (typeof reader.stopContinuousDecode === 'function') {
+      reader.stopContinuousDecode();
+    }
+    if (typeof reader.reset === 'function') {
+      reader.reset();
+    }
+    zxingReaderRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!isScanning || simulatedQrData || !streamReady) {
+      return undefined;
+    }
+    const videoElement = videoRef.current;
+    if (!videoElement) {
+      addDebugInfo('影片還沒就緒，等待下一次重試');
+      return undefined;
+    }
+
+    const DetectorClass = (window as typeof window & { BarcodeDetector?: any }).BarcodeDetector;
+    if (DetectorClass) {
+      const detector = new DetectorClass({ formats: ['qr_code'] });
+      const canvas = canvasRef.current ?? document.createElement('canvas');
+      canvasRef.current = canvas;
+
+      const scanFrame = async () => {
+        const video = videoRef.current;
+        if (!video) return;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        try {
+          const detections = await detector.detect(canvas);
+          if (detections.length) {
+            addDebugInfo('偵測到 QR 碼，自動觸發掃描');
+            processScanData(detections[0].rawValue);
+          }
+        } catch (scanError) {
+          console.error('QR 掃描解析失敗', scanError);
+          addDebugInfo(`QR 掃描解析失敗: ${scanError}`);
+        }
+      };
+
+      detectionIntervalRef.current = window.setInterval(() => {
+        scanFrame();
+      }, 400);
+
+      return () => {
+        if (detectionIntervalRef.current) {
+          window.clearInterval(detectionIntervalRef.current);
+          detectionIntervalRef.current = null;
+        }
+      };
+    }
+
+    addDebugInfo('此瀏覽器暫不支援 BarcodeDetector，改用 @zxing/browser');
+    setError('此瀏覽器暫不支援內建自動掃描，正在使用 fallback 模組');
+    const reader = new BrowserQRCodeReader();
+    zxingReaderRef.current = reader;
+    let active = true;
+
+    const scanLoop = async () => {
+      if (!active || !videoElement) return;
+      try {
+        const result = await reader.decodeOnceFromVideoElement(videoElement);
+        if (result?.getText()) {
+          addDebugInfo('ZXing 成功解析 QR 碼');
+          processScanData(result.getText());
+          return;
+        }
+      } catch (decodeError) {
+        if (decodeError instanceof NotFoundException) {
+          addDebugInfo('ZXing 尚未偵測到 QR，繼續嘗試');
+        } else {
+          console.error('ZXing 掃描錯誤', decodeError);
+          setError('ZXing QR 掃描失敗，請手動輸入');
+          return;
+        }
+      }
+      if (active) {
+        window.setTimeout(scanLoop, 400);
+      }
+    };
+
+    scanLoop();
+
+    return () => {
+      active = false;
+      stopZXingReader();
+    };
+  }, [isScanning, simulatedQrData, processScanData, addDebugInfo, streamReady, stopZXingReader]);
 
   // 處理用戶交互來啟動相機
   const handleUserInteraction = async () => {

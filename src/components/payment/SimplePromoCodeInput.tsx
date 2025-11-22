@@ -24,6 +24,7 @@ interface SimplePromoCodeInputProps {
   currency?: string;
   userId?: string;
   userEmail?: string;
+  orgId?: string; // 機構 ID，用於過濾優惠碼
   onDiscountApplied: (discountInfo: SimpleDiscountInfo | null) => void;
   className?: string;
 }
@@ -33,6 +34,7 @@ export default function SimplePromoCodeInput({
   currency = 'HKD',
   userId,
   userEmail,
+  orgId,
   onDiscountApplied,
   className = ''
 }: SimplePromoCodeInputProps) {
@@ -73,7 +75,8 @@ export default function SimplePromoCodeInput({
         cleanedCode,
         originalAmount,
         userId,
-        userEmail
+        userEmail,
+        orgId
       );
 
       if (result.success && result.data) {

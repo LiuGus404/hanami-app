@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { XCircleIcon } from '@heroicons/react/24/outline';
 import { PAYMENT_METHODS, createAirwallexPayment, uploadScreenshot } from '@/lib/paymentUtils';
@@ -26,6 +26,13 @@ interface PaymentMethodSelectorProps {
     email?: string; 
     phone?: string; 
   } | null;
+  orgPhone?: string | null; // 機構電話號碼
+  orgId?: string | null; // 機構 ID
+  orgData?: {
+    org_name?: string;
+    contact_phone?: string;
+    contact_email?: string;
+  } | null; // 機構資料
 }
 
 export default function PaymentMethodSelector({
@@ -38,13 +45,35 @@ export default function PaymentMethodSelector({
   onPaymentError,
   className = '',
   showPaymentActions = true,
-  user = null
+  user = null,
+  orgPhone = null,
+  orgId = null,
+  orgData = null
 }: PaymentMethodSelectorProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [airwallexLoading, setAirwallexLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [paymentWindowRef, setPaymentWindowRef] = useState<Window | null>(null);
+  const [showRetryButton, setShowRetryButton] = useState(false);
+  const [lastCheckoutUrl, setLastCheckoutUrl] = useState<string | null>(null);
+
+  // 根據機構 ID 過濾支付方法
+  const availablePaymentMethods = useMemo(() => {
+    // 如果機構不是 Hanami Music，過濾掉 Airwallex
+    if (orgId && orgId !== 'f8d269ec-b682-45d1-a796-3b74c2bf3eec') {
+      return PAYMENT_METHODS.filter(method => method.id !== 'airwallex');
+    }
+    return PAYMENT_METHODS;
+  }, [orgId]);
+
+  // 如果當前選中的是 Airwallex 但機構不是 Hanami Music，自動清除選擇
+  useEffect(() => {
+    if (selectedMethod === 'airwallex' && orgId && orgId !== 'f8d269ec-b682-45d1-a796-3b74c2bf3eec') {
+      onMethodChange('');
+    }
+  }, [orgId, selectedMethod, onMethodChange]);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [backupImageUrl, setBackupImageUrl] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
@@ -90,8 +119,185 @@ export default function PaymentMethodSelector({
   // 計算最終金額
   const finalAmount = discountInfo ? discountInfo.final_amount : amount;
 
+  // 清除舊支付視窗
+  const clearPaymentWindow = () => {
+    if (paymentWindowRef && !paymentWindowRef.closed) {
+      try {
+        paymentWindowRef.close();
+        console.log('✅ 已關閉舊支付視窗');
+      } catch (error) {
+        console.error('❌ 關閉舊視窗失敗:', error);
+      }
+    }
+    setPaymentWindowRef(null);
+    setShowRetryButton(false);
+    setLastCheckoutUrl(null);
+  };
+
+  // 重試打開支付視窗
+  const handleRetryPayment = () => {
+    clearPaymentWindow();
+    if (lastCheckoutUrl) {
+      // 直接使用上次的 URL 重試打開
+      handleOpenPaymentWindow(lastCheckoutUrl);
+    } else {
+      // 如果沒有保存的 URL，重新調用完整流程
+      handleAirwallexPayment();
+    }
+  };
+
+  // 打開支付視窗的通用函數
+  const handleOpenPaymentWindow = (checkoutUrl: string) => {
+    setAirwallexLoading(true);
+    setErrors({});
+    setShowRetryButton(false);
+    
+    let paymentWindow: Window | null = null;
+    let popupOpened = false;
+    
+    console.log('🔍 開始嘗試打開新視窗，URL:', checkoutUrl);
+    
+    try {
+      // 方法 1: 標準 window.open 帶詳細參數
+      console.log('🚀 嘗試方法1：使用詳細參數');
+      paymentWindow = window.open(checkoutUrl, 'airwallex_payment', 'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no,popup=yes');
+      
+      console.log('🔍 方法1結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
+      
+      if (paymentWindow && !paymentWindow.closed) {
+        popupOpened = true;
+        console.log('✅ 方法1成功：使用詳細參數打開新視窗');
+      } else {
+        // 方法 2: 使用更寬鬆的參數
+        console.log('🚀 嘗試方法2：使用寬鬆參數');
+        paymentWindow = window.open(checkoutUrl, 'airwallex_payment', 'width=800,height=600,scrollbars=yes,resizable=yes');
+        
+        console.log('🔍 方法2結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
+        
+        if (paymentWindow && !paymentWindow.closed) {
+          popupOpened = true;
+          console.log('✅ 方法2成功：使用寬鬆參數打開新視窗');
+        } else {
+          // 方法 3: 使用 _blank 目標
+          console.log('🚀 嘗試方法3：使用 _blank 目標');
+          paymentWindow = window.open(checkoutUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+          
+          console.log('🔍 方法3結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
+          
+          if (paymentWindow && !paymentWindow.closed) {
+            popupOpened = true;
+            console.log('✅ 方法3成功：使用 _blank 目標打開新視窗');
+          } else {
+            // 方法 4: 創建臨時鏈接並點擊（使用 _blank）
+            console.log('🚀 嘗試方法4：使用臨時鏈接');
+            const tempLink = document.createElement('a');
+            tempLink.href = checkoutUrl;
+            tempLink.target = '_blank';
+            tempLink.rel = 'noopener noreferrer';
+            document.body.appendChild(tempLink);
+            tempLink.click();
+            document.body.removeChild(tempLink);
+            
+            // 使用 _blank 會在新標籤頁打開，假設成功
+            // 注意：_blank 打開新標籤頁時，window.open 可能返回 null，但實際上已經打開了
+            popupOpened = true;
+            console.log('✅ 方法4完成：使用臨時鏈接（_blank），已在新標籤頁打開');
+          }
+        }
+      }
+      
+        // 處理成功打開視窗的情況
+      if (popupOpened) {
+        console.log('✅ 新視窗打開成功');
+        
+        // 如果有 paymentWindow 引用，設置監聽器
+        if (paymentWindow) {
+          console.log('✅ 設置視窗監聽器');
+          setPaymentWindowRef(paymentWindow);
+          
+          // 聚焦到新視窗
+          paymentWindow.focus();
+          
+          // 添加載入監聽
+          paymentWindow.addEventListener('load', () => {
+            console.log('🔄 Airwallex 頁面載入完成');
+          });
+
+          paymentWindow.addEventListener('error', (error) => {
+            console.error('❌ Airwallex 頁面載入錯誤:', error);
+          });
+
+          // 監聽支付完成消息
+          const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            
+            if (event.data.type === 'PAYMENT_SUCCESS') {
+              clearInterval(checkClosed);
+              clearPaymentWindow();
+              onPaymentSuccess?.(event.data);
+              window.removeEventListener('message', handleMessage);
+            } else if (event.data.type === 'PAYMENT_CANCELLED') {
+              clearInterval(checkClosed);
+              clearPaymentWindow();
+              onPaymentError?.('支付已取消');
+              window.removeEventListener('message', handleMessage);
+            }
+          };
+
+          window.addEventListener('message', handleMessage);
+
+          // 監聽視窗關閉
+          const checkClosed = setInterval(() => {
+            if (paymentWindow?.closed) {
+              clearInterval(checkClosed);
+              window.removeEventListener('message', handleMessage);
+              clearPaymentWindow();
+              console.log('🔄 支付視窗已關閉');
+            }
+          }, 1000);
+
+          // 10分鐘後自動清理
+          setTimeout(() => {
+            clearInterval(checkClosed);
+            if (paymentWindow && !paymentWindow.closed) {
+              paymentWindow.close();
+            }
+            window.removeEventListener('message', handleMessage);
+            clearPaymentWindow();
+          }, 600000);
+        } else {
+          // 如果 paymentWindow 為 null（例如使用 _blank 打開新標籤頁），仍然視為成功
+          console.log('✅ 使用 _blank 打開新標籤頁，無法設置監聽器，但視窗已打開');
+        }
+        
+        // 不立即調用 onPaymentSuccess，等待真正的支付完成
+        console.log('✅ 新視窗已打開，等待支付完成...');
+        setAirwallexLoading(false);
+      } else {
+        // 如果所有方法都失敗，顯示錯誤和重試按鈕
+        console.error('❌ 所有打開新視窗的方法都失敗了');
+        setLastCheckoutUrl(checkoutUrl);
+        setShowRetryButton(true);
+        setErrors({ airwallex: '無法打開支付視窗，請檢查瀏覽器設置或允許彈窗' });
+        onPaymentError?.('無法打開支付視窗，請檢查瀏覽器設置或允許彈窗');
+        setAirwallexLoading(false);
+      }
+      
+    } catch (error) {
+      console.error('❌ 打開新視窗失敗:', error);
+      setLastCheckoutUrl(checkoutUrl);
+      setShowRetryButton(true);
+      setErrors({ airwallex: '打開支付視窗時發生錯誤，請檢查瀏覽器設置' });
+      onPaymentError?.('打開支付視窗時發生錯誤，請檢查瀏覽器設置');
+      setAirwallexLoading(false);
+    }
+  };
+
   // 處理 Airwallex 支付
   const handleAirwallexPayment = async () => {
+    // 先清除舊視窗
+    clearPaymentWindow();
+    
     setAirwallexLoading(true);
     setErrors({});
     
@@ -137,135 +343,8 @@ export default function PaymentMethodSelector({
           console.log('🆔 Payment Intent ID:', result.payment_intent_id);
           console.log('🔐 Client Secret 狀態:', result.debug_info?.client_secret);
           
-          // 嘗試多種方式打開新視窗，但不進行同頁跳轉
-          let paymentWindow: Window | null = null;
-          let popupOpened = false;
-          
-          console.log('🔍 開始嘗試打開新視窗，URL:', result.checkout_url);
-          
-          try {
-            // 方法 1: 標準 window.open 帶詳細參數
-            console.log('🚀 嘗試方法1：使用詳細參數');
-            paymentWindow = window.open(result.checkout_url, 'airwallex_payment', 'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no,popup=yes');
-            
-            console.log('🔍 方法1結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
-            
-            if (paymentWindow && !paymentWindow.closed) {
-              popupOpened = true;
-              console.log('✅ 方法1成功：使用詳細參數打開新視窗');
-            } else {
-              // 方法 2: 使用更寬鬆的參數
-              console.log('🚀 嘗試方法2：使用寬鬆參數');
-              paymentWindow = window.open(result.checkout_url, 'airwallex_payment', 'width=800,height=600,scrollbars=yes,resizable=yes');
-              
-              console.log('🔍 方法2結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
-              
-              if (paymentWindow && !paymentWindow.closed) {
-                popupOpened = true;
-                console.log('✅ 方法2成功：使用寬鬆參數打開新視窗');
-              } else {
-                // 方法 3: 使用 _blank 目標
-                console.log('🚀 嘗試方法3：使用 _blank 目標');
-                paymentWindow = window.open(result.checkout_url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-                
-                console.log('🔍 方法3結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
-                
-                if (paymentWindow && !paymentWindow.closed) {
-                  popupOpened = true;
-                  console.log('✅ 方法3成功：使用 _blank 目標打開新視窗');
-                } else {
-                  // 方法 4: 創建臨時鏈接並點擊（使用 _blank）
-                  console.log('🚀 嘗試方法4：使用臨時鏈接');
-                  const tempLink = document.createElement('a');
-                  tempLink.href = result.checkout_url;
-                  tempLink.target = '_blank';
-                  tempLink.rel = 'noopener noreferrer';
-                  document.body.appendChild(tempLink);
-                  tempLink.click();
-                  document.body.removeChild(tempLink);
-                  
-                  // 檢查是否有新視窗打開
-                  setTimeout(() => {
-                    try {
-                      // 嘗試獲取最後打開的視窗
-                      const windows = Array.from(window.parent.frames || []);
-                      console.log('🔍 檢查是否有新視窗打開，當前視窗數:', windows.length);
-                      popupOpened = true; // 假設成功，因為我們使用了 _blank
-                      console.log('✅ 方法4完成：使用臨時鏈接（_blank）');
-                    } catch (error) {
-                      console.log('❌ 方法4檢查失敗:', error);
-                    }
-                  }, 100);
-                }
-              }
-            }
-            
-            if (popupOpened) {
-              console.log('✅ 新視窗打開成功，設置監聽器');
-              
-              if (paymentWindow) {
-                // 聚焦到新視窗
-                paymentWindow.focus();
-                
-                // 添加載入監聽
-                paymentWindow.addEventListener('load', () => {
-                  console.log('🔄 Airwallex 頁面載入完成');
-                });
-
-                paymentWindow.addEventListener('error', (error) => {
-                  console.error('❌ Airwallex 頁面載入錯誤:', error);
-                });
-
-                // 監聽支付完成消息
-                const handleMessage = (event: MessageEvent) => {
-                  if (event.origin !== window.location.origin) return;
-                  
-                  if (event.data.type === 'PAYMENT_SUCCESS') {
-                    clearInterval(checkClosed);
-                    paymentWindow?.close();
-                    onPaymentSuccess?.(event.data);
-                    window.removeEventListener('message', handleMessage);
-                  } else if (event.data.type === 'PAYMENT_CANCELLED') {
-                    clearInterval(checkClosed);
-                    paymentWindow?.close();
-                    onPaymentError?.('支付已取消');
-                    window.removeEventListener('message', handleMessage);
-                  }
-                };
-
-                window.addEventListener('message', handleMessage);
-
-                // 監聽視窗關閉
-                const checkClosed = setInterval(() => {
-                  if (paymentWindow?.closed) {
-                    clearInterval(checkClosed);
-                    window.removeEventListener('message', handleMessage);
-                    console.log('🔄 支付視窗已關閉');
-                  }
-                }, 1000);
-
-                // 10分鐘後自動清理
-                setTimeout(() => {
-                  clearInterval(checkClosed);
-                  if (paymentWindow && !paymentWindow.closed) {
-                    paymentWindow.close();
-                  }
-                  window.removeEventListener('message', handleMessage);
-                }, 600000);
-              }
-              
-              // 不立即調用 onPaymentSuccess，等待真正的支付完成
-              console.log('✅ 新視窗已打開，等待支付完成...');
-            } else {
-              // 如果所有方法都失敗，顯示錯誤而不是跳轉
-              console.error('❌ 所有打開新視窗的方法都失敗了');
-              onPaymentError?.('無法打開支付視窗，請檢查瀏覽器設置或允許彈窗');
-            }
-            
-          } catch (error) {
-            console.error('❌ 打開新視窗失敗:', error);
-            onPaymentError?.('打開支付視窗時發生錯誤，請檢查瀏覽器設置');
-          }
+          // 使用通用函數打開支付視窗
+          handleOpenPaymentWindow(result.checkout_url);
         }
 
       } else {
@@ -293,11 +372,12 @@ export default function PaymentMethodSelector({
     setErrors({});
 
     try {
-      const uploadData: ScreenshotUploadData & { userId?: string } = {
+      const uploadData: ScreenshotUploadData & { userId?: string; orgId?: string | null } = {
         file: uploadedFile,
         amount: amount,
         description: description,
         userId: user?.id,
+        orgId: orgId || null,
         metadata: {
           upload_date: new Date().toISOString(),
           original_filename: uploadedFile.name,
@@ -451,7 +531,7 @@ export default function PaymentMethodSelector({
       <div className="space-y-4">
         {/* 支付方法選項 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {PAYMENT_METHODS.map((method) => (
+          {availablePaymentMethods.map((method) => (
             <motion.button
               key={method.id}
               type="button"
@@ -492,24 +572,33 @@ export default function PaymentMethodSelector({
           </ul>
           
           {/* WhatsApp 聯絡按鍵 */}
-          <div className="mt-4 pt-4 border-t border-[#EADBC8]">
-            <p className="text-sm text-[#2B3A3B]/70 mb-3">
-              如有支付上的困難和問題，可以直接與我們聯絡：
-            </p>
-            <motion.a
-              href="https://wa.me/85298271410"
-              target="_blank"
-              rel="noopener noreferrer"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
-              </svg>
-              <span className="font-medium">WhatsApp 聯絡我們</span>
-            </motion.a>
-          </div>
+          {orgPhone && (() => {
+            // 處理電話號碼格式：移除所有空格、括號、破折號等，保留數字和 + 號
+            const cleanPhone = orgPhone.replace(/[\s\-\(\)]/g, '');
+            // 如果沒有 + 號，確保有國家代碼（預設 +852）
+            const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone.substring(1) : (cleanPhone.startsWith('852') ? cleanPhone : `852${cleanPhone}`);
+            
+            return (
+              <div className="mt-4 pt-4 border-t border-[#EADBC8]">
+                <p className="text-sm text-[#2B3A3B]/70 mb-3">
+                  如有支付上的困難和問題，可以直接與我們聯絡：
+                </p>
+                <motion.a
+                  href={`https://api.whatsapp.com/send/?phone=${formattedPhone}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                  </svg>
+                  <span className="font-medium">WhatsApp 聯絡我們</span>
+                </motion.a>
+              </div>
+            );
+          })()}
         </div>
 
 
@@ -520,6 +609,7 @@ export default function PaymentMethodSelector({
             currency={currency}
             userId={user?.id}
             userEmail={user?.email}
+            orgId={orgId || undefined}
             onDiscountApplied={handleDiscountApplied}
             className="mb-4"
           />
@@ -618,58 +708,63 @@ export default function PaymentMethodSelector({
                       PAYME FPS 支付資訊
                     </h3>
 
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {/* PAYME 資訊 */}
-                      <div className="bg-green-50 rounded-lg p-4">
-                        <h4 className="font-semibold text-green-800 mb-3">PAYME 帳戶</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">電話號碼:</span>
-                            <span className="font-mono text-sm font-medium">{formatPaymePhone(paymentInfo.payme_phone)}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">收款人:</span>
-                            <span className="text-sm font-medium">{paymentInfo.payme_name}</span>
-                          </div>
-                          {paymentInfo.payme_link && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">支付連結:</span>
-                              <a
-                                href={paymentInfo.payme_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline text-sm flex items-center"
-                              >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                                開啟
-                              </a>
+                    {/* 其他機構提示 */}
+                    {orgId && orgId !== 'f8d269ec-b682-45d1-a796-3b74c2bf3eec' && orgData && (
+                      <div className="mb-4 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                        <div className="flex items-start space-x-3">
+                          <svg className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-yellow-800 mb-2">重要提示</h4>
+                            <p className="text-sm text-yellow-700 mb-3">
+                              您選擇的機構是 <span className="font-semibold">{orgData.org_name || '其他機構'}</span>，請在付款前與該機構確認支付資訊。
+                            </p>
+                            <div className="bg-white rounded-lg p-3 space-y-2 text-sm">
+                              {orgData.org_name && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-gray-600">機構名稱:</span>
+                                  <span className="font-medium text-gray-800">{orgData.org_name}</span>
+                                </div>
+                              )}
+                              {orgData.contact_phone && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-gray-600">聯絡電話:</span>
+                                  <span className="font-medium text-gray-800">{orgData.contact_phone}</span>
+                                </div>
+                              )}
+                              {orgData.contact_email && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-gray-600">聯絡電郵:</span>
+                                  <span className="font-medium text-gray-800">{orgData.contact_email}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* FPS 資訊 */}
-                      <div className="bg-blue-50 rounded-lg p-4">
-                        <h4 className="font-semibold text-blue-800 mb-3">FPS 轉數快</h4>
-                        {paymentInfo.fps_phone ? (
+                    {/* 只有 Hanami Music 才顯示 PAYME 和 FPS 帳戶資訊 */}
+                    {(!orgId || orgId === 'f8d269ec-b682-45d1-a796-3b74c2bf3eec') && (
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {/* PAYME 資訊 */}
+                        <div className="bg-green-50 rounded-lg p-4">
+                          <h4 className="font-semibold text-green-800 mb-3">PAYME 帳戶</h4>
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-gray-600">電話號碼:</span>
-                              <span className="font-mono text-sm font-medium">{formatPaymePhone(paymentInfo.fps_phone)}</span>
+                              <span className="font-mono text-sm font-medium">{formatPaymePhone(paymentInfo.payme_phone)}</span>
                             </div>
-                            {paymentInfo.fps_name && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-600">收款人:</span>
-                                <span className="text-sm font-medium">{paymentInfo.fps_name}</span>
-                              </div>
-                            )}
-                            {paymentInfo.fps_link && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">收款人:</span>
+                              <span className="text-sm font-medium">{paymentInfo.payme_name}</span>
+                            </div>
+                            {paymentInfo.payme_link && (
                               <div className="flex items-center justify-between">
                                 <span className="text-sm text-gray-600">支付連結:</span>
                                 <a
-                                  href={paymentInfo.fps_link}
+                                  href={paymentInfo.payme_link}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:underline text-sm flex items-center"
@@ -682,11 +777,46 @@ export default function PaymentMethodSelector({
                               </div>
                             )}
                           </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">未設置 FPS 帳戶</p>
-                        )}
+                        </div>
+
+                        {/* FPS 資訊 */}
+                        <div className="bg-blue-50 rounded-lg p-4">
+                          <h4 className="font-semibold text-blue-800 mb-3">FPS 轉數快</h4>
+                          {paymentInfo.fps_phone ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">電話號碼:</span>
+                                <span className="font-mono text-sm font-medium">{formatPaymePhone(paymentInfo.fps_phone)}</span>
+                              </div>
+                              {paymentInfo.fps_name && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-600">收款人:</span>
+                                  <span className="text-sm font-medium">{paymentInfo.fps_name}</span>
+                                </div>
+                              )}
+                              {paymentInfo.fps_link && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-600">支付連結:</span>
+                                  <a
+                                    href={paymentInfo.fps_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline text-sm flex items-center"
+                                  >
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                    開啟
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">未設置 FPS 帳戶</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {paymentInfo.notes && (
                       <div className="mt-4 p-3 bg-gray-50 rounded-lg">
@@ -707,21 +837,29 @@ export default function PaymentMethodSelector({
                       </div>
                       
                       {/* WhatsApp 聯絡按鍵 */}
-                      <div className="mt-3 pt-3 border-t border-[#EADBC8]">
-                        <motion.a
-                          href="https://wa.me/85298271410"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="inline-flex items-center justify-center px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg text-sm"
-                        >
-                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
-                          </svg>
-                          <span className="font-medium">WhatsApp 聯絡</span>
-                        </motion.a>
-                      </div>
+                      {orgPhone && (
+                        <div className="mt-3 pt-3 border-t border-[#EADBC8]">
+                          <motion.a
+                            href={(() => {
+                              // 處理電話號碼格式：移除所有空格、括號、破折號等，保留數字和 + 號
+                              const cleanPhone = orgPhone.replace(/[\s\-\(\)]/g, '');
+                              // 如果沒有 + 號，確保有國家代碼（預設 +852）
+                              const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone.substring(1) : (cleanPhone.startsWith('852') ? cleanPhone : `852${cleanPhone}`);
+                              return `https://api.whatsapp.com/send/?phone=${formattedPhone}`;
+                            })()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="inline-flex items-center justify-center px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg text-sm"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                            </svg>
+                            <span className="font-medium">WhatsApp 聯絡</span>
+                          </motion.a>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -1019,14 +1157,37 @@ export default function PaymentMethodSelector({
                 </motion.button>
 
                 {errors.airwallex && (
-                  <motion.p
+                  <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-sm text-red-600 flex items-center"
+                    className="space-y-3"
                   >
-                    <XCircleIcon className="w-4 h-4 mr-1" />
-                    {errors.airwallex}
-                  </motion.p>
+                    <p className="text-sm text-red-600 flex items-center">
+                      <XCircleIcon className="w-4 h-4 mr-1" />
+                      {errors.airwallex}
+                    </p>
+                    
+                    {showRetryButton && (
+                      <motion.button
+                        onClick={handleRetryPayment}
+                        disabled={airwallexLoading}
+                        whileHover={!airwallexLoading ? { scale: 1.02 } : {}}
+                        whileTap={!airwallexLoading ? { scale: 0.98 } : {}}
+                        className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
+                          airwallexLoading
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 shadow-md'
+                        }`}
+                      >
+                        <div className="flex items-center justify-center">
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          重新打開支付視窗
+                        </div>
+                      </motion.button>
+                    )}
+                  </motion.div>
                 )}
 
                 {/* 支付說明 */}

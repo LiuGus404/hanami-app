@@ -45,6 +45,8 @@ function toStatus(val: string | null | undefined): 'attended' | 'absent' | 'make
   return null;
 }
 
+const EMPTY_TEACHER_OPTIONS: { label: string; value: string }[] = [];
+
 export default function LessonEditorModal({
   open,
   onClose,
@@ -53,7 +55,7 @@ export default function LessonEditorModal({
   onSaved,
   mode = 'add',
   initialLessonCount,
-  teacherOptions: externalTeacherOptions = [],
+  teacherOptions: externalTeacherOptions = EMPTY_TEACHER_OPTIONS,
   teacherLabelMap: externalTeacherLabelMap,
   defaultRegularTimeslot,
   defaultActualTimeslot,
@@ -126,13 +128,16 @@ export default function LessonEditorModal({
   const [pendingTeacher, setPendingTeacher] = useState<string>('');
   const baseTeacherOption = { label: '未分配', value: '' } as const;
   const [teacherOptions, setTeacherOptions] = useState<{ label: string; value: string }[]>(
-    externalTeacherOptions.length > 0 ? externalTeacherOptions : [baseTeacherOption],
+    externalTeacherOptions && externalTeacherOptions.length > 0
+      ? externalTeacherOptions
+      : [baseTeacherOption],
   );
   const teachersLoadedRef = useRef(false);
 
   useEffect(() => {
-    teachersLoadedRef.current = externalTeacherOptions.length > 0;
-    if (externalTeacherOptions.length > 0) {
+    const hasExternalOptions = externalTeacherOptions.length > 0;
+    teachersLoadedRef.current = hasExternalOptions;
+    if (hasExternalOptions) {
       setTeacherOptions(externalTeacherOptions);
     } else {
       setTeacherOptions([baseTeacherOption]);

@@ -19,11 +19,34 @@ export async function POST(request: NextRequest) {
       code: body.code,
       order_amount: body.order_amount,
       user_id: body.user_id,
-      user_email: body.user_email
+      user_email: body.user_email,
+      org_id: body.org_id
     });
 
     // 使用 SaaS Supabase 客戶端
     const supabase = getSaasServerSupabaseClient();
+
+    // 如果提供了 org_id，先獲取機構資訊
+    let organizationName: string | null = null;
+    if (body.org_id) {
+      try {
+        const { data: orgData, error: orgError } = await supabase
+          .from('hanami_organizations')
+          .select('org_name')
+          .eq('id', body.org_id)
+          .eq('status', 'active')
+          .single();
+
+        if (!orgError && orgData) {
+          organizationName = (orgData as { org_name: string }).org_name;
+          console.log('✅ 獲取機構名稱:', organizationName);
+        } else {
+          console.log('⚠️ 無法獲取機構資訊，將不進行機構過濾');
+        }
+      } catch (e) {
+        console.log('⚠️ 查詢機構資訊失敗:', e);
+      }
+    }
 
     // 檢查表格並查詢優惠碼
     let promoCode = null;
@@ -31,12 +54,19 @@ export async function POST(request: NextRequest) {
 
     // 嘗試從 hanami_promo_codes 查詢
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('hanami_promo_codes')
         .select('*')
         .eq('code', body.code.toUpperCase())
-        .eq('is_active', true)
-        .single();
+        .eq('is_active', true);
+
+      // 如果有機構名稱，根據機構名稱過濾（如果表有 org_id 欄位，也可以直接過濾）
+      // 注意：hanami_promo_codes 可能沒有 org_id 欄位，所以使用 institution_name
+      if (organizationName) {
+        query = query.eq('institution_name', organizationName);
+      }
+
+      const { data, error } = await query.single();
 
       if (!error && data) {
         promoCode = data;
@@ -50,12 +80,18 @@ export async function POST(request: NextRequest) {
     // 如果沒找到，嘗試從 saas_coupons 查詢
     if (!promoCode) {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('saas_coupons')
           .select('*')
           .eq('coupon_code', body.code.toUpperCase())
-          .eq('is_active', true)
-          .single();
+          .eq('is_active', true);
+
+        // 如果有機構名稱，根據機構名稱過濾
+        if (organizationName) {
+          query = query.eq('institution_name', organizationName);
+        }
+
+        const { data, error } = await query.single();
 
         if (!error && data) {
           // 轉換欄位名稱以符合統一格式
@@ -91,14 +127,18 @@ export async function POST(request: NextRequest) {
 
     // 如果沒找到優惠碼
     if (!promoCode) {
-      console.log('❌ 優惠碼不存在');
+      console.log('❌ 優惠碼不存在或不符合機構');
+      const errorMessage = body.org_id && organizationName
+        ? '優惠碼不存在或該優惠碼不屬於此機構'
+        : '優惠碼不存在';
+      
       return NextResponse.json({
         success: true,
         data: {
           is_valid: false,
           discount_amount: 0,
           final_amount: body.order_amount,
-          error_message: '優惠碼不存在'
+          error_message: errorMessage
         }
       });
     }

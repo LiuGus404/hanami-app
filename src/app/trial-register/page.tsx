@@ -327,7 +327,8 @@ export default function TrialRegisterPage() {
             remaining_lessons: 1, // 試聽通常只有1堂課
             ongoing_lessons: 0,
             upcoming_lessons: 1,
-            actual_timeslot: null
+            actual_timeslot: null,
+            confirmed_payment: false // 支付確認狀態，提交時設為 false，之後可手動更新為 true
           };
 
           console.log('🔍 準備插入到 hanami_trial_students 的資料:', trialStudentData);

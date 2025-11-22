@@ -70,8 +70,8 @@ export default function TestBindingPage() {
         
         results.tests.push({
           name: '測試 POST API',
-          status: postResponse.ok ? 'success' : 'error',
-          message: postResponse.ok 
+          status: postResponse.ok && postData?.success !== false ? 'success' : 'error',
+          message: postResponse.ok && postData?.success !== false
             ? 'API 端點正常'
             : `錯誤: ${postData.error || '未知錯誤'}`
         });

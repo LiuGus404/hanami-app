@@ -125,14 +125,16 @@ export default function OrganizationMiniCard({
       onClick={onClick}
       className="w-full text-left bg-white rounded-2xl overflow-hidden border border-[#EADBC8] shadow-sm hover:shadow-lg transition-all relative cursor-pointer"
     >
-      <div className="relative w-full" style={{ aspectRatio: '4/3' }}>
-        <Image
-          src={displayImage}
-          alt={name}
-          fill
-          className="object-contain bg-[#FFFDF8]"
-          sizes="(max-width: 768px) 80vw, 280px"
-        />
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4/3', backgroundColor: '#FFF9F2' }}>
+        <div className="relative w-full h-full">
+          <Image
+            src={displayImage}
+            alt={name}
+            fill
+            className="object-contain"
+            sizes="(max-width: 768px) 80vw, 280px"
+          />
+        </div>
       </div>
       <div className="p-4">
         <div className="text-[#4B4036] font-semibold line-clamp-1">{name}</div>

@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 API: 開始查詢待審核學生...');
+    const { searchParams } = new URL(request.url);
+    const orgId = searchParams.get('orgId');
+    
+    console.log('🔍 API: 開始查詢待審核學生...', { orgId });
     
     // 使用服務角色 key 繞過 RLS
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -16,12 +19,30 @@ export async function GET(request: NextRequest) {
       }
     });
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('hanami_pending_students')
-      .select('*')
-      .order('enrollment_date', { ascending: false });
+      .select('*');
+    
+    // 如果有 org_id，根據 org_id 過濾
+    // 注意：如果表還沒有 org_id 欄位，需要先執行遷移文件 migrations/add_org_id_to_pending_students.sql
+    if (orgId) {
+      query = query.eq('org_id', orgId);
+    }
+    
+    let { data, error } = await query.order('enrollment_date', { ascending: false });
+    
+    // 如果查詢失敗且錯誤是欄位不存在，嘗試不帶 org_id 的查詢
+    if (error && error.message?.includes('org_id') && error.message?.includes('does not exist')) {
+      console.warn('⚠️ org_id 欄位不存在，使用不帶過濾的查詢。請執行遷移文件: migrations/add_org_id_to_pending_students.sql');
+      const fallbackQuery = supabase
+        .from('hanami_pending_students')
+        .select('*');
+      const fallbackResult = await fallbackQuery.order('enrollment_date', { ascending: false });
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
 
-    console.log('🔍 API: 查詢結果:', { data, error });
+    console.log('🔍 API: 查詢結果:', { data, error, orgId });
 
     if (error) throw error;
 

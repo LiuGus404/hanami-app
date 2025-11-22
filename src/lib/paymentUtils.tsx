@@ -88,7 +88,7 @@ export const createAirwallexPayment = async (request: PaymentRequest): Promise<A
 };
 
 // 上傳付款截圖
-export const uploadScreenshot = async (uploadData: ScreenshotUploadData & { userId?: string }): Promise<{ success: boolean; url?: string; data?: any; error?: string }> => {
+export const uploadScreenshot = async (uploadData: ScreenshotUploadData & { userId?: string; orgId?: string | null }): Promise<{ success: boolean; url?: string; data?: any; error?: string }> => {
   try {
     // 驗證檔案
     if (!validateFileType(uploadData.file)) {
@@ -106,6 +106,9 @@ export const uploadScreenshot = async (uploadData: ScreenshotUploadData & { user
     formData.append('description', uploadData.description);
     if (uploadData.userId) {
       formData.append('userId', uploadData.userId);
+    }
+    if (uploadData.orgId) {
+      formData.append('orgId', uploadData.orgId);
     }
     if (uploadData.metadata) {
       formData.append('metadata', JSON.stringify(uploadData.metadata));

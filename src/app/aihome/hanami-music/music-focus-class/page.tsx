@@ -604,7 +604,7 @@ export default function MusicFocusClassPage() {
                     className="flex flex-col sm:flex-row gap-6 justify-center"
                   >
                     <motion.button
-                      onClick={() => router.push('/aihome/course-activities/hanami-music/register')}
+                      onClick={() => router.push('/aihome/course-activities/register')}
                       whileHover={{ scale: 1.05, y: -2 }}
                       whileTap={{ scale: 0.95 }}
                       className="group px-10 py-4 bg-white text-[#4B4036] rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center space-x-3"
@@ -1490,7 +1490,7 @@ export default function MusicFocusClassPage() {
                             </div>
 
                             <motion.button
-                              onClick={() => router.push('/aihome/course-activities/hanami-music/register')}
+                              onClick={() => router.push('/aihome/course-activities/register')}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               className={`w-full px-4 py-3 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 ${

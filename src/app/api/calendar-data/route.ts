@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
-    const { courseType, isTrial, startDate, endDate } = await request.json();
+    const { courseType, isTrial, startDate, endDate, orgId } = await request.json();
 
     if (!courseType) {
       return NextResponse.json({ 
@@ -44,12 +44,18 @@ export async function POST(request: Request) {
     console.log('📚 課程類型資訊:', { trialLimit, maxStudents });
 
     // 獲取排程資料
-    const { data: scheduleData, error: scheduleError } = await supabase
+    let scheduleQuery = supabase
       .from('hanami_schedule')
       .select('*')
       .eq('course_type', courseType)
-      .eq('is_primary_schedule', true)
-      .neq('weekday', 1) // 排除星期一
+      .eq('is_primary_schedule', true);
+    
+    // 如果有 org_id，根據 org_id 過濾
+    if (orgId) {
+      scheduleQuery = scheduleQuery.eq('org_id', orgId);
+    }
+    
+    const { data: scheduleData, error: scheduleError } = await scheduleQuery
       .order('weekday', { ascending: true })
       .order('timeslot', { ascending: true });
 

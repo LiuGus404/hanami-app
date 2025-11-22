@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
   BookOpenIcon, 
@@ -31,6 +31,7 @@ import {
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import LuLuCharacterWithBubble from '@/components/3d/LuLuCharacterWithBubble';
 import AppSidebar from '@/components/AppSidebar';
+import UnifiedNavbar from '@/components/UnifiedNavbar';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -41,22 +42,11 @@ export default function DashboardPage() {
 
   // 更新時間
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     setIsLoaded(true);
   }, []);
 
   // 登出處理 - 使用直接登出邏輯
   const handleLogout = () => {
-    console.log('登出按鈕被點擊，使用直接登出邏輯...');
-    console.log('當前用戶狀態:', { user: !!user, loading });
-    
-    // 直接跳轉到登出頁面，確保完全清除所有狀態
     window.location.href = '/aihome/logout';
   };
 
@@ -145,68 +135,13 @@ export default function DashboardPage() {
 
         {/* 主內容區域 */}
         <div className="flex-1 flex flex-col">
-          {/* 頂部導航欄 */}
-          <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center h-16">
-                <div className="flex items-center space-x-4">
-                  {/* 選單按鈕 */}
-                  <motion.button
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors relative z-40"
-                    title={sidebarOpen ? "關閉選單" : "開啟選單"}
-                  >
-                    <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
-                  </motion.button>
-                  
-                  <div className="w-10 h-10 relative">
-                    <img 
-                      src="/@hanami.png" 
-                      alt="HanamiEcho Logo" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-                <p className="text-sm text-[#2B3A3B]">兒童與成人的智能伙伴</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-[#2B3A3B]">
-                {currentTime.toLocaleTimeString('zh-TW', { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-[#4B4036]">
-                  {user.full_name?.charAt(0).toUpperCase() || 'U'}
-                </span>
-              </div>
-              <motion.button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('登出按鈕被點擊，事件:', e);
-                  handleLogout();
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                title="登出"
-                type="button"
-              >
-                <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                <span>登出</span>
-              </motion.button>
-              
-            </div>
-          </div>
-        </div>
-      </nav>
+        <UnifiedNavbar
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          user={user}
+          onLogout={handleLogout}
+          onLogin={() => router.push('/aihome/auth/login')}
+          onRegister={() => router.push('/aihome/auth/register')}
+        />
 
           {/* 主內容區域 */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 min-h-full">

@@ -165,7 +165,7 @@ export async function getBaseDashboardData(
     };
 
     cache.set(cacheKey, { data, timestamp: Date.now() });
-    return data;
+      return data;
   } catch (error) {
     console.error('獲取基礎儀表板數據失敗:', error);
     return {

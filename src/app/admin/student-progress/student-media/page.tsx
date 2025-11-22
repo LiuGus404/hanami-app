@@ -61,6 +61,7 @@ type StudentMediaPageProps = {
   forcedOrgId?: string | null;
   forcedOrgName?: string | null;
   disableOrgFallback?: boolean;
+  preferServiceApiForStudents?: boolean;
 };
 
 export default function StudentMediaPage({
@@ -68,6 +69,7 @@ export default function StudentMediaPage({
   forcedOrgId = null,
   forcedOrgName = null,
   disableOrgFallback = false,
+  preferServiceApiForStudents = false,
 }: StudentMediaPageProps = {}) {
   const [students, setStudents] = useState<StudentWithMedia[]>([]);
   const [loading, setLoading] = useState(true);
@@ -194,6 +196,39 @@ export default function StudentMediaPage({
     }
   };
 
+  const fetchStudentsFromApi = async () => {
+    if (!validOrgId) {
+      throw new Error('無有效機構 ID，無法透過 API 載入學生');
+    }
+
+    if (typeof window === 'undefined') {
+      throw new Error('fetchStudentsFromApi 只能在瀏覽器中執行');
+    }
+
+    const url = new URL('/api/students/list', window.location.origin);
+    url.searchParams.set('orgId', validOrgId);
+    url.searchParams.set('studentType', '常規');
+
+    console.log('透過 API 載入學生資料:', url.toString());
+
+    const response = await fetch(url.toString(), {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`API 載入學生失敗：${response.status} ${text}`);
+    }
+
+    const result = await response.json();
+    const students = Array.isArray(result.students)
+      ? result.students
+      : Array.isArray(result.data)
+      ? result.data
+      : [];
+    return students;
+  };
+
   const loadStudents = async () => {
     // 防止重複執行
     if (isLoading) {
@@ -213,30 +248,47 @@ export default function StudentMediaPage({
     setLoading(true);
     try {
       console.log('開始載入學生資料...');
-      
-      // 先載入學生基本資料
-      let studentsQuery = supabase
-        .from('Hanami_Students')
-        .select('id, full_name, nick_name, course_type')
-        .order('full_name');
-      studentsQuery = applyOrgFilter(studentsQuery);
-      const { data: studentsData, error: studentsError } = await studentsQuery;
+      let studentsDataResult: any[] | null = null;
 
-      if (studentsError) {
-        console.error('學生資料載入失敗:', studentsError);
-        throw studentsError;
+      if (preferServiceApiForStudents && validOrgId) {
+        try {
+          const apiStudents = await fetchStudentsFromApi();
+          if (apiStudents && apiStudents.length > 0) {
+            studentsDataResult = apiStudents;
+            console.log('透過 API 載入學生成功，數量:', apiStudents.length);
+          } else {
+            console.log('API 回傳學生數為零，改為直接查詢');
+          }
+        } catch (apiError) {
+          console.warn('API 載入學生失敗，改為直接查詢:', apiError);
+        }
       }
 
-      console.log('學生資料載入成功，數量:', studentsData?.length || 0);
+      if (!studentsDataResult) {
+        let studentsQuery = supabase
+          .from('Hanami_Students')
+          .select('id, full_name, nick_name, course_type')
+          .order('full_name');
+        studentsQuery = applyOrgFilter(studentsQuery);
+        const { data: supabaseStudents, error: studentsError } = await studentsQuery;
+
+        if (studentsError) {
+          console.error('學生資料載入失敗:', studentsError);
+          throw studentsError;
+        }
+
+        studentsDataResult = supabaseStudents || [];
+        console.log('學生資料載入成功，數量:', studentsDataResult.length);
+      }
 
       // 檢查是否有學生資料
-      if (!studentsData || studentsData.length === 0) {
+      if (!studentsDataResult || studentsDataResult.length === 0) {
         console.log('沒有找到學生資料');
         setStudents([]);
         return;
       }
 
-      const studentIds = studentsData.map(s => s.id);
+      const studentIds = studentsDataResult.map(s => s.id);
 
       // 分別載入配額資料
       console.log('開始載入配額資料...');
@@ -260,7 +312,7 @@ export default function StudentMediaPage({
       // 載入媒體統計 - 只在有學生資料時執行
       let mediaStats: any[] = [];
       
-      if (studentsData.length > 0) {
+      if (studentsDataResult.length > 0) {
         console.log('開始載入媒體統計...');
         console.log('學生ID列表:', studentIds);
         
@@ -299,14 +351,14 @@ export default function StudentMediaPage({
         }
         
         // 如果媒體統計載入失敗，設定一個超時，避免無限等待
-        if (mediaStats.length === 0 && studentsData.length > 0) {
+        if (mediaStats.length === 0 && studentsDataResult.length > 0) {
           console.log('媒體統計載入失敗，使用預設值繼續處理');
         }
       }
 
       // 處理資料
       console.log('開始處理資料...');
-      const processedStudents = (studentsData || []).map(student => {
+      const processedStudents = (studentsDataResult || []).map(student => {
         // 查找學生的配額資料
         const existingQuota = quotaData?.find(q => q.student_id === student.id);
         

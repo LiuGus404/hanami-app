@@ -83,7 +83,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/aihome/course-activities/hanami-music`,
+      url: `${baseUrl}/aihome/hanami-music`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/aihome/course-activities`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.9,

@@ -44,6 +44,8 @@ function CreatePageContent() {
   const [adminName, setAdminName] = useState('管理員');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTrialDetails, setShowTrialDetails] = useState(false);
+  const [weeklyTrialCounts, setWeeklyTrialCounts] = useState<Array<{ week: string; count: number; startDate: string; endDate: string }>>([]);
 
   const displayName =
     (saasUser?.full_name && saasUser.full_name.trim()) ||
@@ -291,6 +293,7 @@ function CreatePageContent() {
       setStudentCount(0);
       setTrialStudentCount(0);
       setLastLessonCount(0);
+      setWeeklyTrialCounts([]);
       setIsLoading(false);
       return;
     }
@@ -300,13 +303,36 @@ function CreatePageContent() {
         setError(null);
         setIsLoading(true);
 
-        const today = new Date().toISOString().split('T')[0];
+        // 獲取香港時間（UTC+8）的今天日期
+        const getHongKongDateString = () => {
+          const now = new Date();
+          const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Hong_Kong',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          });
+          return formatter.format(now); // 返回 YYYY-MM-DD 格式
+        };
+        
+        const today = getHongKongDateString();
+        const userEmail = saasUser?.email || '';
 
-        // 使用 API 端點查詢學生列表（繞過 RLS）
-        const studentsResponse = await fetch(
-          `/api/students/list?orgId=${encodeURIComponent(orgId)}&userEmail=${encodeURIComponent(saasUser?.email || '')}&studentType=常規`
-        );
+        // 並行執行多個請求以加快載入速度
+        const [studentsResponse, trialStudentsResult] = await Promise.all([
+          // 獲取常規學生列表
+          fetch(
+            `/api/students/list?orgId=${encodeURIComponent(orgId)}&userEmail=${encodeURIComponent(userEmail)}&studentType=常規`
+          ),
+          // 獲取試堂學生列表
+          supabase
+            .from('hanami_trial_students')
+            .select('id, lesson_date')
+            .gte('lesson_date', today)
+            .eq('org_id', orgId)
+        ]);
 
+        // 處理常規學生數據
         if (!studentsResponse.ok) {
           const errorData = await studentsResponse.json().catch(() => ({}));
           console.error('Error fetching regular students:', errorData);
@@ -315,72 +341,137 @@ function CreatePageContent() {
           const studentsData = await studentsResponse.json();
           const regularStudents = studentsData.data || [];
           setStudentCount(regularStudents.length);
-        }
-
-        const { data: trialStudents, error: trialError } = await supabase
-          .from('hanami_trial_students')
-          .select('id, lesson_date')
-          .gte('lesson_date', today)
-          .eq('org_id', orgId);
-
-        if (trialError) {
-          console.error('Error fetching trial students:', trialError);
-        } else if (Array.isArray(trialStudents)) {
-          setTrialStudentCount(trialStudents.length);
-        }
-
-        // 使用 API 端點查詢學生列表（用於課程計數）
-        const studentsForLessonResponse = await fetch(
-          `/api/students/list?orgId=${encodeURIComponent(orgId)}&userEmail=${encodeURIComponent(saasUser?.email || '')}&studentType=常規`
-        );
-
-        if (!studentsForLessonResponse.ok) {
-          console.error('Error fetching regular students for lesson count');
-          setLastLessonCount(0);
-        } else {
-          const studentsForLessonData = await studentsForLessonResponse.json();
-          const regularStudentsForLesson = studentsForLessonData.data || [];
-          const studentIds = regularStudentsForLesson.map((s: any) => s.id);
-
-          if (studentIds.length > 0) {
-            try {
-              // 使用 API 端點計算剩餘課程數（繞過 RLS）
-              const calculateResponse = await fetch('/api/students/calculate-remaining-lessons', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  studentIds,
-                  todayDate: today,
-                  orgId,
-                  userEmail: saasUser?.email || '',
-                }),
-              });
-
-              if (!calculateResponse.ok) {
-                const errorData = await calculateResponse.json().catch(() => ({}));
-                console.error('計算剩餘課程數失敗:', errorData);
+          
+          // 立即開始計算最後一堂課程數（不等待試堂數據）
+          if (regularStudents.length > 0) {
+            const studentIds = regularStudents.map((s: any) => s.id);
+            // 異步計算最後一堂課程數，不阻塞主流程
+            fetch('/api/students/calculate-remaining-lessons', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                studentIds,
+                todayDate: today,
+                orgId,
+                userEmail,
+              }),
+            })
+              .then((calculateResponse) => {
+                if (calculateResponse.ok) {
+                  return calculateResponse.json();
+                }
+                return { data: [] };
+              })
+              .then((calculateData) => {
+                const remainingData = calculateData.data || [];
+                const studentsWithLastLesson = remainingData.filter(
+                  (item: any) => (item.remaining_lessons || 0) <= 1,
+                ).length;
+                setLastLessonCount(studentsWithLastLesson);
+              })
+              .catch((error) => {
+                console.error('計算最後一堂人數時發生錯誤:', error);
                 setLastLessonCount(0);
-                return;
-              }
-
-              const calculateData = await calculateResponse.json();
-              const remainingData = calculateData.data || [];
-
-              const studentsWithLastLesson = remainingData.filter(
-                (item: any) => (item.remaining_lessons || 0) <= 1,
-              ).length;
-
-              setLastLessonCount(studentsWithLastLesson);
-            } catch (error) {
-              console.error('計算最後一堂人數時發生錯誤:', error);
-              setLastLessonCount(0);
-            }
+              });
           } else {
             setLastLessonCount(0);
           }
         }
+
+        // 處理試堂學生數據
+        const { data: trialStudents, error: trialError } = trialStudentsResult;
+
+        // 計算未來4周每週的試堂人數（無論是否有錯誤都計算）
+        const weeklyCounts: Array<{ week: string; count: number; startDate: string; endDate: string }> = [];
+        const validTrialStudents = Array.isArray(trialStudents) ? trialStudents : [];
+        
+        if (trialError) {
+          console.error('Error fetching trial students:', trialError);
+        } else {
+          setTrialStudentCount(validTrialStudents.length);
+        }
+        
+        // 獲取香港時間的日期對象（用於計算星期幾）
+        const getHongKongDateObj = (dateStr: string) => {
+          const [year, month, day] = dateStr.split('-').map(Number);
+          // 使用UTC創建日期對象，但年月日基於香港時間
+          return new Date(Date.UTC(year, month - 1, day));
+        };
+        
+        const hkTodayObj = getHongKongDateObj(today);
+        
+        // 計算本週的週一（使用香港時間）
+        const currentDay = hkTodayObj.getUTCDay(); // 0 = 星期日, 1 = 星期一, ..., 6 = 星期六
+        const daysToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+        
+        // 計算本週週一的日期
+        const [todayYear, todayMonth, todayDay] = today.split('-').map(Number);
+        const mondayDate = new Date(Date.UTC(todayYear, todayMonth - 1, todayDay + daysToMonday));
+        const mondayYear = mondayDate.getUTCFullYear();
+        const mondayMonth = mondayDate.getUTCMonth();
+        const mondayDay = mondayDate.getUTCDate();
+        
+        // 格式化日期為 YYYY-MM-DD
+        const formatDate = (year: number, month: number, day: number) => {
+          return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        };
+        
+        // 無論是否有數據，都初始化4周的數據結構（每週從週一到週日，第4週為之後所有合計）
+        for (let weekIndex = 0; weekIndex < 4; weekIndex++) {
+          // 計算這一週的週一
+          const weekMonday = new Date(Date.UTC(mondayYear, mondayMonth, mondayDay + weekIndex * 7));
+          const weekMondayYear = weekMonday.getUTCFullYear();
+          const weekMondayMonth = weekMonday.getUTCMonth();
+          const weekMondayDay = weekMonday.getUTCDate();
+          
+          const weekStartStr = formatDate(weekMondayYear, weekMondayMonth, weekMondayDay);
+          
+          let weekEndStr: string;
+          let weekCount: number;
+          
+          if (weekIndex === 3) {
+            // 第4週：之後所有合計（從第4週週一開始到未來所有）
+            weekEndStr = ''; // 不設置結束日期，表示之後所有
+            weekCount = validTrialStudents.filter((student: any) => {
+              if (!student.lesson_date) return false;
+              const lessonDate = new Date(student.lesson_date).toISOString().split('T')[0];
+              return lessonDate >= weekStartStr; // 只檢查是否 >= 第4週週一
+            }).length;
+          } else {
+            // 前3週：計算這一週的週日（週一+6天）
+            const weekSunday = new Date(Date.UTC(weekMondayYear, weekMondayMonth, weekMondayDay + 6));
+            const weekSundayYear = weekSunday.getUTCFullYear();
+            const weekSundayMonth = weekSunday.getUTCMonth();
+            const weekSundayDay = weekSunday.getUTCDate();
+            
+            weekEndStr = formatDate(weekSundayYear, weekSundayMonth, weekSundayDay);
+            
+            weekCount = validTrialStudents.filter((student: any) => {
+              if (!student.lesson_date) return false;
+              const lessonDate = new Date(student.lesson_date).toISOString().split('T')[0];
+              return lessonDate >= weekStartStr && lessonDate <= weekEndStr;
+            }).length;
+          }
+          
+          const weekLabel = weekIndex === 0 
+            ? '本週' 
+            : weekIndex === 1 
+            ? '下週' 
+            : weekIndex === 2
+            ? '第3週'
+            : '之後所有合計';
+          
+          weeklyCounts.push({
+            week: weekLabel,
+            count: weekCount,
+            startDate: weekStartStr,
+            endDate: weekEndStr,
+          });
+        }
+        
+        setWeeklyTrialCounts(weeklyCounts);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         setError('載入數據時發生錯誤');
@@ -472,27 +563,46 @@ function CreatePageContent() {
                 <p className={`text-2xl font-bold ${isMember ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{isMember ? '-' : studentCount}</p>
                 <p className={`text-sm ${isMember ? 'text-gray-400' : 'text-[#555]'}`}>常規學生人數</p>
               </button>
-              <button
-                className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
-                  isMember
-                    ? 'bg-gray-100 border border-gray-300 cursor-not-allowed'
-                    : 'bg-[#FFFDF8] border border-[#EADBC8] hover:shadow-md'
-                }`}
-                onClick={() => {
-                  if (isMember) {
-                    toast.error('未開通權限');
-                    return;
-                  }
-                  router.push(
-                    buildOrgPath('/aihome/teacher-link/create/students', { filter: 'trial' }),
-                  );
-                }}
-                disabled={isMember}
-              >
-                <img alt="試堂" src="/icons/penguin-face.PNG" className="w-10 h-10 object-contain mb-2" />
-                <p className={`text-2xl font-bold ${isMember ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{isMember ? '-' : trialStudentCount}</p>
-                <p className={`text-sm ${isMember ? 'text-gray-400' : 'text-[#555]'}`}>試堂學生人數</p>
-              </button>
+              <div className="flex flex-col items-center">
+                <button
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
+                    isMember
+                      ? 'bg-gray-100 border border-gray-300 cursor-not-allowed'
+                      : 'bg-[#FFFDF8] border border-[#EADBC8] hover:shadow-md'
+                  }`}
+                  onClick={() => {
+                    if (isMember) {
+                      toast.error('未開通權限');
+                      return;
+                    }
+                    router.push(
+                      buildOrgPath('/aihome/teacher-link/create/students', { filter: 'trial' }),
+                    );
+                  }}
+                  disabled={isMember}
+                >
+                  <img alt="試堂" src="/icons/penguin-face.PNG" className="w-10 h-10 object-contain mb-2" />
+                  <p className={`text-2xl font-bold ${isMember ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{isMember ? '-' : trialStudentCount}</p>
+                  <p className={`text-sm ${isMember ? 'text-gray-400' : 'text-[#555]'}`}>試堂學生人數</p>
+                </button>
+                {!isMember && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTrialDetails(!showTrialDetails)}
+                    className="mt-2 px-3 py-1 text-xs text-[#8A7C70] hover:text-[#2B3A3B] flex items-center gap-1 transition-colors"
+                  >
+                    <span>{showTrialDetails ? '收起' : '展開'}</span>
+                    <svg
+                      className={`w-3 h-3 transition-transform ${showTrialDetails ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <button
                 className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
                   isMember
@@ -517,6 +627,43 @@ function CreatePageContent() {
                 <p className={`text-sm ${isMember ? 'text-gray-400' : 'text-[#555]'}`}>最後一堂人數</p>
               </button>
             </div>
+            
+            {/* 未來4週試堂人數詳情 */}
+            {showTrialDetails && !isMember && (
+              <AnimatePresence>
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-4 pt-4 border-t border-[#EADBC8]"
+                >
+                  <h3 className="text-sm font-semibold text-[#2B3A3B] mb-3">試堂人數統計</h3>
+                  {weeklyTrialCounts.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {weeklyTrialCounts.map((week, index) => (
+                        <div
+                          key={index}
+                          className="bg-[#FFFDF8] border border-[#EADBC8] rounded-xl p-3 text-center"
+                        >
+                          <p className="text-xs text-[#8A7C70] mb-1">{week.week}</p>
+                          <p className="text-xl font-bold text-[#2B3A3B]">{week.count}</p>
+                          <p className="text-[10px] text-[#8A7C70] mt-1">
+                            {week.endDate 
+                              ? `${new Date(week.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} - ${new Date(week.endDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}`
+                              : `${new Date(week.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} 起`}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-sm text-[#8A7C70]">
+                      載入中...
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            )}
           </div>
 
           {/* 簡化的日曆區 */}

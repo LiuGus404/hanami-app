@@ -18,9 +18,10 @@ function TeacherLinkStudentMediaContent() {
       : organization?.id && UUID_REGEX.test(organization.id)
         ? organization.id
         : null;
+  const ALLOWED_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
 
   return (
-    <StudentProgressPageTemplate
+      <StudentProgressPageTemplate
       title="學生媒體管理"
       subtitle="學生媒體"
       description="管理學生的課堂照片和影片，記錄學習過程中的精彩瞬間，為家長和學生提供視覺化的學習成果展示。"
@@ -73,22 +74,41 @@ function TeacherLinkStudentMediaContent() {
       backHref="/aihome/teacher-link/create/student-progress"
       backLabel="返回進度管理"
       organizationName={organization?.name}
-    >
-      <StudentMediaPage
-        navigationOverrides={{
-          dashboard: '/aihome/teacher-link/create/student-progress',
-          growthTrees: '/aihome/teacher-link/create/student-progress/growth-trees',
-          learningPaths: '/aihome/teacher-link/create/student-progress/learning-paths',
-          abilities: '/aihome/teacher-link/create/student-progress/abilities',
-          activities: '/aihome/teacher-link/create/student-progress/activities',
-          assessments: '/aihome/teacher-link/create/student-progress/ability-assessments',
-          media: '/aihome/teacher-link/create/student-progress/student-media',
-          studentManagement: '/aihome/teacher-link/create/students',
-        }}
-        forcedOrgId={resolvedOrgId}
-        forcedOrgName={organization?.name ?? null}
-        disableOrgFallback
-      />
+      >
+      {resolvedOrgId === ALLOWED_ORG_ID ? (
+        <StudentMediaPage
+          navigationOverrides={{
+            dashboard: '/aihome/teacher-link/create/student-progress',
+            growthTrees: '/aihome/teacher-link/create/student-progress/growth-trees',
+            learningPaths: '/aihome/teacher-link/create/student-progress/learning-paths',
+            abilities: '/aihome/teacher-link/create/student-progress/abilities',
+            activities: '/aihome/teacher-link/create/student-progress/activities',
+            assessments: '/aihome/teacher-link/create/student-progress/ability-assessments',
+            media: '/aihome/teacher-link/create/student-progress/student-media',
+            studentManagement: '/aihome/teacher-link/create/students',
+          }}
+          forcedOrgId={resolvedOrgId}
+          forcedOrgName={organization?.name ?? null}
+          disableOrgFallback
+          preferServiceApiForStudents
+        />
+      ) : (
+        <div className="rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
+          <p className="text-lg font-semibold text-hanami-text">
+            功能暫未開放
+          </p>
+          <p className="mt-2 text-sm text-hanami-text-secondary">
+            若有企業需求請聯繫{' '}
+            <a
+              className="font-medium text-hanami-accent underline"
+              href="mailto:buildthink.ai@gmail.com"
+            >
+              buildthink.ai@gmail.com
+            </a>
+            ，我們會將功能開放給貴單位。
+          </p>
+        </div>
+      )}
     </StudentProgressPageTemplate>
   );
 }

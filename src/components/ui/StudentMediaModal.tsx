@@ -64,6 +64,19 @@ interface StudentMediaModalProps {
   orgId?: string | null; // 新增：機構 ID
 }
 
+interface MediaQuotaLevel {
+  id?: string;
+  level_name: string;
+  video_limit: number;
+  photo_limit: number;
+  storage_limit_mb: number;
+  video_size_limit_mb: number;
+  photo_size_limit_mb: number;
+  description?: string;
+  is_active: boolean;
+  [key: string]: unknown;
+}
+
 export default function StudentMediaModal({ isOpen, onClose, student, onQuotaChanged, orgId }: StudentMediaModalProps) {
   // 自定義關閉函數，重置所有狀態
   const handleClose = () => {
@@ -111,7 +124,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
   const [showActionButtons, setShowActionButtons] = useState(false);
 
   // 新增：配額等級狀態
-  const [quotaLevel, setQuotaLevel] = useState<any>(null);
+  const [quotaLevel, setQuotaLevel] = useState<MediaQuotaLevel | null>(null);
   
   // 新增：媒體編輯器相關狀態
   const [showMediaEditor, setShowMediaEditor] = useState(false);
@@ -669,6 +682,9 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     setUploadProgress(newProgress);
 
     try {
+      let localSuccessCount = 0;
+      let localErrorCount = 0;
+
       for (const file of selectedFiles) {
         try {
         
@@ -712,6 +728,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             const result = await response.json();
             console.log('API 上傳成功:', result);
             setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+            localSuccessCount += 1;
             continue; // 成功，繼續下一個檔案
           } else {
             console.log('API 上傳失敗，嘗試客戶端上傳...');
@@ -803,6 +820,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
         console.log('資料庫插入成功:', dbData);
         setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+        localSuccessCount += 1;
         
         // 立即更新本地媒體列表，確保容量檢查準確
         setMedia(prev => [...prev, {
@@ -816,22 +834,19 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           is_favorite: dbData.is_favorite ?? undefined
         }]);
         } catch (fileError) {
-          console.error(`檔案 ${file.name} 上傳失敗:`, fileError);
-          toast.error(`檔案 ${file.name} 上傳失敗: ${fileError instanceof Error ? fileError.message : '未知錯誤'}`);
-          setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // -1 表示錯誤
+        console.error(`檔案 ${file.name} 上傳失敗:`, fileError);
+        toast.error(`檔案 ${file.name} 上傳失敗: ${fileError instanceof Error ? fileError.message : '未知錯誤'}`);
+        setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // -1 表示錯誤
+        localErrorCount += 1;
           continue; // 繼續處理下一個檔案
         }
       }
 
-      // 檢查是否有檔案上傳成功
-      const successCount = Object.values(uploadProgress).filter(progress => progress === 100).length;
-      const errorCount = Object.values(uploadProgress).filter(progress => progress === -1).length;
-      
-      if (successCount > 0) {
-        if (errorCount === 0) {
+      if (localSuccessCount > 0) {
+        if (localErrorCount === 0) {
           toast.success('所有檔案上傳成功！');
         } else {
-          toast.success(`部分檔案上傳成功！成功 ${successCount} 個，失敗 ${errorCount} 個`);
+          toast.success(`部分檔案上傳成功！成功 ${localSuccessCount} 個，失敗 ${localErrorCount} 個`);
         }
       } else {
         toast.error('所有檔案上傳失敗！');
@@ -1108,122 +1123,81 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
   };
 
   // 新增：載入配額等級
+  const DEFAULT_QUOTA_LEVEL = {
+    level_name: '基礎版',
+    video_limit: 5,
+    photo_limit: 10,
+    video_size_limit_mb: 20,
+    photo_size_limit_mb: 1,
+    storage_limit_mb: 250,
+    is_active: true,
+  };
+
+  const planTypeToLevelName = (planType: string) => {
+    const mapping: { [key: string]: string } = {
+      free: '基礎版',
+      basic: '標準版',
+      premium: '進階版',
+      professional: '專業版',
+    };
+    return mapping[planType] || '基礎版';
+  };
+
+  const fetchActiveQuotaLevels = async () => {
+    if (typeof window === 'undefined') {
+      throw new Error('fetchActiveQuotaLevels 只能在瀏覽器中執行');
+    }
+
+    const url = new URL('/api/media-quota-levels', window.location.origin);
+    url.searchParams.set('active_only', 'true');
+
+    const response = await fetch(url.toString(), {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`無法取得配額等級: ${response.status} ${text}`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload?.data) ? payload.data : [];
+  };
+
   const loadQuotaLevel = async () => {
     if (!student) return;
-    
     try {
-      // 獲取學生的配額設定（如果有 org_id，添加過濾條件）
-      let quotaQuery = supabase
+      let studentQuota = null;
+      const quotaQuery = supabase
         .from('hanami_student_media_quota')
         .select('*')
         .eq('student_id', student.id);
-      
-      if (orgId) {
-        quotaQuery = quotaQuery.eq('org_id', orgId);
-      }
-      
-      const { data: studentQuota, error: quotaError } = await quotaQuery.single();
-
-      if (quotaError) {
-        console.error('獲取學生配額失敗:', quotaError);
-        // 如果沒有配額設定，使用預設的基礎版配額（如果有 org_id，添加過濾條件）
-        let defaultLevelQuery = supabase
-          .from('hanami_media_quota_levels')
-          .select('*')
-          .eq('level_name', '基礎版')
-          .eq('is_active', true);
-        
-        if (orgId) {
-          defaultLevelQuery = defaultLevelQuery.eq('org_id', orgId);
-        }
-        
-        const { data: defaultLevel, error: defaultLevelError } = await defaultLevelQuery.single();
-
-        if (defaultLevelError) {
-          console.error('獲取預設配額等級失敗:', defaultLevelError);
-          // 設定一個預設的配額等級
-          setQuotaLevel({
-            level_name: '基礎版',
-            video_limit: 5,
-            photo_limit: 10,
-            video_size_limit_mb: 20,
-            photo_size_limit_mb: 1,
-            is_active: true
-          });
-        } else {
-          setQuotaLevel(defaultLevel);
-        }
-        return;
+      const { data: quotaData, error: quotaError } = await quotaQuery.single();
+      if (!quotaError && quotaData) {
+        studentQuota = quotaData;
       }
 
-      // 獲取配額等級設定
-      const planTypeToLevelName = (planType: string) => {
-        const mapping: { [key: string]: string } = {
-          'free': '基礎版',
-          'basic': '標準版',
-          'premium': '進階版',
-          'professional': '專業版'
-        };
-        return mapping[planType] || '基礎版';
-      };
+      const targetLevel = planTypeToLevelName(studentQuota?.plan_type ?? 'free');
+      let quotaLevels: MediaQuotaLevel[] = [];
 
-      // 獲取配額等級設定（如果有 org_id，添加過濾條件）
-      let levelQuery = supabase
-        .from('hanami_media_quota_levels')
-        .select('*')
-        .eq('level_name', planTypeToLevelName(studentQuota.plan_type))
-        .eq('is_active', true);
-      
-      if (orgId) {
-        levelQuery = levelQuery.eq('org_id', orgId);
-      }
-      
-      const { data: level, error: levelError } = await levelQuery.single();
-
-      if (levelError) {
-        console.error('獲取配額等級失敗:', levelError);
-        // 如果無法獲取指定等級，使用基礎版（如果有 org_id，添加過濾條件）
-        let defaultLevelQuery = supabase
-          .from('hanami_media_quota_levels')
-          .select('*')
-          .eq('level_name', '基礎版')
-          .eq('is_active', true);
-        
-        if (orgId) {
-          defaultLevelQuery = defaultLevelQuery.eq('org_id', orgId);
-        }
-        
-        const { data: defaultLevel, error: defaultLevelError } = await defaultLevelQuery.single();
-
-        if (defaultLevelError) {
-          console.error('獲取預設配額等級失敗:', defaultLevelError);
-          // 設定一個預設的配額等級
-          setQuotaLevel({
-            level_name: '基礎版',
-            video_limit: 5,
-            photo_limit: 10,
-            video_size_limit_mb: 20,
-            photo_size_limit_mb: 1,
-            is_active: true
-          });
-        } else {
-          setQuotaLevel(defaultLevel);
-        }
-        return;
+      try {
+        quotaLevels = await fetchActiveQuotaLevels();
+      } catch (apiError) {
+        console.warn('透過 API 取得配額等級失敗，將使用預設等級', apiError);
       }
 
-      setQuotaLevel(level);
+      const matchedLevel =
+        quotaLevels.find((level) => level.level_name === targetLevel && level.is_active) ||
+        quotaLevels.find((level) => level.level_name === '基礎版' && level.is_active);
+
+      if (matchedLevel) {
+        setQuotaLevel(matchedLevel);
+      } else {
+        setQuotaLevel(DEFAULT_QUOTA_LEVEL);
+      }
     } catch (error) {
       console.error('載入配額等級錯誤:', error);
-      // 設定預設配額等級
-      setQuotaLevel({
-        level_name: '基礎版',
-        video_limit: 5,
-        photo_limit: 10,
-        video_size_limit_mb: 20,
-        photo_size_limit_mb: 1,
-        is_active: true
-      });
+      setQuotaLevel(DEFAULT_QUOTA_LEVEL);
     }
   };
 

@@ -43,6 +43,52 @@ import {
   type CouponValidationResult 
 } from '@/lib/hanami-ai-pricing-api';
 import ChildSelectionModal from '@/components/children/ChildSelectionModal';
+import Image from 'next/image';
+
+const CATEGORY_LABEL_MAP: Record<string, string> = {
+  music_education: '音樂教育中心',
+  dance_performance: '舞蹈 / 表演藝術',
+  visual_arts_design: '視覺藝術 / 設計',
+  creative_media_digital: '創意媒體 / 數位藝術',
+  early_childhood: '幼兒啟蒙 / 學前教育',
+  language_learning: '語言學習 / 溝通技巧',
+  academic_tutoring: '學科輔導 (K-12 / 大學預科)',
+  stem_creative: 'STEM / 科技創意',
+  programming_robotics: '程式設計 / 機器人教育',
+  ai_education: '人工智能 / AI 教育',
+  sports_fitness: '體育 / 體能發展',
+  mind_body_wellness: '身心靈健康 (瑜珈 / 靜觀 / 冥想)',
+  sen_support: '特殊教育支援 (SEN)',
+  professional_therapy_services: '專業治療服務',
+  speech_therapy: '言語治療',
+  music_therapy: '音樂治療',
+  behavior_therapy: '行為治療',
+  occupational_therapy: '職能治療',
+  physical_therapy: '物理治療',
+  psychological_counseling: '心理輔導 / 遊戲治療',
+  vocational_training: '職業技能培訓 (烹飪 / 金融 / IT 證照)',
+  parental_education: '家長教育 / 親職課程',
+  custom: '其他',
+};
+
+type OrganizationSummary = {
+  id: string;
+  org_name: string;
+  org_slug?: string | null;
+  settings?: {
+    location?: string | null;
+    coverImageUrl?: string | null;
+    categories?: string[] | null;
+    contactPhone?: string | null;
+  } | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  status?: string | null;
+};
+
+type CourseTypeWithOrg = CourseType & {
+  org_id?: string | null;
+};
 
 export default function HanamiMusicRegisterPage() {
   const router = useRouter();
@@ -60,12 +106,15 @@ export default function HanamiMusicRegisterPage() {
   const [showSmartFiltering, setShowSmartFiltering] = useState(false); // 顯示智能篩選界面
   
   // 新的價格系統狀態
-  const [courseTypes, setCourseTypes] = useState<CourseType[]>([]); // 課程類型列表
+  const [courseTypes, setCourseTypes] = useState<CourseTypeWithOrg[]>([]); // 課程類型列表
   const [pricingPlans, setPricingPlans] = useState<CoursePricingPlan[]>([]); // 價格計劃列表
   const [loadingPricing, setLoadingPricing] = useState(false); // 價格載入狀態
   const [priceCalculation, setPriceCalculation] = useState<PriceCalculationResult | null>(null); // 價格計算結果
   const [couponValidation, setCouponValidation] = useState<CouponValidationResult | null>(null); // 優惠券驗證結果
   const [waitingListType, setWaitingListType] = useState<'none' | 'new' | 'existing'>('none'); // 等候區類型
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
+  const [loadingOrganizations, setLoadingOrganizations] = useState(false);
+  const [organizationError, setOrganizationError] = useState<string | null>(null);
   
   // 您孩子資料載入相關狀態
   const [showChildSelection, setShowChildSelection] = useState(false);
@@ -95,7 +144,8 @@ export default function HanamiMusicRegisterPage() {
     availableTimes: [] as string[], // 有空時間
     paymentMethod: '', // 支付方法
     remarks: '',
-    screenshotUploaded: false // 追蹤截圖是否已上傳
+    screenshotUploaded: false, // 追蹤截圖是否已上傳
+    organizationId: '' // 選擇的分校/機構
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -104,14 +154,101 @@ export default function HanamiMusicRegisterPage() {
 
   // 步驟配置
   const steps = [
-    { id: 0, title: '課程性質', icon: MusicalNoteIcon, shortTitle: '性質' },
-    { id: 1, title: '選擇課程', icon: SparklesIcon, shortTitle: '課程' },
-    { id: 2, title: '您孩子資料', icon: UserIcon, shortTitle: '資料' },
-    { id: 3, title: '日期時間', icon: CalendarDaysIcon, shortTitle: '時間' },
-    { id: 4, title: '聯絡方式', icon: PhoneIcon, shortTitle: '聯絡' },
-    { id: 5, title: '支付方法', icon: GiftIcon, shortTitle: '支付' },
-    { id: 6, title: '確認提交', icon: CheckCircleIcon, shortTitle: '確認' }
+    { id: 0, title: '選擇機構', icon: UserGroupIcon, shortTitle: '機構' },
+    { id: 1, title: '課程性質', icon: MusicalNoteIcon, shortTitle: '性質' },
+    { id: 2, title: '選擇課程', icon: SparklesIcon, shortTitle: '課程' },
+    { id: 3, title: '您孩子資料', icon: UserIcon, shortTitle: '資料' },
+    { id: 4, title: '日期時間', icon: CalendarDaysIcon, shortTitle: '時間' },
+    { id: 5, title: '聯絡方式', icon: PhoneIcon, shortTitle: '聯絡' },
+    { id: 6, title: '支付方法', icon: GiftIcon, shortTitle: '支付' },
+    { id: 7, title: '確認提交', icon: CheckCircleIcon, shortTitle: '確認' }
   ];
+
+  const selectedOrganization = useMemo(
+    () => organizations.find(org => org.id === formData.organizationId) || null,
+    [organizations, formData.organizationId]
+  );
+
+  const courseTypesByOrg = useMemo(() => {
+    return courseTypes.reduce<Record<string, CourseTypeWithOrg[]>>((acc, course) => {
+      const orgKey = course.org_id || 'default';
+      if (!acc[orgKey]) {
+        acc[orgKey] = [];
+      }
+      acc[orgKey].push(course);
+      return acc;
+    }, {});
+  }, [courseTypes]);
+
+  const displayedCourseTypes = useMemo(() => {
+    if (!formData.organizationId) return [];
+    return courseTypesByOrg[formData.organizationId] || [];
+  }, [courseTypesByOrg, formData.organizationId]);
+
+  useEffect(() => {
+    if (!formData.organizationId || displayedCourseTypes.length === 0) return;
+    setFormData(prev => {
+      const alreadySelected = displayedCourseTypes.some(course => course.id === prev.courseType);
+      if (alreadySelected) return prev;
+      return {
+        ...prev,
+        courseType: displayedCourseTypes[0].id,
+        selectedPlan: ''
+      };
+    });
+  }, [displayedCourseTypes, formData.organizationId]);
+
+  const handleOrganizationSelect = (orgId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      organizationId: orgId,
+      courseType: '',
+      selectedPlan: '',
+      selectedDate: '',
+      selectedTimeSlot: ''
+    }));
+    setPriceCalculation(null);
+    setCouponValidation(null);
+    setErrors(prev => ({ ...prev, organizationId: '' }));
+  };
+
+  const loadOrganizations = useCallback(async () => {
+    try {
+      setLoadingOrganizations(true);
+      const response = await fetch('/api/organizations/list?status=all', {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ error: '無法解析錯誤' }));
+        console.error('❌ 載入機構失敗:', response.status, errorBody);
+        setOrganizationError('無法載入分校資料，請稍後再試。');
+        return;
+      }
+
+      const json = await response.json();
+      const allOrgs: OrganizationSummary[] = json.data || [];
+      console.log('📊 機構 API 原始資料:', allOrgs);
+
+      const activeOrgs = allOrgs.filter((org) => {
+        const status = String(org.status || '').toLowerCase().trim();
+        const usable = status !== 'inactive' && status !== '';
+        if (!usable) {
+          console.log(`🚫 過濾掉機構: ${org.org_name} (status:${org.status})`);
+        }
+        return usable;
+      }).sort((a, b) => a.org_name.localeCompare(b.org_name));
+
+      console.log('✅ 載入機構成功:', activeOrgs);
+      setOrganizationError(null);
+      setOrganizations(activeOrgs);
+    } catch (err) {
+      console.error('❌ 載入機構例外:', err);
+      setOrganizationError('載入分校發生錯誤，請稍後刷新。');
+    } finally {
+      setLoadingOrganizations(false);
+    }
+  }, []);
 
   // 更新時間
   useEffect(() => {
@@ -324,10 +461,80 @@ export default function HanamiMusicRegisterPage() {
   };
 
 
+  // 圖片圖標對應表 - 移到組件頂層
+  const imageIconMap: Record<string, string> = {
+    'piano': '/HanamiMusic/piano.png',  // 鋼琴課程使用鋼琴圖片
+    'focus': '/HanamiMusic/musicclass.png',  // 專注力班使用音樂課堂圖片
+    'musical-note': '/HanamiMusic/musicclass.png',  // 音樂專注力也使用音樂課堂圖片
+    '鋼琴': '/HanamiMusic/piano.png',  // 鋼琴課程使用鋼琴圖片
+    '音樂專注力': '/HanamiMusic/musicclass.png',  // 音樂專注力班使用音樂課堂圖片
+    '音樂專注力班': '/HanamiMusic/musicclass.png'  // 音樂專注力班使用音樂課堂圖片
+  };
+
+  // 載入課程類型
+  const loadCourseTypes = useCallback(async () => {
+    try {
+      setLoadingPricing(true);
+      setLoadingCourses(true);
+      const types = await hanamiAiPricingApi.courseTypeApi.getCourseTypes();
+
+      const coursesWithDisplay = types.map((course, index) => {
+        console.log(`🔍 處理課程 ${index + 1}:`, {
+          name: course.name,
+          min_age: course.min_age,
+          max_age: course.max_age,
+          age_range: course.age_range
+        });
+
+        const iconMap: Record<string, any> = {
+          'sparkles': SparklesIcon,
+          'musical-note': MusicalNoteIcon,
+          'piano': PianoIcon,
+          'guitar': MusicalNoteIcon,
+          'default': SparklesIcon
+        };
+
+        const defaultColors = [
+          'from-pink-400 to-rose-400',
+          'from-purple-400 to-indigo-400',
+          'from-blue-400 to-cyan-400',
+          'from-green-400 to-emerald-400',
+          'from-yellow-400 to-orange-400',
+          'from-red-400 to-pink-400'
+        ];
+
+        const calculatedAge = getAgeRangeText(course.min_age, course.max_age, course.age_range);
+        console.log(
+          `📝 課程 "${course.name}" 最終年齡範圍:`,
+          calculatedAge,
+          '所屬機構:',
+          (course as any).org_id || 'default'
+        );
+
+        return {
+          ...course,
+          color: course.color_code || defaultColors[index % defaultColors.length],
+          icon: iconMap[course.icon_type || 'default'] || SparklesIcon,
+          age: calculatedAge,
+          org_id: (course as any).org_id || null
+        };
+      });
+
+      setCourseTypes(coursesWithDisplay);
+      console.log('✅ 載入課程類型成功:', coursesWithDisplay);
+    } catch (error) {
+      console.error('❌ 載入課程類型失敗:', error);
+    } finally {
+      setLoadingPricing(false);
+      setLoadingCourses(false);
+    }
+  }, []);
+
   // 初始化載入課程類型
   useEffect(() => {
     loadCourseTypes();
-  }, []); // 移除依賴項，只在組件掛載時執行一次
+    loadOrganizations();
+  }, [loadCourseTypes, loadOrganizations]);
 
   // 當課程類型改變時，重新載入日曆資料和價格計劃
   useEffect(() => {
@@ -357,87 +564,6 @@ export default function HanamiMusicRegisterPage() {
     }
   }, [formData.selectedPlan, formData.courseType, formData.promotionCode]); // 移除函數依賴項
 
-  // 圖片圖標對應表 - 移到組件頂層
-  const imageIconMap: Record<string, string> = {
-    'piano': '/HanamiMusic/piano.png',  // 鋼琴課程使用鋼琴圖片
-    'focus': '/HanamiMusic/musicclass.png',  // 專注力班使用音樂課堂圖片
-    'musical-note': '/HanamiMusic/musicclass.png',  // 音樂專注力也使用音樂課堂圖片
-    '鋼琴': '/HanamiMusic/piano.png',  // 鋼琴課程使用鋼琴圖片
-    '音樂專注力': '/HanamiMusic/musicclass.png',  // 音樂專注力班使用音樂課堂圖片
-    '音樂專注力班': '/HanamiMusic/musicclass.png'  // 音樂專注力班使用音樂課堂圖片
-  };
-
-  // 載入課程類型
-  const loadCourseTypes = useCallback(async () => {
-    try {
-      setLoadingPricing(true);
-      setLoadingCourses(true);
-      const types = await hanamiAiPricingApi.courseTypeApi.getCourseTypes();
-      
-      // 為每個課程添加顯示屬性
-      const coursesWithDisplay = types.map((course, index) => {
-        console.log(`🔍 處理課程 ${index + 1}:`, {
-          name: course.name,
-          min_age: course.min_age,
-          max_age: course.max_age,
-          age_range: course.age_range
-        });
-        
-        // 圖標對應表
-        const iconMap: Record<string, any> = {
-          'sparkles': SparklesIcon,
-          'musical-note': MusicalNoteIcon,
-          'piano': PianoIcon,
-          'guitar': MusicalNoteIcon,
-          'default': SparklesIcon
-        };
-
-        // 預設顏色（如果資料庫沒有設定）
-        const defaultColors = [
-          'from-pink-400 to-rose-400',
-          'from-purple-400 to-indigo-400',
-          'from-blue-400 to-cyan-400',
-          'from-green-400 to-emerald-400',
-          'from-yellow-400 to-orange-400',
-          'from-red-400 to-pink-400'
-        ];
-        
-        const calculatedAge = getAgeRangeText(course.min_age, course.max_age, course.age_range);
-        console.log(`📝 課程 "${course.name}" 最終年齡範圍:`, calculatedAge);
-        
-        return {
-          ...course,
-          // 使用資料庫的顏色，如果沒有則使用預設
-          color: course.color_code || defaultColors[index % defaultColors.length],
-          // 使用資料庫的圖標類型，如果沒有則使用預設
-          icon: iconMap[course.icon_type || 'default'] || SparklesIcon,
-          // 使用計算後的年齡範圍
-          age: calculatedAge,
-        };
-      });
-      
-      setCourseTypes(coursesWithDisplay);
-      console.log('✅ 載入課程類型成功:', coursesWithDisplay);
-      
-      // 自動選擇第一個課程類型 - 只在沒有選擇時才設置
-      if (coursesWithDisplay.length > 0) {
-        setFormData(prev => {
-          if (!prev.courseType) {
-            console.log('🎯 自動選擇第一個課程類型:', coursesWithDisplay[0].id);
-            return { ...prev, courseType: coursesWithDisplay[0].id };
-          }
-          return prev;
-        });
-      }
-    } catch (error) {
-      console.error('❌ 載入課程類型失敗:', error);
-    } finally {
-      setLoadingPricing(false);
-      setLoadingCourses(false);
-    }
-  }, []);
-
-  // 載入價格計劃
   const loadPricingPlans = useCallback(async (courseTypeId: string) => {
     if (!courseTypeId) return;
     
@@ -563,12 +689,14 @@ export default function HanamiMusicRegisterPage() {
             courseType: selectedCourse.name,
             isTrial: true,
             startDate,
-            endDate
+            endDate,
+            orgId: formData.organizationId || null
           }
         : {
             courseType: selectedCourse.name,
             startDate,
-            endDate
+            endDate,
+            orgId: formData.organizationId || null
           };
       
       console.log('📡 使用 API:', apiEndpoint);
@@ -681,26 +809,6 @@ export default function HanamiMusicRegisterPage() {
       
       // 為每個星期幾（0-6）生成資料
       for (let weekday = 0; weekday <= 6; weekday++) {
-        // 星期一顯示為休息日
-        if (weekday === 1) {
-          days.push({
-            date: null,
-            isPast: false,
-            isToday: false,
-            isCurrentMonth: true,
-            isBeyondTwoMonths: false,
-            hasSchedule: false,
-            availableSlots: 0,
-            totalSlots: 0,
-            isFullyBooked: true, // 休息日設為已滿
-            weekday,
-            weekdayName: '休息',
-            timeSlots: [],
-            isRestDay: true // 標記為休息日
-          });
-          continue;
-        }
-        
         // 從 API 資料中獲取該星期幾的排程資訊
         const weekdayData = calendarData.find(day => day.weekday === weekday);
         
@@ -840,7 +948,6 @@ export default function HanamiMusicRegisterPage() {
       
       const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
       const weekday = currentDate.getDay();
-      const isMonday = weekday === 1;
       
       // 從 API 資料中獲取該日期的資訊
       const dayData = getCalendarDay(dateStr);
@@ -968,28 +1075,31 @@ export default function HanamiMusicRegisterPage() {
 
     switch (step) {
       case 0:
-        if (!formData.courseNature) newErrors.courseNature = '請選擇課程性質';
+        if (!formData.organizationId) newErrors.organizationId = '請選擇報名機構';
         break;
       case 1:
+        if (!formData.courseNature) newErrors.courseNature = '請選擇課程性質';
+        break;
+      case 2:
         if (!formData.courseType) newErrors.courseType = '請選擇課程類型';
         if (formData.courseNature === 'regular' && !formData.selectedPlan) {
           newErrors.selectedPlan = '請選擇課程計劃';
         }
         break;
-      case 2:
+      case 3:
         if (!formData.childFullName) newErrors.childFullName = '請輸入您孩子全名';
         if (!formData.childBirthDate) newErrors.childBirthDate = '請選擇出生日期';
         if (!formData.childGender) newErrors.childGender = '請選擇您孩子性別';
         if (!formData.childPreferences) newErrors.childPreferences = '請輸入您孩子喜好物';
         break;
-      case 3:
+      case 4:
         // 等候區學生不需要選擇日期和時段
         if (!isWaitingList) {
         if (!formData.selectedDate) newErrors.selectedDate = '請選擇上課日期';
         if (!formData.selectedTimeSlot) newErrors.selectedTimeSlot = '請選擇上課時段';
         }
         break;
-      case 4:
+      case 5:
         // 驗證聯絡電話
         if (!formData.parentPhone) {
           newErrors.parentPhone = '請輸入聯絡電話';
@@ -1012,7 +1122,7 @@ export default function HanamiMusicRegisterPage() {
         
         if (!formData.parentTitle) newErrors.parentTitle = '請輸入您的稱呼';
         break;
-      case 5:
+      case 6:
         if (!formData.paymentMethod) newErrors.paymentMethod = '請選擇支付方法';
         // 如果選擇了上傳相片支付方式，需要檢查是否已上傳
         if (formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) {
@@ -1082,15 +1192,15 @@ export default function HanamiMusicRegisterPage() {
   // 下一步
   const handleNext = async () => {
     if (validateStep(currentStep)) {
-      // 如果當前是步驟2（孩子資料），自動保存孩子資料
-      if (currentStep === 2) {
+      // 如果當前是步驟3（孩子資料），自動保存孩子資料
+      if (currentStep === 3) {
         await autoSaveChildData();
       }
       
       const nextStep = Math.min(currentStep + 1, steps.length - 1);
       
       // 如果下一步是日期時間步驟（步驟3），先顯示智能篩選界面
-      if (nextStep === 3) {
+      if (nextStep === 4) {
         setShowSmartFiltering(true);
         // 1秒後隱藏篩選界面並進入日期時間步驟
         setTimeout(() => {
@@ -1118,14 +1228,14 @@ export default function HanamiMusicRegisterPage() {
         await handleSubmit();
         
         // 跳轉到確認提交步驟
-        setCurrentStep(6);
+        setCurrentStep(7);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         
         console.log('✅ Airwallex 支付成功，資料已自動提交');
       } catch (error) {
         console.error('❌ Airwallex 支付成功但自動提交失敗:', error);
         // 如果自動提交失敗，仍然跳轉到確認頁面讓用戶手動提交
-        setCurrentStep(6);
+        setCurrentStep(7);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
@@ -1136,8 +1246,8 @@ export default function HanamiMusicRegisterPage() {
   const handlePrev = () => {
     const prevStep = Math.max(currentStep - 1, 0);
     
-    // 如果回到日期時間步驟（步驟3），重置等候區狀態
-    if (prevStep === 3) {
+    // 如果回到日期時間步驟（步驟4），重置等候區狀態
+    if (prevStep === 4) {
       setIsWaitingList(false);
       setWaitingListType('none');
     }
@@ -1151,6 +1261,15 @@ export default function HanamiMusicRegisterPage() {
     if (!validateStep(currentStep)) return;
     
     console.log('提交表單:', formData);
+    console.log('📋 機構 ID (org_id):', formData.organizationId);
+    console.log('📋 選中的機構:', selectedOrganization);
+    
+    // 確保有機構 ID
+    if (!formData.organizationId) {
+      console.error('❌ 缺少機構 ID，無法提交報名');
+      alert('請先選擇報名機構');
+      return;
+    }
     
     try {
       // 生成 student_oid (B840FAF 格式)
@@ -1235,6 +1354,7 @@ export default function HanamiMusicRegisterPage() {
           student_teacher: null,
           student_preference: formData.childPreferences || null,
           health_notes: formData.childHealthNotes || '沒有',
+          org_id: formData.organizationId || null,
           weekday: formData.selectedDate ? new Date(formData.selectedDate).getDay().toString() : null,
           regular_weekday: formData.selectedDate ? new Date(formData.selectedDate).getDay().toString() : null,
           regular_timeslot: formatTimeForDatabase(formData.selectedTimeSlot),
@@ -1247,7 +1367,8 @@ export default function HanamiMusicRegisterPage() {
           remaining_lessons: null,
           ongoing_lessons: null,
           upcoming_lessons: null,
-          actual_timeslot: formatTimeForDatabase(formData.selectedTimeSlot)
+          actual_timeslot: formatTimeForDatabase(formData.selectedTimeSlot),
+          confirmed_payment: false // 支付確認狀態，提交時設為 false，之後可手動更新為 true
         };
 
         console.log('🔍 準備插入到 hanami_trial_students 的資料:', trialStudentData);
@@ -1313,6 +1434,7 @@ export default function HanamiMusicRegisterPage() {
           selected_plan_name: selectedPlan?.plan_name || null,
           package_lessons: selectedPlan?.package_lessons || null,
           package_price: selectedPlan?.package_price || null,
+          org_id: formData.organizationId || null,
           
           // 審核狀態
           review_status: 'pending'
@@ -1337,7 +1459,7 @@ export default function HanamiMusicRegisterPage() {
       setShowSuccessModal(true);
       
       setTimeout(() => {
-        router.push('/aihome/course-activities/hanami-music');
+        router.push('/aihome/course-activities');
       }, 3000);
       
     } catch (error) {
@@ -1519,7 +1641,7 @@ export default function HanamiMusicRegisterPage() {
           <AppSidebar 
             isOpen={sidebarOpen} 
             onClose={() => setSidebarOpen(false)}
-            currentPath="/aihome/course-activities/hanami-music/register"
+            currentPath="/aihome/course-activities/register"
           />
         )}
 
@@ -1642,12 +1764,159 @@ export default function HanamiMusicRegisterPage() {
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                {/* 步驟 0: 課程性質 */}
+                {/* 步驟 0: 選擇分校/機構 */}
                 {currentStep === 0 && (
+                  <div className="space-y-5 sm:space-y-6">
+                    <div className="text-center mb-4">
+                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">選擇分校 / 機構</h2>
+                      <p className="text-sm sm:text-base text-[#2B3A3B]">
+                        依據 <span className="font-semibold">hanami_organizations</span> 表顯示現有活動據點，選擇您希望報名的分校。
+                      </p>
+                    </div>
+
+                    {loadingOrganizations ? (
+                      <div className="text-center py-10">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-3"></div>
+                        <p className="text-[#2B3A3B]">正在載入機構資料...</p>
+                      </div>
+                    ) : organizations.length === 0 ? (
+                      <div className="text-center py-10 bg-white rounded-2xl border border-[#EADBC8] space-y-4">
+                        <SparklesIcon className="w-12 h-12 text-[#2B3A3B]/40 mx-auto mb-3" />
+                        <p className="text-[#2B3A3B]">
+                          {organizationError || '暫未有開放的分校，請稍後再試。'}
+                        </p>
+                        <motion.button
+                          type="button"
+                          onClick={loadOrganizations}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="px-4 py-2 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                        >
+                          重新整理
+                        </motion.button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {organizations.map(org => {
+                          const isSelected = formData.organizationId === org.id;
+                          const displayImage = org.settings?.coverImageUrl || '/@hanami.png';
+                          const displayCategories = (org.settings?.categories || []).map(
+                            cat => CATEGORY_LABEL_MAP[cat] || cat
+                          ).filter(Boolean);
+                          
+                          return (
+                            <motion.button
+                              key={org.id}
+                              type="button"
+                              whileHover={{ scale: 1.01 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => handleOrganizationSelect(org.id)}
+                              className={`w-full rounded-xl border-2 transition-all duration-200 text-left overflow-hidden ${
+                                isSelected
+                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/30 shadow-lg'
+                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/60'
+                              }`}
+                            >
+                              {/* 機構圖案 */}
+                              <div className="relative w-full overflow-hidden" style={{ aspectRatio: '3/2', backgroundColor: '#FFF9F2' }}>
+                                <Image
+                                  src={displayImage}
+                                  alt={org.org_name}
+                                  fill
+                                  className="object-contain"
+                                  sizes="(max-width: 768px) 50vw, 200px"
+                                />
+                              </div>
+                              
+                              {/* 機構資訊 */}
+                              <div className="p-3 sm:p-4">
+                                {/* 機構名稱 */}
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <p className="font-semibold text-[#4B4036] text-sm sm:text-base line-clamp-1">
+                                    {org.org_name}
+                                  </p>
+                                  {isSelected && (
+                                    <CheckCircleIcon className="w-4 h-4 text-[#FFD59A] flex-shrink-0 ml-2" />
+                                  )}
+                                </div>
+                                
+                                {/* 機構類型 */}
+                                {displayCategories.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {displayCategories.slice(0, 2).map((category, index) => (
+                                      <span
+                                        key={index}
+                                        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]"
+                                      >
+                                        {category}
+                                      </span>
+                                    ))}
+                                    {displayCategories.length > 2 && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]">
+                                        +{displayCategories.length - 2}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {errors.organizationId && (
+                      <p className="text-xs text-red-600 flex items-center space-x-1">
+                        <XCircleIcon className="w-3.5 h-3.5" />
+                        <span>{errors.organizationId}</span>
+                      </p>
+                    )}
+
+                    {/* 動態箭頭提醒向下滑動 */}
+                    {formData.organizationId && (
+                      <div className="mt-8 text-center">
+                        <motion.div
+                          animate={{ 
+                            y: [0, 10, 0],
+                            opacity: [0.7, 1, 0.7]
+                          }}
+                          transition={{ 
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                          className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                        >
+                          <p className="text-sm font-medium">選擇後向下滑動按下一步</p>
+                          <ChevronDownIcon className="w-6 h-6" />
+                        </motion.div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 步驟 1: 課程性質 */}
+                {currentStep === 1 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
                       <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">選擇課程性質</h2>
                       <p className="text-sm sm:text-base text-[#2B3A3B]">請選擇試堂或常規課程</p>
+                    </div>
+
+                    {/* 等候區按鈕 */}
+                    <div className="text-center">
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => router.push('/aihome/registration')}
+                        className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                      >
+                        <ClockIcon className="w-5 h-5" />
+                        <span>加入等候區</span>
+                        <ChevronRightIcon className="w-4 h-4" />
+                      </motion.button>
+                      <p className="text-xs text-[#2B3A3B] mt-2 opacity-70">我們將會在有位時第一時間通知您</p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1689,22 +1958,6 @@ export default function HanamiMusicRegisterPage() {
                       </motion.button>
                     </div>
 
-                    {/* 等候區按鈕 */}
-                    <div className="mt-6 text-center">
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => router.push('/aihome/registration')}
-                        className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        <ClockIcon className="w-5 h-5" />
-                        <span>加入等候區</span>
-                        <ChevronRightIcon className="w-4 h-4" />
-                      </motion.button>
-                      <p className="text-xs text-[#2B3A3B] mt-2 opacity-70">我們將會在有位時第一時間通知您</p>
-                    </div>
-
                     {/* 動態箭頭提醒向下滑動 */}
                     <div className="mt-8 text-center">
                       <motion.div
@@ -1726,12 +1979,16 @@ export default function HanamiMusicRegisterPage() {
                   </div>
                 )}
 
-                {/* 步驟 1: 選擇課程 */}
-                {currentStep === 1 && (
+                {/* 步驟 2: 選擇課程 */}
+                {currentStep === 2 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
                       <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">選擇課程類型</h2>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">請選擇適合的課程</p>
+                      <p className="text-sm sm:text-base text-[#2B3A3B]">
+                        {selectedOrganization
+                          ? `目前為 ${selectedOrganization.org_name} 機構篩選課程`
+                          : '請選擇適合的課程'}
+                      </p>
                     </div>
 
                     {/* 載入中狀態 */}
@@ -1740,14 +1997,18 @@ export default function HanamiMusicRegisterPage() {
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
                         <p className="text-[#2B3A3B]">載入課程中...</p>
                       </div>
-                    ) : courseTypes.length === 0 ? (
+                    ) : displayedCourseTypes.length === 0 ? (
                       <div className="text-center py-12 bg-white rounded-2xl border-2 border-[#EADBC8]">
                         <MusicalNoteIcon className="w-16 h-16 text-[#2B3A3B]/30 mx-auto mb-4" />
-                        <p className="text-[#2B3A3B]">目前沒有可用的課程</p>
+                        <p className="text-[#2B3A3B]">
+                          {selectedOrganization
+                            ? `${selectedOrganization.org_name} 尚未開設課程，請選擇其他分校`
+                            : '請先選擇分校以顯示課程'}
+                        </p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {courseTypes.map((course) => (
+                        {displayedCourseTypes.map((course) => (
                         <motion.button
                           key={course.id}
                           type="button"
@@ -1920,11 +2181,32 @@ export default function HanamiMusicRegisterPage() {
                         {errors.courseType}
                       </p>
                     )}
+
+                    {/* 動態箭頭提醒向下滑動 */}
+                    {formData.courseType && (
+                      <div className="mt-8 text-center">
+                        <motion.div
+                          animate={{ 
+                            y: [0, 10, 0],
+                            opacity: [0.7, 1, 0.7]
+                          }}
+                          transition={{ 
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                          className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                        >
+                          <p className="text-sm font-medium">選擇後向下滑動按下一步</p>
+                          <ChevronDownIcon className="w-6 h-6" />
+                        </motion.div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* 步驟 2: 您孩子資料 */}
-                {currentStep === 2 && (
+                {/* 步驟 3: 您孩子資料 */}
+                {currentStep === 3 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
                       <div className="flex items-center justify-center gap-4 mb-4">
@@ -2113,11 +2395,30 @@ export default function HanamiMusicRegisterPage() {
                         />
                       </div>
                     </div>
+
+                    {/* 動態箭頭提醒向下滑動 */}
+                    <div className="mt-8 text-center">
+                      <motion.div
+                        animate={{ 
+                          y: [0, 10, 0],
+                          opacity: [0.7, 1, 0.7]
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                      >
+                        <p className="text-sm font-medium">填寫完成後向下滑動按下一步</p>
+                        <ChevronDownIcon className="w-6 h-6" />
+                      </motion.div>
+                    </div>
                   </div>
                 )}
 
-                {/* 步驟 3: 日期時間 */}
-                {currentStep === 3 && (
+                {/* 步驟 4: 日期時間 */}
+                {currentStep === 4 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
                       <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">
@@ -2128,8 +2429,8 @@ export default function HanamiMusicRegisterPage() {
 
                     {/* 等候區選項 */}
                     <div className="space-y-4 mb-6">
-                      {/* 已收到通知的等候區學生 */}
-                      <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-4 shadow-sm border border-[#EADBC8]">
+                      {/* 已收到通知的等候區學生 - 已隱藏 */}
+                      {/* <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-4 shadow-sm border border-[#EADBC8]">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
@@ -2145,7 +2446,7 @@ export default function HanamiMusicRegisterPage() {
                               setIsWaitingList(true);
                               setWaitingListType('existing');
                               // 跳過日期選擇，直接到聯絡方式步驟
-                              setCurrentStep(4);
+                              setCurrentStep(5);
                             }}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
@@ -2154,7 +2455,7 @@ export default function HanamiMusicRegisterPage() {
                             選擇此選項
                           </motion.button>
                         </div>
-                      </div>
+                      </div> */}
 
                       {/* 沒有合適時間的等候區選項 */}
                       <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFB6C1]/20 rounded-xl p-4 shadow-sm border border-[#EADBC8]">
@@ -2290,13 +2591,7 @@ export default function HanamiMusicRegisterPage() {
                                       
                                       {/* 位置狀態指示 */}
                                       <div className="mt-1">
-                                        {(day as any).isRestDay ? (
-                                          <div className="flex items-center justify-center">
-                                            <span className="text-xs text-gray-500 font-bold bg-gray-100 px-1 py-0.5 rounded-full">
-                                              休息
-                                            </span>
-                                          </div>
-                                        ) : day.isFullyBooked ? (
+                                        {day.isFullyBooked ? (
                                           <div className="flex items-center justify-center">
                                             <span className="text-xs text-red-600 font-bold bg-red-100 px-1 py-0.5 rounded-full">
                                               已滿
@@ -2316,7 +2611,7 @@ export default function HanamiMusicRegisterPage() {
                                               }
                                               return (
                                                 <span className={`text-xs font-bold px-1 py-0.5 rounded-full ${colorClass}`}>
-                                                  {availableSlots}/{day.totalSlots}
+                                                  {availableSlots} 空位
                                                 </span>
                                               );
                                             })()}
@@ -2398,7 +2693,7 @@ export default function HanamiMusicRegisterPage() {
                                           ) : !day.hasSchedule ? (
                                             <div className="flex items-center justify-center">
                                               <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
-                                                {day.weekday === 1 ? '休息' : '無課程'}
+                                                無課程
                                               </span>
                                             </div>
                                           ) : day.isFullyBooked ? (
@@ -2422,7 +2717,7 @@ export default function HanamiMusicRegisterPage() {
                                                     ? 'text-orange-500 bg-orange-100' 
                                                     : 'text-green-500 bg-green-100'
                                                 }`}>
-                                                  {day.availableSlots}/{day.totalSlots}
+                                                  {day.availableSlots} 空位
                                                 </span>
                                               )}
                                             </div>
@@ -2540,7 +2835,7 @@ export default function HanamiMusicRegisterPage() {
                                         : 'text-red-500 bg-red-100'
                                     }`}>
                                       {slot.available ? 
-                                        `${slot.remainingSpots}/${slot.maxCapacity}` 
+                                        `${slot.remainingSpots} 空位` 
                                         : '已滿'}
                                     </div>
                                     {slot.assignedTeachers && (
@@ -2570,11 +2865,32 @@ export default function HanamiMusicRegisterPage() {
                           {errors.selectedTimeSlot}
                         </p>
                       )}
+
+                    {/* 動態箭頭提醒向下滑動 */}
+                    {(!isWaitingList && formData.selectedDate && formData.selectedTimeSlot) && (
+                      <div className="mt-8 text-center">
+                        <motion.div
+                          animate={{ 
+                            y: [0, 10, 0],
+                            opacity: [0.7, 1, 0.7]
+                          }}
+                          transition={{ 
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                          className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                        >
+                          <p className="text-sm font-medium">選擇完成後向下滑動按下一步</p>
+                          <ChevronDownIcon className="w-6 h-6" />
+                        </motion.div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* 步驟 4: 聯絡方式 */}
-                {currentStep === 4 && (
+                {/* 步驟 5: 聯絡方式 */}
+                {currentStep === 5 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
                       <div className="flex items-center justify-center gap-4 mb-4">
@@ -2610,7 +2926,7 @@ export default function HanamiMusicRegisterPage() {
                               setWaitingListType('none');
                               setSelectedDate(''); // 重置選中的日期
                               setFormData(prev => ({ ...prev, selectedDate: '', selectedTimeSlot: '' })); // 重置表單中的日期和時段
-                              setCurrentStep(3);
+                              setCurrentStep(4);
                             }}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
@@ -2752,50 +3068,99 @@ export default function HanamiMusicRegisterPage() {
                         />
                       </div>
                     </div>
+
+                    {/* 動態箭頭提醒向下滑動 */}
+                    <div className="mt-8 text-center">
+                      <motion.div
+                        animate={{ 
+                          y: [0, 10, 0],
+                          opacity: [0.7, 1, 0.7]
+                        }}
+                        transition={{ 
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                      >
+                        <p className="text-sm font-medium">填寫完成後向下滑動按下一步</p>
+                        <ChevronDownIcon className="w-6 h-6" />
+                      </motion.div>
+                    </div>
                   </div>
                 )}
 
-                {/* 步驟 5: 支付方法 */}
-                {currentStep === 5 && (
-                  <PaymentMethodSelector
-                    selectedMethod={formData.paymentMethod}
-                    onMethodChange={(methodId) => setFormData(prev => ({ ...prev, paymentMethod: methodId, screenshotUploaded: false }))}
-                    amount={formData.courseNature === 'trial' ? 168 : (() => {
-                      if (priceCalculation) {
-                        return priceCalculation.final_price;
+                {/* 步驟 6: 支付方法 */}
+                {currentStep === 6 && (
+                  <div>
+                    <PaymentMethodSelector
+                      selectedMethod={formData.paymentMethod}
+                      onMethodChange={(methodId) => setFormData(prev => ({ ...prev, paymentMethod: methodId, screenshotUploaded: false }))}
+                      amount={formData.courseNature === 'trial' ? 168 : (() => {
+                        if (priceCalculation) {
+                          return priceCalculation.final_price;
+                        }
+                        const selectedPlan = pricingPlans.find(p => p.id === formData.selectedPlan);
+                        return selectedPlan ? selectedPlan.package_price || 0 : 0;
+                      })()}
+                      currency="HKD"
+                      description={formData.courseNature === 'trial' 
+                        ? `試堂報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班`
+                        : `常規課程報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班 - ${pricingPlans.find(p => p.id === formData.selectedPlan)?.plan_name}`
                       }
-                      const selectedPlan = pricingPlans.find(p => p.id === formData.selectedPlan);
-                      return selectedPlan ? selectedPlan.package_price || 0 : 0;
-                    })()}
-                    currency="HKD"
-                    description={formData.courseNature === 'trial' 
-                      ? `試堂報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班`
-                      : `常規課程報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班 - ${pricingPlans.find(p => p.id === formData.selectedPlan)?.plan_name}`
-                    }
-                    onPaymentSuccess={(data) => {
-                      // 檢查是否為圖片刪除事件
-                      if (data.screenshotDeleted) {
-                        // 圖片被刪除，重置上傳狀態
-                        setFormData(prev => ({ ...prev, screenshotUploaded: false }));
-                        console.log('🔄 圖片已刪除，重置上傳狀態');
-                      } else if (formData.paymentMethod === 'screenshot') {
-                        // 當支付成功時，標記截圖已上傳
-                        setFormData(prev => ({ ...prev, screenshotUploaded: true }));
-                        console.log('✅ 截圖上傳成功，允許繼續');
-                      }
-                      handlePaymentSuccess(data);
-                    }}
-                    onPaymentError={(error) => {
-                      console.error('支付錯誤:', error);
-                      setErrors(prev => ({ ...prev, paymentMethod: error }));
-                    }}
-                    showPaymentActions={true}
-                    user={user}
-                  />
+                      orgPhone={selectedOrganization?.contact_phone || selectedOrganization?.settings?.contactPhone || null}
+                      orgId={formData.organizationId || null}
+                      orgData={selectedOrganization ? {
+                        org_name: selectedOrganization.org_name,
+                        contact_phone: selectedOrganization.contact_phone || selectedOrganization.settings?.contactPhone || undefined,
+                        contact_email: selectedOrganization.contact_email || undefined
+                      } : null}
+                      onPaymentSuccess={(data) => {
+                        // 檢查是否為圖片刪除事件
+                        if (data.screenshotDeleted) {
+                          // 圖片被刪除，重置上傳狀態
+                          setFormData(prev => ({ ...prev, screenshotUploaded: false }));
+                          console.log('🔄 圖片已刪除，重置上傳狀態');
+                        } else if (formData.paymentMethod === 'screenshot') {
+                          // 當支付成功時，標記截圖已上傳
+                          setFormData(prev => ({ ...prev, screenshotUploaded: true }));
+                          console.log('✅ 截圖上傳成功，允許繼續');
+                        }
+                        handlePaymentSuccess(data);
+                      }}
+                      onPaymentError={(error) => {
+                        console.error('支付錯誤:', error);
+                        setErrors(prev => ({ ...prev, paymentMethod: error }));
+                      }}
+                      showPaymentActions={true}
+                      user={user}
+                    />
+
+                    {/* 動態箭頭提醒向下滑動 */}
+                    {formData.paymentMethod && (
+                      <div className="mt-8 text-center">
+                        <motion.div
+                          animate={{ 
+                            y: [0, 10, 0],
+                            opacity: [0.7, 1, 0.7]
+                          }}
+                          transition={{ 
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                          className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                        >
+                          <p className="text-sm font-medium">選擇完成後向下滑動按下一步</p>
+                          <ChevronDownIcon className="w-6 h-6" />
+                        </motion.div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
-                {/* 步驟 6: 確認提交 */}
-                {currentStep === 6 && (
+                {/* 步驟 7: 確認提交 */}
+                {currentStep === 7 && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="text-center mb-6 sm:mb-8">
                       <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">確認報名資料</h2>
@@ -2816,6 +3181,12 @@ export default function HanamiMusicRegisterPage() {
                             <span className="text-[#2B3A3B]">課程類型：</span>
                             <span className="font-medium text-[#4B4036]">
                               {courseTypes.find(c => c.id === formData.courseType)?.name}班
+                            </span>
+                          </p>
+                          <p className="flex justify-between">
+                            <span className="text-[#2B3A3B]">報名機構：</span>
+                            <span className="font-medium text-[#4B4036]">
+                              {selectedOrganization?.org_name || 'Hanami Music'}
                             </span>
                           </p>
                           {formData.selectedPlan && (
@@ -2964,14 +3335,14 @@ export default function HanamiMusicRegisterPage() {
             )}
             
             {/* 只有不是支付步驟，或者是支付步驟但選擇了截圖上傳時，才顯示下一步按鈕 */}
-            {!(currentStep === 5) || (currentStep === 5 && formData.paymentMethod === 'screenshot') ? (
+            {!(currentStep === 6) || (currentStep === 6 && formData.paymentMethod === 'screenshot') ? (
               <motion.button
                 onClick={currentStep === steps.length - 1 ? handleSubmit : handleNext}
-                disabled={currentStep === 5 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded}
-                whileHover={!(currentStep === 5 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 1.02 } : {}}
-                whileTap={!(currentStep === 5 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 0.98 } : {}}
+                disabled={currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded}
+                whileHover={!(currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 1.02 } : {}}
+                whileTap={!(currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 0.98 } : {}}
                 className={`flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold shadow-lg transition-all duration-200 flex-1 ${
-                  currentStep === 5 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded
+                  currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded
                     ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                     : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:shadow-xl'
                 }`}

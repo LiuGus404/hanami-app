@@ -18,9 +18,12 @@ import {
   CurrencyDollarIcon,
   DocumentTextIcon,
   CalendarDaysIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import BackButton from '@/components/ui/BackButton';
+import { useRouter } from 'next/navigation';
 
 interface PendingStudent {
   id: string;
@@ -79,8 +82,14 @@ interface StudentPackage {
   status: string;
 }
 
-export default function PendingStudentsPage() {
+interface PendingStudentsPageProps {
+  orgId?: string | null;
+}
+
+export default function PendingStudentsPage(props: PendingStudentsPageProps = {}) {
+  const { orgId = null } = props;
   const { user } = useUser();
+  const router = useRouter();
   const [pendingStudents, setPendingStudents] = useState<PendingStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<PendingStudent | null>(null);
@@ -88,6 +97,11 @@ export default function PendingStudentsPage() {
   const [reviewNotes, setReviewNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('pending');
+  
+  // 試堂學生相關狀態
+  const [showTrialStudents, setShowTrialStudents] = useState(false);
+  const [trialStudents, setTrialStudents] = useState<any[]>([]);
+  const [loadingTrialStudents, setLoadingTrialStudents] = useState(false);
   
   // 新增狀態
   const [regularStudents, setRegularStudents] = useState<RegularStudent[]>([]);
@@ -104,9 +118,13 @@ export default function PendingStudentsPage() {
   const loadPendingStudents = async () => {
     try {
       setLoading(true);
-      console.log('🔍 開始載入待審核學生...');
+      console.log('🔍 開始載入待審核學生...', { orgId });
       
-      const response = await fetch('/api/admin/pending-students');
+      const url = orgId 
+        ? `/api/admin/pending-students?orgId=${encodeURIComponent(orgId)}`
+        : '/api/admin/pending-students';
+      
+      const response = await fetch(url);
       const result = await response.json();
       
       console.log('🔍 API 響應:', result);
@@ -121,6 +139,69 @@ export default function PendingStudentsPage() {
       console.error('❌ 載入待審核學生失敗:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 載入試堂學生（confirmed_payment = false）
+  const loadTrialStudents = async () => {
+    try {
+      setLoadingTrialStudents(true);
+      console.log('🔍 開始載入試堂學生（未確認支付）...', { orgId });
+      
+      const url = orgId 
+        ? `/api/admin/trial-students?orgId=${encodeURIComponent(orgId)}`
+        : '/api/admin/trial-students';
+      
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      console.log('🔍 試堂學生 API 響應:', result);
+
+      if (!result.success) {
+        throw new Error(result.error?.message || '載入失敗');
+      }
+      
+      setTrialStudents(result.data || []);
+      console.log('✅ 成功載入試堂學生:', result.count || 0, '個');
+    } catch (error) {
+      console.error('❌ 載入試堂學生失敗:', error);
+    } finally {
+      setLoadingTrialStudents(false);
+    }
+  };
+
+  // 更新試堂學生的支付確認狀態
+  const updateTrialStudentPayment = async (studentId: string) => {
+    try {
+      console.log('🔍 更新試堂學生支付確認狀態:', studentId);
+      
+      const response = await fetch('/api/admin/trial-students/update-payment', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentId,
+          orgId
+        })
+      });
+      
+      const result = await response.json();
+      console.log('🔍 更新支付確認狀態 API 響應:', result);
+
+      if (!result.success) {
+        throw new Error(result.error?.message || '更新失敗');
+      }
+      
+      console.log('✅ 成功更新支付確認狀態');
+      
+      // 重新載入試堂學生列表
+      await loadTrialStudents();
+      
+      alert('支付確認狀態已更新為已確認');
+    } catch (error) {
+      console.error('❌ 更新支付確認狀態失敗:', error);
+      alert('更新失敗，請稍後再試');
     }
   };
 
@@ -675,7 +756,10 @@ export default function PendingStudentsPage() {
   useEffect(() => {
     loadPendingStudents();
     loadRegularStudents();
-  }, []);
+    if (showTrialStudents) {
+      loadTrialStudents();
+    }
+  }, [orgId, showTrialStudents]);
 
   // 當選擇學生時載入付款截圖
   useEffect(() => {
@@ -710,98 +794,284 @@ export default function PendingStudentsPage() {
       <div className="max-w-7xl mx-auto">
         {/* 頁面標題 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#4B4036] mb-2">待審核學生管理</h1>
-          <p className="text-[#2B3A3B]">審核已完成付款的常規課程學生報名</p>
+          <div className="mb-4">
+            <button
+              onClick={() => router.push('/aihome/teacher-link')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#EADBC8] rounded-lg text-[#2B3A3B] hover:text-[#A64B2A] hover:bg-[#FFF9F2] hover:border-[#FFD59A] transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              <span className="font-medium">返回老師主頁</span>
+            </button>
+          </div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-[#4B4036] mb-2">
+                待審核學生管理
+              </h1>
+              <p className="text-[#2B3A3B]">
+                審核已完成付款的常規課程學生報名及試堂學生
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 統計卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8]"
-          >
-            <div className="flex items-center">
-              <ClockIcon className="w-8 h-8 text-yellow-500 mr-3" />
-              <div>
-                <p className="text-sm text-[#2B3A3B]">未確認</p>
-                <p className="text-2xl font-bold text-[#4B4036]">
-                  {pendingStudents.filter(s => s.review_status === 'pending').length}
-                </p>
+        {!showTrialStudents && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8]"
+            >
+              <div className="flex items-center">
+                <ClockIcon className="w-8 h-8 text-yellow-500 mr-3" />
+                <div>
+                  <p className="text-sm text-[#2B3A3B]">未確認</p>
+                  <p className="text-2xl font-bold text-[#4B4036]">
+                    {pendingStudents.filter(s => s.review_status === 'pending').length}
+                  </p>
+                </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
 
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8]"
-          >
-            <div className="flex items-center">
-              <CheckCircleIcon className="w-8 h-8 text-green-500 mr-3" />
-              <div>
-                <p className="text-sm text-[#2B3A3B]">確認</p>
-                <p className="text-2xl font-bold text-[#4B4036]">
-                  {pendingStudents.filter(s => s.review_status === 'approved').length}
-                </p>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8]"
+            >
+              <div className="flex items-center">
+                <CheckCircleIcon className="w-8 h-8 text-green-500 mr-3" />
+                <div>
+                  <p className="text-sm text-[#2B3A3B]">確認</p>
+                  <p className="text-2xl font-bold text-[#4B4036]">
+                    {pendingStudents.filter(s => s.review_status === 'approved').length}
+                  </p>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        </div>
+            </motion.div>
+          </div>
+        )}
+        
+        {showTrialStudents && (
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8]"
+            >
+              <div className="flex items-center">
+                <ClockIcon className="w-8 h-8 text-orange-500 mr-3" />
+                <div>
+                  <p className="text-sm text-[#2B3A3B]">未確認支付的試堂學生</p>
+                  <p className="text-2xl font-bold text-[#4B4036]">
+                    {loadingTrialStudents ? '載入中...' : trialStudents.length}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {/* 過濾器 */}
         <div className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8] mb-6">
           <div className="flex flex-wrap gap-4">
-            <button
-              onClick={() => setFilterStatus('all')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filterStatus === 'all' 
-                  ? 'bg-[#FFD59A] text-[#4B4036]' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              全部
-            </button>
-            <button
-              onClick={() => setFilterStatus('pending')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filterStatus === 'pending' 
-                  ? 'bg-[#FFD59A] text-[#4B4036]' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              未確認
-            </button>
-            <button
-              onClick={() => setFilterStatus('approved')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filterStatus === 'approved' 
-                  ? 'bg-[#FFD59A] text-[#4B4036]' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              確認
-            </button>
+            {showTrialStudents ? (
+              /* 試堂學生頁面：顯示返回按鍵 */
+              <button
+                onClick={() => {
+                  setShowTrialStudents(false);
+                  setFilterStatus('all');
+                }}
+                className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2"
+              >
+                <ArrowLeftIcon className="w-4 h-4" />
+                返回待審核學生
+              </button>
+            ) : (
+              /* 待審核學生頁面：顯示過濾按鍵和試堂學生按鍵 */
+              <>
+                <button
+                  onClick={() => setFilterStatus('all')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    filterStatus === 'all' 
+                      ? 'bg-[#FFD59A] text-[#4B4036]' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  全部
+                </button>
+                <button
+                  onClick={() => setFilterStatus('pending')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    filterStatus === 'pending' 
+                      ? 'bg-[#FFD59A] text-[#4B4036]' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  未確認
+                </button>
+                <button
+                  onClick={() => setFilterStatus('approved')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    filterStatus === 'approved' 
+                      ? 'bg-[#FFD59A] text-[#4B4036]' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  確認
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTrialStudents(true);
+                    loadTrialStudents();
+                  }}
+                  className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+                >
+                  試堂學生
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* 學生列表 */}
         <div className="bg-white rounded-xl shadow-lg border border-[#EADBC8] overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-[#FFF9F2] border-b border-[#EADBC8]">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">學生資訊</th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">課程資訊</th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">付款資訊</th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">狀態</th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">報名時間</th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EADBC8]">
-                {filteredStudents.map((student, index) => (
+          {showTrialStudents ? (
+            loadingTrialStudents ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4B4036] mx-auto mb-4"></div>
+                <p className="text-[#4B4036]">載入中...</p>
+              </div>
+            ) : trialStudents.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-[#4B4036]">目前沒有未確認支付的試堂學生</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-[#FFF9F2] border-b border-[#EADBC8]">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">學生資訊</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">課程資訊</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">付款資訊</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">狀態</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">報名時間</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EADBC8]">
+                    {trialStudents.map((student, index) => (
+                      <motion.tr
+                        key={student.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="hover:bg-[#FFF9F2]/50"
+                      >
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="font-medium text-[#4B4036]">{student.full_name || '未填寫'}</p>
+                            {student.nick_name && (
+                              <p className="text-sm text-[#2B3A3B]">暱稱: {student.nick_name}</p>
+                            )}
+                            <p className="text-sm text-[#2B3A3B]">ID: {student.student_oid}</p>
+                            {student.student_age && (
+                              <p className="text-sm text-[#2B3A3B]">
+                                {Math.floor(student.student_age / 12)}歲{student.student_age % 12}個月
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="font-medium text-[#4B4036]">{student.course_type || '未指定'}</p>
+                            {student.lesson_date && (
+                              <p className="text-sm text-[#2B3A3B]">
+                                試堂日期: {new Date(student.lesson_date).toLocaleDateString('zh-TW')}
+                              </p>
+                            )}
+                            {student.actual_timeslot && (
+                              <p className="text-sm text-[#2B3A3B]">
+                                時間: {student.actual_timeslot}
+                              </p>
+                            )}
+                            {student.trial_status && (
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium mt-1 ${
+                                student.trial_status === 'pending' 
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {student.trial_status === 'pending' ? '待安排' : '已安排'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div>
+                            {student.contact_number && (
+                              <p className="text-sm text-[#2B3A3B] flex items-center">
+                                <PhoneIcon className="w-4 h-4 mr-1" />
+                                {student.contact_number}
+                              </p>
+                            )}
+                            {student.parent_email && (
+                              <p className="text-sm text-[#2B3A3B] flex items-center mt-1">
+                                <EnvelopeIcon className="w-4 h-4 mr-1" />
+                                {student.parent_email}
+                              </p>
+                            )}
+                            <p className="text-sm text-[#2B3A3B] mt-1">
+                              支付方式: {student.payment_method || '未指定'}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            未確認支付
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-[#2B3A3B]">
+                            {new Date(student.created_at).toLocaleDateString('zh-TW')}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <motion.button
+                            onClick={() => {
+                              if (confirm('確認將此試堂學生的支付狀態更新為已確認？')) {
+                                updateTrialStudentPayment(student.id);
+                              }
+                            }}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors shadow-sm"
+                          >
+                            <CheckCircleIcon className="w-4 h-4 mr-1" />
+                            確認支付
+                          </motion.button>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-[#FFF9F2] border-b border-[#EADBC8]">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">學生資訊</th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">課程資訊</th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">付款資訊</th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">狀態</th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">報名時間</th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EADBC8]">
+                  {filteredStudents.map((student, index) => (
                   <motion.tr
                     key={student.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -871,6 +1141,7 @@ export default function PendingStudentsPage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
         {/* 詳情模態框 */}

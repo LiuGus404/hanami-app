@@ -425,6 +425,7 @@ export default function AddRegularStudentForm({
           trial_remarks: formData.trial_remarks || '',
           weekday: weekdayNumber,
           regular_weekday: weekdayNumber,
+          confirmed_payment: true // 在 teacher-link 中新增的試堂學生，支付已確認
         };
       } else {
         payload = {
