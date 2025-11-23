@@ -76,6 +76,18 @@ function MemberManagementContent() {
   const searchParams = useSearchParams();
   const { user: saasUser, loading: saasAuthLoading } = useSaasAuth();
   const { orgId: contextOrgId } = useTeacherLinkOrganization();
+  
+  // 移動端檢測（< 1024px 視為移動端）
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   const [searchEmail, setSearchEmail] = useState('');
   const [searching, setSearching] = useState(false);
   const [foundUser, setFoundUser] = useState<User | null>(null);
@@ -812,8 +824,8 @@ function MemberManagementContent() {
   const effectiveOrgId = contextOrgId || orgId;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] px-4 py-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] px-4 py-6 overflow-x-hidden" style={{ width: '100%', maxWidth: '100vw' }}>
+      <div className="max-w-6xl mx-auto" style={{ width: '100%', maxWidth: '100%' }}>
         <div className="mb-6">
           <BackButton href="/aihome/teacher-link/create" label="返回管理面板" />
         </div>
@@ -1058,6 +1070,11 @@ function MemberManagementContent() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="relative overflow-hidden rounded-[28px] border border-white/60 bg-gradient-to-br from-white/80 via-[#FFEFE2] to-[#FFE4F5] shadow-[0_24px_60px_rgba(231,200,166,0.28)] p-6"
+          style={{ 
+            width: '100%', 
+            maxWidth: '100%',
+            overflowX: isMobile ? 'hidden' : 'visible'
+          }}
         >
           <div className="absolute -right-14 top-10 h-48 w-48 rounded-full bg-white/40 blur-2xl" aria-hidden="true" />
           <div className="absolute -bottom-16 left-10 h-40 w-40 rounded-full bg-[#FFD6E7]/60 blur-3xl" aria-hidden="true" />
@@ -1096,8 +1113,120 @@ function MemberManagementContent() {
                   key={identity.id}
                   className="p-4 rounded-xl border border-[#EADBC8] bg-[#FFFDF8]"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
+                  {/* 移動端：使用可滾動的布局 */}
+                  {isMobile ? (
+                    <div className="w-full">
+                      {/* 左側固定區域（成員信息） */}
+                      <div className="mb-3">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${roleColors[identity.role_type]}`}>
+                            {roleLabels[identity.role_type]}
+                          </span>
+                          {identity.is_primary && (
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
+                              主要身份
+                            </span>
+                          )}
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            identity.status === 'active'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {identity.status === 'active' ? '啟用' : '停用'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-[#6E5A4A] break-words">{identity.user_email}</p>
+                        <p className="text-xs text-[#6E5A4A] mt-1">
+                          加入時間：{new Date(identity.created_at).toLocaleString('zh-TW')}
+                        </p>
+                        {/* 鏈接狀態顯示 */}
+                        {linkStatuses[identity.id] && (
+                          <div className="mt-2 flex items-center gap-2 flex-wrap">
+                            <span className="px-2 py-1 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-full text-xs font-semibold flex items-center gap-1">
+                              <Link2 className="w-3 h-3" />
+                              已鏈接：{linkStatuses[identity.id].teacher_fullname || linkStatuses[identity.id].teacher_nickname}
+                            </span>
+                            {linkStatuses[identity.id].last_synced_at && (
+                              <span className="text-xs text-[#6E5A4A]">
+                                最後同步：{new Date(linkStatuses[identity.id].last_synced_at).toLocaleString('zh-TW')}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {/* 右側可滾動區域（操作按鈕） */}
+                      <div 
+                        className="overflow-x-auto touch-pan-x"
+                        style={{
+                          WebkitOverflowScrolling: 'touch' as any,
+                          touchAction: 'pan-x',
+                          maxWidth: '100%',
+                        }}
+                        onTouchStart={(e) => {
+                          if (e.touches.length > 1) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onTouchMove={(e) => {
+                          if (e.touches.length > 1) {
+                            e.preventDefault();
+                          }
+                        }}
+                      >
+                        <div className="flex gap-2 min-w-max pb-2">
+                          {/* 鏈接/取消鏈接按鈕 */}
+                          {linkStatuses[identity.id] ? (
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => handleUnlinkTeacher(identity)}
+                              className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-orange-400 text-orange-600 hover:bg-orange-50 hover:border-orange-500 rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow-md min-h-[44px] touch-manipulation whitespace-nowrap"
+                              title="取消鏈接"
+                            >
+                              <Unlink className="w-4 h-4" />
+                              <span>取消鏈接</span>
+                            </motion.button>
+                          ) : (
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => handleOpenLinkModal(identity)}
+                              className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-[#FFB6C1] text-[#FFB6C1] hover:bg-gradient-to-r hover:from-[#FFB6C1]/10 hover:to-[#FFD59A]/10 hover:border-[#FFD59A] rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow-md min-h-[44px] touch-manipulation whitespace-nowrap"
+                              title="鏈接到老師資料"
+                            >
+                              <Link2 className="w-4 h-4" />
+                              <span>鏈接</span>
+                            </motion.button>
+                          )}
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setEditingIdentity(identity)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600 rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow-md min-h-[44px] touch-manipulation whitespace-nowrap"
+                            title="編輯"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            <span>編輯</span>
+                          </motion.button>
+                          {identity.role_type !== 'owner' && (
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => handleDeleteIdentity(identity.id)}
+                              className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-red-400 text-red-600 hover:bg-red-50 hover:border-red-500 rounded-xl font-medium text-sm transition-all shadow-sm hover:shadow-md min-h-[44px] touch-manipulation whitespace-nowrap"
+                              title="刪除"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>刪除</span>
+                            </motion.button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* 桌面端：原有布局 */
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${roleColors[identity.role_type]}`}>
                           {roleLabels[identity.role_type]}
@@ -1182,7 +1311,8 @@ function MemberManagementContent() {
                         </motion.button>
                       )}
                     </div>
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

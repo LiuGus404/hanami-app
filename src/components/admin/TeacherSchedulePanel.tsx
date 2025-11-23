@@ -1,7 +1,7 @@
 'use client';
 
 import { startOfMonth, endOfMonth, eachDayOfInterval, format } from 'date-fns';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeftIcon, 
@@ -16,7 +16,10 @@ import {
   XMarkIcon,
   ListBulletIcon,
   Squares2X2Icon,
-  SparklesIcon
+  SparklesIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 
 import { PopupSelect } from '@/components/ui/PopupSelect';
@@ -91,9 +94,10 @@ interface DragSchedule {
 type TeacherSchedulePanelProps = {
   teacherIds?: string[]
   orgId?: string | null
+  userEmail?: string | null // 用戶 email，用於 API 查詢繞過 RLS
 }
 
-export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSchedulePanelProps) {
+export default function TeacherShiftCalendar({ teacherIds, orgId, userEmail }: TeacherSchedulePanelProps) {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -115,9 +119,83 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [showArrangeTeacher, setShowArrangeTeacher] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  // 列表模式編輯狀態
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editingScheduleTime, setEditingScheduleTime] = useState<{ start_time: string; end_time: string } | null>(null);
+  const [showEditScheduleModal, setShowEditScheduleModal] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<{ id: string; teacherId: string; date: string; teacherName: string } | null>(null);
+  // 列表模式展開/收起狀態
+  const [expandedTeachers, setExpandedTeachers] = useState<Set<string>>(new Set());
+  // 日期詳情彈窗狀態
+  const [showDateDetailModal, setShowDateDetailModal] = useState(false);
+  const [selectedDateDetail, setSelectedDateDetail] = useState<{ date: string; dateStr: string; teachers: Teacher[]; schedules: (Schedule | DragSchedule)[]; lessonCount: number } | null>(null);
   const [dragSchedules, setDragSchedules] = useState<DragSchedule[]>([]);
   const [draggedTeacher, setDraggedTeacher] = useState<Teacher | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  
+  // 移動端檢測（包括平板和窄視窗）
+  // 在 < 1024px (lg 斷點) 時使用移動端顯示方法
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // 模態框引用
+  const arrangeTeacherModalRef = useRef<HTMLDivElement>(null);
+  const dateTeacherSelectModalRef = useRef<HTMLDivElement>(null);
+  const singleTeacherScheduleModalRef = useRef<HTMLDivElement>(null);
+
+  // 滑動手勢支持 - 切換月份
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+
+  // 滑動的最小距離（像素）
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    setTouchEnd(null);
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    });
+  };
+
+  const onTouchEnd = () => {
+    if (!isMobile || !touchStart || !touchEnd) return;
+    
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isLeftSwipe = distanceX > minSwipeDistance;
+    const isRightSwipe = distanceX < -minSwipeDistance;
+    const isVerticalSwipe = Math.abs(distanceY) > Math.abs(distanceX);
+
+    // 只處理水平滑動，忽略垂直滑動（避免與頁面滾動衝突）
+    if (!isVerticalSwipe) {
+      if (isLeftSwipe) {
+        handleNextMonth();
+      } else if (isRightSwipe) {
+        handlePrevMonth();
+      }
+    }
+    
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
 
   // 新增：日期選擇彈窗狀態
   const [showDateTeacherSelect, setShowDateTeacherSelect] = useState(false);
@@ -143,6 +221,63 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
     end_time: '18:00',
   });
 
+  // 當模態框打開時，自動滾動到可見位置（移動端）
+  useEffect(() => {
+    if (showArrangeTeacher && isMobile) {
+      setTimeout(() => {
+        // 滾動到頁面底部，確保模態框可見
+        window.scrollTo({ 
+          top: document.documentElement.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 300); // 等待動畫完成
+    }
+  }, [showArrangeTeacher, isMobile]);
+
+  useEffect(() => {
+    if (showDateTeacherSelect && isMobile) {
+      setTimeout(() => {
+        window.scrollTo({ 
+          top: document.documentElement.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 300);
+    }
+  }, [showDateTeacherSelect, isMobile]);
+
+  useEffect(() => {
+    if (showSingleTeacherSchedule && isMobile) {
+      setTimeout(() => {
+        window.scrollTo({ 
+          top: document.documentElement.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 300);
+    }
+  }, [showSingleTeacherSchedule, isMobile]);
+
+  useEffect(() => {
+    if (showEditScheduleModal && isMobile) {
+      setTimeout(() => {
+        window.scrollTo({ 
+          top: document.documentElement.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 300);
+    }
+  }, [showEditScheduleModal, isMobile]);
+
+  useEffect(() => {
+    if (showDateDetailModal && isMobile) {
+      setTimeout(() => {
+        window.scrollTo({ 
+          top: document.documentElement.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 300);
+    }
+  }, [showDateDetailModal, isMobile]);
+
   // 提取資料獲取邏輯為可重用函數
   const fetchData = async () => {
     try {
@@ -156,22 +291,101 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
       const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
 
       // Fetch lessons for the month with student information
-      const lessonQuery = supabase
-        .from('hanami_student_lesson')
-        .select(`
-          id,
-          lesson_date,
-          student_id,
-          regular_timeslot,
-          course_type,
-          Hanami_Students!hanami_student_lesson_student_id_fkey (
+      // 參考 class-activities 頁面的實現，使用 API 端點繞過 RLS
+      let regularLessonsData: any[] = [];
+      let trialLessonsData: any[] = [];
+      let regularLessonsError: any = null;
+      let trialLessonsError: any = null;
+
+      if (orgId) {
+        // 使用新的 API 端點繞過 RLS（參考 /api/class-activities 的實現）
+        try {
+          const apiUrl = `/api/lessons/month?orgId=${encodeURIComponent(orgId)}&monthStart=${encodeURIComponent(monthStartStr)}&monthEnd=${encodeURIComponent(monthEndStr)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+          
+          const lessonsResponse = await fetch(apiUrl, {
+            credentials: 'include',
+          });
+
+          if (lessonsResponse.ok) {
+            const lessonsData = await lessonsResponse.json();
+            regularLessonsData = lessonsData.data?.regularLessons || [];
+            trialLessonsData = lessonsData.data?.trialLessons || [];
+            console.log('✅ [TeacherSchedulePanel] 通過 API 載入的課程數量:', {
+              regular: regularLessonsData.length,
+              trial: trialLessonsData.length,
+              total: regularLessonsData.length + trialLessonsData.length
+            });
+          } else {
+            const errorData = await lessonsResponse.json().catch(() => ({}));
+            regularLessonsError = errorData;
+            console.warn('⚠️ [TeacherSchedulePanel] API 查詢失敗，回退到直接查詢');
+          }
+        } catch (error) {
+          regularLessonsError = error;
+          console.warn('⚠️ [TeacherSchedulePanel] API 查詢異常，回退到直接查詢:', error);
+        }
+      }
+
+      // 如果 API 查詢失敗或沒有提供 orgId，回退到直接查詢
+      if (regularLessonsError || !orgId) {
+        let lessonQuery = supabase
+          .from('hanami_student_lesson')
+          .select(`
             id,
-            full_name,
-            student_age
-          )
-        `)
-        .gte('lesson_date', monthStartStr)
-        .lte('lesson_date', monthEndStr);
+            lesson_date,
+            student_id,
+            regular_timeslot,
+            course_type,
+            Hanami_Students!hanami_student_lesson_student_id_fkey (
+              id,
+              full_name,
+              student_age
+            )
+          `)
+          .gte('lesson_date', monthStartStr)
+          .lte('lesson_date', monthEndStr);
+
+        // 根據 org_id 過濾課程記錄
+        if (orgId) {
+          lessonQuery = lessonQuery.eq('org_id', orgId);
+          console.log('✅ [TeacherSchedulePanel] 課程記錄查詢已添加 org_id 過濾:', orgId);
+        } else {
+          lessonQuery = lessonQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+          console.warn('⚠️ [TeacherSchedulePanel] orgId 為 null，課程記錄查詢將返回空結果');
+        }
+        
+        const lessonResult = await lessonQuery;
+        if (lessonResult.error) {
+          regularLessonsError = lessonResult.error;
+        } else {
+          regularLessonsData = lessonResult.data || [];
+        }
+      }
+
+      // 如果 API 查詢失敗，才需要查詢試堂學生
+      if (trialLessonsError || !trialLessonsData.length) {
+        let trialLessonQuery = supabase
+          .from('hanami_trial_students')
+          .select('id, lesson_date, full_name, student_age, actual_timeslot, course_type, org_id')
+          .gte('lesson_date', monthStartStr)
+          .lte('lesson_date', monthEndStr);
+
+        // 根據 org_id 過濾試堂學生課程記錄
+        if (orgId) {
+          trialLessonQuery = trialLessonQuery.eq('org_id', orgId);
+          console.log('✅ [TeacherSchedulePanel] 試堂課程記錄查詢已添加 org_id 過濾:', orgId);
+        } else {
+          trialLessonQuery = trialLessonQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+          console.warn('⚠️ [TeacherSchedulePanel] orgId 為 null，試堂課程記錄查詢將返回空結果');
+        }
+        
+        const trialLessonResult = await trialLessonQuery;
+        if (trialLessonResult.error) {
+          trialLessonsError = trialLessonResult.error;
+        } else {
+          trialLessonsData = trialLessonResult.data || [];
+        }
+      }
 
       // Fetch schedules for the month
       let scheduleQuery = supabase
@@ -212,8 +426,7 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
       }
 
       console.log('🔍 [TeacherSchedulePanel] 執行並行查詢，orgId:', orgId);
-      const [lessonResult, scheduleResult, teacherResult] = await Promise.all([
-        lessonQuery,
+      const [scheduleResult, teacherResult] = await Promise.all([
         scheduleQuery,
         teacherQuery,
       ]);
@@ -224,19 +437,54 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
         orgId
       });
 
-      // Handle lesson data
-      if (lessonResult.error) {
-        console.warn('Warning fetching lessons:', lessonResult.error.message);
-      } else if (lessonResult.data) {
+      // Handle lesson data (參考 HanamiCalendar 的實現)
+      const allLessons: Lesson[] = [];
+
+      // 處理常規學生課程
+      if (regularLessonsError) {
+        console.warn('Warning fetching regular lessons:', regularLessonsError.message || regularLessonsError);
+      } else if (regularLessonsData && regularLessonsData.length > 0) {
         // 類型轉換，確保 Hanami_Students 欄位型別正確
-        const lessons: Lesson[] = lessonResult.data.map((l: any) => ({
-          ...l,
+        const regularLessons: Lesson[] = regularLessonsData.map((l: any) => ({
+          id: l.id,
+          student_id: l.student_id || '',
+          lesson_date: l.lesson_date || '',
+          regular_timeslot: l.regular_timeslot || '',
+          course_type: l.course_type || '',
+          full_name: l.Hanami_Students?.full_name || '未命名學生',
+          student_age: l.Hanami_Students?.student_age || null,
+          lesson_status: null,
+          remaining_lessons: null,
+          is_trial: false,
           Hanami_Students: l.Hanami_Students && Array.isArray(l.Hanami_Students)
             ? l.Hanami_Students[0]
             : l.Hanami_Students,
         }));
-        setLessons(lessons);
+        allLessons.push(...regularLessons);
       }
+
+      // 處理試堂學生課程
+      if (trialLessonsError) {
+        console.warn('Warning fetching trial lessons:', trialLessonsError.message || trialLessonsError);
+      } else if (trialLessonsData && trialLessonsData.length > 0) {
+        const trialLessons: Lesson[] = trialLessonsData.map((trial: any) => ({
+          id: trial.id,
+          student_id: trial.id, // 試堂學生使用自己的 id 作為 student_id
+          lesson_date: trial.lesson_date || '',
+          regular_timeslot: trial.actual_timeslot || '',
+          course_type: trial.course_type || '',
+          full_name: trial.full_name || '未命名學生',
+          student_age: trial.student_age || null,
+          lesson_status: null,
+          remaining_lessons: null,
+          is_trial: true,
+          Hanami_Students: null,
+        }));
+        allLessons.push(...trialLessons);
+      }
+
+      setLessons(allLessons);
+      console.log('📊 [TeacherSchedulePanel] 載入的課程總數:', allLessons.length, 'orgId:', orgId);
 
       // Handle schedule data
       if (scheduleResult.error) {
@@ -295,17 +543,24 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
     schedulesByDate[dateStr] = scheduledTeachers;
   });
 
-  // Group lessons count by date
+  // Group lessons count by date - 計算每天的唯一學生數（不是課程數）
+  // 參考 HanamiCalendar 的邏輯，使用 Set 去重 student_id
   const lessonsCountByDate: Record<string, number> = {};
   daysInMonth.forEach(day => {
     const dateStr = format(day, 'yyyy-MM-dd');
+    // 過濾當天的所有課程（包括常規和試堂）
+    const dayLessons = lessons.filter(l => l.lesson_date === dateStr);
+    // 使用 Set 去重 student_id，計算唯一學生數
     const uniqueStudentIds = new Set(
-      lessons
-        .filter(l => l.lesson_date === dateStr)
+      dayLessons
         .map(l => l.student_id)
-        .filter(Boolean), // 過濾掉 null 值
+        .filter(Boolean) // 過濾掉 null 值
     );
     lessonsCountByDate[dateStr] = uniqueStudentIds.size;
+    // 調試日誌：顯示當天的課程數和學生數
+    if (dayLessons.length > 0) {
+      console.log(`📊 [TeacherSchedulePanel] ${dateStr}: 課程數=${dayLessons.length}, 學生數=${uniqueStudentIds.size}`);
+    }
   });
 
   // Helper to get teacher initials
@@ -329,6 +584,26 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
   // Handle date cell click
   const handleDateClick = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
+    // 移動端：打開日期詳情彈窗
+    if (isMobile) {
+      const currentSchedules = editMode ? dragSchedules : filteredSchedules;
+      const scheduledTeachers = currentSchedules
+        .filter(s => s.scheduled_date === dateStr)
+        .map(s => filteredTeachers.find(t => t.id === s.teacher_id))
+        .filter(Boolean) as Teacher[];
+      const dateSchedules = currentSchedules.filter(s => s.scheduled_date === dateStr);
+      const lessonCount = lessonsCountByDate[dateStr] || 0;
+      
+      setSelectedDateDetail({
+        date: format(day, 'yyyy年MM月dd日'),
+        dateStr: dateStr,
+        teachers: scheduledTeachers,
+        schedules: dateSchedules,
+        lessonCount: lessonCount,
+      });
+      setShowDateDetailModal(true);
+      return;
+    }
     
     // 設置選中的日期和初始化選擇
     setSelectedDate(dateStr);
@@ -833,6 +1108,78 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
     }
   };
 
+  // 編輯單個排班記錄 - 打開編輯彈窗
+  const handleEditSchedule = (schedule: Schedule, teacher: Teacher) => {
+    setEditingSchedule({
+      id: schedule.id || '',
+      teacherId: teacher.id,
+      date: schedule.scheduled_date || '',
+      teacherName: teacher.teacher_nickname || teacher.teacher_fullname || '',
+    });
+    setEditingScheduleTime({
+      start_time: schedule.start_time?.slice(0, 5) || '09:00',
+      end_time: schedule.end_time?.slice(0, 5) || '18:00',
+    });
+    setShowEditScheduleModal(true);
+  };
+
+  // 取消編輯
+  const handleCancelEdit = () => {
+    setShowEditScheduleModal(false);
+    setEditingSchedule(null);
+    setEditingScheduleTime(null);
+  };
+
+  // 保存編輯的排班
+  const handleSaveEditSchedule = async () => {
+    if (!editingSchedule || !editingScheduleTime) return;
+
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+
+      // 更新排班記錄
+      let updateQuery = supabase
+        .from('teacher_schedule')
+        .update({
+          start_time: editingScheduleTime.start_time,
+          end_time: editingScheduleTime.end_time,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingSchedule.id);
+
+      // 根據 org_id 過濾
+      if (orgId) {
+        updateQuery = updateQuery.eq('org_id', orgId);
+      }
+
+      const { error: updateError } = await updateQuery;
+
+      if (updateError) {
+        console.warn('Error updating schedule:', updateError.message);
+        setErrorMsg(`更新排班失敗：${updateError.message}`);
+        return;
+      }
+
+      // 重新載入資料
+      await fetchData();
+
+      // 關閉彈窗並清除編輯狀態
+      setShowEditScheduleModal(false);
+      setEditingSchedule(null);
+      setEditingScheduleTime(null);
+
+      setErrorMsg('排班已成功更新！');
+      setTimeout(() => setErrorMsg(null), 3000);
+
+    } catch (error) {
+      console.warn('Unexpected error updating schedule:', error);
+      setErrorMsg('更新排班時發生未預期的錯誤');
+    } finally {
+      setLoading(false);
+    }
+  };
+
     // 刪除單個排班記錄
   const deleteSingleSchedule = async (scheduleId: string, teacherName: string, scheduleDate: string) => {
     try {
@@ -1073,38 +1420,38 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
 
   return (
     <>
-      <div className="p-6 bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl shadow-xl border-2 border-[#EADBC8] max-w-7xl mx-auto font-['Quicksand',_sans-serif]">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+      <div className={`${isMobile ? 'p-3 lg:p-6' : 'p-6'} bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md ${isMobile ? 'rounded-2xl' : 'rounded-3xl'} shadow-xl border-2 border-[#EADBC8] max-w-7xl mx-auto font-['Quicksand',_sans-serif] ${isMobile ? 'mb-24' : ''}`}>
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-4 mb-6">
           <div className="flex gap-2">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2 rounded-l-xl border-2 transition-all flex items-center gap-2 ${
+              className={`${isMobile ? 'px-3 py-2.5 text-sm' : 'px-4 py-2'} rounded-l-xl border-2 transition-all flex items-center gap-2 min-h-[44px] touch-manipulation ${
                 viewMode === 'calendar' 
                   ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-[#FFB6C1] shadow-lg' 
                   : 'bg-white/70 text-[#4B4036] border-[#EADBC8] hover:bg-white'
               }`}
               onClick={() => setViewMode('calendar')}
             >
-              <Squares2X2Icon className="w-4 h-4" />
-              日曆顯示
+              <Squares2X2Icon className={`${isMobile ? 'w-4 h-4' : 'w-4 h-4'}`} />
+              <span className={isMobile ? 'hidden sm:inline' : ''}>日曆顯示</span>
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2 rounded-r-xl border-2 border-l-0 transition-all flex items-center gap-2 ${
+              className={`${isMobile ? 'px-3 py-2.5 text-sm' : 'px-4 py-2'} rounded-r-xl border-2 border-l-0 transition-all flex items-center gap-2 min-h-[44px] touch-manipulation ${
                 viewMode === 'list' 
                   ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-[#FFB6C1] shadow-lg' 
                   : 'bg-white/70 text-[#4B4036] border-[#EADBC8] hover:bg-white'
               }`}
               onClick={() => setViewMode('list')}
             >
-              <ListBulletIcon className="w-4 h-4" />
-              列表顯示
+              <ListBulletIcon className={`${isMobile ? 'w-4 h-4' : 'w-4 h-4'}`} />
+              <span className={isMobile ? 'hidden sm:inline' : ''}>列表顯示</span>
             </motion.button>
           </div>
         
-          {viewMode === 'calendar' && (
+          {viewMode === 'calendar' && !isMobile && (
           <div className="flex gap-3">
             {editMode ? (
               <>
@@ -1113,7 +1460,7 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                   whileTap={{ scale: 0.95 }}
                   disabled={loading}
                   onClick={handleSaveEditMode}
-                  className="px-5 py-2.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg disabled:opacity-50 transition-all flex items-center gap-2 font-medium shadow-md"
+                  className={`${isMobile ? 'px-4 py-2.5 text-sm' : 'px-5 py-2.5'} bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg disabled:opacity-50 transition-all flex items-center gap-2 font-medium shadow-md min-h-[44px] touch-manipulation`}
                 >
                   {loading ? (
                     <>
@@ -1122,12 +1469,12 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
                       />
-                      儲存中...
+                      <span className={isMobile ? 'text-sm' : ''}>儲存中...</span>
                     </>
                   ) : (
                     <>
                       <CheckIcon className="w-4 h-4" />
-                      儲存
+                      <span className={isMobile ? 'text-sm' : ''}>儲存</span>
                     </>
                   )}
                 </motion.button>
@@ -1135,10 +1482,10 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleCancelEditMode}
-                  className="px-5 py-2.5 bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm"
+                  className={`${isMobile ? 'px-4 py-2.5 text-sm' : 'px-5 py-2.5'} bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm min-h-[44px] touch-manipulation`}
                 >
                   <XMarkIcon className="w-4 h-4" />
-                  取消
+                  <span className={isMobile ? 'text-sm' : ''}>取消</span>
                 </motion.button>
               </>
             ) : (
@@ -1146,18 +1493,18 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleEditModeToggle}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium shadow-md"
+                className={`${isMobile ? 'px-4 py-2.5 text-sm' : 'px-5 py-2.5'} bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium shadow-md min-h-[44px] touch-manipulation`}
               >
                 <PencilIcon className="w-4 h-4" />
-                編輯模式
+                <span className={isMobile ? 'text-sm' : ''}>編輯模式</span>
               </motion.button>
             )}
           </div>
           )}
         </div>
 
-        {/* 編輯模式老師列表 */}
-        {editMode && viewMode === 'calendar' && (
+        {/* 編輯模式老師列表 - 移動端隱藏 */}
+        {editMode && viewMode === 'calendar' && !isMobile && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1196,7 +1543,7 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
         )}
 
         {viewMode === 'list' ? (
-          <div className="overflow-x-auto mt-4 space-y-6">
+          <div className="overflow-x-auto mt-4 space-y-4">
             {filteredTeachers.map((teacher, teacherIndex) => {
               const teacherSchedules = filteredSchedules.filter(s => s.teacher_id === teacher.id);
               if (teacherSchedules.length === 0) return null;
@@ -1205,6 +1552,36 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
               const sortedSchedules = [...teacherSchedules].sort((a, b) => 
                 new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime()
               );
+
+              // 計算本月統計：上班天數和工作時數
+              const monthStart = startOfMonth(currentMonth);
+              const monthEnd = endOfMonth(currentMonth);
+              const monthStartStr = format(monthStart, 'yyyy-MM-dd');
+              const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
+              
+              // 過濾本月排班
+              const currentMonthSchedules = sortedSchedules.filter(s => {
+                const scheduleDate = s.scheduled_date || '';
+                return scheduleDate >= monthStartStr && scheduleDate <= monthEndStr;
+              });
+
+              // 計算工作時數
+              const calculateWorkHours = (startTime: string, endTime: string): number => {
+                if (!startTime || !endTime) return 0;
+                const [startH, startM] = startTime.split(':').map(Number);
+                const [endH, endM] = endTime.split(':').map(Number);
+                const startMinutes = startH * 60 + startM;
+                const endMinutes = endH * 60 + endM;
+                return (endMinutes - startMinutes) / 60;
+              };
+
+              const totalWorkHours = currentMonthSchedules.reduce((total, schedule) => {
+                const hours = calculateWorkHours(schedule.start_time || '', schedule.end_time || '');
+                return total + hours;
+              }, 0);
+
+              const workDays = currentMonthSchedules.length;
+              const isExpanded = expandedTeachers.has(teacher.id);
               
               return (
                 <motion.div
@@ -1212,107 +1589,292 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: teacherIndex * 0.1 }}
-                  className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 border-[#EADBC8]"
+                  className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-sm rounded-2xl shadow-lg border-2 border-[#EADBC8] overflow-hidden"
                 >
-                  <div className="flex flex-wrap items-center gap-3 mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] p-1 shadow-md">
-                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                          <UserIcon className="w-5 h-5 text-[#4B4036]" />
+                  {/* 收起狀態：顯示統計信息 */}
+                  <div 
+                    className={`${isMobile ? 'p-4' : 'p-6'} cursor-pointer`}
+                    onClick={() => {
+                      const newExpanded = new Set(expandedTeachers);
+                      if (isExpanded) {
+                        newExpanded.delete(teacher.id);
+                      } else {
+                        newExpanded.add(teacher.id);
+                      }
+                      setExpandedTeachers(newExpanded);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className={`${isMobile ? 'w-8 h-8' : 'w-10 h-10'} rounded-full bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] p-1 shadow-md flex-shrink-0`}>
+                          <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                            <UserIcon className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-[#4B4036]`} />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-bold ${isMobile ? 'text-lg' : 'text-xl'} text-[#4B4036] mb-1`}>
+                            {teacher.teacher_nickname || teacher.teacher_fullname}
+                          </div>
+                          <div className={`flex flex-wrap gap-3 ${isMobile ? 'text-sm' : 'text-base'}`}>
+                            <div className="flex items-center gap-1.5">
+                              <CalendarIcon className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-[#FFB6C1]`} />
+                              <span className="text-[#4B4036] font-medium">
+                                本月上班：<span className="font-bold text-[#FFB6C1]">{workDays}</span> 天
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <ClockIcon className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-[#FFD59A]`} />
+                              <span className="text-[#4B4036] font-medium">
+                                工作時數：<span className="font-bold text-[#FFD59A]">{totalWorkHours.toFixed(1)}</span> 小時
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="font-bold text-xl text-[#4B4036]">{teacher.teacher_nickname || teacher.teacher_fullname}</div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 ml-auto">
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 text-sm bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium shadow-md"
-                        onClick={() => handleTeacherScheduleClick(teacher)}
-                        title="安排老師排班"
+                      <motion.div
+                        animate={{ rotate: isExpanded ? 180 : 0 }}
+                        transition={{ duration: 0.3 }}
+                        className={`${isMobile ? 'w-8 h-8' : 'w-10 h-10'} flex items-center justify-center rounded-full bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 border-2 border-[#EADBC8] flex-shrink-0 min-h-[44px] min-w-[44px] touch-manipulation`}
                       >
-                        <CalendarIcon className="w-4 h-4" />
-                        安排排班
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 text-sm bg-gradient-to-r from-red-400 to-red-500 text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-medium shadow-md"
-                        onClick={() => handleTeacherScheduleDelete(teacher)}
-                        title="刪除老師排班"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                        刪除排班
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 text-sm bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm"
-                        onClick={() => exportTeacherCSV(teacher)}
-                      >
-                        <DocumentArrowDownIcon className="w-4 h-4" />
-                        匯出 CSV
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 text-sm bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm"
-                        onClick={() => copyTeacherMarkdown(teacher)}
-                      >
-                        <ClipboardDocumentIcon className="w-4 h-4" />
-                        複製 Markdown
-                      </motion.button>
+                        {isExpanded ? (
+                          <ChevronUpIcon className={`${isMobile ? 'w-5 h-5' : 'w-6 h-6'} text-[#4B4036]`} />
+                        ) : (
+                          <ChevronDownIcon className={`${isMobile ? 'w-5 h-5' : 'w-6 h-6'} text-[#4B4036]`} />
+                        )}
+                      </motion.div>
                     </div>
                   </div>
-                  <div className="bg-white/50 rounded-xl overflow-hidden border border-[#EADBC8]">
-                    <table className="w-full min-w-max">
-                      <thead className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8]">
-                        <tr>
-                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">日期</th>
-                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">老師</th>
-                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">上班時間</th>
-                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">下班時間</th>
-                          <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedSchedules.map((sch, index) => (
-                          <motion.tr
-                            key={sch.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="hover:bg-gradient-to-r hover:from-[#FFF9F2]/50 hover:to-[#FFFDF8]/50 transition-colors"
-                          >
-                            <td className="p-4 border-b border-[#EADBC8] font-medium text-[#4B4036]">{sch.scheduled_date}</td>
-                            <td className="p-4 border-b border-[#EADBC8] text-[#2B3A3B]">{teacher.teacher_nickname || teacher.teacher_fullname}</td>
-                            <td className="p-4 border-b border-[#EADBC8]">
-                              <span className="px-3 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full text-sm font-medium">
-                                {sch.start_time?.slice(0, 5) || ''}
-                              </span>
-                            </td>
-                            <td className="p-4 border-b border-[#EADBC8]">
-                              <span className="px-3 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full text-sm font-medium">
-                                {sch.end_time?.slice(0, 5) || ''}
-                              </span>
-                            </td>
-                            <td className="p-4 border-b border-[#EADBC8]">
-                              <motion.button
-                                whileHover={{ scale: 1.1, rotate: 5 }}
-                                whileTap={{ scale: 0.9 }}
-                                className="px-3 py-1.5 bg-gradient-to-r from-red-400 to-red-500 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-1.5 text-xs font-medium shadow-md"
-                                onClick={() => handleSingleScheduleDelete(sch.id || '', teacher.teacher_nickname || teacher.teacher_fullname || '', sch.scheduled_date || '')}
-                                title="刪除此排班"
+
+                  {/* 展開狀態：顯示完整表格 */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <div className={`${isMobile ? 'px-4 pb-4' : 'px-6 pb-6'}`}>
+                          <div className={`flex ${isMobile ? 'flex-col' : 'flex-wrap'} gap-2 mb-4 pt-4 border-t border-[#EADBC8]`}>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className={`${isMobile ? 'w-full' : 'px-4'} py-2.5 lg:py-2 text-sm bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 font-medium shadow-md min-h-[44px] touch-manipulation`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTeacherScheduleClick(teacher);
+                              }}
+                              title="安排老師排班"
+                            >
+                              <CalendarIcon className="w-4 h-4" />
+                              安排排班
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className={`${isMobile ? 'w-full' : 'px-4'} py-2.5 lg:py-2 text-sm bg-gradient-to-r from-red-400 to-red-500 text-white rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 font-medium shadow-md min-h-[44px] touch-manipulation`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTeacherScheduleDelete(teacher);
+                              }}
+                              title="刪除老師排班"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                              刪除排班
+                            </motion.button>
+                            {!isMobile && (
+                              <>
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  className="px-4 py-2 text-sm bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    exportTeacherCSV(teacher);
+                                  }}
+                                >
+                                  <DocumentArrowDownIcon className="w-4 h-4" />
+                                  匯出 CSV
+                                </motion.button>
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  className="px-4 py-2 text-sm bg-white/70 border-2 border-[#EADBC8] text-[#4B4036] rounded-xl hover:bg-white transition-all flex items-center gap-2 font-medium shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyTeacherMarkdown(teacher);
+                                  }}
+                                >
+                                  <ClipboardDocumentIcon className="w-4 h-4" />
+                                  複製 Markdown
+                                </motion.button>
+                              </>
+                            )}
+                          </div>
+                          {/* 移動端：鎖定老師列，時間區域可橫向滾動；桌面端：完整表格 */}
+                          <div className={`bg-white/50 rounded-xl border border-[#EADBC8] ${isMobile ? 'overflow-hidden' : 'overflow-x-auto'}`}>
+                    {isMobile ? (
+                      // 移動端：鎖定老師列，時間區域可橫向滾動
+                      <div className="flex relative" style={{ width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
+                        {/* 鎖定的老師列 */}
+                        <div className="sticky left-0 z-20 bg-white/95 backdrop-blur-sm border-r-2 border-[#EADBC8] flex-shrink-0" style={{ width: '100px', minWidth: '100px' }}>
+                          <div className="p-2 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8]">
+                            <div className="text-[10px] font-bold text-[#4B4036] mb-1">老師</div>
+                            <div className="text-xs font-medium text-[#2B3A3B] truncate">{teacher.teacher_nickname || teacher.teacher_fullname}</div>
+                          </div>
+                          {sortedSchedules.map((sch, index) => (
+                            <div
+                              key={sch.id}
+                              className="p-2 border-b border-[#EADBC8] bg-white/90 min-h-[60px] flex items-center"
+                            >
+                              <div className="text-[10px] font-medium text-[#4B4036] truncate">{sch.scheduled_date}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* 可滾動的時間區域 */}
+                        <div 
+                          className="flex-1 overflow-x-auto touch-pan-x" 
+                          style={{ 
+                            WebkitOverflowScrolling: 'touch' as any,
+                            touchAction: 'pan-x',
+                            maxWidth: 'calc(100vw - 100px)'
+                          }}
+                          onTouchStart={(e) => {
+                            // 防止雙指縮放
+                            if (e.touches.length > 1) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onTouchMove={(e) => {
+                            // 只允許水平滾動
+                            if (e.touches.length > 1) {
+                              e.preventDefault();
+                            }
+                          }}
+                        >
+                          <div className="min-w-max" style={{ display: 'flex', flexDirection: 'column' }}>
+                            {/* 表頭 */}
+                            <div className="flex border-b border-[#EADBC8] bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] sticky top-0 z-10">
+                              <div className="p-2 border-r border-[#EADBC8] min-w-[90px] text-[10px] font-bold text-[#4B4036] text-center">日期</div>
+                              <div className="p-2 border-r border-[#EADBC8] min-w-[90px] text-[10px] font-bold text-[#4B4036] text-center">上班</div>
+                              <div className="p-2 border-r border-[#EADBC8] min-w-[90px] text-[10px] font-bold text-[#4B4036] text-center">下班</div>
+                              <div className="p-2 min-w-[140px] text-[10px] font-bold text-[#4B4036] text-center">操作</div>
+                            </div>
+                            {/* 表體 */}
+                            {sortedSchedules.map((sch, index) => (
+                              <motion.div
+                                key={sch.id}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.05 }}
+                                className="flex border-b border-[#EADBC8] bg-white/50 min-h-[60px]"
                               >
-                                <TrashIcon className="w-3.5 h-3.5" />
-                                刪除
-                              </motion.button>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                <div className="p-2 border-r border-[#EADBC8] min-w-[90px] font-medium text-[#4B4036] text-[10px] flex items-center justify-center">
+                                  {sch.scheduled_date}
+                                </div>
+                                <div className="p-2 border-r border-[#EADBC8] min-w-[90px] flex items-center justify-center">
+                                  <span className="px-2 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full text-[10px] font-medium whitespace-nowrap">
+                                    {sch.start_time?.slice(0, 5) || ''}
+                                  </span>
+                                </div>
+                                <div className="p-2 border-r border-[#EADBC8] min-w-[90px] flex items-center justify-center">
+                                  <span className="px-2 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full text-[10px] font-medium whitespace-nowrap">
+                                    {sch.end_time?.slice(0, 5) || ''}
+                                  </span>
+                                </div>
+                                <div className="p-2 min-w-[140px] flex items-center justify-center gap-1">
+                                  <motion.button
+                                    whileTap={{ scale: 0.9 }}
+                                    className="px-2 py-1.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-lg transition-all flex items-center justify-center gap-1 text-[10px] font-medium shadow-md min-h-[36px] min-w-[36px] touch-manipulation"
+                                    onClick={() => handleEditSchedule(sch, teacher)}
+                                    title="編輯"
+                                  >
+                                    <PencilIcon className="w-3.5 h-3.5" />
+                                  </motion.button>
+                                  <motion.button
+                                    whileTap={{ scale: 0.9 }}
+                                    className="px-2 py-1.5 bg-gradient-to-r from-red-400 to-red-500 text-white rounded-lg transition-all flex items-center justify-center gap-1 text-[10px] font-medium shadow-md min-h-[36px] min-w-[36px] touch-manipulation"
+                                    onClick={() => handleSingleScheduleDelete(sch.id || '', teacher.teacher_nickname || teacher.teacher_fullname || '', sch.scheduled_date || '')}
+                                    title="刪除此排班"
+                                  >
+                                    <TrashIcon className="w-3.5 h-3.5" />
+                                  </motion.button>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // 桌面端：完整表格，可橫向滾動
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-max">
+                          <thead className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8]">
+                            <tr>
+                              <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">日期</th>
+                              <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">老師</th>
+                              <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">上班時間</th>
+                              <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">下班時間</th>
+                              <th className="p-4 border-b border-[#EADBC8] text-left text-sm font-bold text-[#4B4036]">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedSchedules.map((sch, index) => (
+                              <motion.tr
+                                key={sch.id}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.05 }}
+                                className="hover:bg-gradient-to-r hover:from-[#FFF9F2]/50 hover:to-[#FFFDF8]/50 transition-colors"
+                              >
+                                <td className="p-4 border-b border-[#EADBC8] font-medium text-[#4B4036]">{sch.scheduled_date}</td>
+                                <td className="p-4 border-b border-[#EADBC8] text-[#2B3A3B]">{teacher.teacher_nickname || teacher.teacher_fullname}</td>
+                                <td className="p-4 border-b border-[#EADBC8]">
+                                  <span className="px-3 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full text-sm font-medium">
+                                    {sch.start_time?.slice(0, 5) || ''}
+                                  </span>
+                                </td>
+                                <td className="p-4 border-b border-[#EADBC8]">
+                                  <span className="px-3 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full text-sm font-medium">
+                                    {sch.end_time?.slice(0, 5) || ''}
+                                  </span>
+                                </td>
+                                <td className="p-4 border-b border-[#EADBC8]">
+                                  <div className="flex items-center gap-2">
+                                    <motion.button
+                                      whileHover={{ scale: 1.1, rotate: 5 }}
+                                      whileTap={{ scale: 0.9 }}
+                                      className="px-3 py-1.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-1.5 text-xs font-medium shadow-md"
+                                      onClick={() => handleEditSchedule(sch, teacher)}
+                                      title="編輯"
+                                    >
+                                      <PencilIcon className="w-3.5 h-3.5" />
+                                      編輯
+                                    </motion.button>
+                                    <motion.button
+                                      whileHover={{ scale: 1.1, rotate: 5 }}
+                                      whileTap={{ scale: 0.9 }}
+                                      className="px-3 py-1.5 bg-gradient-to-r from-red-400 to-red-500 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-1.5 text-xs font-medium shadow-md"
+                                      onClick={() => handleSingleScheduleDelete(sch.id || '', teacher.teacher_nickname || teacher.teacher_fullname || '', sch.scheduled_date || '')}
+                                      title="刪除此排班"
+                                    >
+                                      <TrashIcon className="w-3.5 h-3.5" />
+                                      刪除
+                                    </motion.button>
+                                  </div>
+                                </td>
+                              </motion.tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               );
             })}
@@ -1321,7 +1883,10 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between mb-6 bg-white/70 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-[#EADBC8]"
+            className={`flex items-center justify-between mb-6 bg-white/70 backdrop-blur-sm ${isMobile ? 'rounded-xl p-3' : 'rounded-2xl p-4'} shadow-lg border border-[#EADBC8]`}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
           >
             <motion.button
               whileHover={{ scale: 1.1, x: -2 }}
@@ -1339,30 +1904,36 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
               transition={{ duration: 0.3 }}
               className="flex items-center gap-3"
             >
-              <CalendarIcon className="w-6 h-6 text-[#FFB6C1]" />
-              <h2 className="text-2xl font-bold text-[#4B4036]">
+              {!isMobile && <CalendarIcon className="w-6 h-6 text-[#FFB6C1]" />}
+              <h2 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-[#4B4036]`}>
                 {format(currentMonth, 'yyyy年MM月')}
               </h2>
+              {isMobile && (
+                <span className="text-xs text-[#A68A64] ml-2">左右滑動切換</span>
+              )}
             </motion.div>
             <motion.button
               whileHover={{ scale: 1.1, x: 2 }}
               whileTap={{ scale: 0.95 }}
               aria-label="Next Month"
               onClick={handleNextMonth}
-              className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center justify-center"
+              className={`${isMobile ? 'px-3 py-2.5' : 'px-4 py-2'} bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center justify-center min-h-[44px] min-w-[44px] touch-manipulation`}
             >
-              <ChevronRightIcon className="w-5 h-5" />
+              <ChevronRightIcon className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'}`} />
             </motion.button>
           </motion.div>
         )}
 
         {viewMode === 'calendar' ? (
           <div 
-            className="grid grid-cols-7 gap-3 text-center"
+            className={`grid grid-cols-7 ${isMobile ? 'gap-0.5' : 'gap-3'} text-center`}
             onDragOver={editMode ? (e) => {
               e.preventDefault();
               handleAutoScroll(e);
             } : undefined}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
           >
             {['日', '一', '二', '三', '四', '五', '六'].map((day, index) => (
               <motion.div
@@ -1370,7 +1941,7 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="font-bold text-[#4B4036] pb-2 text-sm bg-gradient-to-br from-[#FFD59A]/20 to-[#FFB6C1]/20 rounded-lg px-2 py-2 border border-[#EADBC8]/50"
+                className={`font-bold text-[#4B4036] pb-2 ${isMobile ? 'text-xs' : 'text-sm'} bg-gradient-to-br from-[#FFD59A]/20 to-[#FFB6C1]/20 rounded-lg ${isMobile ? 'px-1 py-1' : 'px-2 py-2'} border border-[#EADBC8]/50`}
               >
                 {day}
               </motion.div>
@@ -1392,10 +1963,12 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
               return (
                 <motion.div
                   key={dateStr}
+                  data-date-cell
+                  data-date={dateStr}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: dayIndex * 0.02 }}
-                  whileHover={editMode ? {} : { 
+                  whileHover={editMode || isMobile ? {} : { 
                     y: -4, 
                     scale: 1.02,
                     boxShadow: "0 10px 25px rgba(255, 182, 193, 0.2)"
@@ -1404,7 +1977,7 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                     scheduledTeachers.length > 0 
                       ? 'from-white/90 to-white/70' 
                       : 'from-white/50 to-white/30'
-                  } backdrop-blur-sm rounded-xl p-2 flex flex-col justify-between min-h-[140px] transition-all duration-300 border-2 ${
+                  } backdrop-blur-sm ${isMobile ? 'rounded-lg' : 'rounded-xl'} ${isMobile ? 'p-1' : 'p-2'} flex flex-col justify-between ${isMobile ? 'min-h-[80px]' : 'min-h-[140px]'} transition-all duration-300 border-2 ${
                     isToday 
                       ? 'border-[#FFB6C1] shadow-lg ring-2 ring-[#FFB6C1]/30' 
                       : 'border-[#EADBC8]'
@@ -1412,7 +1985,7 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                     editMode ? 'cursor-default' : 'cursor-pointer'
                   } ${
                     dragOverDate === dateStr ? 'bg-gradient-to-br from-[#FFE8C2] to-[#FFD59A] border-[#FFB6C1] shadow-xl scale-105' : ''
-                  }`}
+                  } touch-manipulation active:scale-95`}
                   style={{ overflow: 'hidden' }}
                   onClick={editMode ? undefined : () => handleDateClick(day)}
                   onDragOver={editMode ? (e) => {
@@ -1442,10 +2015,10 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                   
                   <div className="relative z-10">
                     {/* 日期數字 */}
-                    <div className="flex items-center justify-between mb-2">
+                    <div className={`flex items-center justify-between ${isMobile ? 'mb-1' : 'mb-2'}`}>
                       <motion.span
                         whileHover={{ scale: 1.1 }}
-                        className={`text-sm font-bold ${
+                        className={`${isMobile ? 'text-xs' : 'text-sm'} font-bold ${
                           isToday 
                             ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white px-2 py-0.5 rounded-full' 
                             : 'text-[#4B4036]'
@@ -1453,7 +2026,7 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                       >
                         {day.getDate()}
                       </motion.span>
-                      {isToday && (
+                      {isToday && !isMobile && (
                         <motion.div
                           animate={{ scale: [1, 1.2, 1] }}
                           transition={{ duration: 2, repeat: Infinity }}
@@ -1461,32 +2034,66 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                         />
                       )}
                     </div>
-                    <div className="flex flex-col gap-2 w-full">
-                      {scheduledTeachers.length > 0 ? scheduledTeachers.map((t, teacherIndex) => {
-                        if (!t) return null;
-                        const schedule = currentSchedules.find(s => s.teacher_id === t.id && s.scheduled_date === dateStr);
+                    {/* 移動端：只顯示統計信息 */}
+                    {isMobile ? (
+                      <div className="flex flex-col gap-1 w-full">
+                        {scheduledTeachers.length > 0 && (
+                          <div className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFE8C2]/50 to-[#FFD59A]/50 rounded px-2 py-1">
+                            <UserIcon className="w-3 h-3 text-[#4B4036]" />
+                            <span className="text-[10px] font-bold text-[#4B4036]">{scheduledTeachers.length}</span>
+                          </div>
+                        )}
+                        {lessonCount > 0 && (
+                          <div className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFB6C1]/50 to-[#FFD59A]/50 rounded px-2 py-1">
+                            <CalendarIcon className="w-3 h-3 text-[#4B4036]" />
+                            <span className="text-[10px] font-bold text-[#4B4036]">{lessonCount}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className={`flex flex-col gap-2 w-full`}>
+                        {/* 學生數量 - 桌面端，顯示在老師之上，可點擊 */}
+                        {!isMobile && lessonCount > 0 && (
+                          <motion.button
+                            initial={{ opacity: 0, scale: 0 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDateClick(day);
+                            }}
+                            className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFB6C1]/30 to-[#FFD59A]/30 rounded-full px-3 py-1.5 border border-[#EADBC8] cursor-pointer transition-all duration-200 hover:from-[#FFB6C1]/50 hover:to-[#FFD59A]/50 hover:shadow-md"
+                          >
+                            <SparklesIcon className="w-3.5 h-3.5 text-[#FFB6C1]" />
+                            <span className="text-xs font-bold text-[#4B4036]">{lessonCount} 學生</span>
+                          </motion.button>
+                        )}
+                        {scheduledTeachers.length > 0 ? scheduledTeachers.map((t, teacherIndex) => {
+                          if (!t) return null;
+                          const schedule = currentSchedules.find(s => s.teacher_id === t.id && s.scheduled_date === dateStr);
                         return (
                           <motion.div
                             key={t.id}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: teacherIndex * 0.1 }}
-                            whileHover={{ scale: 1.05, y: -2 }}
+                            whileHover={isMobile ? {} : { scale: 1.05, y: -2 }}
                             className={`w-full max-w-full bg-gradient-to-br ${
                               editMode && schedule && 'confirmed' in schedule && schedule.confirmed 
                                 ? 'from-[#FFB6C1] to-[#FFD59A] border-[#FFB6C1] ring-2 ring-[#FFB6C1]/50 shadow-lg' 
                                 : 'from-[#FFE8C2] to-[#FFD59A] border-[#EADBC8]'
-                            } rounded-lg shadow-md flex flex-col items-center p-1.5 overflow-hidden border-2 min-w-0 transition-all duration-300 hover:shadow-xl ${
-                              editMode ? 'p-2' : 'p-1.5'
+                            } ${isMobile ? 'rounded' : 'rounded-lg'} shadow-md flex flex-col items-center ${isMobile ? 'p-1' : 'p-1.5'} overflow-hidden border-2 min-w-0 transition-all duration-300 ${isMobile ? '' : 'hover:shadow-xl'} ${
+                              editMode ? (isMobile ? 'p-1' : 'p-2') : (isMobile ? 'p-1' : 'p-1.5')
                             }`}
                             style={{ zIndex: 10, marginBottom: 2 }}
                             onClick={e => e.stopPropagation()}
                           >
-                            <div className="flex flex-col items-center w-full gap-1">
+                            <div className={`flex flex-col items-center w-full ${isMobile ? 'gap-0.5' : 'gap-1'}`}>
                               {/* 老師名字 */}
                               <motion.span
-                                whileHover={{ scale: 1.1 }}
-                                className={`text-xs font-bold w-full text-center bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 shadow-sm transition-all duration-200 ${
+                                whileHover={isMobile ? {} : { scale: 1.1 }}
+                                className={`${isMobile ? 'text-[10px]' : 'text-xs'} font-bold w-full text-center bg-white/90 backdrop-blur-sm rounded-full ${isMobile ? 'px-1 py-0.5' : 'px-2 py-1'} shadow-sm transition-all duration-200 ${
                                   editMode && schedule && 'confirmed' in schedule && schedule.confirmed 
                                     ? 'text-[#4B4036] bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 ring-2 ring-[#FFB6C1]' 
                                     : 'text-[#4B4036]'
@@ -1542,119 +2149,110 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
                                 </div>
                               )}
                             </div>
-                            {/* 時間顯示區域 */}
-                            <div className="flex flex-col items-center gap-1 mt-1 w-full px-1">
-                              {/* 編輯模式：24小時制時間輸入框 */}
-                              {editMode && (
-                                <div className="flex flex-col items-center gap-1 w-full">
-                                  {/* 起始時間 */}
-                                  <div className="w-full relative">
-                                    <input
-                                      className="w-full text-[10px] sm:text-[11px] px-2 py-1 bg-white/90 backdrop-blur-sm border-2 border-[#EADBC8] rounded-lg text-center flex-shrink-0 min-w-[60px] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] transition-all"
-                                      type="text"
-                                      pattern="[0-9]{2}:[0-9]{2}"
-                                      placeholder="HH:MM"
-                                      value={schedule?.start_time?.slice(0, 5) || '09:00'}
-                                      onChange={e => {
-                                        const value = e.target.value;
-                                        // 格式化輸入為 HH:MM
-                                        let formatted = value.replace(/[^\d:]/g, '');
-                                        if (formatted.length === 4 && !formatted.includes(':')) {
-                                          formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
-                                        }
-                                        handleScheduleTimeChange(t.id, dateStr, 'start_time', formatted);
-                                      }}
-                                      onBlur={e => {
-                                        const value = e.target.value;
-                                        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-                                        if (!timeRegex.test(value)) {
-                                          handleScheduleTimeChange(t.id, dateStr, 'start_time', '09:00');
-                                        }
-                                      }}
-                                    />
+                            {/* 時間顯示區域 - 僅桌面端顯示 */}
+                            {!isMobile && (
+                              <div className="flex flex-col items-center gap-1 mt-1 w-full px-1">
+                                {/* 編輯模式：24小時制時間輸入框 */}
+                                {editMode && (
+                                  <div className="flex flex-col items-center gap-1 w-full">
+                                    {/* 起始時間 */}
+                                    <div className="w-full relative">
+                                      <input
+                                        className="w-full text-[10px] lg:text-[11px] px-2 py-1 bg-white/90 backdrop-blur-sm border-2 border-[#EADBC8] rounded-lg text-center flex-shrink-0 min-w-[60px] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] transition-all"
+                                        type="text"
+                                        pattern="[0-9]{2}:[0-9]{2}"
+                                        placeholder="HH:MM"
+                                        value={schedule?.start_time?.slice(0, 5) || '09:00'}
+                                        onChange={e => {
+                                          const value = e.target.value;
+                                          // 格式化輸入為 HH:MM
+                                          let formatted = value.replace(/[^\d:]/g, '');
+                                          if (formatted.length === 4 && !formatted.includes(':')) {
+                                            formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
+                                          }
+                                          handleScheduleTimeChange(t.id, dateStr, 'start_time', formatted);
+                                        }}
+                                        onBlur={e => {
+                                          const value = e.target.value;
+                                          const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                                          if (!timeRegex.test(value)) {
+                                            handleScheduleTimeChange(t.id, dateStr, 'start_time', '09:00');
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    {/* 分隔符號 */}
+                                    <motion.span
+                                      animate={{ scale: [1, 1.2, 1] }}
+                                      transition={{ duration: 2, repeat: Infinity }}
+                                      className="text-[10px] lg:text-[11px] text-[#FFB6C1] font-bold flex-shrink-0"
+                                    >
+                                      →
+                                    </motion.span>
+                                    {/* 結束時間 */}
+                                    <div className="w-full relative">
+                                      <input
+                                        className="w-full text-[10px] lg:text-[11px] px-2 py-1 bg-white/90 backdrop-blur-sm border-2 border-[#EADBC8] rounded-lg text-center flex-shrink-0 min-w-[60px] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] transition-all"
+                                        type="text"
+                                        pattern="[0-9]{2}:[0-9]{2}"
+                                        placeholder="HH:MM"
+                                        value={schedule?.end_time?.slice(0, 5) || '18:00'}
+                                        onChange={e => {
+                                          const value = e.target.value;
+                                          // 格式化輸入為 HH:MM
+                                          let formatted = value.replace(/[^\d:]/g, '');
+                                          if (formatted.length === 4 && !formatted.includes(':')) {
+                                            formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
+                                          }
+                                          handleScheduleTimeChange(t.id, dateStr, 'end_time', formatted);
+                                        }}
+                                        onBlur={e => {
+                                          const value = e.target.value;
+                                          const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                                          if (!timeRegex.test(value)) {
+                                            handleScheduleTimeChange(t.id, dateStr, 'end_time', '18:00');
+                                          }
+                                        }}
+                                      />
+                                    </div>
                                   </div>
-                                  {/* 分隔符號 */}
-                                  <motion.span
-                                    animate={{ scale: [1, 1.2, 1] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                    className="text-[10px] sm:text-[11px] text-[#FFB6C1] font-bold flex-shrink-0"
-                                  >
-                                    →
-                                  </motion.span>
-                                  {/* 結束時間 */}
-                                  <div className="w-full relative">
-                                    <input
-                                      className="w-full text-[10px] sm:text-[11px] px-2 py-1 bg-white/90 backdrop-blur-sm border-2 border-[#EADBC8] rounded-lg text-center flex-shrink-0 min-w-[60px] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] transition-all"
-                                      type="text"
-                                      pattern="[0-9]{2}:[0-9]{2}"
-                                      placeholder="HH:MM"
-                                      value={schedule?.end_time?.slice(0, 5) || '18:00'}
-                                      onChange={e => {
-                                        const value = e.target.value;
-                                        // 格式化輸入為 HH:MM
-                                        let formatted = value.replace(/[^\d:]/g, '');
-                                        if (formatted.length === 4 && !formatted.includes(':')) {
-                                          formatted = formatted.slice(0, 2) + ':' + formatted.slice(2);
-                                        }
-                                        handleScheduleTimeChange(t.id, dateStr, 'end_time', formatted);
-                                      }}
-                                      onBlur={e => {
-                                        const value = e.target.value;
-                                        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-                                        if (!timeRegex.test(value)) {
-                                          handleScheduleTimeChange(t.id, dateStr, 'end_time', '18:00');
-                                        }
-                                      }}
-                                    />
+                                )}
+                                {/* 美化時間文字顯示 - 編輯和非編輯模式都顯示 */}
+                                <motion.div
+                                  whileHover={{ scale: 1.05 }}
+                                  className="text-center w-full mt-1"
+                                >
+                                  <div className="bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] rounded-full px-2 py-1.5 shadow-md border-2 border-[#EADBC8] transition-all duration-200">
+                                    <span className="text-[#4B4036] font-bold text-xs lg:text-sm">
+                                      {schedule?.start_time?.slice(0, 5) || schedule?.start_time || '09:00'}
+                                    </span>
+                                    <motion.span
+                                      animate={{ scale: [1, 1.2, 1] }}
+                                      transition={{ duration: 2, repeat: Infinity }}
+                                      className="text-[#FFB6C1] mx-1 font-bold"
+                                    >
+                                      →
+                                    </motion.span>
+                                    <span className="text-[#4B4036] font-bold text-xs lg:text-sm">
+                                      {schedule?.end_time?.slice(0, 5) || schedule?.end_time || '18:00'}
+                                    </span>
                                   </div>
-                                </div>
-                              )}
-                              {/* 美化時間文字顯示 - 編輯和非編輯模式都顯示 */}
-                              <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                className="text-center w-full mt-1"
-                              >
-                                <div className="bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] rounded-full px-2 py-1.5 shadow-md border-2 border-[#EADBC8] transition-all duration-200">
-                                  <span className="text-[#4B4036] font-bold text-xs sm:text-sm">
-                                    {schedule?.start_time?.slice(0, 5) || schedule?.start_time || '09:00'}
-                                  </span>
-                                  <motion.span
-                                    animate={{ scale: [1, 1.2, 1] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                    className="text-[#FFB6C1] mx-1 font-bold"
-                                  >
-                                    →
-                                  </motion.span>
-                                  <span className="text-[#4B4036] font-bold text-xs sm:text-sm">
-                                    {schedule?.end_time?.slice(0, 5) || schedule?.end_time || '18:00'}
-                                  </span>
-                                </div>
-                              </motion.div>
-                            </div>
+                                </motion.div>
+                              </div>
+                            )}
                           </motion.div>
                         );
-                      }) : (
-                        <motion.span
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-[#aaa] text-xs italic"
-                        >
-                          無排班
-                        </motion.span>
-                      )}
-                    </div>
-                    
-                    {/* 課程數量 */}
-                    {lessonCount > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ scale: 1.1 }}
-                        className="mt-2 flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFB6C1]/30 to-[#FFD59A]/30 rounded-full px-3 py-1.5 border border-[#EADBC8]"
-                      >
-                        <SparklesIcon className="w-3.5 h-3.5 text-[#FFB6C1]" />
-                        <span className="text-xs font-bold text-[#4B4036]">{lessonCount} 課程</span>
-                      </motion.div>
+                      }) : null}
+                        {scheduledTeachers.length === 0 && (
+                          <motion.span
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-[#aaa] text-xs italic"
+                          >
+                            無排班
+                          </motion.span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -1850,22 +2448,37 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
         )}
       </AnimatePresence>
 
-      {/* 安排老師彈窗 */}
+      {/* 安排老師彈窗 - 移動端優化 */}
       {showArrangeTeacher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-[#FFFDF8] rounded-2xl shadow-2xl p-8 w-[400px] max-h-[90vh] overflow-y-auto border border-[#EADBC8] relative">
+        <motion.div
+          ref={arrangeTeacherModalRef}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center bg-black/20"
+          onClick={() => setShowArrangeTeacher(false)}
+          style={{ paddingBottom: isMobile ? '80px' : '0' }}
+        >
+          <motion.div
+            initial={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className={`bg-[#FFFDF8] ${isMobile ? 'rounded-t-3xl' : 'rounded-2xl'} shadow-2xl ${isMobile ? 'p-6 w-full' : 'p-8 w-[400px]'} ${isMobile ? 'max-h-[calc(100vh-100px)]' : 'max-h-[90vh]'} overflow-y-auto border border-[#EADBC8] relative`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               aria-label="關閉"
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow"
+              className={`absolute ${isMobile ? 'top-4 right-4' : 'top-3 right-3'} ${isMobile ? 'w-10 h-10' : 'w-8 h-8'} flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow min-h-[44px] min-w-[44px] touch-manipulation`}
               onClick={() => setShowArrangeTeacher(false)}
             >
               <img src="/close.png" alt="close" className="w-4 h-4" />
             </button>
-            <div className="text-xl font-bold mb-4 text-[#4B4036]">安排老師</div>
+            <div className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold mb-4 text-[#4B4036]`}>安排老師</div>
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">選擇老師：</label>
+              <label className={`block ${isMobile ? 'text-base' : 'text-sm'} font-medium mb-1`}>選擇老師：</label>
               <button
-                className="w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                className={`w-full text-left border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg ${isMobile ? 'px-4 py-3 text-base' : 'px-4 py-2'} shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64] min-h-[44px] touch-manipulation`}
                 onClick={() => setShowTeacherPopup(true)}
               >
                 {selectedTeacher.teacher_id
@@ -1874,36 +2487,40 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
               </button>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">上班時間</label>
-              <TimePicker
-                value={selectedTeacher.start_time}
-                onChange={(time) => setSelectedTeacher(prev => ({ ...prev, start_time: time }))}
-              />
+              <label className={`block ${isMobile ? 'text-base' : 'text-sm'} font-medium mb-1`}>上班時間</label>
+              <div className={isMobile ? 'text-base' : ''}>
+                <TimePicker
+                  value={selectedTeacher.start_time}
+                  onChange={(time) => setSelectedTeacher(prev => ({ ...prev, start_time: time }))}
+                />
+              </div>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">下班時間</label>
-              <TimePicker
-                value={selectedTeacher.end_time}
-                onChange={(time) => setSelectedTeacher(prev => ({ ...prev, end_time: time }))}
-              />
+              <label className={`block ${isMobile ? 'text-base' : 'text-sm'} font-medium mb-1`}>下班時間</label>
+              <div className={isMobile ? 'text-base' : ''}>
+                <TimePicker
+                  value={selectedTeacher.end_time}
+                  onChange={(time) => setSelectedTeacher(prev => ({ ...prev, end_time: time }))}
+                />
+              </div>
             </div>
             {errorMsg && <div className="text-red-500 text-sm mb-2">{errorMsg}</div>}
-            <div className="flex justify-end gap-2 mt-6">
+            <div className={`flex ${isMobile ? 'flex-col-reverse' : 'justify-end'} gap-2 mt-6`}>
               <button
-                className="px-4 py-2 bg-gray-200 rounded-full text-sm text-[#4B4036]"
+                className={`${isMobile ? 'w-full' : 'px-4'} py-3 bg-gray-200 rounded-full text-sm text-[#4B4036] min-h-[44px] touch-manipulation`}
                 onClick={() => setShowArrangeTeacher(false)}
               >
                 取消
               </button>
               <button
-                className="px-4 py-2 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036]"
+                className={`${isMobile ? 'w-full' : 'px-4'} py-3 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036] min-h-[44px] touch-manipulation disabled:opacity-50`}
                 disabled={loading}
                 onClick={handleSaveTeacherSchedule}
               >
                 {loading ? '儲存中...' : '儲存'}
               </button>
             </div>
-          </div>
+          </motion.div>
           {/* PopupSelect 只在需要時彈出 */}
           {showTeacherPopup && (
           <PopupSelect
@@ -1922,29 +2539,42 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
             }}
           />
           )}
-        </div>
+        </motion.div>
       )}
 
-      {/* 日期老師選擇彈窗 */}
+      {/* 日期老師選擇彈窗 - 移動端優化 */}
       {showDateTeacherSelect && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-[#FFFDF8] rounded-2xl shadow-2xl p-8 w-[500px] max-h-[90vh] overflow-y-auto border border-[#EADBC8] relative">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/20"
+          onClick={() => setShowDateTeacherSelect(false)}
+        >
+          <motion.div
+            initial={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className={`bg-[#FFFDF8] ${isMobile ? 'rounded-t-3xl' : 'rounded-2xl'} shadow-2xl ${isMobile ? 'p-6 w-full' : 'p-8 w-[500px]'} max-h-[90vh] overflow-y-auto border border-[#EADBC8] relative`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               aria-label="關閉"
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow"
+              className={`absolute ${isMobile ? 'top-4 right-4' : 'top-3 right-3'} ${isMobile ? 'w-10 h-10' : 'w-8 h-8'} flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow min-h-[44px] min-w-[44px] touch-manipulation`}
               onClick={() => setShowDateTeacherSelect(false)}
             >
               <img src="/close.png" alt="close" className="w-4 h-4" />
             </button>
             
-            <div className="text-xl font-bold mb-4 text-[#4B4036]">
+            <div className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold mb-4 text-[#4B4036]`}>
               安排老師排班 - {selectedDate}
             </div>
 
             {/* 老師選擇區域 */}
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-3 text-[#4B4036]">選擇老師：</label>
-              <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto">
+              <label className={`block ${isMobile ? 'text-sm' : 'text-sm'} font-medium mb-3 text-[#4B4036]`}>選擇老師：</label>
+              <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-3 ${isMobile ? 'max-h-60' : 'max-h-40'} overflow-y-auto`}>
                 {teachers.map(teacher => (
                   <label
                     key={teacher.id}
@@ -1971,24 +2601,24 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
 
             {/* 時間設置區域 */}
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-3 text-[#4B4036]">上班時間：</label>
-              <div className="flex items-center gap-4">
+              <label className={`block ${isMobile ? 'text-base' : 'text-sm'} font-medium mb-3 text-[#4B4036]`}>上班時間：</label>
+              <div className={`flex ${isMobile ? 'flex-col' : 'items-center'} gap-4`}>
                 <div className="flex-1">
-                  <label className="block text-xs text-[#A68A64] mb-1">開始時間</label>
+                  <label className={`block ${isMobile ? 'text-sm' : 'text-xs'} text-[#A68A64] mb-1`}>開始時間</label>
                   <input
                     type="time"
                     value={selectedTimeRange.start_time}
                     onChange={(e) => handleTimeRangeChange('start_time', e.target.value)}
-                    className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                    className={`w-full ${isMobile ? 'px-4 py-3 text-base' : 'px-3 py-2'} border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64] min-h-[44px] touch-manipulation`}
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs text-[#A68A64] mb-1">結束時間</label>
+                  <label className={`block ${isMobile ? 'text-sm' : 'text-xs'} text-[#A68A64] mb-1`}>結束時間</label>
                   <input
                     type="time"
                     value={selectedTimeRange.end_time}
                     onChange={(e) => handleTimeRangeChange('end_time', e.target.value)}
-                    className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
+                    className={`w-full ${isMobile ? 'px-4 py-3 text-base' : 'px-3 py-2'} border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64] min-h-[44px] touch-manipulation`}
                   />
                 </div>
               </div>
@@ -2013,39 +2643,52 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
 
             {errorMsg && <div className="text-red-500 text-sm mb-4">{errorMsg}</div>}
 
-            {/* 操作按鈕 */}
-            <div className="flex justify-end gap-3">
+            {/* 操作按鈕 - 移動端優化 */}
+            <div className={`flex ${isMobile ? 'flex-col-reverse' : 'justify-end'} gap-3`}>
               <button
-                className="px-6 py-2 bg-gray-200 rounded-full text-sm text-[#4B4036] hover:bg-gray-300 transition-colors"
+                className={`${isMobile ? 'w-full' : 'px-6'} py-3 bg-gray-200 rounded-full text-sm text-[#4B4036] hover:bg-gray-300 transition-colors min-h-[44px] touch-manipulation`}
                 onClick={() => setShowDateTeacherSelect(false)}
               >
                 取消
               </button>
               <button
-                className="px-6 py-2 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036] hover:bg-[#DDBA90] transition-colors disabled:opacity-50"
+                className={`${isMobile ? 'w-full' : 'px-6'} py-3 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036] hover:bg-[#DDBA90] transition-colors disabled:opacity-50 min-h-[44px] touch-manipulation`}
                 disabled={loading || selectedTeachersForDate.length === 0}
                 onClick={handleBatchScheduleTeachers}
               >
                 {loading ? '安排中...' : '安排排班'}
               </button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
 
-      {/* 單個老師排班彈窗 */}
+      {/* 單個老師排班彈窗 - 移動端優化 */}
       {showSingleTeacherSchedule && selectedSingleTeacher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-[#FFFDF8] rounded-2xl shadow-2xl p-8 w-[450px] max-h-[90vh] overflow-y-auto border border-[#EADBC8] relative">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/20"
+          onClick={() => setShowSingleTeacherSchedule(false)}
+        >
+          <motion.div
+            initial={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className={`bg-[#FFFDF8] ${isMobile ? 'rounded-t-3xl' : 'rounded-2xl'} shadow-2xl ${isMobile ? 'p-6 w-full' : 'p-8 w-[450px]'} max-h-[90vh] overflow-y-auto border border-[#EADBC8] relative`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               aria-label="關閉"
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow"
+              className={`absolute ${isMobile ? 'top-4 right-4' : 'top-3 right-3'} ${isMobile ? 'w-10 h-10' : 'w-8 h-8'} flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow min-h-[44px] min-w-[44px] touch-manipulation`}
               onClick={() => setShowSingleTeacherSchedule(false)}
             >
               <img src="/close.png" alt="close" className="w-4 h-4" />
             </button>
             
-            <div className="text-xl font-bold mb-4 text-[#4B4036]">
+            <div className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold mb-4 text-[#4B4036]`}>
               安排老師排班
             </div>
 
@@ -2102,25 +2745,25 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
 
             {errorMsg && <div className="text-red-500 text-sm mb-4">{errorMsg}</div>}
 
-            {/* 操作按鈕 */}
-            <div className="flex justify-end gap-3">
+            {/* 操作按鈕 - 移動端優化 */}
+            <div className={`flex ${isMobile ? 'flex-col-reverse' : 'justify-end'} gap-3`}>
               <button
-                className="px-6 py-2 bg-gray-200 rounded-full text-sm text-[#4B4036] hover:bg-gray-300 transition-colors"
+                className={`${isMobile ? 'w-full' : 'px-6'} py-3 bg-gray-200 rounded-full text-sm text-[#4B4036] hover:bg-gray-300 transition-colors min-h-[44px] touch-manipulation disabled:opacity-50`}
                 onClick={() => setShowSingleTeacherSchedule(false)}
                 disabled={loading}
               >
                 取消
               </button>
               <button
-                className="px-6 py-2 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036] hover:bg-[#DDBA90] transition-colors disabled:opacity-50"
+                className={`${isMobile ? 'w-full' : 'px-6'} py-3 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036] hover:bg-[#DDBA90] transition-colors disabled:opacity-50 min-h-[44px] touch-manipulation`}
                 disabled={loading}
                 onClick={handleSingleTeacherSchedule}
               >
                 {loading ? '安排中...' : '安排排班'}
               </button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
 
       {/* Message Display */}
@@ -2139,6 +2782,268 @@ export default function TeacherShiftCalendar({ teacherIds, orgId }: TeacherSched
               <img alt="warning" className="w-4 h-4" src="/close.png" />
             )}
             <span>{errorMsg}</span>
+          </div>
+        </div>
+      )}
+
+      {/* 日期詳情彈窗 - 移動端 */}
+      {showDateDetailModal && selectedDateDetail && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center bg-black/20"
+          onClick={() => setShowDateDetailModal(false)}
+          style={{ paddingBottom: isMobile ? '80px' : '0' }}
+        >
+          <motion.div
+            initial={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className={`bg-[#FFFDF8] ${isMobile ? 'rounded-t-3xl' : 'rounded-2xl'} shadow-2xl ${isMobile ? 'p-6 w-full' : 'p-8 w-[500px]'} ${isMobile ? 'max-h-[calc(100vh-100px)]' : 'max-h-[90vh]'} overflow-y-auto border border-[#EADBC8] relative`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              aria-label="關閉"
+              className={`absolute ${isMobile ? 'top-4 right-4' : 'top-3 right-3'} ${isMobile ? 'w-10 h-10' : 'w-8 h-8'} flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow min-h-[44px] min-w-[44px] touch-manipulation`}
+              onClick={() => setShowDateDetailModal(false)}
+            >
+              <img src="/close.png" alt="close" className="w-4 h-4" />
+            </button>
+            
+            <div className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold mb-4 text-[#4B4036]`}>
+              {selectedDateDetail.date}
+            </div>
+
+            {/* 統計信息 */}
+            <div className="mb-6 grid grid-cols-2 gap-4">
+              <div className="p-4 bg-gradient-to-br from-[#FFE8C2] to-[#FFD59A] rounded-xl border-2 border-[#EADBC8]">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserIcon className="w-5 h-5 text-[#4B4036]" />
+                  <span className="text-sm font-medium text-[#4B4036]">老師</span>
+                </div>
+                <div className="text-2xl font-bold text-[#4B4036]">{selectedDateDetail.teachers.length}</div>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-xl border-2 border-[#EADBC8]">
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarIcon className="w-5 h-5 text-[#4B4036]" />
+                  <span className="text-sm font-medium text-[#4B4036]">學生</span>
+                </div>
+                <div className="text-2xl font-bold text-[#4B4036]">{selectedDateDetail.lessonCount}</div>
+              </div>
+            </div>
+
+            {/* 老師列表 */}
+            {selectedDateDetail.teachers.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-base font-bold mb-3 text-[#4B4036]">排班老師</h3>
+                <div className="space-y-3">
+                  {selectedDateDetail.teachers.map((teacher) => {
+                    const schedule = selectedDateDetail.schedules.find(s => s.teacher_id === teacher.id);
+                    return (
+                      <motion.div
+                        key={teacher.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 bg-gradient-to-br from-white/90 to-white/70 rounded-xl border-2 border-[#EADBC8] shadow-md"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] p-1">
+                              <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                                <UserIcon className="w-4 h-4 text-[#4B4036]" />
+                              </div>
+                            </div>
+                            <span className="font-bold text-[#4B4036]">{teacher.teacher_nickname || teacher.teacher_fullname}</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.9 }}
+                            className="px-3 py-1.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-lg transition-all flex items-center gap-1.5 text-xs font-medium shadow-md min-h-[36px] touch-manipulation"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (schedule && 'id' in schedule) {
+                                handleEditSchedule(schedule as Schedule, teacher);
+                                // 延迟关闭日期详情弹窗，确保编辑弹窗先打开
+                                setTimeout(() => {
+                                  setShowDateDetailModal(false);
+                                }, 100);
+                              }
+                            }}
+                            title="編輯"
+                          >
+                            <PencilIcon className="w-3.5 h-3.5" />
+                            編輯
+                          </motion.button>
+                        </div>
+                        {schedule && (
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[#A68A64]">上班：</span>
+                              <span className="px-2 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full font-medium">
+                                {schedule.start_time?.slice(0, 5) || ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[#A68A64]">下班：</span>
+                              <span className="px-2 py-1 bg-gradient-to-r from-[#FFE8C2] to-[#FFD59A] text-[#4B4036] rounded-full font-medium">
+                                {schedule.end_time?.slice(0, 5) || ''}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 操作按鈕 */}
+            <div className="flex gap-3">
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                className="flex-1 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 font-medium shadow-md min-h-[44px] touch-manipulation"
+                onClick={() => {
+                  setShowDateDetailModal(false);
+                  // 可以添加安排新排班的功能
+                }}
+              >
+                <CalendarIcon className="w-4 h-4" />
+                安排排班
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* 編輯排班彈窗 - 移動端優化 */}
+      {showEditScheduleModal && editingSchedule && editingScheduleTime && (
+        <motion.div
+          ref={arrangeTeacherModalRef}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center bg-black/20"
+          onClick={() => handleCancelEdit()}
+          style={{ paddingBottom: isMobile ? '80px' : '0' }}
+        >
+          <motion.div
+            initial={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: isMobile ? '100%' : 20, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className={`bg-[#FFFDF8] ${isMobile ? 'rounded-t-3xl' : 'rounded-2xl'} shadow-2xl ${isMobile ? 'p-6 w-full' : 'p-8 w-[400px]'} ${isMobile ? 'max-h-[calc(100vh-100px)]' : 'max-h-[90vh]'} overflow-y-auto border border-[#EADBC8] relative`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              aria-label="關閉"
+              className={`absolute ${isMobile ? 'top-4 right-4' : 'top-3 right-3'} ${isMobile ? 'w-10 h-10' : 'w-8 h-8'} flex items-center justify-center rounded-full bg-white border border-[#EADBC8] text-[#A68A64] hover:bg-[#F3F0E5] shadow min-h-[44px] min-w-[44px] touch-manipulation`}
+              onClick={() => handleCancelEdit()}
+            >
+              <img src="/close.png" alt="close" className="w-4 h-4" />
+            </button>
+            
+            <div className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold mb-4 text-[#4B4036]`}>編輯排班</div>
+
+            {/* 老師資訊 */}
+            <div className="mb-6 p-4 bg-[#FFF9F2] rounded-lg border border-[#EADBC8]">
+              <div className={`${isMobile ? 'text-base' : 'text-sm'} font-medium text-[#4B4036] mb-2`}>老師資訊：</div>
+              <div className={`${isMobile ? 'text-lg' : 'text-base'} font-bold text-[#4B4036]`}>{editingSchedule.teacherName}</div>
+            </div>
+
+            {/* 日期顯示 */}
+            <div className="mb-6">
+              <label className={`block ${isMobile ? 'text-base' : 'text-sm'} font-medium mb-1 text-[#4B4036]`}>排班日期：</label>
+              <div className={`${isMobile ? 'px-4 py-3 text-base' : 'px-3 py-2'} bg-white border border-[#EADBC8] rounded-lg text-[#4B4036] min-h-[44px] flex items-center`}>
+                {editingSchedule.date}
+              </div>
+            </div>
+
+            {/* 時間設置區域 */}
+            <div className="mb-6">
+              <label className={`block ${isMobile ? 'text-base' : 'text-sm'} font-medium mb-3 text-[#4B4036]`}>上班時間：</label>
+              <div className={`flex ${isMobile ? 'flex-col' : 'items-center'} gap-4`}>
+                <div className="flex-1">
+                  <label className={`block ${isMobile ? 'text-sm' : 'text-xs'} text-[#A68A64] mb-1`}>開始時間</label>
+                  <input
+                    type="time"
+                    value={editingScheduleTime.start_time}
+                    onChange={(e) => setEditingScheduleTime(prev => prev ? { ...prev, start_time: e.target.value } : null)}
+                    className={`w-full ${isMobile ? 'px-4 py-3 text-base' : 'px-3 py-2'} border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64] min-h-[44px] touch-manipulation`}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className={`block ${isMobile ? 'text-sm' : 'text-xs'} text-[#A68A64] mb-1`}>結束時間</label>
+                  <input
+                    type="time"
+                    value={editingScheduleTime.end_time}
+                    onChange={(e) => setEditingScheduleTime(prev => prev ? { ...prev, end_time: e.target.value } : null)}
+                    className={`w-full ${isMobile ? 'px-4 py-3 text-base' : 'px-3 py-2'} border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] focus:outline-none focus:ring-2 focus:ring-[#A68A64] min-h-[44px] touch-manipulation`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {errorMsg && <div className="text-red-500 text-sm mb-4">{errorMsg}</div>}
+
+            {/* 操作按鈕 - 移動端優化 */}
+            <div className={`flex ${isMobile ? 'flex-col-reverse' : 'justify-end'} gap-3`}>
+              <button
+                className={`${isMobile ? 'w-full' : 'px-6'} py-3 bg-gray-200 rounded-full text-sm text-[#4B4036] hover:bg-gray-300 transition-colors min-h-[44px] touch-manipulation`}
+                onClick={() => handleCancelEdit()}
+                disabled={loading}
+              >
+                取消
+              </button>
+              <button
+                className={`${isMobile ? 'w-full' : 'px-6'} py-3 bg-[#EBC9A4] rounded-full text-sm text-[#4B4036] hover:bg-[#DDBA90] transition-colors disabled:opacity-50 min-h-[44px] touch-manipulation`}
+                disabled={loading}
+                onClick={handleSaveEditSchedule}
+              >
+                {loading ? '儲存中...' : '儲存'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* 移動端固定底部操作欄 */}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-[#EADBC8] p-3 z-40 lg:hidden shadow-lg safe-area-inset-bottom">
+          <div className="flex justify-around items-center max-w-md mx-auto pb-safe">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setViewMode('calendar')}
+              className={`flex flex-col items-center gap-1 min-h-[60px] min-w-[60px] px-3 py-2 rounded-xl transition-all touch-manipulation ${
+                viewMode === 'calendar'
+                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                  : 'text-[#4B4036] hover:bg-[#FFF9F2]'
+              }`}
+            >
+              <Squares2X2Icon className="w-6 h-6" />
+              <span className="text-xs font-medium">日曆</span>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setViewMode('list')}
+              className={`flex flex-col items-center gap-1 min-h-[60px] min-w-[60px] px-3 py-2 rounded-xl transition-all touch-manipulation ${
+                viewMode === 'list'
+                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                  : 'text-[#4B4036] hover:bg-[#FFF9F2]'
+              }`}
+            >
+              <ListBulletIcon className="w-6 h-6" />
+              <span className="text-xs font-medium">列表</span>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowArrangeTeacher(true)}
+              className="flex flex-col items-center gap-1 min-h-[60px] min-w-[60px] px-3 py-2 rounded-xl bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md touch-manipulation"
+            >
+              <CalendarIcon className="w-6 h-6" />
+              <span className="text-xs font-medium">新增</span>
+            </motion.button>
           </div>
         </div>
       )}

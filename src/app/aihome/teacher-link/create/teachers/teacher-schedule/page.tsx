@@ -11,6 +11,7 @@ import { PopupSelect } from '@/components/ui/PopupSelect';
 import { supabase } from '@/lib/supabase';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import TeacherManagementNavBar from '@/components/ui/TeacherManagementNavBar';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -25,6 +26,10 @@ function TeacherScheduleContent() {
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('*');
   const [showTeacherSelect, setShowTeacherSelect] = useState(false);
   const [tempTeacherId, setTempTeacherId] = useState<string>('*');
+
+  // 獲取用戶 email（用於 API 查詢繞過 RLS）
+  const { user: saasUser } = useSaasAuth();
+  const userEmail = saasUser?.email || null;
 
   // 使用 TeacherLinkShell 提供的機構信息
   const { orgId, organization, organizationResolved } = useTeacherLinkOrganization();
@@ -89,55 +94,57 @@ function TeacherScheduleContent() {
   }, [validOrgId, organizationResolved]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] px-4 py-8">
-      <div className="max-w-7xl mx-auto">
-        {/* 返回按鈕 */}
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] px-2 lg:px-4 py-4 lg:py-8 pb-20 lg:pb-8 overflow-x-hidden" style={{ width: '100%', maxWidth: '100vw' }}>
+      <div className="max-w-7xl mx-auto" style={{ width: '100%', maxWidth: '100%' }}>
+        {/* 返回按鈕 - 移動端優化 */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="mb-6"
+          className="mb-4 lg:mb-6"
         >
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => router.push('/aihome/teacher-link/create')}
-            className="flex items-center gap-2 px-4 py-2 bg-white/70 backdrop-blur-sm border border-[#EADBC8] rounded-xl text-[#4B4036] hover:bg-white transition-all shadow-sm"
+            className="flex items-center gap-2 px-3 lg:px-4 py-2.5 lg:py-2 bg-white/70 backdrop-blur-sm border border-[#EADBC8] rounded-xl text-[#4B4036] hover:bg-white transition-all shadow-sm text-sm lg:text-base min-h-[44px] touch-manipulation"
           >
-            <ArrowLeft className="w-4 h-4" />
-            返回管理面板
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">返回管理面板</span>
+            <span className="sm:hidden">返回</span>
           </motion.button>
         </motion.div>
 
         {/* 導航欄 */}
         <TeacherManagementNavBar orgId={orgId} />
 
-        {/* 標題區域 */}
+        {/* 標題區域 - 移動端優化 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-8"
+          className="text-center mb-4 lg:mb-8"
         >
-          <div className="flex items-center justify-center mb-4">
+          <div className="flex items-center justify-center mb-2 lg:mb-4">
             <motion.div
               animate={{ rotate: [0, 10, -10, 0] }}
               transition={{ duration: 2, repeat: Infinity }}
+              className="hidden sm:block"
             >
               <Calendar className="w-8 h-8 text-[#FFB6C1] mr-3" />
             </motion.div>
-            <h1 className="text-4xl font-bold text-[#4B4036]">教師排班管理</h1>
+            <h1 className="text-2xl lg:text-4xl font-bold text-[#4B4036]">教師排班管理</h1>
           </div>
-          <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
+          <p className="text-sm lg:text-lg text-[#2B3A3B] max-w-2xl mx-auto px-2">
             管理老師的排班時間和課程安排
           </p>
         </motion.div>
 
-        {/* 主要內容卡片 */}
+        {/* 主要內容卡片 - 移動端優化 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl p-8 shadow-xl border-2 border-[#EADBC8] overflow-hidden"
+          className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl border-2 border-[#EADBC8] overflow-hidden"
         >
           {/* 動態背景裝飾 */}
           <motion.div
@@ -153,9 +160,9 @@ function TeacherScheduleContent() {
           />
 
           <div className="relative z-10">
-            {/* 老師選擇 */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-[#4B4036] mb-3 flex items-center gap-2">
+            {/* 老師選擇 - 移動端優化 */}
+            <div className="mb-4 lg:mb-6">
+              <label className="block text-sm font-medium text-[#4B4036] mb-2 lg:mb-3 flex items-center gap-2">
                 <User className="w-4 h-4 text-[#FFB6C1]" />
                 選擇老師
               </label>
@@ -163,7 +170,7 @@ function TeacherScheduleContent() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setShowTeacherSelect(true)}
-                className="w-full text-left px-4 py-3 bg-white/70 border border-[#EADBC8] rounded-xl text-[#4B4036] hover:bg-white transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]"
+                className="w-full text-left px-4 py-3.5 lg:py-3 bg-white/70 border border-[#EADBC8] rounded-xl text-[#4B4036] hover:bg-white transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] min-h-[44px] touch-manipulation text-base"
               >
                 {selectedTeacherId === '*' ? '全部老師' : teachers.find(t => t.id === selectedTeacherId)?.teacher_nickname || '請選擇'}
               </motion.button>
@@ -198,6 +205,7 @@ function TeacherScheduleContent() {
                     : [selectedTeacherId]
                 }
                 orgId={validOrgId}
+                userEmail={userEmail}
               />
             </div>
           </div>
