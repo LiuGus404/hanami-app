@@ -198,6 +198,7 @@ export default function MultiCourseAvailabilityDashboard() {
   const [queueByDay, setQueueByDay] = useState<{[weekday: number]: any[]}>({});
   const [expandedQueue, setExpandedQueue] = useState<{[weekday: number]: boolean}>({});
   const [expandedCourses, setExpandedCourses] = useState<{[weekday: number]: {[courseCode: string]: boolean}}>({});
+  const [unassignedStudentsBySlot, setUnassignedStudentsBySlot] = useState<{[key: string]: number}>({});
   const [courseCodes, setCourseCodes] = useState<{[id: string]: CourseCode}>({});
   const [courseTypes, setCourseTypes] = useState<any[]>([]);
   const [trialLimitSettings, setTrialLimitSettings] = useState<{[courseTypeId: string]: number}>({});
@@ -739,6 +740,12 @@ ${timeSlot}有一個位 ^^
           ]);
 
           const available = allStudents?.filter(student => {
+            // 0. 排除"已停用"的學生
+            if (student.student_type === '已停用') {
+              console.log(`學生 ${student.full_name} 已停用，排除`);
+              return false;
+            }
+            
             // 1. 排除已經在這個時段的學生
             if (currentStudentIds.has(student.id)) {
               console.log(`學生 ${student.full_name} 已經在這個時段`);
@@ -819,16 +826,30 @@ ${timeSlot}有一個位 ^^
         student_ids: selectedStudents
       });
 
-      // 1. 更新學生的課程代碼
-      const { error: studentError } = await supabase
-        .from('Hanami_Students')
-        .update({
-          primary_course_code: selectedSlotDetail.course_code
-        })
-        .in('id', selectedStudents)
-        .eq('org_id', validOrgId as string);
+      // 1. 更新學生的課程代碼（使用 API 端點繞過 RLS）
+      const updateResponse = await fetch('/api/students/batch-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentIds: selectedStudents,
+          updates: {
+            primary_course_code: selectedSlotDetail.course_code
+          },
+          orgId: validOrgId as string,
+        }),
+      });
 
-      if (studentError) throw studentError;
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || '更新學生課程代碼失敗');
+      }
+
+      const updateResult = await updateResponse.json();
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || '更新學生課程代碼失敗');
+      }
 
       // 2. 找到對應的時段記錄並更新 assigned_student_ids
       const { data: scheduleData, error: scheduleQueryError } = await supabase
@@ -875,9 +896,12 @@ ${timeSlot}有一個位 ^^
       
       // 重新載入數據
       await fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('添加學生到課程失敗:', error);
-      alert('添加學生到課程失敗');
+      const errorMessage = error?.message || error?.error || '未知錯誤';
+      const errorCode = error?.code || '';
+      console.error('錯誤詳情:', { errorMessage, errorCode, error });
+      alert(`添加學生到課程失敗: ${errorMessage}${errorCode ? ` (${errorCode})` : ''}`);
     }
   };
 
@@ -1106,6 +1130,7 @@ ${timeSlot}有一個位 ^^
 
       // 4. 取得所有常規學生（使用 API 端點繞過 RLS）
       let regularStudentsData: any[] = [];
+      let allRegularStudentsData: any[] = []; // 用於未安排學生計算（包含所有學生，不限制 primary_course_code）
       try {
         // 獲取用戶 email（優先從 session，然後從 user）
         const userEmail = session?.email || user?.email || null;
@@ -1117,10 +1142,17 @@ ${timeSlot}有一個位 ^^
         
         if (response.ok) {
           const result = await response.json();
-          regularStudentsData = result.students || [];
-          // 過濾掉 primary_course_code 為 null 的學生
-          regularStudentsData = regularStudentsData.filter((s: any) => s.primary_course_code != null);
-          console.log('通過 API 載入常規學生數量:', regularStudentsData.length);
+          allRegularStudentsData = result.students || [];
+          // 保存完整數據用於未安排學生計算（只過濾"已停用"的學生）
+          allRegularStudentsData = allRegularStudentsData.filter((s: any) => 
+            s.student_type !== '已停用'
+          );
+          // 過濾掉 primary_course_code 為 null 的學生，以及"已停用"的學生（用於主要顯示）
+          regularStudentsData = allRegularStudentsData.filter((s: any) => 
+            s.primary_course_code != null
+          );
+          console.log('通過 API 載入常規學生數量（已過濾已停用）:', regularStudentsData.length);
+          console.log('通過 API 載入所有常規學生數量（用於未安排計算，已過濾已停用）:', allRegularStudentsData.length);
         } else {
           console.error('無法載入常規學生，API 返回錯誤:', response.status);
           // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
@@ -1128,10 +1160,11 @@ ${timeSlot}有一個位 ^^
             .from('Hanami_Students')
             .select('*')
             .eq('org_id', validOrgId as string)
-            .not('primary_course_code', 'is', null);
+            .neq('student_type', '已停用');
           
           if (!regularStudentsError && data) {
-            regularStudentsData = data;
+            allRegularStudentsData = data;
+            regularStudentsData = data.filter((s: any) => s.primary_course_code != null);
           } else {
             console.error('直接查詢也失敗:', regularStudentsError);
           }
@@ -1194,13 +1227,41 @@ ${timeSlot}有一個位 ^^
         
         // 完全依賴 assigned_student_ids 來顯示學生，不再回退到傳統邏輯
         if (slot.assigned_student_ids && slot.assigned_student_ids.length > 0) {
-          // 直接通過 assigned_student_ids 獲取學生
+          // 直接通過 assigned_student_ids 獲取學生，並過濾掉"已停用"的學生
           regularStudents = regularStudentsData?.filter(student => 
-            slot.assigned_student_ids.includes(student.id)
+            slot.assigned_student_ids.includes(student.id) &&
+            student.student_type !== '已停用'
           ) || [];
           
-          console.log(`通過 assigned_student_ids 找到 ${regularStudents.length} 名學生:`, 
-            regularStudents.map(s => ({ id: s.id, name: s.full_name })));
+          // 如果發現有"已停用"的學生在 assigned_student_ids 中，自動從 assigned_student_ids 中移除
+          const inactiveStudentIds = regularStudentsData?.filter(student => 
+            slot.assigned_student_ids.includes(student.id) &&
+            student.student_type === '已停用'
+          ).map(s => s.id) || [];
+          
+          if (inactiveStudentIds.length > 0) {
+            console.log(`發現 ${inactiveStudentIds.length} 名已停用學生在 assigned_student_ids 中，自動移除:`, inactiveStudentIds);
+            
+            // 更新 assigned_student_ids，移除已停用的學生
+            const updatedAssignedIds = slot.assigned_student_ids.filter((id: string) => !inactiveStudentIds.includes(id));
+            
+            // 異步更新資料庫（不等待完成，避免阻塞）
+            supabase
+              .from('hanami_schedule')
+              .update({ assigned_student_ids: updatedAssignedIds })
+              .eq('id', slot.id)
+              .eq('org_id', validOrgId as string)
+              .then(({ error }) => {
+                if (error) {
+                  console.error('自動移除已停用學生失敗:', error);
+                } else {
+                  console.log('成功自動移除已停用學生');
+                }
+              });
+          }
+          
+          console.log(`通過 assigned_student_ids 找到 ${regularStudents.length} 名學生（已過濾已停用）:`, 
+            regularStudents.map(s => ({ id: s.id, name: s.full_name, student_type: s.student_type })));
         } else {
           // 沒有 assigned_student_ids 時，顯示空列表
           console.log(`時段 ${slot.timeslot} 課程 ${slot.course_code} 沒有 assigned_student_ids，顯示空列表`);
@@ -1288,6 +1349,327 @@ ${timeSlot}有一個位 ^^
           note: '完全依賴 assigned_student_ids 顯示學生，不再使用傳統邏輯'
         });
       });
+
+      // ============================================
+      // 未安排學生判定邏輯說明（完全套用"添加學生到課程"的邏輯）：
+      // ============================================
+      // 1. 篩選條件：
+      //    - 學生必須有 fixed 上課時間（regular_weekday 和 regular_timeslot 不為 null）
+      //    - 學生狀態不能是"已停用"（student_type !== '已停用'）
+      //    - **不要求 primary_course_code**（與"添加學生到課程"邏輯一致）
+      //
+      // 2. 匹配條件（必須同時滿足）：
+      //    a) 時間匹配：學生的 regular_weekday 和 regular_timeslot 必須與時段的 weekday 和 timeslot 完全一致
+      //    b) **不檢查課程匹配**（與"添加學生到課程"邏輯一致）
+      //
+      // 3. 未安排判定：
+      //    - 如果該時段的任何 hanami_schedule 記錄的 assigned_student_ids 中包含該學生 → 已安排
+      //    - 否則 → 未安排
+      //
+      // 4. 鍵值格式：
+      //    - 計算時使用：`${weekday}_${normalizedTimeslot}`（weekday 為數字，timeslot 為 HH:MM 格式）
+      //    - 顯示時使用相同的鍵值格式進行查找
+      // ============================================
+      
+      // 計算每個時段未安排進班別的學生數量
+      const unassignedCounts: {[key: string]: number} = {};
+      
+      // 獲取所有有固定上課時間的學生（regular_weekday 和 regular_timeslot 不為 null），並排除"已停用"的學生
+      // **不要求 primary_course_code**（與"添加學生到課程"邏輯一致）
+      // 使用 allRegularStudentsData（包含所有學生，不限制 primary_course_code）進行未安排學生計算
+      const studentsWithSchedule = allRegularStudentsData?.filter((s: any) => 
+        s.regular_weekday !== null && 
+        s.regular_weekday !== undefined && 
+        s.regular_timeslot !== null && 
+        s.regular_timeslot !== undefined &&
+        s.student_type !== '已停用'
+      ) || [];
+      
+      // 調試：記錄有固定上課時間的學生統計
+      console.log('[未安排學生計算-套用添加學生邏輯] 有固定上課時間的學生數量:', studentsWithSchedule.length);
+      
+      // 標準化時間格式的輔助函數（移除秒數，統一為 HH:MM 格式）
+      const normalizeTime = (timeStr: string | null | undefined): string => {
+        if (!timeStr) return '';
+        // 如果是 HH:MM:SS 格式，轉換為 HH:MM
+        if (timeStr.length >= 8 && timeStr.includes(':')) {
+          return timeStr.substring(0, 5);
+        }
+        // 如果是 HH:MM 格式，保持不變
+        return timeStr.length >= 5 ? timeStr.substring(0, 5) : timeStr;
+      };
+      
+      // 對每個時段計算未安排的學生（完全套用"添加學生到課程"的邏輯）
+      Object.values(slotMap).forEach(slot => {
+        // 標準化時間格式，確保鍵值一致
+        const normalizedTimeslot = normalizeTime(slot.timeslot);
+        // 確保 weekday 類型一致（轉換為數字）- 與顯示邏輯保持一致
+        const slotWeekday = typeof slot.weekday === 'string' 
+          ? parseInt(slot.weekday, 10) 
+          : (typeof slot.weekday === 'number' ? slot.weekday : 0);
+        const slotKey = `${slotWeekday}_${normalizedTimeslot}`;
+        
+        // 獲取該時段所有課程的 assigned_student_ids（合併所有課程的學生ID）
+        const allAssignedStudentIds = new Set<string>();
+        let matchedScheduleCount = 0;
+        scheduleData?.forEach((s: any) => {
+          const normalizedSTimeslot = normalizeTime(s.timeslot);
+          const sWeekday = typeof s.weekday === 'string' 
+            ? parseInt(s.weekday, 10) 
+            : s.weekday;
+          // 如果該 schedule 記錄匹配當前時段
+          if (sWeekday === slotWeekday && normalizedSTimeslot === normalizedTimeslot) {
+            matchedScheduleCount++;
+            // 將該課程的 assigned_student_ids 加入集合
+            if (s.assigned_student_ids && Array.isArray(s.assigned_student_ids)) {
+              s.assigned_student_ids.forEach((id: string) => allAssignedStudentIds.add(id));
+            }
+          }
+        });
+        
+        // 調試：記錄已安排學生ID的構建過程
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[已安排學生ID構建] 時段 ${slotKey}:`, {
+            時段鍵值: slotKey,
+            匹配的schedule記錄數: matchedScheduleCount,
+            已安排學生ID數量: allAssignedStudentIds.size,
+            已安排學生ID列表: Array.from(allAssignedStudentIds)
+          });
+        }
+        
+        // 找出該時段應該上課但未安排的學生
+        // **完全套用"添加學生到課程"的邏輯：只檢查時間匹配，不檢查課程**
+        const unassignedInSlot = studentsWithSchedule.filter((student: any) => {
+          // 1. 檢查時間是否匹配（確保 weekday 和 timeslot 都不為 null）
+          if (student.regular_weekday === null || student.regular_weekday === undefined ||
+              student.regular_timeslot === null || student.regular_timeslot === undefined) {
+            return false;
+          }
+          
+          // 轉換星期數字格式（與"添加學生到課程"邏輯一致）
+          let studentWeekday: number;
+          if (typeof student.regular_weekday === 'string') {
+            studentWeekday = parseInt(student.regular_weekday);
+            if (isNaN(studentWeekday)) {
+              return false;
+            }
+          } else {
+            studentWeekday = student.regular_weekday;
+          }
+          
+          // 檢查星期和時間是否匹配
+          // 為了確保鍵值一致性，我們使用標準化時間進行比較
+          const isSameWeekday = studentWeekday === slotWeekday;
+          
+          // 標準化學生時間和時段時間進行比較
+          const normalizedStudentTime = normalizeTime(student.regular_timeslot);
+          const normalizedSlotTime = normalizedTimeslot; // 已在外部作用域定義
+          
+          // 如果標準化時間不為空且長度足夠，進行比較
+          if (!normalizedStudentTime || normalizedStudentTime.length < 5) {
+            return false;
+          }
+          
+          const isSameTimeslot = normalizedStudentTime === normalizedSlotTime;
+          
+          if (!isSameWeekday || !isSameTimeslot) {
+            return false;
+          }
+          
+          // 2. 檢查該學生是否已經在該時段的任何課程中（檢查合併後的 assigned_student_ids）
+          // 如果學生已經在 assigned_student_ids 中，則為已安排，不算未安排
+          if (allAssignedStudentIds.has(student.id)) {
+            return false;
+          }
+          
+          // 如果時間匹配且不在 assigned_student_ids 中，則為未安排
+          return true;
+        });
+        
+        // 找出所有時間匹配的學生（用於調試）
+        const allMatchingStudents = studentsWithSchedule.filter((student: any) => {
+          if (student.regular_weekday === null || student.regular_weekday === undefined ||
+              student.regular_timeslot === null || student.regular_timeslot === undefined) {
+            return false;
+          }
+          let studentWeekday: number;
+          if (typeof student.regular_weekday === 'string') {
+            studentWeekday = parseInt(student.regular_weekday);
+            if (isNaN(studentWeekday)) return false;
+          } else {
+            studentWeekday = student.regular_weekday;
+          }
+          const isSameWeekday = studentWeekday === slotWeekday;
+          
+          // 使用標準化時間進行比較（與計算邏輯一致）
+          const normalizedStudentTime = normalizeTime(student.regular_timeslot);
+          if (!normalizedStudentTime || normalizedStudentTime.length < 5) {
+            return false;
+          }
+          const isSameTimeslot = normalizedStudentTime === normalizedTimeslot;
+          
+          return isSameWeekday && isSameTimeslot;
+        });
+        
+        unassignedCounts[slotKey] = unassignedInSlot.length;
+        
+        // 調試：記錄所有時段的鍵值生成（包括未安排學生數為0的）
+        console.log(`[計算邏輯-鍵值生成] 時段 ${slotKey}:`, {
+          時段鍵值: slotKey,
+          原始weekday: slot.weekday,
+          標準化weekday: slotWeekday,
+          原始timeslot: slot.timeslot,
+          標準化timeslot: normalizedTimeslot,
+          未安排學生數: unassignedInSlot.length,
+          匹配學生總數: allMatchingStudents.length,
+          已安排學生數: allMatchingStudents.length - unassignedInSlot.length
+        });
+        
+        // 調試：記錄未安排學生的詳細信息（僅當有未安排學生或匹配學生時）
+        if (unassignedInSlot.length > 0 || allMatchingStudents.length > 0) {
+          console.log(`[未安排學生-套用添加學生邏輯] 時段 ${slotKey} (星期${slot.weekday}, ${slot.timeslot}):`, {
+            時段鍵值: slotKey,
+            時段時間: slot.timeslot,
+            匹配學生總數: allMatchingStudents.length,
+            未安排學生數: unassignedInSlot.length,
+            已安排學生數: allMatchingStudents.length - unassignedInSlot.length,
+            已安排學生ID集合: Array.from(allAssignedStudentIds),
+            未安排學生: unassignedInSlot.map(s => ({
+              姓名: s.full_name,
+              id: s.id,
+              primary_course_code: s.primary_course_code,
+              regular_weekday: s.regular_weekday,
+              regular_timeslot: s.regular_timeslot
+            })),
+            所有匹配學生詳情: allMatchingStudents.map(s => ({
+              姓名: s.full_name,
+              id: s.id,
+              primary_course_code: s.primary_course_code,
+              regular_weekday: s.regular_weekday,
+              regular_timeslot: s.regular_timeslot,
+              是否在assigned_student_ids中: allAssignedStudentIds.has(s.id),
+              是否算作未安排: unassignedInSlot.some(u => u.id === s.id)
+            }))
+          });
+        }
+      });
+      
+      // ============================================
+      // 處理不在 slotMap 中的時段（學生有固定時間但該時段沒有 hanami_schedule 記錄）
+      // ============================================
+      // 對於每個有固定上課時間的學生，檢查他們的時段是否存在於 slotMap 中
+      // 如果不存在，則該學生應該算作未安排（與"添加學生到課程"邏輯一致，不要求 primary_course_code）
+      studentsWithSchedule.forEach((student: any) => {
+        // 確保 weekday 和 timeslot 都不為 null
+        if (student.regular_weekday === null || student.regular_weekday === undefined ||
+            student.regular_timeslot === null || student.regular_timeslot === undefined) {
+          return;
+        }
+        
+        // 轉換星期數字格式（與"添加學生到課程"邏輯一致）
+        let studentWeekday: number;
+        if (typeof student.regular_weekday === 'string') {
+          studentWeekday = parseInt(student.regular_weekday);
+          if (isNaN(studentWeekday)) return;
+        } else {
+          studentWeekday = student.regular_weekday;
+        }
+        
+        // 生成鍵值（使用標準化時間，與計算邏輯保持一致）
+        const normalizedStudentTime = normalizeTime(student.regular_timeslot);
+        if (!normalizedStudentTime || normalizedStudentTime.length < 5) {
+          return;
+        }
+        const studentSlotKey = `${studentWeekday}_${normalizedStudentTime}`;
+        
+        // 檢查該時段是否存在於 slotMap 中（使用標準化時間進行比較，確保一致性）
+        const slotExists = Object.values(slotMap).some(slot => {
+          const slotWeekday = typeof slot.weekday === 'string' 
+            ? parseInt(slot.weekday, 10) 
+            : (typeof slot.weekday === 'number' ? slot.weekday : 0);
+          // 使用標準化時間進行比較
+          const normalizedSlotTime = normalizeTime(slot.timeslot);
+          return slotWeekday === studentWeekday && normalizedSlotTime === normalizedStudentTime;
+        });
+        
+        // 如果時段不存在於 slotMap 中，則該學生應該算作未安排
+        // （因為他們有固定時間但該時段沒有課程安排）
+        if (!slotExists) {
+          // 初始化該時段的計數（如果尚未存在）
+          if (!unassignedCounts[studentSlotKey]) {
+            unassignedCounts[studentSlotKey] = 0;
+          }
+          // 增加未安排學生數
+          unassignedCounts[studentSlotKey]++;
+          
+          // 調試：記錄不在 slotMap 中的時段
+          console.log(`[未安排學生-無時段記錄] 學生 ${student.full_name} 的時段 ${studentSlotKey} 不存在於 slotMap 中，計入未安排`, {
+            學生姓名: student.full_name,
+            時段鍵值: studentSlotKey,
+            regular_weekday: student.regular_weekday,
+            regular_timeslot: student.regular_timeslot,
+            標準化時間: normalizedStudentTime,
+            primary_course_code: student.primary_course_code
+          });
+        }
+      });
+      
+      // 調試：記錄所有未安排學生的統計
+      const totalUnassigned = Object.values(unassignedCounts).reduce((sum, count) => sum + count, 0);
+      const slotsWithUnassigned = Object.keys(unassignedCounts).filter(key => unassignedCounts[key] > 0).length;
+      
+      // 特別調試：檢查星期0（星期日）的所有時段
+      const sundaySlots = Object.values(slotMap).filter(slot => {
+        const slotWeekday = typeof slot.weekday === 'string' 
+          ? parseInt(slot.weekday, 10) 
+          : (typeof slot.weekday === 'number' ? slot.weekday : -1);
+        return slotWeekday === 0;
+      });
+      
+      console.log('[未安排學生統計-套用添加學生邏輯]', {
+        總未安排學生數: totalUnassigned,
+        有時段未安排學生的時段數: slotsWithUnassigned,
+        總時段數: Object.keys(unassignedCounts).length,
+        未安排學生分佈: Object.entries(unassignedCounts)
+          .filter(([_, count]) => count > 0)
+          .reduce((acc, [key, count]) => {
+            acc[key] = count;
+            return acc;
+          }, {} as {[key: string]: number}),
+        // 添加所有生成的鍵值列表（包括未安排學生數為0的），方便調試
+        所有生成的鍵值: Object.keys(unassignedCounts).sort(),
+        // 特別列出星期0（星期日）的所有鍵值
+        星期0的所有鍵值: Object.keys(unassignedCounts).filter(key => key.startsWith('0_')),
+        // 星期0的所有時段（來自 slotMap）
+        星期0的所有時段: sundaySlots.map(slot => ({
+          weekday: slot.weekday,
+          timeslot: slot.timeslot,
+          標準化時間: normalizeTime(slot.timeslot),
+          生成的鍵值: `${typeof slot.weekday === 'string' ? parseInt(slot.weekday, 10) : slot.weekday}_${normalizeTime(slot.timeslot)}`,
+          課程代碼: slot.courses.map(c => c.course_code)
+        })),
+        // 星期0的所有學生（有固定時間的）
+        星期0的所有學生: studentsWithSchedule.filter((s: any) => {
+          let sWeekday: number;
+          if (typeof s.regular_weekday === 'string') {
+            sWeekday = parseInt(s.regular_weekday, 10);
+            if (isNaN(sWeekday)) return false;
+          } else {
+            sWeekday = s.regular_weekday;
+          }
+          return sWeekday === 0;
+        }).map((s: any) => ({
+          姓名: s.full_name,
+          id: s.id,
+          primary_course_code: s.primary_course_code,
+          regular_weekday: s.regular_weekday,
+          regular_timeslot: s.regular_timeslot,
+          標準化時間: normalizeTime(s.regular_timeslot),
+          生成的鍵值: `${typeof s.regular_weekday === 'string' ? parseInt(s.regular_weekday, 10) : s.regular_weekday}_${normalizeTime(s.regular_timeslot)}`
+        }))
+      });
+      
+      setUnassignedStudentsBySlot(unassignedCounts);
 
       // 轉換為陣列並進行數據驗證
       Object.values(slotMap).forEach(slot => {
@@ -1624,6 +2006,103 @@ ${timeSlot}有一個位 ^^
                       <div className="font-semibold text-[#4B4036] text-sm mb-1">
                         {slot.regular_students.length}{slot.trial_students.length > 0 ? `+${slot.trial_students.length}` : ''}/{slot.max}
                       </div>
+                      {/* 顯示未安排進班別的學生數量 */}
+                      {(() => {
+                        // 標準化時間格式（與計算邏輯保持一致）
+                        const normalizeTime = (timeStr: string | null | undefined): string => {
+                          if (!timeStr) return '';
+                          // 如果是 HH:MM:SS 格式，轉換為 HH:MM
+                          if (timeStr.length >= 8 && timeStr.includes(':')) {
+                            return timeStr.substring(0, 5);
+                          }
+                          // 如果是 HH:MM 格式，保持不變
+                          return timeStr.length >= 5 ? timeStr.substring(0, 5) : timeStr;
+                        };
+                        
+                        // 標準化 slot.time（它來自 slot.timeslot）
+                        const normalizedTime = normalizeTime(slot.time);
+                        // 確保 weekday 類型一致（轉換為數字）- 與計算邏輯完全一致
+                        const slotWeekday = typeof slot.weekday === 'string' 
+                          ? parseInt(slot.weekday, 10) 
+                          : (typeof slot.weekday === 'number' ? slot.weekday : 0);
+                        const slotKey = `${slotWeekday}_${normalizedTime}`;
+                        
+                        // 直接使用計算邏輯生成的鍵值格式（與計算邏輯完全一致）
+                        let unassignedCount = unassignedStudentsBySlot[slotKey] || 0;
+                        
+                        // 定義替代鍵值（用於後備查找和調試）
+                        const alternativeKeys = [
+                          `${slot.weekday}_${normalizedTime}`, // 原始weekday（可能是字符串）+ 標準化時間
+                          `${slotWeekday}_${slot.time}`, // 標準化weekday + 原始時間
+                          `${slot.weekday}_${slot.time}`, // 原始格式
+                          // 如果 slot.time 是 HH:MM:SS 格式，也嘗試
+                          slot.time && slot.time.length >= 8 ? `${slotWeekday}_${slot.time.substring(0, 5)}` : null,
+                          slot.time && slot.time.length >= 8 ? `${slot.weekday}_${slot.time.substring(0, 5)}` : null,
+                        ].filter(Boolean) as string[];
+                        
+                        // 如果沒有找到，嘗試其他可能的鍵值格式（僅作為後備）
+                        if (unassignedCount === 0) {
+                          for (const key of alternativeKeys) {
+                            const count = unassignedStudentsBySlot[key] || 0;
+                            if (count > unassignedCount) {
+                              unassignedCount = count;
+                            }
+                          }
+                        }
+                        
+                        // 調試：記錄查找過程（包括所有時段，用於排查鍵值不匹配問題）
+                        if (process.env.NODE_ENV === 'development') {
+                          // 檢查是否有相近的鍵值（用於排查格式不一致問題）
+                          const allKeysForWeekday = Object.keys(unassignedStudentsBySlot).filter(k => {
+                            const keyWeekday = k.split('_')[0];
+                            return keyWeekday === String(slotWeekday) || keyWeekday === String(slot.weekday);
+                          });
+                          
+                          // 記錄所有時段的查找過程（包括成功和失敗的）
+                          const keyExists = slotKey in unassignedStudentsBySlot;
+                          if (!keyExists || (unassignedCount === 0 && allKeysForWeekday.length > 0)) {
+                            console.log(`[顯示邏輯] 時段 ${slot.time} (星期${slot.weekday}) ${keyExists ? '鍵值存在但數量為0' : '未找到匹配鍵值'}:`, {
+                              使用的鍵值: slotKey,
+                              鍵值是否存在: keyExists,
+                              未安排學生數: unassignedCount,
+                              slot_weekday類型: typeof slot.weekday,
+                              slot_weekday值: slot.weekday,
+                              標準化weekday: slotWeekday,
+                              slot_time原始值: slot.time,
+                              標準化時間: normalizedTime,
+                              該weekday的所有可用鍵值: allKeysForWeekday,
+                              所有鍵值對應的數量: allKeysForWeekday.map(k => ({ 
+                                key: k, 
+                                count: unassignedStudentsBySlot[k] || 0 
+                              })),
+                              unassignedStudentsBySlot的所有鍵值: Object.keys(unassignedStudentsBySlot).sort(),
+                              嘗試的替代鍵值: alternativeKeys,
+                              替代鍵值結果: alternativeKeys.map((k: string) => ({
+                                key: k,
+                                exists: k in unassignedStudentsBySlot,
+                                count: unassignedStudentsBySlot[k] || 0
+                              }))
+                            });
+                          } else if (unassignedCount > 0) {
+                            // 成功找到時也記錄（用於驗證邏輯正確性）
+                            console.log(`[顯示邏輯] 時段 ${slot.time} (星期${slot.weekday}) 成功找到:`, {
+                              使用的鍵值: slotKey,
+                              未安排學生數: unassignedCount,
+                              slot_weekday類型: typeof slot.weekday,
+                              slot_weekday值: slot.weekday,
+                              標準化weekday: slotWeekday,
+                              slot_time原始值: slot.time,
+                              標準化時間: normalizedTime
+                            });
+                          }
+                        }
+                        
+                        return unassignedCount > 0 ? (
+                          <div className="text-[9px] text-orange-600 font-medium mb-1 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
+                            未安排: {unassignedCount}人
+                          </div>
+                        ) : null;
+                      })()}
                       <div className="text-[9px] text-[#87704e] mb-1">
                         {slot.course_code}
                       </div>

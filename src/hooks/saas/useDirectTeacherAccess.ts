@@ -120,14 +120,7 @@ export function useDirectTeacherAccess() {
         console.error('保存會話存儲失敗:', error);
       }
 
-      // 只在第一次驗證時顯示成功通知
-      const notificationShownKey = 'hanami_teacher_access_notification_shown';
-      const hasShownNotification = sessionStorage.getItem(notificationShownKey);
-      
-      if (!hasShownNotification) {
-        toast.success(successData.message);
-        sessionStorage.setItem(notificationShownKey, 'true');
-      }
+      // 不再顯示驗證成功通知
 
       // 強制重新渲染以確保狀態更新
       setTimeout(() => {

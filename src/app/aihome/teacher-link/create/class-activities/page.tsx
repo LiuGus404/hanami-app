@@ -2,6 +2,8 @@
 
 import ClassActivitiesPage from '@/app/admin/class-activities/page';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
+import CourseManagementNavBar from '@/components/ui/CourseManagementNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -16,19 +18,24 @@ function TeacherLinkClassActivitiesContent() {
       : null);
 
   return (
-    <ClassActivitiesPage
-      hideCalendarButton
-      forcedOrgId={resolvedOrgId}
-      forcedOrgName={organization?.name ?? null}
-      disableOrgFallback
-    />
+    <div>
+      <CourseManagementNavBar orgId={resolvedOrgId} />
+      <ClassActivitiesPage
+        hideCalendarButton
+        forcedOrgId={resolvedOrgId}
+        forcedOrgName={organization?.name ?? null}
+        disableOrgFallback
+      />
+    </div>
   );
 }
 
 export default function TeacherLinkCreateClassActivitiesPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/class-activities">
-      <TeacherLinkClassActivitiesContent />
+      <WithPermissionCheck pageKey="class-activities">
+        <TeacherLinkClassActivitiesContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

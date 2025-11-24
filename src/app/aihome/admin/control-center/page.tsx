@@ -16,6 +16,7 @@ import {
   PlusIcon,
   CheckCircleIcon,
   Bars3Icon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
@@ -112,14 +113,53 @@ export default function AdminControlCenterPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(true);
   const [modelConfigs, setModelConfigs] = useState<EditableModelConfig[]>([]);
   const [originalModelConfigs, setOriginalModelConfigs] = useState<Record<string, ModelConfigSnapshot>>({});
   const [roleConfigs, setRoleConfigs] = useState<RoleConfig[]>([]);
   const [originalConfigs, setOriginalConfigs] = useState<Record<string, RoleConfigSnapshot>>({});
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'ai-models' | 'role-config' | 'role-permissions' | 'audit-logs'>('ai-models');
+  const [activeSection, setActiveSection] = useState<'ai-models' | 'role-config' | 'role-permissions' | 'audit-logs' | 'ai-project-logs'>('ai-models');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // AI 專案對話紀錄相關狀態
+  type LogTabKey = 'rooms' | 'users' | 'messages' | 'errors';
+  const [logActiveTab, setLogActiveTab] = useState<LogTabKey>('rooms');
+  const [logLoading, setLogLoading] = useState(true);
+  const [logUsers, setLogUsers] = useState<any[]>([]);
+  const [logRooms, setLogRooms] = useState<any[]>([]);
+  const [logMessages, setLogMessages] = useState<any[]>([]);
+  const [showLogDialog, setShowLogDialog] = useState(false);
+  const [logDialogTitle, setLogDialogTitle] = useState('');
+  const [logDialogItems, setLogDialogItems] = useState<any[]>([]);
+  
+  const formatHK = (iso?: string | null) => {
+    if (!iso) return '-';
+    try {
+      return new Date(iso).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong' });
+    } catch {
+      return iso;
+    }
+  };
+  
+  const tabLabel = (t: LogTabKey) => (t === 'rooms' ? '專案' : t === 'users' ? '用戶' : t === 'messages' ? '對話' : '錯誤');
+  
+  const openRoomConversation = async (roomId: string) => {
+    try {
+      setShowLogDialog(true);
+      setLogDialogTitle(`專案對話：${roomId}`);
+      const saas = getSaasSupabaseClient();
+      const res: any = await (saas.from('ai_messages') as any)
+        .select('id,room_id,sender_type,sender_user_id,content,content_json,status,error_message,created_at')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true });
+      setLogDialogItems(res?.data || []);
+    } catch (e) {
+      setLogDialogItems([]);
+    }
+  };
   const [expandedModelIds, setExpandedModelIds] = useState<Set<string>>(new Set());
   const [modelSearchTerm, setModelSearchTerm] = useState('');
   const [modelFilter, setModelFilter] = useState<'all' | ModalityKey | 'supportsSearch'>('all');
@@ -323,14 +363,119 @@ export default function AdminControlCenterPage() {
     }
   }, [supabase, syncModelOptionsWith]);
 
+  // 檢查 super_admin 身份
   useEffect(() => {
-    if (loading) return;
-    if (user?.user_role === 'super_admin') {
+    let cancelled = false;
+    const resolveRole = async () => {
+      if (!user) {
+        setIsSuperAdmin(false);
+        setRoleLoading(false);
+        return;
+      }
+
+      // 首先檢查 user 對象中的各種可能的 role 字段
+      const normalizedRoleFromUser = (
+        (user as any)?.user_role ??
+        (user as any)?.role ??
+        (user as any)?.metadata?.user_role ??
+        (user as any)?.metadata?.role ??
+        (user as any)?.app_metadata?.user_role ??
+        (user as any)?.app_metadata?.role ??
+        ''
+      )
+        .toString()
+        .trim()
+        .toLowerCase();
+
+      if (normalizedRoleFromUser === 'super_admin') {
+        console.log('AdminControlCenter: 從 user 對象檢測到 super_admin 身份');
+        setIsSuperAdmin(true);
+        setRoleLoading(false);
+        return;
+      }
+
+      // 如果 user 對象中沒有 role，則從數據庫查詢
+      const userId = (user as any)?.id || (user as any)?.user_id;
+      const userEmail = (user as any)?.email;
+
+      if (!userId && !userEmail) {
+        setIsSuperAdmin(false);
+        setRoleLoading(false);
+        return;
+      }
+
+      try {
+        let query = supabase.from('saas_users').select('user_role');
+        
+        if (userId) {
+          query = query.eq('id', userId);
+        } else if (userEmail) {
+          query = query.eq('email', userEmail);
+        }
+
+        const { data: userData, error } = await query.maybeSingle();
+
+        if (!cancelled) {
+          if (error) {
+            console.error('AdminControlCenter: 讀取 user_role 失敗:', error.message);
+            setIsSuperAdmin(false);
+          } else {
+            const role = (userData as { user_role: string } | null)?.user_role || 'user';
+            const isSuperAdminRole = role.toLowerCase() === 'super_admin';
+            console.log('AdminControlCenter: 從數據庫讀取 user_role:', role, 'isSuperAdmin:', isSuperAdminRole);
+            setIsSuperAdmin(isSuperAdminRole);
+          }
+          setRoleLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('AdminControlCenter: 查詢 user_role 發生錯誤:', err);
+          setIsSuperAdmin(false);
+          setRoleLoading(false);
+        }
+      }
+    };
+
+    resolveRole();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, supabase]);
+
+  useEffect(() => {
+    if (loading || roleLoading) return;
+    if (isSuperAdmin) {
       loadData();
     } else {
       setIsLoading(false);
     }
-  }, [loading, user?.user_role, loadData]);
+  }, [loading, roleLoading, isSuperAdmin, loadData]);
+
+  // 載入 AI 專案對話紀錄
+  useEffect(() => {
+    if (activeSection !== 'ai-project-logs' || !isSuperAdmin || roleLoading) return;
+
+    const loadLogs = async () => {
+      setLogLoading(true);
+      try {
+        const saas = getSaasSupabaseClient();
+        const [uRes, rRes, mRes] = await Promise.all([
+          (saas.from('saas_users') as any).select('id,email,full_name,created_at').order('created_at', { ascending: false }).limit(200),
+          (saas.from('ai_rooms') as any).select('id,title,description,created_by,created_at,last_message_at').order('created_at', { ascending: false }).limit(200),
+          (saas.from('ai_messages') as any)
+            .select('id,room_id,sender_type,sender_user_id,content,content_json,status,error_message,created_at')
+            .order('created_at', { ascending: false })
+            .limit(400)
+        ]);
+        setLogUsers((uRes as any)?.data || []);
+        setLogRooms((rRes as any)?.data || []);
+        setLogMessages((mRes as any)?.data || []);
+      } finally {
+        setLogLoading(false);
+      }
+    };
+    loadLogs();
+  }, [activeSection, isSuperAdmin, roleLoading]);
 
   const updateRoleConfigs = (roleId: string, updater: (role: RoleConfig) => RoleConfig) => {
     setRoleConfigs((prev) => prev.map((role) => (role.id === roleId ? updater(role) : role)));
@@ -801,7 +946,7 @@ export default function AdminControlCenterPage() {
     });
   }, [roleConfigs, roleSearchTerm]);
 
-  if (loading || isLoading) {
+  if (loading || roleLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] flex flex-col items-center justify-center">
         <motion.div
@@ -824,13 +969,16 @@ export default function AdminControlCenterPage() {
     );
   }
 
-  if (user.user_role !== 'super_admin') {
+  if (!isSuperAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] flex flex-col items-center justify-center px-6 text-center">
         <ShieldCheckIcon className="w-14 h-14 text-[#FFB6C1]" />
         <h1 className="mt-4 text-2xl font-semibold text-[#4B4036]">沒有存取權限</h1>
         <p className="mt-3 max-w-md text-[#2B3A3B]/70">
           您的帳號沒有管理員權限。如需協助，請聯絡系統管理員或 Hanami 支援團隊。
+        </p>
+        <p className="mt-2 text-xs text-[#2B3A3B]/50">
+          檢測到的角色：{((user as any)?.user_role || (user as any)?.role || '未知')}
         </p>
       </div>
     );
@@ -933,6 +1081,12 @@ export default function AdminControlCenterPage() {
                         title: '角色設定',
                         icon: PencilSquareIcon,
                         description: '指定角色預設模型與系統指令',
+                      },
+                      {
+                        id: 'ai-project-logs',
+                        title: 'AI 專案對話紀錄',
+                        icon: DocumentTextIcon,
+                        description: '查看專案、用戶、對話與錯誤記錄',
                       },
                       {
                         id: 'role-permissions',
@@ -1935,6 +2089,145 @@ export default function AdminControlCenterPage() {
               </AnimatePresence>
 
               <AnimatePresence mode="wait">
+                {activeSection === 'ai-project-logs' && (
+                  <motion.div
+                    key="ai-project-logs"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.35 }}
+                    className="space-y-6"
+                  >
+                    <div className="bg-white/85 backdrop-blur-md border border-[#EADBC8] rounded-3xl shadow-lg p-6">
+                      <h2 className="text-xl font-semibold text-[#4B4036] flex items-center gap-2">
+                        <DocumentTextIcon className="w-5 h-5" />
+                        AI 專案對話紀錄
+                      </h2>
+                      <p className="mt-2 text-sm text-[#2B3A3B]/70">
+                        查看所有 AI 專案、用戶、對話訊息與錯誤記錄。
+                      </p>
+                    </div>
+
+                    {/* 子標籤頁 */}
+                    <div className="flex gap-2 mb-4">
+                      {(['rooms','users','messages','errors'] as LogTabKey[]).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setLogActiveTab(t)}
+                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                            logActiveTab === t 
+                              ? 'bg-[#FFEAD1] text-[#4B4036] font-medium' 
+                              : 'bg-white border border-[#EADBC8] text-gray-700 hover:bg-[#FFF9F2]'
+                          }`}
+                        >
+                          {tabLabel(t)}
+                        </button>
+                      ))}
+                    </div>
+
+                    {logLoading ? (
+                      <div className="py-10 text-center text-[#2B3A3B]">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFB6C1] mx-auto mb-2" />
+                        <p>載入中...</p>
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-2xl p-4 ring-1 ring-[#EADBC8]">
+                        {logActiveTab === 'rooms' && (
+                          <div className="space-y-2">
+                            {logRooms.length === 0 ? (
+                              <div className="text-center py-8 text-gray-500">目前沒有專案記錄</div>
+                            ) : (
+                              logRooms.map((r:any)=> (
+                                <div key={r.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="font-semibold text-[#4B4036]">
+                                        {r.title || '(未命名專案)'} 
+                                        <span className="text-xs text-gray-500 ml-1">{formatHK(r.created_at)}</span>
+                                      </p>
+                                      <p className="text-xs text-gray-600">room_id: {r.id}</p>
+                                    </div>
+                                    <span className="text-xs text-gray-500">最後: {formatHK(r.last_message_at)}</span>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {logActiveTab === 'users' && (
+                          <div className="space-y-2">
+                            {logUsers.length === 0 ? (
+                              <div className="text-center py-8 text-gray-500">目前沒有用戶記錄</div>
+                            ) : (
+                              logUsers.map((u:any)=> (
+                                <div key={u.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
+                                  <p className="font-semibold text-[#4B4036]">{u.full_name || u.email}</p>
+                                  <p className="text-xs text-gray-600">{u.email} · {formatHK(u.created_at)}</p>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {logActiveTab === 'messages' && (
+                          <div className="space-y-2">
+                            {logMessages.length === 0 ? (
+                              <div className="text-center py-8 text-gray-500">目前沒有對話記錄</div>
+                            ) : (
+                              logMessages.map((m:any)=> (
+                                <div key={m.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
+                                  <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {formatHK(m.created_at)}</p>
+                                  <p className="font-medium text-[#2B3A3B]">
+                                    [{m.sender_type}] {m.content?.slice(0,200) || m.content_json?.text || '(空白)'}
+                                  </p>
+                                  {(((m.status && m.status !== 'sent') ? true : false) || (m.error_message && m.error_message.trim() !== '')) && (
+                                    <p className="text-xs text-rose-600 mt-1">狀態: {m.status || 'error'}</p>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {logActiveTab === 'errors' && (
+                          <div className="space-y-2">
+                            {logMessages.filter((m:any)=> 
+                              m.status==='error' || 
+                              (m.error_message && m.error_message.trim()!=='') || 
+                              (m.content && /遇到點小困難|重新輸入|稍後再試/.test(m.content))
+                            ).length === 0 ? (
+                              <div className="text-center py-8 text-gray-500">目前沒有錯誤記錄</div>
+                            ) : (
+                              logMessages.filter((m:any)=> 
+                                m.status==='error' || 
+                                (m.error_message && m.error_message.trim()!=='') || 
+                                (m.content && /遇到點小困難|重新輸入|稍後再試/.test(m.content))
+                              ).map((m:any)=> (
+                                <div 
+                                  key={m.id} 
+                                  className="p-3 rounded-xl border border-rose-200 bg-rose-50 cursor-pointer hover:bg-rose-100 transition-colors" 
+                                  onClick={()=>openRoomConversation(m.room_id)}
+                                >
+                                  <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {formatHK(m.created_at)}</p>
+                                  <p className="font-medium text-[#B00020]">
+                                    {m.error_message || '系統提示：遇到點小困難，請重新輸入或稍後再試'}
+                                  </p>
+                                  <p className="text-xs text-[#2B3A3B] mt-1">
+                                    內容: {m.content?.slice(0,180) || m.content_json?.text || '(空白)'}
+                                  </p>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence mode="wait">
                 {(activeSection === 'role-permissions' || activeSection === 'audit-logs') && (
                   <motion.div
                     key="coming-soon"
@@ -1961,6 +2254,44 @@ export default function AdminControlCenterPage() {
           </div>
         </div>
       </div>
+
+      {/* 對話詳情視窗 */}
+      {showLogDialog && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30" 
+          onClick={()=>setShowLogDialog(false)}
+        >
+          <div 
+            className="w-full max-w-3xl bg-white rounded-2xl p-4 ring-1 ring-[#EADBC8] max-h-[80vh] flex flex-col" 
+            onClick={(e)=>e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+              <h3 className="text-lg font-bold text-[#2B3A3B]">{logDialogTitle}</h3>
+              <button 
+                className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#2B3A3B] transition-colors" 
+                onClick={()=>setShowLogDialog(false)}
+              >
+                關閉
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto space-y-2 flex-1">
+              {logDialogItems.length === 0 ? (
+                <div className="text-center text-[#2B3A3B] py-6">沒有對話內容</div>
+              ) : (
+                logDialogItems.map((it:any)=>(
+                  <div key={it.id} className="p-3 rounded-xl border border-[#EADBC8]">
+                    <p className="text-xs text-gray-600 mb-1">{formatHK(it.created_at)} · {it.sender_type}</p>
+                    <p className="text-[#2B3A3B] whitespace-pre-wrap">{it.content || it.content_json?.text || '(空白)'}</p>
+                    {(((it.status && it.status!=='sent') ? true : false) || (it.error_message && it.error_message.trim()!=='')) && (
+                      <p className="text-xs text-rose-600 mt-1">狀態: {it.status || 'error'} · {it.error_message}</p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -72,34 +72,63 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
   useEffect(() => {
     let cancelled = false;
     const resolveRole = async () => {
-      if (!user?.id) {
+      if (!user) {
         setIsSuperAdmin(false);
         setRoleLoading(false);
         return;
       }
 
-      if (user.user_role) {
-        setIsSuperAdmin(user.user_role === 'super_admin');
+      // 首先檢查 user 對象中的各種可能的 role 字段
+      const normalizedRoleFromUser = (
+        (user as any)?.user_role ??
+        (user as any)?.role ??
+        (user as any)?.metadata?.user_role ??
+        (user as any)?.metadata?.role ??
+        (user as any)?.app_metadata?.user_role ??
+        (user as any)?.app_metadata?.role ??
+        ''
+      )
+        .toString()
+        .trim()
+        .toLowerCase();
+
+      if (normalizedRoleFromUser === 'super_admin') {
+        console.log('AppSidebar: 從 user 對象檢測到 super_admin 身份');
+        setIsSuperAdmin(true);
+        setRoleLoading(false);
+        return;
+      }
+
+      // 如果 user 對象中沒有 role，則從數據庫查詢
+      const userId = user.id || (user as any)?.user_id;
+      const userEmail = user.email;
+
+      if (!userId && !userEmail) {
+        setIsSuperAdmin(false);
         setRoleLoading(false);
         return;
       }
 
       try {
-        const { data: userData, error } = await saasSupabase
-          .from('saas_users')
-          .select('user_role')
-          .eq('id', user.id)
-          .maybeSingle();
+        let query = saasSupabase.from('saas_users').select('user_role');
+        
+        if (userId) {
+          query = query.eq('id', userId);
+        } else if (userEmail) {
+          query = query.eq('email', userEmail);
+        }
 
-        const data = userData as { user_role: string } | null;
+        const { data: userData, error } = await query.maybeSingle();
 
         if (!cancelled) {
           if (error) {
             console.error('AppSidebar: 讀取 user_role 失敗:', error.message);
             setIsSuperAdmin(false);
           } else {
-            const role = data?.user_role || 'user';
-            setIsSuperAdmin(role === 'super_admin');
+            const role = (userData as { user_role: string } | null)?.user_role || 'user';
+            const isSuperAdminRole = role.toLowerCase() === 'super_admin';
+            console.log('AppSidebar: 從數據庫讀取 user_role:', role, 'isSuperAdmin:', isSuperAdminRole);
+            setIsSuperAdmin(isSuperAdminRole);
           }
           setRoleLoading(false);
         }
@@ -116,59 +145,62 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
     return () => {
       cancelled = true;
     };
-  }, [user?.id, user?.user_role, saasSupabase]);
+  }, [user, saasSupabase]);
 
-  const sidebarMenuItems: SidebarItem[] = [
-    { 
-      icon: HomeIcon, 
-      label: '首頁', 
-      href: '/aihome', 
-      description: '返回主頁' 
-    },
-    { 
-      icon: CalendarDaysIcon, 
-      label: '課程活動', 
-      href: '/aihome/course-activities', 
-      description: '查看所有報讀的機構和課程活動' 
-    },
-    { 
-      icon: UsersIcon, 
-      label: '家長連結', 
-      href: '/aihome/parent/bound-students', 
-      description: '查看孩子的學習' 
-    },
-  {
-    icon: BriefcaseIcon,
-    label: '老師連結',
-    href: '/aihome/teacher-link',
-    description: '建立與管理您的課程機構',
-  },
-    { 
-      icon: SparklesIcon, 
-      label: 'AI伙伴', 
-      href: '/aihome/ai-companions', 
-      description: '您的工作和學習伙伴' 
-    },
-    // 花見老師專區已隱藏
-    // ...(user && (hasTeacherAccess || directHasTeacherAccess) ? [{
-    //   icon: AcademicCapIcon, 
-    //   label: '花見老師專區', 
-    //   href: '/aihome/teacher-zone', 
-    //   description: '教師專用功能和工具' 
-    // }] : []),
-    ...(isSuperAdmin ? [{
-      icon: Cog6ToothIcon,
-      label: '管理員控制室',
-      href: '/aihome/admin/control-center',
-      description: '調整 AI 角色模型與系統設定'
-    }] : []),
-    { 
+  const sidebarMenuItems: SidebarItem[] = useMemo(() => {
+    const baseItems: SidebarItem[] = [
+      { 
+        icon: HomeIcon, 
+        label: '首頁', 
+        href: '/aihome', 
+        description: '返回主頁' 
+      },
+      { 
+        icon: CalendarDaysIcon, 
+        label: '課程活動', 
+        href: '/aihome/course-activities', 
+        description: '查看所有報讀的機構和課程活動' 
+      },
+      { 
+        icon: UsersIcon, 
+        label: '家長連結', 
+        href: '/aihome/parent/bound-students', 
+        description: '查看孩子的學習' 
+      },
+      {
+        icon: BriefcaseIcon,
+        label: '老師連結',
+        href: '/aihome/teacher-link',
+        description: '建立與管理您的課程機構',
+      },
+      { 
+        icon: SparklesIcon, 
+        label: 'AI伙伴', 
+        href: '/aihome/ai-companions', 
+        description: '您的工作和學習伙伴' 
+      },
+    ];
+
+    // 如果是 super_admin 且角色已加載完成，添加管理員控制中心選項
+    if (isSuperAdmin && !roleLoading) {
+      baseItems.push({
+        icon: Cog6ToothIcon,
+        label: '管理員控制中心',
+        href: '/aihome/admin/control-center',
+        description: '調整 AI 角色模型與系統設定'
+      });
+    }
+
+    // 添加設定選項
+    baseItems.push({
       icon: UserIcon, 
       label: '設定', 
       href: '/aihome/profile', 
       description: '管理您的個人信息和系統設定' 
-    }
-  ];
+    });
+
+    return baseItems;
+  }, [isSuperAdmin, roleLoading]);
 
   const handleNavigation = (href: string) => {
     if (href === '/aihome/parent/bound-students' && !user) {

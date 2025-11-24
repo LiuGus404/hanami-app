@@ -59,7 +59,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
-      url: `${baseUrl}/admin/control`,
+      url: `${baseUrl}/admin`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.5,

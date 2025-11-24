@@ -2,6 +2,7 @@
 
 import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import Image from 'next/image';
 
@@ -2301,7 +2302,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     </div>
   );
 
-  return (
+  const modalContent = (
     <>
       {console.log('ActivityForm render, showCustomManager:', showCustomManager)}
       
@@ -2383,7 +2384,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
       {/* 自訂管理彈出視窗 */}
       {showCustomManager.open && (
-        <div className="fixed inset-0 bg-transparent flex items-center justify-center p-4 z-[60]">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[10000] overflow-y-auto">
           <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="p-4 md:p-6 border-b border-gray-200">
               <h2 className="text-xl md:text-2xl font-bold text-hanami-text">
@@ -2503,8 +2504,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       )}
 
       {/* 主表單彈出視窗 */}
-      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] rounded-2xl w-full max-w-lg md:max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl border-2 border-[#EADBC8] relative">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] overflow-y-auto">
+        <div className="bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] rounded-2xl w-full max-w-lg md:max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl border-2 border-[#EADBC8] relative my-8">
           {/* 裝飾性圖案 */}
           <div className="absolute top-4 right-4 opacity-20">
             <Image src="/star-icon.png" alt="" width={60} height={60} className="animate-pulse" />
@@ -2618,4 +2619,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       </div>
     </>
   );
+
+  // 使用 createPortal 將模態視窗渲染到 document.body
+  if (typeof window === 'undefined' || !document.body) {
+    return null;
+  }
+
+  return createPortal(modalContent, document.body);
 } 

@@ -2,10 +2,14 @@
 
 import Image from 'next/image';
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 
 import { supabase } from '@/lib/supabase';
 import { useUser } from '@/hooks/useUser';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { getUserSession } from '@/lib/authUtils';
+import { useTeacherLinkOrganization } from '@/app/aihome/teacher-link/create/TeacherLinkShell';
 
 interface AvailableTimeSlot {
   weekday: number
@@ -31,10 +35,32 @@ interface CopyAvailableTimesModalProps {
 
 export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailableTimesModalProps) {
   const { user } = useUser();
-  const { currentOrganization } = useOrganization();
+  
+  // 嘗試從 TeacherLinkShell context 獲取組織信息（優先）
+  let teacherLinkOrgId: string | null = null;
+  try {
+    const teacherLinkContext = useTeacherLinkOrganization();
+    teacherLinkOrgId = teacherLinkContext?.orgId || null;
+  } catch (e) {
+    // TeacherLinkShell context 不可用，將使用其他方法
+  }
+  
+  // 嘗試從 OrganizationProvider 獲取組織信息
+  let currentOrganization: any = null;
+  try {
+    const orgContext = useOrganization();
+    currentOrganization = orgContext?.currentOrganization || null;
+  } catch (e) {
+    // OrganizationProvider 不可用，將使用其他方法
+  }
+  
+  // 從會話中獲取組織信息（後備方案）
+  const session = getUserSession();
+  const sessionOrganization = session?.organization || null;
+  
   const effectiveOrgId = useMemo(
-    () => currentOrganization?.id || user?.organization?.id || null,
-    [currentOrganization?.id, user?.organization?.id]
+    () => teacherLinkOrgId || currentOrganization?.id || sessionOrganization?.id || user?.organization?.id || null,
+    [teacherLinkOrgId, currentOrganization?.id, sessionOrganization?.id, user?.organization?.id]
   );
   const validOrgId = useMemo(
     () =>
@@ -125,17 +151,53 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         return;
       }
 
-      // 2. 獲取所有常規學生
-      const { data: regularData, error: regularError } = await supabase
-        .from('Hanami_Students')
-        .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
-        .eq('org_id', validOrgId as string)
-        .in('student_type', ['常規', '試堂'])
-        .not('regular_weekday', 'is', null)
-        .not('regular_timeslot', 'is', null);
-
-      if (regularError) {
-        setError(`無法載入常規學生：${regularError.message}`);
+      // 2. 獲取所有常規學生（使用 API 端點繞過 RLS）
+      let regularData: any[] = [];
+      try {
+        const userEmail = user?.email || null;
+        const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId as string)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+        
+        // 獲取 '常規' 類型的學生
+        const regularResponse = await fetch(`${apiUrl}&studentType=常規`, {
+          credentials: 'include',
+        });
+        
+        // 獲取 '試堂' 類型的學生
+        const trialResponse = await fetch(`${apiUrl}&studentType=試堂`, {
+          credentials: 'include',
+        });
+        
+        if (regularResponse.ok) {
+          const regularResult = await regularResponse.json();
+          if (regularResult.students) {
+            regularData = [...regularData, ...regularResult.students];
+          }
+        } else {
+          console.error('無法載入常規學生，API 返回錯誤:', regularResponse.status);
+        }
+        
+        if (trialResponse.ok) {
+          const trialResult = await trialResponse.json();
+          if (trialResult.students) {
+            regularData = [...regularData, ...trialResult.students];
+          }
+        } else {
+          console.error('無法載入試堂學生，API 返回錯誤:', trialResponse.status);
+        }
+        
+        // 過濾掉沒有 regular_weekday 或 regular_timeslot 的學生
+        regularData = regularData.filter((student: any) => 
+          student.regular_weekday !== null && 
+          student.regular_weekday !== undefined && 
+          student.regular_timeslot !== null && 
+          student.regular_timeslot !== undefined
+        );
+        
+        console.log('通過 API 載入的學生數量（已過濾）:', regularData.length);
+      } catch (error) {
+        console.error('載入常規學生時發生錯誤:', error);
+        setError(`無法載入常規學生：${error instanceof Error ? error.message : '未知錯誤'}`);
+        setLoading(false);
         return;
       }
 
@@ -538,44 +600,97 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
     document.body.removeChild(link);
   };
 
-  // 禁止背景滾動
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 禁止背景滾動（但允許模態框內部滾動）
   useEffect(() => {
     if (isOpen) {
+      // 保存原始樣式
+      const originalOverflow = document.body.style.overflow;
+      
+      // 鎖定背景滾動
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+      
+      // 調試日誌
+      console.log('[CopyAvailableTimesModal] 模態框已打開, isOpen:', isOpen);
+      
+      return () => {
+        // 恢復原始樣式
+        document.body.style.overflow = originalOverflow;
+        console.log('[CopyAvailableTimesModal] 模態框已關閉');
+      };
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    return undefined;
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // 調試日誌
+  useEffect(() => {
+    console.log('[CopyAvailableTimesModal] 狀態更新:', { isOpen, mounted, hasValidOrg, validOrgId });
+  }, [isOpen, mounted, hasValidOrg, validOrgId]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* 透明背景覆蓋層 */}
-      <div 
-        className="absolute inset-0 bg-transparent"
-        onClick={onClose}
-      />
-      {/* 模態框內容可滾動 */}
-      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-[#EADBC8]">
+  if (!mounted) {
+    console.log('[CopyAvailableTimesModal] 尚未掛載，返回 null');
+    return null;
+  }
+  
+  if (!isOpen) {
+    console.log('[CopyAvailableTimesModal] isOpen 為 false，返回 null');
+    return null;
+  }
+
+  console.log('[CopyAvailableTimesModal] 準備渲染模態框');
+
+  const modalContent = (
+    <AnimatePresence mode="wait">
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 }}
+        >
+          {/* 半透明背景覆蓋層 */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          {/* 模態框內容可滾動 */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="relative bg-gradient-to-br from-white/95 to-white/90 backdrop-blur-md rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] border-2 border-[#EADBC8] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{ zIndex: 10000 }}
+          >
         {/* 標題欄 */}
-        <div className="bg-gradient-to-r from-[#FFF9F2] to-[#F3EFE3] px-6 py-4 border-b border-[#EADBC8]">
+        <div className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md px-6 py-4 border-b-2 border-[#EADBC8] flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Image
-                alt="時間"
-                className="animate-pulse"
-                height={24}
-                src="/icons/clock.PNG"
-                width={24}
-              />
-              <h2 className="text-lg font-semibold text-[#4B4036]">複製有位時間</h2>
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <Image
+                  alt="時間"
+                  height={24}
+                  src="/icons/clock.PNG"
+                  width={24}
+                />
+              </motion.div>
+              <h2 className="text-xl font-bold text-[#4B4036]">複製有位時間</h2>
             </div>
-            <button
-              className="p-2 hover:bg-[#EADBC8] rounded-full transition-all duration-200 hover:scale-110"
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="p-2 hover:bg-[#EADBC8] rounded-full transition-all duration-200"
               onClick={onClose}
             >
               <Image
@@ -584,12 +699,12 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
                 src="/close.png"
                 width={20}
               />
-            </button>
+            </motion.button>
           </div>
         </div>
 
         {/* 內容區域 */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 overscroll-contain min-h-0">
           {error && (
             <div className="p-4 bg-red-100 border border-red-300 rounded-xl text-red-700 animate-pulse">
               {error}
@@ -598,20 +713,24 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
 
           {/* 全選/清除按鈕 */}
           <div className="flex gap-2">
-            <button
-              className="flex-1 hanami-btn-cute text-sm py-2 flex items-center justify-center gap-2"
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl text-sm font-medium shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
               onClick={handleSelectAll}
             >
               <Image alt="全選" height={16} src="/icons/leaf-sprout.png" width={16} />
               全選
-            </button>
-            <button
-              className="flex-1 hanami-btn-soft text-sm py-2 flex items-center justify-center gap-2"
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex-1 px-4 py-2 bg-white/70 border border-[#EADBC8] text-[#4B4036] rounded-xl text-sm font-medium shadow-sm hover:bg-white transition-all flex items-center justify-center gap-2"
               onClick={handleClearAll}
             >
               <Image alt="清除" height={16} src="/icons/close.png" width={16} />
               清除
-            </button>
+            </motion.button>
           </div>
 
           {/* 顯示試堂日期切換 */}
@@ -866,34 +985,50 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
         </div>
 
         {/* 固定底部按鈕 */}
-        <div className="p-6 border-t border-[#EADBC8] bg-[#FFFDF8] space-y-3">
+        <div className="p-6 border-t-2 border-[#EADBC8] bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md flex-shrink-0 space-y-3">
           <div className="flex gap-3">
-            <button
-              className="flex-1 hanami-btn-cute py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={selectedSlots.length === 0}
               onClick={copyToClipboard}
             >
               <Image alt="複製" height={16} src="/icons/edit-pencil.png" width={16} />
               複製
-            </button>
-            <button
-              className="flex-1 hanami-btn-success py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-[#EBC9A4] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={selectedSlots.length === 0}
               onClick={exportToCSV}
             >
               <Image alt="匯出" height={16} src="/icons/file.svg" width={16} />
               匯出 CSV
-            </button>
+            </motion.button>
           </div>
-          <button
-            className="w-full hanami-btn-soft py-3 flex items-center justify-center gap-2"
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full px-4 py-3 bg-white/70 border border-[#EADBC8] text-[#4B4036] rounded-xl font-medium shadow-sm hover:bg-white transition-all flex items-center justify-center gap-2"
             onClick={onClose}
           >
             <Image alt="返回" height={16} src="/icons/close.png" width={16} />
             返回
-          </button>
+          </motion.button>
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
+
+  if (typeof window === 'undefined' || !document.body) {
+    console.log('[CopyAvailableTimesModal] 服務器端渲染或 document.body 不存在，返回 null');
+    return null;
+  }
+
+  console.log('[CopyAvailableTimesModal] 使用 createPortal 渲染模態框到 document.body');
+  return createPortal(modalContent, document.body);
 } 

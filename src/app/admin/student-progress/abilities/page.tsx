@@ -3,7 +3,6 @@
 
 import Image from 'next/image';
 import {
-  ChartBarIcon,
   UserGroupIcon,
   StarIcon,
   PlusIcon,
@@ -18,7 +17,6 @@ import {
   BookOpenIcon,
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
-import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 
@@ -32,6 +30,8 @@ import AbilityEditModal from '@/components/admin/AbilityEditModal';
 import { supabase } from '@/lib/supabase';
 import { DevelopmentAbility, StudentAbility, DEVELOPMENT_ABILITIES } from '@/types/progress';
 import { PopupSelect } from '@/components/ui/PopupSelect';
+import { useUser } from '@/hooks/useUser';
+import { getUserSession } from '@/lib/authUtils';
 
 type NavigationOverrides = Partial<{
   dashboard: string;
@@ -722,19 +722,66 @@ export default function AbilitiesPage({
       }));
       setAbilities(fixedAbilities);
 
-      // 載入學生
-      let studentsQuery = supabase
-        .from('Hanami_Students')
-        .select('id, full_name, nick_name, student_age, course_type');
+      // 載入學生 - 使用 API 端點繞過 RLS
       if (validOrgId) {
-        studentsQuery = studentsQuery.eq('org_id', validOrgId);
+        try {
+          const session = getUserSession();
+          const userEmail = session?.email || null;
+          
+          const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+          
+          const response = await fetch(apiUrl, {
+            credentials: 'include',
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            const allStudents = result.students || result.data || [];
+            // 只選擇需要的欄位並排序
+            const studentsData = allStudents
+              .map((s: any) => ({
+                id: s.id,
+                full_name: s.full_name,
+                nick_name: s.nick_name,
+                student_age: s.student_age,
+                course_type: s.course_type,
+              }))
+              .sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || ''));
+            setStudents(studentsData);
+            console.log('通過 API 載入學生資料成功:', studentsData.length);
+          } else {
+            console.error('⚠️ 無法載入學生，API 返回錯誤:', response.status);
+            // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
+            const { data: studentsData, error: studentsError } = await supabase
+              .from('Hanami_Students')
+              .select('id, full_name, nick_name, student_age, course_type')
+              .eq('org_id', validOrgId)
+              .order('full_name');
+            
+            if (studentsError) {
+              console.error('直接查詢也失敗:', studentsError);
+              throw studentsError;
+            }
+            setStudents(studentsData || []);
+          }
+        } catch (apiError) {
+          console.error('⚠️ API 調用異常，嘗試直接查詢:', apiError);
+          // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
+          const { data: studentsData, error: studentsError } = await supabase
+            .from('Hanami_Students')
+            .select('id, full_name, nick_name, student_age, course_type')
+            .eq('org_id', validOrgId)
+            .order('full_name');
+          
+          if (studentsError) {
+            console.error('直接查詢也失敗:', studentsError);
+            throw studentsError;
+          }
+          setStudents(studentsData || []);
+        }
+      } else {
+        setStudents([]);
       }
-      const { data: studentsData, error: studentsError } = await studentsQuery.order(
-        'full_name',
-      );
-
-      if (studentsError) throw studentsError;
-      setStudents(studentsData || []);
 
       // 載入學生能力記錄
       let studentAbilitiesQuery = supabase
@@ -960,15 +1007,6 @@ export default function AbilitiesPage({
     <div className="p-6 space-y-6">
       {/* 頁面標題 */}
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-hanami-text flex items-center gap-3">
-            <ChartBarIcon className="h-8 w-8 text-hanami-primary" />
-            學生能力管理
-          </h1>
-          <p className="text-hanami-text-secondary mt-2">
-            追蹤和管理學生的核心能力
-          </p>
-        </div>
         <div className="flex gap-3">
           <HanamiButton
             className="flex items-center gap-2"
@@ -989,62 +1027,6 @@ export default function AbilitiesPage({
         </div>
       </div>
 
-      {/* 學生進度管理導航按鈕區域 */}
-      <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
-        <ResponsiveNavigationDropdown
-          items={[
-            {
-              icon: BarChart3,
-              label: "進度管理面板",
-              href: navigationPaths.dashboard,
-              variant: "secondary"
-            },
-            {
-              icon: TreePine,
-              label: "成長樹管理",
-              href: navigationPaths.growthTrees,
-              variant: "secondary"
-            },
-            {
-              icon: BookOpenIcon,
-              label: "學習路線管理",
-              href: navigationPaths.learningPaths,
-              variant: "secondary"
-            },
-            {
-              icon: TrendingUp,
-              label: "發展能力圖卡",
-              href: navigationPaths.abilities,
-              variant: "primary"
-            },
-            {
-              icon: Gamepad2,
-              label: "教學活動管理",
-              href: navigationPaths.activities,
-              variant: "secondary"
-            },
-            {
-              icon: AcademicCapIcon,
-              label: "能力評估管理",
-              href: navigationPaths.assessments,
-              variant: "secondary"
-            },
-            {
-              icon: VideoCameraIcon,
-              label: "學生媒體管理",
-              href: navigationPaths.media,
-              variant: "secondary"
-            },
-            {
-              icon: Users,
-              label: "返回學生管理",
-              href: navigationPaths.studentManagement,
-              variant: "accent"
-            }
-          ]}
-          currentPage={navigationPaths.abilities}
-        />
-      </div>
 
       {orgDataDisabled && (
         <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">

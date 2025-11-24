@@ -1,14 +1,17 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { GraduationCap } from 'lucide-react';
 import AbilitiesPage from '@/app/admin/student-progress/abilities/page';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
-import StudentProgressPageTemplate from '@/components/ui/StudentProgressPageTemplate';
+import BackButton from '@/components/ui/BackButton';
+import StudentProgressNavBar from '@/components/ui/StudentProgressNavBar';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 function TeacherLinkAbilitiesContent() {
-  const { orgId, organization } = useTeacherLinkOrganization();
+  const { orgId, organization, organizationResolved } = useTeacherLinkOrganization();
 
   const resolvedOrgId =
     orgId &&
@@ -20,76 +23,66 @@ function TeacherLinkAbilitiesContent() {
         : null;
 
   return (
-    <StudentProgressPageTemplate
-      title="發展能力圖卡"
-      subtitle="發展能力"
-      description="建立和管理學生的發展能力圖卡，定義各項能力的等級和分類，為成長樹目標提供能力基礎。"
-      badge="能力管理中心"
-      illustration="/icons/music.PNG"
-      illustrationAlt="能力圖示"
-      features={[
-        {
-          title: '能力分類清晰',
-          description: '按類別組織各項發展能力',
-          icon: '/icons/music.PNG',
-        },
-        {
-          title: '等級靈活設定',
-          description: '自訂能力等級和評估標準',
-          icon: '/icons/book-elephant.PNG',
-        },
-        {
-          title: '關聯成長樹',
-          description: '將能力與成長樹目標連結',
-          icon: '/icons/clock.PNG',
-        },
-      ]}
-      steps={[
-        {
-          step: 1,
-          title: '建立能力',
-          description: '點擊「新增能力」按鈕，輸入能力名稱、描述、分類和最大等級。',
-          icon: '/icons/music.PNG',
-        },
-        {
-          step: 2,
-          title: '設定分類',
-          description: '使用「管理分類」功能建立或編輯能力分類，讓能力組織更清晰。',
-          icon: '/icons/book-elephant.PNG',
-        },
-        {
-          step: 3,
-          title: '配置等級',
-          description: '使用「管理等級」功能設定能力的等級標準和描述。',
-          icon: '/icons/clock.PNG',
-        },
-        {
-          step: 4,
-          title: '關聯目標',
-          description: '在成長樹目標中選擇所需的能力，建立完整的學習路徑。',
-          icon: '/tree ui.png',
-        },
-      ]}
-      backHref="/aihome/teacher-link/create/student-progress"
-      backLabel="返回進度管理"
-      organizationName={organization?.name}
-    >
-      <AbilitiesPage
-        navigationOverrides={{
-          dashboard: '/aihome/teacher-link/create/student-progress',
-          growthTrees: '/aihome/teacher-link/create/student-progress/growth-trees',
-          learningPaths: '/aihome/teacher-link/create/student-progress/learning-paths',
-          abilities: '/aihome/teacher-link/create/student-progress/abilities',
-          activities: '/aihome/teacher-link/create/student-progress/activities',
-          assessments: '/aihome/teacher-link/create/student-progress/ability-assessments',
-          media: '/aihome/teacher-link/create/student-progress/student-media',
-          studentManagement: '/aihome/teacher-link/create/students',
-        }}
-        forcedOrgId={resolvedOrgId}
-        forcedOrgName={organization?.name ?? null}
-        disableOrgFallback
-      />
-    </StudentProgressPageTemplate>
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] px-4 py-8">
+      <div className="max-w-7xl mx-auto">
+        {/* 返回按鈕 */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="mb-6"
+        >
+          <BackButton href="/aihome/teacher-link/create/student-progress" label="返回進度管理" />
+        </motion.div>
+
+        {/* 導航欄 */}
+        {organizationResolved && <StudentProgressNavBar orgId={resolvedOrgId} />}
+
+        {/* 標題區域 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
+          <div className="flex items-center justify-center mb-4">
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <GraduationCap className="w-8 h-8 text-[#FFB6C1] mr-3" />
+            </motion.div>
+            <h1 className="text-4xl font-bold text-[#4B4036]">發展能力圖卡</h1>
+          </div>
+          <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
+            建立和管理學生的發展能力圖卡，定義各項能力的等級和分類，為成長樹目標提供能力基礎
+          </p>
+        </motion.div>
+
+        {/* 主要內容 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-[#EADBC8] overflow-hidden"
+        >
+          <AbilitiesPage
+            navigationOverrides={{
+              dashboard: '/aihome/teacher-link/create/student-progress',
+              growthTrees: '/aihome/teacher-link/create/student-progress/growth-trees',
+              learningPaths: '/aihome/teacher-link/create/student-progress/learning-paths',
+              abilities: '/aihome/teacher-link/create/student-progress/abilities',
+              activities: '/aihome/teacher-link/create/student-progress/activities',
+              assessments: '/aihome/teacher-link/create/student-progress/ability-assessments',
+              media: '/aihome/teacher-link/create/student-progress/student-media',
+              studentManagement: '/aihome/teacher-link/create/students',
+            }}
+            forcedOrgId={resolvedOrgId}
+            forcedOrgName={organization?.name ?? null}
+            disableOrgFallback
+          />
+        </motion.div>
+      </div>
+    </div>
   );
 }
 

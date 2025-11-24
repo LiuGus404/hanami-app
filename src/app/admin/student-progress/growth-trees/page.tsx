@@ -2,7 +2,6 @@
 
 import { PlusIcon, MagnifyingGlassIcon, FunnelIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users } from 'lucide-react';
-import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import Image from 'next/image';
@@ -866,14 +865,6 @@ useEffect(() => {
     <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-hanami-text mb-2">
-              成長樹管理
-            </h1>
-            <p className="text-hanami-text-secondary">
-              管理教學成長樹和學習目標
-            </p>
-          </div>
           <HanamiButton
             className="bg-gradient-to-r from-hanami-primary to-hanami-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={orgDataDisabled || !validOrgId}
@@ -887,22 +878,6 @@ useEffect(() => {
           </HanamiButton>
         </div>
 
-        {/* 學生進度管理導航按鈕區域 */}
-        <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
-          <ResponsiveNavigationDropdown
-            items={[
-              { label: '進度管理面板', href: navigationPaths.dashboard, icon: BarChart3 },
-              { label: '成長樹管理', href: navigationPaths.growthTrees, icon: TreePine },
-              { label: '學習路線管理', href: navigationPaths.learningPaths, icon: BookOpenIcon },
-              { label: '發展能力圖卡', href: navigationPaths.abilities, icon: TrendingUp },
-              { label: '教學活動管理', href: navigationPaths.activities, icon: Gamepad2 },
-              { label: '能力評估管理', href: navigationPaths.assessments, icon: AcademicCapIcon },
-              { label: '學生媒體管理', href: navigationPaths.media, icon: VideoCameraIcon },
-              { label: '返回學生管理', href: navigationPaths.studentManagement, icon: Users },
-            ]}
-            currentPage={navigationPaths.growthTrees}
-          />
-        </div>
 
         {(orgDataDisabled || !validOrgId) && (
           <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">

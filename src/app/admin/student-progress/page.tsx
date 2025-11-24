@@ -15,7 +15,6 @@ import {
   VideoCameraIcon,
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, Users, GraduationCap, Video } from 'lucide-react';
-import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { HanamiNumberSelector } from '@/components/ui/HanamiNumberSelector';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -966,35 +965,7 @@ export default function StudentProgressDashboard(
             </p>
           </div>
         )}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-hanami-text mb-2">
-                學生進度管理
-              </h1>
-              <p className="text-hanami-text-secondary">
-                管理學生發展能力、成長樹和教學活動
-              </p>
-            </div>
-          </div>
-        </div>
 
-        {/* 學生進度管理導航按鈕區域 */}
-        <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
-          <ResponsiveNavigationDropdown
-            items={[
-              { icon: BarChart3, label: '進度管理面板', href: navigationPaths.dashboard, variant: 'primary' },
-              { icon: TreePine, label: '成長樹管理', href: navigationPaths.growthTrees, variant: 'secondary' },
-              { icon: BookOpenIcon, label: '學習路線管理', href: navigationPaths.learningPaths, variant: 'secondary' },
-              { icon: TrendingUp, label: '發展能力圖卡', href: navigationPaths.abilities, variant: 'secondary' },
-              { icon: Gamepad2, label: '教學活動管理', href: navigationPaths.activities, variant: 'secondary' },
-              { icon: GraduationCap, label: '能力評估管理', href: navigationPaths.assessments, variant: 'secondary' },
-              { icon: Video, label: '學生媒體管理', href: navigationPaths.media, variant: 'secondary' },
-              { icon: Users, label: '返回學生管理', href: navigationPaths.studentManagement, variant: 'accent' },
-            ]}
-            currentPage={navigationPaths.dashboard}
-          />
-        </div>
 
         {/* 統計卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">

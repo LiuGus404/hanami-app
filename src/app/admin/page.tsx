@@ -1,533 +1,453 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
-import HanamiCalendar from '@/components/ui/HanamiCalendar';
-import { getUserSession, clearUserSession, fallbackOrganization } from '@/lib/authUtils';
-import { supabase, getSaasSupabaseClient } from '@/lib/supabase';
-import { AnimatePresence, motion } from 'framer-motion';
+import AIControlPanel from '@/components/AIControlPanel';
+import { Spinner } from '@/components/ui/spinner';
+import { getUserSession } from '@/lib/authUtils';
+import { getSaasSupabaseClient } from '@/lib/supabase';
+
+const mockTasks = [
+  { id: '1', model: 'Lulu', icon: '🦊', status: 'processing', description: '任務描述略' },
+  { id: '2', model: 'Taku', icon: '🐻', status: 'done', timestamp: '2024/4/26 15:23' },
+  { id: '3', model: 'Hibi', icon: '🦉', status: 'error', timestamp: '2024/4/26 15:23' },
+];
+
+const mockModels = [
+  { name: 'Hibi', icon: '🦉', status: 'idle' },
+  { name: 'Lulu', icon: '🦊', status: 'busy' },
+  { name: 'Taku', icon: '🐻', status: 'idle' },
+  { name: 'Mimi', icon: '🐰', status: 'idle' },
+];
+
+type TabKey = 'control' | 'logs';
+type LogTabKey = 'rooms' | 'users' | 'messages' | 'errors';
+
+const formatHK = (iso?: string | null) => {
+  if (!iso) return '-';
+  try {
+    return new Date(iso).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong' });
+  } catch {
+    return iso;
+  }
+};
 
 export default function AdminPage() {
   const router = useRouter();
-  const [studentCount, setStudentCount] = useState(0);
-  const [trialStudentCount, setTrialStudentCount] = useState(0);
-  const [lastLessonCount, setLastLessonCount] = useState(0);
-  const [adminName, setAdminName] = useState('管理員');
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [orgId, setOrgId] = useState<string | null>(null);
-  const sessionChecked = useRef(false);
-
-  // AI 專案對話紀錄 - 狀態
-  const [showLogViewer, setShowLogViewer] = useState(false);
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [userRole, setUserRole] = useState('');
+  
+  // 檢查 URL 查詢參數或路徑來設置默認標籤
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'logs') return 'logs';
+      // 如果從 ai-project-logs 路徑訪問，默認顯示 logs
+      if (window.location.pathname.includes('ai-project-logs')) return 'logs';
+    }
+    return 'control';
+  });
+  
+  // AI 專案對話紀錄相關狀態
+  const [logActiveTab, setLogActiveTab] = useState<LogTabKey>('rooms');
+  const [logLoading, setLogLoading] = useState(true);
   const [users, setUsers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'users' | 'rooms' | 'messages' | 'errors'>('rooms');
+  const [showDialog, setShowDialog] = useState(false);
+  const [dialogTitle, setDialogTitle] = useState('');
+  const [dialogItems, setDialogItems] = useState<any[]>([]);
 
-  const openLogViewer = async () => {
-    setShowLogViewer(true);
-    setLogsLoading(true);
+  const tabLabel = (t: LogTabKey) => (t === 'rooms' ? '專案' : t === 'users' ? '用戶' : t === 'messages' ? '對話' : '錯誤');
+
+  const openRoomConversation = async (roomId: string) => {
     try {
+      setShowDialog(true);
+      setDialogTitle(`專案對話：${roomId}`);
       const saas = getSaasSupabaseClient();
-      const [uRes, rRes, mRes] = await Promise.all([
-        (saas.from('saas_users') as any).select('id,email,full_name,created_at').order('created_at', { ascending: false }).limit(100),
-        (saas.from('ai_rooms') as any).select('id,title,description,created_by,created_at,last_message_at').order('created_at', { ascending: false }).limit(100),
-        (saas.from('ai_messages') as any).select('id,room_id,sender_type,sender_user_id,content,content_json,status,error_message,created_at').order('created_at', { ascending: false }).limit(200)
-      ]);
-      setUsers((uRes as any)?.data || []);
-      setRooms((rRes as any)?.data || []);
-      setMessages((mRes as any)?.data || []);
+      const res: any = await (saas.from('ai_messages') as any)
+        .select('id,room_id,sender_type,sender_user_id,content,content_json,status,error_message,created_at')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true });
+      setDialogItems(res?.data || []);
     } catch (e) {
-      console.error('載入 AI 記錄失敗:', e);
-    } finally {
-      setLogsLoading(false);
+      setDialogItems([]);
     }
   };
 
   useEffect(() => {
-    // 防止重複檢查
-    if (sessionChecked.current) return;
-    sessionChecked.current = true;
+    let mounted = true;
 
-    // 檢查用戶會話
-    const userSession = getUserSession();
-    console.log('Admin Page - User Session:', userSession);
-    
-    if (!userSession || userSession.role !== 'admin') {
-      console.log('Admin Page - Invalid session, redirecting to login');
-      clearUserSession();
-      router.replace('/admin/login');
-      return;
-    }
-
-    // 設置管理員名稱
-    setAdminName(userSession.name || '管理員');
-    setOrgId(userSession.organization?.id || null);
-    setIsLoading(false);
-  }, []); // 移除 router 依賴
-
-  useEffect(() => {
-    if (!orgId) return;
-
-    const fetchData = async () => {
+    const checkAuth = async () => {
       try {
-        setError(null);
+        const userSession = getUserSession();
         
-        // 只宣告一次 today
-        const today = new Date().toISOString().split('T')[0];
-        // 獲取常規學生數量（Hanami_Students 表中 student_type = '常規' 的學生）
-        const { data: regularStudents, error: regularError } = await supabase
-          .from('Hanami_Students')
-          .select('id, student_type')
-          .eq('student_type', '常規')
-          .eq('org_id', orgId);
-        
-        if (regularError) {
-          console.error('Error fetching regular students:', regularError);
-          setError('無法獲取常規學生數據');
-        } else if (Array.isArray(regularStudents)) {
-          setStudentCount(regularStudents.length);
+        if (!userSession) {
+          console.error('No user session found');
+          router.replace('/admin/login');
+          return;
         }
 
-        // 獲取今日及之後的試堂學生數量
-        const { data: trialStudents, error: trialError } = await supabase
-          .from('hanami_trial_students')
-          .select('id, lesson_date')
-          .gte('lesson_date', today)
-          .eq('org_id', orgId);
+        const role = userSession.role || '';
         
-        if (trialError) {
-          console.error('Error fetching trial students:', trialError);
-        } else if (Array.isArray(trialStudents)) {
-          setTrialStudentCount(trialStudents.length);
-        }
-
-        // 使用 SQL 函數計算最後一堂人數（剩餘堂數 ≤ 1 的學生）
-        const { data: regularStudentsForLesson, error: regularStudentsError } = await supabase
-          .from('Hanami_Students')
-          .select('id')
-          .eq('student_type', '常規')
-          .eq('org_id', orgId);
-        
-        if (regularStudentsError) {
-          console.error('Error fetching regular students for lesson count:', regularStudentsError);
-        } else if (Array.isArray(regularStudentsForLesson)) {
-          const studentIds = regularStudentsForLesson.map(s => s.id);
-          
-          if (studentIds.length > 0) {
-            try {
-              // 優先使用修復版 SQL 函數計算剩餘堂數
-              console.log('嘗試使用修復版 SQL 函數計算最後一堂人數');
-              const { data: remainingData, error: remainingError } = await (supabase as any)
-                .rpc('calculate_remaining_lessons_batch_fixed', {
-                  student_ids: studentIds,
-                  today_date: today
-                });
-
-              if (remainingError) {
-                console.error('修復版 SQL 查詢失敗，嘗試使用原始函數:', remainingError);
-                
-                // 嘗試使用原始函數作為備用
-                const { data: originalData, error: originalError } = await (supabase as any)
-                  .rpc('calculate_remaining_lessons_batch', {
-                    student_ids: studentIds,
-                    today_date: today
-                  });
-
-                if (originalError) {
-                  console.error('原始 SQL 查詢也失敗:', originalError);
-                  setLastLessonCount(0);
-                  return;
-                }
-
-                console.log('原始 SQL 查詢剩餘堂數結果:', originalData);
-                
-                // 計算剩餘堂數 ≤ 1 的學生數量（包含等於 1 和等於 0）
-                const studentsWithLastLesson = (originalData || [])
-                  .filter((item: any) => (item.remaining_lessons || 0) <= 1)
-                  .length;
-                
-                console.log('最後一堂人數（原始函數）:', studentsWithLastLesson);
-                setLastLessonCount(studentsWithLastLesson);
-              } else {
-                console.log('修復版 SQL 查詢剩餘堂數結果:', remainingData);
-                
-                // 計算剩餘堂數 ≤ 1 的學生數量（包含等於 1 和等於 0）
-                const studentsWithLastLesson = (remainingData || [])
-                  .filter((item: any) => (item.remaining_lessons || 0) <= 1)
-                  .length;
-                
-                console.log('最後一堂人數（修復版函數）:', studentsWithLastLesson);
-                setLastLessonCount(studentsWithLastLesson);
-              }
-            } catch (error) {
-              console.error('計算最後一堂人數時發生錯誤:', error);
-              setLastLessonCount(0);
-            }
+        if (mounted) {
+          if (role !== 'admin') {
+            router.replace('/admin/login');
           } else {
-            setLastLessonCount(0);
+            setUserRole(role);
+            setIsLoading(false);
           }
         }
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setError('載入數據時發生錯誤');
+        console.error('Auth check error:', error);
+        if (mounted) {
+          router.replace('/admin/login');
+        }
       }
     };
 
-    fetchData();
-  }, [orgId]);
+    checkAuth();
+
+    // 監聽 cookie 變化
+    const checkSession = () => {
+      if (mounted) {
+        checkAuth();
+      }
+    };
+
+    // 每 5 秒檢查一次會話狀態
+    const interval = setInterval(checkSession, 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [router]);
+
+  // 載入 AI 專案對話紀錄
+  useEffect(() => {
+    if (activeTab !== 'logs' || !userRole) return;
+
+    const load = async () => {
+      setLogLoading(true);
+      try {
+        const saas = getSaasSupabaseClient();
+        const [uRes, rRes, mRes] = await Promise.all([
+          (saas.from('saas_users') as any).select('id,email,full_name,created_at').order('created_at', { ascending: false }).limit(200),
+          (saas.from('ai_rooms') as any).select('id,title,description,created_by,created_at,last_message_at').order('created_at', { ascending: false }).limit(200),
+          (saas.from('ai_messages') as any)
+            .select('id,room_id,sender_type,sender_user_id,content,content_json,status,error_message,created_at')
+            .order('created_at', { ascending: false })
+            .limit(400)
+        ]);
+        setUsers((uRes as any)?.data || []);
+        setRooms((rRes as any)?.data || []);
+        setMessages((mRes as any)?.data || []);
+      } finally {
+        setLogLoading(false);
+      }
+    };
+    load();
+  }, [activeTab, userRole]);
+
+  const handleCreateTask = () => console.log('Create Task');
+  const handleCancelTask = () => console.log('Cancel Task');
+  const handleFilterChange = (status: string[]) => console.log(`Filter: ${status}`);
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#FFF9F2]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto" />
-          <p className="mt-4 text-[#2B3A3B]">載入管理面板...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner className="h-8 w-8" />
       </div>
     );
   }
 
+  if (!userRole || userRole !== 'admin') {
+    return null;
+  }
+
+  // 強化任務狀態顯示與排版
+  const enhancedTasks = mockTasks.map(task => {
+    let statusLabel = '';
+    let statusColor = '';
+
+    switch (task.status) {
+      case 'processing':
+        statusLabel = '進行中';
+        statusColor = 'text-blue-600';
+        break;
+      case 'done':
+        statusLabel = '完成';
+        statusColor = 'text-green-600';
+        break;
+      case 'error':
+        statusLabel = '錯誤';
+        statusColor = 'text-red-600';
+        break;
+      default:
+        statusLabel = '未知';
+        statusColor = 'text-gray-600';
+    }
+
+    return {
+      ...task,
+      statusLabel,
+      statusColor,
+    };
+  });
+
+  // 強化模型狀態顯示
+  const enhancedModels = mockModels.map(model => {
+    let statusLabel = '';
+    let statusColor = '';
+
+    switch (model.status) {
+      case 'idle':
+        statusLabel = '閒置';
+        statusColor = 'text-gray-600';
+        break;
+      case 'busy':
+        statusLabel = '忙碌中';
+        statusColor = 'text-yellow-600';
+        break;
+      default:
+        statusLabel = '未知';
+        statusColor = 'text-gray-600';
+    }
+
+    return {
+      ...model,
+      statusLabel,
+      statusColor,
+    };
+  });
+
   return (
-    <div className="px-6 py-8">
-      <div className="w-full flex justify-center px-4">
-        <div style={{ width: '420px' }}>
-          {/* 歡迎區 */}
-          <div className="bg-white rounded-2xl p-4 mb-4 flex items-center justify-between border border-[#EADBC8]">
-            <div>
-              <h1 className="text-xl font-bold text-[#2B3A3B]">Hi {adminName}，歡迎回來！</h1>
-            </div>
-            <div
-              style={{
-                width: '60px',
-                height: '60px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-              }}
+    <div className="bg-[#FFF9F2] font-sans text-gray-800 min-h-screen">
+      <div className="max-w-6xl mx-auto p-6">
+        {/* 主標籤頁切換 */}
+        <div className="mb-6">
+          <div className="flex gap-2 border-b border-[#EADBC8]">
+            <button
+              onClick={() => setActiveTab('control')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'control'
+                  ? 'border-b-2 border-[#FF8C42] text-[#FF8C42]'
+                  : 'text-gray-600 hover:text-[#4B4036]'
+              }`}
             >
-              <img
-                alt="管理員"
-                src="/owlui.png"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  display: 'block',
-                }}
-              />
-            </div>
+              控制面板
+            </button>
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'logs'
+                  ? 'border-b-2 border-[#FF8C42] text-[#FF8C42]'
+                  : 'text-gray-600 hover:text-[#4B4036]'
+              }`}
+            >
+              AI 專案對話紀錄
+            </button>
           </div>
+        </div>
 
-          {/* 錯誤訊息 */}
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-              <p>{error}</p>
-            </div>
-          )}
-
-          {/* 學校狀況總覽區 */}
-          <div className="bg-white rounded-2xl p-4 mb-4 border border-[#EADBC8]">
-            <h2 className="text-base font-semibold text-[#2B3A3B] mb-3">學校狀況一覽</h2>
-            <div className="flex flex-row justify-center gap-6 mb-2">
-              <div
-                className="bg-white border border-[#EADBC8] p-3 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer"
-                style={{ paddingBottom: '1rem' }}
-                onClick={() => router.push('/admin/students?filter=regular')}
+        {/* 控制面板視圖 */}
+        {activeTab === 'control' && (
+          <div className="max-w-5xl mx-auto">
+            {/* 快速操作按鈕 */}
+            <div className="mb-4 flex justify-end">
+              <button
+                onClick={() => setActiveTab('logs')}
+                className="px-4 py-2 rounded-xl bg-white border border-[#EADBC8] text-[#4B4036] hover:bg-[#FFF9F2] transition-colors flex items-center gap-2 shadow-sm"
               >
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <img
-                    alt="學生"
-                    src="/icons/bear-face.PNG"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      display: 'block',
-                    }}
-                  />
-                </div>
-                <p className="text-2xl font-bold text-[#2B3A3B]">{studentCount}</p>
-                <p className="text-sm text-[#555]">常規學生人數</p>
-              </div>
-              <div className="bg-white border border-[#EADBC8] p-3 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer" style={{ paddingBottom: '1rem' }} onClick={() => router.push('/admin/students?filter=trial')}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <img
-                    alt="試堂"
-                    src="/icons/penguin-face.PNG"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      display: 'block',
-                    }}
-                  />
-                </div>
-                <p className="text-2xl font-bold text-[#2B3A3B]">{trialStudentCount}</p>
-                <p className="text-sm text-[#555]">試堂學生人數</p>
-              </div>
-              <div className="bg-white border border-[#EADBC8] p-3 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer" style={{ paddingBottom: '1rem' }} onClick={() => router.push('/admin/students?filter=lastLesson')}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <img
-                    alt="最後一堂"
-                    src="/icons/clock.PNG"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      display: 'block',
-                    }}
-                  />
-                </div>
-                <p className="text-2xl font-bold text-[#2B3A3B]">{lastLessonCount}</p>
-                <p className="text-sm text-[#555]">最後一堂人數</p>
-              </div>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                查看 AI 專案對話紀錄
+              </button>
             </div>
-          </div>
-
-          {/* 簡化的日曆區 */}
-          <div className="bg-white rounded-2xl p-4 mb-4 border border-[#EADBC8]">
-            <h3 className="text-base font-semibold text-[#2B3A3B] mb-3">Hanami 日曆</h3>
-            <HanamiCalendar
-              organizationId={orgId}
-              forceEmpty={!orgId || orgId === fallbackOrganization.id || orgId === 'default-org'}
+            <AIControlPanel
+              models={mockModels}
+              onCancelTask={handleCancelTask}
+              onCreateTask={handleCreateTask}
+              onFilterChange={handleFilterChange}
+              onViewLogs={() => setActiveTab('logs')}
             />
           </div>
+        )}
 
-          {/* 管理按鈕區 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 place-items-center gap-4 mb-10 px-2 w-full">
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/students')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2">
-                  <img alt="學生管理" className="w-full h-full object-contain" src="/girl.png" />
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">學生管理</h3>
-              </div>
+        {/* AI 專案對話紀錄視圖 */}
+        {activeTab === 'logs' && (
+          <div>
+            {/* 快速操作按鈕 */}
+            <div className="mb-4 flex justify-end">
+              <button
+                onClick={() => setActiveTab('control')}
+                className="px-4 py-2 rounded-xl bg-white border border-[#EADBC8] text-[#4B4036] hover:bg-[#FFF9F2] transition-colors flex items-center gap-2 shadow-sm"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                返回控制面板
+              </button>
             </div>
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/class-activities')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2">
-                  <img alt="課堂管理" className="w-full h-full object-contain" src="/foxcat.png" />
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">課堂管理</h3>
-              </div>
+            {/* 子標籤頁 */}
+            <div className="flex gap-2 mb-4">
+              {(['rooms','users','messages','errors'] as LogTabKey[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setLogActiveTab(t)}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    logActiveTab === t 
+                      ? 'bg-[#FFEAD1] text-[#4B4036] font-medium' 
+                      : 'bg-white border border-[#EADBC8] text-gray-700 hover:bg-[#FFF9F2]'
+                  }`}
+                >
+                  {tabLabel(t)}
+                </button>
+              ))}
             </div>
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/teachers')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2">
-                  <img alt="老師管理" className="w-full h-full object-contain" src="/teacher.png" />
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">老師管理</h3>
+
+            {logLoading ? (
+              <div className="py-10 text-center text-[#2B3A3B]">
+                <Spinner className="h-6 w-6 mx-auto mb-2" />
+                <p>載入中...</p>
               </div>
+            ) : (
+              <div className="bg-white rounded-2xl p-4 ring-1 ring-[#EADBC8]">
+                {logActiveTab === 'rooms' && (
+                  <div className="space-y-2">
+                    {rooms.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">目前沒有專案記錄</div>
+                    ) : (
+                      rooms.map((r:any)=> (
+                        <div key={r.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-[#4B4036]">
+                                {r.title || '(未命名專案)'} 
+                                <span className="text-xs text-gray-500 ml-1">{formatHK(r.created_at)}</span>
+                              </p>
+                              <p className="text-xs text-gray-600">room_id: {r.id}</p>
+                            </div>
+                            <span className="text-xs text-gray-500">最後: {formatHK(r.last_message_at)}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {logActiveTab === 'users' && (
+                  <div className="space-y-2">
+                    {users.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">目前沒有用戶記錄</div>
+                    ) : (
+                      users.map((u:any)=> (
+                        <div key={u.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
+                          <p className="font-semibold text-[#4B4036]">{u.full_name || u.email}</p>
+                          <p className="text-xs text-gray-600">{u.email} · {formatHK(u.created_at)}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {logActiveTab === 'messages' && (
+                  <div className="space-y-2">
+                    {messages.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">目前沒有對話記錄</div>
+                    ) : (
+                      messages.map((m:any)=> (
+                        <div key={m.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
+                          <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {formatHK(m.created_at)}</p>
+                          <p className="font-medium text-[#2B3A3B]">
+                            [{m.sender_type}] {m.content?.slice(0,200) || m.content_json?.text || '(空白)'}
+                          </p>
+                          {(((m.status && m.status !== 'sent') ? true : false) || (m.error_message && m.error_message.trim() !== '')) && (
+                            <p className="text-xs text-rose-600 mt-1">狀態: {m.status || 'error'}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {logActiveTab === 'errors' && (
+                  <div className="space-y-2">
+                    {messages.filter((m:any)=> 
+                      m.status==='error' || 
+                      (m.error_message && m.error_message.trim()!=='') || 
+                      (m.content && /遇到點小困難|重新輸入|稍後再試/.test(m.content))
+                    ).length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">目前沒有錯誤記錄</div>
+                    ) : (
+                      messages.filter((m:any)=> 
+                        m.status==='error' || 
+                        (m.error_message && m.error_message.trim()!=='') || 
+                        (m.content && /遇到點小困難|重新輸入|稍後再試/.test(m.content))
+                      ).map((m:any)=> (
+                        <div 
+                          key={m.id} 
+                          className="p-3 rounded-xl border border-rose-200 bg-rose-50 cursor-pointer hover:bg-rose-100 transition-colors" 
+                          onClick={()=>openRoomConversation(m.room_id)}
+                        >
+                          <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {formatHK(m.created_at)}</p>
+                          <p className="font-medium text-[#B00020]">
+                            {m.error_message || '系統提示：遇到點小困難，請重新輸入或稍後再試'}
+                          </p>
+                          <p className="text-xs text-[#2B3A3B] mt-1">
+                            內容: {m.content?.slice(0,180) || m.content_json?.text || '(空白)'}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 對話詳情視窗 */}
+      {showDialog && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30" 
+          onClick={()=>setShowDialog(false)}
+        >
+          <div 
+            className="w-full max-w-3xl bg-white rounded-2xl p-4 ring-1 ring-[#EADBC8] max-h-[80vh] flex flex-col" 
+            onClick={(e)=>e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+              <h3 className="text-lg font-bold text-[#2B3A3B]">{dialogTitle}</h3>
+              <button 
+                className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#2B3A3B] transition-colors" 
+                onClick={()=>setShowDialog(false)}
+              >
+                關閉
+              </button>
             </div>
-            {/* AI 專案對話紀錄（aihome 專案） */}
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/ai-project-logs')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <svg className="w-10 h-10 text-[#FF8C42]" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
-                    <path d="M7 8h10v2H7zM7 12h7v2H7z" fill="#fff"/>
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">AI 專案對話紀錄</h3>
-                <p className="text-xs text-[#777] mt-1">用戶 · 專案 · 對話 · 錯誤</p>
-              </div>
-            </div>
-            {/* 課堂空缺按鈕 */}
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/lesson-availability')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2">
-                  <img alt="課堂空缺" className="w-full h-full object-contain" src="/details.png" />
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">課堂空缺</h3>
-              </div>
-            </div>
-            {/* 學生進度管理按鈕 */}
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/student-progress')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2">
-                  <img alt="學生進度" className="w-full h-full object-contain" src="/icons/book-elephant.PNG" />
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">學生進度</h3>
-              </div>
-            </div>
-            {/* 待審核學生按鈕 */}
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/pending-students')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <span className="text-3xl">⏳</span>
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">待審核學生</h3>
-                <p className="text-xs text-[#777] mt-1">常規課程報名審核</p>
-              </div>
-            </div>
-            {/* 管理課堂按鈕 */}
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/schedule-management')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2">
-                  <img alt="管理課堂" className="w-full h-full object-contain" src="/icons/clock.PNG" />
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">管理課堂</h3>
-              </div>
-            </div>
-            {/* 財務狀況按鈕 */}
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/financial-management')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 24 24">
-                    {/* 錢袋圖案 */}
-                    <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm-1 14H5c-.55 0-1-.45-1-1V8h16v9c0 .55-.45 1-1 1z"/>
-                    {/* 錢幣符號 */}
-                    <path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-                    <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">財務狀況</h3>
-              </div>
-            </div>
-            {/* 任務管理按鈕 */}
-            <div className="max-w-[300px] w-full" onClick={() => router.push('/admin/task-management')}>
-              <div className="bg-white border border-[#FDE6B8] p-3 rounded-2xl text-center shadow hover:shadow-md transition cursor-pointer h-full flex flex-col items-center justify-center">
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
-                    {/* 任務清單圖案 */}
-                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-                    {/* 勾選標記 */}
-                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" fill="#10B981"/>
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-[#2B3A3B]">任務管理</h3>
-                <p className="text-xs text-[#777] mt-1">工作任務 · 進度追蹤 · 時間管理</p>
-              </div>
+            <div className="max-h-[70vh] overflow-auto space-y-2 flex-1">
+              {dialogItems.length === 0 ? (
+                <div className="text-center text-[#2B3A3B] py-6">沒有對話內容</div>
+              ) : (
+                dialogItems.map((it:any)=>(
+                  <div key={it.id} className="p-3 rounded-xl border border-[#EADBC8]">
+                    <p className="text-xs text-gray-600 mb-1">{formatHK(it.created_at)} · {it.sender_type}</p>
+                    <p className="text-[#2B3A3B] whitespace-pre-wrap">{it.content || it.content_json?.text || '(空白)'}</p>
+                    {(((it.status && it.status!=='sent') ? true : false) || (it.error_message && it.error_message.trim()!=='')) && (
+                      <p className="text-xs text-rose-600 mt-1">狀態: {it.status || 'error'} · {it.error_message}</p>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
-      </div>
-      {/* AI 專案對話紀錄視窗 */}
-      <AnimatePresence>
-        {showLogViewer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm"
-            onClick={() => setShowLogViewer(false)}
-          >
-            <motion.div
-              initial={{ y: 20, scale: 0.98, opacity: 0 }}
-              animate={{ y: 0, scale: 1, opacity: 1 }}
-              exit={{ y: 10, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className="w-full max-w-5xl bg-white rounded-2xl p-4 sm:p-6 shadow-2xl ring-1 ring-[#EADBC8]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[#2B3A3B]">AI 專案對話紀錄</h3>
-                <div className="flex items-center gap-2">
-                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='rooms'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('rooms')}>專案</button>
-                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='users'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('users')}>用戶</button>
-                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='messages'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('messages')}>對話</button>
-                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='errors'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('errors')}>錯誤</button>
-                </div>
-              </div>
-
-              {logsLoading ? (
-                <div className="py-10 text-center text-[#2B3A3B]">載入中...</div>
-              ) : (
-                <div className="max-h-[70vh] overflow-auto">
-                  {activeTab === 'rooms' && (
-                    <div className="space-y-2">
-                      {rooms.map((r:any)=> (
-                        <div key={r.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold text-[#4B4036]">{r.title || '(未命名專案)'} <span className="text-xs text-gray-500 ml-1">{new Date(r.created_at).toLocaleString()}</span></p>
-                              <p className="text-xs text-gray-600">room_id: {r.id}</p>
-                            </div>
-                            <span className="text-xs text-gray-500">最後: {r.last_message_at ? new Date(r.last_message_at).toLocaleString() : '-'}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeTab === 'users' && (
-                    <div className="space-y-2">
-                      {users.map((u:any)=> (
-                        <div key={u.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
-                          <p className="font-semibold text-[#4B4036]">{u.full_name || u.email}</p>
-                          <p className="text-xs text-gray-600">{u.email} · {new Date(u.created_at).toLocaleString()}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeTab === 'messages' && (
-                    <div className="space-y-2">
-                      {messages.map((m:any)=> (
-                        <div key={m.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
-                          <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {new Date(m.created_at).toLocaleString()}</p>
-                          <p className="font-medium text-[#2B3A3B]">[{m.sender_type}] {m.content?.slice(0,200) || m.content_json?.text || '(空白)'}</p>
-                          {m.status && m.status !== 'sent' && (
-                            <p className="text-xs text-rose-600 mt-1">狀態: {m.status}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeTab === 'errors' && (
-                    <div className="space-y-2">
-                      {messages.filter((m:any)=> m.status==='error' || m.error_message).map((m:any)=> (
-                        <div key={m.id} className="p-3 rounded-xl border border-rose-200 bg-rose-50">
-                          <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {new Date(m.created_at).toLocaleString()}</p>
-                          <p className="font-medium text-[#B00020]">{m.error_message || '未知錯誤'}</p>
-                          <p className="text-xs text-[#2B3A3B] mt-1">內容: {m.content?.slice(0,180) || m.content_json?.text || '(空白)'}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-4 flex justify-end">
-                <button className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-[#2B3A3B]" onClick={()=>setShowLogViewer(false)}>關閉</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      )}
     </div>
   );
-} 
+}

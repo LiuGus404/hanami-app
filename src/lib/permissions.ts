@@ -511,6 +511,158 @@ export const ROLE_MATRIX = {
 export type RoleType = keyof typeof ROLE_MATRIX;
 
 /**
+ * 機構角色類型（用於 Teacher Link 頁面權限）
+ */
+export type OrgRole = 'owner' | 'admin' | 'teacher' | 'member';
+
+/**
+ * Teacher Link 頁面鍵類型
+ */
+export type PageKey =
+  | 'students' // 學生管理
+  | 'members' // 成員管理
+  | 'class-activities' // 課堂活動管理
+  | 'class-activities-full' // 課堂活動管理（完整版，包含課程與課堂排期管理、多課程時間表）
+  | 'progress' // 學生進度
+  | 'finance' // 財務管理
+  | 'tasks' // 任務管理
+  | 'learning-resources' // 學習資源
+  | 'schedule-management' // 課程與課堂排期管理
+  | 'organization-settings' // 機構設置
+  | 'teachers' // 教師管理
+  | 'pending-students' // 待處理學生
+  | 'lesson-availability' // 課程可用性
+  | 'permission-management' // 權限管理
+  | 'ai-tools' // AI 工具
+  | 'ai-select' // AI 選擇
+  | 'ai-project-logs'; // AI 項目日誌
+
+/**
+ * 頁面權限配置接口
+ */
+export interface PagePermission {
+  key: PageKey;
+  path: string;
+  title: string;
+  description?: string;
+  allowedRoles: OrgRole[];
+  restrictedFeatures?: string[]; // 限制的功能（如 teacher 角色在 class-activities 中不能訪問某些功能）
+}
+
+/**
+ * Teacher Link 頁面權限配置
+ * 定義不同角色在機構中可以訪問的頁面和功能
+ */
+export const PAGE_PERMISSIONS: Record<PageKey, PagePermission> = {
+  'students': {
+    key: 'students',
+    path: '/aihome/teacher-link/create/students',
+    title: '學生管理',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'members': {
+    key: 'members',
+    path: '/aihome/teacher-link/create/member-management',
+    title: '成員管理',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'class-activities': {
+    key: 'class-activities',
+    path: '/aihome/teacher-link/create/class-activities',
+    title: '課堂活動管理',
+    description: '不包含課程與課堂排期管理、多課程時間表',
+    allowedRoles: ['owner', 'admin', 'teacher', 'member'],
+    restrictedFeatures: ['schedule-management', 'multi-course-schedule'], // teacher 和 member 不能訪問的功能
+  },
+  'class-activities-full': {
+    key: 'class-activities-full',
+    path: '/aihome/teacher-link/create/class-activities',
+    title: '課堂活動管理（完整版）',
+    description: '包含課程與課堂排期管理、多課程時間表',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'progress': {
+    key: 'progress',
+    path: '/aihome/teacher-link/create/student-progress',
+    title: '學生進度',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'finance': {
+    key: 'finance',
+    path: '/aihome/teacher-link/create/financial-management',
+    title: '財務管理',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'tasks': {
+    key: 'tasks',
+    path: '/aihome/teacher-link/create/task-management',
+    title: '任務管理',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'learning-resources': {
+    key: 'learning-resources',
+    path: '/aihome/teacher-link/create/learning-resources',
+    title: '學習資源',
+    allowedRoles: ['owner', 'admin', 'teacher'],
+  },
+  'schedule-management': {
+    key: 'schedule-management',
+    path: '/aihome/teacher-link/create/schedule-management',
+    title: '課程與課堂排期管理',
+    description: '包含課程類型、課程代碼與多課程時間表',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'organization-settings': {
+    key: 'organization-settings',
+    path: '/aihome/teacher-link/create/organization-settings',
+    title: '機構設置',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'teachers': {
+    key: 'teachers',
+    path: '/aihome/teacher-link/create/teachers',
+    title: '教師管理',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'pending-students': {
+    key: 'pending-students',
+    path: '/aihome/teacher-link/create/pending-students',
+    title: '待處理學生',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'lesson-availability': {
+    key: 'lesson-availability',
+    path: '/aihome/teacher-link/create/lesson-availability',
+    title: '課程可用性',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'permission-management': {
+    key: 'permission-management',
+    path: '/aihome/teacher-link/create/permission-management',
+    title: '權限管理',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'ai-tools': {
+    key: 'ai-tools',
+    path: '/aihome/teacher-link/create/ai-tools',
+    title: 'AI 工具',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'ai-select': {
+    key: 'ai-select',
+    path: '/aihome/teacher-link/create/ai-select',
+    title: 'AI 選擇',
+    allowedRoles: ['owner', 'admin'],
+  },
+  'ai-project-logs': {
+    key: 'ai-project-logs',
+    path: '/aihome/teacher-link/create/ai-project-logs',
+    title: 'AI 項目日誌',
+    allowedRoles: ['owner', 'admin'],
+  },
+};
+
+/**
  * 檢查用戶是否有特定權限
  */
 export function hasPermission(role: RoleType, permission: Permission): boolean {
@@ -537,5 +689,63 @@ export function hasAllPermissions(role: RoleType, permissions: Permission[]): bo
  */
 export function getRolePermissions(role: RoleType): Permission[] {
   return (ROLE_MATRIX[role] || []) as unknown as Permission[];
+}
+
+/**
+ * 檢查角色是否有權限訪問頁面（Teacher Link）
+ */
+export function hasPagePermission(role: OrgRole | null, pageKey: PageKey): boolean {
+  if (!role) return false;
+  
+  const permission = PAGE_PERMISSIONS[pageKey];
+  if (!permission) return false;
+  
+  return permission.allowedRoles.includes(role);
+}
+
+/**
+ * 檢查角色是否可以訪問某個功能（Teacher Link）
+ */
+export function hasFeaturePermission(
+  role: OrgRole | null,
+  pageKey: PageKey,
+  feature: string
+): boolean {
+  if (!role) return false;
+  
+  const permission = PAGE_PERMISSIONS[pageKey];
+  if (!permission) return false;
+  
+  // 如果角色不在允許列表中，無權限
+  if (!permission.allowedRoles.includes(role)) return false;
+  
+  // 如果有限制功能列表，且當前功能在限制列表中，檢查角色
+  if (permission.restrictedFeatures?.includes(feature)) {
+    // owner 和 admin 可以訪問所有功能
+    if (role === 'owner' || role === 'admin') return true;
+    // teacher 和 member 不能訪問限制的功能
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * 獲取角色可以訪問的所有頁面（Teacher Link）
+ */
+export function getAllowedPages(role: OrgRole | null): PagePermission[] {
+  if (!role) return [];
+  
+  return Object.values(PAGE_PERMISSIONS).filter((permission) =>
+    permission.allowedRoles.includes(role)
+  );
+}
+
+/**
+ * 根據路徑獲取頁面權限配置（Teacher Link）
+ */
+export function getPagePermissionByPath(path: string): PagePermission | null {
+  const page = Object.values(PAGE_PERMISSIONS).find((p) => path.startsWith(p.path));
+  return page || null;
 }
 

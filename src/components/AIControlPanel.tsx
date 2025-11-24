@@ -35,6 +35,7 @@ interface Props {
   onCreateTask: () => void
   onCancelTask: () => void
   onFilterChange: (status: string[]) => void
+  onViewLogs?: () => void
 }
 
 const getModelImage = (name: string) => {
@@ -62,6 +63,7 @@ export default function AIControlPanel({
   onCreateTask,
   onCancelTask,
   onFilterChange,
+  onViewLogs,
 }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<'processing' | 'done'>('processing');
@@ -220,6 +222,17 @@ export default function AIControlPanel({
                     </>
                   )}
                   <button className="hanami-btn-soft px-3 py-1 text-[#2B3A3B] text-sm font-semibold" onClick={() => setShowPopup(true)}>篩選：{statusFilter.join(', ')}</button>
+                  {onViewLogs && (
+                    <button
+                      className="px-3 py-1 rounded-full bg-[#FFF8E6] border border-[#DDD2BA] text-[#2B3A3B] text-sm font-semibold flex items-center gap-2 hover:bg-[#F5EAD4] transition-colors"
+                      onClick={onViewLogs}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      AI 專案對話紀錄
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="space-y-4">

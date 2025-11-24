@@ -1871,11 +1871,15 @@ export default function MultiCourseScheduleManagementPanel() {
   if (!hasValidOrg) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <p className="text-[#87704e] bg-[#FFFDF7] border border-[#EADBC8] px-6 py-4 rounded-xl">
-            請先創建屬於您的機構，並建立課程與課堂資料。
-          </p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center"
+        >
+          <div className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl border-2 border-[#EADBC8] px-8 py-6 shadow-xl">
+            <p className="text-[#4B4036] font-medium">請先創建屬於您的機構，並建立課程與課堂資料。</p>
+          </div>
+        </motion.div>
       </div>
     );
   }
@@ -1886,10 +1890,18 @@ export default function MultiCourseScheduleManagementPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64" suppressHydrationWarning>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A68A64] mx-auto mb-2"></div>
-          <p className="text-[#87704e]">載入中...</p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-8 h-8 border-2 border-[#FFD59A] border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-[#2B3A3B] font-medium">載入中...</p>
+        </motion.div>
       </div>
     );
   }
@@ -1897,58 +1909,76 @@ export default function MultiCourseScheduleManagementPanel() {
   if (loadError) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="rounded-2xl border border-[#EADBC8] bg-[#FFF9F2] px-8 py-6 text-center shadow-sm">
-          <p className="text-sm text-[#8A7C70]">{loadError}</p>
-          <button
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl border-2 border-[#EADBC8] px-8 py-6 text-center shadow-xl"
+        >
+          <p className="text-sm text-[#4B4036] mb-4">{loadError}</p>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             type="button"
-            className="mt-3 rounded-full border border-[#EADBC8] bg-white px-4 py-2 text-sm font-medium text-[#4B4036] shadow-sm transition hover:bg-[#FFF4DF]"
+            className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl text-sm font-medium shadow-lg hover:shadow-xl transition-all"
             onClick={fetchData}
           >
             重新嘗試載入
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* 課程類型管理區塊 */}
-      <div className="bg-[#FFFDF7] border border-[#EADBC8] rounded-xl p-4 mb-6">
-        <div className="mb-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[#D48347]">Step 1 · 課程類型</h2>
-          <p className="mt-2 text-sm text-[#6E5A4A]">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl p-6 shadow-xl border-2 border-[#EADBC8] mb-6"
+      >
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[#D48347] mb-2">Step 1 · 課程類型</h2>
+          <p className="text-sm text-[#2B3A3B] leading-relaxed">
             先建立課程類型，定義年齡層、課堂時長與優惠套票。這些設定會被後續的課程代碼引用，確保所有班別遵循同一套課程規格。
           </p>
         </div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-[#4B4036] flex items-center gap-2">
+          <h3 className="text-xl font-bold text-[#4B4036] flex items-center gap-2">
             <Image alt="課程類型" height={24} src="/icons/music.PNG" width={24} />
             課程類型管理
           </h3>
           <div className="flex gap-2">
-            <button
-              className="rounded-full bg-[#EBC9A4] px-4 py-2 text-sm font-medium text-[#4B4036] shadow-sm transition hover:bg-[#D9B38C]"
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-white/70 border border-[#EADBC8] rounded-xl text-sm font-medium text-[#4B4036] shadow-sm hover:bg-white transition-all"
               onClick={() => setShowCourseTypeManagement(!showCourseTypeManagement)}
             >
               {showCourseTypeManagement ? '收起管理' : '展開管理'}
-            </button>
-            <button
-              className="rounded-full bg-[#F59BB5] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#F27EA6]"
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl text-sm font-medium shadow-lg hover:shadow-xl transition-all"
               onClick={openCreateCourseTypeModal}
             >
               新增課程類型
-            </button>
+            </motion.button>
           </div>
         </div>
 
         {showCourseTypeManagement && (
           <div className="space-y-4">
             {courseTypes.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>尚未建立任何課程類型</p>
-                <p className="text-sm mt-2">建立課程後，可於課程代碼與時間表中快速引用。</p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-12 bg-gradient-to-br from-white/50 to-white/30 rounded-2xl border-2 border-dashed border-[#EADBC8]"
+              >
+                <p className="text-[#4B4036] font-medium mb-2">尚未建立任何課程類型</p>
+                <p className="text-sm text-[#2B3A3B]">建立課程後，可於課程代碼與時間表中快速引用。</p>
+              </motion.div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {courseTypes.map((courseType) => {
@@ -1964,184 +1994,256 @@ export default function MultiCourseScheduleManagementPanel() {
                     : '未設定時長';
 
                   return (
-                    <div key={courseType.id} className="bg-white border border-[#EADBC8] rounded-lg p-4 shadow-sm">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <div className="font-semibold text-[#4B4036] text-base">
+                    <motion.div
+                      key={courseType.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-lg border-2 border-[#EADBC8] hover:shadow-xl transition-all duration-300"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="font-bold text-[#4B4036] text-lg mb-1">
                             {courseType.name || '未命名課程類型'}
                           </div>
-                          <div className="text-xs text-[#87704e] mt-1">
+                          <div className="text-xs text-[#2B3A3B] mt-1">
                             難度：{courseType.difficulty_level || '未設定'} | 試堂上限：{courseType.trial_limit ?? '未設定'}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs ${
-                              active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          <motion.span
+                            whileHover={{ scale: 1.05 }}
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              active 
+                                ? 'bg-gradient-to-r from-green-100 to-green-50 text-green-800 border border-green-200' 
+                                : 'bg-gradient-to-r from-red-100 to-red-50 text-red-800 border border-red-200'
                             }`}
                           >
                             {active ? '啟用中' : '已停用'}
-                          </span>
-                          <button
-                            className="text-[#A68A64] hover:text-[#8f7350] text-sm flex items-center space-x-1"
-                            onClick={() => {
-                              setPreviewingCourseType(courseType);
-                              setShowPreviewModal(true);
-                            }}
-                            title="預覽課程"
-                          >
-                            <EyeIcon className="w-4 h-4" />
-                            <span>預覽</span>
-                          </button>
-                          <button
-                            className="text-[#A68A64] hover:text-[#8f7350] text-sm"
-                            onClick={() => openEditCourseTypeModal(courseType)}
-                          >
-                            編輯
-                          </button>
-                          <button
-                            className="text-sm text-[#F59BB5] hover:text-[#F27EA6]"
-                            onClick={() => handleCourseTypeToggleStatus(courseType)}
-                          >
-                            {active ? '停用' : '啟用'}
-                          </button>
+                          </motion.span>
                         </div>
                       </div>
-                      <div className="text-sm text-[#4B4036] space-y-1">
-                        <div>建議年齡：{ageRangeLabel}</div>
-                        <div>課堂時長：{durationLabel} | 容量：{courseType.max_students ?? '未設定'} 人</div>
-                        <div>定價模式：{courseType.pricing_model || '未設定'}{courseType.price_per_lesson ? `（每堂 ${courseType.price_per_lesson} ${courseType.currency || 'HKD'}）` : ''}</div>
-                        <div className="text-xs text-[#8A7C70]">
+                      <div className="text-sm text-[#4B4036] space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#2B3A3B]">建議年齡：</span>
+                          <span className="font-medium">{ageRangeLabel}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#2B3A3B]">課堂時長：</span>
+                          <span className="font-medium">{durationLabel}</span>
+                          <span className="text-[#2B3A3B]">| 容量：</span>
+                          <span className="font-medium">{courseType.max_students ?? '未設定'} 人</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#2B3A3B]">定價模式：</span>
+                          <span className="font-medium">{courseType.pricing_model || '未設定'}{courseType.price_per_lesson ? `（每堂 ${courseType.price_per_lesson} ${courseType.currency || 'HKD'}）` : ''}</span>
+                        </div>
+                        <div className="text-xs text-[#A68A64] bg-gradient-to-r from-[#FFD59A]/20 to-[#EBC9A4]/20 rounded-lg px-3 py-2">
                           套票 {packages.length} 項 | 試堂優惠 {trialBundles.length} 項
                         </div>
-                        <div className="text-xs text-[#8A7C70]">
+                        <div className="text-xs text-[#2B3A3B] bg-white/50 rounded-lg px-3 py-2">
                           {courseType.description || '尚未填寫課程描述'}
                         </div>
                       </div>
-                    </div>
+                      <div className="flex gap-2 pt-3 border-t border-[#EADBC8]">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex-1 px-3 py-2 bg-white/70 border border-[#EADBC8] text-[#4B4036] rounded-xl text-xs font-medium shadow-sm hover:bg-white transition-all flex items-center justify-center gap-1"
+                          onClick={() => {
+                            setPreviewingCourseType(courseType);
+                            setShowPreviewModal(true);
+                          }}
+                          title="預覽課程"
+                        >
+                          <EyeIcon className="w-4 h-4" />
+                          <span>預覽</span>
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex-1 px-3 py-2 bg-white/70 border border-green-500 text-green-600 rounded-xl text-xs font-medium shadow-sm hover:bg-green-50 hover:border-green-600 transition-all"
+                          onClick={() => openEditCourseTypeModal(courseType)}
+                        >
+                          編輯
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-3 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl text-xs font-medium shadow-sm hover:shadow-md transition-all"
+                          onClick={() => handleCourseTypeToggleStatus(courseType)}
+                        >
+                          {active ? '停用' : '啟用'}
+                        </motion.button>
+                      </div>
+                    </motion.div>
                   );
                 })}
               </div>
             )}
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* 課程代碼管理區塊 */}
-      <div className="bg-[#FFFDF7] border border-[#EADBC8] rounded-xl p-4 mb-6">
-        <div className="mb-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[#D48347]">Step 2 · 課程代碼</h2>
-          <p className="mt-2 text-sm text-[#6E5A4A]">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl p-6 shadow-xl border-2 border-[#EADBC8] mb-6"
+      >
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[#D48347] mb-2">Step 2 · 課程代碼</h2>
+          <p className="text-sm text-[#2B3A3B] leading-relaxed">
             為不同課程類型建立班別與課程代碼，指定任教老師、教室與班別容量。課程代碼會在時間表建立中被選用，決定每個時段的詳細資訊。
           </p>
         </div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-[#4B4036] flex items-center gap-2">
+          <h3 className="text-xl font-bold text-[#4B4036] flex items-center gap-2">
             <Image alt="課程代碼" height={24} src="/icons/book-elephant.PNG" width={24} />
             課程代碼管理
           </h3>
           <div className="flex gap-2">
-            <button
-              className="rounded-full bg-[#EBC9A4] px-4 py-2 text-sm font-medium text-[#4B4036] shadow-sm transition hover:bg-[#D9B38C]"
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-white/70 border border-[#EADBC8] rounded-xl text-sm font-medium text-[#4B4036] shadow-sm hover:bg-white transition-all"
               onClick={() => setShowCourseCodeManagement(!showCourseCodeManagement)}
             >
               {showCourseCodeManagement ? '收起管理' : '展開管理'}
-            </button>
-            <button
-              className="rounded-full bg-[#F59BB5] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#F27EA6]"
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl text-sm font-medium shadow-lg hover:shadow-xl transition-all"
               onClick={() => setShowAddCourseCode(true)}
             >
               新增課程代碼
-            </button>
+            </motion.button>
           </div>
         </div>
 
         {showCourseCodeManagement && (
           <div className="space-y-4">
             {courseCodes.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>沒有找到課程代碼數據</p>
-                <p className="text-sm mt-2">請檢查數據庫連接或添加新的課程代碼</p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-12 bg-gradient-to-br from-white/50 to-white/30 rounded-2xl border-2 border-dashed border-[#EADBC8]"
+              >
+                <p className="text-[#4B4036] font-medium mb-2">沒有找到課程代碼數據</p>
+                <p className="text-sm text-[#2B3A3B]">請檢查數據庫連接或添加新的課程代碼</p>
+              </motion.div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {courseCodes.map((courseCode) => (
-                <div key={courseCode.id} className="bg-white border border-[#EADBC8] rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-semibold text-[#4B4036]">{courseCode.course_code}</div>
+                {courseCodes.map((courseCode, index) => (
+                <motion.div
+                  key={courseCode.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ y: -4, scale: 1.02 }}
+                  className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-lg border-2 border-[#EADBC8] hover:shadow-xl transition-all duration-300"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="font-bold text-[#4B4036] text-lg">{courseCode.course_code}</div>
                     <div className="flex items-center gap-2">
-                      <div className={`px-2 py-1 rounded-full text-xs ${
-                        courseCode.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
+                      <motion.span
+                        whileHover={{ scale: 1.05 }}
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          courseCode.is_active 
+                            ? 'bg-gradient-to-r from-green-100 to-green-50 text-green-800 border border-green-200' 
+                            : 'bg-gradient-to-r from-red-100 to-red-50 text-red-800 border border-red-200'
+                        }`}
+                      >
                         {courseCode.is_active ? '活躍' : '停用'}
-                      </div>
-                      <button
-                        className="text-[#A68A64] hover:text-[#8f7350] text-sm transition-colors"
-                        onClick={() => {
-                          setEditingCourseCode(courseCode);
-                          setShowEditCourseCode(true);
-                        }}
-                        title="編輯課程代碼"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        className="text-red-500 hover:text-red-600 text-sm transition-colors"
-                        onClick={() => handleDeleteCourseCode(courseCode.id)}
-                        title="刪除課程代碼"
-                      >
-                        刪除
-                      </button>
+                      </motion.span>
                     </div>
                   </div>
-                  <div className="text-sm text-[#87704e] mb-1">{courseCode.course_name}</div>
-                  <div className="text-sm text-[#87704e] mb-2">({courseCode.course_type_name})</div>
-                  <div className="text-sm text-[#87704e]">
-                    容量: {courseCode.max_students}人 | 
-                    教師: {getTeacherLabel(courseCode.teacher_id, courseCode.teacher_name)} |
-                    教室: {courseCode.room_location || '未設定'}
+                  <div className="text-sm text-[#4B4036] mb-2 font-medium">{courseCode.course_name}</div>
+                  <div className="text-xs text-[#2B3A3B] mb-3 bg-gradient-to-r from-[#FFD59A]/20 to-[#EBC9A4]/20 rounded-lg px-3 py-1 inline-block">
+                    {courseCode.course_type_name}
                   </div>
-                </div>
+                  <div className="text-sm text-[#2B3A3B] space-y-1 mb-4">
+                    <div>容量: <span className="font-medium">{courseCode.max_students}人</span></div>
+                    <div>教師: <span className="font-medium">{getTeacherLabel(courseCode.teacher_id, courseCode.teacher_name)}</span></div>
+                    <div>教室: <span className="font-medium">{courseCode.room_location || '未設定'}</span></div>
+                  </div>
+                  <div className="flex gap-2 pt-3 border-t border-[#EADBC8]">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex-1 px-3 py-2 bg-white/70 border border-green-500 text-green-600 rounded-xl text-xs font-medium shadow-sm hover:bg-green-50 hover:border-green-600 transition-all"
+                      onClick={() => {
+                        setEditingCourseCode(courseCode);
+                        setShowEditCourseCode(true);
+                      }}
+                      title="編輯課程代碼"
+                    >
+                      編輯
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-3 py-2 bg-white/70 border border-red-500 text-red-600 rounded-xl text-xs font-medium shadow-sm hover:bg-red-50 hover:border-red-600 transition-all"
+                      onClick={() => handleDeleteCourseCode(courseCode.id)}
+                      title="刪除課程代碼"
+                    >
+                      刪除
+                    </motion.button>
+                  </div>
+                </motion.div>
                 ))}
               </div>
             )}
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* 多課程時間表管理 */}
-      <div className="bg-[#FFFDF7] border border-[#EADBC8] rounded-xl p-4 mb-6">
-        <div className="mb-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[#D48347]">Step 3 · 多課程時間表</h2>
-          <p className="mt-2 text-sm text-[#6E5A4A]">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl p-6 shadow-xl border-2 border-[#EADBC8] mb-6"
+      >
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[#D48347] mb-2">Step 3 · 多課程時間表</h2>
+          <p className="text-sm text-[#2B3A3B] leading-relaxed">
             依據已設定的課程類型（Step 1）與課程代碼（Step 2），在這裡排出每週的授課時段。完成時間表後，老師與學生即可依時段進行課程，也能更清楚掌握教室使用與班別安排。
           </p>
         </div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-[#4B4036] flex items-center gap-2">
+          <h3 className="text-xl font-bold text-[#4B4036] flex items-center gap-2">
             <Image alt="時間表" height={24} src="/icons/clock.PNG" width={24} />
             多課程時間表管理
           </h3>
           <div className="flex gap-2">
-            <button
-              className="rounded-full bg-[#EBC9A4] px-4 py-2 text-sm font-medium text-[#4B4036] shadow-sm transition hover:bg-[#D9B38C]"
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-white/70 border border-[#EADBC8] rounded-xl text-sm font-medium text-[#4B4036] shadow-sm hover:bg-white transition-all"
               onClick={() => setShowScheduleManagement(!showScheduleManagement)}
             >
               {showScheduleManagement ? '收起管理' : '展開管理'}
-            </button>
-            <button
-              className="rounded-full bg-[#F59BB5] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#F27EA6]"
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl text-sm font-medium shadow-lg hover:shadow-xl transition-all"
               onClick={() => setShowAddSlot(true)}
             >
               新增課堂時段
-            </button>
+            </motion.button>
             {selectedSlots.length > 0 && (
-              <button
-                className="rounded-full bg-[#FCE8EC] px-4 py-2 text-sm font-medium text-[#D95C5C] shadow-sm transition hover:bg-[#F8D0D8]"
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-4 py-2 bg-white/70 border border-red-500 text-red-600 rounded-xl text-sm font-medium shadow-sm hover:bg-red-50 hover:border-red-600 transition-all"
                 onClick={handleDeleteSlots}
               >
                 刪除選中 ({selectedSlots.length})
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
@@ -2293,7 +2395,7 @@ export default function MultiCourseScheduleManagementPanel() {
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* 新增時段模態框 */}
       {showAddSlot && (

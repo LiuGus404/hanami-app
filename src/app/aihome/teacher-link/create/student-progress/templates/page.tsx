@@ -1,78 +1,77 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { FileText } from 'lucide-react';
 import TemplatesPage from '@/app/admin/student-progress/templates/page';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
-import StudentProgressPageTemplate from '@/components/ui/StudentProgressPageTemplate';
+import BackButton from '@/components/ui/BackButton';
+import StudentProgressNavBar from '@/components/ui/StudentProgressNavBar';
 
 function TeacherLinkTemplatesContent() {
-  const { orgId, organization } = useTeacherLinkOrganization();
+  const { orgId, organization, organizationResolved } = useTeacherLinkOrganization();
 
   return (
-    <StudentProgressPageTemplate
-      title="範本管理"
-      subtitle="範本"
-      description="建立和管理教學活動範本，為您的機構創建標準化的活動範本，提高教學活動建立效率。"
-      badge="範本管理中心"
-      illustration="/icons/book-elephant.PNG"
-      illustrationAlt="範本管理圖示"
-      features={[
-        {
-          title: '範本建立',
-          description: '快速建立標準化的教學活動範本',
-          icon: '/icons/music.PNG',
-        },
-        {
-          title: '欄位自訂',
-          description: '靈活定義範本欄位和結構',
-          icon: '/icons/book-elephant.PNG',
-        },
-        {
-          title: '範本複製',
-          description: '快速複製現有範本進行修改',
-          icon: '/icons/clock.PNG',
-        },
-      ]}
-      steps={[
-        {
-          step: 1,
-          title: '建立範本',
-          description: '點擊「新增範本」按鈕，開始建立新的教學活動範本。',
-          icon: '/icons/book-elephant.PNG',
-        },
-        {
-          step: 2,
-          title: '定義欄位',
-          description: '在範本建構器中添加和配置欄位，設定欄位類型、必填性等。',
-          icon: '/icons/music.PNG',
-        },
-        {
-          step: 3,
-          title: '儲存範本',
-          description: '完成範本設定後儲存，範本將可用於建立教學活動。',
-          icon: '/icons/clock.PNG',
-        },
-      ]}
-      backHref="/aihome/teacher-link/create/student-progress"
-      backLabel="返回進度管理"
-      organizationName={organization?.name}
-    >
-      <TemplatesPage
-        navigationOverrides={{
-          dashboard: '/aihome/teacher-link/create/student-progress',
-          growthTrees: '/aihome/teacher-link/create/student-progress/growth-trees',
-          learningPaths: '/aihome/teacher-link/create/student-progress/learning-paths',
-          abilities: '/aihome/teacher-link/create/student-progress/abilities',
-          activities: '/aihome/teacher-link/create/student-progress/activities',
-          assessments: '/aihome/teacher-link/create/student-progress/ability-assessments',
-          media: '/aihome/teacher-link/create/student-progress/student-media',
-          studentManagement: '/aihome/teacher-link/create/students',
-          templates: '/aihome/teacher-link/create/student-progress/templates',
-        }}
-        forcedOrgId={orgId}
-        forcedOrgName={organization?.name ?? null}
-        disableOrgFallback
-      />
-    </StudentProgressPageTemplate>
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] px-4 py-8">
+      <div className="max-w-7xl mx-auto">
+        {/* 返回按鈕 */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="mb-6"
+        >
+          <BackButton href="/aihome/teacher-link/create/student-progress" label="返回進度管理" />
+        </motion.div>
+
+        {/* 導航欄 */}
+        {organizationResolved && <StudentProgressNavBar orgId={orgId} />}
+
+        {/* 標題區域 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
+          <div className="flex items-center justify-center mb-4">
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <FileText className="w-8 h-8 text-[#FFB6C1] mr-3" />
+            </motion.div>
+            <h1 className="text-4xl font-bold text-[#4B4036]">範本管理</h1>
+          </div>
+          <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
+            建立和管理教學活動範本，為您的機構創建標準化的活動範本，提高教學活動建立效率
+          </p>
+        </motion.div>
+
+        {/* 主要內容 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-[#EADBC8] overflow-hidden"
+        >
+          <TemplatesPage
+            navigationOverrides={{
+              dashboard: '/aihome/teacher-link/create/student-progress',
+              growthTrees: '/aihome/teacher-link/create/student-progress/growth-trees',
+              learningPaths: '/aihome/teacher-link/create/student-progress/learning-paths',
+              abilities: '/aihome/teacher-link/create/student-progress/abilities',
+              activities: '/aihome/teacher-link/create/student-progress/activities',
+              assessments: '/aihome/teacher-link/create/student-progress/ability-assessments',
+              media: '/aihome/teacher-link/create/student-progress/student-media',
+              studentManagement: '/aihome/teacher-link/create/students',
+              templates: '/aihome/teacher-link/create/student-progress/templates',
+            }}
+            forcedOrgId={orgId}
+            forcedOrgName={organization?.name ?? null}
+            disableOrgFallback
+          />
+        </motion.div>
+      </div>
+    </div>
   );
 }
 

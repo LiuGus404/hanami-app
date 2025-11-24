@@ -128,22 +128,26 @@ export function useTeacherAccess() {
         setTeacherAccess(data);
       }, 100);
 
-      // 只在第一次檢查時顯示通知
-      const notificationShownKey = 'hanami_teacher_access_notification_shown';
-      const hasShownNotification = sessionStorage.getItem(notificationShownKey);
+      // 不再顯示"已驗證花見老師身份"的通知
+      // 如果消息是驗證身份相關的，不顯示 toast
+      const isVerificationMessage = data.message?.includes('已驗證花見老師身份') || data.message?.includes('已驗證');
       
-      if (!hasShownNotification) {
-        if (data.hasTeacherAccess) {
-          toast.success(data.message, {
-            duration: 3000,
-          });
-        } else {
-          toast(data.message, {
-            icon: 'ℹ️',
-            duration: 2000,
-          });
+      if (!isVerificationMessage) {
+        // 只在第一次檢查時顯示其他通知
+        const notificationShownKey = 'hanami_teacher_access_notification_shown';
+        const hasShownNotification = sessionStorage.getItem(notificationShownKey);
+        
+        if (!hasShownNotification) {
+          if (data.hasTeacherAccess) {
+            // 不顯示驗證身份相關的消息
+          } else {
+            toast(data.message, {
+              icon: 'ℹ️',
+              duration: 2000,
+            });
+          }
+          sessionStorage.setItem(notificationShownKey, 'true');
         }
-        sessionStorage.setItem(notificationShownKey, 'true');
       }
 
     } catch (err: any) {

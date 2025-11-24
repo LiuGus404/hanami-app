@@ -15,6 +15,7 @@ import { HanamiSelect } from '@/components/ui/HanamiSelect';
 import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
 import TeacherManagementNavBar from '@/components/ui/TeacherManagementNavBar';
+import RolePermissionsGuide from '@/components/teacher-link/RolePermissionsGuide';
 
 type RoleType = 'owner' | 'admin' | 'teacher' | 'member';
 
@@ -841,6 +842,16 @@ function MemberManagementContent() {
         >
           <h1 className="text-3xl font-bold text-[#4B4036] mb-2">成員管理</h1>
           <p className="text-[#6E5A4A]">管理機構成員身份和邀請</p>
+        </motion.div>
+
+        {/* 角色權限說明 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-6"
+        >
+          <RolePermissionsGuide />
         </motion.div>
 
         {/* 搜尋用戶區域 */}

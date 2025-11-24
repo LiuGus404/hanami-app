@@ -130,7 +130,7 @@ export default function AIHubPage() {
             </h2>
             <button
               className="px-3 py-1 rounded-full bg-[#FFF8E6] border border-[#DDD2BA] text-[#2B3A3B] text-sm font-semibold flex items-center gap-2"
-              onClick={() => window.location.assign('/admin/control')}
+              onClick={() => window.location.assign('/admin')}
             >
               <Image alt="任務列表" height={20} src="/owlui.png" width={20} />
               任務列表

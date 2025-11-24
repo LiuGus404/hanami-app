@@ -11,6 +11,8 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { TeacherLinkShell, useTeacherLinkOrganization } from './TeacherLinkShell';
 import { toast } from 'react-hot-toast';
 import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
+import { useTeacherLinkPermissions } from '@/hooks/useTeacherLinkPermissions';
+import type { PageKey } from '@/lib/permissions';
 
 function CreatePageContent() {
   const router = useRouter();
@@ -24,20 +26,11 @@ function CreatePageContent() {
     userOrganizations,
   } = useTeacherLinkOrganization();
   
-  // 獲取當前機構中的用戶角色
-  const currentOrgRole = useMemo(() => {
-    if (!orgId || !userOrganizations || userOrganizations.length === 0) {
-      return null;
-    }
-    const currentOrg = userOrganizations.find(org => org.orgId === orgId);
-    return currentOrg?.role || null;
-  }, [orgId, userOrganizations]);
+  // 使用权限系统
+  const { role, hasPermission } = useTeacherLinkPermissions();
   
-  // 檢查是否為成員身份
-  const isMember = currentOrgRole === 'member';
-  
-  // 成員身份需要禁用的按鈕
-  const restrictedButtonsForMembers = ['students', 'availability', 'progress', 'schedule'];
+  // 檢查是否為成員身份（向后兼容）
+  const isMember = role === 'member';
   const [studentCount, setStudentCount] = useState(0);
   const [trialStudentCount, setTrialStudentCount] = useState(0);
   const [lastLessonCount, setLastLessonCount] = useState(0);
@@ -156,61 +149,45 @@ function CreatePageContent() {
     return queryString ? `${basePath}?${queryString}` : basePath;
   };
 
+  // 页面键到权限键的映射
+  const pageKeyMap: Record<string, PageKey> = {
+    'students': 'students',
+    'members': 'members',
+    'class': 'class-activities',
+    'progress': 'progress',
+    'finance': 'finance',
+    'tasks': 'tasks',
+    'learning-resources': 'learning-resources',
+  };
+
   const quickActionsAll = [
     {
       key: 'students',
       title: '學生管理',
       icon: <img alt="學生管理" className="w-12 h-12 object-contain" src="/girl.png" />,
       onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/students')),
+      permissionKey: 'students' as PageKey,
     },
     {
       key: 'members',
       title: '成員管理',
       icon: <img alt="成員管理" className="w-12 h-12 object-contain" src="/teacher.png" />,
       onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/member-management')),
+      permissionKey: 'members' as PageKey,
     },
     {
       key: 'class',
       title: '課堂管理',
       icon: <img alt="課堂管理" className="w-12 h-12 object-contain" src="/foxcat.png" />,
       onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/class-activities')),
-    },
-    {
-      key: 'aiLogs',
-      title: 'AI 專案對話紀錄',
-      subtitle: '用戶 · 專案 · 對話 · 錯誤',
-      icon: (
-        <svg className="w-10 h-10 text-[#FF8C42]" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-          <path d="M7 8h10v2H7zM7 12h7v2H7z" fill="#fff" />
-        </svg>
-      ),
-      onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/ai-project-logs')),
-    },
-    {
-      key: 'availability',
-      title: '課堂空缺',
-      icon: <img alt="課堂空缺" className="w-12 h-12 object-contain" src="/details.png" />,
-      onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/lesson-availability')),
+      permissionKey: 'class-activities' as PageKey,
     },
     {
       key: 'progress',
       title: '學生進度',
       icon: <img alt="學生進度" className="w-12 h-12 object-contain" src="/icons/book-elephant.PNG" />,
       onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/student-progress')),
-    },
-    {
-      key: 'pending',
-      title: '待審核學生',
-      subtitle: '常規課程報名審核',
-      icon: <div className="w-12 h-12 rounded-full bg-[#FFF7D6] flex items-center justify-center text-3xl">⏳</div>,
-      onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/pending-students')),
-    },
-    {
-      key: 'schedule',
-      title: '管理課堂',
-      icon: <img alt="管理課堂" className="w-12 h-12 object-contain" src="/icons/clock.PNG" />,
-      onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/schedule-management')),
+      permissionKey: 'progress' as PageKey,
     },
     {
       key: 'finance',
@@ -223,6 +200,7 @@ function CreatePageContent() {
         </svg>
       ),
       onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/financial-management')),
+      permissionKey: 'finance' as PageKey,
     },
     {
       key: 'tasks',
@@ -235,40 +213,37 @@ function CreatePageContent() {
         </svg>
       ),
       onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/task-management')),
+      permissionKey: 'tasks' as PageKey,
+    },
+    {
+      key: 'learning-resources',
+      title: '學習資源',
+      subtitle: '成長樹 · 學習路線 · 活動 · 能力 · 範本',
+      icon: <img alt="學習資源" className="w-12 h-12 object-contain" src="/icons/book-elephant.PNG" />,
+      onClick: () => router.push(buildOrgPath('/aihome/teacher-link/create/learning-resources')),
+      permissionKey: 'learning-resources' as PageKey,
     },
   ];
 
-  const limitedKeys = ['students', 'class', 'progress', 'schedule', 'availability'];
-  const allowedKeys = isSuperAdmin ? quickActionsAll.map((action) => action.key) : limitedKeys;
-  const quickActions = quickActionsAll.filter((action) => allowedKeys.includes(action.key));
+  // 根據權限過濾和標記按鈕
+  // 財務狀況按鈕只對 admin 和 owner 顯示，其他角色完全隱藏
+  const quickActions = quickActionsAll
+    .filter((action) => {
+      // 如果是財務狀況按鈕，檢查是否有權限，沒有權限則完全隱藏
+      if (action.key === 'finance') {
+        return hasPermission(action.permissionKey);
+      }
+      // 其他按鈕都顯示（但可能被禁用）
+      return true;
+    })
+    .map((action) => {
+      const hasAccess = hasPermission(action.permissionKey);
+      return {
+        ...action,
+        hasAccess,
+      };
+    });
 
-  // AI 專案對話紀錄 - 狀態
-  const [showLogViewer, setShowLogViewer] = useState(false);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [users, setUsers] = useState<any[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'users' | 'rooms' | 'messages' | 'errors'>('rooms');
-
-  const openLogViewer = async () => {
-    setShowLogViewer(true);
-    setLogsLoading(true);
-    try {
-      const saas = getSaasSupabaseClient();
-      const [uRes, rRes, mRes] = await Promise.all([
-        (saas.from('saas_users') as any).select('id,email,full_name,created_at').order('created_at', { ascending: false }).limit(100),
-        (saas.from('ai_rooms') as any).select('id,title,description,created_by,created_at,last_message_at').order('created_at', { ascending: false }).limit(100),
-        (saas.from('ai_messages') as any).select('id,room_id,sender_type,sender_user_id,content,content_json,status,error_message,created_at').order('created_at', { ascending: false }).limit(200)
-      ]);
-      setUsers((uRes as any)?.data || []);
-      setRooms((rRes as any)?.data || []);
-      setMessages((mRes as any)?.data || []);
-    } catch (e) {
-      console.error('載入 AI 記錄失敗:', e);
-    } finally {
-      setLogsLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (saasUser) {
@@ -538,48 +513,48 @@ function CreatePageContent() {
             <div className="flex flex-row justify-center gap-6 mb-2">
               <button
                 className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
-                  isMember
+                  !hasPermission('students')
                     ? 'bg-gray-100 border border-gray-300 cursor-not-allowed'
                     : 'bg-[#FFFDF8] border border-[#EADBC8] hover:shadow-md'
                 }`}
                 onClick={() => {
-                  if (isMember) {
-                    toast.error('未開通權限');
+                  if (!hasPermission('students')) {
+                    toast.error('權限不足，未能進入');
                     return;
                   }
                   router.push(
                     buildOrgPath('/aihome/teacher-link/create/students', { filter: 'regular' }),
                   );
                 }}
-                disabled={isMember}
+                disabled={!hasPermission('students')}
               >
                 <img alt="學生" src="/icons/bear-face.PNG" className="w-10 h-10 object-contain mb-2" />
-                <p className={`text-2xl font-bold ${isMember ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{isMember ? '-' : studentCount}</p>
-                <p className={`text-sm ${isMember ? 'text-gray-400' : 'text-[#555]'}`}>常規學生人數</p>
+                <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : studentCount}</p>
+                <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>常規學生人數</p>
               </button>
               <div className="flex flex-col items-center">
                 <button
                   className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
-                    isMember
+                    !hasPermission('students')
                       ? 'bg-gray-100 border border-gray-300 cursor-not-allowed'
                       : 'bg-[#FFFDF8] border border-[#EADBC8] hover:shadow-md'
                   }`}
                   onClick={() => {
-                    if (isMember) {
-                      toast.error('未開通權限');
+                    if (!hasPermission('students')) {
+                      toast.error('權限不足，未能進入');
                       return;
                     }
                     router.push(
                       buildOrgPath('/aihome/teacher-link/create/students', { filter: 'trial' }),
                     );
                   }}
-                  disabled={isMember}
+                  disabled={!hasPermission('students')}
                 >
                   <img alt="試堂" src="/icons/penguin-face.PNG" className="w-10 h-10 object-contain mb-2" />
-                  <p className={`text-2xl font-bold ${isMember ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{isMember ? '-' : trialStudentCount}</p>
-                  <p className={`text-sm ${isMember ? 'text-gray-400' : 'text-[#555]'}`}>試堂學生人數</p>
+                  <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : trialStudentCount}</p>
+                  <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>試堂學生人數</p>
                 </button>
-                {!isMember && (
+                {hasPermission('students') && (
                   <button
                     type="button"
                     onClick={() => setShowTrialDetails(!showTrialDetails)}
@@ -599,13 +574,13 @@ function CreatePageContent() {
               </div>
               <button
                 className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
-                  isMember
+                  !hasPermission('students')
                     ? 'bg-gray-100 border border-gray-300 cursor-not-allowed'
                     : 'bg-[#FFFDF8] border border-[#EADBC8] hover:shadow-md'
                 }`}
                 onClick={() => {
-                  if (isMember) {
-                    toast.error('未開通權限');
+                  if (!hasPermission('students')) {
+                    toast.error('權限不足，未能進入');
                     return;
                   }
                   router.push(
@@ -614,16 +589,16 @@ function CreatePageContent() {
                     }),
                   );
                 }}
-                disabled={isMember}
+                disabled={!hasPermission('students')}
               >
                 <img alt="最後一堂" src="/icons/clock.PNG" className="w-10 h-10 object-contain mb-2" />
-                <p className={`text-2xl font-bold ${isMember ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{isMember ? '-' : lastLessonCount}</p>
-                <p className={`text-sm ${isMember ? 'text-gray-400' : 'text-[#555]'}`}>最後一堂人數</p>
+                <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : lastLessonCount}</p>
+                <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>最後一堂人數</p>
               </button>
             </div>
             
             {/* 未來4週試堂人數詳情 */}
-            {showTrialDetails && !isMember && (
+            {showTrialDetails && hasPermission('students') && (
               <AnimatePresence>
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -663,13 +638,13 @@ function CreatePageContent() {
           {/* 簡化的日曆區 */}
           <div className="bg-white rounded-2xl p-4 mb-6 border border-[#EADBC8] shadow-sm">
             <h3 className="text-base font-semibold text-[#2B3A3B] mb-3">Hanami 日曆</h3>
-            <HanamiCalendar organizationId={orgId} forceEmpty={orgDataDisabled || isMember} userEmail={saasUser?.email || null} />
+            <HanamiCalendar organizationId={orgId} forceEmpty={orgDataDisabled || !hasPermission('students')} userEmail={saasUser?.email || null} />
           </div>
 
           {/* 管理按鈕區 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 place-items-center gap-4 mb-10 px-2 w-full">
             {quickActions.map((action) => {
-              const isRestricted = isMember && restrictedButtonsForMembers.includes(action.key);
+              const isRestricted = !action.hasAccess;
               
               return (
                 <button
@@ -681,7 +656,7 @@ function CreatePageContent() {
                   } p-3 rounded-2xl text-center transition h-full w-full flex flex-col items-center justify-center`}
                   onClick={() => {
                     if (isRestricted) {
-                      toast.error('未開通權限', {
+                      toast.error('權限不足，未能進入', {
                         duration: 2000,
                       });
                       return;
@@ -708,117 +683,6 @@ function CreatePageContent() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {showLogViewer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm"
-            onClick={() => setShowLogViewer(false)}
-          >
-            <motion.div
-              initial={{ y: 20, scale: 0.98, opacity: 0 }}
-              animate={{ y: 0, scale: 1, opacity: 1 }}
-              exit={{ y: 10, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className="w-full max-w-5xl bg-white rounded-2xl p-4 sm:p-6 shadow-2xl ring-1 ring-[#EADBC8]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[#2B3A3B]">AI 專案對話紀錄</h3>
-                <div className="flex items-center gap-2">
-                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='rooms'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('rooms')}>專案</button>
-                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='users'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('users')}>用戶</button>
-                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='messages'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('messages')}>對話</button>
-                  <button className={`px-3 py-1.5 rounded-lg text-sm ${activeTab==='errors'?'bg-[#FFEAD1] text-[#4B4036]':'bg-gray-100 text-gray-700'}`} onClick={()=>setActiveTab('errors')}>錯誤</button>
-                </div>
-              </div>
-
-              {logsLoading ? (
-                <div className="py-10 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="relative mx-auto w-16 h-16 mb-3">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        className="absolute inset-0 rounded-full border-3 border-[#FFD59A] border-t-transparent"
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <img
-                          src="/owlui.png"
-                          alt="載入中"
-                          className="w-10 h-10 object-contain"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-[#2B3A3B] text-sm">載入中...</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="max-h-[70vh] overflow-auto">
-                  {activeTab === 'rooms' && (
-                    <div className="space-y-2">
-                      {rooms.map((r:any)=> (
-                        <div key={r.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold text-[#4B4036]">{r.title || '(未命名專案)'} <span className="text-xs text-gray-500 ml-1">{new Date(r.created_at).toLocaleString()}</span></p>
-                              <p className="text-xs text-gray-600">room_id: {r.id}</p>
-                            </div>
-                            <span className="text-xs text-gray-500">最後: {r.last_message_at ? new Date(r.last_message_at).toLocaleString() : '-'}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeTab === 'users' && (
-                    <div className="space-y-2">
-                      {users.map((u:any)=> (
-                        <div key={u.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
-                          <p className="font-semibold text-[#4B4036]">{u.full_name || u.email}</p>
-                          <p className="text-xs text-gray-600">{u.email} · {new Date(u.created_at).toLocaleString()}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeTab === 'messages' && (
-                    <div className="space-y-2">
-                      {messages.map((m:any)=> (
-                        <div key={m.id} className="p-3 rounded-xl border border-[#EADBC8] bg-white/60">
-                          <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {new Date(m.created_at).toLocaleString()}</p>
-                          <p className="font-medium text-[#2B3A3B]">[{m.sender_type}] {m.content?.slice(0,200) || m.content_json?.text || '(空白)'}</p>
-                          {m.status && m.status !== 'sent' && (
-                            <p className="text-xs text-rose-600 mt-1">狀態: {m.status}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeTab === 'errors' && (
-                    <div className="space-y-2">
-                      {messages.filter((m:any)=> m.status==='error' || m.error_message).map((m:any)=> (
-                        <div key={m.id} className="p-3 rounded-xl border border-rose-200 bg-rose-50">
-                          <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {new Date(m.created_at).toLocaleString()}</p>
-                          <p className="font-medium text-[#B00020]">{m.error_message || '未知錯誤'}</p>
-                          <p className="text-xs text-[#2B3A3B] mt-1">內容: {m.content?.slice(0,180) || m.content_json?.text || '(空白)'}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-4 flex justify-end">
-                <button className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-[#2B3A3B]" onClick={()=>setShowLogViewer(false)}>關閉</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }

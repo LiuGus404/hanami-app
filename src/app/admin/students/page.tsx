@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion';
 import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare, X, Plus } from 'lucide-react';
-import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { AcademicCapIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -1503,58 +1502,7 @@ export default function StudentManagementPage({
   return (
     <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold text-[#2B3A3B] mb-2">學生資料管理</h1>
-
-        {/* 學生進度管理按鈕區域 */}
-        <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
-          <ResponsiveNavigationDropdown
-            items={[
-              {
-                icon: BarChart3,
-                label: '進度管理面板',
-                href: navigationPaths.dashboard,
-                variant: 'secondary',
-              },
-              {
-                icon: TreePine,
-                label: '成長樹管理',
-                href: navigationPaths.growthTrees,
-                variant: 'secondary',
-              },
-              {
-                icon: BookOpen,
-                label: '學習路線管理',
-                href: navigationPaths.learningPaths,
-                variant: 'secondary',
-              },
-              {
-                icon: TrendingUp,
-                label: '發展能力圖卡',
-                href: navigationPaths.abilities,
-                variant: 'secondary',
-              },
-              {
-                icon: Gamepad2,
-                label: '教學活動管理',
-                href: navigationPaths.activities,
-                variant: 'secondary',
-              },
-              {
-                icon: AcademicCapIcon,
-                label: '能力評估管理',
-                href: navigationPaths.assessments,
-                variant: 'secondary',
-              },
-              {
-                icon: VideoCameraIcon,
-                label: '學生媒體管理',
-                href: navigationPaths.media,
-                variant: 'secondary',
-              },
-            ]}
-            currentPage={navigationPaths.studentManagement}
-          />
-        </div>
+        <h1 className="text-2xl font-bold text-[#2B3A3B] mb-2"></h1>
 
         {/* 操作按鈕區域 */}
         {selectedStudents.length > 0 && (

@@ -23,7 +23,6 @@ import {
   TrendingUp,
   Gamepad2
 } from 'lucide-react';
-import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 
@@ -628,62 +627,6 @@ export default function StudentMediaPage({
     <div className="min-h-screen bg-gradient-to-br from-hanami-background to-hanami-surface p-6">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         <div className="space-y-6">
-          {/* 導航欄 */}
-          <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
-            <ResponsiveNavigationDropdown
-              items={[
-                {
-                  icon: BarChart3,
-                  label: "進度管理面板",
-                  href: navigationPaths.dashboard,
-                  variant: "secondary"
-                },
-                {
-                  icon: TreePine,
-                  label: "成長樹管理",
-                  href: navigationPaths.growthTrees,
-                  variant: "secondary"
-                },
-              {
-                icon: BookOpenIcon,
-                label: "學習路線管理",
-                href: navigationPaths.learningPaths,
-                variant: "secondary"
-              },
-                {
-                  icon: TrendingUp,
-                  label: "發展能力圖卡",
-                  href: navigationPaths.abilities,
-                  variant: "secondary"
-                },
-                {
-                  icon: Gamepad2,
-                  label: "教學活動管理",
-                  href: navigationPaths.activities,
-                  variant: "secondary"
-                },
-                {
-                  icon: AcademicCapIcon,
-                  label: "能力評估管理",
-                  href: navigationPaths.assessments,
-                  variant: "secondary"
-                },
-                {
-                  icon: Video,
-                  label: "學生媒體管理",
-                  href: navigationPaths.media,
-                  variant: "primary"
-                },
-                {
-                  icon: Users,
-                  label: "返回學生管理",
-                  href: navigationPaths.studentManagement,
-                  variant: "accent"
-                }
-              ]}
-              currentPage={navigationPaths.media}
-            />
-          </div>
 
           {orgDataDisabled && (
             <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">
@@ -699,10 +642,6 @@ export default function StudentMediaPage({
 
           {/* 標題和操作按鈕 */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">學生媒體管理</h1>
-              <p className="text-gray-600 mt-1">管理每位學生的影片和相片媒體檔案</p>
-            </div>
             <div className="flex gap-3 items-center">
               <HanamiButton 
                 variant="secondary"

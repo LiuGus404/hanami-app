@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import { Copy, Settings, Users, UserPlus, LayoutGrid, List } from 'lucide-react';
 
 import CopyAvailableTimesModal from '@/components/ui/CopyAvailableTimesModal';
 import LessonAvailabilityDashboard from '@/components/ui/LessonAvailabilityDashboard';
@@ -55,81 +57,120 @@ export default function LessonAvailabilityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF9F2] px-4 py-6 font-['Quicksand',_sans-serif]">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-4 flex justify-between items-center pr-4">
-          <div className="flex gap-2">
-            <button
-              className={`px-4 py-2 rounded-full font-semibold transition-colors duration-200 ${
-                viewMode === 'multi-course'
-                  ? 'bg-[#A68A64] text-white'
-                  : 'bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] border border-[#EADBC8]'
-              }`}
+    <div className="p-6">
+      {/* 工具欄 */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-[#EADBC8] mb-6"
+      >
+        <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+          {/* 左側：視圖切換 */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setViewMode('multi-course')}
-            >
-              多課程視圖
-            </button>
-            <button
-              className={`px-4 py-2 rounded-full font-semibold transition-colors duration-200 ${
-                viewMode === 'traditional'
-                  ? 'bg-[#A68A64] text-white'
-                  : 'bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] border border-[#EADBC8]'
+              className={`px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${
+                viewMode === 'multi-course'
+                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
+                  : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white'
               }`}
-              onClick={() => setViewMode('traditional')}
             >
+              <LayoutGrid className="w-4 h-4" />
+              多課程視圖
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setViewMode('traditional')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${
+                viewMode === 'traditional'
+                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
+                  : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white'
+              }`}
+            >
+              <List className="w-4 h-4" />
               傳統視圖
-            </button>
+            </motion.button>
           </div>
           
-          <div className="flex gap-3">
-            <button
-              className="bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] font-semibold py-2 px-4 rounded-full border border-[#EADBC8] shadow-sm transition-colors duration-200"
+          {/* 右側：操作按鈕 */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-white/70 border border-[#EADBC8] rounded-xl text-[#4B4036] hover:bg-white transition-all shadow-sm flex items-center gap-2"
               onClick={() => setIsModalOpen(true)}
             >
+              <Copy className="w-4 h-4" />
               複製有位時間
-            </button>
-            <button
-              className="bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] font-semibold py-2 px-4 rounded-full border border-[#EADBC8] shadow-sm transition-colors duration-200"
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 bg-white/70 border border-[#EADBC8] rounded-xl text-[#4B4036] hover:bg-white transition-all shadow-sm flex items-center gap-2"
               onClick={() => router.push(scheduleManagementPath)}
             >
+              <Settings className="w-4 h-4" />
               管理課程
-            </button>
-            <Link 
-              className={`font-semibold py-2 px-4 rounded-full border shadow-sm transition-colors duration-200 ${
-                isAllowedOrg
-                  ? 'bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] border-[#EADBC8]'
-                  : 'bg-gray-400 opacity-60 text-white border-gray-400 cursor-pointer'
-              }`}
-              href="/admin/trial-queue"
-              onClick={handleTrialQueueClick}
+            </motion.button>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              輪候學生列表
-            </Link>
-            <Link 
-              className={`font-semibold py-2 px-4 rounded-full border shadow-sm transition-colors duration-200 ${
-                isAllowedOrg
-                  ? 'bg-[#FFFDF8] hover:bg-[#F3EFE3] text-[#4B4036] border-[#EADBC8]'
-                  : 'bg-gray-400 opacity-60 text-white border-gray-400 cursor-pointer'
-              }`}
-              href="/admin/add-trial-students"
-              onClick={handleAddTrialClick}
+              <Link 
+                className={`px-4 py-2 rounded-xl font-medium shadow-sm transition-all flex items-center gap-2 ${
+                  isAllowedOrg
+                    ? 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white'
+                    : 'bg-gray-400 opacity-60 text-white border-gray-400 cursor-not-allowed'
+                }`}
+                href="/admin/trial-queue"
+                onClick={handleTrialQueueClick}
+              >
+                <Users className="w-4 h-4" />
+                輪候學生列表
+              </Link>
+            </motion.div>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              新增輪候學生
-            </Link>
+              <Link 
+                className={`px-4 py-2 rounded-xl font-medium shadow-sm transition-all flex items-center gap-2 ${
+                  isAllowedOrg
+                    ? 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white'
+                    : 'bg-gray-400 opacity-60 text-white border-gray-400 cursor-not-allowed'
+                }`}
+                href="/admin/add-trial-students"
+                onClick={handleAddTrialClick}
+              >
+                <UserPlus className="w-4 h-4" />
+                新增輪候學生
+              </Link>
+            </motion.div>
           </div>
         </div>
-        
+      </motion.div>
+      
+      {/* 主要內容區域 */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.1 }}
+      >
         {viewMode === 'multi-course' ? (
           <MultiCourseAvailabilityDashboard />
         ) : (
           <LessonAvailabilityDashboard />
         )}
-        
-        <CopyAvailableTimesModal 
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-        />
-      </div>
+      </motion.div>
+      
+      <CopyAvailableTimesModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }

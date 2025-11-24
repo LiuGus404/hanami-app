@@ -23,7 +23,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import BackButton from '@/components/ui/BackButton';
+import { HanamiCard } from '@/components/ui';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence } from 'framer-motion';
 
 interface PendingStudent {
   id: string;
@@ -780,9 +782,13 @@ export default function PendingStudentsPage(props: PendingStudentsPageProps = {}
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4B4036] mx-auto mb-4"></div>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-8 h-8 border-2 border-[#FFD59A] border-t-transparent rounded-full mx-auto mb-4"
+          />
           <p className="text-[#4B4036]">載入中...</p>
         </div>
       </div>
@@ -790,153 +796,192 @@ export default function PendingStudentsPage(props: PendingStudentsPageProps = {}
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] p-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0] px-4 py-8">
       <div className="max-w-7xl mx-auto">
-        {/* 頁面標題 */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <button
-              onClick={() => router.push('/aihome/teacher-link')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#EADBC8] rounded-lg text-[#2B3A3B] hover:text-[#A64B2A] hover:bg-[#FFF9F2] hover:border-[#FFD59A] transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2"
+        {/* 返回按鈕 */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="mb-6"
+        >
+          <BackButton href="/aihome/teacher-link" label="返回管理面板" />
+        </motion.div>
+
+        {/* 標題區域 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
+          <div className="flex items-center justify-center mb-4">
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
             >
-              <ArrowLeftIcon className="w-4 h-4" />
-              <span className="font-medium">返回老師主頁</span>
-            </button>
+              <AcademicCapIcon className="w-8 h-8 text-[#FFB6C1] mr-3" />
+            </motion.div>
+            <h1 className="text-4xl font-bold text-[#4B4036]">待審核學生管理</h1>
           </div>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-[#4B4036] mb-2">
-                待審核學生管理
-              </h1>
-              <p className="text-[#2B3A3B]">
-                審核已完成付款的常規課程學生報名及試堂學生
-              </p>
-            </div>
-          </div>
-        </div>
+          <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
+            審核已完成付款的常規課程學生報名及試堂學生
+          </p>
+        </motion.div>
 
         {/* 統計卡片 */}
-        {!showTrialStudents && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8]"
-            >
-              <div className="flex items-center">
-                <ClockIcon className="w-8 h-8 text-yellow-500 mr-3" />
-                <div>
-                  <p className="text-sm text-[#2B3A3B]">未確認</p>
-                  <p className="text-2xl font-bold text-[#4B4036]">
-                    {pendingStudents.filter(s => s.review_status === 'pending').length}
-                  </p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mb-8"
+        >
+          {!showTrialStudents ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <HanamiCard className="p-6">
+                <div className="flex items-center">
+                  <div className="p-3 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full">
+                    <ClockIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-[#2B3A3B]">未確認</p>
+                    <p className="text-2xl font-bold text-[#4B4036]">
+                      {pendingStudents.filter(s => s.review_status === 'pending').length}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
+              </HanamiCard>
 
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8]"
-            >
-              <div className="flex items-center">
-                <CheckCircleIcon className="w-8 h-8 text-green-500 mr-3" />
-                <div>
-                  <p className="text-sm text-[#2B3A3B]">確認</p>
-                  <p className="text-2xl font-bold text-[#4B4036]">
-                    {pendingStudents.filter(s => s.review_status === 'approved').length}
-                  </p>
+              <HanamiCard className="p-6">
+                <div className="flex items-center">
+                  <div className="p-3 bg-gradient-to-br from-green-400 to-green-500 rounded-full">
+                    <CheckCircleIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-[#2B3A3B]">已確認</p>
+                    <p className="text-2xl font-bold text-[#4B4036]">
+                      {pendingStudents.filter(s => s.review_status === 'approved').length}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-        
-        {showTrialStudents && (
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8]"
-            >
-              <div className="flex items-center">
-                <ClockIcon className="w-8 h-8 text-orange-500 mr-3" />
-                <div>
-                  <p className="text-sm text-[#2B3A3B]">未確認支付的試堂學生</p>
-                  <p className="text-2xl font-bold text-[#4B4036]">
-                    {loadingTrialStudents ? '載入中...' : trialStudents.length}
-                  </p>
+              </HanamiCard>
+
+              <HanamiCard className="p-6">
+                <div className="flex items-center">
+                  <div className="p-3 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full">
+                    <UserIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-[#2B3A3B]">總數</p>
+                    <p className="text-2xl font-bold text-[#4B4036]">
+                      {pendingStudents.length}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
+              </HanamiCard>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+              <HanamiCard className="p-6">
+                <div className="flex items-center">
+                  <div className="p-3 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full">
+                    <ClockIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-[#2B3A3B]">未確認支付的試堂學生</p>
+                    <p className="text-2xl font-bold text-[#4B4036]">
+                      {loadingTrialStudents ? '載入中...' : trialStudents.length}
+                    </p>
+                  </div>
+                </div>
+              </HanamiCard>
+            </div>
+          )}
+        </motion.div>
 
         {/* 過濾器 */}
-        <div className="bg-white rounded-xl p-6 shadow-lg border border-[#EADBC8] mb-6">
-          <div className="flex flex-wrap gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-[#EADBC8] mb-6"
+        >
+          <div className="flex flex-wrap gap-3">
             {showTrialStudents ? (
               /* 試堂學生頁面：顯示返回按鍵 */
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => {
                   setShowTrialStudents(false);
                   setFilterStatus('all');
                 }}
-                className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2"
+                className="px-4 py-2 rounded-xl font-medium transition-all bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white flex items-center gap-2 shadow-sm"
               >
                 <ArrowLeftIcon className="w-4 h-4" />
                 返回待審核學生
-              </button>
+              </motion.button>
             ) : (
               /* 待審核學生頁面：顯示過濾按鍵和試堂學生按鍵 */
               <>
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setFilterStatus('all')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-xl font-medium transition-all ${
                     filterStatus === 'all' 
-                      ? 'bg-[#FFD59A] text-[#4B4036]' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg' 
+                      : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
                   }`}
                 >
                   全部
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setFilterStatus('pending')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-xl font-medium transition-all ${
                     filterStatus === 'pending' 
-                      ? 'bg-[#FFD59A] text-[#4B4036]' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg' 
+                      : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
                   }`}
                 >
                   未確認
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setFilterStatus('approved')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-xl font-medium transition-all ${
                     filterStatus === 'approved' 
-                      ? 'bg-[#FFD59A] text-[#4B4036]' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg' 
+                      : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
                   }`}
                 >
-                  確認
-                </button>
-                <button
+                  已確認
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     setShowTrialStudents(true);
                     loadTrialStudents();
                   }}
-                  className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  className="px-4 py-2 rounded-xl font-medium transition-all bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm"
                 >
                   試堂學生
-                </button>
+                </motion.button>
               </>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* 學生列表 */}
-        <div className="bg-white rounded-xl shadow-lg border border-[#EADBC8] overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-[#EADBC8] overflow-hidden"
+        >
           {showTrialStudents ? (
             loadingTrialStudents ? (
               <div className="p-8 text-center">
@@ -1142,7 +1187,7 @@ export default function PendingStudentsPage(props: PendingStudentsPageProps = {}
             </table>
           </div>
           )}
-        </div>
+        </motion.div>
 
         {/* 詳情模態框 */}
         {showModal && selectedStudent && (

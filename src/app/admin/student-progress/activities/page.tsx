@@ -18,7 +18,6 @@ import {
   BookOpenIcon,
 } from '@heroicons/react/24/outline';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, Database, ChevronDown } from 'lucide-react';
-import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 
@@ -815,14 +814,6 @@ const loadMasterOptions = async () => {
       <div className="max-w-7xl mx-auto">
         {/* 頁面標題 */}
         <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-hanami-text mb-2">
-              教學活動管理
-            </h1>
-            <p className="text-hanami-text-secondary">
-              管理教學遊戲、訓練和練習活動
-            </p>
-          </div>
           <div className="flex gap-3">
             {/* 載入 Notion 資料按鈕已隱藏 */}
             <HanamiButton
@@ -850,62 +841,6 @@ const loadMasterOptions = async () => {
           </div>
         </div>
 
-        {/* 導航按鈕 */}
-        <div className="mb-6 p-4 bg-gradient-to-br from-white to-[#FFFCEB] rounded-xl border border-[#EADBC8] shadow-sm">
-          <ResponsiveNavigationDropdown
-            items={[
-              {
-                icon: BarChart3,
-                label: "進度管理面板",
-                href: navigationPaths.dashboard,
-                variant: "secondary"
-              },
-              {
-                icon: TreePine,
-                label: "成長樹管理",
-                href: navigationPaths.growthTrees,
-                variant: "secondary"
-              },
-              {
-                icon: BookOpenIcon,
-                label: "學習路線管理",
-                href: navigationPaths.learningPaths,
-                variant: "secondary"
-              },
-              {
-                icon: TrendingUp,
-                label: "發展能力圖卡",
-                href: navigationPaths.abilities,
-                variant: "secondary"
-              },
-              {
-                icon: Gamepad2,
-                label: "教學活動管理",
-                href: navigationPaths.activities,
-                variant: "primary"
-              },
-              {
-                icon: AcademicCapIcon,
-                label: "能力評估管理",
-                href: navigationPaths.assessments,
-                variant: "secondary"
-              },
-              {
-                icon: VideoCameraIcon,
-                label: "學生媒體管理",
-                href: navigationPaths.media,
-                variant: "secondary"
-              },
-              {
-                icon: Users,
-                label: "返回學生管理",
-                href: navigationPaths.studentManagement,
-                variant: "accent"
-              }
-            ]}
-            currentPage={navigationPaths.activities}
-          />
-        </div>
 
         {orgDataDisabled && (
           <div className="mx-auto mb-6 flex max-w-xl flex-col items-center justify-center rounded-3xl border border-hanami-border bg-white px-8 py-12 text-center shadow-sm">

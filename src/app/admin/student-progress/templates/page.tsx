@@ -5,7 +5,6 @@ import { TemplateManagement } from '@/components/admin/TemplateManagement';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useUser } from '@/hooks/useUser';
 import type { OrganizationProfile } from '@/lib/authUtils';
-import { ResponsiveNavigationDropdown } from '@/components/ui/ResponsiveNavigationDropdown';
 import { BarChart3, TreePine, TrendingUp, Gamepad2, Users, BookOpenIcon } from 'lucide-react';
 import StudentProgressPageTemplate from '@/components/ui/StudentProgressPageTemplate';
 
@@ -99,19 +98,6 @@ export default function TemplatesPage({
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-          <ResponsiveNavigationDropdown
-            items={[
-              { icon: BarChart3, label: '進度管理面板', href: navigationPaths.dashboard, variant: 'secondary' },
-              { icon: TreePine, label: '成長樹管理', href: navigationPaths.growthTrees, variant: 'secondary' },
-              { icon: BookOpenIcon, label: '學習路線管理', href: navigationPaths.learningPaths, variant: 'secondary' },
-              { icon: TrendingUp, label: '發展能力圖卡', href: navigationPaths.abilities, variant: 'secondary' },
-              { icon: Gamepad2, label: '教學活動管理', href: navigationPaths.activities, variant: 'secondary' },
-              { icon: BookOpenIcon, label: '範本管理', href: navigationPaths.templates, variant: 'primary' },
-              { icon: Users, label: '返回學生管理', href: navigationPaths.studentManagement, variant: 'accent' },
-            ]}
-            currentPage={navigationPaths.templates}
-          />
-
           <div className="rounded-3xl border border-[#EADBC8] bg-white px-10 py-16 text-center shadow-sm">
             <div className="mb-6 flex justify-center">
               <BookOpenIcon className="h-24 w-24 text-[#EADBC8]" />
@@ -131,19 +117,6 @@ export default function TemplatesPage({
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFFDF8] p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        <ResponsiveNavigationDropdown
-          items={[
-            { icon: BarChart3, label: '進度管理面板', href: navigationPaths.dashboard, variant: 'secondary' },
-            { icon: TreePine, label: '成長樹管理', href: navigationPaths.growthTrees, variant: 'secondary' },
-            { icon: BookOpenIcon, label: '學習路線管理', href: navigationPaths.learningPaths, variant: 'secondary' },
-            { icon: TrendingUp, label: '發展能力圖卡', href: navigationPaths.abilities, variant: 'secondary' },
-            { icon: Gamepad2, label: '教學活動管理', href: navigationPaths.activities, variant: 'secondary' },
-            { icon: BookOpenIcon, label: '範本管理', href: navigationPaths.templates, variant: 'primary' },
-            { icon: Users, label: '返回學生管理', href: navigationPaths.studentManagement, variant: 'accent' },
-          ]}
-          currentPage={navigationPaths.templates}
-        />
-
         <div className="rounded-3xl border border-[#EADBC8] bg-white p-8 shadow-sm">
           <TemplateManagement 
             onBack={() => window.history.back()} 

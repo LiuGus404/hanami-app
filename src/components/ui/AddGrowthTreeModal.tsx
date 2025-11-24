@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 import { HanamiButton } from './HanamiButton';
 import { PopupSelect } from './PopupSelect';
@@ -341,8 +342,8 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-2 sm:p-4 overflow-y-auto">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col">
         {/* 標題欄 */}
         <div className="bg-[#FFF9F2] px-6 py-4 border-b border-[#EADBC8]">
@@ -854,7 +855,7 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
 
       {/* 活動多選彈窗 */}
       {showActivitySelector.open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <span className="font-bold text-lg">選擇相關活動</span>
@@ -901,7 +902,7 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
 
       {/* 能力多選彈窗 */}
       {showAbilitySelector.open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <span className="font-bold text-lg">選擇所需發展能力</span>
@@ -992,4 +993,11 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
       )}
     </div>
   );
+
+  // 使用 createPortal 將模態視窗渲染到 document.body
+  if (typeof window === 'undefined' || !document.body) {
+    return null;
+  }
+
+  return createPortal(modalContent, document.body);
 }
