@@ -423,21 +423,21 @@ export default function ParentDashboard() {
         onRegister={() => router.push('/parent/login')}
       />
       <HanamiDashboardLayout
-        activeTab={activeTab}
-        tabs={[
-          { id: 'overview', name: '概覽', icon: '📊' },
-          { id: 'progress', name: '學習進度', icon: '📈' },
-          { id: 'videos', name: '課堂影片', icon: '🎥' },
-          { id: 'certificates', name: '證書', icon: '🏆' },
-          { id: 'comments', name: '評語', icon: '💬' },
-          { id: 'packages', name: '課程包', icon: '📦' },
-        ]}
-        title={`${parentName}的儀表板`}
-        onLogout={handleLogout}
-        onTabChange={setActiveTab}
-      >
-        {renderContent()}
-      </HanamiDashboardLayout>
+      activeTab={activeTab}
+      tabs={[
+        { id: 'overview', name: '概覽', icon: '📊' },
+        { id: 'progress', name: '學習進度', icon: '📈' },
+        { id: 'videos', name: '課堂影片', icon: '🎥' },
+        { id: 'certificates', name: '證書', icon: '🏆' },
+        { id: 'comments', name: '評語', icon: '💬' },
+        { id: 'packages', name: '課程包', icon: '📦' },
+      ]}
+      title={`${parentName}的儀表板`}
+      onLogout={handleLogout}
+      onTabChange={setActiveTab}
+    >
+      {renderContent()}
+    </HanamiDashboardLayout>
     </>
   );
 } 

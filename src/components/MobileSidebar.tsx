@@ -20,11 +20,11 @@ export default function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
       )}
       
       {/* 側邊欄 */}
-      <div className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-[#EADBC8] z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
+      <div className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-[#EADBC8] z-50 transform transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         {/* Logo 區域 */}
-        <div className="p-6 border-b border-[#EADBC8] flex items-center justify-between">
+        <div className="p-6 border-b border-[#EADBC8] flex items-center justify-between flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-lg flex items-center justify-center shadow-md">
               <svg className="w-6 h-6 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

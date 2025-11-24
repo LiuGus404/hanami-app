@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       queries.push(Promise.resolve({ data: [], error: null }));
     }
     
-    // 上次課堂活動查詢
+    // 上次課堂活動查詢 - 查詢所有歷史活動，稍後只保留最近一次課的活動
     if (lessonDate) {
       let previousQuery = supabase
         .from('hanami_student_activities')
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
         previousQuery = previousQuery.eq('activity_id', '00000000-0000-0000-0000-000000000000');
       }
       
-      queries.push(previousQuery.order('lesson_date', { ascending: false }).limit(5));
+      queries.push(previousQuery.order('lesson_date', { ascending: false }).limit(20));
     } else {
       queries.push(Promise.resolve({ data: [], error: null }));
     }
@@ -192,9 +192,19 @@ export async function GET(request: NextRequest) {
     const [currentResult, previousResult, ongoingResult, completedOngoingResult] = await Promise.all(queries);
     
     const currentLessonActivities = currentResult.data || [];
-    const previousLessonActivities = previousResult.data || [];
+    let previousLessonActivities = previousResult.data || [];
     const allOngoingActivities = ongoingResult.data || [];
     const completedOngoingActivities = completedOngoingResult.data || [];
+    
+    // 只保留最近一次課的活動（上次課堂活動應該只顯示最近一次課的活動）
+    if (previousLessonActivities.length > 0) {
+      // 找到最近的課堂日期（因為已經按日期降序排列，第一個就是最近的）
+      const mostRecentLessonDate = previousLessonActivities[0].lesson_date;
+      // 只保留該日期的活動
+      previousLessonActivities = previousLessonActivities.filter(
+        (activity: any) => activity.lesson_date === mostRecentLessonDate
+      );
+    }
     
     // 將所有正在學習的活動分為未完成和已完成兩類
     const ongoingActivities = allOngoingActivities.filter((activity: any) => (activity.progress || 0) < 100);
@@ -231,6 +241,15 @@ export async function GET(request: NextRequest) {
     // 處理活動資料，統一格式
     const processActivity = (activity: any) => {
       const teachingActivity = activity.hanami_teaching_activities;
+      const progress = activity.progress || 0;
+      // 根據進度自動設置完成狀態：如果進度 >= 100，則標記為已完成
+      // 參考正在學習活動中已完成活動的載入邏輯
+      const normalizedProgress = progress > 1 ? progress / 100 : progress;
+      const isCompleted = normalizedProgress >= 1 || activity.completion_status === 'completed';
+      const completionStatus = isCompleted 
+        ? 'completed' 
+        : (normalizedProgress > 0 ? 'in_progress' : (activity.completion_status || 'not_started'));
+      
       // 即使教學活動關聯缺失，也要帶回 student_activity 的基本資訊以利前端偵錯
       if (!teachingActivity) {
         return {
@@ -245,11 +264,11 @@ export async function GET(request: NextRequest) {
           estimatedDuration: null,
           materialsNeeded: [],
           instructions: null,
-          completionStatus: activity.completion_status,
+          completionStatus: completionStatus,
           teacherNotes: activity.teacher_notes,
           studentFeedback: activity.student_feedback,
           timeSpent: activity.time_spent || 0,
-          progress: activity.progress || 0,
+          progress: progress,
           assignedAt: activity.assigned_at,
           lessonDate: activity.lesson_date,
           timeslot: activity.timeslot,
@@ -269,11 +288,11 @@ export async function GET(request: NextRequest) {
         estimatedDuration: teachingActivity.duration_minutes || 0,
         materialsNeeded: teachingActivity.materials_needed || [],
         instructions: teachingActivity.instructions || '',
-        completionStatus: activity.completion_status,
+        completionStatus: completionStatus,
         teacherNotes: activity.teacher_notes,
         studentFeedback: activity.student_feedback,
         timeSpent: activity.time_spent || 0,
-        progress: activity.progress || 0,
+        progress: progress,
         assignedAt: activity.assigned_at,
         lessonDate: activity.lesson_date,
         timeslot: activity.timeslot,

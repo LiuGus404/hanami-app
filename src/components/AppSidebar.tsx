@@ -243,10 +243,10 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
             initial={{ x: -300 }}
             animate={{ x: 0 }}
             exit={{ x: -300 }}
-            className="fixed top-16 bottom-0 left-0 w-80 bg-white shadow-xl z-50 lg:fixed lg:top-16 lg:shadow-lg lg:z-50 lg:flex-shrink-0"
+            className="fixed top-16 bottom-0 left-0 w-80 bg-white shadow-xl z-50 lg:fixed lg:top-16 lg:shadow-lg lg:z-50 lg:flex-shrink-0 flex flex-col h-full"
           >
             {/* 標題區域 */}
-            <div className="p-6 border-b border-[#EADBC8]">
+            <div className="p-6 border-b border-[#EADBC8] flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 relative">
@@ -273,7 +273,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
             </div>
 
             {/* 選單項目 */}
-            <nav className="p-4 space-y-2">
+            <nav className="flex-1 overflow-y-auto p-4 space-y-2">
               {sidebarMenuItems.map((item, index) => {
                 const isActive = currentPath === item.href;
                 

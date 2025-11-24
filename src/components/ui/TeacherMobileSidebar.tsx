@@ -47,10 +47,10 @@ export default function TeacherMobileSidebar({
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-0 left-0 h-full w-64 bg-white border-r border-[#EADBC8] z-50 lg:hidden"
+            className="fixed top-0 left-0 h-full w-64 bg-white border-r border-[#EADBC8] z-50 lg:hidden flex flex-col"
           >
             {/* Logo 區域 */}
-            <div className="p-6 border-b border-[#EADBC8] flex items-center justify-between">
+            <div className="p-6 border-b border-[#EADBC8] flex items-center justify-between flex-shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-[#FFD59A] rounded-xl flex items-center justify-center">
                   <span className="text-brown-700 text-xl">🎵</span>
@@ -98,7 +98,7 @@ export default function TeacherMobileSidebar({
             </div>
 
             {/* 底部通知 */}
-            <div className="p-4 border-t border-[#EADBC8]">
+            <div className="p-4 border-t border-[#EADBC8] flex-shrink-0">
               <motion.button
                 onClick={onLogout}
                 className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-brown-600 hover:bg-[#FFF9F2] transition-all duration-200"

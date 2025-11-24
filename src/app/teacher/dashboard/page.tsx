@@ -6033,7 +6033,7 @@ export default function TeacherDashboard() {
         `}>
           <div className="flex flex-col h-full">
             {/* 側邊欄標題 */}
-            <div className="flex items-center justify-between p-4 border-b border-[#EADBC8]">
+            <div className="flex items-center justify-between p-4 border-b border-[#EADBC8] flex-shrink-0">
               <h2 className="text-lg font-semibold text-[#4B4036]">功能選單</h2>
               <button
                 onClick={() => setSidebarOpen(false)}
@@ -6046,7 +6046,7 @@ export default function TeacherDashboard() {
             </div>
 
             {/* 導航選單 */}
-            <nav className="flex-1 p-4 space-y-2">
+            <nav className="flex-1 overflow-y-auto p-4 space-y-2">
               <button
                 onClick={() => {
                   setActiveTab('dashboard');

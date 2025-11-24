@@ -3359,17 +3359,37 @@ const PLACEHOLDER_ORG_IDS = new Set([
                                       {/* 活動狀態和名稱 */}
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center space-x-2">
-                                          {activity.completionStatus === 'not_started' ? (
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                          ) : activity.completionStatus === 'in_progress' ? (
-                                            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                                          ) : (
-                                            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                                          )}
-                                          <span className="text-xs text-gray-600">
-                                            {activity.completionStatus === 'not_started' ? '未開始' : 
-                                             activity.completionStatus === 'in_progress' ? '進行中' : '學習中'}
-                                          </span>
+                                          {(() => {
+                                            // 參考正在學習活動中已完成活動的載入邏輯：同時檢查 progress 和 completionStatus
+                                            const progress = activity.progress || 0;
+                                            const normalizedProgress = progress > 1 ? progress / 100 : progress;
+                                            const isCompleted = normalizedProgress >= 1 || activity.completionStatus === 'completed';
+                                            const isInProgress = !isCompleted && normalizedProgress > 0;
+                                            const isNotStarted = !isCompleted && !isInProgress;
+                                            
+                                            if (isNotStarted) {
+                                              return (
+                                                <>
+                                                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                  <span className="text-xs text-gray-600">未開始</span>
+                                                </>
+                                              );
+                                            } else if (isInProgress) {
+                                              return (
+                                                <>
+                                                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                                                  <span className="text-xs text-gray-600">進行中</span>
+                                                </>
+                                              );
+                                            } else {
+                                              return (
+                                                <>
+                                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                  <span className="text-xs text-gray-600">已完成</span>
+                                                </>
+                                              );
+                                            }
+                                          })()}
                                         </div>
                                         <button
                                           onClick={() => {
@@ -3923,17 +3943,37 @@ const PLACEHOLDER_ORG_IDS = new Set([
                                             {/* 活動狀態和名稱 */}
                                             <div className="flex items-center justify-between">
                                               <div className="flex items-center space-x-2">
-                                                {activity.completionStatus === 'not_started' ? (
-                                                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                                ) : activity.completionStatus === 'in_progress' ? (
-                                                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                                                ) : (
-                                                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                                                )}
-                                                <span className="text-xs text-gray-600">
-                                                  {activity.completionStatus === 'not_started' ? '未開始' : 
-                                                   activity.completionStatus === 'in_progress' ? '進行中' : '學習中'}
-                                                </span>
+                                                {(() => {
+                                                  // 參考正在學習活動中已完成活動的載入邏輯：同時檢查 progress 和 completionStatus
+                                                  const progress = activity.progress || 0;
+                                                  const normalizedProgress = progress > 1 ? progress / 100 : progress;
+                                                  const isCompleted = normalizedProgress >= 1 || activity.completionStatus === 'completed';
+                                                  const isInProgress = !isCompleted && normalizedProgress > 0;
+                                                  const isNotStarted = !isCompleted && !isInProgress;
+                                                  
+                                                  if (isNotStarted) {
+                                                    return (
+                                                      <>
+                                                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                        <span className="text-xs text-gray-600">未開始</span>
+                                                      </>
+                                                    );
+                                                  } else if (isInProgress) {
+                                                    return (
+                                                      <>
+                                                        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                                                        <span className="text-xs text-gray-600">進行中</span>
+                                                      </>
+                                                    );
+                                                  } else {
+                                                    return (
+                                                      <>
+                                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                        <span className="text-xs text-gray-600">已完成</span>
+                                                      </>
+                                                    );
+                                                  }
+                                                })()}
                                               </div>
                                               <button
                                                 onClick={() => {

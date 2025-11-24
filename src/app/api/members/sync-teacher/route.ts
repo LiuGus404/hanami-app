@@ -96,8 +96,8 @@ export async function POST(request: NextRequest) {
       if (identity) {
         const identityData = identity as { id: string; role_type: string; status: string };
         if (identityData.role_type === 'teacher' && identityData.role_type !== teacher.teacher_role) {
-          // 如果成员身份是 teacher，可以同步角色
-          // 注意：这里可能需要根据实际业务逻辑调整
+        // 如果成员身份是 teacher，可以同步角色
+        // 注意：这里可能需要根据实际业务逻辑调整
         }
       }
     }
