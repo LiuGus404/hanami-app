@@ -29,7 +29,6 @@ export default function OrgReviewSection({ orgId }: OrgReviewSectionProps) {
         getUserOrgReview(orgId),
       ]);
 
-      setReviews(reviewsData);
       setStats(statsData);
       setUserReview(userReviewData);
       

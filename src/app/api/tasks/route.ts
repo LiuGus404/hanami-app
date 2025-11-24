@@ -24,11 +24,19 @@ export async function GET(request: NextRequest) {
     const sort_field = searchParams.get('sort_by') || 'created_at';
     const sort_direction = searchParams.get('sort_order') || 'desc';
     const phone = searchParams.get('phone');
+    const orgId = searchParams.get('orgId');
+    const userEmail = searchParams.get('userEmail');
 
     // 構建查詢
     let query = supabase
       .from('hanami_task_list')
       .select('*', { count: 'exact' });
+
+    // 添加 org_id 篩選（如果提供）
+    // 注意：如果字段不存在，查詢會失敗，需要在執行時捕獲錯誤
+    if (orgId) {
+      query = query.eq('org_id', orgId);
+    }
 
     // 應用篩選條件
     if (status && status.length > 0) {
@@ -106,11 +114,69 @@ export async function GET(request: NextRequest) {
     const to = from + limit - 1;
     query = query.range(from, to);
 
-    const { data: tasks, error, count } = await query;
+    let result;
+    try {
+      result = await query;
+    } catch (queryError: any) {
+      // 如果查詢失敗（可能是因為 org_id 字段不存在），嘗試不帶 org_id 的查詢
+      if (orgId && (queryError?.message?.includes('org_id') || queryError?.code === '42703')) {
+        console.warn('org_id 字段不存在，使用不帶機構篩選的查詢');
+        // 重新構建查詢，不包含 org_id
+        let fallbackQuery = supabase
+          .from('hanami_task_list')
+          .select('*', { count: 'exact' });
+        
+        // 重新應用其他篩選條件（與上面相同的邏輯）
+        if (status && status.length > 0) {
+          fallbackQuery = fallbackQuery.in('status', status);
+        }
+        if (priority && priority.length > 0) {
+          fallbackQuery = fallbackQuery.in('priority', priority);
+        }
+        if (category && category.length > 0) {
+          fallbackQuery = fallbackQuery.overlaps('category', category);
+        }
+        if (assigned_to) {
+          fallbackQuery = fallbackQuery.contains('assigned_to', [assigned_to]);
+        }
+        if (project_id) {
+          fallbackQuery = fallbackQuery.eq('project_id', project_id);
+        }
+        if (due_date_from) {
+          fallbackQuery = fallbackQuery.gte('due_date', due_date_from);
+        }
+        if (due_date_to) {
+          fallbackQuery = fallbackQuery.lte('due_date', due_date_to);
+        }
+        if (is_public !== null) {
+          fallbackQuery = fallbackQuery.eq('is_public', is_public === 'true');
+        }
+        if (search) {
+          fallbackQuery = fallbackQuery.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+        }
+        
+        const sortOrder = sort_direction === 'desc' ? { ascending: false } : { ascending: true };
+        if (sort_field === 'priority') {
+          fallbackQuery = fallbackQuery.order('priority', sortOrder);
+        } else {
+          fallbackQuery = fallbackQuery.order(sort_field, sortOrder);
+        }
+        
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+        fallbackQuery = fallbackQuery.range(from, to);
+        
+        result = await fallbackQuery;
+      } else {
+        throw queryError;
+      }
+    }
+
+    const { data: tasks, error, count } = result;
 
     if (error) {
       console.error('Error fetching tasks:', error);
-      console.error('Query parameters:', { status, priority, category, created_date, assigned_to, project_id, phone });
+      console.error('Query parameters:', { status, priority, category, created_date, assigned_to, project_id, phone, orgId });
       return NextResponse.json(
         { error: 'Failed to fetch tasks', details: error.message },
         { status: 500 }
@@ -186,24 +252,32 @@ export async function POST(request: NextRequest) {
     }
 
     // 創建任務
+    const taskData: any = {
+      title: body.title,
+      description: body.description,
+      follow_up_content: body.follow_up_content,
+      priority: body.priority,
+      category: body.category,
+      phone: body.phone,
+      assigned_to: body.assigned_to && typeof body.assigned_to === 'string' && (body.assigned_to as string).trim() !== '' ? 
+        (body.assigned_to as string).split(',').map(name => name.trim()).filter(name => name !== '') : 
+        null,
+      due_date: body.due_date && body.due_date.trim() !== '' ? body.due_date : null,
+      time_block_start: body.time_block_start && body.time_block_start.trim() !== '' ? body.time_block_start : null,
+      time_block_end: body.time_block_end && body.time_block_end.trim() !== '' ? body.time_block_end : null,
+      is_public: body.is_public || false,
+      project_id: body.project_id && body.project_id.trim() !== '' ? body.project_id : null
+    };
+
+    // 如果提供了 org_id，添加到任務數據中
+    // 如果字段不存在，插入會失敗，但我們會捕獲錯誤
+    if ((body as any).org_id) {
+      taskData.org_id = (body as any).org_id;
+    }
+
     const { data: task, error } = await (supabase as any)
       .from('hanami_task_list')
-      .insert([{
-        title: body.title,
-        description: body.description,
-        follow_up_content: body.follow_up_content,
-        priority: body.priority,
-        category: body.category,
-        phone: body.phone,
-        assigned_to: body.assigned_to && typeof body.assigned_to === 'string' && (body.assigned_to as string).trim() !== '' ? 
-          (body.assigned_to as string).split(',').map(name => name.trim()).filter(name => name !== '') : 
-          null,
-        due_date: body.due_date && body.due_date.trim() !== '' ? body.due_date : null,
-        time_block_start: body.time_block_start && body.time_block_start.trim() !== '' ? body.time_block_start : null,
-        time_block_end: body.time_block_end && body.time_block_end.trim() !== '' ? body.time_block_end : null,
-        is_public: body.is_public || false,
-        project_id: body.project_id && body.project_id.trim() !== '' ? body.project_id : null
-      }])
+      .insert([taskData])
       .select()
       .single();
 

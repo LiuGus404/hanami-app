@@ -88,6 +88,12 @@ export async function PUT(
       // 處理空字串或無效 UUID
       updateData.project_id = body.project_id && body.project_id.trim() !== '' ? body.project_id : null;
     }
+    
+    // 如果提供了 org_id，更新它
+    // 如果字段不存在，更新會失敗，但我們會捕獲錯誤
+    if ((body as any).org_id !== undefined) {
+      updateData.org_id = (body as any).org_id;
+    }
 
     // 若沒有任何可更新欄位，至少更新 updated_at 以避免空更新報錯
     if (Object.keys(updateData).length === 0) {

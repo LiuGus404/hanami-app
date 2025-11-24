@@ -9,6 +9,8 @@ import Calendarui from '../ui/Calendarui';
 
 interface TaskDashboardProps {
   userPhone?: string;
+  orgId?: string | null;
+  userEmail?: string;
   onTaskEdit?: (task: Task) => void;
   onTaskCreate?: () => void;
   taskFilter?: 'all' | 'personal' | 'shared';
@@ -17,7 +19,7 @@ interface TaskDashboardProps {
   onFilteredTasksChange?: (tasks: Task[]) => void;
 }
 
-export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, taskFilter, userSession, personalTasks, onFilteredTasksChange }: TaskDashboardProps) {
+export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit, onTaskCreate, taskFilter, userSession, personalTasks, onFilteredTasksChange }: TaskDashboardProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<TaskStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
   useEffect(() => {
     fetchTasks();
     fetchStats();
-  }, [userPhone, statusFilter, priorityFilter, categoryFilter, dateFilter, sortBy, sortOrder]);
+  }, [userPhone, orgId, userEmail, statusFilter, priorityFilter, categoryFilter, dateFilter, sortBy, sortOrder]);
 
   // 更新日期篩選計數
   useEffect(() => {
@@ -120,6 +122,14 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
       params.append('sort_by', sortBy);
       params.append('sort_order', sortOrder);
       params.append('limit', '50');
+      
+      // 添加 org_id 和 userEmail 參數
+      if (orgId) {
+        params.append('orgId', orgId);
+      }
+      if (userEmail) {
+        params.append('userEmail', userEmail);
+      }
 
       const response = await fetch(`/api/tasks?${params}`);
       if (!response.ok) throw new Error('Failed to fetch tasks');
@@ -135,7 +145,15 @@ export default function TaskDashboard({ userPhone, onTaskEdit, onTaskCreate, tas
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/tasks/stats');
+      const params = new URLSearchParams();
+      if (orgId) {
+        params.append('orgId', orgId);
+      }
+      if (userEmail) {
+        params.append('userEmail', userEmail);
+      }
+      
+      const response = await fetch(`/api/tasks/stats?${params}`);
       if (!response.ok) throw new Error('Failed to fetch stats');
       
       const data = await response.json();

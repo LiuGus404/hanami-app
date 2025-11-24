@@ -287,7 +287,7 @@ function CreatePageContent() {
         const today = getHongKongDateString();
         const userEmail = saasUser?.email || '';
 
-        // 並行執行多個請求以加快載入速度
+        // 第一步：並行獲取學生列表和試堂學生列表
         const [studentsResponse, trialStudentsResult] = await Promise.all([
           // 獲取常規學生列表
           fetch(
@@ -302,59 +302,65 @@ function CreatePageContent() {
         ]);
 
         // 處理常規學生數據
+        let regularStudents: any[] = [];
         if (!studentsResponse.ok) {
           const errorData = await studentsResponse.json().catch(() => ({}));
           console.error('Error fetching regular students:', errorData);
           setError(errorData.error || '無法獲取常規學生數據');
         } else {
           const studentsData = await studentsResponse.json();
-          const regularStudents = studentsData.data || [];
+          regularStudents = studentsData.data || [];
           setStudentCount(regularStudents.length);
-          
-          // 立即開始計算最後一堂課程數（不等待試堂數據）
-          if (regularStudents.length > 0) {
-            const studentIds = regularStudents.map((s: any) => s.id);
-            // 異步計算最後一堂課程數，不阻塞主流程
-            fetch('/api/students/calculate-remaining-lessons', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                studentIds,
-                todayDate: today,
-                orgId,
-                userEmail,
-              }),
-            })
-              .then((calculateResponse) => {
-                if (calculateResponse.ok) {
-                  return calculateResponse.json();
-                }
-                return { data: [] };
-              })
-              .then((calculateData) => {
-                const remainingData = calculateData.data || [];
-                const studentsWithLastLesson = remainingData.filter(
-                  (item: any) => (item.remaining_lessons || 0) <= 1,
-                ).length;
-                setLastLessonCount(studentsWithLastLesson);
-              })
-              .catch((error) => {
-                console.error('計算最後一堂人數時發生錯誤:', error);
-                setLastLessonCount(0);
-              });
-          } else {
-            setLastLessonCount(0);
-          }
         }
 
         // 處理試堂學生數據
         const { data: trialStudents, error: trialError } = trialStudentsResult;
+        const validTrialStudents = Array.isArray(trialStudents) ? trialStudents : [];
+        
+        if (trialError) {
+          console.error('Error fetching trial students:', trialError);
+        } else {
+          setTrialStudentCount(validTrialStudents.length);
+        }
+        
+        // 第二步：並行處理最後一堂課程數計算（不阻塞試堂週數計算）
+        if (regularStudents.length > 0) {
+          // 異步計算最後一堂課程數，不阻塞主流程
+          fetch('/api/students/calculate-remaining-lessons', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              studentIds: regularStudents.map((s: any) => s.id),
+              todayDate: today,
+              orgId,
+              userEmail,
+            }),
+          })
+            .then((calculateResponse) => {
+              if (calculateResponse.ok) {
+                return calculateResponse.json();
+              }
+              return { data: [] };
+            })
+            .then((calculateData) => {
+              const remainingData = calculateData.data || [];
+              const studentsWithLastLesson = remainingData.filter(
+                (item: any) => (item.remaining_lessons || 0) <= 1,
+              ).length;
+              setLastLessonCount(studentsWithLastLesson);
+            })
+            .catch((error) => {
+              console.error('計算最後一堂人數時發生錯誤:', error);
+              setLastLessonCount(0);
+            });
+        } else {
+          setLastLessonCount(0);
+        }
 
         // 計算未來4周每週的試堂人數（無論是否有錯誤都計算）
         const weeklyCounts: Array<{ week: string; count: number; startDate: string; endDate: string }> = [];
-        const validTrialStudents = Array.isArray(trialStudents) ? trialStudents : [];
         
         if (trialError) {
           console.error('Error fetching trial students:', trialError);

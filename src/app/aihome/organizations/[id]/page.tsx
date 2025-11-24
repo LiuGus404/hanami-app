@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation';
 import OrganizationPreviewCard from '@/components/ui/OrganizationPreviewCard';
 import CourseMiniCard from '@/components/ui/CourseMiniCard';
 import OrgReviewSection from '@/components/ui/OrgReviewSection';
-import { supabase } from '@/lib/supabase';
 
 export default function OrganizationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -19,22 +18,49 @@ export default function OrganizationDetailPage() {
     const load = async () => {
       try {
         if (!orgId) return;
-        const { data: orgData, error: orgError } = await supabase
-          .from('hanami_organizations')
-          .select('id, org_name, contact_phone, contact_email, settings')
-          .eq('id', orgId)
-          .maybeSingle();
-        if (orgError) throw orgError;
-        setOrg(orgData);
+        
+        // 使用 API 端點獲取機構資訊（繞過 RLS）
+        const orgResponse = await fetch(`/api/organizations/get?orgId=${encodeURIComponent(orgId)}`, {
+          credentials: 'include',
+        });
+        
+        if (!orgResponse.ok) {
+          const errorData = await orgResponse.json().catch(() => ({ error: '無法解析錯誤響應' }));
+          console.error('❌ 獲取機構資訊失敗:', orgResponse.status, errorData);
+          setOrg(null);
+          setLoading(false);
+          return;
+        }
+        
+        const orgResult = await orgResponse.json();
+        if (orgResult.success && orgResult.data) {
+          setOrg(orgResult.data);
+        } else {
+          console.error('❌ 機構數據格式錯誤:', orgResult);
+          setOrg(null);
+        }
 
-        // 載入機構課程
-        const { data: ctData, error: ctError } = await supabase
-          .from('Hanami_CourseTypes')
-          .select('*')
-          .eq('org_id', orgId);
-        if (ctError) throw ctError;
-        const valid = (ctData || []).filter((c: any) => c && (c.status === true || c.status === 'true'));
-        setCourses(valid);
+        // 使用 API 端點獲取機構課程（繞過 RLS）
+        const coursesResponse = await fetch(`/api/courses/list?orgId=${encodeURIComponent(orgId)}&status=true`, {
+          credentials: 'include',
+        });
+        
+        if (coursesResponse.ok) {
+          const coursesResult = await coursesResponse.json();
+          if (coursesResult.success && coursesResult.data) {
+            // 過濾有效的課程
+            const valid = (coursesResult.data || []).filter((c: any) => c && (c.status === true || c.status === 'true'));
+            setCourses(valid);
+          }
+        } else {
+          const errorData = await coursesResponse.json().catch(() => ({ error: '無法解析錯誤響應' }));
+          console.error('❌ 獲取課程列表失敗:', coursesResponse.status, errorData);
+          setCourses([]);
+        }
+      } catch (error) {
+        console.error('載入機構詳情失敗:', error);
+        setOrg(null);
+        setCourses([]);
       } finally {
         setLoading(false);
       }
@@ -55,8 +81,24 @@ export default function OrganizationDetailPage() {
 
   if (!org) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-[#4B4036]">未找到機構</div>
+      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="mb-6">
+            <div className="w-24 h-24 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-12 h-12 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-[#4B4036] mb-2">未找到機構</h2>
+            <p className="text-[#2B3A3B] mb-6">抱歉，找不到您要查看的機構資訊</p>
+          </div>
+          <button
+            onClick={() => router.push('/aihome/course-activities')}
+            className="px-6 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+          >
+            返回課程活動
+          </button>
+        </div>
       </div>
     );
   }

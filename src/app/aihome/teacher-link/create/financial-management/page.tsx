@@ -127,103 +127,108 @@ function FinancialManagementContent() {
       const startDate = `${year}-${month}-01`;
       const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().slice(0, 10);
 
-      // 獲取常規學生數量（使用 API 端點以繞過 RLS）
       const userEmail = saasUser?.email || '';
-      const studentsResponse = await fetch(
-        `/api/students/list?orgId=${encodeURIComponent(resolvedOrgId)}&userEmail=${encodeURIComponent(userEmail)}&studentType=常規`
-      );
-      const studentsResult = await studentsResponse.json();
-      const studentData = studentsResult.data || [];
 
-      // 獲取本月收入（活躍課程包總價值）- 需要通過學生 ID 關聯
-      const studentIds = studentData.map((s: any) => s.id);
-      let packageData: Package[] = [];
-      if (studentIds.length > 0) {
-        try {
-          // 查詢課程包（使用主要 Supabase 客戶端）
-          const { data: packageDataResult, error: packageError } = await supabase
-            .from('Hanami_Student_Package')
-            .select(`
-              id,
-              course_name,
-              price,
-              total_lessons,
-              remaining_lessons,
-              status,
-              student_id,
-              full_name
-            `)
-            .eq('status', 'active')
-            .in('student_id', studentIds);
-
-          if (packageError) {
-            console.error('查詢課程包失敗:', packageError);
-            // 不拋出錯誤，繼續執行其他查詢，設置為空數組
-            packageData = [];
-          } else {
-            packageData = (packageDataResult || []) as Package[];
-            // 如果數據中有 org_id 欄位，在客戶端過濾
-            if (packageData.length > 0 && (packageData[0] as any).org_id) {
-              packageData = packageData.filter((pkg: any) => pkg.org_id === resolvedOrgId);
-            }
-          }
-        } catch (error: any) {
-          console.error('查詢課程包時發生錯誤:', error);
-          // 不拋出錯誤，繼續執行其他查詢
-          packageData = [];
-        }
-      }
-
-      // 獲取本月支出（根據 org_id 過濾）
-      const { data: expenseData, error: expenseError } = await supabase
-        .from('hanami_financial_expenses')
-        .select('*')
-        .gte('expense_date', startDate)
-        .lte('expense_date', endDate)
-        .eq('org_id', resolvedOrgId)
-        .order('expense_date', { ascending: false });
-
-      if (expenseError) throw expenseError;
-
-      // 獲取本月常規學生課程記錄（根據 org_id 過濾）
-      let lessonData: any[] = [];
-      if (studentIds.length > 0) {
-        const { data: lessonDataResult, error: lessonError } = await supabase
-          .from('hanami_student_lesson')
-          .select('id, lesson_date, lesson_status, status, course_type, student_id, full_name, notes, remarks')
+      // 第一步：並行執行所有不依賴學生 ID 的查詢，同時獲取學生列表
+      const [
+        studentsResponse,
+        expenseResult,
+        trialResult,
+        courseTypeResult
+      ] = await Promise.all([
+        // 獲取常規學生數量（使用 API 端點以繞過 RLS）
+        fetch(
+          `/api/students/list?orgId=${encodeURIComponent(resolvedOrgId)}&userEmail=${encodeURIComponent(userEmail)}&studentType=常規`
+        ),
+        // 獲取本月支出（根據 org_id 過濾，只選擇需要的字段）
+        supabase
+          .from('hanami_financial_expenses')
+          .select('id, expense_date, expense_category, expense_description, amount, payment_method, receipt_url, notes, created_at, org_id')
+          .gte('expense_date', startDate)
+          .lte('expense_date', endDate)
+          .eq('org_id', resolvedOrgId)
+          .order('expense_date', { ascending: false }),
+        
+        // 獲取本月試堂學生記錄（根據 org_id 過濾）
+        supabase
+          .from('hanami_trial_students')
+          .select('id, lesson_date, full_name, course_type')
           .gte('lesson_date', startDate)
           .lte('lesson_date', endDate)
+          .eq('org_id', resolvedOrgId),
+        
+        // 獲取課程類型（根據 org_id 過濾，只選擇需要的字段）
+        supabase
+          .from('Hanami_CourseTypes')
+          .select('id, name, status, trial_limit, price_per_lesson, created_at')
+          .eq('status', true)
           .eq('org_id', resolvedOrgId)
-          .in('student_id', studentIds);
+          .order('name')
+      ]);
 
-        if (lessonError) throw lessonError;
-        lessonData = lessonDataResult || [];
+      // 處理學生數據
+      const studentsResult = await studentsResponse.json();
+      const studentData = studentsResult.data || [];
+      const studentIds = studentData.map((s: any) => s.id);
+
+      // 處理支出數據
+      if (expenseResult.error) throw expenseResult.error;
+      const expenseData = expenseResult.data || [];
+
+      // 處理試堂數據
+      if (trialResult.error) throw trialResult.error;
+      const trialData = trialResult.data || [];
+
+      // 處理課程類型數據
+      if (courseTypeResult.error) {
+        console.error('獲取課程類型錯誤:', courseTypeResult.error);
+      }
+      const courseTypeData = (courseTypeResult.data || []) as CourseType[];
+
+      // 第三步：並行執行依賴學生 ID 的查詢
+      let packageData: Package[] = [];
+      let lessonData: any[] = [];
+
+      if (studentIds.length > 0) {
+        const [
+          packageResult,
+          lessonResult
+        ] = await Promise.all([
+          // 查詢課程包（使用主要 Supabase 客戶端，只選擇需要的字段）
+          supabase
+            .from('Hanami_Student_Package')
+            .select('id, course_name, price, total_lessons, remaining_lessons, status, student_id, full_name')
+            .eq('status', 'active')
+            .in('student_id', studentIds),
+          
+          // 獲取本月常規學生課程記錄（根據 org_id 過濾，只選擇需要的字段）
+          supabase
+            .from('hanami_student_lesson')
+            .select('id, lesson_date, lesson_status, status, course_type, student_id, full_name, notes, remarks')
+            .gte('lesson_date', startDate)
+            .lte('lesson_date', endDate)
+            .eq('org_id', resolvedOrgId)
+            .in('student_id', studentIds)
+        ]);
+
+        // 處理課程包數據
+        if (packageResult.error) {
+          console.error('查詢課程包失敗:', packageResult.error);
+          packageData = [];
+        } else {
+          packageData = (packageResult.data || []) as Package[];
+          // 如果數據中有 org_id 欄位，在客戶端過濾
+          if (packageData.length > 0 && (packageData[0] as any).org_id) {
+            packageData = packageData.filter((pkg: any) => pkg.org_id === resolvedOrgId);
+          }
+        }
+
+        // 處理課程記錄數據
+        if (lessonResult.error) throw lessonResult.error;
+        lessonData = lessonResult.data || [];
       }
 
-      // 獲取本月試堂學生記錄（根據 org_id 過濾）
-      const { data: trialData, error: trialError } = await supabase
-        .from('hanami_trial_students')
-        .select('id, lesson_date, full_name, course_type')
-        .gte('lesson_date', startDate)
-        .lte('lesson_date', endDate)
-        .eq('org_id', resolvedOrgId);
-
-      if (trialError) throw trialError;
-
-      // 獲取課程類型（根據 org_id 過濾）
-      const { data: courseTypeData, error: courseTypeError } = await supabase
-        .from('Hanami_CourseTypes')
-        .select('*')
-        .eq('status', true)
-        .eq('org_id', resolvedOrgId)
-        .order('name');
-
-      if (courseTypeError) {
-        console.error('獲取課程類型錯誤:', courseTypeError);
-        // 不拋出錯誤，繼續執行
-      }
-
-      const typedCourseTypeData = (courseTypeData || []) as CourseType[];
+      const typedCourseTypeData = courseTypeData;
 
       // 計算堂數統計
       const totalLessons = lessonData?.length || 0;

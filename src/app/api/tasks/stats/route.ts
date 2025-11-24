@@ -7,18 +7,46 @@ export async function GET(request: NextRequest) {
     const supabase = createSaasAdminClient();
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get('phone');
+    const orgId = searchParams.get('orgId');
+    const userEmail = searchParams.get('userEmail');
 
     // 構建查詢條件
     let query = supabase
       .from('hanami_task_list')
       .select('status, priority, progress_percentage, actual_duration', { count: 'exact' });
 
+    // 添加 org_id 篩選（如果提供）
+    if (orgId) {
+      query = query.eq('org_id', orgId);
+    }
+
     // 權限篩選
     if (phone) {
       query = query.or(`phone.eq.${phone},assigned_to.cs.{${phone}},is_public.eq.true`);
     }
 
-    const { data: tasks, error, count } = await query;
+    let result;
+    try {
+      result = await query;
+    } catch (queryError: any) {
+      // 如果查詢失敗（可能是因為 org_id 字段不存在），嘗試不帶 org_id 的查詢
+      if (orgId && (queryError?.message?.includes('org_id') || queryError?.code === '42703')) {
+        console.warn('org_id 字段不存在，使用不帶機構篩選的查詢');
+        let fallbackQuery = supabase
+          .from('hanami_task_list')
+          .select('status, priority, progress_percentage, actual_duration', { count: 'exact' });
+        
+        if (phone) {
+          fallbackQuery = fallbackQuery.or(`phone.eq.${phone},assigned_to.cs.{${phone}},is_public.eq.true`);
+        }
+        
+        result = await fallbackQuery;
+      } else {
+        throw queryError;
+      }
+    }
+
+    const { data: tasks, error, count } = result;
 
     if (error) {
       console.error('Error fetching task stats:', error);

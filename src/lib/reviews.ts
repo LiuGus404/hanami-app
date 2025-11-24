@@ -85,36 +85,42 @@ export async function getOrgReviews(
 ): Promise<OrgReview[]> {
   console.log('📋 getOrgReviews', { orgId, limit, offset });
   
-  const oldSupabase = getSupabaseClient();
-  
   try {
-    const { data, error } = await oldSupabase
-      .from('hanami_org_reviews')
-      .select('id, user_id, user_name, content, rating, created_at, updated_at')
-      .eq('org_id', orgId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    // 使用 API 端點獲取評論列表（繞過 RLS）
+    const userId = getUserId(); // 可選，用於獲取用戶自己的評論
+    const url = `/api/organizations/review?orgId=${encodeURIComponent(orgId)}&limit=${limit}&offset=${offset}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`;
     
-    if (error) {
-      console.error('❌ 獲取評論列表失敗:', error);
-      throw error;
+    const response = await fetch(url, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const message = errorData?.error || `獲取評論列表 API 回傳 ${response.status}`;
+      console.error('❌ 獲取評論列表失敗:', message);
+      throw new Error(message);
     }
-    
-    const reviews: OrgReview[] = (data || []).map((r: any) => ({
-      id: r.id,
-      userId: r.user_id,
-      userName: r.user_name || '匿名用戶',
-      content: r.content,
-      rating: r.rating,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-    }));
-    
-    console.log('✅ 獲取評論列表成功:', reviews.length, '條');
-    return reviews;
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      const reviews: OrgReview[] = result.data.map((r: any) => ({
+        id: r.id,
+        userId: r.userId,
+        userName: r.userName || '匿名用戶',
+        content: r.content,
+        rating: r.rating,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      }));
+      
+      console.log('✅ 獲取評論列表成功:', reviews.length, '條');
+      return reviews;
+    } else {
+      throw new Error('API 返回格式錯誤');
+    }
   } catch (error) {
     console.error('❌ getOrgReviews 發生錯誤:', error);
+    // 返回空數組而不是拋出錯誤，避免影響 UI
     return [];
   }
 }
@@ -194,6 +200,47 @@ export async function getUserOrgReview(
   
   console.log('📋 getUserOrgReview', { orgId, userId: finalUserId, includeDeleted });
   
+  // 如果不需要包含已刪除的評論，使用 API 端點（繞過 RLS）
+  if (!includeDeleted) {
+    try {
+      const response = await fetch(
+        `/api/organizations/review?orgId=${encodeURIComponent(orgId)}&userId=${encodeURIComponent(finalUserId)}&limit=1`,
+        {
+          credentials: 'include',
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message = errorData?.error || `獲取用戶評論 API 回傳 ${response.status}`;
+        console.error('❌ 獲取用戶評論失敗:', message);
+        // 如果 API 失敗，回退到直接查詢
+      } else {
+        const result = await response.json();
+        if (result.success && result.userReview) {
+          const review: OrgReview = {
+            id: result.userReview.id,
+            userId: result.userReview.userId,
+            userName: result.userReview.userName || '匿名用戶',
+            content: result.userReview.content,
+            rating: result.userReview.rating,
+            createdAt: result.userReview.createdAt,
+            updatedAt: result.userReview.updatedAt,
+          };
+          console.log('✅ 獲取用戶評論成功');
+          return review;
+        } else {
+          // 沒有用戶評論
+          return null;
+        }
+      }
+    } catch (error) {
+      console.error('❌ getUserOrgReview API 調用失敗:', error);
+      // 回退到直接查詢
+    }
+  }
+  
+  // 如果需要包含已刪除的評論，或 API 失敗，使用直接查詢
   const oldSupabase = getSupabaseClient();
   
   try {
@@ -272,160 +319,43 @@ export async function upsertOrgReview(
       throw new Error('評分必須在 1-5 之間');
     }
   }
-  
-  const oldSupabase = getSupabaseClient();
-  
+
   try {
-    // 檢查是否已存在評論
-    const existingReview = await getUserOrgReview(orgId, finalUserId);
-    
-    if (existingReview) {
-      // 更新現有評論
-      console.log('📝 更新現有評論');
-      const { data, error } = await oldSupabase
-        .from('hanami_org_reviews')
-        .update({
-          user_name: userName || '匿名用戶',
-          content: input.content.trim(),
-          rating: input.rating || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existingReview.id)
-        .eq('user_id', finalUserId)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('❌ 更新評論失敗:', error);
-        throw error;
-      }
-      
-      const review: OrgReview = {
-        id: data.id,
-        userId: data.user_id,
-        userName: data.user_name || '匿名用戶',
-        content: data.content,
-        rating: data.rating,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+    // 使用 API 端點創建或更新評論（繞過 RLS）
+    const response = await fetch('/api/organizations/review', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orgId,
+        userId: finalUserId,
+        userName: userName || '匿名用戶',
+        content: input.content.trim(),
+        rating: input.rating || null,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const message = errorData?.error || `評論 API 回傳 ${response.status}`;
+      console.error('❌ 創建或更新評論失敗:', message);
+      throw new Error(message);
+    }
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      console.log(`✅ ${result.isUpdate ? '更新' : '創建'}評論成功`);
+      return {
+        id: result.data.id,
+        userId: result.data.userId,
+        userName: result.data.userName || '匿名用戶',
+        content: result.data.content,
+        rating: result.data.rating,
+        createdAt: result.data.createdAt,
+        updatedAt: result.data.updatedAt,
       };
-      
-      console.log('✅ 更新評論成功');
-      return review;
     } else {
-      // 創建新評論
-      console.log('➕ 創建新評論');
-      const { data, error } = await oldSupabase
-        .from('hanami_org_reviews')
-        .insert({
-          org_id: orgId,
-          user_id: finalUserId,
-          user_name: userName || '匿名用戶',
-          content: input.content.trim(),
-          rating: input.rating || null,
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('❌ 創建評論失敗:', error);
-        // 如果是唯一約束錯誤，表示已經存在（可能是已刪除的評論），嘗試更新而不是創建
-        if (error.code === '23505') {
-          console.warn('⚠️ 唯一約束錯誤，嘗試更新現有評論（包括已刪除的）');
-          try {
-            // 重新查詢現有評論（包括已刪除的）
-            const existingReview = await getUserOrgReview(orgId, finalUserId, true);
-            if (existingReview) {
-              // 更新現有評論（恢復為 active 狀態）
-              const { data: updateData, error: updateError } = await oldSupabase
-                .from('hanami_org_reviews')
-                .update({
-                  user_name: userName || '匿名用戶',
-                  content: input.content.trim(),
-                  rating: input.rating || null,
-                  status: 'active', // 恢復為 active
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', existingReview.id)
-                .eq('user_id', finalUserId)
-                .select()
-                .single();
-              
-              if (updateError) {
-                console.error('❌ 更新評論失敗:', updateError);
-                throw updateError;
-              }
-              
-              const review: OrgReview = {
-                id: updateData.id,
-                userId: updateData.user_id,
-                userName: updateData.user_name || '匿名用戶',
-                content: updateData.content,
-                rating: updateData.rating,
-                createdAt: updateData.created_at,
-                updatedAt: updateData.updated_at,
-              };
-              
-              console.log('✅ 更新評論成功（從唯一約束錯誤恢復）');
-              return review;
-            } else {
-              // 如果查詢不到，可能是並發問題，稍等後重試一次
-              console.warn('⚠️ 查詢不到現有評論，可能是並發問題');
-              await new Promise(resolve => setTimeout(resolve, 100));
-              const retryReview = await getUserOrgReview(orgId, finalUserId, true);
-              if (retryReview) {
-                // 再次嘗試更新
-                const { data: retryData, error: retryError } = await oldSupabase
-                  .from('hanami_org_reviews')
-                  .update({
-                    user_name: userName || '匿名用戶',
-                    content: input.content.trim(),
-                    rating: input.rating || null,
-                    status: 'active',
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', retryReview.id)
-                  .eq('user_id', finalUserId)
-                  .select()
-                  .single();
-                
-                if (!retryError && retryData) {
-                  const review: OrgReview = {
-                    id: retryData.id,
-                    userId: retryData.user_id,
-                    userName: retryData.user_name || '匿名用戶',
-                    content: retryData.content,
-                    rating: retryData.rating,
-                    createdAt: retryData.created_at,
-                    updatedAt: retryData.updated_at,
-                  };
-                  console.log('✅ 重試更新評論成功');
-                  return review;
-                }
-              }
-            }
-          } catch (updateErr) {
-            console.error('❌ 處理唯一約束錯誤時失敗:', updateErr);
-            // 繼續拋出原始錯誤
-          }
-        }
-        // 將 Supabase 錯誤轉換為可讀的錯誤信息
-        const errorMessage = error.message || error.details || '創建評論失敗，請稍後再試';
-        throw new Error(errorMessage);
-      }
-      
-      const review: OrgReview = {
-        id: data.id,
-        userId: data.user_id,
-        userName: data.user_name || '匿名用戶',
-        content: data.content,
-        rating: data.rating,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-      
-      console.log('✅ 創建評論成功');
-      return review;
+      throw new Error('API 返回格式錯誤');
     }
   } catch (e) {
     console.error('❌ upsertOrgReview 發生錯誤:', e);
@@ -433,14 +363,6 @@ export async function upsertOrgReview(
     // 處理不同類型的錯誤
     if (e instanceof Error) {
       throw e; // 如果已經是 Error 對象，直接拋出
-    } else if (typeof e === 'object' && e !== null) {
-      // 處理 Supabase 錯誤對象
-      const supabaseError = e as any;
-      const errorMessage = supabaseError.message || 
-                          supabaseError.details || 
-                          supabaseError.hint ||
-                          '提交評論失敗，請稍後再試';
-      throw new Error(errorMessage);
     } else {
       throw new Error(String(e) || '提交評論失敗，請稍後再試');
     }
@@ -466,28 +388,31 @@ export async function deleteOrgReview(
     console.error('❌ 用戶未認證');
     throw new Error('NOT_AUTHENTICATED');
   }
-  
-  const oldSupabase = getSupabaseClient();
-  
+
   try {
-    const { data, error } = await oldSupabase
-      .from('hanami_org_reviews')
-      .update({ status: 'deleted', updated_at: new Date().toISOString() })
-      .eq('id', reviewId)
-      .eq('user_id', finalUserId)
-      .select();
-    
-    if (error) {
-      console.error('❌ 刪除評論失敗:', error);
-      throw error;
+    // 使用 API 端點刪除評論（繞過 RLS）
+    const response = await fetch(
+      `/api/organizations/review?reviewId=${encodeURIComponent(reviewId)}&userId=${encodeURIComponent(finalUserId)}`,
+      {
+        method: 'DELETE',
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const message = errorData?.error || `刪除評論 API 回傳 ${response.status}`;
+      console.error('❌ 刪除評論失敗:', message);
+      throw new Error(message);
     }
-    
-    if (!data || data.length === 0) {
-      throw new Error('找不到評論或無權限刪除');
+
+    const result = await response.json();
+    if (result.success) {
+      console.log('✅ 刪除評論成功');
+      return true;
+    } else {
+      throw new Error(result.error || '刪除評論失敗');
     }
-    
-    console.log('✅ 刪除評論成功');
-    return true;
   } catch (e) {
     console.error('❌ deleteOrgReview 發生錯誤:', e);
     const errorMessage = e instanceof Error ? e.message : String(e);
