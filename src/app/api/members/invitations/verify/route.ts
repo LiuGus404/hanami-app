@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 查找邀請記錄
-    const { data: invitationData, error: inviteError } = await oldSupabase
-      .from('hanami_org_invitations')
+    const { data: invitationData, error: inviteError } = await ((oldSupabase as any)
+      .from('hanami_org_invitations'))
       .select('*')
       .eq('invitation_code', invitationCode)
       .single();
@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 檢查是否已有身份記錄
-    const { data: existingIdentity } = await oldSupabase
-      .from('hanami_org_identities')
+    const { data: existingIdentity } = await ((oldSupabase as any)
+      .from('hanami_org_identities'))
       .select('id')
       .eq('org_id', invitation.org_id)
       .eq('user_email', userEmail)

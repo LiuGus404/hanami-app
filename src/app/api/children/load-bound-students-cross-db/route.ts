@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     console.log('查找學生詳細資料，學生 IDs:', studentIds);
     
     // 查詢試堂學生
-    const { data: trialStudents, error: trialError } = await oldSupabaseClient
+    const { data: trialStudents, error: trialError } = await (oldSupabaseClient as any)
       .from('hanami_trial_students')
       .select('id, full_name, nick_name, student_dob, gender, student_preference, health_notes, contact_number, parent_email')
       .in('id', studentIds);
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     console.log('試堂學生查詢結果:', { trialStudents, trialError });
 
     // 查詢常規學生
-    const { data: regularStudents, error: regularError } = await oldSupabaseClient
+    const { data: regularStudents, error: regularError } = await (oldSupabaseClient as any)
       .from('Hanami_Students')
       .select('id, full_name, nick_name, student_dob, gender, student_preference, health_notes, contact_number, parent_email')
       .in('id', studentIds);

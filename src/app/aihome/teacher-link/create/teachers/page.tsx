@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
 import toast from 'react-hot-toast';
 import TeacherManagementNavBar from '@/components/ui/TeacherManagementNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 function TeachersContent() {
   const { orgId, organizationResolved } = useTeacherLinkOrganization();
@@ -37,30 +38,30 @@ function TeachersContent() {
     const fetchTeachers = async () => {
       setLoading(true);
       let query = supabase.from('hanami_employee').select('*');
-      
+
       if (orgId) {
         query = query.eq('org_id', orgId);
       }
-      
+
       const { data, error } = await query;
       if (!error) setTeachers(data || []);
       setLoading(false);
     };
 
     const fetchRoles = async () => {
-      let query = supabase
-        .from('hanami_employee')
+      let query = (supabase
+        .from('hanami_employee') as any)
         .select('teacher_role')
         .not('teacher_role', 'is', null);
-      
+
       if (orgId) {
         query = query.eq('org_id', orgId);
       }
-      
+
       const { data, error } = await query;
       if (!error && data) {
         const roleMap = new Map<string, string>();
-        data.forEach(r => {
+        data.forEach((r: any) => {
           const raw = r.teacher_role;
           const normalized = raw?.trim().toLowerCase();
           if (normalized && !roleMap.has(normalized)) {
@@ -80,7 +81,7 @@ function TeachersContent() {
   // 載入每個老師的鏈接狀態
   useEffect(() => {
     if (!orgId || !organizationResolved || teachers.length === 0) return;
-    
+
     const loadLinkStatuses = async () => {
       const statuses: Record<string, any> = {};
       for (const teacher of teachers) {
@@ -98,7 +99,7 @@ function TeachersContent() {
       }
       setLinkStatuses(statuses);
     };
-    
+
     loadLinkStatuses();
   }, [teachers, orgId, organizationResolved]);
 
@@ -226,11 +227,10 @@ function TeachersContent() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setDisplayMode(displayMode === 'grid' ? 'list' : 'grid')}
-                className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                  displayMode === 'grid'
+                className={`px-4 py-2 rounded-xl font-medium transition-all ${displayMode === 'grid'
                     ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
                     : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white'
-                }`}
+                  }`}
               >
                 {displayMode === 'grid' ? (
                   <>
@@ -390,15 +390,15 @@ function TeachersContent() {
                   initial={{ opacity: 0, y: 30, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -30, scale: 0.9 }}
-                  transition={{ 
-                    duration: 0.6, 
+                  transition={{
+                    duration: 0.6,
                     delay: index * 0.1,
                     type: "spring",
                     damping: 20,
                     stiffness: 300
                   }}
-                  whileHover={{ 
-                    y: -8, 
+                  whileHover={{
+                    y: -8,
                     scale: 1.03,
                     boxShadow: "0 25px 50px rgba(255, 182, 193, 0.2)"
                   }}
@@ -407,7 +407,7 @@ function TeachersContent() {
                 >
                   {/* 動態背景裝飾 */}
                   <motion.div
-                    animate={{ 
+                    animate={{
                       background: [
                         "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)",
                         "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.1) 0%, transparent 50%)",
@@ -463,11 +463,10 @@ function TeachersContent() {
                       {teacher.teacher_status && (
                         <motion.span
                           whileHover={{ scale: 1.05 }}
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            teacher.teacher_status === 'full time'
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${teacher.teacher_status === 'full time'
                               ? 'bg-gradient-to-r from-green-100 to-green-50 text-green-800 border border-green-200'
                               : 'bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 border border-blue-200'
-                          }`}
+                            }`}
                         >
                           {teacher.teacher_status === 'full time' ? '全職' : '兼職'}
                         </motion.span>
@@ -622,11 +621,10 @@ function TeachersContent() {
                       <td className="p-4 text-sm text-[#2B3A3B]">{teacher.teacher_role || '—'}</td>
                       <td className="p-4">
                         {teacher.teacher_status && (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            teacher.teacher_status === 'full time'
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${teacher.teacher_status === 'full time'
                               ? 'bg-green-100 text-green-800'
                               : 'bg-blue-100 text-blue-800'
-                          }`}>
+                            }`}>
                             {teacher.teacher_status === 'full time' ? '全職' : '兼職'}
                           </span>
                         )}
@@ -694,7 +692,9 @@ function TeachersContent() {
 export default function TeacherLinkCreateTeachersPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/teachers">
-      <TeachersContent />
+      <WithPermissionCheck pageKey="teachers">
+        <TeachersContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

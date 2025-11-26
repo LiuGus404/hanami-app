@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  TreePine, 
-  History, 
-  Plus, 
-  Eye, 
-  Edit3, 
-  Trash2, 
+import {
+  TreePine,
+  History,
+  Plus,
+  Eye,
+  Edit3,
+  Trash2,
   ArrowRight,
   Calendar,
   User,
@@ -56,7 +56,7 @@ export default function GrowthTreeVersionsPage() {
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [showCreateVersion, setShowCreateVersion] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState<TreeVersion | null>(null);
-  
+
   // 創建版本的表單狀態
   const [newVersion, setNewVersion] = useState({
     version: '',
@@ -78,13 +78,13 @@ export default function GrowthTreeVersionsPage() {
 
   const loadTrees = async () => {
     try {
-      const { data, error } = await supabase
-        .from('hanami_growth_trees')
+      const { data, error } = await (supabase
+        .from('hanami_growth_trees') as any)
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTrees((data || []).map(tree => ({
+      setTrees((data || []).map((tree: any) => ({
         ...tree,
         tree_description: tree.tree_description || undefined,
         tree_icon: tree.tree_icon || undefined,
@@ -139,7 +139,7 @@ export default function GrowthTreeVersionsPage() {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         // 重新載入版本列表
         await loadTreeVersions(selectedTree.id);
@@ -203,16 +203,15 @@ export default function GrowthTreeVersionsPage() {
                   成長樹列表
                 </h2>
               </div>
-              
+
               <div className="space-y-2">
                 {trees.map((tree) => (
                   <div
                     key={tree.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                      selectedTree?.id === tree.id
-                        ? 'bg-[#FFD59A] border-[#A68A64]'
-                        : 'bg-white border-[#EADBC8] hover:bg-[#FFFDF8]'
-                    }`}
+                    className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedTree?.id === tree.id
+                      ? 'bg-[#FFD59A] border-[#A68A64]'
+                      : 'bg-white border-[#EADBC8] hover:bg-[#FFFDF8]'
+                      }`}
                     onClick={() => setSelectedTree(tree)}
                   >
                     <h3 className="font-medium text-[#2B3A3B]">{tree.tree_name}</h3>
@@ -288,13 +287,13 @@ export default function GrowthTreeVersionsPage() {
                               </HanamiButton>
                             </div>
                           </div>
-                          
+
                           {version.version_description && (
                             <p className="text-sm text-[#87704e] mt-2">
                               {version.version_description}
                             </p>
                           )}
-                          
+
                           {version.changes_summary && (
                             <div className="mt-2">
                               <HanamiBadge variant="info" className="text-xs">
@@ -302,7 +301,7 @@ export default function GrowthTreeVersionsPage() {
                               </HanamiBadge>
                             </div>
                           )}
-                          
+
                           <div className="mt-2 text-xs text-[#A68A64]">
                             包含 {version.goals_snapshot?.length || 0} 個學習目標
                           </div>
@@ -318,7 +317,7 @@ export default function GrowthTreeVersionsPage() {
                     <FileText className="w-5 h-5" />
                     最近變更記錄
                   </h2>
-                  
+
                   <div className="space-y-3">
                     {changeLogs.map((log) => (
                       <div
@@ -336,7 +335,7 @@ export default function GrowthTreeVersionsPage() {
                             <Trash2 className="w-4 h-4 text-red-600" />
                           )}
                         </div>
-                        
+
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-[#2B3A3B]">
@@ -350,14 +349,14 @@ export default function GrowthTreeVersionsPage() {
                               </span>
                             )}
                           </div>
-                          
+
                           <p className="text-xs text-[#A68A64] mt-1">
                             {new Date(log.created_at).toLocaleString('zh-HK')}
                           </p>
                         </div>
                       </div>
                     ))}
-                    
+
                     {changeLogs.length === 0 && (
                       <div className="text-center py-8 text-[#87704e]">
                         <AlertCircle className="w-8 h-8 mx-auto mb-2" />
@@ -390,7 +389,7 @@ export default function GrowthTreeVersionsPage() {
               <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
                 <h2 className="text-xl font-bold text-hanami-text">創建新版本</h2>
               </div>
-              
+
               <div className="p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-[#A68A64] mb-2">
@@ -404,7 +403,7 @@ export default function GrowthTreeVersionsPage() {
                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#A68A64] focus:border-transparent"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-[#A68A64] mb-2">
                     版本名稱
@@ -417,7 +416,7 @@ export default function GrowthTreeVersionsPage() {
                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#A68A64] focus:border-transparent"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-[#A68A64] mb-2">
                     版本描述
@@ -430,7 +429,7 @@ export default function GrowthTreeVersionsPage() {
                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#A68A64] focus:border-transparent"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-[#A68A64] mb-2">
                     變更摘要
@@ -444,7 +443,7 @@ export default function GrowthTreeVersionsPage() {
                   />
                 </div>
               </div>
-              
+
               <div className="flex gap-3 p-6 border-t border-[#EADBC8]">
                 <HanamiButton
                   variant="secondary"
@@ -482,7 +481,7 @@ export default function GrowthTreeVersionsPage() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="p-6 space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold text-[#2B3A3B] mb-3">版本資訊</h3>
@@ -510,7 +509,7 @@ export default function GrowthTreeVersionsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {selectedVersion.version_description && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-[#A68A64] mb-2">版本描述</label>
@@ -520,7 +519,7 @@ export default function GrowthTreeVersionsPage() {
                     </div>
                   )}
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-semibold text-[#2B3A3B] mb-3">
                     學習目標快照 ({selectedVersion.goals_snapshot?.length || 0} 個)

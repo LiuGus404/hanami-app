@@ -88,9 +88,9 @@ export async function POST(request: NextRequest) {
     
     console.log('📝 [AI訊息API] 準備插入資料:', insertData);
     
-    const { data: logData, error: logError } = await supabase
-      .from('hanami_ai_message_logs')
-      .insert(insertData);
+    const { data: logData, error: logError } = await (supabase
+      .from('hanami_ai_message_logs') as any)
+      .insert(insertData as any);
 
     if (logError) {
       console.error('❌ [AI訊息API] 記錄訊息失敗:', logError);
@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const logId = insertedData.id;
+    const typedInsertedData = insertedData as { id: string; [key: string]: any };
+    const logId = typedInsertedData.id;
     console.log('✅ [AI訊息API] 資料庫記錄成功, logId:', logId);
 
     // 發送到Webhook
@@ -186,9 +187,9 @@ export async function POST(request: NextRequest) {
 
       console.log('💾 [AI訊息API] 更新資料庫狀態:', updateData);
 
-      const { error: updateError } = await supabase
-        .from('hanami_ai_message_logs')
-        .update(updateData)
+      const { error: updateError } = await (supabase
+        .from('hanami_ai_message_logs') as any)
+        .update(updateData as any)
         .eq('id', logId);
 
       if (updateError) {
@@ -231,9 +232,9 @@ export async function POST(request: NextRequest) {
         status: 'failed',
       };
 
-      await supabase
-        .from('hanami_ai_message_logs')
-        .update(updateData)
+      await (supabase
+        .from('hanami_ai_message_logs') as any)
+        .update(updateData as any)
         .eq('id', logId);
 
       return NextResponse.json(

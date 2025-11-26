@@ -12,7 +12,7 @@ export async function POST() {
 
     // 修復 registration_requests 表
     console.log('修復 registration_requests 表...');
-    const { error: registrationError } = await supabase.rpc('exec_sql', {
+    const { error: registrationError } = await (supabase.rpc as any)('exec_sql', {
       sql: `
         ALTER TABLE registration_requests ENABLE ROW LEVEL SECURITY;
         

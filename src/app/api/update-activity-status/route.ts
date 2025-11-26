@@ -46,12 +46,12 @@ export async function PUT(request: NextRequest) {
     }
 
     // 更新活動狀態
-    const { error } = await supabase
-      .from('hanami_student_activities' as any)
+    const { error } = await (supabase
+      .from('hanami_student_activities') as any)
       .update({ 
         completion_status: status,
         updated_at: new Date().toISOString()
-      })
+      } as any)
       .eq('id', activityId);
 
     if (error) {

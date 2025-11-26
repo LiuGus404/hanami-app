@@ -161,12 +161,12 @@ export default function ClassManagementPanel() {
     }
     
     try {
-      const { error } = await supabase
-        .from('Hanami_CourseTypes')
+      const { error } = await (supabase
+        .from('Hanami_CourseTypes') as any)
         .insert({
           name: newClassName.trim(),
           status: true,
-        });
+        } as any);
       
       if (error) throw error;
       
@@ -186,8 +186,8 @@ export default function ClassManagementPanel() {
     }
     
     try {
-      const { error } = await supabase
-        .from('hanami_schedule')
+      const { error } = await (supabase
+        .from('hanami_schedule') as any)
         .insert({
           weekday: newSlot.weekday ?? 1,
           timeslot: newSlot.timeslot || '09:00:00',
@@ -195,7 +195,7 @@ export default function ClassManagementPanel() {
           assigned_teachers: newSlot.assigned_teachers || null,
           course_type: newSlot.course_type || null,
           duration: newSlot.duration || null,
-        });
+        } as any);
       
       if (error) throw error;
       
@@ -256,9 +256,9 @@ export default function ClassManagementPanel() {
       const updateData = { name: editClassName.trim() };
       console.log('🔍 更新資料:', updateData);
       
-      const { data, error } = await supabase
-        .from('Hanami_CourseTypes')
-        .update(updateData)
+      const { data, error } = await (supabase
+        .from('Hanami_CourseTypes') as any)
+        .update(updateData as any)
         .eq('id', editingClass.id)
         .select();
       
@@ -284,9 +284,9 @@ export default function ClassManagementPanel() {
 
   const handleToggleClassStatus = async (classType: ClassType) => {
     try {
-      const { error } = await supabase
-        .from('Hanami_CourseTypes')
-        .update({ status: !classType.status })
+      const { error } = await (supabase
+        .from('Hanami_CourseTypes') as any)
+        .update({ status: !classType.status } as any)
         .eq('id', classType.id);
       
       if (error) throw error;
@@ -348,8 +348,8 @@ export default function ClassManagementPanel() {
     }
     
     try {
-      const { error } = await supabase
-        .from('hanami_schedule')
+      const { error } = await (supabase
+        .from('hanami_schedule') as any)
         .update({
           weekday: editSlot.weekday,
           timeslot: editSlot.timeslot,
@@ -357,7 +357,7 @@ export default function ClassManagementPanel() {
           assigned_teachers: editSlot.assigned_teachers || null,
           course_type: editSlot.course_type || null,
           duration: editSlot.duration || null,
-        })
+        } as any)
         .eq('id', editingSlot.id);
       
       if (error) throw error;
@@ -440,7 +440,12 @@ export default function ClassManagementPanel() {
         return;
       }
 
-      setCourseTypes((data || []).map(item => ({ ...item, name: item.name || '' })));
+      const typedData = (data || []) as Array<{
+        id?: string;
+        name?: string | null;
+        [key: string]: any;
+      }>;
+      setCourseTypes(typedData.map(item => ({ id: item.id || '', name: item.name || '' })));
     } catch (error) {
       console.error('Error:', error);
     }

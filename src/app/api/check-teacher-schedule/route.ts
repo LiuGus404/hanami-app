@@ -51,8 +51,14 @@ export async function GET() {
     }
 
     // 4. 按教師分組統計排班記錄
-    const scheduleByTeacher = recentSchedules?.reduce((acc, schedule) => {
+    const typedRecentSchedules = (recentSchedules || []) as Array<{
+      teacher_id?: string;
+      scheduled_date?: string;
+      [key: string]: any;
+    }>;
+    const scheduleByTeacher = typedRecentSchedules.reduce((acc, schedule) => {
       const teacherId = schedule.teacher_id;
+      if (!teacherId) return acc;
       if (!acc[teacherId]) {
         acc[teacherId] = [];
       }
@@ -61,7 +67,7 @@ export async function GET() {
     }, {} as Record<string, any[]>);
 
     // 5. 檢查是否有重複的排班記錄
-    const duplicateSchedules = recentSchedules?.filter((schedule, index, self) => 
+    const duplicateSchedules = typedRecentSchedules.filter((schedule, index, self) => 
       self.findIndex(s => 
         s.teacher_id === schedule.teacher_id && 
         s.scheduled_date === schedule.scheduled_date
@@ -74,14 +80,14 @@ export async function GET() {
       success: true,
       summary: {
         totalSchedules: totalSchedules?.length || 0,
-        recentSchedules: recentSchedules?.length || 0,
+        recentSchedules: typedRecentSchedules.length || 0,
         totalTeachers: teachers?.length || 0,
-        duplicateSchedules: duplicateSchedules?.length || 0,
+        duplicateSchedules: duplicateSchedules.length || 0,
       },
-      recentSchedules: recentSchedules || [],
+      recentSchedules: typedRecentSchedules,
       teachers: teachers || [],
       scheduleByTeacher: scheduleByTeacher || {},
-      duplicateSchedules: duplicateSchedules || [],
+      duplicateSchedules: duplicateSchedules,
       checkDate: new Date().toISOString(),
     });
 

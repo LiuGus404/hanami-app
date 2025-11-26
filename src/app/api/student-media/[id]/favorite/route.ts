@@ -8,9 +8,9 @@ export async function PATCH(
   try {
     const { is_favorite } = await request.json();
     
-    const { data, error } = await supabase
-      .from('hanami_student_media')
-      .update({ is_favorite })
+    const { data, error } = await (supabase
+      .from('hanami_student_media') as any)
+      .update({ is_favorite } as any)
       .eq('id', params.id)
       .select()
       .single();

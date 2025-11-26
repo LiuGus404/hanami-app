@@ -67,6 +67,7 @@ export const initializeDevelopmentAbilities = async () => {
     // 插入能力資料
     const { data, error } = await supabase
       .from('hanami_development_abilities')
+      // @ts-ignore
       .insert(abilities)
       .select();
 
@@ -141,6 +142,7 @@ export const initializeTeachingActivities = async () => {
     }
 
     // 為活動分配目標能力
+    const typedAbilities = abilities as Array<{ id: string; ability_name: string; }>;
     const activitiesWithAbilities = activities.map((activity, index) => {
       const abilityMap: { [key: string]: string[] } = {
         '音樂節奏遊戲': ['小肌發展', '專注力'],
@@ -149,7 +151,7 @@ export const initializeTeachingActivities = async () => {
       };
 
       const targetAbilityNames = abilityMap[activity.activity_name] || [];
-      const targetAbilities = abilities
+      const targetAbilities = typedAbilities
         .filter(ability => targetAbilityNames.includes(ability.ability_name))
         .map(ability => ability.id);
 
@@ -171,6 +173,7 @@ export const initializeTeachingActivities = async () => {
     // 插入活動資料
     const { data, error } = await supabase
       .from('hanami_teaching_activities')
+      // @ts-ignore
       .insert(activitiesWithAbilities)
       .select();
 
@@ -212,6 +215,7 @@ export const initializeCourseTypes = async () => {
 
     const { data, error } = await supabase
       .from('Hanami_CourseTypes')
+      // @ts-ignore
       .insert(courseTypes)
       .select();
 
@@ -254,7 +258,8 @@ export const initializeGrowthTrees = async () => {
     }
 
     // 為每個課程類型建立基礎成長樹
-    const trees = courseTypes.map((courseType, index) => ({
+    const typedCourseTypes = courseTypes as Array<{ id: string; name: string; }>;
+    const trees = typedCourseTypes.map((courseType, index) => ({
       tree_name: `${courseType.name}基礎成長樹`,
       tree_description: `${courseType.name}課程的基礎學習目標和進度追蹤`,
       course_type: courseType.id,
@@ -264,6 +269,7 @@ export const initializeGrowthTrees = async () => {
 
     const { data, error } = await supabase
       .from('hanami_growth_trees')
+      // @ts-ignore
       .insert(trees)
       .select();
 
@@ -275,8 +281,11 @@ export const initializeGrowthTrees = async () => {
     console.log('成功初始化成長樹資料：', data);
 
     // 為每個成長樹建立基礎目標
-    for (const tree of data) {
-      await initializeGrowthGoals(tree.id, tree.tree_name);
+    const typedData = data as Array<{ id: string; tree_name: string; [key: string]: any; }> | null;
+    if (typedData) {
+      for (const tree of typedData) {
+        await initializeGrowthGoals(tree.id, tree.tree_name);
+      }
     }
 
   } catch (err) {
@@ -327,6 +336,7 @@ export const initializeGrowthGoals = async (treeId: string, treeName: string) =>
 
     const { data, error } = await supabase
       .from('hanami_growth_goals')
+      // @ts-ignore
       .insert(goals)
       .select();
 

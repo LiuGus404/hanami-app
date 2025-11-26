@@ -136,13 +136,17 @@ export default function TrialQueueForm() {
         }
         
         if (data) {
+          const typedData = data as {
+            prefer_time?: string | any;
+            [key: string]: any;
+          };
           // 解析 prefer_time JSON
           let preferTimeArray: string[] = [];
-          if (data.prefer_time) {
+          if (typedData.prefer_time) {
             try {
-              const preferTime = typeof data.prefer_time === 'string' 
-                ? JSON.parse(data.prefer_time) 
-                : data.prefer_time;
+              const preferTime = typeof typedData.prefer_time === 'string' 
+                ? JSON.parse(typedData.prefer_time) 
+                : typedData.prefer_time;
               
               if (preferTime.week && Array.isArray(preferTime.week) && preferTime.range && Array.isArray(preferTime.range)) {
                 // 將 week 和 range 轉換為選項值
@@ -168,24 +172,25 @@ export default function TrialQueueForm() {
           
           // 轉換年齡格式
           let ageText = '';
-          if (data.student_age !== null && data.student_age !== undefined) {
-            const years = Math.floor(data.student_age / 12);
-            const months = data.student_age % 12;
+          if (typedData.student_age !== null && typedData.student_age !== undefined) {
+            const studentAge = typeof typedData.student_age === 'number' ? typedData.student_age : parseInt(String(typedData.student_age)) || 0;
+            const years = Math.floor(studentAge / 12);
+            const months = studentAge % 12;
             ageText = `${years}Y${months}M`;
           }
           
           setForm({
-            id: data.id || '',
-            full_name: data.full_name || '',
-            student_dob: data.student_dob || '',
+            id: typedData.id || '',
+            full_name: typedData.full_name || '',
+            student_dob: typedData.student_dob || '',
             student_age: ageText,
-            student_id: data.student_id || '',
+            student_id: typedData.student_id || '',
             prefer_time: preferTimeArray,
-            notes: data.notes || '',
-            status: data.status || 'pending',
-            created_at: data.created_at || '',
-            phone_no: data.phone_no || '',
-            course_types: data.course_types ? (typeof data.course_types === 'string' ? JSON.parse(data.course_types) : data.course_types) : [],
+            notes: typedData.notes || '',
+            status: typedData.status || 'pending',
+            created_at: typedData.created_at || '',
+            phone_no: typedData.phone_no || '',
+            course_types: typedData.course_types ? (typeof typedData.course_types === 'string' ? JSON.parse(typedData.course_types) : typedData.course_types) : [],
           });
         }
       } catch (err) {
@@ -280,16 +285,16 @@ export default function TrialQueueForm() {
     let error;
     if (isEditMode) {
       // 更新現有資料
-      const { error: updateError } = await supabase
-        .from('hanami_trial_queue')
-        .update(insertData)
+      const { error: updateError } = await (supabase
+        .from('hanami_trial_queue') as any)
+        .update(insertData as any)
         .eq('id', editId);
       error = updateError;
     } else {
       // 插入新資料
-      const { error: insertError } = await supabase
-        .from('hanami_trial_queue')
-        .insert([insertData]);
+      const { error: insertError } = await (supabase
+        .from('hanami_trial_queue') as any)
+        .insert([insertData] as any);
       error = insertError;
     }
     

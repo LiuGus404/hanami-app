@@ -41,7 +41,7 @@ export default function GrowthTreesPage({
   disableOrgFallback = false,
 }: GrowthTreesPageProps = {}) {
   const { currentOrganization } = useOrganization();
-  
+
   const navigationPaths = useMemo(
     () => ({
       dashboard: '/admin/student-progress',
@@ -140,9 +140,9 @@ export default function GrowthTreesPage({
     return true;
   }, [validOrgId, orgDataDisabled]);
 
-useEffect(() => {
-  loadAllData();
-}, [orgDataDisabled, validOrgId]);
+  useEffect(() => {
+    loadAllData();
+  }, [orgDataDisabled, validOrgId]);
 
   const loadAllData = async () => {
     if (orgDataDisabled || !validOrgId) {
@@ -160,10 +160,10 @@ useEffect(() => {
     setError(null);
     try {
       console.log('開始載入資料...');
-      
+
       // 成長樹
-      let treesQuery = supabase
-        .from('hanami_growth_trees')
+      let treesQuery = (supabase
+        .from('hanami_growth_trees') as any)
         .select('*')
         .order('tree_name');
       treesQuery = applyOrgFilter(treesQuery);
@@ -176,10 +176,10 @@ useEffect(() => {
       }));
       setTrees(fixedTrees);
       console.log('載入成長樹:', fixedTrees);
-      
+
       // 目標
-      let goalsQuery = supabase
-        .from('hanami_growth_goals')
+      let goalsQuery = (supabase
+        .from('hanami_growth_goals') as any)
         .select('*')
         .order('goal_order');
       goalsQuery = applyOrgFilter(goalsQuery);
@@ -187,12 +187,12 @@ useEffect(() => {
       if (goalsError) throw goalsError;
       const fixedGoals = (goalsData || []).map((g: any) => {
         console.log(`處理目標 ${g.goal_name} 的原始資料:`, g);
-        
+
         // 確保進度內容是陣列且過濾空值
-        const progressContents = Array.isArray(g.progress_contents) 
+        const progressContents = Array.isArray(g.progress_contents)
           ? (g.progress_contents as string[]).filter(content => content && content.trim() !== '')
           : [];
-        
+
         const fixedGoal = {
           ...g,
           is_completed: g.is_completed ?? false,
@@ -211,38 +211,38 @@ useEffect(() => {
       });
       setGoals(fixedGoals);
       console.log('載入目標:', fixedGoals);
-      
+
       // 發展能力
-      let abilitiesQuery = supabase
-        .from('hanami_development_abilities')
+      let abilitiesQuery = (supabase
+        .from('hanami_development_abilities') as any)
         .select('id, ability_name')
         .order('ability_name');
       abilitiesQuery = applyOrgFilter(abilitiesQuery);
       const { data: abilitiesData, error: abilitiesError } = await abilitiesQuery;
       if (abilitiesError) throw abilitiesError;
       setAbilitiesOptions((abilitiesData || []).map((a: any) => ({ value: a.id, label: a.ability_name })));
-      
+
       // 活動
-      let activitiesQuery = supabase
-        .from('hanami_teaching_activities')
+      let activitiesQuery = (supabase
+        .from('hanami_teaching_activities') as any)
         .select('id, activity_name')
         .order('activity_name');
       activitiesQuery = applyOrgFilter(activitiesQuery);
       const { data: activitiesData, error: activitiesError } = await activitiesQuery;
       if (activitiesError) throw activitiesError;
       setActivitiesOptions((activitiesData || []).map((a: any) => ({ value: a.id, label: a.activity_name })));
-      
+
       // 老師
-      let teachersQuery = supabase
-        .from('hanami_employee')
+      let teachersQuery = (supabase
+        .from('hanami_employee') as any)
         .select('id, teacher_nickname, teacher_fullname')
         .order('teacher_nickname');
       teachersQuery = applyOrgFilter(teachersQuery);
       const { data: teachersData, error: teachersError } = await teachersQuery;
       if (teachersError) throw teachersError;
       // 管理員
-      let adminsQuery = supabase
-        .from('hanami_admin')
+      let adminsQuery = (supabase
+        .from('hanami_admin') as any)
         .select('id, admin_name')
         .order('admin_name');
       adminsQuery = applyOrgFilter(adminsQuery);
@@ -252,10 +252,10 @@ useEffect(() => {
         ...((teachersData || []).map((t: any) => ({ value: t.id, label: t.teacher_nickname || t.teacher_fullname || '老師' }))),
         ...((adminsData || []).map((a: any) => ({ value: a.id, label: `${a.admin_name}（管理員）` }))),
       ]);
-      
+
       // 課程類型
-      let courseTypesQuery = supabase
-        .from('Hanami_CourseTypes')
+      let courseTypesQuery = (supabase
+        .from('Hanami_CourseTypes') as any)
         .select('id, name')
         .eq('status', true)
         .order('name');
@@ -263,7 +263,7 @@ useEffect(() => {
       const { data: courseTypesData, error: courseTypesError } = await courseTypesQuery;
       if (courseTypesError) throw courseTypesError;
       setCourseTypesOptions((courseTypesData || []).map((ct: any) => ({ value: ct.id, label: ct.name })));
-      
+
       console.log('資料載入完成');
     } catch (err: any) {
       console.error('資料載入失敗:', err);
@@ -284,10 +284,10 @@ useEffect(() => {
     try {
       console.log('開始新增成長樹:', treeData);
       console.log('目標資料:', goals);
-      
+
       // 1. 新增成長樹
-      const { data: treeInsert, error: treeError } = await supabase
-        .from('hanami_growth_trees')
+      const { data: treeInsert, error: treeError } = await (supabase
+        .from('hanami_growth_trees') as any)
         .insert([{
           tree_name: treeData.tree_name,
           tree_description: treeData.tree_description,
@@ -299,23 +299,23 @@ useEffect(() => {
         }])
         .select()
         .single();
-      
+
       if (treeError) {
         console.error('新增成長樹失敗:', treeError);
         throw treeError;
       }
-      
+
       console.log('成長樹新增成功:', treeInsert);
       const treeId = treeInsert.id;
-      
+
       // 2. 新增所有目標
       if (goals && goals.length > 0) {
         const goalsInsert = goals.map((g, idx) => {
           // 確保進度內容是陣列且過濾空值
-          const progressContents = Array.isArray(g.progress_contents) 
+          const progressContents = Array.isArray(g.progress_contents)
             ? (g.progress_contents as string[]).filter(content => content && content.trim() !== '')
             : [];
-          
+
           const goalData = {
             tree_id: treeId,
             goal_name: g.goal_name,
@@ -337,26 +337,26 @@ useEffect(() => {
           console.log(`新增目標 ${g.goal_name} 的資料:`, goalData);
           return goalData;
         });
-        
+
         console.log('準備新增目標:', goalsInsert);
-        
-        const { data: goalsData, error: goalsError } = await supabase
-          .from('hanami_growth_goals')
+
+        const { data: goalsData, error: goalsError } = await (supabase
+          .from('hanami_growth_goals') as any)
           .insert(goalsInsert)
           .select();
-          
+
         if (goalsError) {
           console.error('新增目標失敗:', goalsError);
           throw goalsError;
         }
-        
+
         console.log('目標新增成功:', goalsData);
       }
-      
+
       // 3. 重新載入資料
       console.log('重新載入資料...');
       await loadAllData();
-      
+
       console.log('新增完成，關閉模態框');
       setShowAddModal(false);
     } catch (err: any) {
@@ -378,14 +378,14 @@ useEffect(() => {
     try {
       console.log('開始更新成長樹:', treeData);
       console.log('目標資料:', goals);
-      
+
       if (!editingTree) {
         throw new Error('沒有要編輯的成長樹');
       }
-      
+
       // 1. 更新成長樹
-      let treeUpdate = supabase
-        .from('hanami_growth_trees')
+      let treeUpdate = (supabase
+        .from('hanami_growth_trees') as any)
         .update({
           tree_name: treeData.tree_name,
           tree_description: treeData.tree_description,
@@ -397,58 +397,58 @@ useEffect(() => {
         });
       treeUpdate = applyOrgFilter(treeUpdate);
       const { error: treeError } = await treeUpdate.eq('id', editingTree.id);
-      
+
       if (treeError) {
         console.error('更新成長樹失敗:', treeError);
         throw treeError;
       }
-      
+
       console.log('成長樹更新成功');
-      
+
       // 2. 獲取現有目標的所有資料
-      let existingGoalsQuery = supabase
-        .from('hanami_growth_goals')
+      let existingGoalsQuery = (supabase
+        .from('hanami_growth_goals') as any)
         .select('*')
         .eq('tree_id', editingTree.id);
       existingGoalsQuery = applyOrgFilter(existingGoalsQuery);
       const { data: existingGoals, error: fetchError } = await existingGoalsQuery;
-      
+
       if (fetchError) {
         console.error('獲取現有目標失敗:', fetchError);
         throw fetchError;
       }
-      
+
       // 創建現有目標資料映射
       const existingGoalsMap = new Map();
-      (existingGoals || []).forEach(goal => {
+      (existingGoals || []).forEach((goal: any) => {
         existingGoalsMap.set(goal.goal_name, goal);
       });
-      
+
       // 3. 刪除現有目標
-      let deleteExistingGoalsQuery = supabase
-        .from('hanami_growth_goals')
+      let deleteExistingGoalsQuery = (supabase
+        .from('hanami_growth_goals') as any)
         .delete()
         .eq('tree_id', editingTree.id);
       deleteExistingGoalsQuery = applyOrgFilter(deleteExistingGoalsQuery);
       const { error: deleteError } = await deleteExistingGoalsQuery;
-      
+
       if (deleteError) {
         console.error('刪除現有目標失敗:', deleteError);
         throw deleteError;
       }
-      
+
       // 4. 新增新目標，保留現有資料
       if (goals && goals.length > 0) {
         const goalsInsert = goals.map((g, idx) => {
           const existingGoal = existingGoalsMap.get(g.goal_name);
-          
+
           // 優先使用新資料，如果新資料為空則使用現有資料
           const progressContents = Array.isArray(g.progress_contents) && g.progress_contents.length > 0
             ? (g.progress_contents as string[]).filter(content => content && content.trim() !== '')
             : (Array.isArray(existingGoal?.progress_contents) && existingGoal.progress_contents.length > 0
               ? (existingGoal.progress_contents as string[]).filter(content => content && content.trim() !== '')
               : []);
-          
+
           const goalData = {
             tree_id: editingTree.id,
             goal_name: g.goal_name,
@@ -459,45 +459,45 @@ useEffect(() => {
             is_completed: existingGoal?.is_completed || false, // 保留現有完成狀態
             progress_max: Number(g.progress_max || existingGoal?.progress_max || 5), // 優先使用新資料
             required_abilities: Array.isArray(g.required_abilities) && g.required_abilities.length > 0
-              ? g.required_abilities 
+              ? g.required_abilities
               : (Array.isArray(existingGoal?.required_abilities) ? existingGoal.required_abilities : []),
             related_activities: Array.isArray(g.related_activities) && g.related_activities.length > 0
-              ? g.related_activities 
+              ? g.related_activities
               : (Array.isArray(existingGoal?.related_activities) ? existingGoal.related_activities : []),
             progress_contents: progressContents,
             // 添加評估模式欄位
             assessment_mode: g.assessment_mode || existingGoal?.assessment_mode || 'progress',
             multi_select_levels: Array.isArray(g.multi_select_levels) && g.multi_select_levels.length > 0
-              ? g.multi_select_levels 
+              ? g.multi_select_levels
               : (Array.isArray(existingGoal?.multi_select_levels) ? existingGoal.multi_select_levels : []),
             multi_select_descriptions: Array.isArray(g.multi_select_descriptions) && g.multi_select_descriptions.length > 0
-              ? g.multi_select_descriptions 
+              ? g.multi_select_descriptions
               : (Array.isArray(existingGoal?.multi_select_descriptions) ? existingGoal.multi_select_descriptions : []),
             org_id: validOrgId,
           };
           console.log(`目標 ${g.goal_name} 的資料:`, goalData);
           return goalData;
         });
-        
+
         console.log('準備新增目標:', goalsInsert);
-        
-        const { data: goalsData, error: goalsError } = await supabase
-          .from('hanami_growth_goals')
+
+        const { data: goalsData, error: goalsError } = await (supabase
+          .from('hanami_growth_goals') as any)
           .insert(goalsInsert)
           .select();
-          
+
         if (goalsError) {
           console.error('新增目標失敗:', goalsError);
           throw goalsError;
         }
-        
+
         console.log('目標新增成功:', goalsData);
       }
-      
+
       // 4. 重新載入資料
       console.log('重新載入資料...');
       await loadAllData();
-      
+
       console.log('更新完成，關閉模態框');
       setEditingTree(null);
     } catch (err: any) {
@@ -514,16 +514,16 @@ useEffect(() => {
 
     try {
       // 先刪除相關的目標
-      let deleteGoalsQuery = supabase
-        .from('hanami_growth_goals')
+      let deleteGoalsQuery = (supabase
+        .from('hanami_growth_goals') as any)
         .delete()
         .eq('tree_id', id);
       deleteGoalsQuery = applyOrgFilter(deleteGoalsQuery);
       await deleteGoalsQuery;
 
       // 再刪除成長樹
-      let deleteTreeQuery = supabase
-        .from('hanami_growth_trees')
+      let deleteTreeQuery = (supabase
+        .from('hanami_growth_trees') as any)
         .delete()
         .eq('id', id);
       deleteTreeQuery = applyOrgFilter(deleteTreeQuery);
@@ -549,24 +549,24 @@ useEffect(() => {
     }
 
     try {
-      let goalsQuery = supabase
-        .from('hanami_growth_goals')
+      let goalsQuery = (supabase
+        .from('hanami_growth_goals') as any)
         .select('*')
         .eq('tree_id', treeId)
         .order('goal_order');
       goalsQuery = applyOrgFilter(goalsQuery);
       const { data: goalsData, error: goalsError } = await goalsQuery;
-      
+
       if (goalsError) throw goalsError;
-      
+
       return (goalsData || []).map((g: any) => {
         console.log(`loadExistingGoals - 處理目標 ${g.goal_name} 的資料:`, g);
-        
+
         // 確保進度內容是陣列且過濾空值
-        const progressContents = Array.isArray(g.progress_contents) 
+        const progressContents = Array.isArray(g.progress_contents)
           ? (g.progress_contents as string[]).filter(content => content && content.trim() !== '')
           : [];
-        
+
         return {
           goal_name: g.goal_name,
           goal_description: g.goal_description || '',
@@ -593,20 +593,20 @@ useEffect(() => {
 
     try {
       console.log(`切換目標 ${goalId} 的完成狀態: ${currentStatus} -> ${!currentStatus}`);
-      
-      let updateQuery = supabase
-        .from('hanami_growth_goals')
+
+      let updateQuery = (supabase
+        .from('hanami_growth_goals') as any)
         .update({ is_completed: !currentStatus });
       updateQuery = applyOrgFilter(updateQuery);
       const { error } = await updateQuery.eq('id', goalId);
-      
+
       if (error) {
         console.error('切換目標完成狀態失敗:', error);
         throw error;
       }
-      
+
       console.log('目標完成狀態切換成功');
-      
+
       // 重新載入資料以更新顯示
       await loadAllData();
     } catch (error) {
@@ -624,10 +624,10 @@ useEffect(() => {
 
     try {
       console.log('載入在此成長樹的學生資料:', treeId);
-      
+
       // 使用現有的關聯表查詢學生
-      let studentsQuery = supabase
-        .from('hanami_student_trees')
+      let studentsQuery = (supabase
+        .from('hanami_student_trees') as any)
         .select(`
           student_id,
           enrollment_date,
@@ -649,16 +649,16 @@ useEffect(() => {
         .or('status.eq.active,tree_status.eq.active');
       studentsQuery = applyOrgFilter(studentsQuery);
       const { data: studentsData, error } = await studentsQuery;
-      
+
       if (error) {
         console.error('載入學生資料失敗:', error);
         setStudentsInTree([]);
         return;
       }
-      
+
       console.log('載入到的學生資料:', studentsData);
       console.log('學生數量:', studentsData?.length || 0);
-      
+
       // 轉換資料格式以符合現有介面
       const formattedStudents = (studentsData || []).map((item: any) => ({
         id: item.Hanami_Students.id,
@@ -671,10 +671,10 @@ useEffect(() => {
         status: item.status || item.tree_status,
         completed_goals: item.completed_goals || []
       }));
-      
+
       // 在客戶端排序
-      formattedStudents.sort((a, b) => a.full_name.localeCompare(b.full_name));
-      
+      formattedStudents.sort((a: any, b: any) => a.full_name.localeCompare(b.full_name));
+
       console.log('格式化後的學生資料:', formattedStudents);
       setStudentsInTree(formattedStudents);
     } catch (error) {
@@ -780,11 +780,11 @@ useEffect(() => {
   const getFilteredTrees = () => {
     console.log('開始篩選成長樹，總數:', trees.length);
     console.log('當前篩選條件:', filters);
-    
+
     // 暫時禁用所有篩選，直接返回所有成長樹
     console.log('暫時禁用篩選，返回所有成長樹');
     return trees;
-    
+
     /*
     const filtered = trees.filter(tree => {
       console.log(`檢查成長樹: ${tree.tree_name} (ID: ${tree.id})`);
@@ -909,7 +909,7 @@ useEffect(() => {
                       onChange={(value) => handleFilterChange('search', value)}
                     />
                   </div>
-                  
+
                   {/* 成長樹等級多選篩選 */}
                   <div className="relative">
                     <button
@@ -1062,21 +1062,21 @@ useEffect(() => {
                 </div>
                 <div className="text-sm text-hanami-text-secondary">總成長樹數</div>
               </HanamiCard>
-              
+
               <HanamiCard className="p-6 text-center">
                 <div className="text-2xl font-bold text-green-600 mb-2">
                   {getFilteredTrees().filter(t => t.is_active).length}
                 </div>
                 <div className="text-sm text-hanami-text-secondary">啟用中</div>
               </HanamiCard>
-              
+
               <HanamiCard className="p-6 text-center">
                 <div className="text-2xl font-bold text-blue-600 mb-2">
                   {goals.length}
                 </div>
                 <div className="text-sm text-hanami-text-secondary">總目標數</div>
               </HanamiCard>
-              
+
               <HanamiCard className="p-6 text-center">
                 <div className="text-2xl font-bold text-purple-600 mb-2">
                   {abilitiesOptions.length}
@@ -1095,22 +1095,22 @@ useEffect(() => {
               showPopup.field === 'tree_levels'
                 ? [1, 2, 3, 4, 5].map(level => ({ value: level.toString(), label: `等級 ${level}` }))
                 : showPopup.field === 'statuses'
-                ? [
+                  ? [
                     { value: 'active', label: '啟用' },
                     { value: 'inactive', label: '停用' }
                   ]
-                : showPopup.field === 'abilities'
-                ? abilitiesOptions
-                : showPopup.field === 'activities'
-                ? activitiesOptions
-                : []
+                  : showPopup.field === 'abilities'
+                    ? abilitiesOptions
+                    : showPopup.field === 'activities'
+                      ? activitiesOptions
+                      : []
             }
             selected={popupSelected}
             title={
               showPopup.field === 'tree_levels' ? '選擇成長樹等級' :
-              showPopup.field === 'statuses' ? '選擇狀態' :
-              showPopup.field === 'abilities' ? '選擇能力' :
-              showPopup.field === 'activities' ? '選擇活動' : '選擇'
+                showPopup.field === 'statuses' ? '選擇狀態' :
+                  showPopup.field === 'abilities' ? '選擇能力' :
+                    showPopup.field === 'activities' ? '選擇活動' : '選擇'
             }
             onCancel={handleFilterPopupCancel}
             onChange={(value: string | string[]) => setPopupSelected(value)}
@@ -1140,12 +1140,12 @@ useEffect(() => {
               ...editingTree,
               goals: getGoalsForTree(editingTree.id).map((g: any) => {
                 console.log(`編輯模式 - 處理目標 ${g.goal_name} 的資料:`, g);
-                
+
                 // 確保進度內容是陣列且過濾空值
-                const progressContents = Array.isArray(g.progress_contents) 
+                const progressContents = Array.isArray(g.progress_contents)
                   ? (g.progress_contents as string[]).filter(content => content && content.trim() !== '')
                   : [];
-                
+
                 return {
                   goal_name: g.goal_name,
                   goal_description: g.goal_description || '',
@@ -1223,7 +1223,7 @@ useEffect(() => {
                   <h2 className="text-xl font-bold text-white">確認刪除</h2>
                 </div>
               </div>
-              
+
               <div className="p-6">
                 <div className="flex items-center gap-3 mb-4">
                   {treeToDelete?.tree_icon && treeToDelete.tree_icon !== '🌳' && treeToDelete.tree_icon !== '/tree ui.png' ? (
@@ -1242,7 +1242,7 @@ useEffect(() => {
                     <p className="text-sm text-hanami-text-secondary">成長樹</p>
                   </div>
                 </div>
-                
+
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                   <p className="text-red-800 text-sm">
                     <strong>警告：</strong>刪除此成長樹將會：
@@ -1253,11 +1253,11 @@ useEffect(() => {
                     <li>• 可能影響相關的學生進度記錄</li>
                   </ul>
                 </div>
-                
+
                 <p className="text-hanami-text mb-6">
                   您確定要刪除成長樹 <strong>"{treeToDelete.tree_name}"</strong> 嗎？
                 </p>
-                
+
                 <div className="flex gap-3 justify-end">
                   <button
                     className="px-4 py-2 text-sm font-medium text-hanami-text-secondary bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
@@ -1281,7 +1281,7 @@ useEffect(() => {
           {getFilteredTrees().map((tree) => {
             const treeGoals = getGoalsForTree(tree.id);
             const completedGoals = treeGoals.filter(goal => goal.is_completed).length;
-            
+
             return (
               <HanamiCard key={tree.id} className="p-6 rounded-2xl shadow-lg bg-white hover:shadow-xl transition-shadow cursor-pointer border border-[#EADBC8] relative" onClick={() => openDetailModal(tree)}>
                 <div className="flex justify-between items-start mb-4">
@@ -1322,7 +1322,7 @@ useEffect(() => {
                 <div className="space-y-2 mb-4">
                   <div className="flex flex-wrap items-center text-sm text-hanami-text-secondary gap-2">
                     <span className="break-words">課程類型: {
-                      tree.course_type 
+                      tree.course_type
                         ? (courseTypesOptions.find(opt => opt.value === tree.course_type)?.label || tree.course_type)
                         : '未指定'
                     }</span>
@@ -1344,8 +1344,8 @@ useEffect(() => {
                     <p className="text-sm font-medium text-hanami-text mb-2">目標列表:</p>
                     <div className="space-y-1">
                       {treeGoals.slice(0, 3).map((goal) => (
-                        <div 
-                          key={goal.id} 
+                        <div
+                          key={goal.id}
                           className="flex items-start text-sm gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors"
                           title={`點擊切換完成狀態: ${goal.is_completed ? '已完成' : '未完成'}`}
                           onClick={(e) => {

@@ -209,11 +209,13 @@ export default function StudentAbilityAssessments({
       console.log('載入學生能力評估數據:', studentId);
 
       // 載入能力評估記錄
-      const { data: assessmentsData, error: assessmentsError } = await supabase
+      const { data: assessmentsDataRaw, error: assessmentsError } = await supabase
         .from('hanami_ability_assessments')
         .select('*')
         .eq('student_id', studentId)
         .order('assessment_date', { ascending: false });
+      
+      const assessmentsData = assessmentsDataRaw as Array<{ tree_id: string; [key: string]: any; }> | null;
 
       if (assessmentsError) {
         console.error('載入能力評估失敗:', assessmentsError);
@@ -249,7 +251,7 @@ export default function StudentAbilityAssessments({
         }
       }
 
-      setAssessments(assessmentsData || []);
+      setAssessments((assessmentsData || []) as any);
       setAbilities(abilitiesData || []);
       setTrees(treesData);
 

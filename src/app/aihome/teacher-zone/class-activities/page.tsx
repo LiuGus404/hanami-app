@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
-import { 
-  ChevronLeftIcon, 
+import {
+  ChevronLeftIcon,
   ChevronRightIcon,
   ChevronUpIcon,
   ChevronDownIcon,
@@ -163,7 +163,7 @@ export default function TeacherZoneClassActivitiesPage() {
   // 使用香港時區的今天日期
   const getTodayInHongKong = () => {
     const today = new Date();
-    const hongKongTime = new Date(today.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+    const hongKongTime = new Date(today.toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" }));
     console.log('🌏 香港時區今天:', hongKongTime.toISOString().split('T')[0]);
     console.log('🗓️ 今天是星期:', hongKongTime.getDay()); // 0=星期日, 1=星期一...6=星期六
     return hongKongTime;
@@ -212,7 +212,7 @@ export default function TeacherZoneClassActivitiesPage() {
       teacherRole
     });
     setShowTeacherSelectionModal(true);
-    
+
     // 如果還沒有載入老師列表，則載入
     if (allTeachers.length === 0) {
       loadAllTeachers();
@@ -224,8 +224,8 @@ export default function TeacherZoneClassActivitiesPage() {
     if (!selectedClassForTeacher) return;
 
     try {
-      const { error } = await supabase
-        .from('hanami_schedule_daily')
+      const { error } = await (supabase
+        .from('hanami_schedule_daily') as any)
         .update({
           [selectedClassForTeacher.teacherRole === 'main' ? 'teacher_main_id' : 'teacher_assist_id']: teacherId
         })
@@ -259,24 +259,24 @@ export default function TeacherZoneClassActivitiesPage() {
   const loadClassGroupData = async () => {
     try {
       setLoadingText('載入班別資料中...');
-      
+
       // 計算選中日期的星期幾
       const selectedWeekday = selectedDate.getDay(); // 0=星期日, 1=星期一...6=星期六
-      
+
       // 格式化時間為 HH:mm 格式
       const formatLocalDate = (date: Date) => {
-        const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+        const hongKongTime = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" }));
         const year = hongKongTime.getFullYear();
         const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
         const day = String(hongKongTime.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
-      
+
       const dateStr = formatLocalDate(selectedDate);
-      
+
       // 獲取該星期幾的所有班級排程
-      const { data: schedules, error: scheduleError } = await supabase
-        .from('hanami_schedule')
+      const { data: schedules, error: scheduleError } = await (supabase
+        .from('hanami_schedule') as any)
         .select('*')
         .eq('weekday', selectedWeekday)
         .order('timeslot');
@@ -294,12 +294,12 @@ export default function TeacherZoneClassActivitiesPage() {
       for (const schedule of schedules) {
         // 找到該班級在選中日期的課程記錄
         const matchedLessons = [
-          ...lessons.filter(lesson => 
-            lesson.lesson_date === dateStr && 
+          ...lessons.filter(lesson =>
+            lesson.lesson_date === dateStr &&
             lesson.actual_timeslot === schedule.timeslot
           ),
-          ...trialLessons.filter(lesson => 
-            lesson.lesson_date === dateStr && 
+          ...trialLessons.filter(lesson =>
+            lesson.lesson_date === dateStr &&
             lesson.actual_timeslot === schedule.timeslot
           )
         ];
@@ -307,10 +307,10 @@ export default function TeacherZoneClassActivitiesPage() {
         // 獲取該班級在選中日期的老師資訊
         let teacherMainName = '';
         let teacherAssistName = '';
-        
+
         if (schedule.id) {
-          const { data: dailySchedule, error: dailyError } = await supabase
-            .from('hanami_schedule_daily')
+          const { data: dailySchedule, error: dailyError } = await (supabase
+            .from('hanami_schedule_daily') as any)
             .select('teacher_main_id, teacher_assist_id')
             .eq('schedule_template_id', schedule.id)
             .eq('lesson_date', dateStr)
@@ -319,12 +319,12 @@ export default function TeacherZoneClassActivitiesPage() {
           if (!dailyError && dailySchedule) {
             // 獲取主教資訊
             if (dailySchedule.teacher_main_id) {
-              const { data: mainTeacher, error: mainError } = await supabase
-                .from('hanami_employee')
+              const { data: mainTeacher, error: mainError } = await (supabase
+                .from('hanami_employee') as any)
                 .select('teacher_fullname, teacher_nickname')
                 .eq('id', dailySchedule.teacher_main_id)
                 .single();
-              
+
               if (!mainError && mainTeacher) {
                 teacherMainName = mainTeacher.teacher_fullname || mainTeacher.teacher_nickname || '';
               }
@@ -332,12 +332,12 @@ export default function TeacherZoneClassActivitiesPage() {
 
             // 獲取助教資訊
             if (dailySchedule.teacher_assist_id) {
-              const { data: assistTeacher, error: assistError } = await supabase
-                .from('hanami_employee')
+              const { data: assistTeacher, error: assistError } = await (supabase
+                .from('hanami_employee') as any)
                 .select('teacher_fullname, teacher_nickname')
                 .eq('id', dailySchedule.teacher_assist_id)
                 .single();
-              
+
               if (!assistError && assistTeacher) {
                 teacherAssistName = assistTeacher.teacher_fullname || assistTeacher.teacher_nickname || '';
               }
@@ -348,20 +348,20 @@ export default function TeacherZoneClassActivitiesPage() {
         // 獲取該班級的所有學生
         let students: any[] = [];
         if (schedule.assigned_student_ids && schedule.assigned_student_ids.length > 0) {
-          const { data: studentData, error: studentError } = await supabase
-            .from('Hanami_Students')
+          const { data: studentData, error: studentError } = await (supabase
+            .from('Hanami_Students') as any)
             .select('*')
             .in('id', schedule.assigned_student_ids);
 
           if (!studentError && studentData) {
-            students = studentData.map(student => {
+            students = studentData.map((student: any) => {
               // 檢查該學生是否有出席記錄
-              const hasAttendance = matchedLessons.some(lesson => 
+              const hasAttendance = matchedLessons.some(lesson =>
                 'student_id' in lesson && lesson.student_id === student.id
               );
-              
+
               // 獲取該學生的課程記錄
-              const lessonData = matchedLessons.find(lesson => 
+              const lessonData = matchedLessons.find(lesson =>
                 'student_id' in lesson && lesson.student_id === student.id
               );
 
@@ -400,7 +400,7 @@ export default function TeacherZoneClassActivitiesPage() {
       setLoadingText('');
     }
   };
-  
+
   const todayHK = getTodayInHongKong();
   const [selectedDate, setSelectedDate] = useState(todayHK); // 預設選中今天
   const [viewMode, setViewMode] = useState<'day'>('day'); // 只保留單日檢視
@@ -464,30 +464,30 @@ export default function TeacherZoneClassActivitiesPage() {
   useEffect(() => {
     if (displayMode === 'class' && classGroups.length > 0) {
       const allStudentIds = classGroups.flatMap(group => group.students.map(s => s.id));
-      
+
       // 載入學生活動
       allStudentIds.forEach(studentId => {
         if (!studentActivitiesMap.has(studentId) && !loadingStudentActivities.has(studentId)) {
           // 這裡可以添加載入學生活動的邏輯
         }
       });
-      
+
       // 載入剩餘堂數
       if (allStudentIds.length > 0 && !loadingRemainingLessons) {
         calculateRemainingLessonsBatch(allStudentIds, new Date()).then(remainingLessons => {
           setRemainingLessonsMap(remainingLessons);
         });
       }
-      
+
       // 載入評估狀態
       if (allStudentIds.length > 0 && !loadingAssessmentStatus) {
         const loadAssessmentStatus = async () => {
           try {
             setLoadingAssessmentStatus(true);
             const today = new Date().toISOString().split('T')[0];
-            
-            const { data: assessments, error } = await supabase
-              .from('hanami_ability_assessments')
+
+            const { data: assessments, error } = await (supabase
+              .from('hanami_ability_assessments') as any)
               .select('student_id')
               .in('student_id', allStudentIds)
               .eq('assessment_date', today);
@@ -495,7 +495,7 @@ export default function TeacherZoneClassActivitiesPage() {
             if (!error && assessments) {
               const statusMap: Record<string, boolean> = {};
               allStudentIds.forEach(id => { statusMap[id] = false; });
-              assessments.forEach(assessment => {
+              assessments.forEach((assessment: any) => {
                 statusMap[assessment.student_id] = true;
               });
               setStudentAssessmentStatus(statusMap);
@@ -512,7 +512,7 @@ export default function TeacherZoneClassActivitiesPage() {
   }, [classGroups, displayMode]);
   const [loadingText, setLoadingText] = useState('載入課堂資料中...');
   const [hasAutoSwitched, setHasAutoSwitched] = useState(false); // 防止重複自動切換
-  
+
   // 老師選擇模態框狀態
   const [showTeacherSelectionModal, setShowTeacherSelectionModal] = useState(false);
   const [selectedClassForTeacher, setSelectedClassForTeacher] = useState<{
@@ -524,18 +524,18 @@ export default function TeacherZoneClassActivitiesPage() {
   } | null>(null);
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(false);
-  
+
   // 快取機制
   const [dataCache, setDataCache] = useState<Map<string, any>>(new Map());
   const [selectedLesson, setSelectedLesson] = useState<Lesson | TrialLesson | null>(null);
   const [showActivitySelector, setShowActivitySelector] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string>('');
-  
+
   // 學習路徑相關狀態
   const [showLearningPathSelector, setShowLearningPathSelector] = useState(false);
   const [learningPaths, setLearningPaths] = useState<any[]>([]);
   const [selectedLearningPath, setSelectedLearningPath] = useState<any>(null);
-  
+
   // 教案編輯相關狀態
   const [showLessonPlanModal, setShowLessonPlanModal] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<{
@@ -568,7 +568,7 @@ export default function TeacherZoneClassActivitiesPage() {
     lessonDate: string;
     timeslot: string;
   } | null>(null);
-  
+
   // 新增：能力評估模態框狀態
   const [showAbilityAssessmentModal, setShowAbilityAssessmentModal] = useState(false);
   const [selectedStudentForAssessment, setSelectedStudentForAssessment] = useState<{
@@ -588,32 +588,32 @@ export default function TeacherZoneClassActivitiesPage() {
     try {
       setLoading(true);
       setLoadingText('載入課堂資料中...');
-      
+
       const formatLocalDate = (date: Date) => {
-        const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+        const hongKongTime = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" }));
         const year = hongKongTime.getFullYear();
         const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
         const day = String(hongKongTime.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
-      
+
       const dateStr = formatLocalDate(selectedDate);
-      
+
       // 發送 API 請求
       const response = await fetch(`/api/class-activities?weekStart=${dateStr}&weekEnd=${dateStr}`);
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.error || '載入課堂資料失敗');
       }
-      
+
       console.log('API 返回的資料:', result.data);
-      
+
       setLessons(result.data.lessons || []);
       setTrialLessons(result.data.trialLessons || []);
       setTreeActivities(result.data.treeActivities || []);
       setAssignedActivities(result.data.assignedActivities || []);
-      
+
     } catch (error) {
       console.error('載入課堂資料失敗:', error);
       toast.error(error instanceof Error ? error.message : '載入課堂資料失敗');
@@ -711,27 +711,25 @@ export default function TeacherZoneClassActivitiesPage() {
               className="px-4 py-2 border border-hanami-border rounded-lg focus:ring-2 focus:ring-hanami-primary focus:border-transparent"
             />
           </div>
-          
+
           {/* 顯示模式切換 */}
           <div className="flex items-center space-x-3 bg-white rounded-full p-1.5 shadow-md border border-hanami-border">
             <button
               onClick={() => setDisplayMode('student')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-300 ${
-                displayMode === 'student'
-                  ? 'bg-gradient-to-r from-hanami-primary to-hanami-accent text-hanami-text shadow-md'
-                  : 'text-hanami-text-secondary hover:text-hanami-text'
-              }`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-300 ${displayMode === 'student'
+                ? 'bg-gradient-to-r from-hanami-primary to-hanami-accent text-hanami-text shadow-md'
+                : 'text-hanami-text-secondary hover:text-hanami-text'
+                }`}
             >
               <UserIcon className="w-4 h-4" />
               <span className="text-sm">按學生</span>
             </button>
             <button
               onClick={() => setDisplayMode('class')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-300 ${
-                displayMode === 'class'
-                  ? 'bg-gradient-to-r from-hanami-primary to-hanami-accent text-hanami-text shadow-md'
-                  : 'text-hanami-text-secondary hover:text-hanami-text'
-              }`}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all duration-300 ${displayMode === 'class'
+                ? 'bg-gradient-to-r from-hanami-primary to-hanami-accent text-hanami-text shadow-md'
+                : 'text-hanami-text-secondary hover:text-hanami-text'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4" />
               <span className="text-sm">按班別</span>
@@ -750,13 +748,13 @@ export default function TeacherZoneClassActivitiesPage() {
               </div>
             ) : (
               classGroups.map((classGroup, groupIndex) => (
-                <div 
-                  key={`${classGroup.id}-${groupIndex}`} 
+                <div
+                  key={`${classGroup.id}-${groupIndex}`}
                   className="group animate-fade-in-up"
                   style={{ animationDelay: `${groupIndex * 100}ms` }}
                 >
                   {/* 班級標題卡片 */}
-                  <div 
+                  <div
                     className="time-slot-header hanami-card-glow rounded-2xl p-6 mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
                     onClick={() => toggleClassExpansion(classGroup.id)}
                   >
@@ -779,7 +777,7 @@ export default function TeacherZoneClassActivitiesPage() {
                             <div className="text-xs text-white/70">學生人數</div>
                           </div>
                         </div>
-                        
+
                         {/* 課程詳細資訊 */}
                         <div className="text-white">
                           <h2 className="text-2xl font-bold mb-2">
@@ -790,9 +788,9 @@ export default function TeacherZoneClassActivitiesPage() {
                               <ClockIcon className="w-4 h-4" />
                               <span>{classGroup.timeslot}</span>
                             </div>
-                            
+
                             {/* 主教師 */}
-                            <div 
+                            <div
                               className="flex items-center space-x-2 cursor-pointer hover:scale-105 transition-transform duration-200"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -806,9 +804,9 @@ export default function TeacherZoneClassActivitiesPage() {
                                 {classGroup.teacher_main_name || '未設定'}
                               </span>
                             </div>
-                            
+
                             {/* 助教 */}
-                            <div 
+                            <div
                               className="flex items-center space-x-2 cursor-pointer hover:scale-105 transition-transform duration-200"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -822,7 +820,7 @@ export default function TeacherZoneClassActivitiesPage() {
                                 {classGroup.teacher_assist_name || '未設定'}
                               </span>
                             </div>
-                            
+
                             {classGroup.room_id && (
                               <div className="flex items-center space-x-1">
                                 <span className="font-medium">教室: {classGroup.room_id}</span>
@@ -831,7 +829,7 @@ export default function TeacherZoneClassActivitiesPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* 右側裝飾 */}
                       <div className="text-white text-right">
                         <div className="mb-2">
@@ -858,20 +856,19 @@ export default function TeacherZoneClassActivitiesPage() {
                         const lessonData = student.lessonData;
                         const isTrial = lessonData && 'trial_status' in lessonData;
                         const remainingLessons = remainingLessonsMap[studentId] || 0;
-                        
+
                         return (
-                          <div 
-                            key={`${studentId}-${studentIndex}`} 
+                          <div
+                            key={`${studentId}-${studentIndex}`}
                             className="group/card relative animate-fade-in-up"
                             style={{ animationDelay: `${(groupIndex * 100) + (studentIndex * 50)}ms` }}
                           >
-                            <div className={`student-card rounded-2xl p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden border-2 ${
-                              getStudentBackgroundColor(remainingLessons, isTrial)
-                            }`}>
+                            <div className={`student-card rounded-2xl p-5 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 relative overflow-hidden border-2 ${getStudentBackgroundColor(remainingLessons, isTrial)
+                              }`}>
                               {/* 背景裝飾 */}
                               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-hanami-primary/10 to-hanami-accent/10 rounded-full -translate-y-8 translate-x-8 group-hover/card:scale-150 transition-transform duration-500"></div>
                               <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-hanami-secondary/10 to-hanami-primary/10 rounded-full translate-y-6 -translate-x-6 group-hover/card:scale-125 transition-transform duration-700"></div>
-                              
+
                               {/* 學生頭像和資訊 */}
                               <div className="relative z-10 mb-4">
                                 <div className="flex items-center space-x-4">
@@ -919,13 +916,13 @@ export default function TeacherZoneClassActivitiesPage() {
                                 <button
                                   onClick={() => {
                                     const formatLocalDate = (date: Date) => {
-                                      const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+                                      const hongKongTime = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" }));
                                       const year = hongKongTime.getFullYear();
                                       const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
                                       const day = String(hongKongTime.getDate()).padStart(2, '0');
                                       return `${year}-${month}-${day}`;
                                     };
-                                    
+
                                     // 這裡可以添加學生活動分配功能
                                     toast('學生活動分配功能開發中...');
                                   }}
@@ -934,7 +931,7 @@ export default function TeacherZoneClassActivitiesPage() {
                                   <PlusIcon className="w-4 h-4" />
                                   <span>分配活動</span>
                                 </button>
-                                
+
                                 <button
                                   onClick={() => {
                                     toast('詳情功能開發中...');
@@ -950,7 +947,7 @@ export default function TeacherZoneClassActivitiesPage() {
                       })}
                     </div>
                   )}
-                  
+
                   {/* 收起狀態下的學生小圖卡 */}
                   {!expandedClasses.has(classGroup.id) && classGroup.students.length > 0 && (
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
@@ -958,9 +955,9 @@ export default function TeacherZoneClassActivitiesPage() {
                         {classGroup.students.map((student, studentIndex) => {
                           const hasAttendance = student.hasAttendance;
                           const isTrial = student.lessonData && 'trial_status' in student.lessonData;
-                          
+
                           return (
-                            <div 
+                            <div
                               key={`mini-${student.id}-${studentIndex}`}
                               className="flex items-center space-x-3 bg-white rounded-lg p-3 shadow-sm border-2 border-hanami-primary/30 hover:border-hanami-primary/50 transition-all duration-200 hover:shadow-md"
                             >
@@ -971,7 +968,7 @@ export default function TeacherZoneClassActivitiesPage() {
                                 </div>
                                 <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border border-white bg-gradient-to-br from-green-400 to-green-500"></div>
                               </div>
-                              
+
                               {/* 學生資訊 */}
                               <div className="flex-1 min-w-0">
                                 <h4 className="font-semibold text-sm truncate text-hanami-text">
@@ -981,7 +978,7 @@ export default function TeacherZoneClassActivitiesPage() {
                                   {convertAgeToYears(student.student_age)} 歲
                                 </p>
                               </div>
-                              
+
                               {/* 按鍵 */}
                               <button
                                 onClick={() => {
@@ -997,7 +994,7 @@ export default function TeacherZoneClassActivitiesPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* 沒有學生的提示 */}
                   {classGroup.students.length === 0 && (
                     <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
@@ -1039,14 +1036,14 @@ export default function TeacherZoneClassActivitiesPage() {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="mb-4 p-3 bg-hanami-primary/10 rounded-lg">
                 <p className="text-sm text-hanami-text-secondary">
                   班別：{selectedClassForTeacher.classCode}
                 </p>
                 <p className="text-sm text-hanami-text-secondary">
                   目前{selectedClassForTeacher.teacherRole === 'main' ? '主教' : '助教'}：
-                  {selectedClassForTeacher.teacherRole === 'main' 
+                  {selectedClassForTeacher.teacherRole === 'main'
                     ? selectedClassForTeacher.currentMainTeacher || '未設定'
                     : selectedClassForTeacher.currentAssistTeacher || '未設定'
                   }
@@ -1105,7 +1102,7 @@ export default function TeacherZoneClassActivitiesPage() {
                       </div>
                     </button>
                   ))}
-                  
+
                   {allTeachers.length === 0 && (
                     <div className="text-center py-8 text-hanami-text-secondary">
                       <UserIcon className="w-12 h-12 mx-auto mb-2 text-gray-400" />

@@ -92,9 +92,9 @@ export default function AccountForm({ userType, editingUser, onClose, onSuccess 
 
       if (editingUser) {
         // 更新現有帳戶
-        const { error: updateError } = await supabase
-          .from(tableName as any)
-          .update(data)
+        const { error: updateError } = await (supabase
+          .from(tableName as any) as any)
+          .update(data as any)
           .eq('id', editingUser.id);
 
         if (updateError) {

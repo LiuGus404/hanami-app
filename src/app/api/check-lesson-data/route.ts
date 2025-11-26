@@ -21,8 +21,13 @@ export async function GET() {
     }
 
     // 統計教師工作日期
+    const typedLessons = (lessons || []) as Array<{
+      lesson_teacher?: string | null;
+      lesson_date?: string | null;
+      [key: string]: any;
+    }>;
     const teacherWorkDates = new Map<string, Set<string>>();
-    lessons?.forEach(lesson => {
+    typedLessons.forEach(lesson => {
       if (lesson.lesson_teacher && lesson.lesson_date) {
         if (!teacherWorkDates.has(lesson.lesson_teacher)) {
           teacherWorkDates.set(lesson.lesson_teacher, new Set());
@@ -48,7 +53,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      totalLessons: lessons?.length || 0,
+      totalLessons: typedLessons.length || 0,
       uniqueTeachers: teacherWorkDates.size,
       potentialSchedules: potentialSchedules.length,
       teacherWorkDates: Object.fromEntries(
@@ -57,7 +62,7 @@ export async function GET() {
           Array.from(dates).sort()
         ])
       ),
-      recentLessons: lessons?.slice(0, 10) || [],
+      recentLessons: typedLessons.slice(0, 10) || [],
       checkTime: new Date().toISOString(),
     });
 

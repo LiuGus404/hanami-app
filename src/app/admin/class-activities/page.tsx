@@ -514,8 +514,9 @@ const PLACEHOLDER_ORG_IDS = new Set([
         }
         
         if (employeeData) {
-          console.log('找到對應的 teacher_id:', employeeData.id);
-          setCurrentTeacherId(employeeData.id);
+          const typedEmployeeData = employeeData as any;
+          console.log('找到對應的 teacher_id:', typedEmployeeData.id);
+          setCurrentTeacherId(typedEmployeeData.id);
         } else {
           console.log('未找到對應的 teacher_id，用戶可能未鏈接到教師記錄');
           setCurrentTeacherId(null);
@@ -1495,7 +1496,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
       
       // 標記已評估的學生
       if (assessments) {
-        assessments.forEach(assessment => {
+        (assessments as any[]).forEach((assessment: any) => {
           statusMap[assessment.student_id] = true;
         });
       }
@@ -1602,7 +1603,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
             if (!error && assessments) {
               const statusMap: Record<string, boolean> = {};
               allStudentIds.forEach(id => { statusMap[id] = false; });
-              assessments.forEach(assessment => {
+              (assessments as any[]).forEach((assessment: any) => {
                 statusMap[assessment.student_id] = true;
               });
               setStudentAssessmentStatus(statusMap);
@@ -1676,7 +1677,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
             statusMap[id] = false; 
           });
           
-          dateMedia.forEach(media => {
+          (dateMedia as any[]).forEach((media: any) => {
             statusMap[media.student_id] = true;
           });
           
@@ -1733,15 +1734,16 @@ const PLACEHOLDER_ORG_IDS = new Set([
       }
 
       // 處理配額數據
-      const quota = quotaData ? {
-        student_id: quotaData.student_id,
-        plan_type: quotaData.plan_type || 'free',
-        video_limit: quotaData.video_limit || 5,
-        photo_limit: quotaData.photo_limit || 10,
-        video_count: quotaData.video_count || 0,
-        photo_count: quotaData.photo_count || 0,
-        total_used_space: quotaData.total_used_space || 0,
-        last_updated: quotaData.last_updated || new Date().toISOString()
+      const typedQuotaData = quotaData as any;
+      const quota = typedQuotaData ? {
+        student_id: typedQuotaData.student_id,
+        plan_type: typedQuotaData.plan_type || 'free',
+        video_limit: typedQuotaData.video_limit || 5,
+        photo_limit: typedQuotaData.photo_limit || 10,
+        video_count: typedQuotaData.video_count || 0,
+        photo_count: typedQuotaData.photo_count || 0,
+        total_used_space: typedQuotaData.total_used_space || 0,
+        last_updated: typedQuotaData.last_updated || new Date().toISOString()
       } : {
         student_id: studentId,
         plan_type: 'free',
@@ -1754,8 +1756,9 @@ const PLACEHOLDER_ORG_IDS = new Set([
       };
 
       // 處理媒體計數
-      const videoCount = mediaCount?.filter(m => m.media_type === 'video').length || 0;
-      const photoCount = mediaCount?.filter(m => m.media_type === 'photo').length || 0;
+      const typedMediaCount = (mediaCount || []) as Array<{ media_type: string }>;
+      const videoCount = typedMediaCount.filter(m => m.media_type === 'video').length || 0;
+      const photoCount = typedMediaCount.filter(m => m.media_type === 'photo').length || 0;
 
       return {
         quota,
@@ -1965,8 +1968,9 @@ const PLACEHOLDER_ORG_IDS = new Set([
             continue;
           }
 
-          if (treeActivity && treeActivity.activity_id) {
-            actualActivityId = treeActivity.activity_id;
+          const typedTreeActivity = treeActivity as { activity_id: string } | null;
+          if (typedTreeActivity && typedTreeActivity.activity_id) {
+            actualActivityId = typedTreeActivity.activity_id;
             console.log('從 tree_activities 獲取 activity_id:', actualActivityId);
           }
         } else if (node.activity_id) {
@@ -2092,11 +2096,17 @@ const PLACEHOLDER_ORG_IDS = new Set([
         return;
       }
 
+      const typedCourseTypeData = courseTypeData as { id: string } | null;
+      if (!typedCourseTypeData || !typedCourseTypeData.id) {
+        toast.error('無法獲取課程類型ID');
+        return;
+      }
+
       // 根據課程類型ID獲取成長樹
       let growthTreeQuery = supabase
         .from('hanami_growth_trees')
         .select('id, tree_name')
-        .eq('course_type_id', courseTypeData.id)
+        .eq('course_type_id', typedCourseTypeData.id)
         .eq('is_active', true)
         .order('tree_level', { ascending: true });
 
@@ -2119,7 +2129,8 @@ const PLACEHOLDER_ORG_IDS = new Set([
       }
 
       // 獲取第一個成長樹的學習路徑
-      const treeId = growthTrees[0].id;
+      const typedGrowthTrees = growthTrees as Array<{ id: string; tree_name: string }>;
+      const treeId = typedGrowthTrees[0].id;
       const learningParams = new URLSearchParams({ treeId });
       if (validOrgId) {
         learningParams.set('orgId', validOrgId);
@@ -2190,11 +2201,17 @@ const PLACEHOLDER_ORG_IDS = new Set([
         return;
       }
 
+      const typedCourseTypeData2 = courseTypeData as { id: string } | null;
+      if (!typedCourseTypeData2 || !typedCourseTypeData2.id) {
+        console.error('無法獲取課程類型ID');
+        return;
+      }
+
       // 根據課程類型ID獲取成長樹
       let treesQuery = supabase
         .from('hanami_growth_trees')
         .select('*')
-        .eq('course_type_id', courseTypeData.id)
+        .eq('course_type_id', typedCourseTypeData2.id)
         .order('tree_level', { ascending: true });
 
       if (validOrgId) {
@@ -2372,12 +2389,15 @@ const PLACEHOLDER_ORG_IDS = new Set([
         return;
       }
 
+      const typedAbilities = (abilities || []) as Array<{ id: string; ability_name: string }>;
+      const typedTeachers = (teachers || []) as Array<{ id: string; teacher_fullname: string | null }>;
+      
       setGrowthTreeData({
         tree: selectedTree,
         goals: goals || [],
-        abilitiesOptions: (abilities || []).map(a => ({ value: a.id, label: a.ability_name })),
+        abilitiesOptions: typedAbilities.map(a => ({ value: a.id, label: a.ability_name })),
         activitiesOptions: (activities || []).map(a => ({ value: a.id, label: a.activity_name })),
-        teachersOptions: (teachers || []).map(t => ({ value: t.id, label: t.teacher_fullname || '未命名教師' })),
+        teachersOptions: typedTeachers.map(t => ({ value: t.id, label: t.teacher_fullname || '未命名教師' })),
         studentsInTree: studentsInTree || []
       });
 
@@ -4643,7 +4663,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
               try {
                 // 準備 API 調用的資料格式
                 const apiData = {
-                  student_id: assessment.student_id,
+                  student_id: (assessment as any).student_id,
                   tree_id: assessment.tree_id,
                   assessment_date: assessment.assessment_date,
                   lesson_date: assessment.lesson_date,

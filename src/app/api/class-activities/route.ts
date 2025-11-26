@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
     let teacherSchedule: any[] = [];
     if (teacherId) {
       console.log('查詢教師排程，教師ID:', teacherId);
-      let teacherScheduleQuery = supabase
+      let teacherScheduleQuery = (supabase as any)
         .from('teacher_schedule')
         .select('scheduled_date, start_time, end_time, note')
         .eq('teacher_id', teacherId)
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
     
     const [lessonsResult, trialLessonsResult] = await Promise.all([
       // 查詢正式學生課程
-      supabase
+      (supabase as any)
         .from('hanami_student_lesson')
         .select(`
           id,
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
         .order('actual_timeslot', { ascending: true }),
       
       // 查詢試聽學生課程
-      supabase
+      (supabase as any)
         .from('hanami_trial_students')
         .select(`
           id,

@@ -72,12 +72,12 @@ export default function RoleBasedPermissionsPage() {
     try {
       setSaving(true);
       
-      const { error } = await supabase
-        .from('hanami_roles')
+      const { error } = await (supabase
+        .from('hanami_roles') as any)
         .update({ 
           permissions,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', selectedRole.id);
 
       if (error) throw error;
@@ -119,9 +119,9 @@ export default function RoleBasedPermissionsPage() {
     try {
       setSaving(true);
       
-      const { data, error } = await supabase
-        .from('hanami_roles')
-        .insert(newRole)
+      const { data, error } = await (supabase
+        .from('hanami_roles') as any)
+        .insert(newRole as any)
         .select()
         .single();
 

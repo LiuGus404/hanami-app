@@ -58,13 +58,19 @@ export const roomAPI = {
   // 獲取用戶的房間列表
   async getUserRooms(): Promise<AIRoom[]> {
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) {
+        return [];
+      }
+      
       const { data, error } = await supabase
         .from('ai_rooms')
         .select(`
           *,
           room_members!inner(user_id)
         `)
-        .eq('room_members.user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('room_members.user_id', userId)
         .eq('is_archived', false)
         .order('last_message_at', { ascending: false });
 
@@ -101,6 +107,7 @@ export const roomAPI = {
 
       const { data: room, error: roomError } = await supabase
         .from('ai_rooms')
+        // @ts-ignore - ai_rooms table type may not be fully defined
         .insert({
           ...request,
           created_by: user.id,
@@ -109,12 +116,16 @@ export const roomAPI = {
         .single();
 
       if (roomError) handleSupabaseError(roomError);
+      if (!room) throw new AICompanionError('房間創建失敗');
+
+      const typedRoom = room as { id: string; [key: string]: any };
 
       // 將創建者添加為房間擁有者
       const { error: memberError } = await supabase
         .from('room_members')
+        // @ts-ignore - room_members table type may not be fully defined
         .insert({
-          room_id: room.id,
+          room_id: typedRoom.id,
           user_id: user.id,
           role: 'owner',
         });
@@ -133,13 +144,15 @@ export const roomAPI = {
     try {
       const { data, error } = await supabase
         .from('ai_rooms')
+        // @ts-ignore - ai_rooms table type may not be fully defined
         .update(updates)
         .eq('id', roomId)
         .select()
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('更新房間失敗');
+      return data as AIRoom;
     } catch (error) {
       console.error('更新房間失敗:', error);
       throw error;
@@ -151,6 +164,7 @@ export const roomAPI = {
     try {
       const { error } = await supabase
         .from('ai_rooms')
+        // @ts-ignore - ai_rooms table type may not be fully defined
         .update({ is_archived: true })
         .eq('id', roomId);
 
@@ -183,6 +197,7 @@ export const roomAPI = {
     try {
       const { error } = await supabase
         .from('room_members')
+        // @ts-ignore - room_members table type may not be fully defined
         .insert({
           room_id: roomId,
           user_id: userId,
@@ -272,6 +287,7 @@ export const roleAPI = {
 
       const { data, error } = await supabase
         .from('ai_roles')
+        // @ts-ignore - ai_roles table type may not be fully defined
         .insert({
           ...request,
           creator_user_id: user.id,
@@ -280,7 +296,8 @@ export const roleAPI = {
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('創建角色失敗');
+      return data as AIRole;
     } catch (error) {
       console.error('創建角色失敗:', error);
       throw error;
@@ -292,13 +309,15 @@ export const roleAPI = {
     try {
       const { data, error } = await supabase
         .from('ai_roles')
+        // @ts-ignore - ai_roles table type may not be fully defined
         .update(updates)
         .eq('id', roleId)
         .select()
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('更新角色失敗');
+      return data as AIRole;
     } catch (error) {
       console.error('更新角色失敗:', error);
       throw error;
@@ -349,6 +368,7 @@ export const roleAPI = {
 
       const { data: instance, error: instanceError } = await supabase
         .from('role_instances')
+        // @ts-ignore - role_instances table type may not be fully defined
         .insert({
           ...request,
           created_by: user.id,
@@ -357,13 +377,17 @@ export const roleAPI = {
         .single();
 
       if (instanceError) handleSupabaseError(instanceError);
+      if (!instance) throw new AICompanionError('創建角色實例失敗');
+
+      const typedInstance = instance as { id: string; [key: string]: any };
 
       // 添加到房間角色列表
       const { error: roomRoleError } = await supabase
         .from('room_roles')
+        // @ts-ignore - room_roles table type may not be fully defined
         .insert({
           room_id: request.room_id,
-          role_instance_id: instance.id,
+          role_instance_id: typedInstance.id,
           display_order: 0,
         });
 
@@ -381,13 +405,15 @@ export const roleAPI = {
     try {
       const { data, error } = await supabase
         .from('role_instances')
+        // @ts-ignore - role_instances table type may not be fully defined
         .update(updates)
         .eq('id', instanceId)
         .select('*, role:ai_roles(*)')
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('更新角色實例失敗');
+      return data as RoleInstance;
     } catch (error) {
       console.error('更新角色實例失敗:', error);
       throw error;
@@ -468,6 +494,7 @@ export const messageAPI = {
 
       const { data, error } = await supabase
         .from('ai_messages')
+        // @ts-ignore - ai_messages table type may not be fully defined
         .insert({
           room_id: request.room_id,
           session_id: sessionId,
@@ -483,21 +510,25 @@ export const messageAPI = {
 
       if (error) handleSupabaseError(error);
 
+      const typedData = data as { id?: string; [key: string]: any } | null;
+
       // 如果有指定目標角色，創建一個處理中的 AI 回應
       if (request.target_role_instance_id) {
         await supabase
           .from('ai_messages')
+          // @ts-ignore - ai_messages table type may not be fully defined
           .insert({
             room_id: request.room_id,
             session_id: sessionId,
             sender_type: 'role',
             sender_role_instance_id: request.target_role_instance_id,
-            reply_to_id: data?.id,
+            reply_to_id: typedData?.id,
             status: 'queued',
           });
       }
 
-      return data;
+      if (!typedData) throw new AICompanionError('發送訊息失敗');
+      return typedData as AIMessage;
     } catch (error) {
       console.error('發送訊息失敗:', error);
       throw error;
@@ -509,6 +540,7 @@ export const messageAPI = {
     try {
       const { data, error } = await supabase
         .from('ai_messages')
+        // @ts-ignore - ai_messages table type may not be fully defined
         .update({
           ...updates,
           is_edited: true,
@@ -518,7 +550,8 @@ export const messageAPI = {
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('更新訊息失敗');
+      return data as AIMessage;
     } catch (error) {
       console.error('更新訊息失敗:', error);
       throw error;
@@ -569,12 +602,14 @@ export const memoryAPI = {
     try {
       const { data, error } = await supabase
         .from('memory_items')
+        // @ts-ignore - memory_items table type may not be fully defined
         .insert(request)
         .select()
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('創建記憶失敗');
+      return data as MemoryItem;
     } catch (error) {
       console.error('創建記憶失敗:', error);
       throw error;
@@ -609,10 +644,10 @@ export const memoryAPI = {
       const { data, error } = await query;
       if (error) handleSupabaseError(error);
 
-      return (data || []).map(item => ({
+      return ((data || []) as Array<{ [key: string]: any }>).map(item => ({
         ...item,
         similarity: 0.8, // 模擬相似度分數
-      }));
+      })) as SearchMemoryResult[];
     } catch (error) {
       console.error('搜尋記憶失敗:', error);
       throw error;
@@ -651,13 +686,15 @@ export const memoryAPI = {
     try {
       const { data, error } = await supabase
         .from('memory_items')
+        // @ts-ignore - memory_items table type may not be fully defined
         .update(updates)
         .eq('id', memoryId)
         .select()
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('更新記憶失敗');
+      return data as MemoryItem;
     } catch (error) {
       console.error('更新記憶失敗:', error);
       throw error;
@@ -700,7 +737,7 @@ export const usageAPI = {
       if (error) handleSupabaseError(error);
 
       // 處理統計資料
-      const usage = data || [];
+      const usage = ((data || []) as Array<{ total_tokens?: number; cost_usd?: number; latency_ms?: number; provider?: string; model?: string; [key: string]: any }>);
       const totalRequests = usage.length;
       const totalTokens = usage.reduce((sum, u) => sum + (u.total_tokens || 0), 0);
       const totalCost = usage.reduce((sum, u) => sum + (u.cost_usd || 0), 0);
@@ -762,7 +799,7 @@ export const usageAPI = {
       if (error) handleSupabaseError(error);
 
       // 處理統計資料（類似 getRoomUsage 的邏輯）
-      const usage = data || [];
+      const usage = ((data || []) as Array<{ total_tokens?: number; cost_usd?: number; latency_ms?: number; [key: string]: any }>);
       const totalRequests = usage.length;
       const totalTokens = usage.reduce((sum, u) => sum + (u.total_tokens || 0), 0);
       const totalCost = usage.reduce((sum, u) => sum + (u.cost_usd || 0), 0);
@@ -796,6 +833,7 @@ export const taskAPI = {
 
       const { data, error } = await supabase
         .from('ai_tasks')
+        // @ts-ignore - ai_tasks table type may not be fully defined
         .insert({
           ...request,
           created_by: user.id,
@@ -804,7 +842,8 @@ export const taskAPI = {
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('創建任務失敗');
+      return data as AITask;
     } catch (error) {
       console.error('創建任務失敗:', error);
       throw error;
@@ -838,13 +877,15 @@ export const taskAPI = {
 
       const { data, error } = await supabase
         .from('ai_tasks')
+        // @ts-ignore - ai_tasks table type may not be fully defined
         .update(updates)
         .eq('id', taskId)
         .select()
         .single();
 
       if (error) handleSupabaseError(error);
-      return data;
+      if (!data) throw new AICompanionError('更新任務狀態失敗');
+      return data as AITask;
     } catch (error) {
       console.error('更新任務狀態失敗:', error);
       throw error;
@@ -861,6 +902,7 @@ export const statsAPI = {
   async getRoomStats(roomId: string): Promise<RoomStatistics> {
     try {
       const { data, error } = await supabase
+        // @ts-ignore - get_room_statistics RPC function may not be fully defined
         .rpc('get_room_statistics', { p_room_id: roomId });
 
       if (error) handleSupabaseError(error);

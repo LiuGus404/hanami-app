@@ -114,11 +114,13 @@ async function resolveOrganization(
     return FALLBACK_ORG;
   }
 
+  const typedData = data as { id: string; org_name: string; org_slug: string; status: string; [key: string]: any };
+
   return {
-    id: data.id,
-    name: data.org_name,
-    slug: data.org_slug,
-    status: data.status,
+    id: typedData.id,
+    name: typedData.org_name,
+    slug: typedData.org_slug,
+    status: typedData.status,
   };
 }
 
@@ -137,14 +139,16 @@ export async function validateUserCredentials(email: string, password: string): 
       .single();
 
     if (permissionData && !permissionError) {
+      const typedPermissionData = permissionData as { role_id: string; [key: string]: any };
       // 根據 role_id 查詢角色名稱
       const { data: roleData, error: roleError } = await supabase
         .from('hanami_roles')
         .select('role_name')
-        .eq('id', permissionData.role_id)
+        .eq('id', typedPermissionData.role_id)
         .single();
 
-      const roleName = roleData?.role_name;
+      const typedRoleData = roleData as { role_name?: string; [key: string]: any } | null;
+      const roleName = typedRoleData?.role_name;
       
       if (roleName === 'admin') {
         // 檢查管理員表
@@ -155,17 +159,18 @@ export async function validateUserCredentials(email: string, password: string): 
           .single();
 
         if (adminData && !adminError) {
+          const typedAdminData = adminData as { id: string; org_id: string | null; admin_email: string | null; admin_name: string | null; [key: string]: any };
           // 這裡可以添加密碼驗證邏輯
           // 暫時跳過密碼檢查，直接返回成功
-          const organization = await resolveOrganization(supabase, adminData.org_id, adminData.admin_email || email);
+          const organization = await resolveOrganization(supabase, typedAdminData.org_id, typedAdminData.admin_email || email);
 
           return {
             success: true,
             user: {
-              id: adminData.id,
-              email: adminData.admin_email || email,
+              id: typedAdminData.id,
+              email: typedAdminData.admin_email || email,
               role: 'admin',
-              name: adminData.admin_name || '管理員',
+              name: typedAdminData.admin_name || '管理員',
               organization,
             },
           };
@@ -180,23 +185,25 @@ export async function validateUserCredentials(email: string, password: string): 
           .single();
 
         if (teacherData && !teacherError) {
+          const typedTeacherData = teacherData as { id: string; org_id: string | null; teacher_email: string | null; teacher_fullname: string | null; teacher_nickname: string | null; [key: string]: any };
           // 獲取老師負責的學生ID列表
           const { data: students } = await supabase
             .from('Hanami_Students')
             .select('id')
-            .eq('student_teacher', teacherData.id);
+            .eq('student_teacher', typedTeacherData.id);
 
-          const organization = await resolveOrganization(supabase, teacherData.org_id, teacherData.teacher_email || email);
+          const typedStudents = (students || []) as Array<{ id: string }>;
+          const organization = await resolveOrganization(supabase, typedTeacherData.org_id, typedTeacherData.teacher_email || email);
 
           return {
             success: true,
             user: {
-              id: teacherData.id,
-              email: teacherData.teacher_email || email,
+              id: typedTeacherData.id,
+              email: typedTeacherData.teacher_email || email,
               role: 'teacher',
-              name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
+              name: typedTeacherData.teacher_nickname || typedTeacherData.teacher_fullname || '老師',
               organization,
-              relatedIds: students?.map(s => s.id) || [],
+              relatedIds: typedStudents.map(s => s.id),
             },
           };
         }
@@ -211,23 +218,25 @@ export async function validateUserCredentials(email: string, password: string): 
           .single();
 
         if (parentData && !parentError) {
+          const typedParentData = parentData as { id: string; org_id: string | null; parent_email: string | null; parent_name: string | null; [key: string]: any };
           // 獲取家長連結的學生ID列表
           const { data: linkedStudents } = await supabase
             .from('hanami_parent_student_links')
             .select('student_id')
-            .eq('parent_id', parentData.id);
+            .eq('parent_id', typedParentData.id);
 
-          const organization = await resolveOrganization(supabase, parentData.org_id, parentData.parent_email || email);
+          const typedLinkedStudents = (linkedStudents || []) as Array<{ student_id: string }>;
+          const organization = await resolveOrganization(supabase, typedParentData.org_id, typedParentData.parent_email || email);
 
           return {
             success: true,
             user: {
-              id: parentData.id,
-              email: parentData.parent_email || email,
+              id: typedParentData.id,
+              email: typedParentData.parent_email || email,
               role: 'parent',
-              name: parentData.parent_name || '家長',
+              name: typedParentData.parent_name || '家長',
               organization,
-              relatedIds: linkedStudents?.map(s => s.student_id) || [],
+              relatedIds: typedLinkedStudents.map(s => s.student_id),
             },
           };
         }
@@ -268,23 +277,25 @@ export async function validateUserCredentials(email: string, password: string): 
       .single();
 
     if (teacherData && !teacherError) {
+      const typedTeacherData = teacherData as { id: string; org_id: string | null; teacher_email: string | null; teacher_fullname: string | null; teacher_nickname: string | null; [key: string]: any };
       // 獲取老師負責的學生ID列表
       const { data: students } = await supabase
         .from('Hanami_Students')
         .select('id')
-        .eq('student_teacher', teacherData.id);
+        .eq('student_teacher', typedTeacherData.id);
 
-      const organization = await resolveOrganization(supabase, teacherData.org_id, teacherData.teacher_email || email);
+      const typedStudents = (students || []) as Array<{ id: string }>;
+      const organization = await resolveOrganization(supabase, typedTeacherData.org_id, typedTeacherData.teacher_email || email);
 
       return {
         success: true,
         user: {
-          id: teacherData.id,
-          email: teacherData.teacher_email || email,
+          id: typedTeacherData.id,
+          email: typedTeacherData.teacher_email || email,
           role: 'teacher',
-          name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
+          name: typedTeacherData.teacher_nickname || typedTeacherData.teacher_fullname || '老師',
           organization,
-          relatedIds: students?.map(s => s.id) || [],
+          relatedIds: typedStudents.map(s => s.id),
         },
       };
     }
@@ -298,17 +309,18 @@ export async function validateUserCredentials(email: string, password: string): 
       .single();
 
     if (studentData && !studentError) {
-      const organization = await resolveOrganization(supabase, studentData.org_id, studentData.student_email || studentData.parent_email || email);
+      const typedStudentData = studentData as { id: string; org_id: string | null; student_email: string | null; parent_email: string | null; full_name: string | null; [key: string]: any };
+      const organization = await resolveOrganization(supabase, typedStudentData.org_id, typedStudentData.student_email || typedStudentData.parent_email || email);
 
       return {
         success: true,
         user: {
-          id: studentData.id,
-          email: studentData.student_email || email,
+          id: typedStudentData.id,
+          email: typedStudentData.student_email || email,
           role: 'parent',
-          name: `${studentData.full_name}的家長`,
+          name: `${typedStudentData.full_name || '學生'}的家長`,
           organization,
-          relatedIds: [studentData.id],
+          relatedIds: [typedStudentData.id],
         },
       };
     }
@@ -322,17 +334,18 @@ export async function validateUserCredentials(email: string, password: string): 
       .single();
 
     if (parentData && !parentError) {
-      const organization = await resolveOrganization(supabase, parentData.org_id, parentData.parent_email || email);
+      const typedParentData = parentData as { id: string; org_id: string | null; parent_email: string | null; full_name: string | null; [key: string]: any };
+      const organization = await resolveOrganization(supabase, typedParentData.org_id, typedParentData.parent_email || email);
 
       return {
         success: true,
         user: {
-          id: parentData.id,
-          email: parentData.parent_email || email,
+          id: typedParentData.id,
+          email: typedParentData.parent_email || email,
           role: 'parent',
-          name: `${parentData.full_name}的家長`,
+          name: `${typedParentData.full_name || '學生'}的家長`,
           organization,
-          relatedIds: [parentData.id],
+          relatedIds: [typedParentData.id],
         },
       };
     }
@@ -510,13 +523,14 @@ export async function getUserProfile(): Promise<UserProfile | null> {
           .single();
         
         if (adminData) {
-          const organization = await resolveOrganization(supabase, adminData.org_id, adminData.admin_email || user.email);
+          const typedAdminData = adminData as { id: string; org_id: string | null; admin_email: string | null; admin_name: string | null; [key: string]: any };
+          const organization = await resolveOrganization(supabase, typedAdminData.org_id, typedAdminData.admin_email || user.email);
 
           return {
-            id: adminData.id,
-            email: adminData.admin_email || user.email,
+            id: typedAdminData.id,
+            email: typedAdminData.admin_email || user.email,
             role: 'admin',
-            name: adminData.admin_name || '管理員',
+            name: typedAdminData.admin_name || '管理員',
             organization,
           };
         }
@@ -531,21 +545,23 @@ export async function getUserProfile(): Promise<UserProfile | null> {
           .single();
         
         if (teacherData) {
+          const typedTeacherData = teacherData as { id: string; org_id: string | null; teacher_email: string | null; teacher_fullname: string | null; teacher_nickname: string | null; [key: string]: any };
           // 取得老師負責的學生ID列表
           const { data: students } = await supabase
             .from('Hanami_Students')
             .select('id')
-            .eq('student_teacher', teacherData.id);
+            .eq('student_teacher', typedTeacherData.id);
 
-          const organization = await resolveOrganization(supabase, teacherData.org_id, teacherData.teacher_email || user.email);
+          const typedStudents = (students || []) as Array<{ id: string }>;
+          const organization = await resolveOrganization(supabase, typedTeacherData.org_id, typedTeacherData.teacher_email || user.email);
 
           return {
-            id: teacherData.id,
-            email: teacherData.teacher_email || user.email,
+            id: typedTeacherData.id,
+            email: typedTeacherData.teacher_email || user.email,
             role: 'teacher',
-            name: teacherData.teacher_nickname || teacherData.teacher_fullname || '老師',
+            name: typedTeacherData.teacher_nickname || typedTeacherData.teacher_fullname || '老師',
             organization,
-            relatedIds: students?.map(s => s.id) || [],
+            relatedIds: typedStudents.map(s => s.id),
           };
         }
         break;
@@ -560,21 +576,23 @@ export async function getUserProfile(): Promise<UserProfile | null> {
           .single();
 
         if (parentData) {
+          const typedParentData = parentData as { id: string; org_id: string | null; parent_email: string | null; parent_name: string | null; [key: string]: any };
           // 取得家長連結的學生ID列表
           const { data: linkedStudents } = await supabase
             .from('hanami_parent_student_links')
             .select('student_id')
-            .eq('parent_id', parentData.id);
+            .eq('parent_id', typedParentData.id);
 
-          const organization = await resolveOrganization(supabase, parentData.org_id, parentData.parent_email || user.email);
+          const typedLinkedStudents = (linkedStudents || []) as Array<{ student_id: string }>;
+          const organization = await resolveOrganization(supabase, typedParentData.org_id, typedParentData.parent_email || user.email);
 
           return {
-            id: parentData.id,
-            email: parentData.parent_email || user.email,
+            id: typedParentData.id,
+            email: typedParentData.parent_email || user.email,
             role: 'parent',
-            name: parentData.parent_name || '家長',
+            name: typedParentData.parent_name || '家長',
             organization,
-            relatedIds: linkedStudents?.map(s => s.student_id) || [],
+            relatedIds: typedLinkedStudents.map(s => s.student_id),
           };
         }
         break;

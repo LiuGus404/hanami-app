@@ -6,6 +6,7 @@ import AddRegularStudentForm from '@/components/AddRegularStudentForm';
 import BackButton from '@/components/ui/BackButton';
 
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 function TeacherLinkAddStudentContent() {
   const { orgId, organization, orgDataDisabled } = useTeacherLinkOrganization();
@@ -40,7 +41,9 @@ function TeacherLinkAddStudentContent() {
 export default function TeacherLinkStudentNewPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/students/new">
-      <TeacherLinkAddStudentContent />
+      <WithPermissionCheck pageKey="students">
+        <TeacherLinkAddStudentContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

@@ -106,11 +106,12 @@ export default function TeachingActivityDetailModal({
         console.log('範本載入失敗:', error);
         setTemplate(null);
       } else {
-        console.log('載入的範本資料:', data);
-        if (data && typeof data.template_schema === 'object' && data.template_schema && 'fields' in data.template_schema && Array.isArray(data.template_schema.fields)) {
-          console.log('範本欄位順序:', data.template_schema.fields.map((f: any) => f.title || f.id));
+        const typedData = data as { template_schema?: { fields?: any[]; [key: string]: any }; [key: string]: any } | null;
+        console.log('載入的範本資料:', typedData);
+        if (typedData && typeof typedData.template_schema === 'object' && typedData.template_schema && 'fields' in typedData.template_schema && Array.isArray(typedData.template_schema.fields)) {
+          console.log('範本欄位順序:', typedData.template_schema.fields.map((f: any) => f.title || f.id));
         }
-        setTemplate(data);
+        setTemplate(typedData);
       }
     } catch (error) {
       console.error('載入範本失敗:', error);

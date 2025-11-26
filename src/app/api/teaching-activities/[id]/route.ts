@@ -63,9 +63,9 @@ export async function PUT(
 
     console.log('更新資料:', updateData);
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('hanami_teaching_activities')
-      .update(updateData)
+      .update(updateData as any)
       .eq('id', params.id)
       .select()
       .single();

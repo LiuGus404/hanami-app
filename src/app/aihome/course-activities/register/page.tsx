@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   ArrowLeftIcon,
   CalendarDaysIcon,
   ClockIcon,
@@ -35,12 +35,12 @@ import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector';
 import PhoneInput from '@/components/ui/PhoneInput';
 import EmailInput from '@/components/ui/EmailInput';
 import { validatePhoneNumber, validateEmail } from '@/lib/validationUtils';
-import { 
-  hanamiAiPricingApi, 
-  type CoursePricingPlan, 
+import {
+  hanamiAiPricingApi,
+  type CoursePricingPlan,
   type CourseType,
   type PriceCalculationResult,
-  type CouponValidationResult 
+  type CouponValidationResult
 } from '@/lib/hanami-ai-pricing-api';
 import ChildSelectionModal from '@/components/children/ChildSelectionModal';
 import Image from 'next/image';
@@ -104,7 +104,7 @@ export default function HanamiMusicRegisterPage() {
   const [courseTypeInfo, setCourseTypeInfo] = useState<any>(null); // 課程類型資訊
   const [loadingSchedule, setLoadingSchedule] = useState(false); // 排程載入狀態
   const [showSmartFiltering, setShowSmartFiltering] = useState(false); // 顯示智能篩選界面
-  
+
   // 新的價格系統狀態
   const [courseTypes, setCourseTypes] = useState<CourseTypeWithOrg[]>([]); // 課程類型列表
   const [pricingPlans, setPricingPlans] = useState<CoursePricingPlan[]>([]); // 價格計劃列表
@@ -115,7 +115,7 @@ export default function HanamiMusicRegisterPage() {
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
   const [loadingOrganizations, setLoadingOrganizations] = useState(false);
   const [organizationError, setOrganizationError] = useState<string | null>(null);
-  
+
   // 您孩子資料載入相關狀態
   const [showChildSelection, setShowChildSelection] = useState(false);
   const [availableChildren, setAvailableChildren] = useState<any[]>([]);
@@ -266,7 +266,7 @@ export default function HanamiMusicRegisterPage() {
       // 檢查用戶電話是否已包含國碼
       const countryCodes = ['+852', '+86', '+886', '+65', '+60', '+66', '+84', '+63', '+62', '+1', '+44', '+81', '+82', '+61', '+64'];
       const foundCountry = countryCodes.find(code => user.phone!.startsWith(code));
-      
+
       if (foundCountry) {
         // 如果包含國碼，分離國碼和電話號碼
         const phoneOnly = user.phone!.replace(foundCountry, '').trim();
@@ -307,18 +307,18 @@ export default function HanamiMusicRegisterPage() {
       // 使用當前登入用戶的郵箱
       const userResponse = await fetch(`/api/children/get-user-by-email?email=${encodeURIComponent(user.email)}`);
       const userResult = await userResponse.json();
-      
+
       if (!userResult.success || !userResult.user) {
         alert('無法獲取用戶信息，請確認您已登入');
         return;
       }
-      
+
       const userId = userResult.user.id;
-      
+
       // 獲取您孩子資料
       const response = await fetch(`/api/children?userId=${userId}`);
       const data = await response.json();
-      
+
       if (response.ok && data.children) {
         if (data.children.length === 0) {
           alert('還沒有添加任何您孩子資料，請先在設定頁面添加');
@@ -346,7 +346,7 @@ export default function HanamiMusicRegisterPage() {
   const loadChildData = (child: any) => {
     const birthDate = child.birth_date || child.date_of_birth;
     const age = child.age_in_months ? Math.floor(child.age_in_months / 12) : 0;
-    
+
     setFormData(prev => ({
       ...prev,
       childFullName: child.full_name || '',
@@ -356,7 +356,7 @@ export default function HanamiMusicRegisterPage() {
       childPreferences: child.preferences || '',
       childHealthNotes: child.health_notes || ''
     }));
-    
+
     setShowChildSelection(false);
   };
 
@@ -381,7 +381,7 @@ export default function HanamiMusicRegisterPage() {
         parentEmail: user.email || '',
         parentTitle: user.full_name || '' // 載入用戶的暱稱作為稱呼
       }));
-      
+
       alert('已載入您的聯絡資料');
     } catch (error) {
       console.error('載入用戶資料失敗:', error);
@@ -399,22 +399,22 @@ export default function HanamiMusicRegisterPage() {
   // 計算年齡範圍顯示文字
   const getAgeRangeText = (minAge?: number, maxAge?: number, ageRange?: string) => {
     console.log('🎯 getAgeRangeText 輸入參數:', { minAge, maxAge, ageRange });
-    
+
     // 優先使用資料庫的 age_range 文字
     if (ageRange) {
       console.log('✅ 使用 age_range:', ageRange);
       return ageRange;
     }
-    
+
     // 如果有 min_age 和 max_age，計算年齡範圍
     if (minAge !== undefined && minAge !== null) {
       const minYears = Math.floor(minAge / 12);
       const minMonths = minAge % 12;
-      
+
       if (maxAge !== undefined && maxAge !== null) {
         const maxYears = Math.floor(maxAge / 12);
         const maxMonths = maxAge % 12;
-        
+
         // 格式化最小年齡
         let minAgeText = '';
         if (minYears > 0) {
@@ -425,7 +425,7 @@ export default function HanamiMusicRegisterPage() {
         } else {
           minAgeText = `${minMonths}個月`;
         }
-        
+
         // 格式化最大年齡
         let maxAgeText = '';
         if (maxYears > 0) {
@@ -436,7 +436,7 @@ export default function HanamiMusicRegisterPage() {
         } else {
           maxAgeText = `${maxMonths}個月`;
         }
-        
+
         const result = `${minAgeText} - ${maxAgeText}`;
         console.log('✅ 計算結果（有最大年齡）:', result);
         return result;
@@ -455,7 +455,7 @@ export default function HanamiMusicRegisterPage() {
         return result;
       }
     }
-    
+
     console.log('⚠️ 沒有年齡資料，使用預設值');
     return '適合所有年齡';
   };
@@ -566,7 +566,7 @@ export default function HanamiMusicRegisterPage() {
 
   const loadPricingPlans = useCallback(async (courseTypeId: string) => {
     if (!courseTypeId) return;
-    
+
     try {
       setLoadingPricing(true);
       const plans = await hanamiAiPricingApi.coursePricingApi.getCoursePackagePlans(courseTypeId);
@@ -583,7 +583,7 @@ export default function HanamiMusicRegisterPage() {
   // 計算價格
   const calculatePrice = useCallback(async (courseTypeId: string, pricingPlanId: string, couponCode?: string) => {
     if (!courseTypeId || !pricingPlanId) return;
-    
+
     try {
       const result = await hanamiAiPricingApi.pricingCalculationApi.calculateFinalPrice(
         courseTypeId,
@@ -604,12 +604,12 @@ export default function HanamiMusicRegisterPage() {
       setCouponValidation(null);
       return;
     }
-    
+
     try {
       const result = await hanamiAiPricingApi.couponApi.validateCoupon(couponCode);
       setCouponValidation(result);
       console.log('✅ 優惠券驗證結果:', result);
-      
+
       // 如果優惠券有效且已選擇價格計劃，重新計算價格
       if (result.isValid && formData.selectedPlan && formData.courseType) {
         await calculatePrice(formData.courseType, formData.selectedPlan, couponCode);
@@ -644,22 +644,22 @@ export default function HanamiMusicRegisterPage() {
   // 使用新的 API 獲取日曆資料 - 使用 useCallback 避免重複創建
   const fetchCalendarData = useCallback(async () => {
     console.log('🔄 fetchCalendarData 被調用，formData.courseType:', formData.courseType);
-    
+
     if (!formData.courseType) {
       console.log('❌ 沒有選擇課程類型，跳過日曆資料獲取');
       return;
     }
-    
+
     try {
       setLoadingSchedule(true);
-      
+
       // 計算查詢日期範圍（未來60天）- 使用香港時區
       const now = new Date();
       const hkDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Hong_Kong' }).format(now);
       const today = new Date(hkDateStr);
       const startDate = hkDateStr;
       const endDate = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
+
       // 獲取課程名稱
       const selectedCourse = courseTypes.find(course => course.id === formData.courseType);
       if (!selectedCourse) {
@@ -668,7 +668,7 @@ export default function HanamiMusicRegisterPage() {
         console.error('🔍 可用課程類型:', courseTypes.map(c => ({ id: c.id, name: c.name })));
         return;
       }
-      
+
       console.log('📅 準備調用 API，參數:', {
         courseType: selectedCourse.name,
         isTrial: formData.courseNature === 'trial',
@@ -678,30 +678,30 @@ export default function HanamiMusicRegisterPage() {
       console.log('🔍 選中的課程詳情:', selectedCourse);
       console.log('🔍 課程性質:', formData.courseNature);
       console.log('🔍 當前 formData:', formData);
-      
+
       // 根據課程性質選擇不同的 API
-      const apiEndpoint = formData.courseNature === 'trial' 
-        ? '/api/calendar-data' 
+      const apiEndpoint = formData.courseNature === 'trial'
+        ? '/api/calendar-data'
         : '/api/regular-course-calendar';
-      
-      const requestBody = formData.courseNature === 'trial' 
+
+      const requestBody = formData.courseNature === 'trial'
         ? {
-            courseType: selectedCourse.name,
-            isTrial: true,
-            startDate,
-            endDate,
-            orgId: formData.organizationId || null
-          }
+          courseType: selectedCourse.name,
+          isTrial: true,
+          startDate,
+          endDate,
+          orgId: formData.organizationId || null
+        }
         : {
-            courseType: selectedCourse.name,
-            startDate,
-            endDate,
-            orgId: formData.organizationId || null
-          };
-      
+          courseType: selectedCourse.name,
+          startDate,
+          endDate,
+          orgId: formData.organizationId || null
+        };
+
       console.log('📡 使用 API:', apiEndpoint);
       console.log('📡 請求參數:', requestBody);
-      
+
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
@@ -720,14 +720,14 @@ export default function HanamiMusicRegisterPage() {
 
       const result = await response.json();
       console.log('📡 API 響應結果:', result);
-      
+
       if (result.success) {
         console.log('📅 日曆資料獲取成功:', result.data.length, '天');
         console.log('📊 統計資訊:', result.stats);
         // console.log('📅 前3筆日曆資料:', result.data.slice(0, 3));
         setCalendarData(result.data);
         setCourseTypeInfo(result.courseType);
-        
+
         // 如果是常規課程且沒有選中日期，自動選擇第一個有排程的日期
         if (formData.courseNature === 'regular' && !selectedDate && result.data.length > 0) {
           const firstAvailableDay = result.data.find((day: any) => day.hasSchedule && day.timeSlots && day.timeSlots.length > 0);
@@ -764,12 +764,12 @@ export default function HanamiMusicRegisterPage() {
   // 將時間格式轉換為顯示格式 - 使用 useCallback 避免重複創建
   const formatTimeSlot = useCallback((timeSlot: string, duration?: string) => {
     if (!timeSlot) return '';
-    
+
     // 處理 time without time zone 格式 (HH:MM:SS)
     const timeParts = timeSlot.split(':');
     const startHour = parseInt(timeParts[0]);
     const startMin = parseInt(timeParts[1]);
-    
+
     // 根據課程時長計算結束時間
     let durationMinutes = 45; // 預設45分鐘
     if (duration) {
@@ -778,40 +778,40 @@ export default function HanamiMusicRegisterPage() {
       const durationMins = parseInt(durationParts[1]) || 0;
       durationMinutes = durationHours * 60 + durationMins;
     }
-    
+
     let endHour = startHour;
     let endMin = startMin + durationMinutes;
-    
+
     // 處理分鐘進位
     if (endMin >= 60) {
       endHour += Math.floor(endMin / 60);
       endMin = endMin % 60;
     }
-    
+
     const formatTime = (h: number, m: number) => {
       const displayHour = h.toString().padStart(2, '0');
       const displayMin = m.toString().padStart(2, '0');
       return `${displayHour}:${displayMin}`;
     };
-    
+
     return `${formatTime(startHour, startMin)}-${formatTime(endHour, endMin)}`;
   }, []);
 
   // 生成周曆的函數 - 使用 useMemo 避免無限循環
   const generateWeekCalendar = useMemo(() => {
     console.log('🔍 generateWeekCalendar 執行，formData.courseNature:', formData.courseNature);
-    
+
     // 如果是常規課程，直接使用 API 返回的星期幾排程資料
     if (formData.courseNature === 'regular') {
       console.log('📅 常規課程：使用星期幾排程模式');
-      
+
       const days = [];
-      
+
       // 為每個星期幾（0-6）生成資料
       for (let weekday = 0; weekday <= 6; weekday++) {
         // 從 API 資料中獲取該星期幾的排程資訊
         const weekdayData = calendarData.find(day => day.weekday === weekday);
-        
+
         if (weekdayData) {
           // 有排程資料的星期幾
           days.push({
@@ -848,42 +848,42 @@ export default function HanamiMusicRegisterPage() {
           });
         }
       }
-      
+
       return days;
     }
-    
+
     // 試堂課程：使用原有的日期範圍邏輯
     console.log('📅 試堂課程：使用日期範圍邏輯');
-    
+
     // 使用香港時區獲取當前時間
     const now = new Date();
     const hkDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Hong_Kong' }).format(now);
     const today = new Date(hkDateStr);
-    
+
     // 計算當前週的開始日期（星期日，因為0是日）
     const currentWeekStart = new Date(today);
     const dayOfWeek = today.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     const daysToSunday = dayOfWeek === 0 ? 0 : -dayOfWeek; // 如果是星期日，不調整；否則往前推到星期日
     currentWeekStart.setDate(today.getDate() + daysToSunday);
-    
+
     console.log('📅 生成周曆 (香港時間): 當前週開始日期:', currentWeekStart.toDateString());
     console.log('📅 今天是星期:', dayOfWeek, '(0=日, 1=一, ..., 6=六)');
-    
+
     const days = [];
-    
+
     // 只生成一週的資料（7天，從星期日開始）
     for (let day = 0; day < 7; day++) {
       const currentDate = new Date(currentWeekStart);
       currentDate.setDate(currentWeekStart.getDate() + day);
-      
+
       const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
       const weekday = currentDate.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
-      
+
       // 從 API 資料中獲取該日期的資訊
       const dayData = getCalendarDay(dateStr);
-      
+
       const isToday = currentDate.getTime() === today.getTime();
-      
+
       if (dayData) {
         // 有 API 資料的日期
         days.push({
@@ -914,7 +914,7 @@ export default function HanamiMusicRegisterPage() {
         });
       }
     }
-    
+
     return days;
   }, [getCalendarDay, formData.courseNature, calendarData]);
 
@@ -925,39 +925,39 @@ export default function HanamiMusicRegisterPage() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const startDate = new Date(firstDay);
-    
+
     // 計算該月第一天是星期幾，然後往前推到星期日
     const firstDayOfWeek = firstDay.getDay(); // 0=Sunday, 1=Monday, etc.
     startDate.setDate(startDate.getDate() - firstDayOfWeek);
-    
+
     console.log(`📅 生成日曆: 月份 ${month + 1}, 第一天是星期 ${firstDayOfWeek}, 開始日期: ${startDate.toDateString()}`);
-    
+
     const days = [];
     // 使用香港時區獲取今天的日期
     const now = new Date();
     const hkDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Hong_Kong' }).format(now);
     const today = new Date(hkDateStr);
-    
+
     console.log('🕐 當前香港時間:', now.toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong' }));
     console.log('📅 當前日期 (YYYY-MM-DD):', hkDateStr);
     console.log('🔍 今天日期物件:', today);
-    
+
     for (let i = 0; i < 42; i++) {
       const currentDate = new Date(startDate);
       currentDate.setDate(currentDate.getDate() + i);
-      
+
       const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
       const weekday = currentDate.getDay();
-      
+
       // 從 API 資料中獲取該日期的資訊
       const dayData = getCalendarDay(dateStr);
-      
+
       const isPast = currentDate < today;
       const isToday = currentDate.getTime() === today.getTime();
       const isCurrentMonth = currentDate.getMonth() === month;
       const daysFromToday = Math.floor((currentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       const isBeyondTwoMonths = daysFromToday > 60;
-      
+
       if (dayData) {
         // 有 API 資料的日期
         days.push({
@@ -988,24 +988,24 @@ export default function HanamiMusicRegisterPage() {
         });
       }
     }
-    
+
     return days;
   }, [currentMonth, getCalendarDay, formData.courseNature, calendarData]);
 
   // 獲取選中日期的時段資訊 - 使用 useCallback 避免重複計算
   const getTimeSlotsForDate = useCallback((dateStr: string) => {
     if (!dateStr) return [];
-    
+
     // 常規課程：處理星期幾選擇
     if (formData.courseNature === 'regular' && dateStr.startsWith('weekday-')) {
       const weekday = parseInt(dateStr.replace('weekday-', ''));
       const weekdayData = calendarData.find(day => day.weekday === weekday);
-      
+
       if (!weekdayData || !weekdayData.timeSlots) {
         console.log(`📅 選中星期${weekday}: 沒有時段資料`);
         return [];
       }
-      
+
       // 轉換為前端需要的格式
       const timeSlots = weekdayData.timeSlots.map((slot: any) => ({
         id: slot.id,
@@ -1019,20 +1019,20 @@ export default function HanamiMusicRegisterPage() {
         assignedTeachers: slot.assignedTeachers,
         status: slot.status
       }));
-      
+
       return timeSlots;
     }
-    
+
     // 試堂課程：處理具體日期選擇
     const dayData = getCalendarDay(dateStr);
-    
+
     if (!dayData || !dayData.timeSlots) {
       console.log(`📅 選中日期 ${dateStr}: 沒有時段資料`);
       return [];
     }
-    
+
     console.log(`📅 選中日期 ${dateStr}: 找到 ${dayData.timeSlots.length} 個時段`);
-    
+
     // 轉換為前端需要的格式
     const timeSlots = dayData.timeSlots.map((slot: any) => ({
       id: slot.id,
@@ -1046,7 +1046,7 @@ export default function HanamiMusicRegisterPage() {
       assignedTeachers: slot.assignedTeachers,
       status: slot.status
     }));
-    
+
     console.log(`🎯 最終返回的時段:`, timeSlots);
     return timeSlots;
   }, [getCalendarDay, formData.courseNature]);
@@ -1060,11 +1060,11 @@ export default function HanamiMusicRegisterPage() {
       const today = new Date(hkDateStr);
       let age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
-      
+
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
-      
+
       setFormData(prev => ({ ...prev, childAge: age }));
     }
   }, [formData.childBirthDate]);
@@ -1095,8 +1095,8 @@ export default function HanamiMusicRegisterPage() {
       case 4:
         // 等候區學生不需要選擇日期和時段
         if (!isWaitingList) {
-        if (!formData.selectedDate) newErrors.selectedDate = '請選擇上課日期';
-        if (!formData.selectedTimeSlot) newErrors.selectedTimeSlot = '請選擇上課時段';
+          if (!formData.selectedDate) newErrors.selectedDate = '請選擇上課日期';
+          if (!formData.selectedTimeSlot) newErrors.selectedTimeSlot = '請選擇上課時段';
         }
         break;
       case 5:
@@ -1109,7 +1109,7 @@ export default function HanamiMusicRegisterPage() {
             newErrors.parentPhone = phoneValidation.error || '電話號碼格式不正確';
           }
         }
-        
+
         // 驗證電郵地址
         if (!formData.parentEmail) {
           newErrors.parentEmail = '請輸入電郵地址';
@@ -1119,7 +1119,7 @@ export default function HanamiMusicRegisterPage() {
             newErrors.parentEmail = emailValidation.error || '電郵地址格式不正確';
           }
         }
-        
+
         if (!formData.parentTitle) newErrors.parentTitle = '請輸入您的稱呼';
         break;
       case 6:
@@ -1141,23 +1141,23 @@ export default function HanamiMusicRegisterPage() {
       // 獲取用戶信息
       const userResponse = await fetch('/api/children/get-user-by-email?email=tqfea12@gmail.com');
       const userResult = await userResponse.json();
-      
+
       if (!userResult.success || !userResult.user) {
         console.log('無法獲取用戶信息，跳過自動保存');
         return;
       }
-      
+
       const userId = userResult.user.id;
-      
+
       // 檢查用戶是否已有孩子資料
       const checkResponse = await fetch(`/api/children?userId=${userId}`);
       const checkData = await checkResponse.json();
-      
+
       if (checkResponse.ok && checkData.children && checkData.children.length > 0) {
         console.log('用戶已有孩子資料，跳過自動保存');
         return;
       }
-      
+
       // 準備孩子資料
       const childData = {
         parent_id: userId,
@@ -1169,7 +1169,7 @@ export default function HanamiMusicRegisterPage() {
         health_notes: formData.childHealthNotes || null,
         allergies: null // 目前表單沒有過敏欄位
       };
-      
+
       // 保存到 hanami_children 表
       const saveResponse = await fetch('/api/children', {
         method: 'POST',
@@ -1178,7 +1178,7 @@ export default function HanamiMusicRegisterPage() {
         },
         body: JSON.stringify(childData),
       });
-      
+
       if (saveResponse.ok) {
         console.log('✅ 孩子資料已自動保存到個人資料');
       } else {
@@ -1196,9 +1196,9 @@ export default function HanamiMusicRegisterPage() {
       if (currentStep === 3) {
         await autoSaveChildData();
       }
-      
+
       const nextStep = Math.min(currentStep + 1, steps.length - 1);
-      
+
       // 如果下一步是日期時間步驟（步驟3），先顯示智能篩選界面
       if (nextStep === 4) {
         setShowSmartFiltering(true);
@@ -1218,19 +1218,19 @@ export default function HanamiMusicRegisterPage() {
   // 處理支付成功後的跳轉
   const handlePaymentSuccess = async (data: any) => {
     console.log('支付成功:', data);
-    
+
     // 如果是 Airwallex 支付成功，直接自動提交並跳轉到確認頁面
     if (formData.paymentMethod === 'airwallex') {
       console.log('🚀 Airwallex 支付成功，開始自動提交資料...');
-      
+
       try {
         // 自動執行提交邏輯
         await handleSubmit();
-        
+
         // 跳轉到確認提交步驟
         setCurrentStep(7);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        
+
         console.log('✅ Airwallex 支付成功，資料已自動提交');
       } catch (error) {
         console.error('❌ Airwallex 支付成功但自動提交失敗:', error);
@@ -1245,13 +1245,13 @@ export default function HanamiMusicRegisterPage() {
   // 上一步
   const handlePrev = () => {
     const prevStep = Math.max(currentStep - 1, 0);
-    
+
     // 如果回到日期時間步驟（步驟4），重置等候區狀態
     if (prevStep === 4) {
       setIsWaitingList(false);
       setWaitingListType('none');
     }
-    
+
     setCurrentStep(prevStep);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1259,18 +1259,18 @@ export default function HanamiMusicRegisterPage() {
   // 提交表單
   const handleSubmit = async () => {
     if (!validateStep(currentStep)) return;
-    
+
     console.log('提交表單:', formData);
     console.log('📋 機構 ID (org_id):', formData.organizationId);
     console.log('📋 選中的機構:', selectedOrganization);
-    
+
     // 確保有機構 ID
     if (!formData.organizationId) {
       console.error('❌ 缺少機構 ID，無法提交報名');
       alert('請先選擇報名機構');
       return;
     }
-    
+
     try {
       // 生成 student_oid (B840FAF 格式)
       const generateStudentOid = () => {
@@ -1304,31 +1304,31 @@ export default function HanamiMusicRegisterPage() {
       // 時間格式處理函數
       const formatTimeForDatabase = (timeSlot: string) => {
         if (!timeSlot) return null;
-        
+
         // 取開始時間部分
         const startTime = timeSlot.split('-')[0].trim();
         console.log('🔍 處理時間:', { timeSlot, startTime });
-        
+
         // 如果已經是 HH:MM:SS 格式，直接返回
         if (/^\d{2}:\d{2}:\d{2}$/.test(startTime)) {
           console.log('🔍 時間已經是正確格式:', startTime);
           return startTime;
         }
-        
+
         // 如果是 HH:MM 格式，添加秒數
         if (/^\d{2}:\d{2}$/.test(startTime)) {
           const result = startTime + ':00';
           console.log('🔍 時間格式轉換:', { from: startTime, to: result });
           return result;
         }
-        
+
         // 如果是 HH 格式，添加分秒
         if (/^\d{2}$/.test(startTime)) {
           const result = startTime + ':00:00';
           console.log('🔍 時間格式轉換:', { from: startTime, to: result });
           return result;
         }
-        
+
         console.log('🔍 無法識別的時間格式:', startTime);
         return null;
       };
@@ -1373,8 +1373,8 @@ export default function HanamiMusicRegisterPage() {
 
         console.log('🔍 準備插入到 hanami_trial_students 的資料:', trialStudentData);
 
-        const { error: trialStudentError } = await supabase
-          .from('hanami_trial_students')
+        const { error: trialStudentError } = await (supabase
+          .from('hanami_trial_students') as any)
           .insert([trialStudentData]);
 
         if (trialStudentError) {
@@ -1388,7 +1388,7 @@ export default function HanamiMusicRegisterPage() {
         // 常規課程 - 插入到 hanami_pending_students 待審核
         const selectedPlan = pricingPlans.find(p => p.id === formData.selectedPlan);
         const courseTypeName = courseTypes.find(c => c.id === formData.courseType)?.name || null;
-        
+
         // 處理星期幾選擇（常規課程）
         let weekday = null;
         if (formData.selectedDate && formData.selectedDate.startsWith('weekday-')) {
@@ -1421,29 +1421,29 @@ export default function HanamiMusicRegisterPage() {
           ongoing_lessons: 0,
           upcoming_lessons: selectedPlan?.package_lessons || 0,
           access_role: 'admin',
-          
+
           // 付款資訊
           payment_status: 'paid',
           payment_method: formData.paymentMethod || 'unknown',
           payment_amount: priceCalculation?.final_price || selectedPlan?.package_price || 0,
           payment_currency: 'HKD',
           payment_reference: `PAY_${Date.now()}`,
-          
+
           // 課程計劃資訊
           selected_plan_id: formData.selectedPlan || null,
           selected_plan_name: selectedPlan?.plan_name || null,
           package_lessons: selectedPlan?.package_lessons || null,
           package_price: selectedPlan?.package_price || null,
           org_id: formData.organizationId || null,
-          
+
           // 審核狀態
           review_status: 'pending'
         };
 
         console.log('🔍 準備插入到 hanami_pending_students 的資料:', pendingStudentData);
 
-        const { error: pendingStudentError } = await supabase
-          .from('hanami_pending_students')
+        const { error: pendingStudentError } = await (supabase
+          .from('hanami_pending_students') as any)
           .insert([pendingStudentData]);
 
         if (pendingStudentError) {
@@ -1457,11 +1457,11 @@ export default function HanamiMusicRegisterPage() {
 
       // 顯示成功訊息
       setShowSuccessModal(true);
-      
+
       setTimeout(() => {
         router.push('/aihome/course-activities');
       }, 3000);
-      
+
     } catch (error) {
       console.error('❌ 提交表單異常:', error);
       alert('提交時發生錯誤，請稍後再試');
@@ -1511,12 +1511,12 @@ export default function HanamiMusicRegisterPage() {
                   <Bars3Icon className="w-5 h-5 sm:w-6 sm:h-6 text-[#4B4036]" />
                 </motion.button>
               )}
-              
-              
+
+
               <div className="w-8 h-8 sm:w-10 sm:h-10 relative">
-                <img 
-                  src="/@hanami.png" 
-                  alt="Hanami Music Logo" 
+                <img
+                  src="/@hanami.png"
+                  alt="Hanami Music Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -1525,7 +1525,7 @@ export default function HanamiMusicRegisterPage() {
                 <p className="text-xs sm:text-sm text-[#2B3A3B]">Hanami Music 花見音樂</p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2 sm:space-x-4">
               <div className="hidden sm:block text-sm text-[#2B3A3B]">
                 {currentTime.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
@@ -1583,8 +1583,8 @@ export default function HanamiMusicRegisterPage() {
                 <div className="flex items-center">
                   <div className={`
                     w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300
-                    ${index <= currentStep 
-                      ? 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-md' 
+                    ${index <= currentStep
+                      ? 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-md'
                       : 'bg-gray-200 text-gray-400'
                     }
                   `}>
@@ -1597,9 +1597,8 @@ export default function HanamiMusicRegisterPage() {
                   </div>
                 </div>
                 {index < steps.length - 1 && (
-                  <div className={`flex-1 h-1 mx-4 rounded-full transition-all duration-300 ${
-                    index < currentStep ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]' : 'bg-gray-200'
-                  }`} />
+                  <div className={`flex-1 h-1 mx-4 rounded-full transition-all duration-300 ${index < currentStep ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]' : 'bg-gray-200'
+                    }`} />
                 )}
               </div>
             ))}
@@ -1620,13 +1619,12 @@ export default function HanamiMusicRegisterPage() {
             </div>
             <div className="flex space-x-1">
               {steps.map((_, index) => (
-                <div 
-                  key={index} 
-                  className={`h-1.5 rounded-full flex-1 transition-all duration-300 ${
-                    index <= currentStep 
-                      ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]' 
+                <div
+                  key={index}
+                  className={`h-1.5 rounded-full flex-1 transition-all duration-300 ${index <= currentStep
+                      ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]'
                       : 'bg-gray-200'
-                  }`}
+                    }`}
                 />
               ))}
             </div>
@@ -1638,8 +1636,8 @@ export default function HanamiMusicRegisterPage() {
       <div className="flex-1 flex pb-20 sm:pb-24">
         {/* 側邊欄選單 - 只在登入時顯示 */}
         {user && (
-          <AppSidebar 
-            isOpen={sidebarOpen} 
+          <AppSidebar
+            isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             currentPath="/aihome/course-activities/register"
           />
@@ -1683,7 +1681,7 @@ export default function HanamiMusicRegisterPage() {
                         <p className="text-sm text-[#2B3A3B]/70">正在為 {formData.childFullName || '您孩子'} 尋找最適合的課程時間</p>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-3">
                       <motion.div
                         initial={{ opacity: 0, x: -20 }}
@@ -1764,433 +1762,205 @@ export default function HanamiMusicRegisterPage() {
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                {/* 步驟 0: 選擇分校/機構 */}
-                {currentStep === 0 && (
-                  <div className="space-y-5 sm:space-y-6">
-                    <div className="text-center mb-4">
-                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">選擇分校 / 機構</h2>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">
-                        依據 <span className="font-semibold">hanami_organizations</span> 表顯示現有活動據點，選擇您希望報名的分校。
-                      </p>
-                    </div>
-
-                    {loadingOrganizations ? (
-                      <div className="text-center py-10">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-3"></div>
-                        <p className="text-[#2B3A3B]">正在載入機構資料...</p>
-                      </div>
-                    ) : organizations.length === 0 ? (
-                      <div className="text-center py-10 bg-white rounded-2xl border border-[#EADBC8] space-y-4">
-                        <SparklesIcon className="w-12 h-12 text-[#2B3A3B]/40 mx-auto mb-3" />
-                        <p className="text-[#2B3A3B]">
-                          {organizationError || '暫未有開放的分校，請稍後再試。'}
+                  {/* 步驟 0: 選擇分校/機構 */}
+                  {currentStep === 0 && (
+                    <div className="space-y-5 sm:space-y-6">
+                      <div className="text-center mb-4">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">選擇分校 / 機構</h2>
+                        <p className="text-sm sm:text-base text-[#2B3A3B]">
+                          依據 <span className="font-semibold">hanami_organizations</span> 表顯示現有活動據點，選擇您希望報名的分校。
                         </p>
-                        <motion.button
-                          type="button"
-                          onClick={loadOrganizations}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="px-4 py-2 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                        >
-                          重新整理
-                        </motion.button>
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {organizations.map(org => {
-                          const isSelected = formData.organizationId === org.id;
-                          const displayImage = org.settings?.coverImageUrl || '/@hanami.png';
-                          const displayCategories = (org.settings?.categories || []).map(
-                            cat => CATEGORY_LABEL_MAP[cat] || cat
-                          ).filter(Boolean);
-                          
-                          return (
-                            <motion.button
-                              key={org.id}
-                              type="button"
-                              whileHover={{ scale: 1.01 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => handleOrganizationSelect(org.id)}
-                              className={`w-full rounded-xl border-2 transition-all duration-200 text-left overflow-hidden ${
-                                isSelected
-                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/30 shadow-lg'
-                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/60'
-                              }`}
-                            >
-                              {/* 機構圖案 */}
-                              <div className="relative w-full overflow-hidden" style={{ aspectRatio: '3/2', backgroundColor: '#FFF9F2' }}>
-                                <Image
-                                  src={displayImage}
-                                  alt={org.org_name}
-                                  fill
-                                  className="object-contain"
-                                  sizes="(max-width: 768px) 50vw, 200px"
-                                />
-                              </div>
-                              
-                              {/* 機構資訊 */}
-                              <div className="p-3 sm:p-4">
-                                {/* 機構名稱 */}
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <p className="font-semibold text-[#4B4036] text-sm sm:text-base line-clamp-1">
-                                    {org.org_name}
-                                  </p>
-                                  {isSelected && (
-                                    <CheckCircleIcon className="w-4 h-4 text-[#FFD59A] flex-shrink-0 ml-2" />
-                                  )}
+
+                      {loadingOrganizations ? (
+                        <div className="text-center py-10">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-3"></div>
+                          <p className="text-[#2B3A3B]">正在載入機構資料...</p>
+                        </div>
+                      ) : organizations.length === 0 ? (
+                        <div className="text-center py-10 bg-white rounded-2xl border border-[#EADBC8] space-y-4">
+                          <SparklesIcon className="w-12 h-12 text-[#2B3A3B]/40 mx-auto mb-3" />
+                          <p className="text-[#2B3A3B]">
+                            {organizationError || '暫未有開放的分校，請稍後再試。'}
+                          </p>
+                          <motion.button
+                            type="button"
+                            onClick={loadOrganizations}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="px-4 py-2 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                          >
+                            重新整理
+                          </motion.button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {organizations.map(org => {
+                            const isSelected = formData.organizationId === org.id;
+                            const displayImage = org.settings?.coverImageUrl || '/@hanami.png';
+                            const displayCategories = (org.settings?.categories || []).map(
+                              cat => CATEGORY_LABEL_MAP[cat] || cat
+                            ).filter(Boolean);
+
+                            return (
+                              <motion.button
+                                key={org.id}
+                                type="button"
+                                whileHover={{ scale: 1.01 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => handleOrganizationSelect(org.id)}
+                                className={`w-full rounded-xl border-2 transition-all duration-200 text-left overflow-hidden ${isSelected
+                                    ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/30 shadow-lg'
+                                    : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/60'
+                                  }`}
+                              >
+                                {/* 機構圖案 */}
+                                <div className="relative w-full overflow-hidden" style={{ aspectRatio: '3/2', backgroundColor: '#FFF9F2' }}>
+                                  <Image
+                                    src={displayImage}
+                                    alt={org.org_name}
+                                    fill
+                                    className="object-contain"
+                                    sizes="(max-width: 768px) 50vw, 200px"
+                                  />
                                 </div>
-                                
-                                {/* 機構類型 */}
-                                {displayCategories.length > 0 && (
-                                  <div className="flex flex-wrap gap-1">
-                                    {displayCategories.slice(0, 2).map((category, index) => (
-                                      <span
-                                        key={index}
-                                        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]"
-                                      >
-                                        {category}
-                                      </span>
-                                    ))}
-                                    {displayCategories.length > 2 && (
-                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]">
-                                        +{displayCategories.length - 2}
-                                      </span>
+
+                                {/* 機構資訊 */}
+                                <div className="p-3 sm:p-4">
+                                  {/* 機構名稱 */}
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <p className="font-semibold text-[#4B4036] text-sm sm:text-base line-clamp-1">
+                                      {org.org_name}
+                                    </p>
+                                    {isSelected && (
+                                      <CheckCircleIcon className="w-4 h-4 text-[#FFD59A] flex-shrink-0 ml-2" />
                                     )}
                                   </div>
-                                )}
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    )}
 
-                    {errors.organizationId && (
-                      <p className="text-xs text-red-600 flex items-center space-x-1">
-                        <XCircleIcon className="w-3.5 h-3.5" />
-                        <span>{errors.organizationId}</span>
-                      </p>
-                    )}
+                                  {/* 機構類型 */}
+                                  {displayCategories.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {displayCategories.slice(0, 2).map((category, index) => (
+                                        <span
+                                          key={index}
+                                          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]"
+                                        >
+                                          {category}
+                                        </span>
+                                      ))}
+                                      {displayCategories.length > 2 && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]">
+                                          +{displayCategories.length - 2}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                    {/* 動態箭頭提醒向下滑動 */}
-                    {formData.organizationId && (
-                      <div className="mt-8 text-center">
-                        <motion.div
-                          animate={{ 
-                            y: [0, 10, 0],
-                            opacity: [0.7, 1, 0.7]
-                          }}
-                          transition={{ 
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
-                          className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
-                        >
-                          <p className="text-sm font-medium">選擇後向下滑動按下一步</p>
-                          <ChevronDownIcon className="w-6 h-6" />
-                        </motion.div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 步驟 1: 課程性質 */}
-                {currentStep === 1 && (
-                  <div className="space-y-4 sm:space-y-6">
-                    <div className="text-center mb-6 sm:mb-8">
-                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">選擇課程性質</h2>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">請選擇試堂或常規課程</p>
-                    </div>
-
-                    {/* 等候區按鈕 */}
-                    <div className="text-center">
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => router.push('/aihome/registration')}
-                        className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        <ClockIcon className="w-5 h-5" />
-                        <span>加入等候區</span>
-                        <ChevronRightIcon className="w-4 h-4" />
-                      </motion.button>
-                      <p className="text-xs text-[#2B3A3B] mt-2 opacity-70">我們將會在有位時第一時間通知您</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setFormData(prev => ({ ...prev, courseNature: 'trial' }))}
-                        className={`p-6 sm:p-8 rounded-2xl border-2 transition-all duration-200 ${
-                          formData.courseNature === 'trial'
-                            ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                        }`}
-                      >
-                        <SparklesIcon className="w-12 h-12 sm:w-16 sm:h-16 text-[#4B4036] mx-auto mb-4" />
-                        <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036] mb-2">試堂</h3>
-                        <p className="text-sm sm:text-base text-[#2B3A3B] mb-2">以"最優惠"價格體驗課堂</p>
-                        <p className="text-lg sm:text-xl font-bold text-green-600">試堂$168</p>
-                      </motion.button>
-
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          console.log('🎯 用戶選擇常規課程');
-                          setFormData(prev => ({ ...prev, courseNature: 'regular' }));
-                        }}
-                        className={`p-6 sm:p-8 rounded-2xl border-2 transition-all duration-200 ${
-                          formData.courseNature === 'regular'
-                            ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                        }`}
-                      >
-                        <CheckCircleIcon className="w-12 h-12 sm:w-16 sm:h-16 text-[#4B4036] mx-auto mb-4" />
-                        <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036] mb-2">常規課程</h3>
-                        <p className="text-sm sm:text-base text-[#2B3A3B] mb-2">以優惠價惠價格，展開您孩子的學習之旅</p>
-                        <p className="text-lg sm:text-xl font-bold text-[#F89090]">立即開始</p>
-                      </motion.button>
-                    </div>
-
-                    {/* 動態箭頭提醒向下滑動 */}
-                    <div className="mt-8 text-center">
-                      <motion.div
-                        animate={{ 
-                          y: [0, 10, 0],
-                          opacity: [0.7, 1, 0.7]
-                        }}
-                        transition={{ 
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                        className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
-                      >
-                        <p className="text-sm font-medium">選擇後向下滑動按下一步</p>
-                        <ChevronDownIcon className="w-6 h-6" />
-                      </motion.div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 步驟 2: 選擇課程 */}
-                {currentStep === 2 && (
-                  <div className="space-y-4 sm:space-y-6">
-                    <div className="text-center mb-6 sm:mb-8">
-                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">選擇課程類型</h2>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">
-                        {selectedOrganization
-                          ? `目前為 ${selectedOrganization.org_name} 機構篩選課程`
-                          : '請選擇適合的課程'}
-                      </p>
-                    </div>
-
-                    {/* 載入中狀態 */}
-                    {loadingCourses ? (
-                      <div className="text-center py-12">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
-                        <p className="text-[#2B3A3B]">載入課程中...</p>
-                      </div>
-                    ) : displayedCourseTypes.length === 0 ? (
-                      <div className="text-center py-12 bg-white rounded-2xl border-2 border-[#EADBC8]">
-                        <MusicalNoteIcon className="w-16 h-16 text-[#2B3A3B]/30 mx-auto mb-4" />
-                        <p className="text-[#2B3A3B]">
-                          {selectedOrganization
-                            ? `${selectedOrganization.org_name} 尚未開設課程，請選擇其他分校`
-                            : '請先選擇分校以顯示課程'}
+                      {errors.organizationId && (
+                        <p className="text-xs text-red-600 flex items-center space-x-1">
+                          <XCircleIcon className="w-3.5 h-3.5" />
+                          <span>{errors.organizationId}</span>
                         </p>
+                      )}
+
+                      {/* 動態箭頭提醒向下滑動 */}
+                      {formData.organizationId && (
+                        <div className="mt-8 text-center">
+                          <motion.div
+                            animate={{
+                              y: [0, 10, 0],
+                              opacity: [0.7, 1, 0.7]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }}
+                            className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                          >
+                            <p className="text-sm font-medium">選擇後向下滑動按下一步</p>
+                            <ChevronDownIcon className="w-6 h-6" />
+                          </motion.div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 步驟 1: 課程性質 */}
+                  {currentStep === 1 && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <div className="text-center mb-6 sm:mb-8">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">選擇課程性質</h2>
+                        <p className="text-sm sm:text-base text-[#2B3A3B]">請選擇試堂或常規課程</p>
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {displayedCourseTypes.map((course) => (
+
+                      {/* 等候區按鈕 */}
+                      <div className="text-center">
                         <motion.button
-                          key={course.id}
+                          type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => router.push('/aihome/registration')}
+                          className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                        >
+                          <ClockIcon className="w-5 h-5" />
+                          <span>加入等候區</span>
+                          <ChevronRightIcon className="w-4 h-4" />
+                        </motion.button>
+                        <p className="text-xs text-[#2B3A3B] mt-2 opacity-70">我們將會在有位時第一時間通知您</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <motion.button
                           type="button"
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => setFormData(prev => ({ ...prev, courseType: course.id }))}
-                          className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 text-left relative ${
-                            formData.courseType === course.id
+                          onClick={() => setFormData(prev => ({ ...prev, courseNature: 'trial' }))}
+                          className={`p-6 sm:p-8 rounded-2xl border-2 transition-all duration-200 ${formData.courseNature === 'trial'
                               ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
                               : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                          }`}
+                            }`}
                         >
-                          {/* 精選標籤 */}
-                          {course.is_featured && (
-                            <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md flex items-center space-x-1">
-                              <StarIcon className="w-3 h-3" />
-                              <span>精選</span>
-                            </div>
-                          )}
-                          
-                          <div className="flex items-start space-x-3 mb-3">
-                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${(course as any).color || 'from-blue-500 to-purple-600'} flex items-center justify-center flex-shrink-0 overflow-hidden`}>
-                              {imageIconMap[course.name] || imageIconMap[(course as any).icon_type] ? (
-                                <img 
-                                  src={imageIconMap[course.name] || imageIconMap[(course as any).icon_type]} 
-                                  alt={course.name}
-                                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
-                                />
-                              ) : (
-                                (course as any).icon && React.createElement((course as any).icon, { className: "w-6 h-6 sm:w-7 sm:h-7 text-white" })
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-[#4B4036] mb-2 text-base sm:text-lg">{course.name}班</h3>
-                              <div className="space-y-1.5">
-                                {/* 年齡範圍 */}
-                                <div className="flex items-center space-x-2">
-                                  <UserGroupIcon className="w-4 h-4 text-[#4B4036] flex-shrink-0" />
-                                  <span className="text-xs sm:text-sm text-[#2B3A3B]">
-                                    {(course as any).age || '適合所有年齡'}
-                                  </span>
-                                </div>
-                                {/* 課程時長 */}
-                                {course.duration_minutes && (
-                                  <div className="flex items-center space-x-2">
-                                    <ClockIcon className="w-4 h-4 text-[#4B4036] flex-shrink-0" />
-                                    <span className="text-xs sm:text-sm text-[#2B3A3B]">
-                                      {course.duration_minutes} 分鐘
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* 課程描述 */}
-                          {course.description && (
-                            <p className="text-xs sm:text-sm text-[#2B3A3B]/80 line-clamp-2">
-                              {course.description}
-                            </p>
-                          )}
+                          <SparklesIcon className="w-12 h-12 sm:w-16 sm:h-16 text-[#4B4036] mx-auto mb-4" />
+                          <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036] mb-2">試堂</h3>
+                          <p className="text-sm sm:text-base text-[#2B3A3B] mb-2">以"最優惠"價格體驗課堂</p>
+                          <p className="text-lg sm:text-xl font-bold text-green-600">試堂$168</p>
                         </motion.button>
-                      ))}
+
+                        <motion.button
+                          type="button"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            console.log('🎯 用戶選擇常規課程');
+                            setFormData(prev => ({ ...prev, courseNature: 'regular' }));
+                          }}
+                          className={`p-6 sm:p-8 rounded-2xl border-2 transition-all duration-200 ${formData.courseNature === 'regular'
+                              ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
+                              : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                            }`}
+                        >
+                          <CheckCircleIcon className="w-12 h-12 sm:w-16 sm:h-16 text-[#4B4036] mx-auto mb-4" />
+                          <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036] mb-2">常規課程</h3>
+                          <p className="text-sm sm:text-base text-[#2B3A3B] mb-2">以優惠價惠價格，展開您孩子的學習之旅</p>
+                          <p className="text-lg sm:text-xl font-bold text-[#F89090]">立即開始</p>
+                        </motion.button>
                       </div>
-                    )}
 
-                    {!loadingCourses && formData.courseNature === 'regular' && (
-                      <div className="mt-6 sm:mt-8">
-                        <h3 className="text-lg sm:text-xl font-bold text-[#4B4036] mb-4">選擇課程計劃</h3>
-                        
-                        {loadingPricing ? (
-                          <div className="text-center py-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
-                            <p className="text-[#2B3A3B]">載入課程計劃中...</p>
-                          </div>
-                        ) : pricingPlans.length === 0 ? (
-                          <div className="text-center py-8 bg-white rounded-2xl border-2 border-[#EADBC8]">
-                            <MusicalNoteIcon className="w-12 h-12 text-[#2B3A3B]/30 mx-auto mb-4" />
-                            <p className="text-[#2B3A3B]">此課程暫無可用的課程計劃</p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {pricingPlans.map((plan) => {
-                              const averagePricePerLesson = plan.package_lessons && plan.package_price 
-                                ? hanamiAiPricingApi.pricingCalculationApi.calculateAveragePricePerLesson(
-                                    plan.package_price, 
-                                    plan.package_lessons
-                                  )
-                                : 0;
-                              
-                              return (
-                                <motion.button
-                                  key={plan.id}
-                                  type="button"
-                                  whileHover={{ scale: 1.02 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  onClick={() => setFormData(prev => ({ ...prev, selectedPlan: plan.id }))}
-                                  className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 relative ${
-                                    formData.selectedPlan === plan.id
-                                      ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                                      : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                                  }`}
-                                >
-                                  {plan.is_featured && (
-                                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                                      最多人選擇
-                                    </div>
-                                  )}
-                                  <h4 className="text-base sm:text-lg font-bold text-[#4B4036] mb-2">{plan.plan_name}</h4>
-                                  {plan.plan_description && (
-                                    <p className="text-xs sm:text-sm text-[#2B3A3B] mb-3">{plan.plan_description}</p>
-                                  )}
-                                  <div className="mb-2 text-center">
-                                    {plan.price_per_lesson && plan.package_lessons && (
-                                      <div className="text-sm text-gray-400 line-through mb-1">
-                                        {hanamiAiPricingApi.formatPrice(plan.price_per_lesson * plan.package_lessons, plan.currency)}
-                                      </div>
-                                    )}
-                                    <div className="text-xl sm:text-2xl font-bold text-[#4B4036]">
-                                      {hanamiAiPricingApi.formatPrice(plan.package_price || 0, plan.currency)}
-                                    </div>
-                                  </div>
-                                  <p className="text-xs text-[#2B3A3B]">
-                                    {plan.package_lessons} 堂課程
-                                    {averagePricePerLesson > 0 && (
-                                      <span className="block mt-1 text-green-600">
-                                        平均每堂 {hanamiAiPricingApi.formatPrice(averagePricePerLesson, plan.currency)}
-                                      </span>
-                                    )}
-                                  </p>
-                                </motion.button>
-                              );
-                            })}
-                          </div>
-                        )}
-
-
-                        {/* 價格計算結果 */}
-                        {priceCalculation && formData.selectedPlan && (
-                          <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border border-green-200">
-                            <h4 className="text-sm font-semibold text-green-800 mb-3">價格明細</h4>
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-green-700">課程包原價：</span>
-                                <span className="font-medium">{hanamiAiPricingApi.formatPrice(priceCalculation.base_price, priceCalculation.currency)}</span>
-                              </div>
-                              {priceCalculation.discount_amount > 0 && (
-                                <div className="flex justify-between text-green-600">
-                                  <span>優惠折扣：</span>
-                                  <span className="font-medium">-{hanamiAiPricingApi.formatPrice(priceCalculation.discount_amount, priceCalculation.currency)}</span>
-                                </div>
-                              )}
-                              <div className="border-t border-green-300 pt-2">
-                                <div className="flex justify-between">
-                                  <span className="font-semibold text-green-800">最終價格：</span>
-                                  <span className="text-lg font-bold text-green-800">
-                                    {hanamiAiPricingApi.formatPrice(priceCalculation.final_price, priceCalculation.currency)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {errors.courseType && (
-                      <p className="text-sm text-red-600 flex items-center justify-center mt-2">
-                        <XCircleIcon className="w-4 h-4 mr-1" />
-                        {errors.courseType}
-                      </p>
-                    )}
-
-                    {/* 動態箭頭提醒向下滑動 */}
-                    {formData.courseType && (
+                      {/* 動態箭頭提醒向下滑動 */}
                       <div className="mt-8 text-center">
                         <motion.div
-                          animate={{ 
+                          animate={{
                             y: [0, 10, 0],
                             opacity: [0.7, 1, 0.7]
                           }}
-                          transition={{ 
+                          transition={{
                             duration: 2,
                             repeat: Infinity,
                             ease: "easeInOut"
@@ -2201,236 +1971,454 @@ export default function HanamiMusicRegisterPage() {
                           <ChevronDownIcon className="w-6 h-6" />
                         </motion.div>
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 步驟 3: 您孩子資料 */}
-                {currentStep === 3 && (
-                  <div className="space-y-4 sm:space-y-6">
-                    <div className="text-center mb-6 sm:mb-8">
-                      <div className="flex items-center justify-center gap-4 mb-4">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">您孩子資料</h2>
-                        <button
-                          onClick={loadExistingChildren}
-                          disabled={loadingChildren}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-xl hover:bg-[#EBC9A4] transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {loadingChildren ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-[#4B4036] border-t-transparent rounded-full animate-spin"></div>
-                              <span className="text-sm font-medium">載入中...</span>
-                            </>
-                          ) : (
-                            <>
-                              <ArrowPathIcon className="w-4 h-4" />
-                              <span className="text-sm font-medium">載入現有資料</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫您孩子的基本資料</p>
                     </div>
+                  )}
 
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                          全名 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.childFullName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, childFullName: e.target.value }))}
-                          className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                            errors.childFullName
-                              ? 'border-red-500 focus:border-red-500'
-                              : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                          } focus:outline-none`}
-                          placeholder="請輸入您孩子全名"
-                        />
-                        {errors.childFullName && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center">
-                            <XCircleIcon className="w-4 h-4 mr-1" />
-                            {errors.childFullName}
+                  {/* 步驟 2: 選擇課程 */}
+                  {currentStep === 2 && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <div className="text-center mb-6 sm:mb-8">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">選擇課程類型</h2>
+                        <p className="text-sm sm:text-base text-[#2B3A3B]">
+                          {selectedOrganization
+                            ? `目前為 ${selectedOrganization.org_name} 機構篩選課程`
+                            : '請選擇適合的課程'}
+                        </p>
+                      </div>
+
+                      {/* 載入中狀態 */}
+                      {loadingCourses ? (
+                        <div className="text-center py-12">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
+                          <p className="text-[#2B3A3B]">載入課程中...</p>
+                        </div>
+                      ) : displayedCourseTypes.length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-2xl border-2 border-[#EADBC8]">
+                          <MusicalNoteIcon className="w-16 h-16 text-[#2B3A3B]/30 mx-auto mb-4" />
+                          <p className="text-[#2B3A3B]">
+                            {selectedOrganization
+                              ? `${selectedOrganization.org_name} 尚未開設課程，請選擇其他分校`
+                              : '請先選擇分校以顯示課程'}
                           </p>
-                        )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {displayedCourseTypes.map((course) => (
+                            <motion.button
+                              key={course.id}
+                              type="button"
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setFormData(prev => ({ ...prev, courseType: course.id }))}
+                              className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 text-left relative ${formData.courseType === course.id
+                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
+                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                }`}
+                            >
+                              {/* 精選標籤 */}
+                              {course.is_featured && (
+                                <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md flex items-center space-x-1">
+                                  <StarIcon className="w-3 h-3" />
+                                  <span>精選</span>
+                                </div>
+                              )}
+
+                              <div className="flex items-start space-x-3 mb-3">
+                                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${(course as any).color || 'from-blue-500 to-purple-600'} flex items-center justify-center flex-shrink-0 overflow-hidden`}>
+                                  {imageIconMap[course.name] || imageIconMap[(course as any).icon_type] ? (
+                                    <img
+                                      src={imageIconMap[course.name] || imageIconMap[(course as any).icon_type]}
+                                      alt={course.name}
+                                      className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                                    />
+                                  ) : (
+                                    (course as any).icon && React.createElement((course as any).icon, { className: "w-6 h-6 sm:w-7 sm:h-7 text-white" })
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-[#4B4036] mb-2 text-base sm:text-lg">{course.name}班</h3>
+                                  <div className="space-y-1.5">
+                                    {/* 年齡範圍 */}
+                                    <div className="flex items-center space-x-2">
+                                      <UserGroupIcon className="w-4 h-4 text-[#4B4036] flex-shrink-0" />
+                                      <span className="text-xs sm:text-sm text-[#2B3A3B]">
+                                        {(course as any).age || '適合所有年齡'}
+                                      </span>
+                                    </div>
+                                    {/* 課程時長 */}
+                                    {course.duration_minutes && (
+                                      <div className="flex items-center space-x-2">
+                                        <ClockIcon className="w-4 h-4 text-[#4B4036] flex-shrink-0" />
+                                        <span className="text-xs sm:text-sm text-[#2B3A3B]">
+                                          {course.duration_minutes} 分鐘
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 課程描述 */}
+                              {course.description && (
+                                <p className="text-xs sm:text-sm text-[#2B3A3B]/80 line-clamp-2">
+                                  {course.description}
+                                </p>
+                              )}
+                            </motion.button>
+                          ))}
+                        </div>
+                      )}
+
+                      {!loadingCourses && formData.courseNature === 'regular' && (
+                        <div className="mt-6 sm:mt-8">
+                          <h3 className="text-lg sm:text-xl font-bold text-[#4B4036] mb-4">選擇課程計劃</h3>
+
+                          {loadingPricing ? (
+                            <div className="text-center py-8">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
+                              <p className="text-[#2B3A3B]">載入課程計劃中...</p>
+                            </div>
+                          ) : pricingPlans.length === 0 ? (
+                            <div className="text-center py-8 bg-white rounded-2xl border-2 border-[#EADBC8]">
+                              <MusicalNoteIcon className="w-12 h-12 text-[#2B3A3B]/30 mx-auto mb-4" />
+                              <p className="text-[#2B3A3B]">此課程暫無可用的課程計劃</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {pricingPlans.map((plan) => {
+                                const averagePricePerLesson = plan.package_lessons && plan.package_price
+                                  ? hanamiAiPricingApi.pricingCalculationApi.calculateAveragePricePerLesson(
+                                    plan.package_price,
+                                    plan.package_lessons
+                                  )
+                                  : 0;
+
+                                return (
+                                  <motion.button
+                                    key={plan.id}
+                                    type="button"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => setFormData(prev => ({ ...prev, selectedPlan: plan.id }))}
+                                    className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 relative ${formData.selectedPlan === plan.id
+                                        ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
+                                        : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                      }`}
+                                  >
+                                    {plan.is_featured && (
+                                      <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                                        最多人選擇
+                                      </div>
+                                    )}
+                                    <h4 className="text-base sm:text-lg font-bold text-[#4B4036] mb-2">{plan.plan_name}</h4>
+                                    {plan.plan_description && (
+                                      <p className="text-xs sm:text-sm text-[#2B3A3B] mb-3">{plan.plan_description}</p>
+                                    )}
+                                    <div className="mb-2 text-center">
+                                      {plan.price_per_lesson && plan.package_lessons && (
+                                        <div className="text-sm text-gray-400 line-through mb-1">
+                                          {hanamiAiPricingApi.formatPrice(plan.price_per_lesson * plan.package_lessons, plan.currency)}
+                                        </div>
+                                      )}
+                                      <div className="text-xl sm:text-2xl font-bold text-[#4B4036]">
+                                        {hanamiAiPricingApi.formatPrice(plan.package_price || 0, plan.currency)}
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-[#2B3A3B]">
+                                      {plan.package_lessons} 堂課程
+                                      {averagePricePerLesson > 0 && (
+                                        <span className="block mt-1 text-green-600">
+                                          平均每堂 {hanamiAiPricingApi.formatPrice(averagePricePerLesson, plan.currency)}
+                                        </span>
+                                      )}
+                                    </p>
+                                  </motion.button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+
+                          {/* 價格計算結果 */}
+                          {priceCalculation && formData.selectedPlan && (
+                            <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border border-green-200">
+                              <h4 className="text-sm font-semibold text-green-800 mb-3">價格明細</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-green-700">課程包原價：</span>
+                                  <span className="font-medium">{hanamiAiPricingApi.formatPrice(priceCalculation.base_price, priceCalculation.currency)}</span>
+                                </div>
+                                {priceCalculation.discount_amount > 0 && (
+                                  <div className="flex justify-between text-green-600">
+                                    <span>優惠折扣：</span>
+                                    <span className="font-medium">-{hanamiAiPricingApi.formatPrice(priceCalculation.discount_amount, priceCalculation.currency)}</span>
+                                  </div>
+                                )}
+                                <div className="border-t border-green-300 pt-2">
+                                  <div className="flex justify-between">
+                                    <span className="font-semibold text-green-800">最終價格：</span>
+                                    <span className="text-lg font-bold text-green-800">
+                                      {hanamiAiPricingApi.formatPrice(priceCalculation.final_price, priceCalculation.currency)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {errors.courseType && (
+                        <p className="text-sm text-red-600 flex items-center justify-center mt-2">
+                          <XCircleIcon className="w-4 h-4 mr-1" />
+                          {errors.courseType}
+                        </p>
+                      )}
+
+                      {/* 動態箭頭提醒向下滑動 */}
+                      {formData.courseType && (
+                        <div className="mt-8 text-center">
+                          <motion.div
+                            animate={{
+                              y: [0, 10, 0],
+                              opacity: [0.7, 1, 0.7]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }}
+                            className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                          >
+                            <p className="text-sm font-medium">選擇後向下滑動按下一步</p>
+                            <ChevronDownIcon className="w-6 h-6" />
+                          </motion.div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 步驟 3: 您孩子資料 */}
+                  {currentStep === 3 && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <div className="text-center mb-6 sm:mb-8">
+                        <div className="flex items-center justify-center gap-4 mb-4">
+                          <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">您孩子資料</h2>
+                          <button
+                            onClick={loadExistingChildren}
+                            disabled={loadingChildren}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-xl hover:bg-[#EBC9A4] transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {loadingChildren ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-[#4B4036] border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-sm font-medium">載入中...</span>
+                              </>
+                            ) : (
+                              <>
+                                <ArrowPathIcon className="w-4 h-4" />
+                                <span className="text-sm font-medium">載入現有資料</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫您孩子的基本資料</p>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">暱稱</label>
-                        <input
-                          type="text"
-                          value={formData.childNickname}
-                          onChange={(e) => setFormData(prev => ({ ...prev, childNickname: e.target.value }))}
-                          className="w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 border-[#EADBC8] focus:border-[#FFD59A] focus:outline-none transition-all duration-200"
-                          placeholder="請輸入暱稱（選填）"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                          出生日期 <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                            全名 <span className="text-red-500">*</span>
+                          </label>
                           <input
-                            type="date"
-                            value={formData.childBirthDate}
-                            onChange={(e) => setFormData(prev => ({ ...prev, childBirthDate: e.target.value }))}
-                            className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                              errors.childBirthDate
+                            type="text"
+                            value={formData.childFullName}
+                            onChange={(e) => setFormData(prev => ({ ...prev, childFullName: e.target.value }))}
+                            className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.childFullName
                                 ? 'border-red-500 focus:border-red-500'
                                 : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                            } focus:outline-none`}
+                              } focus:outline-none`}
+                            placeholder="請輸入您孩子全名"
                           />
-                          <CakeIcon className="absolute right-3 top-3.5 sm:top-4 w-5 h-5 text-[#4B4036] pointer-events-none" />
+                          {errors.childFullName && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <XCircleIcon className="w-4 h-4 mr-1" />
+                              {errors.childFullName}
+                            </p>
+                          )}
                         </div>
-                        {errors.childBirthDate && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center">
-                            <XCircleIcon className="w-4 h-4 mr-1" />
-                            {errors.childBirthDate}
-                          </p>
-                        )}
-                      </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">年齡</label>
-                        <div className="px-4 py-3 sm:py-4 rounded-xl border-2 border-[#EADBC8] bg-gray-50">
-                          <span className="text-[#4B4036] font-medium">
-                            {formData.childAge > 0 ? `${formData.childAge} 歲` : '請先選擇出生日期'}
-                          </span>
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">暱稱</label>
+                          <input
+                            type="text"
+                            value={formData.childNickname}
+                            onChange={(e) => setFormData(prev => ({ ...prev, childNickname: e.target.value }))}
+                            className="w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 border-[#EADBC8] focus:border-[#FFD59A] focus:outline-none transition-all duration-200"
+                            placeholder="請輸入暱稱（選填）"
+                          />
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                          性別 <span className="text-red-500">*</span>
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <motion.button
-                            type="button"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setFormData(prev => ({ ...prev, childGender: '男' }))}
-                            className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                              formData.childGender === '男'
-                                ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
-                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                            }`}
-                          >
-                            <div className="text-center">
-                              <div className="mb-2 flex justify-center">
-                                <img 
-                                  src="/boy.png" 
-                                  alt="男孩" 
-                                  className="w-12 h-12 object-contain"
-                                />
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                            出生日期 <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={formData.childBirthDate}
+                              onChange={(e) => setFormData(prev => ({ ...prev, childBirthDate: e.target.value }))}
+                              className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.childBirthDate
+                                  ? 'border-red-500 focus:border-red-500'
+                                  : 'border-[#EADBC8] focus:border-[#FFD59A]'
+                                } focus:outline-none`}
+                            />
+                            <CakeIcon className="absolute right-3 top-3.5 sm:top-4 w-5 h-5 text-[#4B4036] pointer-events-none" />
+                          </div>
+                          {errors.childBirthDate && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <XCircleIcon className="w-4 h-4 mr-1" />
+                              {errors.childBirthDate}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">年齡</label>
+                          <div className="px-4 py-3 sm:py-4 rounded-xl border-2 border-[#EADBC8] bg-gray-50">
+                            <span className="text-[#4B4036] font-medium">
+                              {formData.childAge > 0 ? `${formData.childAge} 歲` : '請先選擇出生日期'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                            性別 <span className="text-red-500">*</span>
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <motion.button
+                              type="button"
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setFormData(prev => ({ ...prev, childGender: '男' }))}
+                              className={`p-4 rounded-xl border-2 transition-all duration-200 ${formData.childGender === '男'
+                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
+                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                }`}
+                            >
+                              <div className="text-center">
+                                <div className="mb-2 flex justify-center">
+                                  <img
+                                    src="/boy.png"
+                                    alt="男孩"
+                                    className="w-12 h-12 object-contain"
+                                  />
+                                </div>
+                                <span className="font-medium text-[#4B4036]">男孩</span>
                               </div>
-                              <span className="font-medium text-[#4B4036]">男孩</span>
-                            </div>
-                          </motion.button>
-                          <motion.button
-                            type="button"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setFormData(prev => ({ ...prev, childGender: '女' }))}
-                            className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                              formData.childGender === '女'
-                                ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
-                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                            }`}
-                          >
-                            <div className="text-center">
-                              <div className="mb-2 flex justify-center">
-                                <img 
-                                  src="/girl.png" 
-                                  alt="女孩" 
-                                  className="w-12 h-12 object-contain"
-                                />
+                            </motion.button>
+                            <motion.button
+                              type="button"
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setFormData(prev => ({ ...prev, childGender: '女' }))}
+                              className={`p-4 rounded-xl border-2 transition-all duration-200 ${formData.childGender === '女'
+                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
+                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                }`}
+                            >
+                              <div className="text-center">
+                                <div className="mb-2 flex justify-center">
+                                  <img
+                                    src="/girl.png"
+                                    alt="女孩"
+                                    className="w-12 h-12 object-contain"
+                                  />
+                                </div>
+                                <span className="font-medium text-[#4B4036]">女孩</span>
                               </div>
-                              <span className="font-medium text-[#4B4036]">女孩</span>
-                            </div>
-                          </motion.button>
+                            </motion.button>
+                          </div>
+                          {errors.childGender && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <XCircleIcon className="w-4 h-4 mr-1" />
+                              {errors.childGender}
+                            </p>
+                          )}
                         </div>
-                        {errors.childGender && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center">
-                            <XCircleIcon className="w-4 h-4 mr-1" />
-                            {errors.childGender}
-                          </p>
-                        )}
+
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                            喜好物 <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={formData.childPreferences}
+                            onChange={(e) => setFormData(prev => ({ ...prev, childPreferences: e.target.value }))}
+                            className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 resize-none ${errors.childPreferences
+                                ? 'border-red-500 focus:border-red-500'
+                                : 'border-[#EADBC8] focus:border-[#FFD59A]'
+                              } focus:outline-none`}
+                            placeholder="例如：喜歡音樂、玩具、顏色等"
+                            rows={3}
+                          />
+                          {errors.childPreferences && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <XCircleIcon className="w-4 h-4 mr-1" />
+                              {errors.childPreferences}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                            健康/過敏情況 <span className="text-gray-500 text-xs">(選填)</span>
+                          </label>
+                          <textarea
+                            value={formData.childHealthNotes}
+                            onChange={(e) => setFormData(prev => ({ ...prev, childHealthNotes: e.target.value }))}
+                            className="w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 border-[#EADBC8] focus:border-[#FFD59A] focus:outline-none transition-all duration-200 resize-none"
+                            placeholder="例如：過敏、特殊健康狀況、需要特別注意的事項等"
+                            rows={3}
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                          喜好物 <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          value={formData.childPreferences}
-                          onChange={(e) => setFormData(prev => ({ ...prev, childPreferences: e.target.value }))}
-                          className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 resize-none ${
-                            errors.childPreferences
-                              ? 'border-red-500 focus:border-red-500'
-                              : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                          } focus:outline-none`}
-                          placeholder="例如：喜歡音樂、玩具、顏色等"
-                          rows={3}
-                        />
-                        {errors.childPreferences && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center">
-                            <XCircleIcon className="w-4 h-4 mr-1" />
-                            {errors.childPreferences}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                          健康/過敏情況 <span className="text-gray-500 text-xs">(選填)</span>
-                        </label>
-                        <textarea
-                          value={formData.childHealthNotes}
-                          onChange={(e) => setFormData(prev => ({ ...prev, childHealthNotes: e.target.value }))}
-                          className="w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 border-[#EADBC8] focus:border-[#FFD59A] focus:outline-none transition-all duration-200 resize-none"
-                          placeholder="例如：過敏、特殊健康狀況、需要特別注意的事項等"
-                          rows={3}
-                        />
+                      {/* 動態箭頭提醒向下滑動 */}
+                      <div className="mt-8 text-center">
+                        <motion.div
+                          animate={{
+                            y: [0, 10, 0],
+                            opacity: [0.7, 1, 0.7]
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                          className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                        >
+                          <p className="text-sm font-medium">填寫完成後向下滑動按下一步</p>
+                          <ChevronDownIcon className="w-6 h-6" />
+                        </motion.div>
                       </div>
                     </div>
+                  )}
 
-                    {/* 動態箭頭提醒向下滑動 */}
-                    <div className="mt-8 text-center">
-                      <motion.div
-                        animate={{ 
-                          y: [0, 10, 0],
-                          opacity: [0.7, 1, 0.7]
-                        }}
-                        transition={{ 
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                        className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
-                      >
-                        <p className="text-sm font-medium">填寫完成後向下滑動按下一步</p>
-                        <ChevronDownIcon className="w-6 h-6" />
-                      </motion.div>
-                    </div>
-                  </div>
-                )}
+                  {/* 步驟 4: 日期時間 */}
+                  {currentStep === 4 && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <div className="text-center mb-6 sm:mb-8">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">
+                          {formData.courseNature === 'regular' ? '常規課程日曆（周曆顯示）' : '選擇日期與時段'}
+                        </h2>
+                        <p className="text-sm sm:text-base text-[#2B3A3B]">請選擇上課日期和時間</p>
+                      </div>
 
-                {/* 步驟 4: 日期時間 */}
-                {currentStep === 4 && (
-                  <div className="space-y-4 sm:space-y-6">
-                    <div className="text-center mb-6 sm:mb-8">
-                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">
-                        {formData.courseNature === 'regular' ? '常規課程日曆（周曆顯示）' : '選擇日期與時段'}
-                      </h2>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">請選擇上課日期和時間</p>
-                    </div>
-
-                    {/* 等候區選項 */}
-                    <div className="space-y-4 mb-6">
-                      {/* 已收到通知的等候區學生 - 已隱藏 */}
-                      {/* <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-4 shadow-sm border border-[#EADBC8]">
+                      {/* 等候區選項 */}
+                      <div className="space-y-4 mb-6">
+                        {/* 已收到通知的等候區學生 - 已隱藏 */}
+                        {/* <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-4 shadow-sm border border-[#EADBC8]">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
@@ -2457,860 +2445,849 @@ export default function HanamiMusicRegisterPage() {
                         </div>
                       </div> */}
 
-                      {/* 沒有合適時間的等候區選項 */}
-                      <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFB6C1]/20 rounded-xl p-4 shadow-sm border border-[#EADBC8]">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center">
-                              <ClockIcon className="w-5 h-5 text-[#4B4036]" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-[#4B4036]">沒有合適時間？</h4>
-                              <p className="text-sm text-[#2B3A3B]/70">加入等候區，有位置時會優先通知您</p>
-                            </div>
-                          </div>
-                          <motion.button
-                            onClick={() => {
-                              // 跳轉到等候區註冊頁面
-                              router.push('/aihome/registration');
-                            }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="px-6 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-[#4B4036] rounded-lg hover:from-[#FFD59A] hover:to-[#FFB6C1] transition-all duration-200 font-medium shadow-sm"
-                          >
-                            加入等候區
-                          </motion.button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 月份導航（僅試堂顯示） */}
-                    {formData.courseNature === 'trial' && (
-                      <div className="flex items-center justify-between mb-6 bg-white rounded-xl p-4 shadow-sm border border-[#EADBC8]">
-                        <motion.button
-                          onClick={() => setCurrentMonth(prev => {
-                            const newMonth = new Date(prev);
-                            newMonth.setMonth(prev.getMonth() - 1);
-                            return newMonth;
-                          })}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors font-medium"
-                        >
-                          <ChevronLeftIcon className="w-5 h-5" />
-                          <span className="hidden sm:inline">上個月</span>
-                        </motion.button>
-                        
-                        <div className="text-center">
-                          <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036]">
-                            {currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' })}
-                          </h3>
-                          <p className="text-sm text-[#2B3A3B]/70 mt-1">選擇上課日期</p>
-                        </div>
-                        
-                        <motion.button
-                          onClick={() => setCurrentMonth(prev => {
-                            const newMonth = new Date(prev);
-                            newMonth.setMonth(prev.getMonth() + 1);
-                            return newMonth;
-                          })}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors font-medium"
-                        >
-                          <span className="hidden sm:inline">下個月</span>
-                          <ChevronRightIcon className="w-5 h-5" />
-                        </motion.button>
-                      </div>
-                    )}
-
-                    {/* 日曆 */}
-                    <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]">
-                      {loadingSchedule ? (
-                        <div className="text-center py-12">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
-                          <p className="text-[#2B3A3B]">載入排程中...</p>
-                        </div>
-                      ) : (
-                        <>
-                        {formData.courseNature === 'regular' ? (
-                          /* 周曆顯示 - 只顯示一週 */
-                          <div className="space-y-4">
-                            {/* 週標題 */}
-                            <div className="text-center">
-                              <h3 className="text-lg font-bold text-[#4B4036]">
-                                {formData.courseNature === 'regular' ? '星期課程安排' : '本週課程安排'}
-                              </h3>
-                            </div>
-                            
-                            {/* 星期標題 */}
-                            <div className="grid grid-cols-7 gap-2">
-                              {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-                                <div key={day} className="text-center text-sm font-bold text-[#4B4036] py-2 bg-[#FFF9F2] rounded-lg">
-                                  {day}
-                                </div>
-                              ))}
-                            </div>
-                            
-                            {/* 日期格子 */}
-                            <div className="grid grid-cols-7 gap-2">
-                              {generateWeekCalendar.map((day, dayIndex) => {
-                                const dateStr = day.date ? day.date.toLocaleDateString('en-CA') : `weekday-${day.weekday}`;
-                                const isSelected = selectedDate === dateStr;
-                                
-                                return (
-                                  <motion.button
-                                    key={dayIndex}
-                                    type="button"
-                                    disabled={day.isFullyBooked}
-                                    whileHover={!day.isFullyBooked ? { scale: 1.02 } : {}}
-                                    whileTap={!day.isFullyBooked ? { scale: 0.98 } : {}}
-                                    onClick={() => {
-                                      if (!day.isFullyBooked) {
-                                        setSelectedDate(dateStr);
-                                        setFormData(prev => ({ ...prev, selectedDate: dateStr }));
-                                      }
-                                    }}
-                                    className={`relative p-2 rounded-xl border-2 transition-all duration-200 min-h-[60px] flex flex-col justify-center items-center ${
-                                      isSelected
-                                        ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
-                                        : day.isFullyBooked
-                                        ? 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed'
-                                        : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
-                                    }`}
-                                  >
-                                    <div className="text-center w-full">
-                                      <p className={`text-sm font-bold mb-1 ${
-                                        day.isToday ? 'text-[#FFD59A]' : ''
-                                      }`}>
-                                        {formData.courseNature === 'regular' 
-                                          ? (day as any).weekdayName || getWeekdayName((day as any).weekday)
-                                          : day.date?.getDate() || ''
-                                        }
-                                      </p>
-                                      
-                                      {/* 位置狀態指示 */}
-                                      <div className="mt-1">
-                                        {day.isFullyBooked ? (
-                                          <div className="flex items-center justify-center">
-                                            <span className="text-xs text-red-600 font-bold bg-red-100 px-1 py-0.5 rounded-full">
-                                              已滿
-                                            </span>
-                                          </div>
-                                        ) : day.hasSchedule ? (
-                                          <div className="flex items-center justify-center">
-                                            {(() => {
-                                              const availableSlots = day.availableSlots || 0;
-                                              let colorClass = '';
-                                              if (availableSlots <= 3) {
-                                                colorClass = 'text-red-600 bg-red-100'; // 1-3個位置：紅色
-                                              } else if (availableSlots <= 5) {
-                                                colorClass = 'text-orange-600 bg-orange-100'; // 4-5個位置：橙色
-                                              } else {
-                                                colorClass = 'text-green-600 bg-green-100'; // 5個以上：綠色
-                                              }
-                                              return (
-                                                <span className={`text-xs font-bold px-1 py-0.5 rounded-full ${colorClass}`}>
-                                                  {availableSlots} 空位
-                                                </span>
-                                              );
-                                            })()}
-                                          </div>
-                                        ) : (
-                                          <div className="flex items-center justify-center">
-                                            <span className="text-xs text-gray-500 font-bold bg-gray-100 px-1 py-0.5 rounded-full">
-                                              無課
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </motion.button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : (
-                          /* 月曆顯示（試堂） */
-                          <>
-                            {/* 星期標題 */}
-                            <div className="grid grid-cols-7 gap-2 mb-6">
-                              {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-                                <div key={day} className="text-center text-sm font-bold text-[#4B4036] py-3 bg-[#FFF9F2] rounded-lg">
-                                  {day}
-                                </div>
-                              ))}
-                            </div>
-                            
-                            {/* 日期格子 */}
-                            <div className="grid grid-cols-7 gap-2">
-                              {generateCalendarDays.map((day, index) => {
-                                const dateStr = day.date ? day.date.toLocaleDateString('en-CA') : `weekday-${day.weekday}`; // 使用本地日期格式
-                                const isSelected = selectedDate === dateStr;
-                                
-                                return (
-                                  <motion.button
-                                    key={index}
-                                    type="button"
-                                    disabled={day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')}
-                                    whileHover={!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial') ? { scale: 1.02 } : {}}
-                                    whileTap={!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial') ? { scale: 0.98 } : {}}
-                                    onClick={() => {
-                                      if (!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial')) {
-                                        setSelectedDate(dateStr);
-                                        setFormData(prev => ({ ...prev, selectedDate: dateStr }));
-                                      }
-                                    }}
-                                    className={`relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 min-h-[80px] flex flex-col justify-center items-center ${
-                                      isSelected
-                                        ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
-                                        : day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')
-                                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                        : day.isFullyBooked
-                                        ? 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
-                                        : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
-                                    }`}
-                                  >
-                                    <div className="text-center w-full">
-                                      <p className={`text-sm sm:text-base font-bold mb-1 ${
-                                        day.isToday ? 'text-[#FFD59A]' : ''
-                                      }`}>
-                                        {formData.courseNature === 'regular' 
-                                          ? (day as any).weekdayName || getWeekdayName((day as any).weekday)
-                                          : day.date?.getDate() || ''
-                                        }
-                                      </p>
-                                      
-                                      {/* 位置狀態指示 */}
-                                      {day.isCurrentMonth && !day.isPast && (
-                                        <div className="mt-2">
-                                          {day.isBeyondTwoMonths ? (
-                                            <div className="flex items-center justify-center">
-                                              <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
-                                                暫不開放
-                                              </span>
-                                            </div>
-                                          ) : !day.hasSchedule ? (
-                                            <div className="flex items-center justify-center">
-                                              <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
-                                                無課程
-                                              </span>
-                                            </div>
-                                          ) : day.isFullyBooked ? (
-                                            <div className="flex items-center justify-center">
-                                              <span className="text-xs text-red-500 font-bold bg-red-100 px-2 py-1 rounded-full">
-                                                FULL
-                                              </span>
-                                            </div>
-                                          ) : day.availableSlots > 0 ? (
-                                            <div className="flex items-center justify-center">
-                                              {/* 即日試堂顯示 FULL */}
-                                              {day.isToday && formData.courseNature === 'trial' ? (
-                                                <span className="text-xs text-red-500 font-bold bg-red-100 px-2 py-1 rounded-full">
-                                                  FULL
-                                                </span>
-                                              ) : (
-                                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                                  day.availableSlots <= 3 
-                                                    ? 'text-red-500 bg-red-100' 
-                                                    : day.availableSlots <= 5 
-                                                    ? 'text-orange-500 bg-orange-100' 
-                                                    : 'text-green-500 bg-green-100'
-                                                }`}>
-                                                  {day.availableSlots} 空位
-                                                </span>
-                                              )}
-                                            </div>
-                                          ) : day.hasSchedule && (day as any).totalBookings === 0 ? (
-                                            <div className="flex items-center justify-center">
-                                              <span className="text-xs text-purple-600 font-bold bg-purple-100 px-2 py-1 rounded-full">
-                                                加開
-                                              </span>
-                                            </div>
-                                          ) : (
-                                            <div className="flex items-center justify-center">
-                                              <span className="text-xs text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded-full">
-                                                可預約
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
-                                      
-                                      {/* 今天標記 */}
-                                      {day.isToday && (
-                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFD59A] rounded-full border-2 border-white"></div>
-                                      )}
-                                    </div>
-                                  </motion.button>
-                                );
-                              })}
-                            </div>
-                            </>
-                        )}
-                        </>
-                      )}
-                    </div>
-
-                    {/* 選中日期的時段選擇 */}
-                    {selectedDate && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]"
-                      >
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-12 h-12 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-xl flex items-center justify-center">
-                            <CalendarDaysIcon className="w-6 h-6 text-[#4B4036]" />
-                          </div>
-                    <div>
-                            <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036]">
-                              {formData.courseNature === 'regular' && selectedDate.startsWith('weekday-') 
-                                ? `星期${getWeekdayName(parseInt(selectedDate.replace('weekday-', '')))}`
-                                : new Date(selectedDate).toLocaleDateString('zh-TW', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric',
-                                    weekday: 'long'
-                                  })
-                              }
-                            </h3>
-                            <p className="text-sm text-[#2B3A3B]/70">選擇上課時段</p>
-                          </div>
-                        </div>
-                        
-                        {getTimeSlotsForDate(selectedDate).length === 0 ? (
-                          <div className="text-center py-8">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <CalendarDaysIcon className="w-8 h-8 text-gray-400" />
-                            </div>
-                            <p className="text-gray-500 text-lg font-medium">當日無可用時段</p>
-                            <p className="text-gray-400 text-sm mt-2">請選擇其他日期</p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                            {getTimeSlotsForDate(selectedDate).map((slot: any, index: number) => {
-                          const isSelected = formData.selectedTimeSlot === slot.time;
-                              
-                          return (
-                            <motion.button
-                              key={slot.id || index}
-                              type="button"
-                              disabled={!slot.available} // 已滿員的時段無法點擊
-                              whileHover={{ scale: slot.available ? 1.02 : 1 }}
-                              whileTap={{ scale: slot.available ? 0.98 : 1 }}
-                              onClick={() => {
-                                if (slot.available) {
-                                  setFormData(prev => ({ ...prev, selectedTimeSlot: slot.time }));
-                                }
-                              }}
-                                  className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                                isSelected
-                                      ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
-                                  : slot.available
-                                      ? 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
-                                      : 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
-                              }`}
-                            >
-                                  <div className="flex flex-col items-center text-center">
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
-                                      isSelected 
-                                        ? 'bg-white/20' 
-                                        : slot.available 
-                                          ? 'bg-[#FFF9F2]' 
-                                          : 'bg-gray-100'
-                                    }`}>
-                                      <ClockIcon className={`w-5 h-5 ${
-                                        isSelected ? 'text-[#4B4036]' : 'text-[#2B3A3B]'
-                                      }`} />
-                                    </div>
-                                    <span className="font-bold text-sm mb-2">{slot.time}</span>
-                                    <div className={`text-xs px-3 py-1 rounded-full font-medium ${
-                                      slot.available 
-                                        ? slot.remainingSpots <= 3 
-                                          ? 'text-red-600 bg-red-100' 
-                                          : slot.remainingSpots <= 5 
-                                          ? 'text-orange-600 bg-orange-100' 
-                                          : 'text-green-600 bg-green-100'
-                                        : 'text-red-500 bg-red-100'
-                                    }`}>
-                                      {slot.available ? 
-                                        `${slot.remainingSpots} 空位` 
-                                        : '已滿'}
-                                    </div>
-                                    {slot.assignedTeachers && (
-                                      <div className="text-xs text-[#2B3A3B]/70 mt-1 truncate max-w-full">
-                                        {slot.assignedTeachers}
-                                      </div>
-                                )}
+                        {/* 沒有合適時間的等候區選項 */}
+                        <div className="bg-gradient-to-br from-[#FFF9F2] to-[#FFB6C1]/20 rounded-xl p-4 shadow-sm border border-[#EADBC8]">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center">
+                                <ClockIcon className="w-5 h-5 text-[#4B4036]" />
                               </div>
+                              <div>
+                                <h4 className="font-semibold text-[#4B4036]">沒有合適時間？</h4>
+                                <p className="text-sm text-[#2B3A3B]/70">加入等候區，有位置時會優先通知您</p>
+                              </div>
+                            </div>
+                            <motion.button
+                              onClick={() => {
+                                // 跳轉到等候區註冊頁面
+                                router.push('/aihome/registration');
+                              }}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              className="px-6 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-[#4B4036] rounded-lg hover:from-[#FFD59A] hover:to-[#FFB6C1] transition-all duration-200 font-medium shadow-sm"
+                            >
+                              加入等候區
                             </motion.button>
-                          );
-                        })}
-                      </div>
-                        )}
-                      </motion.div>
-                    )}
-
-                    {errors.selectedDate && (
-                      <p className="text-sm text-red-600 flex items-center justify-center">
-                        <XCircleIcon className="w-4 h-4 mr-1" />
-                        {errors.selectedDate}
-                      </p>
-                    )}
-                    
-                      {errors.selectedTimeSlot && (
-                      <p className="text-sm text-red-600 flex items-center justify-center">
-                          <XCircleIcon className="w-4 h-4 mr-1" />
-                          {errors.selectedTimeSlot}
-                        </p>
-                      )}
-
-                    {/* 動態箭頭提醒向下滑動 */}
-                    {(!isWaitingList && formData.selectedDate && formData.selectedTimeSlot) && (
-                      <div className="mt-8 text-center">
-                        <motion.div
-                          animate={{ 
-                            y: [0, 10, 0],
-                            opacity: [0.7, 1, 0.7]
-                          }}
-                          transition={{ 
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
-                          className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
-                        >
-                          <p className="text-sm font-medium">選擇完成後向下滑動按下一步</p>
-                          <ChevronDownIcon className="w-6 h-6" />
-                        </motion.div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 步驟 5: 聯絡方式 */}
-                {currentStep === 5 && (
-                  <div className="space-y-4 sm:space-y-6">
-                    <div className="text-center mb-6 sm:mb-8">
-                      <div className="flex items-center justify-center gap-4 mb-4">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">聯絡方式</h2>
-                        <button
-                          onClick={loadCurrentUserData}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-xl hover:bg-[#EBC9A4] transition-colors shadow-lg hover:shadow-xl"
-                        >
-                          <ArrowPathIcon className="w-4 h-4" />
-                          <span className="text-sm font-medium">載入我的資料</span>
-                        </button>
-                      </div>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫聯絡資料</p>
-                      
-                      {/* 等候區狀態顯示 */}
-                      {isWaitingList && (
-                        <div className="mt-4 bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-4 border border-[#EADBC8]">
-                          <div className="flex items-center justify-center gap-2 text-[#4B4036] mb-2">
-                            <UserIcon className="w-5 h-5" />
-                            <span className="font-medium">
-                              {waitingListType === 'existing' ? '等候區學生' : '新加入等候區'}
-                            </span>
                           </div>
-                          <p className="text-sm text-[#2B3A3B] mb-3">
-                            {waitingListType === 'existing' 
-                              ? '您已在等候名單中，已為您優先安排課程'
-                              : '您已加入等候區，有合適時間時我們會優先通知您'
-                            }
-                          </p>
+                        </div>
+                      </div>
+
+                      {/* 月份導航（僅試堂顯示） */}
+                      {formData.courseNature === 'trial' && (
+                        <div className="flex items-center justify-between mb-6 bg-white rounded-xl p-4 shadow-sm border border-[#EADBC8]">
                           <motion.button
-                            onClick={() => {
-                              setIsWaitingList(false);
-                              setWaitingListType('none');
-                              setSelectedDate(''); // 重置選中的日期
-                              setFormData(prev => ({ ...prev, selectedDate: '', selectedTimeSlot: '' })); // 重置表單中的日期和時段
-                              setCurrentStep(4);
-                            }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="px-4 py-2 bg-white text-[#4B4036] border border-[#EADBC8] rounded-lg hover:bg-[#FFF9F2] transition-all duration-200 font-medium text-sm"
+                            onClick={() => setCurrentMonth(prev => {
+                              const newMonth = new Date(prev);
+                              newMonth.setMonth(prev.getMonth() - 1);
+                              return newMonth;
+                            })}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors font-medium"
                           >
-                            改為選擇日期時段
+                            <ChevronLeftIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">上個月</span>
+                          </motion.button>
+
+                          <div className="text-center">
+                            <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036]">
+                              {currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' })}
+                            </h3>
+                            <p className="text-sm text-[#2B3A3B]/70 mt-1">選擇上課日期</p>
+                          </div>
+
+                          <motion.button
+                            onClick={() => setCurrentMonth(prev => {
+                              const newMonth = new Date(prev);
+                              newMonth.setMonth(prev.getMonth() + 1);
+                              return newMonth;
+                            })}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors font-medium"
+                          >
+                            <span className="hidden sm:inline">下個月</span>
+                            <ChevronRightIcon className="w-5 h-5" />
                           </motion.button>
                         </div>
                       )}
-                    </div>
 
-                    <div className="space-y-4">
-                      {/* 您的稱呼 - 必填 */}
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                          您的稱呼 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.parentTitle}
-                          onChange={(e) => setFormData(prev => ({ ...prev, parentTitle: e.target.value }))}
-                          className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                            errors.parentTitle
-                              ? 'border-red-500 focus:border-red-500'
-                              : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                          } focus:outline-none`}
-                          placeholder="例如：陳媽媽、李爸爸、王小姐等"
-                        />
-                        {errors.parentTitle && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center">
-                            <XCircleIcon className="w-4 h-4 mr-1" />
-                            {errors.parentTitle}
-                          </p>
-                        )}
-                      </div>
+                      {/* 日曆 */}
+                      <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]">
+                        {loadingSchedule ? (
+                          <div className="text-center py-12">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
+                            <p className="text-[#2B3A3B]">載入排程中...</p>
+                          </div>
+                        ) : (
+                          <>
+                            {formData.courseNature === 'regular' ? (
+                              /* 周曆顯示 - 只顯示一週 */
+                              <div className="space-y-4">
+                                {/* 週標題 */}
+                                <div className="text-center">
+                                  <h3 className="text-lg font-bold text-[#4B4036]">
+                                    {formData.courseNature === 'regular' ? '星期課程安排' : '本週課程安排'}
+                                  </h3>
+                                </div>
 
-                      {/* 聯絡電話 - 必填，建議填Whatsapp電話 */}
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                          聯絡電話 <span className="text-red-500">*</span>
-                          <span className="text-gray-500 text-xs ml-2">(建議填Whatsapp電話)</span>
-                        </label>
-                        <PhoneInput
-                          value={formData.parentPhone}
-                          countryCode={formData.parentCountryCode}
-                          onChange={(phone, countryCode) => {
-                            setFormData(prev => ({ 
-                              ...prev, 
-                              parentPhone: phone,
-                              parentCountryCode: countryCode
-                            }));
-                            // 清除錯誤
-                            if (errors.parentPhone) {
-                              setErrors(prev => ({ ...prev, parentPhone: '' }));
-                            }
-                          }}
-                          placeholder="請輸入電話號碼"
-                          error={errors.parentPhone}
-                          required
-                        />
-                      </div>
+                                {/* 星期標題 */}
+                                <div className="grid grid-cols-7 gap-2">
+                                  {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+                                    <div key={day} className="text-center text-sm font-bold text-[#4B4036] py-2 bg-[#FFF9F2] rounded-lg">
+                                      {day}
+                                    </div>
+                                  ))}
+                                </div>
 
-                      {/* 電郵地址 - 必填 */}
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                          電郵地址 <span className="text-red-500">*</span>
-                        </label>
-                        <EmailInput
-                          value={formData.parentEmail}
-                          onChange={(email) => {
-                            setFormData(prev => ({ ...prev, parentEmail: email }));
-                            // 清除錯誤
-                            if (errors.parentEmail) {
-                              setErrors(prev => ({ ...prev, parentEmail: '' }));
-                            }
-                          }}
-                          placeholder="請輸入電郵地址"
-                          error={errors.parentEmail}
-                          required
-                          showValidation
-                        />
-                      </div>
+                                {/* 日期格子 */}
+                                <div className="grid grid-cols-7 gap-2">
+                                  {generateWeekCalendar.map((day, dayIndex) => {
+                                    const dateStr = day.date ? day.date.toLocaleDateString('en-CA') : `weekday-${day.weekday}`;
+                                    const isSelected = selectedDate === dateStr;
 
-                      {/* 有空時間 - 只在加入等候區時顯示 */}
-                      {isWaitingList && waitingListType === 'new' && (
-                        <div>
-                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
-                            有空時間 <span className="text-gray-500 text-xs">(選填)</span>
-                          </label>
-                          <p className="text-sm text-[#2B3A3B]/70 mb-3">請選擇您方便的時間，我們會優先安排</p>
-                          <div className="grid grid-cols-2 gap-3">
-                            {['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'].map((day) => (
-                              <div key={day} className="space-y-2">
-                                <h4 className="text-sm font-medium text-[#4B4036]">{day}</h4>
-                                <div className="space-y-1">
-                                  {['上午', '下午'].map((period) => {
-                                    const timeKey = `${day}-${period}`;
-                                    const isSelected = formData.availableTimes.includes(timeKey);
                                     return (
                                       <motion.button
-                                        key={timeKey}
+                                        key={dayIndex}
                                         type="button"
+                                        disabled={day.isFullyBooked}
+                                        whileHover={!day.isFullyBooked ? { scale: 1.02 } : {}}
+                                        whileTap={!day.isFullyBooked ? { scale: 0.98 } : {}}
                                         onClick={() => {
-                                          setFormData(prev => ({
-                                            ...prev,
-                                            availableTimes: isSelected
-                                              ? prev.availableTimes.filter(t => t !== timeKey)
-                                              : [...prev.availableTimes, timeKey]
-                                          }));
+                                          if (!day.isFullyBooked) {
+                                            setSelectedDate(dateStr);
+                                            setFormData(prev => ({ ...prev, selectedDate: dateStr }));
+                                          }
                                         }}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        className={`w-full px-3 py-2 text-xs rounded-lg border-2 transition-all duration-200 ${
-                                          isSelected
-                                            ? 'border-[#FFD59A] bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
-                                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                                        }`}
+                                        className={`relative p-2 rounded-xl border-2 transition-all duration-200 min-h-[60px] flex flex-col justify-center items-center ${isSelected
+                                            ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
+                                            : day.isFullyBooked
+                                              ? 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed'
+                                              : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
+                                          }`}
                                       >
-                                        {period}
+                                        <div className="text-center w-full">
+                                          <p className={`text-sm font-bold mb-1 ${day.isToday ? 'text-[#FFD59A]' : ''
+                                            }`}>
+                                            {formData.courseNature === 'regular'
+                                              ? (day as any).weekdayName || getWeekdayName((day as any).weekday)
+                                              : day.date?.getDate() || ''
+                                            }
+                                          </p>
+
+                                          {/* 位置狀態指示 */}
+                                          <div className="mt-1">
+                                            {day.isFullyBooked ? (
+                                              <div className="flex items-center justify-center">
+                                                <span className="text-xs text-red-600 font-bold bg-red-100 px-1 py-0.5 rounded-full">
+                                                  已滿
+                                                </span>
+                                              </div>
+                                            ) : day.hasSchedule ? (
+                                              <div className="flex items-center justify-center">
+                                                {(() => {
+                                                  const availableSlots = day.availableSlots || 0;
+                                                  let colorClass = '';
+                                                  if (availableSlots <= 3) {
+                                                    colorClass = 'text-red-600 bg-red-100'; // 1-3個位置：紅色
+                                                  } else if (availableSlots <= 5) {
+                                                    colorClass = 'text-orange-600 bg-orange-100'; // 4-5個位置：橙色
+                                                  } else {
+                                                    colorClass = 'text-green-600 bg-green-100'; // 5個以上：綠色
+                                                  }
+                                                  return (
+                                                    <span className={`text-xs font-bold px-1 py-0.5 rounded-full ${colorClass}`}>
+                                                      {availableSlots} 空位
+                                                    </span>
+                                                  );
+                                                })()}
+                                              </div>
+                                            ) : (
+                                              <div className="flex items-center justify-center">
+                                                <span className="text-xs text-gray-500 font-bold bg-gray-100 px-1 py-0.5 rounded-full">
+                                                  無課
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
                                       </motion.button>
                                     );
                                   })}
                                 </div>
                               </div>
-                            ))}
+                            ) : (
+                              /* 月曆顯示（試堂） */
+                              <>
+                                {/* 星期標題 */}
+                                <div className="grid grid-cols-7 gap-2 mb-6">
+                                  {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+                                    <div key={day} className="text-center text-sm font-bold text-[#4B4036] py-3 bg-[#FFF9F2] rounded-lg">
+                                      {day}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 日期格子 */}
+                                <div className="grid grid-cols-7 gap-2">
+                                  {generateCalendarDays.map((day, index) => {
+                                    const dateStr = day.date ? day.date.toLocaleDateString('en-CA') : `weekday-${day.weekday}`; // 使用本地日期格式
+                                    const isSelected = selectedDate === dateStr;
+
+                                    return (
+                                      <motion.button
+                                        key={index}
+                                        type="button"
+                                        disabled={day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')}
+                                        whileHover={!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial') ? { scale: 1.02 } : {}}
+                                        whileTap={!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial') ? { scale: 0.98 } : {}}
+                                        onClick={() => {
+                                          if (!day.isPast && day.isCurrentMonth && !day.isBeyondTwoMonths && !(day.isToday && formData.courseNature === 'trial')) {
+                                            setSelectedDate(dateStr);
+                                            setFormData(prev => ({ ...prev, selectedDate: dateStr }));
+                                          }
+                                        }}
+                                        className={`relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 min-h-[80px] flex flex-col justify-center items-center ${isSelected
+                                            ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
+                                            : day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')
+                                              ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                              : day.isFullyBooked
+                                                ? 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
+                                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
+                                          }`}
+                                      >
+                                        <div className="text-center w-full">
+                                          <p className={`text-sm sm:text-base font-bold mb-1 ${day.isToday ? 'text-[#FFD59A]' : ''
+                                            }`}>
+                                            {formData.courseNature === 'regular'
+                                              ? (day as any).weekdayName || getWeekdayName((day as any).weekday)
+                                              : day.date?.getDate() || ''
+                                            }
+                                          </p>
+
+                                          {/* 位置狀態指示 */}
+                                          {day.isCurrentMonth && !day.isPast && (
+                                            <div className="mt-2">
+                                              {day.isBeyondTwoMonths ? (
+                                                <div className="flex items-center justify-center">
+                                                  <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
+                                                    暫不開放
+                                                  </span>
+                                                </div>
+                                              ) : !day.hasSchedule ? (
+                                                <div className="flex items-center justify-center">
+                                                  <span className="text-xs text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-full">
+                                                    無課程
+                                                  </span>
+                                                </div>
+                                              ) : day.isFullyBooked ? (
+                                                <div className="flex items-center justify-center">
+                                                  <span className="text-xs text-red-500 font-bold bg-red-100 px-2 py-1 rounded-full">
+                                                    FULL
+                                                  </span>
+                                                </div>
+                                              ) : day.availableSlots > 0 ? (
+                                                <div className="flex items-center justify-center">
+                                                  {/* 即日試堂顯示 FULL */}
+                                                  {day.isToday && formData.courseNature === 'trial' ? (
+                                                    <span className="text-xs text-red-500 font-bold bg-red-100 px-2 py-1 rounded-full">
+                                                      FULL
+                                                    </span>
+                                                  ) : (
+                                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${day.availableSlots <= 3
+                                                        ? 'text-red-500 bg-red-100'
+                                                        : day.availableSlots <= 5
+                                                          ? 'text-orange-500 bg-orange-100'
+                                                          : 'text-green-500 bg-green-100'
+                                                      }`}>
+                                                      {day.availableSlots} 空位
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              ) : day.hasSchedule && (day as any).totalBookings === 0 ? (
+                                                <div className="flex items-center justify-center">
+                                                  <span className="text-xs text-purple-600 font-bold bg-purple-100 px-2 py-1 rounded-full">
+                                                    加開
+                                                  </span>
+                                                </div>
+                                              ) : (
+                                                <div className="flex items-center justify-center">
+                                                  <span className="text-xs text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded-full">
+                                                    可預約
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* 今天標記 */}
+                                          {day.isToday && (
+                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFD59A] rounded-full border-2 border-white"></div>
+                                          )}
+                                        </div>
+                                      </motion.button>
+                                    );
+                                  })}
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* 選中日期的時段選擇 */}
+                      {selectedDate && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]"
+                        >
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-xl flex items-center justify-center">
+                              <CalendarDaysIcon className="w-6 h-6 text-[#4B4036]" />
+                            </div>
+                            <div>
+                              <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036]">
+                                {formData.courseNature === 'regular' && selectedDate.startsWith('weekday-')
+                                  ? `星期${getWeekdayName(parseInt(selectedDate.replace('weekday-', '')))}`
+                                  : new Date(selectedDate).toLocaleDateString('zh-TW', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    weekday: 'long'
+                                  })
+                                }
+                              </h3>
+                              <p className="text-sm text-[#2B3A3B]/70">選擇上課時段</p>
+                            </div>
                           </div>
-                        </div>
+
+                          {getTimeSlotsForDate(selectedDate).length === 0 ? (
+                            <div className="text-center py-8">
+                              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <CalendarDaysIcon className="w-8 h-8 text-gray-400" />
+                              </div>
+                              <p className="text-gray-500 text-lg font-medium">當日無可用時段</p>
+                              <p className="text-gray-400 text-sm mt-2">請選擇其他日期</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                              {getTimeSlotsForDate(selectedDate).map((slot: any, index: number) => {
+                                const isSelected = formData.selectedTimeSlot === slot.time;
+
+                                return (
+                                  <motion.button
+                                    key={slot.id || index}
+                                    type="button"
+                                    disabled={!slot.available} // 已滿員的時段無法點擊
+                                    whileHover={{ scale: slot.available ? 1.02 : 1 }}
+                                    whileTap={{ scale: slot.available ? 0.98 : 1 }}
+                                    onClick={() => {
+                                      if (slot.available) {
+                                        setFormData(prev => ({ ...prev, selectedTimeSlot: slot.time }));
+                                      }
+                                    }}
+                                    className={`p-4 rounded-xl border-2 transition-all duration-200 ${isSelected
+                                        ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
+                                        : slot.available
+                                          ? 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
+                                          : 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
+                                      }`}
+                                  >
+                                    <div className="flex flex-col items-center text-center">
+                                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${isSelected
+                                          ? 'bg-white/20'
+                                          : slot.available
+                                            ? 'bg-[#FFF9F2]'
+                                            : 'bg-gray-100'
+                                        }`}>
+                                        <ClockIcon className={`w-5 h-5 ${isSelected ? 'text-[#4B4036]' : 'text-[#2B3A3B]'
+                                          }`} />
+                                      </div>
+                                      <span className="font-bold text-sm mb-2">{slot.time}</span>
+                                      <div className={`text-xs px-3 py-1 rounded-full font-medium ${slot.available
+                                          ? slot.remainingSpots <= 3
+                                            ? 'text-red-600 bg-red-100'
+                                            : slot.remainingSpots <= 5
+                                              ? 'text-orange-600 bg-orange-100'
+                                              : 'text-green-600 bg-green-100'
+                                          : 'text-red-500 bg-red-100'
+                                        }`}>
+                                        {slot.available ?
+                                          `${slot.remainingSpots} 空位`
+                                          : '已滿'}
+                                      </div>
+                                      {slot.assignedTeachers && (
+                                        <div className="text-xs text-[#2B3A3B]/70 mt-1 truncate max-w-full">
+                                          {slot.assignedTeachers}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </motion.button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </motion.div>
                       )}
 
-                      {/* 備註 */}
-                      <div>
-                        <label className="block text-sm font-medium text-[#4B4036] mb-2">備註</label>
-                        <textarea
-                          value={formData.remarks}
-                          onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                          rows={4}
-                          className="w-full px-4 py-3 text-base rounded-xl border-2 border-[#EADBC8] focus:border-[#FFD59A] focus:outline-none transition-all duration-200 resize-none"
-                          placeholder="如有特別要求或備註，請在此填寫..."
-                        />
+                      {errors.selectedDate && (
+                        <p className="text-sm text-red-600 flex items-center justify-center">
+                          <XCircleIcon className="w-4 h-4 mr-1" />
+                          {errors.selectedDate}
+                        </p>
+                      )}
+
+                      {errors.selectedTimeSlot && (
+                        <p className="text-sm text-red-600 flex items-center justify-center">
+                          <XCircleIcon className="w-4 h-4 mr-1" />
+                          {errors.selectedTimeSlot}
+                        </p>
+                      )}
+
+                      {/* 動態箭頭提醒向下滑動 */}
+                      {(!isWaitingList && formData.selectedDate && formData.selectedTimeSlot) && (
+                        <div className="mt-8 text-center">
+                          <motion.div
+                            animate={{
+                              y: [0, 10, 0],
+                              opacity: [0.7, 1, 0.7]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }}
+                            className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                          >
+                            <p className="text-sm font-medium">選擇完成後向下滑動按下一步</p>
+                            <ChevronDownIcon className="w-6 h-6" />
+                          </motion.div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 步驟 5: 聯絡方式 */}
+                  {currentStep === 5 && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <div className="text-center mb-6 sm:mb-8">
+                        <div className="flex items-center justify-center gap-4 mb-4">
+                          <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036]">聯絡方式</h2>
+                          <button
+                            onClick={loadCurrentUserData}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-xl hover:bg-[#EBC9A4] transition-colors shadow-lg hover:shadow-xl"
+                          >
+                            <ArrowPathIcon className="w-4 h-4" />
+                            <span className="text-sm font-medium">載入我的資料</span>
+                          </button>
+                        </div>
+                        <p className="text-sm sm:text-base text-[#2B3A3B]">請填寫聯絡資料</p>
+
+                        {/* 等候區狀態顯示 */}
+                        {isWaitingList && (
+                          <div className="mt-4 bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 rounded-xl p-4 border border-[#EADBC8]">
+                            <div className="flex items-center justify-center gap-2 text-[#4B4036] mb-2">
+                              <UserIcon className="w-5 h-5" />
+                              <span className="font-medium">
+                                {waitingListType === 'existing' ? '等候區學生' : '新加入等候區'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-[#2B3A3B] mb-3">
+                              {waitingListType === 'existing'
+                                ? '您已在等候名單中，已為您優先安排課程'
+                                : '您已加入等候區，有合適時間時我們會優先通知您'
+                              }
+                            </p>
+                            <motion.button
+                              onClick={() => {
+                                setIsWaitingList(false);
+                                setWaitingListType('none');
+                                setSelectedDate(''); // 重置選中的日期
+                                setFormData(prev => ({ ...prev, selectedDate: '', selectedTimeSlot: '' })); // 重置表單中的日期和時段
+                                setCurrentStep(4);
+                              }}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              className="px-4 py-2 bg-white text-[#4B4036] border border-[#EADBC8] rounded-lg hover:bg-[#FFF9F2] transition-all duration-200 font-medium text-sm"
+                            >
+                              改為選擇日期時段
+                            </motion.button>
+                          </div>
+                        )}
                       </div>
-                    </div>
 
-                    {/* 動態箭頭提醒向下滑動 */}
-                    <div className="mt-8 text-center">
-                      <motion.div
-                        animate={{ 
-                          y: [0, 10, 0],
-                          opacity: [0.7, 1, 0.7]
-                        }}
-                        transition={{ 
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                        className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
-                      >
-                        <p className="text-sm font-medium">填寫完成後向下滑動按下一步</p>
-                        <ChevronDownIcon className="w-6 h-6" />
-                      </motion.div>
-                    </div>
-                  </div>
-                )}
+                      <div className="space-y-4">
+                        {/* 您的稱呼 - 必填 */}
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                            您的稱呼 <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.parentTitle}
+                            onChange={(e) => setFormData(prev => ({ ...prev, parentTitle: e.target.value }))}
+                            className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.parentTitle
+                                ? 'border-red-500 focus:border-red-500'
+                                : 'border-[#EADBC8] focus:border-[#FFD59A]'
+                              } focus:outline-none`}
+                            placeholder="例如：陳媽媽、李爸爸、王小姐等"
+                          />
+                          {errors.parentTitle && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <XCircleIcon className="w-4 h-4 mr-1" />
+                              {errors.parentTitle}
+                            </p>
+                          )}
+                        </div>
 
-                {/* 步驟 6: 支付方法 */}
-                {currentStep === 6 && (
-                  <div>
-                    <PaymentMethodSelector
-                      selectedMethod={formData.paymentMethod}
-                      onMethodChange={(methodId) => setFormData(prev => ({ ...prev, paymentMethod: methodId, screenshotUploaded: false }))}
-                      amount={formData.courseNature === 'trial' ? 168 : (() => {
-                        if (priceCalculation) {
-                          return priceCalculation.final_price;
-                        }
-                        const selectedPlan = pricingPlans.find(p => p.id === formData.selectedPlan);
-                        return selectedPlan ? selectedPlan.package_price || 0 : 0;
-                      })()}
-                      currency="HKD"
-                      description={formData.courseNature === 'trial' 
-                        ? `試堂報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班`
-                        : `常規課程報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班 - ${pricingPlans.find(p => p.id === formData.selectedPlan)?.plan_name}`
-                      }
-                      orgPhone={selectedOrganization?.contact_phone || selectedOrganization?.settings?.contactPhone || null}
-                      orgId={formData.organizationId || null}
-                      orgData={selectedOrganization ? {
-                        org_name: selectedOrganization.org_name,
-                        contact_phone: selectedOrganization.contact_phone || selectedOrganization.settings?.contactPhone || undefined,
-                        contact_email: selectedOrganization.contact_email || undefined
-                      } : null}
-                      onPaymentSuccess={(data) => {
-                        // 檢查是否為圖片刪除事件
-                        if (data.screenshotDeleted) {
-                          // 圖片被刪除，重置上傳狀態
-                          setFormData(prev => ({ ...prev, screenshotUploaded: false }));
-                          console.log('🔄 圖片已刪除，重置上傳狀態');
-                        } else if (formData.paymentMethod === 'screenshot') {
-                          // 當支付成功時，標記截圖已上傳
-                          setFormData(prev => ({ ...prev, screenshotUploaded: true }));
-                          console.log('✅ 截圖上傳成功，允許繼續');
-                        }
-                        handlePaymentSuccess(data);
-                      }}
-                      onPaymentError={(error) => {
-                        console.error('支付錯誤:', error);
-                        setErrors(prev => ({ ...prev, paymentMethod: error }));
-                      }}
-                      showPaymentActions={true}
-                      user={user}
-                    />
+                        {/* 聯絡電話 - 必填，建議填Whatsapp電話 */}
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                            聯絡電話 <span className="text-red-500">*</span>
+                            <span className="text-gray-500 text-xs ml-2">(建議填Whatsapp電話)</span>
+                          </label>
+                          <PhoneInput
+                            value={formData.parentPhone}
+                            countryCode={formData.parentCountryCode}
+                            onChange={(phone, countryCode) => {
+                              setFormData(prev => ({
+                                ...prev,
+                                parentPhone: phone,
+                                parentCountryCode: countryCode
+                              }));
+                              // 清除錯誤
+                              if (errors.parentPhone) {
+                                setErrors(prev => ({ ...prev, parentPhone: '' }));
+                              }
+                            }}
+                            placeholder="請輸入電話號碼"
+                            error={errors.parentPhone}
+                            required
+                          />
+                        </div>
 
-                    {/* 動態箭頭提醒向下滑動 */}
-                    {formData.paymentMethod && (
+                        {/* 電郵地址 - 必填 */}
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                            電郵地址 <span className="text-red-500">*</span>
+                          </label>
+                          <EmailInput
+                            value={formData.parentEmail}
+                            onChange={(email) => {
+                              setFormData(prev => ({ ...prev, parentEmail: email }));
+                              // 清除錯誤
+                              if (errors.parentEmail) {
+                                setErrors(prev => ({ ...prev, parentEmail: '' }));
+                              }
+                            }}
+                            placeholder="請輸入電郵地址"
+                            error={errors.parentEmail}
+                            required
+                            showValidation
+                          />
+                        </div>
+
+                        {/* 有空時間 - 只在加入等候區時顯示 */}
+                        {isWaitingList && waitingListType === 'new' && (
+                          <div>
+                            <label className="block text-sm font-medium text-[#4B4036] mb-2">
+                              有空時間 <span className="text-gray-500 text-xs">(選填)</span>
+                            </label>
+                            <p className="text-sm text-[#2B3A3B]/70 mb-3">請選擇您方便的時間，我們會優先安排</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              {['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'].map((day) => (
+                                <div key={day} className="space-y-2">
+                                  <h4 className="text-sm font-medium text-[#4B4036]">{day}</h4>
+                                  <div className="space-y-1">
+                                    {['上午', '下午'].map((period) => {
+                                      const timeKey = `${day}-${period}`;
+                                      const isSelected = formData.availableTimes.includes(timeKey);
+                                      return (
+                                        <motion.button
+                                          key={timeKey}
+                                          type="button"
+                                          onClick={() => {
+                                            setFormData(prev => ({
+                                              ...prev,
+                                              availableTimes: isSelected
+                                                ? prev.availableTimes.filter(t => t !== timeKey)
+                                                : [...prev.availableTimes, timeKey]
+                                            }));
+                                          }}
+                                          whileHover={{ scale: 1.02 }}
+                                          whileTap={{ scale: 0.98 }}
+                                          className={`w-full px-3 py-2 text-xs rounded-lg border-2 transition-all duration-200 ${isSelected
+                                              ? 'border-[#FFD59A] bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
+                                              : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                            }`}
+                                        >
+                                          {period}
+                                        </motion.button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 備註 */}
+                        <div>
+                          <label className="block text-sm font-medium text-[#4B4036] mb-2">備註</label>
+                          <textarea
+                            value={formData.remarks}
+                            onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                            rows={4}
+                            className="w-full px-4 py-3 text-base rounded-xl border-2 border-[#EADBC8] focus:border-[#FFD59A] focus:outline-none transition-all duration-200 resize-none"
+                            placeholder="如有特別要求或備註，請在此填寫..."
+                          />
+                        </div>
+                      </div>
+
+                      {/* 動態箭頭提醒向下滑動 */}
                       <div className="mt-8 text-center">
                         <motion.div
-                          animate={{ 
+                          animate={{
                             y: [0, 10, 0],
                             opacity: [0.7, 1, 0.7]
                           }}
-                          transition={{ 
+                          transition={{
                             duration: 2,
                             repeat: Infinity,
                             ease: "easeInOut"
                           }}
                           className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
                         >
-                          <p className="text-sm font-medium">選擇完成後向下滑動按下一步</p>
+                          <p className="text-sm font-medium">填寫完成後向下滑動按下一步</p>
                           <ChevronDownIcon className="w-6 h-6" />
                         </motion.div>
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 步驟 7: 確認提交 */}
-                {currentStep === 7 && (
-                  <div className="space-y-4 sm:space-y-6">
-                    <div className="text-center mb-6 sm:mb-8">
-                      <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">確認報名資料</h2>
-                      <p className="text-sm sm:text-base text-[#2B3A3B]">請確認以下資料是否正確</p>
                     </div>
+                  )}
 
-                    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-[#EADBC8] space-y-4">
-                      <div className="pb-4 border-b border-[#EADBC8]">
-                        <h3 className="text-base sm:text-lg font-bold text-[#4B4036] mb-3">課程資訊</h3>
-                        <div className="space-y-2 text-sm sm:text-base">
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">課程性質：</span>
-                            <span className="font-medium text-[#4B4036]">
-                              {formData.courseNature === 'trial' ? '試堂' : '常規課程'}
-                            </span>
-                          </p>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">課程類型：</span>
-                            <span className="font-medium text-[#4B4036]">
-                              {courseTypes.find(c => c.id === formData.courseType)?.name}班
-                            </span>
-                          </p>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">報名機構：</span>
-                            <span className="font-medium text-[#4B4036]">
-                              {selectedOrganization?.org_name || 'Hanami Music'}
-                            </span>
-                          </p>
-                          {formData.selectedPlan && (
+                  {/* 步驟 6: 支付方法 */}
+                  {currentStep === 6 && (
+                    <div>
+                      <PaymentMethodSelector
+                        selectedMethod={formData.paymentMethod}
+                        onMethodChange={(methodId) => setFormData(prev => ({ ...prev, paymentMethod: methodId, screenshotUploaded: false }))}
+                        amount={formData.courseNature === 'trial' ? 168 : (() => {
+                          if (priceCalculation) {
+                            return priceCalculation.final_price;
+                          }
+                          const selectedPlan = pricingPlans.find(p => p.id === formData.selectedPlan);
+                          return selectedPlan ? selectedPlan.package_price || 0 : 0;
+                        })()}
+                        currency="HKD"
+                        description={formData.courseNature === 'trial'
+                          ? `試堂報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班`
+                          : `常規課程報名 - ${courseTypes.find(c => c.id === formData.courseType)?.name}班 - ${pricingPlans.find(p => p.id === formData.selectedPlan)?.plan_name}`
+                        }
+                        orgPhone={selectedOrganization?.contact_phone || selectedOrganization?.settings?.contactPhone || null}
+                        orgId={formData.organizationId || null}
+                        orgData={selectedOrganization ? {
+                          org_name: selectedOrganization.org_name,
+                          contact_phone: selectedOrganization.contact_phone || selectedOrganization.settings?.contactPhone || undefined,
+                          contact_email: selectedOrganization.contact_email || undefined
+                        } : null}
+                        onPaymentSuccess={(data) => {
+                          // 檢查是否為圖片刪除事件
+                          if (data.screenshotDeleted) {
+                            // 圖片被刪除，重置上傳狀態
+                            setFormData(prev => ({ ...prev, screenshotUploaded: false }));
+                            console.log('🔄 圖片已刪除，重置上傳狀態');
+                          } else if (formData.paymentMethod === 'screenshot') {
+                            // 當支付成功時，標記截圖已上傳
+                            setFormData(prev => ({ ...prev, screenshotUploaded: true }));
+                            console.log('✅ 截圖上傳成功，允許繼續');
+                          }
+                          handlePaymentSuccess(data);
+                        }}
+                        onPaymentError={(error) => {
+                          console.error('支付錯誤:', error);
+                          setErrors(prev => ({ ...prev, paymentMethod: error }));
+                        }}
+                        showPaymentActions={true}
+                        user={user}
+                      />
+
+                      {/* 動態箭頭提醒向下滑動 */}
+                      {formData.paymentMethod && (
+                        <div className="mt-8 text-center">
+                          <motion.div
+                            animate={{
+                              y: [0, 10, 0],
+                              opacity: [0.7, 1, 0.7]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }}
+                            className="inline-flex flex-col items-center space-y-2 text-[#4B4036]"
+                          >
+                            <p className="text-sm font-medium">選擇完成後向下滑動按下一步</p>
+                            <ChevronDownIcon className="w-6 h-6" />
+                          </motion.div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 步驟 7: 確認提交 */}
+                  {currentStep === 7 && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <div className="text-center mb-6 sm:mb-8">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-[#4B4036] mb-2">確認報名資料</h2>
+                        <p className="text-sm sm:text-base text-[#2B3A3B]">請確認以下資料是否正確</p>
+                      </div>
+
+                      <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-[#EADBC8] space-y-4">
+                        <div className="pb-4 border-b border-[#EADBC8]">
+                          <h3 className="text-base sm:text-lg font-bold text-[#4B4036] mb-3">課程資訊</h3>
+                          <div className="space-y-2 text-sm sm:text-base">
                             <p className="flex justify-between">
-                              <span className="text-[#2B3A3B]">課程計劃：</span>
+                              <span className="text-[#2B3A3B]">課程性質：</span>
                               <span className="font-medium text-[#4B4036]">
-                                {pricingPlans.find(p => p.id === formData.selectedPlan)?.plan_name}
+                                {formData.courseNature === 'trial' ? '試堂' : '常規課程'}
                               </span>
                             </p>
-                          )}
-                          {!isWaitingList && (
-                            <>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">上課日期：</span>
-                            <span className="font-medium text-[#4B4036]">
-                              {formData.courseNature === 'regular' && formData.selectedDate.startsWith('weekday-') 
-                                ? `星期${getWeekdayName(parseInt(formData.selectedDate.replace('weekday-', '')))}`
-                                : new Date(formData.selectedDate).toLocaleDateString('zh-TW')
-                              }
-                            </span>
-                          </p>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">上課時段：</span>
-                            <span className="font-medium text-[#4B4036]">{formData.selectedTimeSlot}</span>
-                          </p>
-                            </>
-                          )}
-                          {isWaitingList && (
                             <p className="flex justify-between">
-                              <span className="text-[#2B3A3B]">報名狀態：</span>
-                              <span className="font-medium text-[#4B4036] bg-[#FFF9F2] px-2 py-1 rounded-lg">
-                                等候區學生
+                              <span className="text-[#2B3A3B]">課程類型：</span>
+                              <span className="font-medium text-[#4B4036]">
+                                {courseTypes.find(c => c.id === formData.courseType)?.name}班
                               </span>
                             </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="pb-4 border-b border-[#EADBC8]">
-                        <h3 className="text-base sm:text-lg font-bold text-[#4B4036] mb-3">您孩子資料</h3>
-                        <div className="space-y-2 text-sm sm:text-base">
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">全名：</span>
-                            <span className="font-medium text-[#4B4036]">{formData.childFullName}</span>
-                          </p>
-                          {formData.childNickname && (
                             <p className="flex justify-between">
-                              <span className="text-[#2B3A3B]">暱稱：</span>
-                              <span className="font-medium text-[#4B4036]">{formData.childNickname}</span>
+                              <span className="text-[#2B3A3B]">報名機構：</span>
+                              <span className="font-medium text-[#4B4036]">
+                                {selectedOrganization?.org_name || 'Hanami Music'}
+                              </span>
                             </p>
-                          )}
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">出生日期：</span>
-                            <span className="font-medium text-[#4B4036]">
-                              {new Date(formData.childBirthDate).toLocaleDateString('zh-TW')}
-                            </span>
-                          </p>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">年齡：</span>
-                            <span className="font-medium text-[#4B4036]">{formData.childAge} 歲</span>
-                          </p>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">性別：</span>
-                            <span className="font-medium text-[#4B4036]">{formData.childGender}</span>
-                          </p>
-                          {formData.childPreferences && (
-                            <div className="mt-2">
-                              <p className="text-[#2B3A3B] mb-1">喜好物：</p>
-                              <p className="text-sm text-[#4B4036] bg-[#FFF9F2] p-2 rounded-lg">
-                                {formData.childPreferences}
+                            {formData.selectedPlan && (
+                              <p className="flex justify-between">
+                                <span className="text-[#2B3A3B]">課程計劃：</span>
+                                <span className="font-medium text-[#4B4036]">
+                                  {pricingPlans.find(p => p.id === formData.selectedPlan)?.plan_name}
+                                </span>
                               </p>
-                            </div>
-                          )}
-                          {formData.childHealthNotes && (
-                            <div className="mt-2">
-                              <p className="text-[#2B3A3B] mb-1">健康/過敏情況：</p>
-                              <p className="text-sm text-[#4B4036] bg-[#FFF9F2] p-2 rounded-lg">
-                                {formData.childHealthNotes}
+                            )}
+                            {!isWaitingList && (
+                              <>
+                                <p className="flex justify-between">
+                                  <span className="text-[#2B3A3B]">上課日期：</span>
+                                  <span className="font-medium text-[#4B4036]">
+                                    {formData.courseNature === 'regular' && formData.selectedDate.startsWith('weekday-')
+                                      ? `星期${getWeekdayName(parseInt(formData.selectedDate.replace('weekday-', '')))}`
+                                      : new Date(formData.selectedDate).toLocaleDateString('zh-TW')
+                                    }
+                                  </span>
+                                </p>
+                                <p className="flex justify-between">
+                                  <span className="text-[#2B3A3B]">上課時段：</span>
+                                  <span className="font-medium text-[#4B4036]">{formData.selectedTimeSlot}</span>
+                                </p>
+                              </>
+                            )}
+                            {isWaitingList && (
+                              <p className="flex justify-between">
+                                <span className="text-[#2B3A3B]">報名狀態：</span>
+                                <span className="font-medium text-[#4B4036] bg-[#FFF9F2] px-2 py-1 rounded-lg">
+                                  等候區學生
+                                </span>
                               </p>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <h3 className="text-base sm:text-lg font-bold text-[#4B4036] mb-3">聯絡資料</h3>
-                        <div className="space-y-2 text-sm sm:text-base">
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">家長姓名：</span>
-                            <span className="font-medium text-[#4B4036]">{formData.parentName}</span>
-                          </p>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">聯絡電話：</span>
-                            <span className="font-medium text-[#4B4036]">{formData.parentCountryCode} {formData.parentPhone}</span>
-                          </p>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">電郵地址：</span>
-                            <span className="font-medium text-[#4B4036]">{formData.parentEmail}</span>
-                          </p>
-                          <p className="flex justify-between">
-                            <span className="text-[#2B3A3B]">支付方法：</span>
-                            <span className="font-medium text-[#4B4036]">
-                              {formData.paymentMethod === 'screenshot' ? '上傳付款截圖' : 
-                               formData.paymentMethod === 'airwallex' ? 'Airwallex 線上支付' : 
-                               '未選擇'}
-                            </span>
-                          </p>
-                          {formData.promotionCode && (
+                        <div className="pb-4 border-b border-[#EADBC8]">
+                          <h3 className="text-base sm:text-lg font-bold text-[#4B4036] mb-3">您孩子資料</h3>
+                          <div className="space-y-2 text-sm sm:text-base">
                             <p className="flex justify-between">
-                              <span className="text-[#2B3A3B]">優惠代碼：</span>
-                              <span className="font-medium text-green-600">{formData.promotionCode}</span>
+                              <span className="text-[#2B3A3B]">全名：</span>
+                              <span className="font-medium text-[#4B4036]">{formData.childFullName}</span>
                             </p>
-                          )}
-                          {formData.remarks && (
-                            <div className="mt-3 pt-3 border-t border-[#EADBC8]">
-                              <p className="text-[#2B3A3B] mb-1">備註：</p>
-                              <p className="text-[#4B4036]">{formData.remarks}</p>
-                            </div>
-                          )}
+                            {formData.childNickname && (
+                              <p className="flex justify-between">
+                                <span className="text-[#2B3A3B]">暱稱：</span>
+                                <span className="font-medium text-[#4B4036]">{formData.childNickname}</span>
+                              </p>
+                            )}
+                            <p className="flex justify-between">
+                              <span className="text-[#2B3A3B]">出生日期：</span>
+                              <span className="font-medium text-[#4B4036]">
+                                {new Date(formData.childBirthDate).toLocaleDateString('zh-TW')}
+                              </span>
+                            </p>
+                            <p className="flex justify-between">
+                              <span className="text-[#2B3A3B]">年齡：</span>
+                              <span className="font-medium text-[#4B4036]">{formData.childAge} 歲</span>
+                            </p>
+                            <p className="flex justify-between">
+                              <span className="text-[#2B3A3B]">性別：</span>
+                              <span className="font-medium text-[#4B4036]">{formData.childGender}</span>
+                            </p>
+                            {formData.childPreferences && (
+                              <div className="mt-2">
+                                <p className="text-[#2B3A3B] mb-1">喜好物：</p>
+                                <p className="text-sm text-[#4B4036] bg-[#FFF9F2] p-2 rounded-lg">
+                                  {formData.childPreferences}
+                                </p>
+                              </div>
+                            )}
+                            {formData.childHealthNotes && (
+                              <div className="mt-2">
+                                <p className="text-[#2B3A3B] mb-1">健康/過敏情況：</p>
+                                <p className="text-sm text-[#4B4036] bg-[#FFF9F2] p-2 rounded-lg">
+                                  {formData.childHealthNotes}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-base sm:text-lg font-bold text-[#4B4036] mb-3">聯絡資料</h3>
+                          <div className="space-y-2 text-sm sm:text-base">
+                            <p className="flex justify-between">
+                              <span className="text-[#2B3A3B]">家長姓名：</span>
+                              <span className="font-medium text-[#4B4036]">{formData.parentName}</span>
+                            </p>
+                            <p className="flex justify-between">
+                              <span className="text-[#2B3A3B]">聯絡電話：</span>
+                              <span className="font-medium text-[#4B4036]">{formData.parentCountryCode} {formData.parentPhone}</span>
+                            </p>
+                            <p className="flex justify-between">
+                              <span className="text-[#2B3A3B]">電郵地址：</span>
+                              <span className="font-medium text-[#4B4036]">{formData.parentEmail}</span>
+                            </p>
+                            <p className="flex justify-between">
+                              <span className="text-[#2B3A3B]">支付方法：</span>
+                              <span className="font-medium text-[#4B4036]">
+                                {formData.paymentMethod === 'screenshot' ? '上傳付款截圖' :
+                                  formData.paymentMethod === 'airwallex' ? 'Airwallex 線上支付' :
+                                    '未選擇'}
+                              </span>
+                            </p>
+                            {formData.promotionCode && (
+                              <p className="flex justify-between">
+                                <span className="text-[#2B3A3B]">優惠代碼：</span>
+                                <span className="font-medium text-green-600">{formData.promotionCode}</span>
+                              </p>
+                            )}
+                            {formData.remarks && (
+                              <div className="mt-3 pt-3 border-t border-[#EADBC8]">
+                                <p className="text-[#2B3A3B] mb-1">備註：</p>
+                                <p className="text-[#4B4036]">{formData.remarks}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -3319,7 +3296,7 @@ export default function HanamiMusicRegisterPage() {
       </div>
 
       {/* 底部導航按鈕 - 改為相對定位 */}
-      <div className="bg-white/90 backdrop-blur-sm border-t border-[#EADBC8] mt-8 mb-15"> 
+      <div className="bg-white/90 backdrop-blur-sm border-t border-[#EADBC8] mt-8 mb-15">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3">
             {currentStep > 0 && (
@@ -3333,7 +3310,7 @@ export default function HanamiMusicRegisterPage() {
                 <span className="text-sm sm:text-base">上一步</span>
               </motion.button>
             )}
-            
+
             {/* 只有不是支付步驟，或者是支付步驟但選擇了截圖上傳時，才顯示下一步按鈕 */}
             {!(currentStep === 6) || (currentStep === 6 && formData.paymentMethod === 'screenshot') ? (
               <motion.button
@@ -3341,11 +3318,10 @@ export default function HanamiMusicRegisterPage() {
                 disabled={currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded}
                 whileHover={!(currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 1.02 } : {}}
                 whileTap={!(currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 0.98 } : {}}
-                className={`flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold shadow-lg transition-all duration-200 flex-1 ${
-                  currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded
+                className={`flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold shadow-lg transition-all duration-200 flex-1 ${currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded
                     ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                     : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:shadow-xl'
-                }`}
+                  }`}
               >
                 <span className="text-sm sm:text-base">
                   {currentStep === steps.length - 1 ? '提交報名' : '下一步'}

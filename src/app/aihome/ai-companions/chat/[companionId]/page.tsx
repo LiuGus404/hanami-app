@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useParams } from 'next/navigation';
-import { 
-  Bars3Icon, 
+import {
+  Bars3Icon,
   PaperAirplaneIcon,
   ArrowLeftIcon,
   MicrophoneIcon,
@@ -45,7 +45,7 @@ export default function ChatPage() {
   const router = useRouter();
   const params = useParams();
   const companionId = params.companionId as 'mori' | 'pico';
-  
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -105,8 +105,8 @@ export default function ChatPage() {
 
     try {
       // 查找用戶與此 companion 的對話房間
-      const { data: rooms, error: roomsError } = await supabase
-        .from('ai_rooms')
+      const { data: rooms, error: roomsError } = await (supabase
+        .from('ai_rooms') as any)
         .select('id')
         .eq('created_by', user.id)
         .eq('room_type', 'chat')
@@ -123,8 +123,8 @@ export default function ChatPage() {
       setCurrentRoomId(roomId);
 
       // 載入該房間的訊息
-      const { data: messages, error: messagesError } = await supabase
-        .from('ai_messages')
+      const { data: messages, error: messagesError } = await (supabase
+        .from('ai_messages') as any)
         .select('*')
         .eq('room_id', roomId)
         .order('created_at', { ascending: true })
@@ -136,7 +136,7 @@ export default function ChatPage() {
       }
 
       if (messages && messages.length > 0) {
-        const formattedMessages: Message[] = messages.map(msg => ({
+        const formattedMessages: Message[] = messages.map((msg: any) => ({
           id: msg.id,
           content: msg.content || '',
           sender: msg.sender_type === 'user' ? 'user' : 'companion',
@@ -159,11 +159,11 @@ export default function ChatPage() {
     try {
       // 確保有房間 ID
       let targetRoomId = roomId || currentRoomId;
-      
+
       if (!targetRoomId) {
         // 創建新的房間
-        const { data: newRoom, error: roomError } = await supabase
-          .from('ai_rooms')
+        const { data: newRoom, error: roomError } = await (supabase
+          .from('ai_rooms') as any)
           .insert({
             title: `與 ${companion.name} 的對話`,
             description: `用戶與 ${companion.name} 的個人對話記錄`,
@@ -182,8 +182,8 @@ export default function ChatPage() {
         setCurrentRoomId(targetRoomId);
 
         // 添加用戶為房間成員
-        const { error: memberError } = await supabase
-          .from('room_members')
+        const { error: memberError } = await (supabase
+          .from('room_members') as any)
           .insert({
             room_id: targetRoomId,
             user_id: user.id,
@@ -214,8 +214,8 @@ export default function ChatPage() {
         status: 'sent'
       };
 
-      const { error: messageError } = await supabase
-        .from('ai_messages')
+      const { error: messageError } = await (supabase
+        .from('ai_messages') as any)
         .insert(messageData);
 
       if (messageError) {
@@ -237,7 +237,7 @@ export default function ChatPage() {
     if (isLoading || isTyping) {
       // 根據 companion 和任務類型設定預估時間
       let estimatedSeconds = 5; // 預設 5 秒
-      
+
       if (companion?.id === 'pico') {
         // Pico 的任務類型判斷
         const lastMessage = messages[messages.length - 1]?.content || '';
@@ -257,10 +257,10 @@ export default function ChatPage() {
           estimatedSeconds = 8; // 一般問答
         }
       }
-      
+
       setEstimatedTime(estimatedSeconds);
       setElapsedTime(0);
-      
+
       // 開始計時
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
@@ -273,7 +273,7 @@ export default function ChatPage() {
       }
       setElapsedTime(0);
     }
-    
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -304,12 +304,12 @@ export default function ChatPage() {
   // 模擬 AI 回覆
   const simulateAIResponse = async (userMessage: string) => {
     setIsTyping(true);
-    
+
     // 模擬 API 延遲
     await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-    
+
     let response = '';
-    
+
     if (companion.id === 'mori') {
       // 墨墨的回覆風格 - 學術性
       if (userMessage.includes('學習') || userMessage.includes('研究')) {
@@ -329,7 +329,7 @@ export default function ChatPage() {
         response = '嗨！很高興和您聊天！我充滿創意的大腦已經開始運轉了！有什麼有趣的創作想法想要分享嗎？';
       }
     }
-    
+
     const aiMessage: Message = {
       id: Date.now().toString(),
       content: response,
@@ -337,7 +337,7 @@ export default function ChatPage() {
       timestamp: new Date(),
       type: 'text'
     };
-    
+
     setIsTyping(false);
     setMessages(prev => [...prev, aiMessage]);
 
@@ -349,7 +349,7 @@ export default function ChatPage() {
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
-    
+
     const messageContent = inputMessage.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -358,7 +358,7 @@ export default function ChatPage() {
       timestamp: new Date(),
       type: 'text'
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
@@ -366,7 +366,7 @@ export default function ChatPage() {
 
     // 儲存用戶訊息到 Supabase
     await saveMessageToSupabase(userMessage);
-    
+
     // 如果是 Pico 聊天，發送到 webhook；否則使用模擬回應
     if (companion.id === 'pico' && user?.id) {
       console.log('🚀 發送到 Pico webhook:', messageContent);
@@ -382,7 +382,7 @@ export default function ChatPage() {
       // 墨墨或其他角色使用模擬回應
       await simulateAIResponse(userMessage.content);
     }
-    
+
     setIsLoading(false);
     setIsTyping(false);
   };
@@ -404,12 +404,12 @@ export default function ChatPage() {
         'modern', '現代', 'contemporary', '當代',
         'style', '風格', '樣式'
       ];
-      
+
       // 如果訊息包含風格關鍵字，使用 kawaii 作為預設
       if (styleKeywords.some(keyword => lowerMsg.includes(keyword))) {
         return 'kawaii';
       }
-      
+
       // 否則留空，讓 AI 自行決定
       return '';
     };
@@ -463,32 +463,32 @@ export default function ChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(webhookData)
       });
-      
+
       const out = await res.json();
       console.log('✅ 自動 webhook 回應:', { status: res.status, data: out });
-      
+
       // 處理 n8n 的回應並顯示給用戶
       if (res.ok) {
         let responseContent = '';
         let messageType: 'text' | 'image' = 'text';
         let imageUrl = '';
-        
+
         console.log('🔍 分析 webhook 回應結構:', out);
-        
+
         // 根據你的 n8n workflow，檢查不同的回應格式
         if (out.data) {
           let rawResponse = '';
-          
+
           if (typeof out.data === 'string') {
             rawResponse = out.data;
           } else if (out.data.raw) {
             rawResponse = out.data.raw;
           }
-          
+
           // 提取圖片 URL（從 iframe 或直接 URL）
           if (rawResponse) {
             console.log('🔍 原始回應內容:', rawResponse);
-            
+
             // 檢查是否包含 iframe
             if (rawResponse.includes('<iframe') && rawResponse.includes('https://')) {
               // 從 iframe srcdoc 中提取圖片 URL
@@ -522,17 +522,17 @@ export default function ChatPage() {
             responseContent = out.data.response;
           }
         }
-        
+
         // 如果沒有找到明確的回應，使用預設訊息
         if (!responseContent) {
           responseContent = '🎨 我收到您的請求了！正在發揮創意為您創作...';
         }
-        
+
         // 如果有圖片，添加圖片 URL 到內容
         if (imageUrl) {
           responseContent += `\n\n![創作作品](${imageUrl})`;
         }
-        
+
         // 創建 AI 回應訊息
         const aiResponse: Message = {
           id: (Date.now() + Math.random()).toString(),
@@ -541,7 +541,7 @@ export default function ChatPage() {
           timestamp: new Date(),
           type: messageType
         };
-        
+
         // 添加到訊息列表
         setMessages(prev => [...prev, aiResponse]);
         console.log('🎨 已添加 Pico 的回應到對話中:', aiResponse);
@@ -559,11 +559,11 @@ export default function ChatPage() {
           timestamp: new Date(),
           type: 'text'
         };
-        
+
         setMessages(prev => [...prev, errorMessage]);
         console.log('❌ Webhook 回應錯誤，顯示錯誤訊息');
       }
-      
+
       return { success: res.ok, data: out };
     } catch (error) {
       console.error('❌ 自動 webhook 錯誤:', error);
@@ -576,21 +576,21 @@ export default function ChatPage() {
     console.log('🔥 點擊了送到Pico按鈕');
     console.log('🔍 檢查companion.id:', companion.id);
     console.log('👤 檢查user:', user);
-    
+
     if (companion.id !== 'pico') {
       console.log('❌ 不是 Pico，返回');
       return;
     }
-    
+
     if (!user?.id) {
       console.log('❌ 用戶未登入');
       alert('用戶未登入，無法發送到 Pico！');
       return;
     }
-    
+
     const text = inputMessage.trim() || messages.filter(m => m.sender === 'user').slice(-1)[0]?.content || '';
     console.log('📝 準備發送的文本:', text);
-    
+
     if (!text) {
       console.log('❌ 沒有文本內容');
       alert('沒有內容可以發送到 Pico！');
@@ -601,7 +601,7 @@ export default function ChatPage() {
 
     try {
       setSendingPico(true);
-      
+
       // 使用相同的風格檢測邏輯
       const detectStyle = (message: string): string => {
         const lowerMsg = message.toLowerCase();
@@ -617,7 +617,7 @@ export default function ChatPage() {
 
       const detectedStyle = detectStyle(text);
       console.log('🎨 手動發送檢測到的風格:', detectedStyle || '無指定（留空）');
-      
+
       const res = await fetch('/aihome/api/aipico', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -629,10 +629,10 @@ export default function ChatPage() {
           model: 'nanobanana'
         })
       });
-      
+
       const out = await res.json();
       console.log('Pico API 回應:', { status: res.status, data: out });
-      
+
       // 在對話中提示一則系統訊息
       setMessages(prev => ([
         ...prev,
@@ -711,7 +711,7 @@ export default function ChatPage() {
               >
                 <ArrowLeftIcon className="w-6 h-6 text-[#4B4036]" />
               </motion.button>
-              
+
               {/* 伙伴資訊 */}
               <div className="flex items-center space-x-3">
                 <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
@@ -734,7 +734,7 @@ export default function ChatPage() {
                   <p className="text-sm text-[#2B3A3B]">{companion.specialty}</p>
                 </div>
                 {/* 在線狀態 */}
-                <motion.div 
+                <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                   className="w-3 h-3 bg-green-400 rounded-full"
@@ -758,9 +758,9 @@ export default function ChatPage() {
       </nav>
 
       {/* 側邊欄 */}
-      <AppSidebar 
-        isOpen={sidebarOpen} 
-        onClose={() => setSidebarOpen(false)} 
+      <AppSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         currentPath="/aihome/ai-companions"
       />
 
@@ -779,9 +779,8 @@ export default function ChatPage() {
                   transition={{ duration: 0.3 }}
                   className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`flex items-end space-x-3 max-w-[70%] ${
-                    message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'
-                  }`}>
+                  <div className={`flex items-end space-x-3 max-w-[70%] ${message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'
+                    }`}>
                     {/* 頭像 */}
                     {message.sender === 'companion' && (
                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${companion.color} p-0.5 flex-shrink-0`}>
@@ -798,7 +797,7 @@ export default function ChatPage() {
                         </div>
                       </div>
                     )}
-                    
+
                     {message.sender === 'user' && (
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] flex items-center justify-center flex-shrink-0">
                         <span className="text-sm font-bold text-white">
@@ -810,11 +809,10 @@ export default function ChatPage() {
                     {/* 訊息氣泡 */}
                     <motion.div
                       whileHover={{ scale: 1.02 }}
-                      className={`px-4 py-3 rounded-2xl shadow-lg ${
-                        message.sender === 'user'
-                          ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                          : 'bg-white/70 backdrop-blur-sm text-[#4B4036] border border-[#EADBC8]'
-                      }`}
+                      className={`px-4 py-3 rounded-2xl shadow-lg ${message.sender === 'user'
+                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                        : 'bg-white/70 backdrop-blur-sm text-[#4B4036] border border-[#EADBC8]'
+                        }`}
                     >
                       {/* 訊息內容 */}
                       <div className="text-sm leading-relaxed">
@@ -823,7 +821,7 @@ export default function ChatPage() {
                           const imageMatch = line.match(/!\[.*?\]\((.*?)\)/);
                           if (imageMatch) {
                             let imageUrl = imageMatch[1];
-                            
+
                             // 如果是 iframe，提取其中的圖片 URL
                             if (imageUrl.includes('<iframe')) {
                               const urlExtract = imageUrl.match(/https:\/\/[^\s"<>]+\.(?:png|jpg|jpeg|webp|gif)/i);
@@ -833,12 +831,12 @@ export default function ChatPage() {
                                 return <p key={index} className="text-red-500">圖片連結解析失敗</p>;
                               }
                             }
-                            
+
                             return (
                               <div key={index} className="mt-3">
                                 <div className="bg-white/30 rounded-lg p-2 shadow-sm">
-                                  <img 
-                                    src={imageUrl} 
+                                  <img
+                                    src={imageUrl}
                                     alt="Pico 創作作品"
                                     className="max-w-full h-auto rounded-lg shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
                                     onClick={() => window.open(imageUrl, '_blank')}
@@ -861,7 +859,7 @@ export default function ChatPage() {
                               </div>
                             );
                           }
-                          
+
                           // 一般文字內容
                           if (line.trim()) {
                             return <p key={index} className="mb-1">{line}</p>;
@@ -869,12 +867,11 @@ export default function ChatPage() {
                           return null;
                         })}
                       </div>
-                      <p className={`text-xs mt-2 ${
-                        message.sender === 'user' ? 'text-white/70' : 'text-[#2B3A3B]/70'
-                      }`}>
-                        {message.timestamp.toLocaleTimeString('zh-TW', { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
+                      <p className={`text-xs mt-2 ${message.sender === 'user' ? 'text-white/70' : 'text-[#2B3A3B]/70'
+                        }`}>
+                        {message.timestamp.toLocaleTimeString('zh-TW', {
+                          hour: '2-digit',
+                          minute: '2-digit'
                         })}
                       </p>
                     </motion.div>
@@ -894,13 +891,13 @@ export default function ChatPage() {
                 >
                   <div className="flex items-end space-x-3 max-w-[80%]">
                     {/* AI 頭像 */}
-                    <motion.div 
+                    <motion.div
                       className={`w-8 h-8 rounded-full bg-gradient-to-br ${companion.color} p-0.5 flex-shrink-0`}
-                      animate={{ 
+                      animate={{
                         scale: [1, 1.1, 1],
                         rotate: [0, 5, -5, 0]
                       }}
-                      transition={{ 
+                      transition={{
                         duration: 2,
                         repeat: Infinity,
                         ease: "easeInOut"
@@ -938,7 +935,7 @@ export default function ChatPage() {
                           })()}
                         </motion.span>
                       </div>
-                      
+
                       {/* 動畫點點 */}
                       <div className="flex items-center space-x-1 mb-2">
                         <motion.div
@@ -957,7 +954,7 @@ export default function ChatPage() {
                           className={`w-2 h-2 rounded-full bg-gradient-to-r ${companion.color}`}
                         />
                       </div>
-                      
+
                       {/* 時間顯示 */}
                       <div className="flex items-center justify-between text-xs text-[#2B3A3B]/70">
                         <span className={elapsedTime > estimatedTime ? 'text-orange-600 font-medium' : ''}>
@@ -967,29 +964,28 @@ export default function ChatPage() {
                           {elapsedTime > estimatedTime ? '處理中...' : `預估: ~${estimatedTime}s`}
                         </span>
                       </div>
-                      
+
                       {/* 進度條 */}
                       <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
                         <motion.div
-                          className={`h-1 rounded-full ${
-                            elapsedTime > estimatedTime 
-                              ? 'bg-gradient-to-r from-orange-400 to-red-500' 
-                              : `bg-gradient-to-r ${companion.color}`
-                          }`}
+                          className={`h-1 rounded-full ${elapsedTime > estimatedTime
+                            ? 'bg-gradient-to-r from-orange-400 to-red-500'
+                            : `bg-gradient-to-r ${companion.color}`
+                            }`}
                           initial={{ width: 0 }}
-                          animate={{ 
-                            width: elapsedTime > estimatedTime 
+                          animate={{
+                            width: elapsedTime > estimatedTime
                               ? '100%'
                               : `${Math.min((elapsedTime / estimatedTime) * 100, 100)}%`,
                             opacity: elapsedTime > estimatedTime ? [0.5, 1, 0.5] : 1
                           }}
-                          transition={{ 
+                          transition={{
                             duration: elapsedTime > estimatedTime ? 1 : 0.5,
                             repeat: elapsedTime > estimatedTime ? Infinity : 0
                           }}
                         />
                       </div>
-                      
+
                       {/* 創作提示（僅 Pico 顯示）*/}
                       {companion?.id === 'pico' && (
                         <motion.div
@@ -1007,7 +1003,7 @@ export default function ChatPage() {
                           </span>
                         </motion.div>
                       )}
-                      
+
                       {/* 墨墨的思考提示 */}
                       {companion?.id === 'mori' && (
                         <motion.div
@@ -1027,7 +1023,7 @@ export default function ChatPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-            
+
             <div ref={messagesEndRef} />
           </div>
         </div>
@@ -1076,7 +1072,7 @@ export default function ChatPage() {
                   style={{ maxHeight: '120px' }}
                   disabled={isLoading}
                 />
-                
+
                 {/* 發送按鈕 */}
                 <motion.button
                   whileHover={{ scale: 1.1 }}

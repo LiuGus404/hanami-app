@@ -61,7 +61,7 @@ export default function StudentDetailPage() {
       }
     }
   }, [student, activeTab]);
-  
+
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
   const currentIdRef = useRef<string | null>(null);
@@ -76,7 +76,7 @@ export default function StudentDetailPage() {
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
     if (loading || !user) return;
-    
+
     // 如果用戶不是管理員，重定向
     if (role !== 'admin') {
       alert('無權限訪問');
@@ -86,14 +86,14 @@ export default function StudentDetailPage() {
 
     // 如果 ID 沒有變化且已經載入過，不重複載入
     if (currentIdRef.current === id && dataFetchedRef.current) return;
-    
+
     // 防止重複載入
     if (loadingRef.current) return;
     loadingRef.current = true;
-    
+
     // 更新當前 ID
     currentIdRef.current = id as string;
-    
+
     setPageLoading(true);
     setStudent(null);
     setError(null);
@@ -102,8 +102,8 @@ export default function StudentDetailPage() {
     const checkAuth = async () => {
       try {
         // 先檢查是否為停用學生
-        const { data: inactiveData, error: inactiveError } = await supabase
-          .from('inactive_student_list')
+        const { data: inactiveData, error: inactiveError } = await (supabase
+          .from('inactive_student_list') as any)
           .select('*')
           .eq('id', id as string)
           .single();
@@ -124,15 +124,15 @@ export default function StudentDetailPage() {
           setPageLoading(false);
           dataFetchedRef.current = true;
           loadingRef.current = false;
-          
+
           // 檢查課堂資料
           await checkLessonData(convertedStudent.id);
           return;
         }
 
         // 檢查是否為試堂學生
-        const { data: trialData, error: trialError } = await supabase
-          .from('hanami_trial_students')
+        const { data: trialData, error: trialError } = await (supabase
+          .from('hanami_trial_students') as any)
           .select('*')
           .eq('id', id as string)
           .single();
@@ -142,15 +142,15 @@ export default function StudentDetailPage() {
           setPageLoading(false);
           dataFetchedRef.current = true;
           loadingRef.current = false;
-          
+
           // 檢查課堂資料
           await checkLessonData(trialData.id);
           return;
         }
 
         // 如果不是試堂學生，則從常規學生表中獲取數據
-        const { data: studentData, error: studentError } = await supabase
-          .from('Hanami_Students')
+        const { data: studentData, error: studentError } = await (supabase
+          .from('Hanami_Students') as any)
           .select('*')
           .eq('id', id as string)
           .single();
@@ -167,7 +167,7 @@ export default function StudentDetailPage() {
         setPageLoading(false);
         dataFetchedRef.current = true;
         loadingRef.current = false;
-        
+
         // 檢查課堂資料
         await checkLessonData(studentData.id);
       } catch (err) {
@@ -182,47 +182,47 @@ export default function StudentDetailPage() {
     const checkLessonData = async (studentId: string) => {
       try {
         console.log('🔍 檢查課堂資料表...');
-        
+
         // 檢查表是否存在資料
-        const { data: allLessons, error: allError } = await supabase
-          .from('hanami_student_lesson')
+        const { data: allLessons, error: allError } = await (supabase
+          .from('hanami_student_lesson') as any)
           .select('*')
           .limit(5);
-        
-        console.log('📊 課堂資料表檢查:', { 
+
+        console.log('📊 課堂資料表檢查:', {
           hasData: allLessons && allLessons.length > 0,
           totalRecords: allLessons?.length || 0,
-          sampleData: allLessons?.slice(0, 2).map(l => ({ id: l.id, student_id: l.student_id, lesson_date: l.lesson_date })),
+          sampleData: allLessons?.slice(0, 2).map((l: any) => ({ id: l.id, student_id: l.student_id, lesson_date: l.lesson_date })),
           error: allError?.message || '無錯誤',
         });
-        
+
         // 檢查特定學生的課堂資料
-        const { data: studentLessons, error: studentError } = await supabase
-          .from('hanami_student_lesson')
+        const { data: studentLessons, error: studentError } = await (supabase
+          .from('hanami_student_lesson') as any)
           .select('id, lesson_date, course_type, student_id')
           .eq('student_id', studentId)
           .limit(5);
-        
+
         console.log('📋 學生課堂資料檢查:', {
           studentId,
           lessonCount: studentLessons?.length || 0,
-          lessons: studentLessons?.map(l => ({ id: l.id, date: l.lesson_date, type: l.course_type, student_id: l.student_id })),
+          lessons: studentLessons?.map((l: any) => ({ id: l.id, date: l.lesson_date, type: l.course_type, student_id: l.student_id })),
           error: studentError?.message || '無錯誤',
         });
-        
+
         // 檢查是否有其他學生的課堂資料
         if (!studentLessons || studentLessons.length === 0) {
-          const { data: otherLessons, error: otherError } = await supabase
-            .from('hanami_student_lesson')
+          const { data: otherLessons, error: otherError } = await (supabase
+            .from('hanami_student_lesson') as any)
             .select('student_id, lesson_date')
             .limit(3);
-          
+
           console.log('🔍 其他學生課堂資料:', {
-            otherLessons: otherLessons?.map(l => ({ student_id: l.student_id, date: l.lesson_date })),
+            otherLessons: otherLessons?.map((l: any) => ({ student_id: l.student_id, date: l.lesson_date })),
             error: otherError?.message || '無錯誤',
           });
         }
-        
+
       } catch (err) {
         console.error('❌ 檢查課堂資料失敗:', err);
       }
@@ -242,7 +242,7 @@ export default function StudentDetailPage() {
   // 回復學生功能
   const handleRestoreStudent = async () => {
     if (!student || !isInactiveStudent) return;
-    
+
     if (!confirm('確定要回復此學生嗎？')) {
       return;
     }
@@ -279,13 +279,13 @@ export default function StudentDetailPage() {
       };
 
       // 使用 upsert 而不是 insert
-      const { error: restoreError } = await supabase
-        .from('Hanami_Students')
-        .upsert(studentData, { 
+      const { error: restoreError } = await (supabase
+        .from('Hanami_Students') as any)
+        .upsert(studentData, {
           onConflict: 'id',
-          ignoreDuplicates: false, 
+          ignoreDuplicates: false,
         });
-      
+
       if (restoreError) {
         console.error('Error restoring student:', restoreError);
         alert(`回復學生時發生錯誤: ${restoreError.message}`);
@@ -293,8 +293,8 @@ export default function StudentDetailPage() {
       }
 
       // 從 inactive_student_list 表中刪除
-      const { error: deleteError } = await supabase
-        .from('inactive_student_list')
+      const { error: deleteError } = await (supabase
+        .from('inactive_student_list') as any)
         .delete()
         .eq('id', id as string);
 
@@ -402,48 +402,48 @@ export default function StudentDetailPage() {
               const studentOrgId = student?.org_id ?? null;
               const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
               const isDisabled = (key === 'media' || key === 'phone') && !isPremiumOrg;
-              
+
               return (
-              <div key={key} className="relative">
-                <motion.button
-                  onClick={() => handleTabChange(key as any)}
-                  onMouseEnter={() => setShowTooltip(key)}
-                  onMouseLeave={() => setShowTooltip(null)}
-                  className={`
+                <div key={key} className="relative">
+                  <motion.button
+                    onClick={() => handleTabChange(key as any)}
+                    onMouseEnter={() => setShowTooltip(key)}
+                    onMouseLeave={() => setShowTooltip(null)}
+                    className={`
                     flex items-center rounded-lg text-sm font-medium transition-colors whitespace-nowrap
                     ${isDisabled
-                      ? 'opacity-50 cursor-pointer text-gray-400'
-                      : activeTab === key
-                        ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
-                        : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
-                    }
+                        ? 'opacity-50 cursor-pointer text-gray-400'
+                        : activeTab === key
+                          ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
+                          : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
+                      }
                     px-2 py-3 sm:px-4
                   `}
-                  whileHover={isDisabled ? {} : { scale: 1.02 }}
-                  whileTap={isDisabled ? {} : { scale: 0.98 }}
-                >
-                  <Icon className="w-4 h-4 sm:mr-2" />
-                  {/* 小螢幕隱藏文字，大螢幕顯示 */}
-                  <span className="hidden sm:inline">{label}</span>
-                </motion.button>
-                
-                {/* 工具提示 - 只在小螢幕顯示 */}
-                {showTooltip === key && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-[#2B3A3B] text-white text-xs rounded-lg shadow-lg z-50 sm:hidden"
+                    whileHover={isDisabled ? {} : { scale: 1.02 }}
+                    whileTap={isDisabled ? {} : { scale: 0.98 }}
                   >
-                    <div className="text-center">
-                      <div className="font-medium">{label}</div>
-                      <div className="text-[#EADBC8] text-xs mt-1">{description}</div>
-                    </div>
-                    {/* 箭頭 */}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-[#2B3A3B]"></div>
-                  </motion.div>
-                )}
-              </div>
+                    <Icon className="w-4 h-4 sm:mr-2" />
+                    {/* 小螢幕隱藏文字，大螢幕顯示 */}
+                    <span className="hidden sm:inline">{label}</span>
+                  </motion.button>
+
+                  {/* 工具提示 - 只在小螢幕顯示 */}
+                  {showTooltip === key && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-[#2B3A3B] text-white text-xs rounded-lg shadow-lg z-50 sm:hidden"
+                    >
+                      <div className="text-center">
+                        <div className="font-medium">{label}</div>
+                        <div className="text-[#EADBC8] text-xs mt-1">{description}</div>
+                      </div>
+                      {/* 箭頭 */}
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-[#2B3A3B]"></div>
+                    </motion.div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -459,8 +459,8 @@ export default function StudentDetailPage() {
         >
           {/* 基本資料分頁 */}
           {activeTab === 'basic' && (
-            <StudentBasicInfo 
-              isInactive={isInactiveStudent} 
+            <StudentBasicInfo
+              isInactive={isInactiveStudent}
               student={student}
               onUpdate={(newData) => {
                 setStudent(newData);
@@ -485,8 +485,8 @@ export default function StudentDetailPage() {
                   studentType: student.student_type,
                 });
                 return (
-                  <StudentLessonPanel 
-                    contactNumber={student.contact_number} 
+                  <StudentLessonPanel
+                    contactNumber={student.contact_number}
                     studentId={lessonStudentId}
                     studentName={student.full_name}
                     studentType={student.student_type}
@@ -510,7 +510,7 @@ export default function StudentDetailPage() {
 
           {/* 互動角色分頁 */}
           {activeTab === 'avatar' && student && (
-            <EnhancedStudentAvatarTab 
+            <EnhancedStudentAvatarTab
               student={student}
               className="mt-4"
             />
@@ -519,12 +519,12 @@ export default function StudentDetailPage() {
           {/* 媒體庫分頁 */}
           {activeTab === 'media' && student && (
             <>
-              {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', { 
-                studentId: student.id, 
+              {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', {
+                studentId: student.id,
                 studentName: student.full_name,
-                studentObject: student 
+                studentObject: student
               })}
-              <StudentMediaTimeline 
+              <StudentMediaTimeline
                 studentId={student.id}
                 studentName={student.full_name}
                 className="mt-4"
@@ -534,7 +534,7 @@ export default function StudentDetailPage() {
 
           {/* AI分析分頁 */}
           {activeTab === 'phone' && student && (
-            <StudentPhoneProfile 
+            <StudentPhoneProfile
               studentId={student.id}
               studentPhone={student.contact_number}
               studentName={student.full_name}

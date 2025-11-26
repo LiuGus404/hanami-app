@@ -26,10 +26,11 @@ export async function GET(request: NextRequest) {
 
     // 如果沒有提供學生ID，返回所有成長樹
     if (!studentId) {
+      const typedAllTreesNoFilter = (allTrees || []) as Array<any>;
       return NextResponse.json({
         success: true,
-        data: allTrees || [],
-        count: allTrees?.length || 0
+        data: typedAllTreesNoFilter,
+        count: typedAllTreesNoFilter.length || 0
       });
     }
 
@@ -49,11 +50,13 @@ export async function GET(request: NextRequest) {
     }
 
     // 過濾掉學生已有的成長樹
-    const studentTreeIds = (studentTrees || []).map(st => st.tree_id);
-    const availableTrees = (allTrees || []).filter(tree => !studentTreeIds.includes(tree.id));
+    const typedStudentTrees = (studentTrees || []) as Array<{ tree_id: string; [key: string]: any }>;
+    const typedAllTrees = (allTrees || []) as Array<{ id: string; [key: string]: any }>;
+    const studentTreeIds = typedStudentTrees.map(st => st.tree_id);
+    const availableTrees = typedAllTrees.filter(tree => !studentTreeIds.includes(tree.id));
 
     console.log('可用成長樹:', {
-      total: allTrees?.length || 0,
+      total: typedAllTrees.length || 0,
       studentHas: studentTreeIds.length,
       available: availableTrees.length
     });
@@ -63,7 +66,7 @@ export async function GET(request: NextRequest) {
       data: availableTrees,
       count: availableTrees.length,
       metadata: {
-        totalTrees: allTrees?.length || 0,
+        totalTrees: typedAllTrees.length || 0,
         studentTreeCount: studentTreeIds.length,
         availableCount: availableTrees.length
       }

@@ -120,8 +120,9 @@ async function calculateRemainingLessonsFallback(
     if (!data) return 0;
 
     // 分類：大於今天的都算，等於今天的要判斷結束時間
+    const typedData = data as Array<{ lesson_date: string; actual_timeslot?: string | null; lesson_duration?: string | null; [key: string]: any; }>;
     let count = 0;
-    for (const lesson of data) {
+    for (const lesson of typedData) {
       if (lesson.lesson_date > todayStr) {
         count++;
       } else if (lesson.lesson_date === todayStr) {
@@ -263,8 +264,9 @@ async function calculateRemainingLessonsBatchFallback(
   console.log(`查詢到 ${lessonsData?.length || 0} 條課堂記錄`);
 
   // 依學生分組，使用與單個學生計算相同的邏輯
+  const typedLessonsData = lessonsData as Array<{ student_id: string; lesson_date: string; actual_timeslot?: string | null; lesson_duration?: string | null; [key: string]: any; }> | null;
   studentIds.forEach(id => {
-    const lessons = (lessonsData || []).filter(l => l.student_id === id);
+    const lessons = (typedLessonsData || []).filter(l => l.student_id === id);
     let count = 0;
     
     console.log(`學生 ${id} 有 ${lessons.length} 條課堂記錄`);

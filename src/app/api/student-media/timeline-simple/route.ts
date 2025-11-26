@@ -48,17 +48,20 @@ export async function GET(request: NextRequest) {
     }
 
     // 為每個課程添加真實的媒體資料
-    const lessonsWithMedia = (lessonsData || []).map(lesson => {
+    const typedLessonsData = (lessonsData || []) as Array<{ id: string; lesson_date: string; [key: string]: any }>;
+    const typedMediaData = (mediaData || []) as Array<{ lesson_id?: string; created_at: string; [key: string]: any }>;
+    
+    const lessonsWithMedia = typedLessonsData.map(lesson => {
       // 根據 lesson_id 關聯媒體檔案（優先使用課程關聯）
-      let lessonMedia = (mediaData || []).filter(media => media.lesson_id === lesson.id);
+      let lessonMedia = typedMediaData.filter(media => media.lesson_id === lesson.id);
       
       // 如果沒有通過 lesson_id 關聯的媒體，則使用日期匹配作為備用方案
       // 但需要確保該媒體沒有被其他課程的 lesson_id 關聯
       if (lessonMedia.length === 0) {
         const lessonDate = new Date(lesson.lesson_date);
-        lessonMedia = (mediaData || []).filter(media => {
+        lessonMedia = typedMediaData.filter(media => {
           // 檢查該媒體是否已經被其他課程的 lesson_id 關聯
-          const isAlreadyLinked = (lessonsData || []).some(otherLesson => 
+          const isAlreadyLinked = typedLessonsData.some(otherLesson => 
             otherLesson.id !== lesson.id && media.lesson_id === otherLesson.id
           );
           
@@ -83,7 +86,7 @@ export async function GET(request: NextRequest) {
 
     console.log('🎉 資料處理完成:', {
       totalLessons: lessonsWithMedia.length,
-      totalMedia: mediaData?.length || 0
+      totalMedia: typedMediaData.length || 0
     });
 
     // 詳細的媒體關聯分析
@@ -112,7 +115,7 @@ export async function GET(request: NextRequest) {
       data: {
         lessons: lessonsWithMedia,
         totalLessons: lessonsWithMedia.length,
-        totalMedia: mediaData?.length || 0,
+        totalMedia: typedMediaData.length || 0,
         hasAssessment: false
       }
     });

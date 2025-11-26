@@ -78,7 +78,7 @@ export default function RemoveTeacherForeignKeyPage() {
 
       for (const statement of statements) {
         try {
-          const { error } = await supabase.rpc('exec_sql', { sql: statement } as any);
+          const { error } = await (supabase.rpc as any)('exec_sql', { sql: statement });
           if (error) {
             console.error('SQL 執行錯誤:', error);
             results.push(`❌ 錯誤: ${error.message}`);

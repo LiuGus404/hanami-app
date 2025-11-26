@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 調用統一資料庫函數驗證優惠碼
-    const { data, error } = await supabase.rpc('validate_promo_code_unified', {
+    const { data, error } = await (supabase.rpc as any)('validate_promo_code_unified', {
       p_code: body.code.toUpperCase(),
       p_user_id: body.user_id || null,
       p_user_email: body.user_email || null,

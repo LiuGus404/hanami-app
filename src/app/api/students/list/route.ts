@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 查詢學生列表
-    const query = supabase
+    const query = (supabase as any)
       .from('Hanami_Students')
       .select('*')
       .eq('org_id', orgId)

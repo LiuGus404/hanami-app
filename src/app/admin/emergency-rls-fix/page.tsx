@@ -16,8 +16,8 @@ export default function EmergencyRLSFixPage() {
 
       // 1. 測試更新操作
       console.log('步驟 1: 測試當前更新操作');
-      const { data: testData, error: testError } = await supabase
-        .from('hanami_course_codes')
+      const { data: testData, error: testError } = await (supabase
+        .from('hanami_course_codes') as any)
         .update({
           updated_at: new Date().toISOString()
         })

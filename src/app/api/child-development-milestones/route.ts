@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 跳過插入，因為 hanami_child_development_milestones 表可能不存在
-    const { data, error } = await supabase
-      .from('ai_tasks')
+    const { data, error } = await (supabase
+      .from('ai_tasks') as any)
       .insert({
         status: 'completed',
         title: 'Child Development Milestone',
@@ -168,9 +168,9 @@ export async function PUT(request: NextRequest) {
     });
 
     // 跳過更新，因為 hanami_child_development_milestones 表可能不存在
-    const { data, error } = await supabase
-      .from('ai_tasks')
-      .update({ status: 'completed' })
+    const { data, error } = await (supabase
+      .from('ai_tasks') as any)
+      .update({ status: 'completed' } as any)
       .eq('id', body.id)
       .select()
       .single();

@@ -43,7 +43,7 @@ export async function GET(
 
     // 如果提供了 orgId，先檢查停用學生列表
     if (orgId) {
-      const { data: inactiveData } = await supabase
+      const { data: inactiveData } = await (supabase as any)
         .from('inactive_student_list')
         .select('*')
         .eq('id', studentId)
@@ -69,7 +69,7 @@ export async function GET(
       }
 
       // 檢查試堂學生
-      const { data: trialStudent } = await supabase
+      const { data: trialStudent } = await (supabase as any)
         .from('hanami_trial_students')
         .select('*')
         .eq('id', studentId)
@@ -86,7 +86,7 @@ export async function GET(
     }
 
     // 獲取常規學生資訊
-    let query = supabase
+    let query = (supabase as any)
       .from('Hanami_Students')
       .select('*')
       .eq('id', studentId);
@@ -339,7 +339,7 @@ export async function PATCH(
       if (!updatedStudent) {
         console.log('沒有返回數據，嘗試查詢...');
         const tableName = isTrialStudent ? 'hanami_trial_students' : 'Hanami_Students';
-        const { data: fetchedStudent, error: fetchError } = await supabase
+        const { data: fetchedStudent, error: fetchError } = await (supabase as any)
           .from(tableName)
           .select('*')
           .eq('id', studentId)

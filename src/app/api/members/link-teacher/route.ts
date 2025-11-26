@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
 
     // 1. 获取成员身份信息
     console.log('[link-teacher POST] 查询成员身份:', { identityId, orgId });
-    const { data: identity, error: identityError } = await oldSupabase
-      .from('hanami_org_identities')
+    const { data: identity, error: identityError } = await ((oldSupabase as any)
+      .from('hanami_org_identities'))
       .select('user_email, user_id')
       .eq('id', identityId)
       .eq('org_id', orgId)
@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
 
     if (!identity) {
       // 尝试不限制 org_id 查询，看看是否存在
-      const { data: identityWithoutOrg, error: checkError } = await oldSupabase
-        .from('hanami_org_identities')
+      const { data: identityWithoutOrg, error: checkError } = await ((oldSupabase as any)
+        .from('hanami_org_identities'))
         .select('id, org_id, user_email, user_id')
         .eq('id', identityId)
         .maybeSingle();
@@ -85,15 +85,15 @@ export async function POST(request: NextRequest) {
 
     // 3. 更新老师记录，添加链接信息
     const identityData = identity as { user_email: string; user_id: string };
-    const { error: updateError } = await supabase
-      .from('hanami_employee')
+    const { error: updateError } = await ((supabase as any)
+      .from('hanami_employee'))
       .update({
         linked_user_id: identityData.user_id,
         linked_user_email: identityData.user_email,
         sync_status: 'manual',
         last_synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
+      } as any)
       .eq('id', teacherId);
 
     if (updateError) {
@@ -155,15 +155,15 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 清除链接信息
-    const { error: updateError } = await supabase
-      .from('hanami_employee')
+    const { error: updateError } = await ((supabase as any)
+      .from('hanami_employee'))
       .update({
         linked_user_id: null,
         linked_user_email: null,
         sync_status: 'disabled',
         last_synced_at: null,
         updated_at: new Date().toISOString(),
-      })
+      } as any)
       .eq('id', teacherId);
 
     if (updateError) {
@@ -209,8 +209,8 @@ export async function GET(request: NextRequest) {
 
     if (identityId) {
       // 通过 identityId 查找链接的老师
-      const { data: identity, error: identityError } = await oldSupabase
-        .from('hanami_org_identities')
+      const { data: identity, error: identityError } = await ((oldSupabase as any)
+        .from('hanami_org_identities'))
         .select('user_email, user_id')
         .eq('id', identityId)
         .eq('org_id', orgId)
@@ -247,7 +247,8 @@ export async function GET(request: NextRequest) {
         .eq('org_id', orgId)
         .single();
 
-      if (teacherError || !teacher || !teacher.linked_user_id) {
+      const typedTeacher = teacher as { id: string; linked_user_id: string | null; linked_user_email: string | null; sync_status: string | null; last_synced_at: string | null } | null;
+      if (teacherError || !typedTeacher || !typedTeacher.linked_user_id) {
         return NextResponse.json({
           success: true,
           linked: false,
@@ -258,10 +259,10 @@ export async function GET(request: NextRequest) {
       // 查找链接的成员身份
       // 注意：hanami_org_identities 表使用 user_email 而不是 user_id
       // 需要先通过 user_id 查找 saas_users 获取 email，然后查找 identity
-      const { data: identity, error: identityError } = await oldSupabase
-        .from('hanami_org_identities')
+      const { data: identity, error: identityError } = await ((oldSupabase as any)
+        .from('hanami_org_identities'))
         .select('id, user_email, role_type, status')
-        .eq('user_email', teacher.linked_user_email || '')
+        .eq('user_email', typedTeacher.linked_user_email || '')
         .eq('org_id', orgId)
         .maybeSingle();
 

@@ -256,11 +256,19 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
       // 調試信息：檢查課程類型資料
       console.log('模態框課程類型資料：', courseTypes);
       
-      for (const schedule of scheduleData || []) {
+      const typedScheduleData = (scheduleData || []) as Array<{
+        weekday?: number;
+        timeslot?: string;
+        course_type?: string | null;
+        max_students?: number;
+        [key: string]: any;
+      }>;
+      
+      for (const schedule of typedScheduleData) {
         const courseType = schedule.course_type || '';
         const key = `${schedule.weekday}_${schedule.timeslot}_${courseType}`;
         const currentStudents = studentCountMap[key] || 0;
-        const availableSlots = Math.max(0, schedule.max_students - currentStudents);
+        const availableSlots = Math.max(0, (schedule.max_students || 0) - currentStudents);
         
         // 調試信息：檢查每個時段的學生數量
         console.log(`模態框時段檢查 - 時段: ${schedule.timeslot}, 星期: ${schedule.weekday}, 課程: ${courseType}`);
@@ -280,12 +288,12 @@ export default function CopyAvailableTimesModal({ isOpen, onClose }: CopyAvailab
           console.log(`模態框映射結果: ${courseName}`);
           
           availableSlotsList.push({
-            weekday: schedule.weekday,
+            weekday: schedule.weekday || 0,
             weekdayName: weekdays.find(w => w.value === schedule.weekday)?.name || '',
-            timeslot: schedule.timeslot,
-            course_type: schedule.course_type,
+            timeslot: schedule.timeslot || '',
+            course_type: schedule.course_type || '',
             course_name: courseName,
-            max_students: schedule.max_students,
+            max_students: schedule.max_students || 0,
             current_students: currentStudents,
             available_slots: availableSlots,
           });

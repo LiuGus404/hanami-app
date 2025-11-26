@@ -11,6 +11,7 @@ import BackButton from '@/components/ui/BackButton';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 import { createPortal } from 'react-dom';
 import FinancialManagementNavBar from '@/components/ui/FinancialManagementNavBar';
 
@@ -175,8 +176,8 @@ function IncomeManagementContent() {
       let packageData: Package[] = [];
       if (studentIds.length > 0) {
         try {
-          const { data: packageDataResult, error: packageError } = await supabase
-            .from('Hanami_Student_Package')
+          const { data: packageDataResult, error: packageError } = await (supabase
+            .from('Hanami_Student_Package') as any)
             .select(`
               id,
               course_name,
@@ -206,8 +207,8 @@ function IncomeManagementContent() {
       }
 
       // 獲取課程類型（根據 org_id 過濾）
-      const { data: courseTypeData, error: courseTypeError } = await supabase
-        .from('Hanami_CourseTypes')
+      const { data: courseTypeData, error: courseTypeError } = await (supabase
+        .from('Hanami_CourseTypes') as any)
         .select('*')
         .eq('status', true)
         .eq('org_id', resolvedOrgId)
@@ -262,8 +263,8 @@ function IncomeManagementContent() {
 
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('Hanami_Student_Package')
+      const { error } = await (supabase
+        .from('Hanami_Student_Package') as any)
         .update({ price: newPrice })
         .eq('id', editingPackage.id);
 
@@ -294,8 +295,8 @@ function IncomeManagementContent() {
 
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('Hanami_CourseTypes')
+      const { error } = await (supabase
+        .from('Hanami_CourseTypes') as any)
         .update({ price_per_lesson: newCourseTypePrice })
         .eq('id', editingCourseType.id);
 
@@ -516,7 +517,7 @@ function IncomeManagementContent() {
         border: 'border-[#DDD6FE]'
       }
     };
-    
+
     return themes[courseTypeName as keyof typeof themes] || {
       bg: 'from-[#F7FAFC] to-[#EDF2F7]',
       text: 'text-gray-800',
@@ -544,12 +545,12 @@ function IncomeManagementContent() {
   // 價格編輯模態框內容
   const priceEditorModalContent = showPriceEditor && editingPackage && isMounted && typeof document !== 'undefined' && document.body ? (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto my-8">
-      <div 
+      <div
         className="p-6 w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold text-[#2B3A3B] mb-4">編輯課程包價格</h3>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[#2B3A3B] mb-1">課程名稱</label>
@@ -648,7 +649,7 @@ function IncomeManagementContent() {
               </ul>
             </div>
           </div>
-          
+
           <div className="max-h-[80vh] overflow-y-auto px-6 py-6">
             <div className="space-y-5">
               <section className="rounded-3xl border border-[#F1E4D3] bg-white/90 p-5 shadow-sm">
@@ -662,7 +663,7 @@ function IncomeManagementContent() {
                     <input
                       type="date"
                       value={newIncome.income_date}
-                      onChange={(e) => setNewIncome({...newIncome, income_date: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, income_date: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
                     />
                   </div>
@@ -670,7 +671,7 @@ function IncomeManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">收入分類 *</label>
                     <select
                       value={newIncome.income_category}
-                      onChange={(e) => setNewIncome({...newIncome, income_category: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, income_category: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23D48347%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-right-4 bg-[length:16px_16px] pr-10"
                     >
                       <option value="">請選擇分類</option>
@@ -680,12 +681,12 @@ function IncomeManagementContent() {
                           // 提取分類標題（移除分隔線）
                           const title = category.replace(/──────────/g, '').trim();
                           return (
-                            <option 
-                              key={category} 
+                            <option
+                              key={category}
                               value=""
                               disabled
-                              style={{ 
-                                fontWeight: 'bold', 
+                              style={{
+                                fontWeight: 'bold',
                                 backgroundColor: '#FFF9F2',
                                 color: '#D48347',
                                 fontSize: '0.8rem',
@@ -699,8 +700,8 @@ function IncomeManagementContent() {
                           );
                         }
                         return (
-                          <option 
-                            key={category} 
+                          <option
+                            key={category}
                             value={category}
                             style={{
                               paddingLeft: '20px',
@@ -727,7 +728,7 @@ function IncomeManagementContent() {
                     <input
                       type="text"
                       value={newIncome.income_description}
-                      onChange={(e) => setNewIncome({...newIncome, income_description: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, income_description: e.target.value })}
                       placeholder="例如：課程包收入"
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
                     />
@@ -737,7 +738,7 @@ function IncomeManagementContent() {
                     <input
                       type="number"
                       value={newIncome.amount}
-                      onChange={(e) => setNewIncome({...newIncome, amount: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setNewIncome({ ...newIncome, amount: parseFloat(e.target.value) || 0 })}
                       placeholder="0.00"
                       step="0.01"
                       min="0"
@@ -757,7 +758,7 @@ function IncomeManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">付款方式</label>
                     <select
                       value={newIncome.payment_method}
-                      onChange={(e) => setNewIncome({...newIncome, payment_method: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, payment_method: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23D48347%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-right-4 bg-[length:16px_16px] pr-10"
                     >
                       <option value="">請選擇付款方式</option>
@@ -770,7 +771,7 @@ function IncomeManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">備註</label>
                     <textarea
                       value={newIncome.notes}
-                      onChange={(e) => setNewIncome({...newIncome, notes: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, notes: e.target.value })}
                       placeholder="可選的備註資訊"
                       rows={3}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
@@ -849,7 +850,7 @@ function IncomeManagementContent() {
               </ul>
             </div>
           </div>
-          
+
           <div className="max-h-[80vh] overflow-y-auto px-6 py-6">
             <div className="space-y-5">
               <section className="rounded-3xl border border-[#F1E4D3] bg-white/90 p-5 shadow-sm">
@@ -863,7 +864,7 @@ function IncomeManagementContent() {
                     <input
                       type="date"
                       value={newIncome.income_date}
-                      onChange={(e) => setNewIncome({...newIncome, income_date: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, income_date: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
                     />
                   </div>
@@ -871,7 +872,7 @@ function IncomeManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">收入分類 *</label>
                     <select
                       value={newIncome.income_category}
-                      onChange={(e) => setNewIncome({...newIncome, income_category: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, income_category: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23D48347%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-right-4 bg-[length:16px_16px] pr-10"
                     >
                       <option value="">請選擇分類</option>
@@ -881,12 +882,12 @@ function IncomeManagementContent() {
                           // 提取分類標題（移除分隔線）
                           const title = category.replace(/──────────/g, '').trim();
                           return (
-                            <option 
-                              key={category} 
+                            <option
+                              key={category}
                               value=""
                               disabled
-                              style={{ 
-                                fontWeight: 'bold', 
+                              style={{
+                                fontWeight: 'bold',
                                 backgroundColor: '#FFF9F2',
                                 color: '#D48347',
                                 fontSize: '0.8rem',
@@ -900,8 +901,8 @@ function IncomeManagementContent() {
                           );
                         }
                         return (
-                          <option 
-                            key={category} 
+                          <option
+                            key={category}
                             value={category}
                             style={{
                               paddingLeft: '20px',
@@ -928,7 +929,7 @@ function IncomeManagementContent() {
                     <input
                       type="text"
                       value={newIncome.income_description}
-                      onChange={(e) => setNewIncome({...newIncome, income_description: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, income_description: e.target.value })}
                       placeholder="例如：課程包收入"
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
                     />
@@ -938,7 +939,7 @@ function IncomeManagementContent() {
                     <input
                       type="number"
                       value={newIncome.amount}
-                      onChange={(e) => setNewIncome({...newIncome, amount: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setNewIncome({ ...newIncome, amount: parseFloat(e.target.value) || 0 })}
                       placeholder="0.00"
                       step="0.01"
                       min="0"
@@ -958,7 +959,7 @@ function IncomeManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">付款方式</label>
                     <select
                       value={newIncome.payment_method}
-                      onChange={(e) => setNewIncome({...newIncome, payment_method: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, payment_method: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23D48347%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-right-4 bg-[length:16px_16px] pr-10"
                     >
                       <option value="">請選擇付款方式</option>
@@ -971,7 +972,7 @@ function IncomeManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">備註</label>
                     <textarea
                       value={newIncome.notes}
-                      onChange={(e) => setNewIncome({...newIncome, notes: e.target.value})}
+                      onChange={(e) => setNewIncome({ ...newIncome, notes: e.target.value })}
                       placeholder="可選的備註資訊"
                       rows={3}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
@@ -1015,12 +1016,12 @@ function IncomeManagementContent() {
   // 課程類型價格編輯模態框內容
   const courseTypePriceEditorModalContent = showCourseTypePriceEditor && editingCourseType && isMounted && typeof document !== 'undefined' && document.body ? (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto my-8">
-      <div 
+      <div
         className="p-6 w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold text-[#2B3A3B] mb-4">設定課程類型價格</h3>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[#2B3A3B] mb-1">課程名稱</label>
@@ -1388,7 +1389,7 @@ function IncomeManagementContent() {
                   <h2 className="text-xl font-semibold text-[#2B3A3B]">課程類型管理</h2>
                 </div>
               </div>
-              
+
               {courseTypes.length > 0 ? (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {courseTypes.map((courseType, index) => {
@@ -1468,7 +1469,7 @@ function IncomeManagementContent() {
                   <h2 className="text-xl font-semibold text-[#2B3A3B]">課程包收入詳情</h2>
                 </div>
               </div>
-              
+
               {packages.length > 0 ? (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {packages.map((pkg) => (
@@ -1539,7 +1540,9 @@ function IncomeManagementContent() {
 export default function IncomeManagementPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/financial-management/income">
-      <IncomeManagementContent />
+      <WithPermissionCheck pageKey="finance">
+        <IncomeManagementContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

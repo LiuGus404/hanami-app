@@ -158,7 +158,7 @@ export async function GET(request: Request) {
     if (treesData && treesData.length > 0) {
       // 使用真實的 tree_id 進行測試
       const testGoalData = {
-        tree_id: treesData[0].id, // 使用真實的 tree_id
+        tree_id: (treesData as Array<{ id: string; [key: string]: any }>)[0]?.id || '', // 使用真實的 tree_id
         goal_name: '測試目標',
         goal_description: '這是一個測試目標',
         goal_icon: '🧪',
@@ -175,9 +175,9 @@ export async function GET(request: Request) {
       };
 
       try {
-        const { data: insertData, error: insertErr } = await supabase
+        const { data: insertData, error: insertErr } = await (supabase as any)
           .from('hanami_growth_goals')
-          .insert([testGoalData])
+          .insert([testGoalData] as any)
           .select()
           .single();
 

@@ -133,12 +133,14 @@ export default function ScheduleManagementPanel() {
     setLoading(true);
     try {
       // 取得課堂時段
-      const { data: slotData, error: slotError } = await supabase
+      const { data: slotDataRaw, error: slotError } = await supabase
         .from('hanami_schedule')
         .select('*')
         .eq('org_id', validOrgId as string)
         .order('weekday')
         .order('timeslot');
+      
+      const slotData = slotDataRaw as Array<{ created_at: string | null; updated_at: string | null; [key: string]: any; }> | null;
       
       console.log('🔍 課堂空缺情況資料查詢結果:', { slotData, slotError });
       
@@ -162,11 +164,11 @@ export default function ScheduleManagementPanel() {
       
       if (teacherError) throw teacherError;
 
-      setScheduleSlots((slotData || []).map(slot => ({
+      setScheduleSlots((slotData || []).map((slot: any) => ({
         ...slot,
         created_at: slot.created_at || '',
         updated_at: slot.updated_at || '',
-      })));
+      })) as any);
       setCourseTypes(classData || []);
       setTeachers(teacherData || []);
 
@@ -189,7 +191,8 @@ export default function ScheduleManagementPanel() {
       return;
     }
     try {
-      const { error } = await supabase
+      // hanami_schedule table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_schedule')
         .insert([{ 
           ...newSlot,
@@ -200,7 +203,7 @@ export default function ScheduleManagementPanel() {
           assigned_teachers: newSlot.assigned_teachers || null,
           course_type: newSlot.course_type || null,
           duration: newSlot.duration || null,
-        }]);
+        }]));
       
       if (error) throw error;
       
@@ -259,7 +262,8 @@ export default function ScheduleManagementPanel() {
       return;
     }
     try {
-      const { error } = await supabase
+      // hanami_schedule table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_schedule')
         .update({
           ...editSlot,
@@ -271,7 +275,7 @@ export default function ScheduleManagementPanel() {
           duration: editSlot.duration || null,
         })
         .eq('id', editSlot.id!)
-        .eq('org_id', validOrgId as string);
+        .eq('org_id', validOrgId as string));
       
       if (error) throw error;
       
@@ -371,9 +375,10 @@ export default function ScheduleManagementPanel() {
       alert('請先創建屬於您的機構後再新增課程');
       return;
     }
-    const { error } = await supabase
+    // Hanami_CourseTypes table type may not be fully defined
+    const { error } = await ((supabase as any)
       .from('Hanami_CourseTypes')
-      .insert({ name: newCourseName.trim(), status: true, org_id: validOrgId });
+      .insert({ name: newCourseName.trim(), status: true, org_id: validOrgId }));
     if (!error) {
       setNewCourseName('');
       fetchCourses();
@@ -391,11 +396,12 @@ export default function ScheduleManagementPanel() {
       alert('請先創建屬於您的機構後再更新課程');
       return;
     }
-    const { error } = await supabase
+    // Hanami_CourseTypes table type may not be fully defined
+    const { error } = await ((supabase as any)
       .from('Hanami_CourseTypes')
       .update({ name: editingCourseName.trim() })
       .eq('id', editingCourseId)
-      .eq('org_id', validOrgId as string);
+      .eq('org_id', validOrgId as string));
     if (!error) {
       setEditingCourseId(null);
       setEditingCourseName('');

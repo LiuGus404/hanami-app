@@ -184,7 +184,13 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       if (!error && data) {
         console.log('📊 [HanamiCalendar] 載入的假期數量:', data.length, 'effectiveOrgId:', effectiveOrgId);
         // 確保資料符合 Holiday 型別，並且只包含當前機構的假期
-        const validHolidays: Holiday[] = data
+        const typedData = (data || []) as Array<{
+          date?: string | null;
+          title?: string | null;
+          org_id?: string | null;
+          [key: string]: any;
+        }>;
+        const validHolidays: Holiday[] = typedData
           .filter((h): boolean => {
             const isValid = h.date !== null && h.title !== null;
             if (isValid && effectiveOrgId) {
@@ -198,8 +204,8 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             return isValid;
           })
           .map(h => ({
-            date: h.date,
-            title: h.title,
+            date: h.date || '',
+            title: h.title || '',
           }));
         console.log('📊 [HanamiCalendar] 有效的假期列表:', validHolidays.map(h => ({ date: h.date, title: h.title })));
         setHolidays(validHolidays);
@@ -397,7 +403,11 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           }
 
           // 計算常規學生的剩餘堂數
-          const regularStudentIds = (regularLessonsData || [])
+          const typedRegularLessonsData = (regularLessonsData || []) as Array<{
+            student_id?: string;
+            [key: string]: any;
+          }>;
+          const regularStudentIds = typedRegularLessonsData
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
           
@@ -406,8 +416,23 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           });
 
           // 處理常規學生數據
-          const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
-            id: lesson.id,
+          const typedRegularLessonsDataForMap = (regularLessonsData || []) as Array<{
+            id?: string;
+            student_id?: string;
+            lesson_date?: string | null;
+            regular_timeslot?: string | null;
+            course_type?: string | null;
+            lesson_status?: string | null;
+            lesson_duration?: string | null;
+            Hanami_Students?: {
+              full_name?: string | null;
+              student_age?: number | null;
+              contact_number?: string | null;
+            } | null;
+            [key: string]: any;
+          }>;
+          const processedRegularLessons = typedRegularLessonsDataForMap.map((lesson) => ({
+            id: lesson.id || '',
             student_id: lesson.student_id || '',
             lesson_date: lesson.lesson_date || '',
             regular_timeslot: lesson.regular_timeslot || '',
@@ -423,14 +448,24 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           }));
 
           // 處理試堂學生數據
-          const processedTrialLessons = (trialLessonsData || []).map((trial) => ({
-            id: trial.id,
-            student_id: trial.id,
+          const typedTrialLessonsData = (trialLessonsData || []) as Array<{
+            id?: string;
+            lesson_date?: string | null;
+            actual_timeslot?: string | null;
+            course_type?: string | null;
+            full_name?: string | null;
+            student_age?: number | null;
+            lesson_duration?: string | null;
+            [key: string]: any;
+          }>;
+          const processedTrialLessons = typedTrialLessonsData.map((trial) => ({
+            id: trial.id || '',
+            student_id: trial.id || '',
             lesson_date: trial.lesson_date || '',
             regular_timeslot: trial.actual_timeslot || '',
             course_type: trial.course_type || '',
             full_name: trial.full_name || '未命名學生',
-            student_age: trial.student_age,
+            student_age: trial.student_age || null,
             lesson_status: null,
             remaining_lessons: null,
             is_trial: true,
@@ -499,7 +534,11 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           }
 
           // 計算常規學生的剩餘堂數
-          const regularStudentIds = (regularLessonsData || [])
+          const typedRegularLessonsData = (regularLessonsData || []) as Array<{
+            student_id?: string;
+            [key: string]: any;
+          }>;
+          const regularStudentIds = typedRegularLessonsData
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
           
@@ -508,8 +547,23 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           });
 
           // 處理常規學生數據
-          const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
-            id: lesson.id,
+          const typedRegularLessonsDataForMap = (regularLessonsData || []) as Array<{
+            id?: string;
+            student_id?: string;
+            lesson_date?: string | null;
+            regular_timeslot?: string | null;
+            course_type?: string | null;
+            lesson_status?: string | null;
+            lesson_duration?: string | null;
+            Hanami_Students?: {
+              full_name?: string | null;
+              student_age?: number | null;
+              contact_number?: string | null;
+            } | null;
+            [key: string]: any;
+          }>;
+          const processedRegularLessons = typedRegularLessonsDataForMap.map((lesson) => ({
+            id: lesson.id || '',
             student_id: lesson.student_id || '',
             lesson_date: lesson.lesson_date || '',
             regular_timeslot: lesson.regular_timeslot || '',
@@ -525,14 +579,24 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           }));
 
           // 處理試堂學生數據
-          const processedTrialLessons = (trialLessonsData || []).map((trial) => ({
-            id: trial.id,
-            student_id: trial.id,
+          const typedTrialLessonsData = (trialLessonsData || []) as Array<{
+            id?: string;
+            lesson_date?: string | null;
+            actual_timeslot?: string | null;
+            course_type?: string | null;
+            full_name?: string | null;
+            student_age?: number | null;
+            lesson_duration?: string | null;
+            [key: string]: any;
+          }>;
+          const processedTrialLessons = typedTrialLessonsData.map((trial) => ({
+            id: trial.id || '',
+            student_id: trial.id || '',
             lesson_date: trial.lesson_date || '',
             regular_timeslot: trial.actual_timeslot || '',
             course_type: trial.course_type || '',
             full_name: trial.full_name || '未命名學生',
-            student_age: trial.student_age,
+            student_age: trial.student_age || null,
             lesson_status: null,
             remaining_lessons: null,
             is_trial: true,
@@ -593,7 +657,11 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           }
 
           // 計算常規學生的剩餘堂數
-          const regularStudentIds = (regularLessonsData || [])
+          const typedRegularLessonsData = (regularLessonsData || []) as Array<{
+            student_id?: string;
+            [key: string]: any;
+          }>;
+          const regularStudentIds = typedRegularLessonsData
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
           
@@ -602,8 +670,23 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           });
 
           // 處理常規學生數據
-          const processedRegularLessons = (regularLessonsData || []).map((lesson) => ({
-            id: lesson.id,
+          const typedRegularLessonsDataForMap = (regularLessonsData || []) as Array<{
+            id?: string;
+            student_id?: string;
+            lesson_date?: string | null;
+            regular_timeslot?: string | null;
+            course_type?: string | null;
+            lesson_status?: string | null;
+            lesson_duration?: string | null;
+            Hanami_Students?: {
+              full_name?: string | null;
+              student_age?: number | null;
+              contact_number?: string | null;
+            } | null;
+            [key: string]: any;
+          }>;
+          const processedRegularLessons = typedRegularLessonsDataForMap.map((lesson) => ({
+            id: lesson.id || '',
             student_id: lesson.student_id || '',
             lesson_date: lesson.lesson_date || '',
             regular_timeslot: lesson.regular_timeslot || '',
@@ -619,14 +702,24 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           }));
 
           // 處理試堂學生數據
-          const processedTrialLessons = (trialLessonsData || []).map((trial) => ({
-            id: trial.id,
-            student_id: trial.id,
+          const typedTrialLessonsData = (trialLessonsData || []) as Array<{
+            id?: string;
+            lesson_date?: string | null;
+            actual_timeslot?: string | null;
+            course_type?: string | null;
+            full_name?: string | null;
+            student_age?: number | null;
+            lesson_duration?: string | null;
+            [key: string]: any;
+          }>;
+          const processedTrialLessons = typedTrialLessonsData.map((trial) => ({
+            id: trial.id || '',
+            student_id: trial.id || '',
             lesson_date: trial.lesson_date || '',
             regular_timeslot: trial.actual_timeslot || '',
             course_type: trial.course_type || '',
             full_name: trial.full_name || '未命名學生',
-            student_age: trial.student_age,
+            student_age: trial.student_age || null,
             lesson_status: null,
             remaining_lessons: null,
             is_trial: true,
@@ -759,7 +852,11 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
     }
 
     // 計算常規學生的剩餘堂數
-    const regularStudentIds = (regularLessonsData || [])
+    const typedRegularLessonsDataForCalc = (regularLessonsData || []) as Array<{
+      student_id?: string;
+      [key: string]: any;
+    }>;
+    const regularStudentIds = typedRegularLessonsDataForCalc
       .filter(lesson => lesson.student_id)
       .map(lesson => lesson.student_id!);
     const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date(), {
@@ -860,12 +957,12 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
   const handleUpdateStatus = async (lessonId: string, status: string) => {
     try {
       // 1. 使用 PATCH 只更新狀態欄位
-      const { error: updateError } = await supabase
-        .from('hanami_student_lesson')
+      const { error: updateError } = await (supabase
+        .from('hanami_student_lesson') as any)
         .update({
           lesson_status: status,
           updated_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', lessonId);
 
       if (updateError) {
@@ -896,9 +993,9 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       // 3. 更新本地狀態
       if (updatedLesson) {
         setLessons(prevLessons => 
-          prevLessons.map(lesson => 
-            lesson.id === lessonId 
-              ? { ...lesson, ...updatedLesson }
+          prevLessons.map(lesson =>
+            lesson.id === lessonId
+              ? { ...lesson, ...(updatedLesson as any) }
               : lesson,
           ),
         );

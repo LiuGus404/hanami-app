@@ -16,14 +16,14 @@ export async function POST(request: Request) {
         }, { status: 400 });
       }
 
-      const { error } = await supabase
-        .from('teacher_schedule')
+      const { error } = await (supabase
+        .from('teacher_schedule') as any)
         .insert({
           teacher_id: teacherId,
           scheduled_date: date,
           start_time: startTime || '09:00',
           end_time: endTime || '18:00',
-        });
+        } as any);
 
       if (error) {
         console.error('❌ 還原單一排班記錄失敗:', error);
@@ -50,9 +50,9 @@ export async function POST(request: Request) {
         }, { status: 400 });
       }
 
-      const { error } = await supabase
-        .from('teacher_schedule')
-        .insert(schedules);
+      const { error } = await (supabase
+        .from('teacher_schedule') as any)
+        .insert(schedules as any);
 
       if (error) {
         console.error('❌ 批量還原排班記錄失敗:', error);
@@ -84,8 +84,9 @@ export async function POST(request: Request) {
       }
 
       // 找出重複記錄並保留最新的
+      const typedDuplicates = (duplicates || []) as Array<{ teacher_id: string; scheduled_date: string; [key: string]: any }>;
       const uniqueSchedules = new Map();
-      duplicates?.forEach(schedule => {
+      typedDuplicates.forEach(schedule => {
         const key = `${schedule.teacher_id}-${schedule.scheduled_date}`;
         if (!uniqueSchedules.has(key)) {
           uniqueSchedules.set(key, schedule);
@@ -110,9 +111,9 @@ export async function POST(request: Request) {
 
       // 重新插入去重後的記錄
       if (uniqueSchedulesArray.length > 0) {
-        const { error: insertError } = await supabase
-          .from('teacher_schedule')
-          .insert(uniqueSchedulesArray);
+        const { error: insertError } = await (supabase
+          .from('teacher_schedule') as any)
+          .insert(uniqueSchedulesArray as any);
 
         if (insertError) {
           console.error('❌ 重新插入記錄失敗:', insertError);

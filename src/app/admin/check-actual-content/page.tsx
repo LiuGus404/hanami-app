@@ -40,13 +40,14 @@ export default function CheckActualContentPage() {
       console.log('完整的記錄數據:', JSON.stringify(data, null, 2));
 
       // 檢查result的結構
-      if (data.result) {
-        console.log('result內容:', data.result);
-        console.log('result長度:', data.result.length);
-        console.log('result前200字符:', data.result.substring(0, 200));
+      const typedData = data as any;
+      if (typedData.result) {
+        console.log('result內容:', typedData.result);
+        console.log('result長度:', typedData.result.length);
+        console.log('result前200字符:', typedData.result.substring(0, 200));
         
         try {
-          const parsedResult = JSON.parse(data.result);
+          const parsedResult = JSON.parse(typedData.result);
           console.log('解析後的result結構:', Object.keys(parsedResult));
           
           if (parsedResult.generated_content) {

@@ -6,6 +6,7 @@ import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShel
 import BackButton from '@/components/ui/BackButton';
 import StudentManagementNavBar from '@/components/ui/StudentManagementNavBar';
 import { UserGroupIcon } from '@heroicons/react/24/outline';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -97,7 +98,9 @@ function TeacherLinkStudentsContent() {
 export default function TeacherLinkCreateStudentsPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/students">
-      <TeacherLinkStudentsContent />
+      <WithPermissionCheck pageKey="students">
+        <TeacherLinkStudentsContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

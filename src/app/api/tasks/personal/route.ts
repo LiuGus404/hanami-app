@@ -33,14 +33,14 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. 從 hanami_admin 查找對應的管理員
-    const { data: adminUser, error: adminError } = await legacySupabase
+    const { data: adminUser, error: adminError } = await (legacySupabase as any)
       .from('hanami_admin')
       .select('admin_name, admin_email')
       .eq('admin_email', email)
       .single();
 
     // 3. 從 hanami_employee 查找對應的員工
-    const { data: employeeUser, error: employeeError } = await legacySupabase
+    const { data: employeeUser, error: employeeError } = await (legacySupabase as any)
       .from('hanami_employee')
       .select('teacher_nickname, teacher_fullname, teacher_email')
       .eq('teacher_email', email)

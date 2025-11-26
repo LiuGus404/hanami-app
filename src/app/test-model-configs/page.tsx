@@ -56,11 +56,11 @@ export default function TestModelConfigsPage() {
         if (fallbackError) {
           setError(`備用查詢也失敗: ${fallbackError.message}`);
         } else {
-          setModels(fallbackData || []);
+          setModels((fallbackData || []) as any);
           setTestResult('使用備用查詢成功載入模型配置');
         }
       } else {
-        setModels(data || []);
+        setModels((data || []) as any);
         setTestResult(`成功載入 ${data?.length || 0} 個模型配置`);
       }
     } catch (err) {

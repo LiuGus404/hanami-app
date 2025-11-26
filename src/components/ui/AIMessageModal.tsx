@@ -557,7 +557,25 @@ export default function AIMessageModal({ isOpen, onClose, students, selectedLess
           } else {
             console.log(`載入試堂學生 ${student.full_name} 資料成功:`, trialData?.length || 0, '筆');
             // 將試堂學生資料轉換為課堂格式
-            data = trialData?.map(trial => {
+            const typedTrialData = (trialData || []) as Array<{
+              id?: string;
+              lesson_date?: string | null;
+              actual_timeslot?: string | null;
+              course_type?: string | null;
+              student_teacher?: string | null;
+              trial_status?: string | null;
+              trial_remarks?: string | null;
+              lesson_duration?: string | null;
+              student_oid?: string | null;
+              regular_timeslot?: string | null;
+              regular_weekday?: string | null;
+              full_name?: string | null;
+              access_role?: string | null;
+              created_at?: string | null;
+              updated_at?: string | null;
+              [key: string]: any;
+            }>;
+            data = (typedTrialData.map(trial => {
               console.log(`[AI訊息] 試堂學生資料轉換:`, trial);
               return {
                 id: trial.id,
@@ -584,7 +602,7 @@ export default function AIMessageModal({ isOpen, onClose, students, selectedLess
                 created_at: trial.created_at || '',
                 updated_at: trial.updated_at
               };
-            }) || [];
+            }) || []) as any;
             console.log(`[AI訊息] 轉換後的課堂資料:`, data);
             error = null;
           }
@@ -1165,12 +1183,12 @@ export default function AIMessageModal({ isOpen, onClose, students, selectedLess
   const handleCreateTemplate = async () => {
     if (!newTemplate.template_name || !newTemplate.template_content) return;
     
-    const { data, error } = await supabase
-      .from('hanami_ai_message_templates')
+    const { data, error } = await (supabase
+      .from('hanami_ai_message_templates') as any)
       .insert([{
         ...newTemplate,
         is_active: true
-      }])
+      }] as any)
       .select()
       .single();
     
@@ -1191,13 +1209,13 @@ export default function AIMessageModal({ isOpen, onClose, students, selectedLess
   const handleUpdateTemplate = async () => {
     if (!editingTemplate) return;
     
-    const { error } = await supabase
-      .from('hanami_ai_message_templates')
+    const { error } = await (supabase
+      .from('hanami_ai_message_templates') as any)
       .update({
         template_name: editingTemplate.template_name,
         template_content: editingTemplate.template_content,
         template_type: editingTemplate.template_type
-      })
+      } as any)
       .eq('id', editingTemplate.id);
     
     if (error) {
@@ -1234,9 +1252,9 @@ export default function AIMessageModal({ isOpen, onClose, students, selectedLess
     
     if (messageLogs && messageLogs.length > 0) {
       // 有相關記錄，使用軟刪除
-      const { error: softDeleteError } = await supabase
-        .from('hanami_ai_message_templates')
-        .update({ is_active: false })
+      const { error: softDeleteError } = await (supabase
+        .from('hanami_ai_message_templates') as any)
+        .update({ is_active: false } as any)
         .eq('id', templateId);
       
       if (softDeleteError) {

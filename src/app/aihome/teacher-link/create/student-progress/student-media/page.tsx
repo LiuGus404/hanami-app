@@ -6,6 +6,7 @@ import StudentMediaPage from '@/app/admin/student-progress/student-media/page';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import BackButton from '@/components/ui/BackButton';
 import StudentProgressNavBar from '@/components/ui/StudentProgressNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -109,7 +110,9 @@ function TeacherLinkStudentMediaContent() {
 export default function TeacherLinkStudentMediaPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/student-progress/student-media">
-      <TeacherLinkStudentMediaContent />
+      <WithPermissionCheck pageKey="progress">
+        <TeacherLinkStudentMediaContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

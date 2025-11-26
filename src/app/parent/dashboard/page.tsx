@@ -109,19 +109,20 @@ export default function ParentDashboard() {
         return;
       }
 
-      if (childrenData && childrenData.length > 0) {
+      const typedChildrenData = (childrenData || []) as Array<{ id: string; [key: string]: any }>;
+      if (typedChildrenData.length > 0) {
         // 計算孩子的剩餘堂數
-        const childIds = childrenData.map(child => child.id);
+        const childIds = typedChildrenData.map(child => child.id);
         const remainingLessonsMap = await calculateRemainingLessonsBatch(childIds, new Date());
         
         // 為孩子添加剩餘堂數
-        const childrenWithRemaining = childrenData.map(child => ({
+        const childrenWithRemaining = typedChildrenData.map(child => ({
           ...child,
           remaining_lessons: remainingLessonsMap[child.id] || 0,
         }));
         
-        setChildren(childrenWithRemaining);
-        setSelectedChild(childrenWithRemaining[0]); // 預設選擇第一個孩子
+        setChildren(childrenWithRemaining as any);
+        setSelectedChild(childrenWithRemaining[0] as any); // 預設選擇第一個孩子
         setStudentCount(childrenWithRemaining.length);
         
         // 載入第一個孩子的資料

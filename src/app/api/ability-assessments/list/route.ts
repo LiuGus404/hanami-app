@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     });
 
     // 構建查詢
-    let query = supabase
+    let query = (supabase as any)
       .from('hanami_ability_assessments')
       .select('*');
 
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       const [studentResults, treeResults] = await Promise.all([
         studentIds.length > 0
           ? (() => {
-              let studentQuery = supabase
+              let studentQuery = (supabase as any)
                 .from('Hanami_Students')
                 .select('id, full_name, nick_name, course_type')
                 .in('id', studentIds);
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
             })()
           : Promise.resolve({ data: [], error: null }),
         treeIds.length > 0
-          ? supabase
+          ? (supabase as any)
               .from('hanami_growth_trees')
               .select('id, tree_name, tree_description')
               .in('id', treeIds)

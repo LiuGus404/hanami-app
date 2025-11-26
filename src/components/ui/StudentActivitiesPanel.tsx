@@ -438,10 +438,12 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
       }
 
       // 首先查詢指定成長樹的學習路徑
-      const { data: currentTreePaths, error: currentTreeError } = await supabase
+      const { data: currentTreePathsRaw, error: currentTreeError } = await supabase
         .from('hanami_learning_paths')
         .select('*')
         .eq('tree_id', targetTreeId);
+      
+      const currentTreePaths = currentTreePathsRaw as Array<{ name: string; [key: string]: any; }> | null;
       
       if (currentTreeError) {
         console.error('載入當前成長樹學習路徑失敗:', currentTreeError);
@@ -450,7 +452,7 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
       
       console.log('當前成長樹學習路徑數量:', currentTreePaths?.length || 0);
 
-      let pathData = null;
+      let pathData: { name: string; [key: string]: any; } | null = null;
 
       if (currentTreePaths && currentTreePaths.length > 0) {
         // 使用當前成長樹的學習路徑
@@ -545,11 +547,14 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
         if (node.id && typeof node.id === 'string' && node.id.startsWith('tree_activity_')) {
           const actualActivityId = node.id.replace('tree_activity_', '');
           try {
-            const { data: treeActivity, error: treeActivityError } = await supabase
+            const { data: treeActivityRaw, error: treeActivityError } = await supabase
               .from('hanami_tree_activities')
               .select('activity_id')
               .eq('id', actualActivityId)
               .single();
+            
+            const treeActivity = treeActivityRaw as { activity_id: string; [key: string]: any; } | null;
+            
             if (!treeActivityError && treeActivity?.activity_id) {
               realActivityId = treeActivity.activity_id as string;
             }
@@ -675,11 +680,13 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
           
           // 查詢 hanami_tree_activities 表來獲取真正的 activity_id
           console.log('🔍 查詢 hanami_tree_activities 表...');
-          const { data: treeActivity, error: treeActivityError } = await supabase
+          const { data: treeActivityRaw, error: treeActivityError } = await supabase
             .from('hanami_tree_activities')
             .select('activity_id')
             .eq('id', actualActivityId)
             .single();
+          
+          const treeActivity = treeActivityRaw as { activity_id: string; [key: string]: any; } | null;
 
           if (treeActivityError) {
             console.error('查詢 hanami_tree_activities 失敗:', treeActivityError);
@@ -708,11 +715,13 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
       }
 
       // 檢查學生是否已經有正在進行的活動
-      const { data: ongoingActivities, error: ongoingError } = await supabase
+      const { data: ongoingActivitiesRaw, error: ongoingError } = await supabase
         .from('hanami_student_activities')
         .select('*')
         .eq('student_id', studentId)
         .eq('completion_status', 'in_progress');
+      
+      const ongoingActivities = ongoingActivitiesRaw as Array<{ activity_id: string; [key: string]: any; }> | null;
 
       if (ongoingError) {
         console.error('查詢正在進行的活動失敗:', ongoingError);
@@ -740,11 +749,13 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
               const candidateActualId = candidateActivity.id.replace('tree_activity_', '');
               
               // 查詢 hanami_tree_activities 表來獲取真正的 activity_id
-              const { data: candidateTreeActivity, error: candidateTreeActivityError } = await supabase
+              const { data: candidateTreeActivityRaw, error: candidateTreeActivityError } = await supabase
                 .from('hanami_tree_activities')
                 .select('activity_id')
                 .eq('id', candidateActualId)
                 .single();
+              
+              const candidateTreeActivity = candidateTreeActivityRaw as { activity_id: string; [key: string]: any; } | null;
 
               if (!candidateTreeActivityError && candidateTreeActivity && candidateTreeActivity.activity_id) {
                 const candidateRealActivityId = candidateTreeActivity.activity_id;
@@ -788,13 +799,14 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
           
           // 將正在進行的活動標記為完成
           for (const activity of ongoingActivities) {
-            const { error: updateError } = await supabase
+            // hanami_student_activities table type may not be fully defined
+            const { error: updateError } = await ((supabase as any)
               .from('hanami_student_activities')
               .update({ 
                 completion_status: 'completed',
                 completed_at: new Date().toISOString()
               })
-              .eq('id', activity.id);
+              .eq('id', activity.id));
 
             if (updateError) {
               console.error('更新活動狀態失敗:', updateError);
@@ -817,11 +829,12 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
 
       console.log('準備插入的數據:', insertData);
 
-      const { data: newActivity, error: insertError } = await supabase
+      // hanami_student_activities table type may not be fully defined
+      const { data: newActivity, error: insertError } = await ((supabase as any)
         .from('hanami_student_activities')
         .insert(insertData)
         .select()
-        .single();
+        .single());
 
       if (insertError) {
         console.error('安排活動失敗:', insertError);
@@ -881,13 +894,15 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
       console.log('🔍 開始載入學習路徑，課程類型:', courseType);
       
       // 首先根據課程類型獲取成長樹
-      const { data: courseTypeData, error: courseTypeError } = await supabase
+      const { data: courseTypeDataRaw, error: courseTypeError } = await supabase
         .from('Hanami_CourseTypes')
         .select('id')
         .eq('name', courseType)
         .single();
+      
+      const courseTypeData = courseTypeDataRaw as { id: string; [key: string]: any; } | null;
 
-      if (courseTypeError) {
+      if (courseTypeError || !courseTypeData) {
         console.error('❌ 獲取課程類型失敗:', courseTypeError);
         alert(`無法獲取課程類型 "${courseType}" 的資訊`);
         return;
@@ -896,12 +911,14 @@ const StudentActivitiesPanel: React.FC<StudentActivitiesPanelProps> = ({
       console.log('✅ 課程類型資料:', courseTypeData);
 
       // 根據課程類型ID獲取成長樹
-      const { data: growthTrees, error: treesError } = await supabase
+      const { data: growthTreesRaw, error: treesError } = await supabase
         .from('hanami_growth_trees')
         .select('id, tree_name, course_type_id')
         .eq('course_type_id', courseTypeData.id)
         .eq('is_active', true)
         .order('tree_level', { ascending: true });
+      
+      const growthTrees = growthTreesRaw as Array<{ id: string; tree_name: string; course_type_id: string | null; [key: string]: any; }> | null;
 
       if (treesError) {
         console.error('❌ 獲取成長樹失敗:', treesError);

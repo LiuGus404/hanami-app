@@ -12,6 +12,7 @@ import HanamiSelect from '@/components/ui/HanamiSelect';
 import OrganizationPreviewCard from '@/components/ui/OrganizationPreviewCard';
 import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 import {
   CATEGORY_GROUPS,
   CATEGORY_LABEL_MAP,
@@ -950,7 +951,9 @@ function OrganizationSettingsContent() {
 export default function OrganizationSettingsPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/organization-settings">
-      <OrganizationSettingsContent />
+      <WithPermissionCheck pageKey="organization-settings">
+        <OrganizationSettingsContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

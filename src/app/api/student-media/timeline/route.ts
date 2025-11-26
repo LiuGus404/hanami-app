@@ -66,17 +66,20 @@ export async function GET(request: NextRequest) {
     }
 
     // 合併資料
-    const lessonsWithMedia = lessonsData.map(lesson => {
+    const typedLessonsData = (lessonsData || []) as Array<{ id: string; lesson_date: string; [key: string]: any }>;
+    const typedMediaData = (mediaData || []) as Array<{ lesson_id?: string; created_at: string; [key: string]: any }>;
+    
+    const lessonsWithMedia = typedLessonsData.map(lesson => {
       // 根據 lesson_id 關聯媒體檔案（優先使用課程關聯）
-      let lessonMedia = mediaData.filter(media => media.lesson_id === lesson.id);
+      let lessonMedia = typedMediaData.filter(media => media.lesson_id === lesson.id);
       
       // 如果沒有通過 lesson_id 關聯的媒體，則使用日期匹配作為備用方案
       // 但需要確保該媒體沒有被其他課程的 lesson_id 關聯
       if (lessonMedia.length === 0) {
         const lessonDate = new Date(lesson.lesson_date);
-        lessonMedia = mediaData.filter(media => {
+        lessonMedia = typedMediaData.filter(media => {
           // 檢查該媒體是否已經被其他課程的 lesson_id 關聯
-          const isAlreadyLinked = lessonsData.some(otherLesson => 
+          const isAlreadyLinked = typedLessonsData.some(otherLesson => 
             otherLesson.id !== lesson.id && media.lesson_id === otherLesson.id
           );
           
@@ -92,7 +95,8 @@ export async function GET(request: NextRequest) {
 
       // 根據課程日期匹配評估
       const lessonDate = new Date(lesson.lesson_date);
-      const lessonAssessment = assessmentData?.find(assessment => {
+      const typedAssessmentData = (assessmentData || []) as Array<{ assessment_date: string; [key: string]: any }>;
+      const lessonAssessment = typedAssessmentData.find(assessment => {
         const assessmentDate = new Date(assessment.assessment_date);
         return lessonDate.toDateString() === assessmentDate.toDateString();
       });
@@ -122,10 +126,11 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const typedAssessmentDataFinal = (assessmentData || []) as Array<{ [key: string]: any }>;
     console.log('🎉 資料處理完成:', {
       totalLessons: lessonsWithMedia.length,
-      totalMedia: mediaData.length,
-      hasAssessment: assessmentData && assessmentData.length > 0
+      totalMedia: typedMediaData.length,
+      hasAssessment: typedAssessmentDataFinal.length > 0
     });
 
     return NextResponse.json({
@@ -133,8 +138,8 @@ export async function GET(request: NextRequest) {
       data: {
         lessons: lessonsWithMedia,
         totalLessons: lessonsWithMedia.length,
-        totalMedia: mediaData.length,
-        hasAssessment: assessmentData && assessmentData.length > 0
+        totalMedia: typedMediaData.length,
+        hasAssessment: typedAssessmentDataFinal.length > 0
       }
     });
 

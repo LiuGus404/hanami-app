@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     // 嘗試從 hanami_promo_codes 查詢
     try {
-      let query = supabase
+      let query = (supabase as any)
         .from('hanami_promo_codes')
         .select('*')
         .eq('code', body.code.toUpperCase())
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     // 如果沒找到，嘗試從 saas_coupons 查詢
     if (!promoCode) {
       try {
-        let query = supabase
+        let query = (supabase as any)
           .from('saas_coupons')
           .select('*')
           .eq('coupon_code', body.code.toUpperCase())

@@ -63,8 +63,7 @@ export async function GET(request: NextRequest) {
     let rlsError: any = 'RLS 檢查失敗';
     
     try {
-      const result = await supabase
-        .rpc('get_rls_policies' as any, { table_name: 'hanami_student_media' });
+      const result = await (supabase.rpc as any)('get_rls_policies', { table_name: 'hanami_student_media' });
       rlsData = result.data;
       rlsError = result.error;
     } catch (error) {
@@ -79,7 +78,8 @@ export async function GET(request: NextRequest) {
     // 測試 6: 如果有學生資料，測試媒體統計查詢
     if (studentsData && studentsData.length > 0) {
       console.log('測試 6: 測試媒體統計查詢...');
-      const studentIds = studentsData.map(s => s.id);
+      const typedStudentsData = (studentsData || []) as Array<{ id: string; [key: string]: any }>;
+      const studentIds = typedStudentsData.map(s => s.id);
       
       try {
         const { data: mediaStats, error: mediaStatsError } = await supabase
@@ -109,8 +109,7 @@ export async function GET(request: NextRequest) {
     let schemaError: any = '表結構檢查失敗';
     
     try {
-      const result = await supabase
-        .rpc('get_table_info' as any, { table_name: 'hanami_student_media' });
+      const result = await (supabase.rpc as any)('get_table_info', { table_name: 'hanami_student_media' });
       schemaData = result.data;
       schemaError = result.error;
     } catch (error) {

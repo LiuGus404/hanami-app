@@ -15,12 +15,12 @@ export default function AddLessonIdToMediaPage() {
     try {
       // 檢查欄位是否已存在
       const { data: columns, error: columnError } = await supabase
-        .rpc('get_table_columns', { table_name: 'hanami_student_media' });
+        .rpc('get_table_columns', { table_name: 'hanami_student_media' } as any);
 
       if (columnError) {
         console.log('無法檢查欄位，嘗試直接執行遷移...');
       } else {
-        const hasLessonId = columns?.some((col: any) => col.column_name === 'lesson_id');
+        const hasLessonId = (columns as any[])?.some((col: any) => col.column_name === 'lesson_id');
         if (hasLessonId) {
           setResult('✅ lesson_id 欄位已存在，無需執行遷移');
           setLoading(false);
@@ -38,9 +38,9 @@ export default function AddLessonIdToMediaPage() {
         CREATE INDEX IF NOT EXISTS idx_student_media_lesson_id ON hanami_student_media(lesson_id);
       `;
 
-      const { error: migrationError } = await supabase.rpc('exec_sql', { 
-        sql: migrationSQL 
-      });
+      const { error: migrationError } = await supabase.rpc('exec_sql', {
+        sql: migrationSQL
+      } as any);
 
       if (migrationError) {
         // 如果 rpc 不存在，嘗試使用 SQL 編輯器

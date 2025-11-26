@@ -102,10 +102,11 @@ export const courseTypeApi = {
     console.log('📊 所有課程類型:', allData);
     
     // 過濾啟用價格的課程類型
-    const enabledData = allData?.filter(course => course.is_pricing_enabled === true) || [];
+    const typedAllData = allData as Array<{ is_pricing_enabled?: boolean; [key: string]: any; }> | null;
+    const enabledData = typedAllData?.filter(course => course.is_pricing_enabled === true) || [];
     console.log('✅ 啟用價格的課程類型:', enabledData);
     
-    return enabledData;
+    return enabledData as CourseType[];
   },
 
   // 根據 ID 獲取課程類型
@@ -178,7 +179,8 @@ export const coursePricingApi = {
     console.log('📊 所有價格計劃:', allPlans);
     
     // 過濾課程包計劃
-    const packagePlans = allPlans?.filter(plan => 
+    const typedAllPlans = allPlans as Array<{ plan_type?: string; is_active?: boolean; package_lessons?: number; [key: string]: any; }> | null;
+    const packagePlans = typedAllPlans?.filter(plan => 
       plan.plan_type === 'package' && plan.is_active === true
     ) || [];
     
@@ -187,7 +189,7 @@ export const coursePricingApi = {
     // 按堂數排序
     const sortedPlans = packagePlans.sort((a, b) => (a.package_lessons || 0) - (b.package_lessons || 0));
     
-    return sortedPlans;
+    return sortedPlans as CoursePricingPlan[];
   },
 };
 
@@ -211,16 +213,17 @@ export const couponApi = {
     }
 
     // 檢查使用限制
-    if (data.usage_limit && data.usage_count >= data.usage_limit) {
+    const typedData = data as { usage_limit?: number | null; usage_count?: number; valid_from?: string; valid_until?: string | null; [key: string]: any; };
+    if (typedData.usage_limit && typedData.usage_count && typedData.usage_count >= typedData.usage_limit) {
       return { isValid: false, message: '此優惠券已達使用上限' };
     }
 
     // 檢查有效期
     const now = new Date();
-    const validFrom = new Date(data.valid_from);
-    const validUntil = data.valid_until ? new Date(data.valid_until) : null;
+    const validFrom = typedData.valid_from ? new Date(typedData.valid_from) : null;
+    const validUntil = typedData.valid_until ? new Date(typedData.valid_until) : null;
 
-    if (now < validFrom) {
+    if (validFrom && now < validFrom) {
       return { isValid: false, message: '此優惠券尚未生效' };
     }
 
@@ -230,7 +233,7 @@ export const couponApi = {
 
     return {
       isValid: true,
-      coupon: data,
+      coupon: typedData as any,
       message: '優惠券驗證成功！'
     };
   },

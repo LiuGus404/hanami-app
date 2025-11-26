@@ -65,6 +65,14 @@ export async function POST(request: NextRequest) {
 
     if (quotaError) throw quotaError;
 
+    const typedQuota = quota as { plan_type: string; [key: string]: any } | null;
+    if (!typedQuota || !typedQuota.plan_type) {
+      return NextResponse.json(
+        { error: '無法獲取配額資訊' },
+        { status: 400 }
+      );
+    }
+
     // 獲取配額等級設定
     const planTypeToLevelName = (planType: string) => {
       const mapping: { [key: string]: string } = {
@@ -79,11 +87,19 @@ export async function POST(request: NextRequest) {
     const { data: quotaLevel, error: levelError } = await supabase
       .from('hanami_media_quota_levels')
       .select('*')
-      .eq('level_name', planTypeToLevelName(quota.plan_type))
+      .eq('level_name', planTypeToLevelName(typedQuota.plan_type))
       .eq('is_active', true)
       .single();
 
     if (levelError) throw levelError;
+
+    const typedQuotaLevel = quotaLevel as { video_limit: number; photo_limit: number; video_size_limit_mb: number; photo_size_limit_mb: number; [key: string]: any } | null;
+    if (!typedQuotaLevel) {
+      return NextResponse.json(
+        { error: '無法獲取配額等級設定' },
+        { status: 400 }
+      );
+    }
 
     // 檢查數量限制
     const { data: currentMedia, error: countError } = await supabase
@@ -94,8 +110,9 @@ export async function POST(request: NextRequest) {
 
     if (countError) throw countError;
 
-    const currentCount = currentMedia?.length || 0;
-    const limit = mediaType === 'video' ? quotaLevel.video_limit : quotaLevel.photo_limit;
+    const typedCurrentMedia = (currentMedia || []) as Array<{ id: string; [key: string]: any }>;
+    const currentCount = typedCurrentMedia.length || 0;
+    const limit = mediaType === 'video' ? typedQuotaLevel.video_limit : typedQuotaLevel.photo_limit;
 
     if (currentCount >= limit) {
       return NextResponse.json(
@@ -105,7 +122,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 檢查檔案大小（使用配額等級的設定）
-    const maxSizeMB = mediaType === 'video' ? quotaLevel.video_size_limit_mb : quotaLevel.photo_size_limit_mb;
+    const maxSizeMB = mediaType === 'video' ? typedQuotaLevel.video_size_limit_mb : typedQuotaLevel.photo_size_limit_mb;
     const maxSize = maxSizeMB * 1024 * 1024;
     
     if (file.size > maxSize) {
@@ -138,9 +155,9 @@ export async function POST(request: NextRequest) {
       uploaded_by: 'current_user_id', // 需要從 context 獲取
     };
 
-    const { data: dbData, error: dbError } = await supabase
-      .from('hanami_student_media')
-      .insert(mediaData)
+    const { data: dbData, error: dbError } = await (supabase
+      .from('hanami_student_media') as any)
+      .insert(mediaData as any)
       .select()
       .single();
 
@@ -178,10 +195,18 @@ export async function DELETE(request: NextRequest) {
 
     if (fetchError) throw fetchError;
 
+    const typedMedia = media as { file_path: string; [key: string]: any } | null;
+    if (!typedMedia || !typedMedia.file_path) {
+      return NextResponse.json(
+        { error: '找不到媒體檔案資訊' },
+        { status: 404 }
+      );
+    }
+
     // 從 Storage 刪除檔案
     const { error: storageError } = await supabase.storage
       .from('hanami-media')
-      .remove([media.file_path]);
+      .remove([typedMedia.file_path]);
 
     if (storageError) throw storageError;
 

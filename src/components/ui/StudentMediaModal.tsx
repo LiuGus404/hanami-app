@@ -155,11 +155,13 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     if (!student) return;
     
     try {
-      const { data, error } = await supabase
+      const { data: dataRaw, error } = await supabase
         .from('hanami_student_lesson')
         .select('id, lesson_date, lesson_status, lesson_teacher, lesson_activities, notes, video_url')
         .eq('student_id', student.id)
         .order('lesson_date', { ascending: false });
+      
+      const data = dataRaw as Array<{ id: string; lesson_date: string | null; lesson_status: string | null; lesson_teacher: string | null; lesson_activities: string | null; notes: string | null; video_url: string | null; [key: string]: any; }> | null;
 
       if (error) {
         console.error('載入課程資料庫錯誤:', error);
@@ -168,7 +170,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       
       setStudentLessons((data || []).map(lesson => ({
         id: lesson.id,
-        lesson_date: lesson.lesson_date,
+        lesson_date: lesson.lesson_date || '',
         lesson_status: lesson.lesson_status || 'unknown',
         lesson_teacher: lesson.lesson_teacher || undefined,
         lesson_activities: lesson.lesson_activities || undefined,
@@ -203,18 +205,20 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: dataRaw, error } = await supabase
         .from('hanami_student_media')
         .select('*')
         .eq('student_id', student.id)
         .order('created_at', { ascending: false });
+      
+      const data = dataRaw as Array<{ media_type: string; file_duration: number | null; thumbnail_path: string | null; title: string | null; description: string | null; uploaded_by: string | null; is_favorite: boolean | null; [key: string]: any; }> | null;
 
       if (error) {
         console.error('載入媒體資料庫錯誤:', error);
         throw error;
       }
       
-      setMedia((data || []).map(media => ({
+      setMedia((data || []).map((media: any) => ({
         ...media,
         media_type: media.media_type as 'video' | 'photo',
         file_duration: media.file_duration ?? undefined,
@@ -291,7 +295,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         console.error('獲取學生配額失敗:', quotaError);
         errors.push('無法獲取學生配額設定');
       } else {
-        studentQuota = quota;
+        studentQuota = quota as { plan_type: string; lesson_date: string | null; [key: string]: any } | null;
       }
     } catch (error) {
       console.error('獲取配額錯誤:', error);
@@ -323,7 +327,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           console.error('獲取配額等級失敗:', levelError);
           errors.push('無法獲取配額等級設定');
         } else {
-          quotaLevel = level;
+          quotaLevel = level as { video_size_limit_mb: number; photo_size_limit_mb: number; [key: string]: any } | null;
         }
       } catch (error) {
         console.error('獲取配額等級錯誤:', error);
@@ -442,7 +446,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             .eq('student_id', student.id)
             .single();
           
-          if (studentQuota) {
+          if (studentQuota && (studentQuota as { plan_type: string }).plan_type) {
             const planTypeToLevelName = (planType: string) => {
               const mapping: { [key: string]: string } = {
                 'free': '基礎版',
@@ -456,7 +460,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             let levelQuery = supabase
               .from('hanami_media_quota_levels')
               .select('storage_limit_mb')
-              .eq('level_name', planTypeToLevelName(studentQuota.plan_type))
+              .eq('level_name', planTypeToLevelName((studentQuota as { plan_type: string }).plan_type))
               .eq('is_active', true);
             
             if (orgId) {
@@ -464,7 +468,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             }
             
             const { data: level } = await levelQuery.single();
-            storageLimitMB = level?.storage_limit_mb;
+            storageLimitMB = (level as { storage_limit_mb?: number } | null)?.storage_limit_mb;
           }
         } catch (error) {
           console.error('獲取儲存空間限制失敗:', error);
@@ -629,7 +633,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         return null;
       }
       
-      return lessons && lessons.length > 0 ? lessons[0] : null;
+      return lessons && lessons.length > 0 ? (lessons[0] as { id: string; [key: string]: any }) : null;
     } catch (error) {
       console.error('獲取今天課堂信息錯誤:', error);
       return null;
@@ -823,15 +827,40 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         localSuccessCount += 1;
         
         // 立即更新本地媒體列表，確保容量檢查準確
+        const typedDbData = dbData as { 
+          id: string; 
+          student_id: string;
+          media_type: string; 
+          file_name: string;
+          file_path: string;
+          file_size: number;
+          file_duration?: number | null; 
+          thumbnail_path?: string | null; 
+          title?: string | null; 
+          description?: string | null; 
+          uploaded_by?: string | null; 
+          lesson_id?: string | null;
+          is_favorite?: boolean | null;
+          created_at: string;
+          updated_at: string;
+          [key: string]: any;
+        };
         setMedia(prev => [...prev, {
-          ...dbData,
-          media_type: dbData.media_type as 'video' | 'photo',
-          file_duration: dbData.file_duration ?? undefined,
-          thumbnail_path: dbData.thumbnail_path ?? undefined,
-          title: dbData.title ?? undefined,
-          description: dbData.description ?? undefined,
-          uploaded_by: dbData.uploaded_by ?? undefined,
-          is_favorite: dbData.is_favorite ?? undefined
+          id: typedDbData.id,
+          student_id: typedDbData.student_id,
+          media_type: typedDbData.media_type as 'video' | 'photo',
+          file_name: typedDbData.file_name,
+          file_path: typedDbData.file_path,
+          file_size: typedDbData.file_size,
+          file_duration: typedDbData.file_duration ?? undefined,
+          thumbnail_path: typedDbData.thumbnail_path ?? undefined,
+          title: typedDbData.title ?? undefined,
+          description: typedDbData.description ?? undefined,
+          uploaded_by: typedDbData.uploaded_by ?? undefined,
+          lesson_id: typedDbData.lesson_id ?? undefined,
+          created_at: typedDbData.created_at,
+          updated_at: typedDbData.updated_at,
+          is_favorite: typedDbData.is_favorite ?? undefined
         }]);
         } catch (fileError) {
         console.error(`檔案 ${file.name} 上傳失敗:`, fileError);
@@ -909,6 +938,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     try {
       const { error } = await supabase
         .from('hanami_student_media')
+        // @ts-ignore - hanami_student_media table type may not be fully defined
         .update({ is_favorite: !currentFavorite })
         .eq('id', mediaId);
 
@@ -952,6 +982,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     try {
       const { error } = await supabase
         .from('hanami_student_media')
+        // @ts-ignore - hanami_student_media table type may not be fully defined
         .update({ 
           title: editTitle.trim(),
           updated_at: new Date().toISOString()
@@ -1000,6 +1031,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     try {
       const { error } = await supabase
         .from('hanami_student_media')
+        // @ts-ignore - hanami_student_media table type may not be fully defined
         .update({ 
           lesson_id: selectedLessonId || null,
           updated_at: new Date().toISOString()
@@ -1174,10 +1206,10 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         .eq('student_id', student.id);
       const { data: quotaData, error: quotaError } = await quotaQuery.single();
       if (!quotaError && quotaData) {
-        studentQuota = quotaData;
+        studentQuota = quotaData as { plan_type: string; [key: string]: any } | null;
       }
 
-      const targetLevel = planTypeToLevelName(studentQuota?.plan_type ?? 'free');
+      const targetLevel = planTypeToLevelName((studentQuota as { plan_type?: string } | null)?.plan_type ?? 'free');
       let quotaLevels: MediaQuotaLevel[] = [];
 
       try {

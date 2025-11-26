@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '未找到該學生' }, { status: 404 });
     }
 
-    const studentId = students[0].id;
+    const typedStudents = (students || []) as Array<{ id: string; [key: string]: any }>;
+    const studentId = typedStudents[0]?.id;
     console.log('學生ID:', studentId);
 
     // 查找評估記錄
@@ -50,20 +51,25 @@ export async function GET(request: NextRequest) {
 
     // 如果有評估記錄，獲取對應的成長樹目標
     let treeGoals: any[] = [];
-    if (assessments && assessments.length > 0) {
-      const treeId = assessments[0].tree_id;
+    const typedAssessments = (assessments || []) as Array<{ tree_id?: string; [key: string]: any }>;
+    if (typedAssessments.length > 0) {
+      const treeId = typedAssessments[0].tree_id;
       console.log('成長樹ID:', treeId);
       
-      const { data: goals, error: goalsError } = await supabase
-        .from('hanami_growth_goals')
-        .select('*')
-        .eq('tree_id', treeId);
-
-      if (goalsError) {
-        console.error('載入成長樹目標失敗:', goalsError);
+      if (!treeId) {
+        console.log('沒有成長樹ID，跳過查詢');
       } else {
-        treeGoals = goals || [];
-        console.log('載入的成長樹目標:', treeGoals);
+        const { data: goals, error: goalsError } = await (supabase as any)
+          .from('hanami_growth_goals')
+          .select('*')
+          .eq('tree_id', treeId);
+
+        if (goalsError) {
+          console.error('載入成長樹目標失敗:', goalsError);
+        } else {
+          treeGoals = goals || [];
+          console.log('載入的成長樹目標:', treeGoals);
+        }
       }
     }
 

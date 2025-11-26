@@ -37,9 +37,9 @@ export async function GET() {
       course_type: 'piano',
     };
 
-    const { data: insertData, error: insertError } = await supabase
-      .from('hanami_growth_goals')
-      .insert([testGoalData])
+    const { data: insertData, error: insertError } = await (supabase
+      .from('hanami_growth_goals') as any)
+      .insert([testGoalData] as any)
       .select()
       .single();
 

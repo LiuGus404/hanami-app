@@ -320,7 +320,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       ];
       
       // 只添加屬於當前機構的自訂選項
-      const customTypes = (activityTypesData || []).filter(item => {
+      const typedActivityTypesData = (activityTypesData || []) as Array<{ org_id?: string; option_value?: string; option_name?: string; [key: string]: any }>;
+      const customTypes = typedActivityTypesData.filter(item => {
         // 確保只顯示屬於當前 orgId 的選項
         if (orgId) {
           return item.org_id === orgId;
@@ -363,7 +364,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       ];
       
       // 只添加屬於當前機構的自訂選項
-      const customStatuses = (statusesData || []).filter(item => {
+      const typedStatusesData = (statusesData || []) as Array<{ org_id?: string; option_value?: string; option_name?: string; [key: string]: any }>;
+      const customStatuses = typedStatusesData.filter(item => {
         // 確保只顯示屬於當前 orgId 的選項
         if (orgId) {
           return item.org_id === orgId;
@@ -422,11 +424,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
     try {
       // 更新資料庫
-      const { error } = await supabase
-        .from('hanami_resource_categories')
+      const { error } = await (supabase
+        .from('hanami_resource_categories') as any)
         .update({
           category_name: newOptionName.trim(),
-        })
+        } as any)
         .eq('id', editingOption.id);
 
       if (error) throw error;
@@ -445,9 +447,9 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   const handleDeleteCategory = async (categoryId: string) => {
     try {
       // 軟刪除（設為非活躍）
-      const { error } = await supabase
-        .from('hanami_resource_categories')
-        .update({ is_active: false })
+      const { error } = await (supabase
+        .from('hanami_resource_categories') as any)
+        .update({ is_active: false } as any)
         .eq('id', categoryId);
 
       if (error) throw error;
@@ -1004,11 +1006,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     if (field === 'tag') {
       // 編輯標籤
       try {
-        const { error } = await supabase
-          .from('hanami_resource_tags')
+        const { error } = await (supabase
+          .from('hanami_resource_tags') as any)
           .update({
             tag_name: newOptionName.trim(),
-          })
+          } as any)
           .eq('id', editingOption.id);
 
         if (error) throw error;
@@ -1031,11 +1033,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
       try {
         // 更新資料庫
-        const { error } = await supabase
-          .from('hanami_custom_options')
+        const { error } = await (supabase
+          .from('hanami_custom_options') as any)
           .update({
             option_name: newOptionName.trim(),
-          })
+          } as any)
           .eq('option_type', optionType)
           .eq('option_value', editingOption.id);
 
@@ -1076,9 +1078,9 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       // 刪除標籤
       try {
         // 軟刪除（設為非活躍）
-        const { error } = await supabase
-          .from('hanami_resource_tags')
-          .update({ is_active: false })
+        const { error } = await (supabase
+          .from('hanami_resource_tags') as any)
+          .update({ is_active: false } as any)
           .eq('id', optionId);
 
         if (error) throw error;
@@ -1097,9 +1099,9 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
       try {
         // 軟刪除（設為非活躍）
-        const { error } = await supabase
-          .from('hanami_custom_options')
-          .update({ is_active: false })
+        const { error } = await (supabase
+          .from('hanami_custom_options') as any)
+          .update({ is_active: false } as any)
           .eq('option_type', optionType)
           .eq('option_value', optionId);
 

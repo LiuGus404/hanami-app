@@ -27,9 +27,8 @@ export async function POST() {
       
       try {
         // 1. 獲取現有政策
-        const { data: existingPolicies, error: policyError } = await supabase
-          .rpc('exec_sql', {
-            sql: `
+        const { data: existingPolicies, error: policyError } = await (supabase.rpc as any)('exec_sql', {
+          sql: `
               SELECT policyname 
               FROM pg_policies 
               WHERE tablename = '${tableName}' 
@@ -91,7 +90,7 @@ export async function POST() {
           dropSQL += `DROP POLICY IF EXISTS "${policyName}" ON ${tableName.includes(' ') ? `"${tableName}"` : tableName};\n`;
         }
 
-        const { error: dropError } = await supabase.rpc('exec_sql', {
+        const { error: dropError } = await (supabase.rpc as any)('exec_sql', {
           sql: dropSQL
         });
 
@@ -101,7 +100,7 @@ export async function POST() {
 
         // 3. 創建簡單政策
         const policyName = `Simple ${tableName.replace(/[^a-zA-Z0-9]/g, '_')} access`;
-        const { error: createError } = await supabase.rpc('exec_sql', {
+        const { error: createError } = await (supabase.rpc as any)('exec_sql', {
           sql: `
             CREATE POLICY "${policyName}" ON ${tableName.includes(' ') ? `"${tableName}"` : tableName}
             FOR ALL USING (true);
@@ -113,9 +112,8 @@ export async function POST() {
         }
 
         // 4. 驗證新政策
-        const { data: newPolicies, error: verifyError } = await supabase
-          .rpc('exec_sql', {
-            sql: `
+        const { data: newPolicies, error: verifyError } = await (supabase.rpc as any)('exec_sql', {
+          sql: `
               SELECT policyname
               FROM pg_policies 
               WHERE tablename = '${tableName}' 

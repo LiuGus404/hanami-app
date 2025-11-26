@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
 
     // 測試 1: 檢查函數是否存在
     console.log('🔍 測試驗證函數...');
-    const { data: validateData, error: validateError } = await supabase.rpc('validate_promo_code_unified', {
+    const { data: validateData, error: validateError } = await (supabase.rpc as any)('validate_promo_code_unified', {
       p_code: 'HANAMI10',
       p_user_id: null,
       p_user_email: null,
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     // 測試 2: 檢查使用函數
     console.log('🔍 測試使用函數...');
-    const { data: useData, error: useError } = await supabase.rpc('use_promo_code_unified', {
+    const { data: useData, error: useError } = await (supabase.rpc as any)('use_promo_code_unified', {
       p_promo_code_id: '00000000-0000-0000-0000-000000000000',
       p_user_id: 'test-user',
       p_user_email: 'test@example.com',
@@ -105,9 +105,9 @@ export async function POST(request: NextRequest) {
 
       // 嘗試 hanami_promo_codes
       try {
-        const { data, error } = await supabase
-          .from('hanami_promo_codes')
-          .insert(testPromoCodes)
+        const { data, error } = await (supabase
+          .from('hanami_promo_codes') as any)
+          .insert(testPromoCodes as any)
           .select();
 
         if (error) {
@@ -137,9 +137,9 @@ export async function POST(request: NextRequest) {
           notes: promo.notes
         }));
 
-        const { data, error } = await supabase
-          .from('saas_coupons')
-          .insert(testDataForSaas)
+        const { data, error } = await (supabase
+          .from('saas_coupons') as any)
+          .insert(testDataForSaas as any)
           .select();
 
         if (error) {

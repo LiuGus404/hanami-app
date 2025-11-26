@@ -16,11 +16,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 查找項目
-    const { data: project, error: projectError } = await supabase
+    const { data: project, error: projectError } = await ((supabase as any)
       .from('hanami_projects')
       .select('*')
       .eq('invite_code', body.invite_code)
-      .single();
+      .single());
 
     if (projectError || !project) {
       return NextResponse.json(
@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    const typedProject = project as { id: string; [key: string]: any };
 
     // 獲取當前用戶信息 (這裡需要從認證中獲取)
     // 暫時使用請求中的用戶信息
@@ -41,12 +43,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 檢查是否已經是成員
-    const { data: existingMember } = await supabase
+    const { data: existingMember } = await ((supabase as any)
       .from('hanami_project_members')
       .select('*')
-      .eq('project_id', project.id)
+      .eq('project_id', typedProject.id)
       .eq('user_phone', user_phone)
-      .single();
+      .single());
 
     if (existingMember) {
       return NextResponse.json(
@@ -56,15 +58,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 加入項目
-    const { data: member, error: memberError } = await supabase
+    const { data: member, error: memberError } = await ((supabase as any)
       .from('hanami_project_members')
       .insert([{
-        project_id: project.id,
+        project_id: typedProject.id,
         user_phone: user_phone,
         role: body.role || 'member'
-      }])
+      }] as any)
       .select()
-      .single();
+      .single());
 
     if (memberError) {
       console.error('Error joining project:', memberError);

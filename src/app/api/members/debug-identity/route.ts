@@ -39,29 +39,29 @@ export async function GET(request: NextRequest) {
     }
 
     // 查詢 hanami_org_identities
-    const { data: identities, error: identitiesError } = await oldSupabase
-      .from('hanami_org_identities')
+    const { data: identities, error: identitiesError } = await ((oldSupabase as any)
+      .from('hanami_org_identities'))
       .select('*')
       .eq('org_id', orgId)
       .eq('user_email', userEmail);
 
     // 查詢 hanami_admin
-    const { data: admins, error: adminsError } = await oldSupabase
-      .from('hanami_admin')
+    const { data: admins, error: adminsError } = await ((oldSupabase as any)
+      .from('hanami_admin'))
       .select('*')
       .eq('org_id', orgId)
       .eq('admin_email', userEmail);
 
     // 查詢 hanami_employee
-    const { data: employees, error: employeesError } = await oldSupabase
-      .from('hanami_employee')
+    const { data: employees, error: employeesError } = await ((oldSupabase as any)
+      .from('hanami_employee'))
       .select('*')
       .eq('org_id', orgId)
       .eq('teacher_email', userEmail);
 
     // 查詢機構信息
-    const { data: org, error: orgError } = await oldSupabase
-      .from('hanami_organizations')
+    const { data: org, error: orgError } = await ((oldSupabase as any)
+      .from('hanami_organizations'))
       .select('id, org_name, org_slug')
       .eq('id', orgId)
       .maybeSingle();

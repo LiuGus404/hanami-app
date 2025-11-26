@@ -16,22 +16,34 @@ export async function GET(
 
     if (error) throw error;
 
+    const typedData = data as {
+      id: string;
+      template_name: string;
+      template_description: string | null;
+      template_schema: any;
+      template_type: string;
+      created_at: string;
+      updated_at: string;
+      is_active: boolean;
+      [key: string]: any;
+    };
+
     // 轉換資料結構以向後兼容
     const transformedData = {
-      id: data.id,
-      name: data.template_name,
-      description: data.template_description,
-      fields: (data.template_schema as any)?.fields || [],
-      category: data.template_type,
+      id: typedData.id,
+      name: typedData.template_name,
+      description: typedData.template_description,
+      fields: (typedData.template_schema as any)?.fields || [],
+      category: typedData.template_type,
       tags: [],
-      created_at: data.created_at,
-      updated_at: data.updated_at,
+      created_at: typedData.created_at,
+      updated_at: typedData.updated_at,
       // 保留原始資料
-      template_name: data.template_name,
-      template_description: data.template_description,
-      template_schema: data.template_schema,
-      template_type: data.template_type,
-      is_active: data.is_active,
+      template_name: typedData.template_name,
+      template_description: typedData.template_description,
+      template_schema: typedData.template_schema,
+      template_type: typedData.template_type,
+      is_active: typedData.is_active,
     };
 
     return NextResponse.json(transformedData);
@@ -67,6 +79,11 @@ export async function PUT(
       );
     }
 
+    const typedExistingTemplate = existingTemplate as {
+      template_schema?: any;
+      [key: string]: any;
+    };
+
     // 準備更新資料，保留現有內容
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -99,7 +116,7 @@ export async function PUT(
       updateData.template_schema = body.template_schema;
     } else if (body.fields) {
       // 如果只提供了 fields，合併到現有的 template_schema 中
-      const existingSchema = existingTemplate.template_schema || {};
+      const existingSchema = typedExistingTemplate.template_schema || {};
       updateData.template_schema = {
         ...existingSchema,
         fields: Array.isArray(body.fields) ? body.fields : [],
@@ -123,9 +140,9 @@ export async function PUT(
     }
 
     // 執行更新
-    const { data, error } = await supabase
-      .from('hanami_resource_templates')
-      .update(updateData)
+    const { data, error } = await (supabase
+      .from('hanami_resource_templates') as any)
+      .update(updateData as any)
       .eq('id', params.id)
       .select()
       .single();

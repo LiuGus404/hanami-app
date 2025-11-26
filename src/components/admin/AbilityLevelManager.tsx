@@ -56,14 +56,14 @@ export default function AbilityLevelManager({
 
   const createLevel = async () => {
     try {
-      const { data, error } = await supabase
-        .from('hanami_ability_levels')
+      const { data, error } = await (supabase
+        .from('hanami_ability_levels') as any)
         .insert([{
           ability_id: abilityId,
           level: newLevel.level,
           level_title: newLevel.level_title,
           level_description: newLevel.level_description,
-        }])
+        }] as any)
         .select()
         .single();
 
@@ -80,12 +80,12 @@ export default function AbilityLevelManager({
     if (!editingLevel) return;
     
     try {
-      const { data, error } = await supabase
-        .from('hanami_ability_levels')
+      const { data, error } = await (supabase
+        .from('hanami_ability_levels') as any)
         .update({
           level_title: editingLevel.level_title,
           level_description: editingLevel.level_description,
-        })
+        } as any)
         .eq('id', editingLevel.id)
         .select()
         .single();

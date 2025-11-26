@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabaseClient();
     
     // 檢查現有數據
-    const { data: existingData, error: dataError } = await supabase
+    const { data: existingData, error: dataError } = await (supabase as any)
       .from('Hanami_CourseTypes')
       .select('*')
       .limit(5);

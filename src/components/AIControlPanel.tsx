@@ -103,8 +103,23 @@ export default function AIControlPanel({
         console.error('Error fetching tasks:', error);
         setTasks([]);
       } else {
-        const mappedTasks = (data || []).map((item) => ({
-          id: item.id,
+        const typedData = (data || []) as Array<{
+          id?: string;
+          title?: string;
+          model?: string;
+          status?: string;
+          prompt?: string;
+          result?: string;
+          created_at?: string;
+          started_at?: string;
+          finished_at?: string;
+          error_message?: string;
+          assigned_model?: string;
+          memory_id?: string;
+          [key: string]: any;
+        }>;
+        const mappedTasks = typedData.map((item) => ({
+          id: item.id || '',
           title: item.title || '',
           model: item.model || '',
           status: item.status || 'processing',
@@ -149,7 +164,7 @@ export default function AIControlPanel({
 
       console.log('送出任務', newTask);
 
-      const { error } = await supabase.from('ai_tasks').insert([newTask]);
+      const { error } = await (supabase.from('ai_tasks') as any).insert([newTask] as any);
 
       if (error) {
         console.error('任務送出失敗:', error);

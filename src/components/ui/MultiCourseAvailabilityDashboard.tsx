@@ -269,7 +269,8 @@ export default function MultiCourseAvailabilityDashboard() {
       const newTrialStatus = !selectedSlotDetail.is_trial_open;
       
       // 更新資料庫，確保 org_id 被記錄
-      const { error } = await supabase
+      // hanami_schedule table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_schedule')
         .update({ 
           is_trial_open: newTrialStatus,
@@ -278,7 +279,7 @@ export default function MultiCourseAvailabilityDashboard() {
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
         .eq('course_code', selectedSlotDetail.course_code)
-        .eq('org_id', validOrgId as string);
+        .eq('org_id', validOrgId as string));
       
       if (error) throw error;
       
@@ -313,7 +314,8 @@ export default function MultiCourseAvailabilityDashboard() {
       const newRegistrationStatus = !selectedSlotDetail.is_registration_open;
       
       // 更新資料庫，確保 org_id 被記錄
-      const { error } = await supabase
+      // hanami_schedule table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_schedule')
         .update({ 
           is_registration_open: newRegistrationStatus,
@@ -322,7 +324,7 @@ export default function MultiCourseAvailabilityDashboard() {
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
         .eq('course_code', selectedSlotDetail.course_code)
-        .eq('org_id', validOrgId as string);
+        .eq('org_id', validOrgId as string));
       
       if (error) throw error;
       
@@ -523,7 +525,8 @@ ${timeSlot}有一個位 ^^
     }
     
     try {
-      const { error } = await supabase
+      // hanami_trial_queue table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_trial_queue')
         .update({
           status: editFormData.status,
@@ -532,7 +535,7 @@ ${timeSlot}有一個位 ^^
           prefer_time: editFormData.prefer_time
         })
         .eq('id', editingStudent.id)
-        .eq('org_id', validOrgId as string);
+        .eq('org_id', validOrgId as string));
       
       if (error) throw error;
       
@@ -580,10 +583,12 @@ ${timeSlot}有一個位 ^^
         return;
       }
       // 取得等候區學生
-      const { data: queueStudentsData, error: queueStudentsError } = await supabase
+      const { data: queueStudentsDataRaw, error: queueStudentsError } = await supabase
         .from('hanami_trial_queue')
         .select('*')
         .eq('org_id', validOrgId as string);
+      
+      const queueStudentsData = queueStudentsDataRaw as Array<{ created_at: string; status: string; [key: string]: any; }> | null;
 
       if (queueStudentsError) {
         console.error('無法載入等候區學生：', queueStudentsError);
@@ -852,13 +857,15 @@ ${timeSlot}有一個位 ^^
       }
 
       // 2. 找到對應的時段記錄並更新 assigned_student_ids
-      const { data: scheduleData, error: scheduleQueryError } = await supabase
+      const { data: scheduleDataRaw, error: scheduleQueryError } = await supabase
         .from('hanami_schedule')
         .select('id, assigned_student_ids')
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
         .eq('course_code', selectedSlotDetail.course_code)
         .eq('org_id', validOrgId as string);
+      
+      const scheduleData = scheduleDataRaw as Array<{ id: string; assigned_student_ids: string[] | null; [key: string]: any; }> | null;
 
       if (scheduleQueryError) throw scheduleQueryError;
 
@@ -876,13 +883,14 @@ ${timeSlot}有一個位 ^^
           updated_ids: updatedStudentIds
         });
 
-        const { error: scheduleError } = await supabase
+        // hanami_schedule table type may not be fully defined
+        const { error: scheduleError } = await ((supabase as any)
           .from('hanami_schedule')
           .update({
             assigned_student_ids: updatedStudentIds
           })
           .eq('id', scheduleId)
-          .eq('org_id', validOrgId as string);
+          .eq('org_id', validOrgId as string));
 
         if (scheduleError) throw scheduleError;
       }
@@ -924,13 +932,15 @@ ${timeSlot}有一個位 ^^
 
       // 只從時段的 assigned_student_ids 中移除學生，不清空學生的 primary_course_code
       // 這樣可以讓系統完全依賴 assigned_student_ids 來顯示學生
-      const { data: scheduleData, error: scheduleQueryError } = await supabase
+      const { data: scheduleDataRaw, error: scheduleQueryError } = await supabase
         .from('hanami_schedule')
         .select('id, assigned_student_ids')
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
         .eq('course_code', selectedSlotDetail.course_code)
         .eq('org_id', validOrgId as string);
+      
+      const scheduleData = scheduleDataRaw as Array<{ id: string; assigned_student_ids: string[] | null; [key: string]: any; }> | null;
 
       if (scheduleQueryError) throw scheduleQueryError;
 
@@ -949,13 +959,14 @@ ${timeSlot}有一個位 ^^
           removed_count: currentStudentIds.length - updatedStudentIds.length
         });
 
-        const { error: scheduleError } = await supabase
+        // hanami_schedule table type may not be fully defined
+        const { error: scheduleError } = await ((supabase as any)
           .from('hanami_schedule')
           .update({
             assigned_student_ids: updatedStudentIds
           })
           .eq('id', scheduleId)
-          .eq('org_id', validOrgId as string);
+          .eq('org_id', validOrgId as string));
 
         if (scheduleError) throw scheduleError;
         
@@ -976,13 +987,15 @@ ${timeSlot}有一個位 ^^
       
       // 額外驗證：檢查移除的學生是否還在 assigned_student_ids 中
       console.log('驗證移除操作：檢查時段數據是否正確更新');
-      const { data: verifyData, error: verifyError } = await supabase
+      const { data: verifyDataRaw, error: verifyError } = await supabase
         .from('hanami_schedule')
         .select('assigned_student_ids')
         .eq('weekday', selectedSlotDetail.weekday)
         .eq('timeslot', selectedSlotDetail.time)
         .eq('course_code', selectedSlotDetail.course_code)
         .eq('org_id', validOrgId as string);
+      
+      const verifyData = verifyDataRaw as Array<{ assigned_student_ids: string[] | null; [key: string]: any; }> | null;
       
       if (!verifyError && verifyData && verifyData.length > 0) {
         const currentIds = verifyData[0].assigned_student_ids || [];
@@ -1027,7 +1040,7 @@ ${timeSlot}有一個位 ^^
     setError(null);
     try {
       // 1. 載入課程代碼資料
-      const { data: courseCodesData, error: courseCodesError } = await supabase
+      const { data: courseCodesDataRaw, error: courseCodesError } = await supabase
         .from('hanami_course_codes')
         .select(`
           id,
@@ -1041,6 +1054,8 @@ ${timeSlot}有一個位 ^^
         `)
         .eq('is_active', true)
         .eq('org_id', validOrgId as string);
+      
+      const courseCodesData = courseCodesDataRaw as Array<{ id: string; course_code: string; course_name: string; max_students: number | null; teacher_id: string | null; room_location: string | null; is_active: boolean; course_type_id: string | null; [key: string]: any; }> | null;
 
       if (courseCodesError) {
         console.error('無法載入課程代碼：', courseCodesError);
@@ -1056,9 +1071,9 @@ ${timeSlot}有一個位 ^^
           id: course.id,
           course_code: course.course_code,
           course_name: course.course_name,
-          course_type_id: course.course_type_id,
+          course_type_id: course.course_type_id || '',
           course_type_name: '載入中...', // 稍後載入課程類型名稱
-          max_students: course.max_students,
+          max_students: course.max_students || 0,
           teacher_id: course.teacher_id,
           teacher_name: null, // 將在後面載入教師資訊
           room_location: course.room_location,
@@ -1068,10 +1083,12 @@ ${timeSlot}有一個位 ^^
       setCourseCodes(courseCodesMap);
 
       // 2. 載入教師資訊
-      const { data: teachersData } = await supabase
+      const { data: teachersDataRaw } = await supabase
         .from('hanami_employee')
         .select('id, teacher_nickname')
         .eq('org_id', validOrgId as string);
+      
+      const teachersData = teachersDataRaw as Array<{ id: string; teacher_nickname: string | null; [key: string]: any; }> | null;
 
       const teachersMap: {[id: string]: string} = {};
       teachersData?.forEach(teacher => {
@@ -1079,10 +1096,12 @@ ${timeSlot}有一個位 ^^
       });
 
       // 3. 載入課程類型資訊
-      const { data: courseTypesData } = await supabase
+      const { data: courseTypesDataRaw } = await supabase
         .from('Hanami_CourseTypes')
         .select('id, name')
         .eq('org_id', validOrgId as string);
+      
+      const courseTypesData = courseTypesDataRaw as Array<{ id: string; name: string | null; [key: string]: any; }> | null;
 
       const courseTypesMap: {[id: string]: string} = {};
       courseTypesData?.forEach(courseType => {
@@ -1114,13 +1133,15 @@ ${timeSlot}有一個位 ^^
       })));
 
       // 3. 從 hanami_schedule 表取得多課程時間表
-      const { data: scheduleData, error: scheduleError } = await supabase
+      const { data: scheduleDataRaw, error: scheduleError } = await supabase
         .from('hanami_schedule')
         .select('*, is_trial_open, is_registration_open')
         .not('course_code', 'is', null)
         .eq('org_id', validOrgId as string)
         .order('weekday', { ascending: true })
         .order('timeslot', { ascending: true });
+      
+      const scheduleData = scheduleDataRaw as Array<{ weekday: number; timeslot: string; course_code: string | null; is_trial_open: boolean | null; is_registration_open: boolean | null; [key: string]: any; }> | null;
 
       if (scheduleError) {
         setError(`無法載入時間表：${scheduleError.message}`);
@@ -1174,11 +1195,13 @@ ${timeSlot}有一個位 ^^
       }
 
       // 5. 取得試聽學生
-      const { data: trialStudentsData, error: trialStudentsError } = await supabase
+      const { data: trialStudentsDataRaw, error: trialStudentsError } = await supabase
         .from('hanami_trial_students')
         .select('*')
         .eq('org_id', validOrgId as string)
         .not('trial_course_code', 'is', null);
+      
+      const trialStudentsData = trialStudentsDataRaw as Array<{ lesson_date: string; [key: string]: any; }> | null;
 
       if (trialStudentsError) {
         console.error('無法載入試聽學生：', trialStudentsError);
@@ -1207,13 +1230,13 @@ ${timeSlot}有一個位 ^^
         }
 
         const courseInfo: CourseInfo = {
-          course_code: slot.course_code,
-          course_name: courseCodesMap[slot.course_code]?.course_name || '未知課程',
-          course_type: courseCodesMap[slot.course_code]?.course_type_name || '未知類型',
-          max_students: courseCodesMap[slot.course_code]?.max_students || slot.max_students || 0,
+          course_code: slot.course_code || '',
+          course_name: courseCodesMap[slot.course_code || '']?.course_name || '未知課程',
+          course_type: courseCodesMap[slot.course_code || '']?.course_type_name || '未知類型',
+          max_students: courseCodesMap[slot.course_code || '']?.max_students || slot.max_students || 0,
           current_students: 0,
-          teacher_name: courseCodesMap[slot.course_code]?.teacher_name || null,
-          room_location: courseCodesMap[slot.course_code]?.room_location || slot.room_id || null,
+          teacher_name: courseCodesMap[slot.course_code || '']?.teacher_name || null,
+          room_location: courseCodesMap[slot.course_code || '']?.room_location || slot.room_id || null,
           trial_students: [],
           regular_students_ages: [],
           regular_students: [],
@@ -1246,12 +1269,13 @@ ${timeSlot}有一個位 ^^
             const updatedAssignedIds = slot.assigned_student_ids.filter((id: string) => !inactiveStudentIds.includes(id));
             
             // 異步更新資料庫（不等待完成，避免阻塞）
-            supabase
+            // hanami_schedule table type may not be fully defined
+            (supabase as any)
               .from('hanami_schedule')
               .update({ assigned_student_ids: updatedAssignedIds })
               .eq('id', slot.id)
               .eq('org_id', validOrgId as string)
-              .then(({ error }) => {
+              .then(({ error }: { error: any }) => {
                 if (error) {
                   console.error('自動移除已停用學生失敗:', error);
                 } else {
@@ -1276,7 +1300,7 @@ ${timeSlot}有一個位 ^^
 
         // 根據傳統視圖邏輯計算試堂學生
         // 定義課程類型名稱（用於試堂學生過濾）
-        const scheduleCourseName = courseCodesMap[slot.course_code]?.course_type_name || '未知課程';
+        const scheduleCourseName = courseCodesMap[slot.course_code || '']?.course_type_name || '未知課程';
         
         const trialStudents = trialStudentsData?.filter(student => {
           // 排除今天以前的試堂學生

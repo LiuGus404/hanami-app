@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabase';
 export async function POST(request: NextRequest) {
   try {
     // 創建默認扭蛋機
-    const { data: machine, error: machineError } = await supabase
-      .from('saas_gacha_machines')
+    const { data: machine, error: machineError } = await (supabase
+      .from('saas_gacha_machines') as any)
       .insert({
         machine_name: 'Hanami VIP 扭蛋機',
         machine_slug: 'hanami-vip-gachapon',
@@ -27,10 +27,12 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (machineError) {
+    if (machineError || !machine) {
       console.error('創建扭蛋機失敗:', machineError);
       return NextResponse.json({ error: '創建扭蛋機失敗' }, { status: 500 });
     }
+
+    const typedMachine = machine as { id: string; [key: string]: any };
 
     // 創建獎勵
     const rewards = [
@@ -110,27 +112,29 @@ export async function POST(request: NextRequest) {
 
     const { data: createdRewards, error: rewardsError } = await supabase
       .from('saas_gacha_rewards')
-      .insert(rewards)
+      .insert(rewards as any)
       .select();
 
-    if (rewardsError) {
+    if (rewardsError || !createdRewards || createdRewards.length === 0) {
       console.error('創建獎勵失敗:', rewardsError);
       return NextResponse.json({ error: '創建獎勵失敗' }, { status: 500 });
     }
 
+    const typedCreatedRewards = createdRewards as Array<{ id: string; [key: string]: any }>;
+
     // 創建扭蛋機獎勵關聯
     const machineRewards = [
-      { machine_id: machine.id, reward_id: createdRewards[0].id, probability: 40, weight: 100, display_order: 1 },
-      { machine_id: machine.id, reward_id: createdRewards[1].id, probability: 25, weight: 100, display_order: 2 },
-      { machine_id: machine.id, reward_id: createdRewards[2].id, probability: 15, weight: 100, display_order: 3 },
-      { machine_id: machine.id, reward_id: createdRewards[3].id, probability: 10, weight: 100, display_order: 4 },
-      { machine_id: machine.id, reward_id: createdRewards[4].id, probability: 7, weight: 100, display_order: 5 },
-      { machine_id: machine.id, reward_id: createdRewards[5].id, probability: 3, weight: 100, display_order: 6 }
+      { machine_id: typedMachine.id, reward_id: typedCreatedRewards[0].id, probability: 40, weight: 100, display_order: 1 },
+      { machine_id: typedMachine.id, reward_id: typedCreatedRewards[1].id, probability: 25, weight: 100, display_order: 2 },
+      { machine_id: typedMachine.id, reward_id: typedCreatedRewards[2].id, probability: 15, weight: 100, display_order: 3 },
+      { machine_id: typedMachine.id, reward_id: typedCreatedRewards[3].id, probability: 10, weight: 100, display_order: 4 },
+      { machine_id: typedMachine.id, reward_id: typedCreatedRewards[4].id, probability: 7, weight: 100, display_order: 5 },
+      { machine_id: typedMachine.id, reward_id: typedCreatedRewards[5].id, probability: 3, weight: 100, display_order: 6 }
     ];
 
     const { error: machineRewardsError } = await supabase
       .from('saas_gacha_machine_rewards')
-      .insert(machineRewards);
+      .insert(machineRewards as any);
 
     if (machineRewardsError) {
       console.error('創建扭蛋機獎勵關聯失敗:', machineRewardsError);
@@ -140,8 +144,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       message: '扭蛋機系統初始化成功',
-      machine,
-      rewards: createdRewards
+      machine: typedMachine,
+      rewards: typedCreatedRewards
     });
 
   } catch (error) {

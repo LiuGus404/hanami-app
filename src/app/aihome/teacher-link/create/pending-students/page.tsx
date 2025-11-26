@@ -28,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
 import StudentManagementNavBar from '@/components/ui/StudentManagementNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -2025,7 +2026,9 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 export default function TeacherLinkCreatePendingStudentsPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/pending-students">
-      <PendingStudentsPageContent />
+      <WithPermissionCheck pageKey="pending-students">
+        <PendingStudentsPageContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

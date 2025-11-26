@@ -43,9 +43,9 @@ export async function GET(request: NextRequest) {
       trial_limit: 1
     };
 
-    const { data: insertData, error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await (supabase as any)
       .from('Hanami_CourseTypes')
-      .insert(testData)
+      .insert(testData as any)
       .select();
 
     console.log('插入測試數據結果:', { data: insertData, error: insertError });

@@ -40,11 +40,12 @@ export function useDirectTeacherAccess() {
         .eq('teacher_email', email)
         .maybeSingle();
 
-      console.log('Supabase 查詢結果:', { employeeData, employeeError });
+      const typedEmployeeData = employeeData as { teacher_status?: string; [key: string]: any } | null;
+      console.log('Supabase 查詢結果:', { employeeData: typedEmployeeData, employeeError });
       console.log('教師狀態檢查:', { 
-        teacher_status: employeeData?.teacher_status, 
+        teacher_status: typedEmployeeData?.teacher_status, 
         validStatuses: ['active', 'full time', 'part time', 'contract'],
-        isValid: employeeData ? ['active', 'full time', 'part time', 'contract'].includes(employeeData.teacher_status) : false
+        isValid: typedEmployeeData ? ['active', 'full time', 'part time', 'contract'].includes(typedEmployeeData.teacher_status || '') : false
       });
 
       if (employeeError) {
@@ -71,7 +72,7 @@ export function useDirectTeacherAccess() {
         }
       }
 
-      if (!employeeData) {
+      if (!typedEmployeeData) {
         const noAccessData: TeacherAccessData = {
           success: false,
           email: email,
@@ -86,12 +87,12 @@ export function useDirectTeacherAccess() {
 
       // 檢查教師狀態 - 支持多種狀態
       const validStatuses = ['active', 'full time', 'part time', 'contract'];
-      if (!validStatuses.includes(employeeData.teacher_status)) {
+      if (!validStatuses.includes(typedEmployeeData.teacher_status || '')) {
         const inactiveData: TeacherAccessData = {
           success: false,
           email: email,
           hasTeacherAccess: false,
-          employeeData,
+          employeeData: typedEmployeeData,
           message: '您的教師帳號未啟用',
           mode: 'direct_supabase_check'
         };
@@ -104,7 +105,7 @@ export function useDirectTeacherAccess() {
         success: true,
         email: email,
         hasTeacherAccess: true,
-        employeeData,
+        employeeData: typedEmployeeData,
         message: '✓ 已驗證花見老師身份',
         mode: 'direct_supabase_check',
         timestamp: Date.now()

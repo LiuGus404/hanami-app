@@ -105,9 +105,10 @@ export default function AbilityEditModal({
         },
       ];
 
-      const customCategories: AbilityCategory[] = (customData || []).map(item => ({
-        id: item.option_value,
-        category_name: item.option_name,
+      const typedCustomData = (customData || []) as Array<{ option_value?: string; option_name?: string; sort_order?: number; created_at?: string; [key: string]: any }>;
+      const customCategories: AbilityCategory[] = typedCustomData.map(item => ({
+        id: item.option_value || '',
+        category_name: item.option_name || '',
         category_description: '',
         category_color: '#3B82F6',
         sort_order: item.sort_order || 100,
@@ -214,9 +215,10 @@ export default function AbilityEditModal({
       console.log('修改後的預設類別:', modifiedDefaultCategories);
       console.log('自訂預設類別:', customDefaultCategories);
       
-      const customCategories: AbilityCategory[] = (customData || []).map(item => ({
-        id: item.option_value,
-        category_name: item.option_name,
+      const typedCustomDataForEdit = (customData || []) as Array<{ option_value?: string; option_name?: string; sort_order?: number; created_at?: string; [key: string]: any }>;
+      const customCategories: AbilityCategory[] = typedCustomDataForEdit.map(item => ({
+        id: item.option_value || '',
+        category_name: item.option_name || '',
         category_description: '',
         category_color: '#3B82F6',
         sort_order: item.sort_order || 100,
@@ -238,15 +240,15 @@ export default function AbilityEditModal({
   const updateAbility = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('hanami_development_abilities')
+      const { data, error } = await (supabase
+        .from('hanami_development_abilities') as any)
         .update({
           ability_name: editingAbility.ability_name,
           ability_description: editingAbility.ability_description,
           // ability_color: editingAbility.ability_color, // 移除，因為該屬性不存在於類型定義中
           max_level: editingAbility.max_level,
           // category: editingAbility.category, // 移除，因為該屬性不存在於類型定義中
-        })
+        } as any)
         .eq('id', editingAbility.id)
         .select()
         .single();
@@ -351,15 +353,15 @@ export default function AbilityEditModal({
         toast.success(`已新增預設類別「${newOptionName.trim()}」！`);
       } else {
         // 新增為自訂類別：保存到資料庫
-        const { data, error } = await supabase
-          .from('hanami_custom_options')
+        const { data, error } = await (supabase
+          .from('hanami_custom_options') as any)
           .insert({
             option_type: 'activity_type',
             option_name: newOptionName.trim(),
             option_value: `custom_${Date.now()}`,
             sort_order: 999,
             is_active: true,
-          })
+          } as any)
           .select()
           .single();
 
@@ -434,11 +436,11 @@ export default function AbilityEditModal({
       } else {
         // 自訂選項：更新資料庫
         console.log('編輯自訂選項:', editingOption.name);
-        const { error } = await supabase
-          .from('hanami_custom_options')
+        const { error } = await (supabase
+          .from('hanami_custom_options') as any)
           .update({
             option_name: newOptionName.trim(),
-          })
+          } as any)
           .eq('option_type', 'activity_type')
           .eq('option_value', editingOption.id);
 
@@ -522,9 +524,9 @@ export default function AbilityEditModal({
       } else {
         // 自訂選項：軟刪除
         console.log('刪除自訂選項:', optionToDelete.category_name);
-        const { error } = await supabase
-          .from('hanami_custom_options')
-          .update({ is_active: false })
+        const { error } = await (supabase
+          .from('hanami_custom_options') as any)
+          .update({ is_active: false } as any)
           .eq('option_type', 'activity_type')
           .eq('option_value', optionId);
 

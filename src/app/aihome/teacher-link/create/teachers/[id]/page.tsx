@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { Teacher } from '@/types';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import toast from 'react-hot-toast';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 function translateRole(role: string): string {
   switch (role) {
@@ -70,15 +71,15 @@ function TeacherDetailContent() {
 
   useEffect(() => {
     const fetchRoles = async () => {
-      const { data, error } = await supabase
-        .from('hanami_employee')
+      const { data, error } = await (supabase
+        .from('hanami_employee') as any)
         .select('teacher_role');
       if (!error && data) {
         const uniqueRoles = Array.from(new Set(
-          data.map((r) => r.teacher_role?.trim())
-            .filter((r): r is string => !!r && !['', 'undefined'].includes(r)),
+          data.map((r: any) => r.teacher_role?.trim())
+            .filter((r: any): r is string => !!r && !['', 'undefined'].includes(r)),
         ));
-        setRoleOptions(uniqueRoles.map((r) => ({ label: translateRole(r), value: r })));
+        setRoleOptions(uniqueRoles.map((r) => ({ label: translateRole(r as string), value: r as string })));
       }
     };
     fetchRoles();
@@ -86,12 +87,12 @@ function TeacherDetailContent() {
 
   useEffect(() => {
     if (!organizationResolved || !orgId) return;
-    
+
     setLoading(true);
     setError(null);
     const fetchTeacher = async () => {
-      const { data, error } = await supabase
-        .from('hanami_employee')
+      const { data, error } = await (supabase
+        .from('hanami_employee') as any)
         .select('*')
         .eq('id', id as string)
         .eq('org_id', orgId)
@@ -112,7 +113,7 @@ function TeacherDetailContent() {
   // 載入鏈接狀態
   useEffect(() => {
     if (!orgId || !organizationResolved || !id) return;
-    
+
     const loadLinkStatus = async () => {
       try {
         const response = await fetch(
@@ -128,7 +129,7 @@ function TeacherDetailContent() {
         console.error('載入鏈接狀態失敗:', error);
       }
     };
-    
+
     loadLinkStatus();
   }, [id, orgId, organizationResolved]);
 
@@ -156,8 +157,8 @@ function TeacherDetailContent() {
       if (result.success) {
         toast.success(result.message || '同步成功');
         // 重新載入老師資料
-        const { data, error } = await supabase
-          .from('hanami_employee')
+        const { data, error } = await (supabase
+          .from('hanami_employee') as any)
           .select('*')
           .eq('id', id as string)
           .eq('org_id', orgId)
@@ -229,8 +230,8 @@ function TeacherDetailContent() {
       updateData[key] = value;
     });
 
-    const { error } = await supabase
-      .from('hanami_employee')
+    const { error } = await (supabase
+      .from('hanami_employee') as any)
       .update(updateData)
       .eq('id', id as string);
     setSaving(false);
@@ -298,7 +299,7 @@ function TeacherDetailContent() {
         >
           {/* 動態背景裝飾 */}
           <motion.div
-            animate={{ 
+            animate={{
               background: [
                 "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)",
                 "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.1) 0%, transparent 50%)",
@@ -336,7 +337,7 @@ function TeacherDetailContent() {
                 {editData.teacher_fullname || '未命名'}
               </h1>
               <p className="text-lg text-[#A68A64] mb-4">{editData.teacher_nickname || '—'}</p>
-              
+
               {/* 鏈接狀態和操作按鈕 */}
               <div className="flex flex-col items-center gap-3">
                 {linkStatus && (
@@ -403,7 +404,7 @@ function TeacherDetailContent() {
                   <User className="w-5 h-5 text-[#FFB6C1]" />
                   基本資訊
                 </h2>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-[#2B3A3B] mb-2">姓名</label>
                   {editMode ? (
@@ -693,7 +694,9 @@ function TeacherDetailContent() {
 export default function TeacherDetailPage() {
   return (
     <TeacherLinkShell currentPath={`/aihome/teacher-link/create/teachers/[id]`}>
-      <TeacherDetailContent />
+      <WithPermissionCheck pageKey="teachers">
+        <TeacherDetailContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

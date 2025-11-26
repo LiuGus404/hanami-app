@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
     // 嘗試更新 hanami_promo_codes
     try {
       // 先獲取當前資料
-      const { data: currentData, error: fetchError } = await supabase
+      const { data: currentData, error: fetchError } = await ((supabase as any)
         .from('hanami_promo_codes')
         .select('used_count, used_by_user_ids, used_by_emails')
         .eq('id', body.promo_code_id)
-        .single();
+        .single());
 
       if (fetchError || !currentData) {
         console.log('❌ 無法獲取當前優惠碼資料:', fetchError);
@@ -82,11 +82,11 @@ export async function POST(request: NextRequest) {
     // 嘗試更新 saas_coupons
     try {
       // 先獲取當前資料
-      const { data: currentData, error: fetchError } = await supabase
+      const { data: currentData, error: fetchError } = await ((supabase as any)
         .from('saas_coupons')
         .select('usage_count, used_by_user_ids, used_by_emails')
         .eq('id', body.promo_code_id)
-        .single();
+        .single());
 
       if (fetchError || !currentData) {
         console.log('❌ 無法獲取當前優惠券資料:', fetchError);

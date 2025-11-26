@@ -11,9 +11,8 @@ export async function POST() {
     console.log('開始簡化 hanami_employee 表的RLS政策...');
 
     // 1. 先獲取現有的政策列表
-    const { data: existingPolicies, error: policyError } = await supabase
-      .rpc('exec_sql', {
-        sql: `
+    const { data: existingPolicies, error: policyError } = await (supabase.rpc as any)('exec_sql', {
+      sql: `
           SELECT policyname 
           FROM pg_policies 
           WHERE tablename = 'hanami_employee' 
@@ -28,7 +27,7 @@ export async function POST() {
     }
 
     // 2. 刪除所有現有的RLS政策
-    const { error: dropError } = await supabase.rpc('exec_sql', {
+    const { error: dropError } = await (supabase.rpc as any)('exec_sql', {
       sql: `
         DROP POLICY IF EXISTS "Teacher authentication access" ON hanami_employee;
         DROP POLICY IF EXISTS "Allow all authenticated access" ON hanami_employee;
@@ -55,7 +54,7 @@ export async function POST() {
     }
 
     // 3. 創建一個簡單的寬鬆政策
-    const { error: createError } = await supabase.rpc('exec_sql', {
+    const { error: createError } = await (supabase.rpc as any)('exec_sql', {
       sql: `
         CREATE POLICY "Simple teacher access" ON hanami_employee
         FOR ALL USING (true);
@@ -69,9 +68,8 @@ export async function POST() {
     }
 
     // 4. 驗證政策是否創建成功
-    const { data: newPolicies, error: verifyError } = await supabase
-      .rpc('exec_sql', {
-        sql: `
+    const { data: newPolicies, error: verifyError } = await (supabase.rpc as any)('exec_sql', {
+      sql: `
           SELECT 
             policyname,
             permissive,

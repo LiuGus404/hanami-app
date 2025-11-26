@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import TeacherManagementNavBar from '@/components/ui/TeacherManagementNavBar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -218,7 +219,9 @@ function TeacherScheduleContent() {
 export default function TeacherSchedulePage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/teachers/teacher-schedule">
-      <TeacherScheduleContent />
+      <WithPermissionCheck pageKey="teachers">
+        <TeacherScheduleContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

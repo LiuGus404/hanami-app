@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 驗證所有學生是否屬於該機構
-    const { data: studentsData, error: studentsError } = await supabase
+    const { data: studentsData, error: studentsError } = await (supabase as any)
       .from('Hanami_Students')
       .select('id, org_id')
       .in('id', studentIds);
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     // 批量更新學生資訊
     const { data: updatedStudents, error: updateError } = await (supabase as any)
       .from('Hanami_Students')
-      .update(updates)
+      .update(updates as any)
       .in('id', studentIds)
       .eq('org_id', orgId)
       .select();

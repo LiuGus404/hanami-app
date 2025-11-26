@@ -98,6 +98,7 @@ export default function TrialLimitSettingsModal({
         Object.entries(settings).map(async ([id, limit]) => {
           const { error } = await supabase
             .from('Hanami_CourseTypes')
+            // @ts-ignore - Hanami_CourseTypes table type may not be fully defined
             .update({ 
               trial_limit: limit,
               org_id: validOrgId

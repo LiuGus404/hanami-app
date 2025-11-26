@@ -112,7 +112,7 @@ export function useGachapon() {
         }
         throw error;
       }
-      setMachines(data || []);
+      setMachines((data as unknown as GachaMachine[]) || []);
     } catch (err) {
       console.error('獲取扭蛋機失敗:', err);
       setError(err instanceof Error ? err.message : '獲取扭蛋機失敗');
@@ -138,7 +138,7 @@ export function useGachapon() {
         }
         throw error;
       }
-      setRewards(data || []);
+      setRewards((data as unknown as GachaReward[]) || []);
     } catch (err) {
       console.error('獲取獎勵失敗:', err);
       setError(err instanceof Error ? err.message : '獲取獎勵失敗');
@@ -159,7 +159,7 @@ export function useGachapon() {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-      setMachineRewards(data || []);
+      setMachineRewards((data as unknown as MachineReward[]) || []);
     } catch (err) {
       console.error('獲取扭蛋機獎勵失敗:', err);
       setError(err instanceof Error ? err.message : '獲取扭蛋機獎勵失敗');
@@ -190,7 +190,7 @@ export function useGachapon() {
         }
         throw error;
       }
-      setUserRewards(data || []);
+      setUserRewards((data as unknown as UserReward[]) || []);
     } catch (err) {
       console.error('獲取用戶獎勵失敗:', err);
       setError(err instanceof Error ? err.message : '獲取用戶獎勵失敗');
@@ -227,7 +227,7 @@ export function useGachapon() {
         const random = Math.random() * 100;
         let cumulativeProbability = 0;
 
-        for (const machineReward of machine as MachineReward[]) {
+        for (const machineReward of (machine as unknown as MachineReward[])) {
           cumulativeProbability += machineReward.probability;
           if (random <= cumulativeProbability) {
             results.push({

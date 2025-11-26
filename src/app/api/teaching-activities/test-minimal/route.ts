@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
       console.log(`${key}: ${typeof (minimalData as Record<string, any>)[key]} = ${JSON.stringify((minimalData as Record<string, any>)[key])}`);
     });
     
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('hanami_teaching_activities')
-      .insert(minimalData)
+      .insert(minimalData as any)
       .select()
       .single();
     

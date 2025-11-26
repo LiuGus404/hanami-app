@@ -10,9 +10,10 @@ export async function GET(request: NextRequest) {
       .eq('table_schema', 'public')
       .in('table_name', ['hanami_promo_codes', 'saas_coupons']);
 
-    const tableNames = tablesData?.map(t => t.table_name) || [];
+    const typedTablesData = (tablesData || []) as Array<{ table_name: string; [key: string]: any }>;
+    const tableNames = typedTablesData.map(t => t.table_name);
     
-    let promo_codes = [];
+    let promo_codes: any[] = [];
     let table_name = '';
 
     if (tableNames.includes('hanami_promo_codes')) {

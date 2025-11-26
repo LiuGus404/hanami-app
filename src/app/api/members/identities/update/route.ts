@@ -37,8 +37,8 @@ export async function PUT(request: NextRequest) {
     }
 
     // 先獲取身份記錄以獲取org_id
-    const { data: identityData } = await oldSupabase
-      .from('hanami_org_identities')
+    const { data: identityData } = await ((oldSupabase as any)
+      .from('hanami_org_identities'))
       .select('org_id')
       .eq('id', identityId)
       .single();
@@ -50,16 +50,16 @@ export async function PUT(request: NextRequest) {
     const identity = identityData as { org_id: string };
 
     // 檢查用戶是否有權限管理該機構
-    const { data: userIdentity } = await oldSupabase
-      .from('hanami_org_identities')
+    const { data: userIdentity } = await ((oldSupabase as any)
+      .from('hanami_org_identities'))
       .select('role_type')
       .eq('org_id', identity.org_id)
       .eq('user_email', userEmail)
       .eq('status', 'active')
       .single();
 
-    const { data: admin } = await oldSupabase
-      .from('hanami_admin')
+    const { data: admin } = await ((oldSupabase as any)
+      .from('hanami_admin'))
       .select('role')
       .eq('org_id', identity.org_id)
       .eq('admin_email', userEmail)

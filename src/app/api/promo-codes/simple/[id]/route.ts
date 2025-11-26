@@ -9,13 +9,14 @@ export async function GET(
     const { id } = params;
 
     // 檢查使用哪個表格
-    const { data: tablesData } = await supabase
+    const { data: tablesData } = await ((supabase as any)
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public')
-      .in('table_name', ['hanami_promo_codes', 'saas_coupons']);
+      .in('table_name', ['hanami_promo_codes', 'saas_coupons']));
 
-    const tableNames = tablesData?.map(t => t.table_name) || [];
+    const typedTablesData = (tablesData || []) as Array<{ table_name: string; [key: string]: any }>;
+    const tableNames = typedTablesData.map(t => t.table_name);
     
     let result;
 
@@ -90,13 +91,14 @@ export async function PUT(
     const body = await request.json();
 
     // 檢查使用哪個表格
-    const { data: tablesData } = await supabase
+    const { data: tablesData } = await ((supabase as any)
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public')
-      .in('table_name', ['hanami_promo_codes', 'saas_coupons']);
+      .in('table_name', ['hanami_promo_codes', 'saas_coupons']));
 
-    const tableNames = tablesData?.map(t => t.table_name) || [];
+    const typedTablesData = (tablesData || []) as Array<{ table_name: string; [key: string]: any }>;
+    const tableNames = typedTablesData.map(t => t.table_name);
     
     let result;
 
@@ -116,12 +118,12 @@ export async function PUT(
       if (body.notes !== undefined) updateData.notes = body.notes;
       if (body.is_active !== undefined) updateData.is_active = body.is_active;
 
-      const { data, error } = await supabase
+      const { data, error } = await ((supabase as any)
         .from('hanami_promo_codes')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
-        .single();
+        .single());
 
       if (error) throw error;
       result = data;
@@ -141,12 +143,12 @@ export async function PUT(
       if (body.notes !== undefined) updateData.notes = body.notes;
       if (body.is_active !== undefined) updateData.is_active = body.is_active;
 
-      const { data, error } = await supabase
+      const { data, error } = await ((supabase as any)
         .from('saas_coupons')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
-        .single();
+        .single());
 
       if (error) throw error;
       
@@ -204,26 +206,27 @@ export async function DELETE(
     const { id } = params;
 
     // 檢查使用哪個表格
-    const { data: tablesData } = await supabase
+    const { data: tablesData } = await ((supabase as any)
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public')
-      .in('table_name', ['hanami_promo_codes', 'saas_coupons']);
+      .in('table_name', ['hanami_promo_codes', 'saas_coupons']));
 
-    const tableNames = tablesData?.map(t => t.table_name) || [];
+    const typedTablesData = (tablesData || []) as Array<{ table_name: string; [key: string]: any }>;
+    const tableNames = typedTablesData.map(t => t.table_name);
 
     if (tableNames.includes('hanami_promo_codes')) {
-      const { error } = await supabase
+      const { error } = await ((supabase as any)
         .from('hanami_promo_codes')
         .delete()
-        .eq('id', id);
+        .eq('id', id));
 
       if (error) throw error;
     } else if (tableNames.includes('saas_coupons')) {
-      const { error } = await supabase
+      const { error } = await ((supabase as any)
         .from('saas_coupons')
         .delete()
-        .eq('id', id);
+        .eq('id', id));
 
       if (error) throw error;
     } else {

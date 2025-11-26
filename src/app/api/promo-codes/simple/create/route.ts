@@ -22,14 +22,15 @@ export async function POST(request: NextRequest) {
       .eq('table_schema', 'public')
       .in('table_name', ['hanami_promo_codes', 'saas_coupons']);
 
-    const tableNames = tablesData?.map(t => t.table_name) || [];
+    const typedTablesData = (tablesData || []) as Array<{ table_name: string; [key: string]: any }>;
+    const tableNames = typedTablesData.map(t => t.table_name);
     
     let result;
 
     if (tableNames.includes('hanami_promo_codes')) {
       // 使用 hanami_promo_codes 表格
-      const { data, error } = await supabase
-        .from('hanami_promo_codes')
+      const { data, error } = await (supabase
+        .from('hanami_promo_codes') as any)
         .insert({
           code: code.toUpperCase(),
           name,
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
           valid_until: body.valid_until || null,
           notes: body.notes || null,
           is_active: body.is_active !== false
-        })
+        } as any)
         .select()
         .single();
 
@@ -51,8 +52,8 @@ export async function POST(request: NextRequest) {
       result = data;
     } else if (tableNames.includes('saas_coupons')) {
       // 使用 saas_coupons 表格
-      const { data, error } = await supabase
-        .from('saas_coupons')
+      const { data, error } = await (supabase
+        .from('saas_coupons') as any)
         .insert({
           coupon_code: code.toUpperCase(),
           coupon_name: name,
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
           valid_until: body.valid_until || null,
           notes: body.notes || null,
           is_active: body.is_active !== false
-        })
+        } as any)
         .select()
         .single();
 

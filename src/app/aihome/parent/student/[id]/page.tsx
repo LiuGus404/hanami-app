@@ -64,7 +64,7 @@ export default function ParentStudentDetailPage() {
       }
     }
   }, [student, activeTab]);
-  
+
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
   const currentIdRef = useRef<string | null>(null);
@@ -103,17 +103,17 @@ export default function ParentStudentDetailPage() {
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
     if (loading || !user) return;
-    
+
     // 如果 ID 沒有變化且已經載入過，不重複載入
     if (currentIdRef.current === id && dataFetchedRef.current) return;
-    
+
     // 防止重複載入
     if (loadingRef.current) return;
     loadingRef.current = true;
-    
+
     // 更新當前 ID
     currentIdRef.current = id as string;
-    
+
     setPageLoading(true);
     setStudent(null);
     setError(null);
@@ -122,10 +122,10 @@ export default function ParentStudentDetailPage() {
     const checkAuth = async () => {
       try {
         const supabase = getSupabaseClient();
-        
+
         // 先檢查是否為停用學生
-        const { data: inactiveData, error: inactiveError } = await supabase
-          .from('inactive_student_list')
+        const { data: inactiveData, error: inactiveError } = await (supabase
+          .from('inactive_student_list') as any)
           .select('*')
           .eq('id', id as string)
           .single();
@@ -150,18 +150,18 @@ export default function ParentStudentDetailPage() {
           setPageLoading(false);
           dataFetchedRef.current = true;
           loadingRef.current = false;
-          
+
           // 記錄訪問日誌
           await logAccess(convertedStudent.id, institution, 'view');
-          
+
           // 檢查課堂資料
           await checkLessonData(convertedStudent.id);
           return;
         }
 
         // 檢查是否為試堂學生
-        const { data: trialData, error: trialError } = await supabase
-          .from('hanami_trial_students')
+        const { data: trialData, error: trialError } = await (supabase
+          .from('hanami_trial_students') as any)
           .select('*')
           .eq('id', id as string)
           .single();
@@ -174,18 +174,18 @@ export default function ParentStudentDetailPage() {
           setPageLoading(false);
           dataFetchedRef.current = true;
           loadingRef.current = false;
-          
+
           // 記錄訪問日誌
           await logAccess(trialData.id, institution, 'view');
-          
+
           // 檢查課堂資料
           await checkLessonData(trialData.id);
           return;
         }
 
         // 如果不是試堂學生，則從常規學生表中獲取數據
-        const { data: studentData, error: studentError } = await supabase
-          .from('Hanami_Students')
+        const { data: studentData, error: studentError } = await (supabase
+          .from('Hanami_Students') as any)
           .select('*')
           .eq('id', id as string)
           .single();
@@ -217,10 +217,10 @@ export default function ParentStudentDetailPage() {
         setPageLoading(false);
         dataFetchedRef.current = true;
         loadingRef.current = false;
-        
+
         // 記錄訪問日誌
         await logAccess(studentData.id, institution, 'view');
-        
+
         // 檢查課堂資料
         await checkLessonData(studentData.id);
       } catch (err) {
@@ -235,36 +235,36 @@ export default function ParentStudentDetailPage() {
     const checkLessonData = async (studentId: string) => {
       try {
         console.log('🔍 檢查課堂資料表...');
-        
+
         const supabase = getSupabaseClient();
-        
+
         // 檢查表是否存在資料
-        const { data: allLessons, error: allError } = await supabase
-          .from('hanami_student_lesson')
+        const { data: allLessons, error: allError } = await (supabase
+          .from('hanami_student_lesson') as any)
           .select('*')
           .limit(5);
-        
-        console.log('📊 課堂資料表檢查:', { 
+
+        console.log('📊 課堂資料表檢查:', {
           hasData: allLessons && allLessons.length > 0,
           totalRecords: allLessons?.length || 0,
-          sampleData: allLessons?.slice(0, 2).map(l => ({ id: l.id, student_id: l.student_id, lesson_date: l.lesson_date })),
+          sampleData: allLessons?.slice(0, 2).map((l: any) => ({ id: l.id, student_id: l.student_id, lesson_date: l.lesson_date })),
           error: allError?.message || '無錯誤',
         });
-        
+
         // 檢查特定學生的課堂資料
-        const { data: studentLessons, error: studentError } = await supabase
-          .from('hanami_student_lesson')
+        const { data: studentLessons, error: studentError } = await (supabase
+          .from('hanami_student_lesson') as any)
           .select('id, lesson_date, course_type, student_id')
           .eq('student_id', studentId)
           .limit(5);
-        
+
         console.log('📋 學生課堂資料檢查:', {
           studentId,
           lessonCount: studentLessons?.length || 0,
-          lessons: studentLessons?.map(l => ({ id: l.id, date: l.lesson_date, type: l.course_type, student_id: l.student_id })),
+          lessons: studentLessons?.map((l: any) => ({ id: l.id, date: l.lesson_date, type: l.course_type, student_id: l.student_id })),
           error: studentError?.message || '無錯誤',
         });
-        
+
       } catch (err) {
         console.error('❌ 檢查課堂資料失敗:', err);
       }
@@ -359,8 +359,8 @@ export default function ParentStudentDetailPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
       <div className="flex">
         {/* 側邊欄選單 */}
-        <AppSidebar 
-          isOpen={sidebarOpen} 
+        <AppSidebar
+          isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentPath="/aihome/parent/student/[id]"
         />
@@ -369,248 +369,247 @@ export default function ParentStudentDetailPage() {
         <div className="flex-1 flex flex-col bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] min-h-full">
           {/* 頂部導航欄 */}
           <nav className="bg-white/80 backdrop-blur-sm border-b border-[#EADBC8] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              {/* 選單按鈕 */}
-              <motion.button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                title="開啟選單"
-              >
-                <Menu className="w-6 h-6 text-[#4B4036]" />
-              </motion.button>
-              
-              <div className="w-10 h-10 relative">
-                <img 
-                  src="/@hanami.png" 
-                  alt="HanamiEcho Logo" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-                <p className="text-sm text-[#2B3A3B]">家長查看</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-[#2B3A3B]">
-                {currentTime.toLocaleTimeString('zh-TW', { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-[#4B4036]">
-                  {user?.full_name?.charAt(0).toUpperCase() || 'U'}
-                </span>
-              </div>
-              <motion.button
-                onClick={handleLogout}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                title="登出"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>登出</span>
-              </motion.button>
-            </div>
-          </div>
-        </div>
-      </nav>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                <div className="flex items-center space-x-4">
+                  {/* 選單按鈕 */}
+                  <motion.button
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                    title="開啟選單"
+                  >
+                    <Menu className="w-6 h-6 text-[#4B4036]" />
+                  </motion.button>
 
+                  <div className="w-10 h-10 relative">
+                    <img
+                      src="/@hanami.png"
+                      alt="HanamiEcho Logo"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
+                    <p className="text-sm text-[#2B3A3B]">家長查看</p>
+                  </div>
+                </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 返回按鈕和機構信息 */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <motion.button
-              onClick={handleBack}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors"
-            >
-              <span>←</span>
-              <span>返回連接頁面</span>
-            </motion.button>
-            
-            <div className="flex items-center space-x-2 px-3 py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8]">
-              <Building className="w-4 h-4 text-[#4B4036]" />
-              <span className="text-sm font-medium text-[#4B4036]">{institution}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 停用學生警告 */}
-        {isInactiveStudent && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path clipRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" fillRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">
-                  此學生已停用
-                </h3>
-                <div className="mt-2 text-sm text-yellow-700">
-                  <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
-                  <p>停用原因：{student.inactive_reason}</p>
+                <div className="flex items-center space-x-4">
+                  <div className="text-sm text-[#2B3A3B]">
+                    {currentTime.toLocaleTimeString('zh-TW', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-[#4B4036]">
+                      {user?.full_name?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                  <motion.button
+                    onClick={handleLogout}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex items-center space-x-2 px-3 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
+                    title="登出"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>登出</span>
+                  </motion.button>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          </nav>
 
-        {/* 分頁導航 */}
-        <div className="mb-6">
-          <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1">
-            {[
-              { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
-              { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
-              { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度' },
-              { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' }
-            ].map(({ key, label, icon: Icon, description }) => {
-              const studentOrgId = student?.org_id ?? null;
-              const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
-              const isDisabled = key === 'media' && !isPremiumOrg;
-              
-              return (
-              <motion.button
-                key={key}
-                onClick={() => handleTabChange(key as any)}
-                className={`
+
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* 返回按鈕和機構信息 */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <motion.button
+                  onClick={handleBack}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors"
+                >
+                  <span>←</span>
+                  <span>返回連接頁面</span>
+                </motion.button>
+
+                <div className="flex items-center space-x-2 px-3 py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8]">
+                  <Building className="w-4 h-4 text-[#4B4036]" />
+                  <span className="text-sm font-medium text-[#4B4036]">{institution}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 停用學生警告 */}
+            {isInactiveStudent && (
+              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path clipRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" fillRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      此學生已停用
+                    </h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
+                      <p>停用原因：{student.inactive_reason}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 分頁導航 */}
+            <div className="mb-6">
+              <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1">
+                {[
+                  { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
+                  { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
+                  { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度' },
+                  { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' }
+                ].map(({ key, label, icon: Icon, description }) => {
+                  const studentOrgId = student?.org_id ?? null;
+                  const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
+                  const isDisabled = key === 'media' && !isPremiumOrg;
+
+                  return (
+                    <motion.button
+                      key={key}
+                      onClick={() => handleTabChange(key as any)}
+                      className={`
                   flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
-                  ${
-                    isDisabled
-                      ? 'opacity-50 cursor-pointer text-gray-400'
-                      : activeTab === key
-                        ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
-                        : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
-                  }
+                  ${isDisabled
+                          ? 'opacity-50 cursor-pointer text-gray-400'
+                          : activeTab === key
+                            ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
+                            : 'text-[#2B3A3B]/70 hover:text-[#2B3A3B] hover:bg-white/50'
+                        }
                 `}
-                whileHover={isDisabled ? {} : { scale: 1.02 }}
-                whileTap={isDisabled ? {} : { scale: 0.98 }}
-                title={description}
-              >
-                <Icon className="w-4 h-4 mr-2" />
-                {label}
-              </motion.button>
-              );
-            })}
-          </div>
-        </div>
+                      whileHover={isDisabled ? {} : { scale: 1.02 }}
+                      whileTap={isDisabled ? {} : { scale: 0.98 }}
+                      title={description}
+                    >
+                      <Icon className="w-4 h-4 mr-2" />
+                      {label}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
 
-        {/* 分頁內容 */}
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-        >
-          {/* 基本資料分頁 */}
-          {activeTab === 'basic' && (
-            <StudentBasicInfo 
-              isInactive={isInactiveStudent} 
-              student={student}
-              hideTeacherInfo={true}
-              hideSensitiveInfo={true}
-              hideContactDays={true}
-              readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
-              visibleFields={['full_name', 'nick_name', 'student_age', 'gender', 'course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'duration_months', 'school', 'address', 'health_notes', 'student_remarks']}
-              onUpdate={(newData) => {
-                setStudent(newData);
-                // 如果是試堂學生且課程有更新，觸發課堂資料重新載入
-                if (newData.student_type === '試堂' && newData.course_type !== student.course_type) {
-                  setCourseUpdateTrigger(prev => prev + 1);
-                }
+            {/* 分頁內容 */}
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* 基本資料分頁 */}
+              {activeTab === 'basic' && (
+                <StudentBasicInfo
+                  isInactive={isInactiveStudent}
+                  student={student}
+                  hideTeacherInfo={true}
+                  hideSensitiveInfo={true}
+                  hideContactDays={true}
+                  readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
+                  visibleFields={['full_name', 'nick_name', 'student_age', 'gender', 'course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'duration_months', 'school', 'address', 'health_notes', 'student_remarks']}
+                  onUpdate={(newData) => {
+                    setStudent(newData);
+                    // 如果是試堂學生且課程有更新，觸發課堂資料重新載入
+                    if (newData.student_type === '試堂' && newData.course_type !== student.course_type) {
+                      setCourseUpdateTrigger(prev => prev + 1);
+                    }
+                  }}
+                />
+              )}
+
+              {/* 課程記錄分頁 */}
+              {activeTab === 'lessons' && student && (
+                <div className="mt-4">
+                  {(() => {
+                    const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
+                    console.log('🎯 準備載入課堂資料:', {
+                      lessonStudentId,
+                      isInactiveStudent,
+                      studentOriginalId: student.original_id,
+                      currentStudentId: student.id,
+                      studentType: student.student_type,
+                    });
+                    return (
+                      <StudentLessonPanel
+                        contactNumber={student.contact_number}
+                        studentId={lessonStudentId}
+                        studentName={student.full_name}
+                        studentType={student.student_type}
+                        onCourseUpdate={() => {
+                          // 觸發課程更新
+                          setCourseUpdateTrigger(prev => prev + 1);
+                        }}
+                        studentData={student}
+                        hideActionButtons={true}
+                        hideTeacherColumn={true}
+                        hideCareAlert={true}
+                        orgId={student.org_id ?? null}
+                        organizationName={
+                          (student as any)?.organization_name ??
+                          (student as any)?.organizationName ??
+                          null
+                        }
+                      />
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* 互動角色分頁 */}
+              {activeTab === 'avatar' && student && (
+                <EnhancedStudentAvatarTab
+                  student={student}
+                  className="mt-4"
+                />
+              )}
+
+              {/* 媒體庫分頁 */}
+              {activeTab === 'media' && student && (
+                <>
+                  {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', {
+                    studentId: student.id,
+                    studentName: student.full_name,
+                    studentObject: student
+                  })}
+                  <StudentMediaTimeline
+                    studentId={student.id}
+                    studentName={student.full_name}
+                    className="mt-4"
+                  />
+                </>
+              )}
+            </motion.div>
+            <LessonEditorModal
+              lesson={editingLesson}
+              mode={editingLesson ? 'edit' : 'add'}
+              open={isModalOpen}
+              studentId={student.id}
+              orgId={student.org_id ?? null}
+              onClose={() => {
+                setIsModalOpen(false);
+                setEditingLesson(null);
+              }}
+              onSaved={() => {
+                setIsModalOpen(false);
+                setEditingLesson(null);
               }}
             />
-          )}
-
-          {/* 課程記錄分頁 */}
-          {activeTab === 'lessons' && student && (
-            <div className="mt-4">
-              {(() => {
-                const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
-                console.log('🎯 準備載入課堂資料:', {
-                  lessonStudentId,
-                  isInactiveStudent,
-                  studentOriginalId: student.original_id,
-                  currentStudentId: student.id,
-                  studentType: student.student_type,
-                });
-                return (
-                  <StudentLessonPanel 
-                    contactNumber={student.contact_number} 
-                    studentId={lessonStudentId}
-                    studentName={student.full_name}
-                    studentType={student.student_type}
-                    onCourseUpdate={() => {
-                      // 觸發課程更新
-                      setCourseUpdateTrigger(prev => prev + 1);
-                    }}
-                    studentData={student}
-                    hideActionButtons={true}
-                    hideTeacherColumn={true}
-                    hideCareAlert={true}
-                    orgId={student.org_id ?? null}
-                    organizationName={
-                      (student as any)?.organization_name ??
-                      (student as any)?.organizationName ??
-                      null
-                    }
-                  />
-                );
-              })()}
-            </div>
-          )}
-
-          {/* 互動角色分頁 */}
-          {activeTab === 'avatar' && student && (
-            <EnhancedStudentAvatarTab 
-              student={student}
-              className="mt-4"
-            />
-          )}
-
-          {/* 媒體庫分頁 */}
-          {activeTab === 'media' && student && (
-            <>
-              {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', { 
-                studentId: student.id, 
-                studentName: student.full_name,
-                studentObject: student 
-              })}
-              <StudentMediaTimeline 
-                studentId={student.id}
-                studentName={student.full_name}
-                className="mt-4"
-              />
-            </>
-          )}
-        </motion.div>
-        <LessonEditorModal
-          lesson={editingLesson}
-          mode={editingLesson ? 'edit' : 'add'}
-          open={isModalOpen}
-          studentId={student.id}
-          orgId={student.org_id ?? null}
-          onClose={() => {
-            setIsModalOpen(false);
-            setEditingLesson(null);
-          }}
-          onSaved={() => {
-            setIsModalOpen(false);
-            setEditingLesson(null);
-          }}
-        />
           </div>
         </div>
       </div>

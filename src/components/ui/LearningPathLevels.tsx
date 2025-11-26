@@ -315,10 +315,20 @@ export default function LearningPathLevels({
       }
 
       // 保存學生成長樹到狀態
-      setStudentTrees(studentTrees);
+      const typedStudentTrees = (studentTrees || []) as Array<{
+        tree_id?: string;
+        tree?: {
+          id?: string;
+          tree_name?: string;
+          tree_description?: string;
+          is_active?: boolean;
+        } | null;
+        [key: string]: any;
+      }>;
+      setStudentTrees(typedStudentTrees);
 
       // 提取成長樹 ID
-      const studentTreeIds = studentTrees.map(st => st.tree_id);
+      const studentTreeIds = typedStudentTrees.map(st => st.tree_id || '').filter(Boolean);
       console.log('學生成長樹 ID 列表:', studentTreeIds);
 
       // 初始化選中的成長樹（只在第一次載入時設置）
@@ -348,7 +358,18 @@ export default function LearningPathLevels({
       console.log('學生成長樹的學習路徑:', studentTreePaths);
       
       // 詳細檢查每個學習路徑
-      studentTreePaths?.forEach((path, index) => {
+      const typedStudentTreePaths = (studentTreePaths || []) as Array<{
+        id?: string;
+        name?: string;
+        tree_id?: string;
+        nodes?: Array<{
+          title?: string;
+          [key: string]: any;
+        }>;
+        is_active?: boolean;
+        [key: string]: any;
+      }>;
+      typedStudentTreePaths.forEach((path, index) => {
         console.log(`🔍 學習路徑 ${index + 1}:`, {
           id: path.id,
           name: path.name,
@@ -367,7 +388,7 @@ export default function LearningPathLevels({
       
       if (currentTreeId && studentTreeIds.includes(currentTreeId)) {
         console.log('🔍 使用選中的成長樹 ID:', currentTreeId);
-        const treePaths = studentTreePaths?.filter(path => path.tree_id === currentTreeId) || [];
+        const treePaths = typedStudentTreePaths.filter(path => path.tree_id === currentTreeId);
         console.log('🔍 該成長樹的學習路徑數量:', treePaths.length);
         console.log('🔍 該成長樹的學習路徑:', treePaths);
         
@@ -509,17 +530,23 @@ export default function LearningPathLevels({
                   .eq('id', actualActivityId)
                   .single();
 
-                if (treeActivityError || !treeActivity || !treeActivity.activity_id) {
+                const typedTreeActivity = treeActivity as {
+                  activity_id?: string;
+                  tree_id?: string;
+                  [key: string]: any;
+                } | null;
+
+                if (treeActivityError || !typedTreeActivity || !typedTreeActivity.activity_id) {
                   console.log(`節點 ${node.title} (${actualActivityId}): 無法找到對應的活動記錄，標記為未完成`);
                   return null; // 返回 null 表示過濾掉這個節點
                 }
 
                 // 檢查這個活動是否屬於當前選中的成長樹
-                if (treeActivity.tree_id !== selectedTreeId) {
+                if (typedTreeActivity.tree_id !== selectedTreeId) {
                   return null; // 返回 null 表示過濾掉這個節點
                 }
 
-                const realActivityId = treeActivity.activity_id;
+                const realActivityId = typedTreeActivity.activity_id;
                 
                 // 查找該活動的所有記錄（使用正確的活動數據）
                 const activityRecords = allActivities?.filter(
@@ -584,7 +611,7 @@ export default function LearningPathLevels({
       );
 
       setLearningPath({
-        id: selectedPath.id,
+        id: selectedPath.id || '',
         name: selectedPath.path_name || '學習路徑',
         description: selectedPath.path_description || '',
         nodes: nodes,

@@ -640,9 +640,9 @@ export default function TeacherShiftCalendar({ teacherIds, orgId, userEmail }: T
         insertData.org_id = orgId;
       }
 
-      const { error } = await supabase
-        .from('teacher_schedule')
-        .insert(insertData);
+      const { error } = await (supabase
+        .from('teacher_schedule') as any)
+        .insert(insertData as any);
 
       if (error) {
         console.warn('Error saving teacher schedule:', error.message);
@@ -980,12 +980,12 @@ export default function TeacherShiftCalendar({ teacherIds, orgId, userEmail }: T
 
       if (existingSchedule) {
         // 更新現有排班
-        let updateQuery = supabase
-          .from('teacher_schedule')
+        let updateQuery = (supabase
+          .from('teacher_schedule') as any)
           .update({
             start_time: selectedScheduleTime.start_time,
             end_time: selectedScheduleTime.end_time,
-          })
+          } as any)
           .eq('teacher_id', selectedSingleTeacher.id)
           .eq('scheduled_date', selectedScheduleDate);
 
@@ -1003,9 +1003,9 @@ export default function TeacherShiftCalendar({ teacherIds, orgId, userEmail }: T
         }
       } else {
         // 插入新排班
-        const { error: insertError } = await supabase
-          .from('teacher_schedule')
-          .insert(scheduleData);
+        const { error: insertError } = await (supabase
+          .from('teacher_schedule') as any)
+          .insert(scheduleData as any);
 
         if (insertError) {
           console.warn('Error inserting schedule:', insertError.message);
@@ -1139,13 +1139,13 @@ export default function TeacherShiftCalendar({ teacherIds, orgId, userEmail }: T
       setErrorMsg(null);
 
       // 更新排班記錄
-      let updateQuery = supabase
-        .from('teacher_schedule')
+      let updateQuery = (supabase
+        .from('teacher_schedule') as any)
         .update({
           start_time: editingScheduleTime.start_time,
           end_time: editingScheduleTime.end_time,
           updated_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', editingSchedule.id);
 
       // 根據 org_id 過濾
@@ -1264,9 +1264,9 @@ export default function TeacherShiftCalendar({ teacherIds, orgId, userEmail }: T
         return schedule;
       });
 
-      const { error: insertError } = await supabase
-        .from('teacher_schedule')
-        .insert(schedulesWithOrgId);
+      const { error: insertError } = await (supabase
+        .from('teacher_schedule') as any)
+        .insert(schedulesWithOrgId as any);
 
       if (insertError) {
         console.warn('Error inserting schedules:', insertError.message);
@@ -1348,9 +1348,9 @@ export default function TeacherShiftCalendar({ teacherIds, orgId, userEmail }: T
           return schedule;
         });
 
-        const { error: insertError } = await supabase
-          .from('teacher_schedule')
-          .insert(schedulesToInsert);
+        const { error: insertError } = await (supabase
+          .from('teacher_schedule') as any)
+          .insert(schedulesToInsert as any);
 
         if (insertError) {
           console.warn('Error inserting schedules:', insertError.message);

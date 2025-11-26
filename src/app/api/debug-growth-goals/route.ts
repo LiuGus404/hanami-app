@@ -64,9 +64,9 @@ export async function GET() {
       deprecated_reason: null
     };
 
-    const { data: insertData, error: insertError } = await supabase
-      .from('hanami_growth_goals')
-      .insert([testData])
+    const { data: insertData, error: insertError } = await (supabase
+      .from('hanami_growth_goals') as any)
+      .insert([testData] as any)
       .select();
 
     if (insertError) {

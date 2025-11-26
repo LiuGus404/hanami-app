@@ -84,9 +84,9 @@ export default function ManageScheduleStudents() {
     if (!selectedSchedule) return;
 
     try {
-      const { error } = await supabase
-        .from('hanami_schedule')
-        .update({ assigned_student_ids: selectedStudents })
+      const { error } = await (supabase
+        .from('hanami_schedule') as any)
+        .update({ assigned_student_ids: selectedStudents } as any)
         .eq('id', selectedSchedule);
 
       if (error) throw error;

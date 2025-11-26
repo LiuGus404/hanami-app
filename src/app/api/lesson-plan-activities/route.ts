@@ -169,9 +169,9 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString()
     }));
 
-    const { data: insertedActivities, error: insertError } = await supabase
-      .from('hanami_lesson_plan_activities' as any)
-      .insert(activitiesToInsert)
+    const { data: insertedActivities, error: insertError } = await (supabase
+      .from('hanami_lesson_plan_activities') as any)
+      .insert(activitiesToInsert as any)
       .select();
 
     if (insertError) {

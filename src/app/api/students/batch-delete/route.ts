@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 驗證所有學生是否屬於該機構
-    const { data: studentsData, error: studentsError } = await supabase
+    const { data: studentsData, error: studentsError } = await (supabase as any)
       .from('Hanami_Students')
       .select('id, org_id')
       .in('id', studentIds);
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 批量刪除學生
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await (supabase as any)
       .from('Hanami_Students')
       .delete()
       .in('id', studentIds)

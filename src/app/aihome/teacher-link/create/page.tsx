@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ChartBarIcon, CalendarIcon } from '@heroicons/react/24/outline';
 
 import HanamiCalendar from '@/components/ui/HanamiCalendar';
 import { supabase, getSaasSupabaseClient } from '@/lib/supabase';
@@ -127,15 +127,8 @@ function CreatePageContent() {
   ) => {
     const params = new URLSearchParams();
 
-    if (organization?.id && !orgDataDisabled) {
-      params.set('orgId', organization.id);
-      if (organization.name) {
-        params.set('orgName', organization.name);
-      }
-      if (organization.slug) {
-        params.set('orgSlug', organization.slug);
-      }
-    }
+    // 不再在 URL 中顯示機構 ID，機構信息從 localStorage 讀取
+    // 只保留其他必要的查詢參數（如 filter）
 
     if (extraParams) {
       Object.entries(extraParams).forEach(([key, value]) => {
@@ -470,80 +463,144 @@ function CreatePageContent() {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-6xl px-4 py-10 text-[#2B3A3B]">
-        <div className="mx-auto" style={{ width: '420px' }}>
-          {/* 返回機構選擇按鍵 */}
-          <button
-            type="button"
-            onClick={() => router.push('/aihome/teacher-link/create/select-organization')}
-            className="mb-4 inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#EADBC8] rounded-lg text-[#2B3A3B] hover:text-[#A64B2A] hover:bg-[#FFF9F2] hover:border-[#FFD59A] transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2"
-          >
-            <ArrowLeftIcon className="w-4 h-4" />
-            <span className="font-medium">選擇機構</span>
-          </button>
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 text-[#2B3A3B]">
+        {/* 響應式佈局：大屏幕左右分欄，小屏幕單欄 */}
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-center lg:gap-8">
+          {/* 左側內容區 */}
+          <div className="w-full lg:w-[420px] lg:flex-shrink-0">
+            {/* 返回機構選擇按鍵 */}
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+              whileHover={{ scale: 1.02, x: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => router.push('/aihome/teacher-link/create/select-organization')}
+              className="mb-4 inline-flex items-center gap-2 px-4 py-2 bg-white/70 backdrop-blur-sm border border-[#EADBC8] rounded-xl text-[#2B3A3B] hover:text-[#A64B2A] hover:bg-white/90 hover:border-[#FFD59A] transition-all duration-200 shadow-sm hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              <span className="font-medium">選擇機構</span>
+            </motion.button>
 
           {/* 歡迎區 */}
-          <button
+          <motion.button
             type="button"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            whileHover={{ y: -2, scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
             onClick={() =>
               router.push(
                 buildOrgPath('/aihome/teacher-link/create/organization-settings'),
               )
             }
-            className="bg-white rounded-2xl p-4 mb-4 flex w-full items-center justify-between border border-[#EADBC8] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#FFD59A]"
+            className="relative bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl p-4 mb-4 flex w-full items-center justify-between border-2 border-[#EADBC8] shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden group"
           >
-            <div className="text-left">
-              <h1 className="text-xl font-bold text-[#2B3A3B]">Hi {adminName}，歡迎回來！</h1>
+            {/* 動態背景裝飾 */}
+            <motion.div
+              animate={{
+                background: [
+                  "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)",
+                  "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.1) 0%, transparent 50%)",
+                  "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)"
+                ]
+              }}
+              transition={{ duration: 8, repeat: Infinity }}
+              className="absolute inset-0 pointer-events-none"
+            />
+            <div className="text-left relative z-10">
+              <motion.h1 
+                className="text-xl font-bold text-[#2B3A3B]"
+                whileHover={{ scale: 1.02 }}
+              >
+                Hi {adminName}，歡迎回來！
+              </motion.h1>
               <p className="text-sm text-[#8A7C70] mt-1 flex items-center gap-2">
                 {organization.name}
-                <span className="rounded-full bg-[#FFF4DF] px-2 py-0.5 text-[11px] text-[#D48347]">
+                <motion.span 
+                  className="rounded-full bg-gradient-to-r from-[#FFF4DF] to-[#FFE3C6] px-2 py-0.5 text-[11px] text-[#D48347] border border-[#FFD59A]/30"
+                  whileHover={{ scale: 1.05 }}
+                >
                   點此修改您的機構資料
-                </span>
+                </motion.span>
               </p>
             </div>
-            <div className="w-16 h-16 rounded-full bg-[#FFF9F2] border border-[#FFE3C6] flex items-center justify-center overflow-hidden">
+            <motion.div 
+              className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFF9F2] to-[#FFE3C6] border-2 border-[#FFD59A] flex items-center justify-center overflow-hidden shadow-lg relative z-10"
+              whileHover={{ rotate: [0, -5, 5, 0] }}
+              transition={{ duration: 0.5 }}
+            >
               <img alt="管理員" src="/owlui.png" className="w-full h-full object-contain" />
-            </div>
-          </button>
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full shadow-md"
+              />
+            </motion.div>
+          </motion.button>
 
           {/* 錯誤訊息 */}
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-2xl mb-4">
-              <p>{error}</p>
-            </div>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-gradient-to-r from-red-100 to-red-50 border-2 border-red-400 text-red-700 px-4 py-3 rounded-2xl mb-4 shadow-lg"
+              >
+                <p className="font-medium">{error}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* 學校狀況總覽區 */}
-          <div className="bg-white rounded-2xl p-4 mb-4 border border-[#EADBC8] shadow-sm">
-            <h2 className="text-base font-semibold text-[#2B3A3B] mb-3">學校狀況一覽</h2>
-            <div className="flex flex-row justify-center gap-6 mb-2">
-              <button
-                className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
-                  !hasPermission('students')
-                    ? 'bg-gray-100 border border-gray-300 cursor-not-allowed'
-                    : 'bg-[#FFFDF8] border border-[#EADBC8] hover:shadow-md'
-                }`}
-                onClick={() => {
-                  if (!hasPermission('students')) {
-                    toast.error('權限不足，未能進入');
-                    return;
-                  }
-                  router.push(
-                    buildOrgPath('/aihome/teacher-link/create/students', { filter: 'regular' }),
-                  );
-                }}
-                disabled={!hasPermission('students')}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="relative bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl p-4 mb-4 border-2 border-[#EADBC8] shadow-xl overflow-hidden"
+          >
+            {/* 動態背景裝飾 */}
+            <motion.div
+              animate={{
+                background: [
+                  "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.08) 0%, transparent 50%)",
+                  "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.08) 0%, transparent 50%)",
+                  "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.08) 0%, transparent 50%)"
+                ]
+              }}
+              transition={{ duration: 8, repeat: Infinity }}
+              className="absolute inset-0 pointer-events-none"
+            />
+            <div className="relative z-10">
+              <motion.h2 
+                className="text-base font-semibold text-[#2B3A3B] mb-3 flex items-center gap-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
               >
-                <img alt="學生" src="/icons/bear-face.PNG" className="w-10 h-10 object-contain mb-2" />
-                <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : studentCount}</p>
-                <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>常規學生人數</p>
-              </button>
-              <div className="flex flex-col items-center">
-                <button
-                  className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                  className="w-5 h-5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center"
+                >
+                  <ChartBarIcon className="w-3 h-3 text-white" />
+                </motion.div>
+                學校狀況一覽
+              </motion.h2>
+              <div className="flex flex-row justify-center gap-6 mb-2">
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 }}
+                  whileHover={{ y: -4, scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${
                     !hasPermission('students')
-                      ? 'bg-gray-100 border border-gray-300 cursor-not-allowed'
-                      : 'bg-[#FFFDF8] border border-[#EADBC8] hover:shadow-md'
+                      ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
+                      : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
                   }`}
                   onClick={() => {
                     if (!hasPermission('students')) {
@@ -551,57 +608,111 @@ function CreatePageContent() {
                       return;
                     }
                     router.push(
-                      buildOrgPath('/aihome/teacher-link/create/students', { filter: 'trial' }),
+                      buildOrgPath('/aihome/teacher-link/create/students', { filter: 'regular' }),
                     );
                   }}
                   disabled={!hasPermission('students')}
                 >
-                  <img alt="試堂" src="/icons/penguin-face.PNG" className="w-10 h-10 object-contain mb-2" />
-                  <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : trialStudentCount}</p>
-                  <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>試堂學生人數</p>
-                </button>
-                {hasPermission('students') && (
-                  <button
-                    type="button"
-                    onClick={() => setShowTrialDetails(!showTrialDetails)}
-                    className="mt-2 px-3 py-1 text-xs text-[#8A7C70] hover:text-[#2B3A3B] flex items-center gap-1 transition-colors"
+                  <motion.div
+                    animate={hasPermission('students') ? { y: [0, -3, 0] } : {}}
+                    transition={{ duration: 2, repeat: Infinity }}
                   >
-                    <span>{showTrialDetails ? '收起' : '展開'}</span>
-                    <svg
-                      className={`w-3 h-3 transition-transform ${showTrialDetails ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                    <img alt="學生" src="/icons/bear-face.PNG" className="w-10 h-10 object-contain mb-2" />
+                  </motion.div>
+                  <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : studentCount}</p>
+                  <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>常規學生人數</p>
+                </motion.button>
+                <div className="flex flex-col items-center">
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5 }}
+                    whileHover={{ y: -4, scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${
+                      !hasPermission('students')
+                        ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
+                        : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
+                    }`}
+                    onClick={() => {
+                      if (!hasPermission('students')) {
+                        toast.error('權限不足，未能進入');
+                        return;
+                      }
+                      router.push(
+                        buildOrgPath('/aihome/teacher-link/create/students', { filter: 'trial' }),
+                      );
+                    }}
+                    disabled={!hasPermission('students')}
+                  >
+                    <motion.div
+                      animate={hasPermission('students') ? { y: [0, -3, 0] } : {}}
+                      transition={{ duration: 2, repeat: Infinity, delay: 0.2 }}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                )}
+                      <img alt="試堂" src="/icons/penguin-face.PNG" className="w-10 h-10 object-contain mb-2" />
+                    </motion.div>
+                    <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : trialStudentCount}</p>
+                    <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>試堂學生人數</p>
+                  </motion.button>
+                  {hasPermission('students') && (
+                    <motion.button
+                      type="button"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.6 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowTrialDetails(!showTrialDetails)}
+                      className="mt-2 px-3 py-1 text-xs text-[#8A7C70] hover:text-[#2B3A3B] flex items-center gap-1 transition-colors bg-white/60 rounded-full border border-[#EADBC8]"
+                    >
+                      <span>{showTrialDetails ? '收起' : '展開'}</span>
+                      <motion.svg
+                        animate={{ rotate: showTrialDetails ? 180 : 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </motion.svg>
+                    </motion.button>
+                  )}
+                </div>
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.6 }}
+                  whileHover={{ y: -4, scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${
+                    !hasPermission('students')
+                      ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
+                      : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
+                  }`}
+                  onClick={() => {
+                    if (!hasPermission('students')) {
+                      toast.error('權限不足，未能進入');
+                      return;
+                    }
+                    router.push(
+                      buildOrgPath('/aihome/teacher-link/create/students', {
+                        filter: 'lastLesson',
+                      }),
+                    );
+                  }}
+                  disabled={!hasPermission('students')}
+                >
+                  <motion.div
+                    animate={hasPermission('students') ? { y: [0, -3, 0] } : {}}
+                    transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
+                  >
+                    <img alt="最後一堂" src="/icons/clock.PNG" className="w-10 h-10 object-contain mb-2" />
+                  </motion.div>
+                  <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : lastLessonCount}</p>
+                  <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>最後一堂人數</p>
+                </motion.button>
               </div>
-              <button
-                className={`p-3 rounded-2xl flex flex-col items-center justify-center transition ${
-                  !hasPermission('students')
-                    ? 'bg-gray-100 border border-gray-300 cursor-not-allowed'
-                    : 'bg-[#FFFDF8] border border-[#EADBC8] hover:shadow-md'
-                }`}
-                onClick={() => {
-                  if (!hasPermission('students')) {
-                    toast.error('權限不足，未能進入');
-                    return;
-                  }
-                  router.push(
-                    buildOrgPath('/aihome/teacher-link/create/students', {
-                      filter: 'lastLesson',
-                    }),
-                  );
-                }}
-                disabled={!hasPermission('students')}
-              >
-                <img alt="最後一堂" src="/icons/clock.PNG" className="w-10 h-10 object-contain mb-2" />
-                <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : lastLessonCount}</p>
-                <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>最後一堂人數</p>
-              </button>
-            </div>
             
             {/* 未來4週試堂人數詳情 */}
             {showTrialDetails && hasPermission('students') && (
@@ -610,82 +721,316 @@ function CreatePageContent() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="mt-4 pt-4 border-t border-[#EADBC8]"
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="mt-4 pt-4 border-t-2 border-[#EADBC8] relative z-10"
                 >
-                  <h3 className="text-sm font-semibold text-[#2B3A3B] mb-3">試堂人數統計</h3>
+                  <motion.h3 
+                    className="text-sm font-semibold text-[#2B3A3B] mb-3 flex items-center gap-2"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="w-2 h-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full"
+                    />
+                    試堂人數統計
+                  </motion.h3>
                   {weeklyTrialCounts.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {weeklyTrialCounts.map((week, index) => (
-                        <div
+                        <motion.div
                           key={index}
-                          className="bg-[#FFFDF8] border border-[#EADBC8] rounded-xl p-3 text-center"
+                          initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ delay: 0.2 + index * 0.1, duration: 0.3 }}
+                          whileHover={{ y: -2, scale: 1.02 }}
+                          className="relative bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] rounded-xl p-3 text-center hover:border-[#FFD59A] hover:shadow-md transition-all duration-300 overflow-hidden group"
                         >
-                          <p className="text-xs text-[#8A7C70] mb-1">{week.week}</p>
-                          <p className="text-xl font-bold text-[#2B3A3B]">{week.count}</p>
-                          <p className="text-[10px] text-[#8A7C70] mt-1">
-                            {week.endDate 
-                              ? `${new Date(week.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} - ${new Date(week.endDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}`
-                              : `${new Date(week.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} 起`}
-                          </p>
-                        </div>
+                          {/* 裝飾背景 */}
+                          <motion.div
+                            animate={{
+                              background: [
+                                "radial-gradient(circle at 50% 50%, rgba(255, 182, 193, 0.1) 0%, transparent 70%)",
+                                "radial-gradient(circle at 50% 50%, rgba(255, 213, 154, 0.1) 0%, transparent 70%)",
+                                "radial-gradient(circle at 50% 50%, rgba(255, 182, 193, 0.1) 0%, transparent 70%)"
+                              ]
+                            }}
+                            transition={{ duration: 4, repeat: Infinity }}
+                            className="absolute inset-0 pointer-events-none"
+                          />
+                          <div className="relative z-10">
+                            <p className="text-xs text-[#8A7C70] mb-1 font-medium">{week.week}</p>
+                            <motion.p 
+                              className="text-xl font-bold text-[#2B3A3B]"
+                              whileHover={{ scale: 1.1 }}
+                            >
+                              {week.count}
+                            </motion.p>
+                            <p className="text-[10px] text-[#8A7C70] mt-1">
+                              {week.endDate 
+                                ? `${new Date(week.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} - ${new Date(week.endDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}`
+                                : `${new Date(week.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} 起`}
+                            </p>
+                          </div>
+                        </motion.div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-4 text-sm text-[#8A7C70]">
+                    <motion.div 
+                      className="text-center py-4 text-sm text-[#8A7C70]"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        className="w-6 h-6 border-2 border-[#FFD59A] border-t-transparent rounded-full mx-auto mb-2"
+                      />
                       載入中...
-                    </div>
+                    </motion.div>
                   )}
                 </motion.div>
               </AnimatePresence>
             )}
-          </div>
+            </div>
+          </motion.div>
 
           {/* 簡化的日曆區 */}
-          <div className="bg-white rounded-2xl p-4 mb-6 border border-[#EADBC8] shadow-sm">
-            <h3 className="text-base font-semibold text-[#2B3A3B] mb-3">Hanami 日曆</h3>
-            <HanamiCalendar organizationId={orgId} forceEmpty={orgDataDisabled || !hasPermission('students')} userEmail={saasUser?.email || null} />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="relative bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md rounded-3xl p-4 mb-6 border-2 border-[#EADBC8] shadow-xl overflow-hidden"
+          >
+            {/* 動態背景裝飾 */}
+            <motion.div
+              animate={{
+                background: [
+                  "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.08) 0%, transparent 50%)",
+                  "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.08) 0%, transparent 50%)",
+                  "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.08) 0%, transparent 50%)"
+                ]
+              }}
+              transition={{ duration: 8, repeat: Infinity }}
+              className="absolute inset-0 pointer-events-none"
+            />
+            <div className="relative z-10">
+              <motion.h3 
+                className="text-base font-semibold text-[#2B3A3B] mb-3 flex items-center gap-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                <motion.div
+                  animate={{ rotate: [0, 15, -15, 0] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                  className="w-5 h-5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center"
+                >
+                  <CalendarIcon className="w-3 h-3 text-white" />
+                </motion.div>
+                Hanami 日曆
+              </motion.h3>
+              <HanamiCalendar organizationId={orgId} forceEmpty={orgDataDisabled || !hasPermission('students')} userEmail={saasUser?.email || null} />
+            </div>
+          </motion.div>
+
           </div>
 
-          {/* 管理按鈕區 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 place-items-center gap-4 mb-10 px-2 w-full">
-            {quickActions.map((action) => {
-              const isRestricted = !action.hasAccess;
-              
-              return (
-                <button
-                  key={action.key}
-                  className={`${
-                    isRestricted
-                      ? 'bg-gray-200 border-gray-300 opacity-60 cursor-not-allowed'
-                      : 'bg-white border border-[#FDE6B8] shadow hover:shadow-md'
-                  } p-3 rounded-2xl text-center transition h-full w-full flex flex-col items-center justify-center`}
-                  onClick={() => {
-                    if (isRestricted) {
-                      toast.error('權限不足，未能進入', {
-                        duration: 2000,
-                      });
-                      return;
-                    }
-                    action.onClick();
-                  }}
-                  disabled={isRestricted}
+          {/* 右側管理按鈕區 - 僅在大屏幕上顯示 */}
+          <div className="hidden lg:block lg:w-[400px] lg:flex-shrink-0">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="sticky top-8"
+            >
+              <motion.h3
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+                className="text-lg font-semibold text-[#2B3A3B] mb-4 flex items-center gap-2"
+              >
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                  className="w-5 h-5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center"
                 >
-                  <div className={`w-12 h-12 mb-2 flex items-center justify-center ${isRestricted ? 'opacity-50' : ''}`}>
-                    {action.icon}
-                  </div>
-                  <span className={`text-lg font-semibold ${isRestricted ? 'text-gray-500' : 'text-[#2B3A3B]'}`}>
-                    {action.title}
-                  </span>
-                  {action.subtitle && (
-                    <span className={`text-xs mt-1 ${isRestricted ? 'text-gray-400' : 'text-[#777]'}`}>
-                      {action.subtitle}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                  <ChartBarIcon className="w-3 h-3 text-white" />
+                </motion.div>
+                管理功能
+              </motion.h3>
+              <div className="grid grid-cols-1 gap-3">
+                {quickActions.map((action, index) => {
+                  const isRestricted = !action.hasAccess;
+                  
+                  return (
+                    <motion.button
+                      key={action.key}
+                      initial={{ opacity: 0, x: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      transition={{ delay: 0.7 + index * 0.1, duration: 0.4 }}
+                      whileHover={!isRestricted ? { x: -4, scale: 1.02 } : {}}
+                      whileTap={!isRestricted ? { scale: 0.98 } : {}}
+                      className={`relative ${
+                        isRestricted
+                          ? 'bg-gray-200 border-2 border-gray-300 opacity-60 cursor-not-allowed'
+                          : 'bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md border-2 border-[#EADBC8] hover:border-[#FFD59A] shadow-lg hover:shadow-2xl'
+                      } p-4 rounded-2xl text-left transition-all duration-500 w-full flex flex-row items-center gap-4 overflow-hidden group`}
+                      onClick={() => {
+                        if (isRestricted) {
+                          toast.error('權限不足，未能進入', {
+                            duration: 2000,
+                          });
+                          return;
+                        }
+                        action.onClick();
+                      }}
+                      disabled={isRestricted}
+                    >
+                      {/* 動態背景裝飾 */}
+                      {!isRestricted && (
+                        <motion.div
+                          animate={{
+                            background: [
+                              "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)",
+                              "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.1) 0%, transparent 50%)",
+                              "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)"
+                            ]
+                          }}
+                          transition={{ duration: 8, repeat: Infinity }}
+                          className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                        />
+                      )}
+                      <div className={`relative z-10 w-12 h-12 flex-shrink-0 flex items-center justify-center ${isRestricted ? 'opacity-50' : ''}`}>
+                        <motion.div
+                          animate={!isRestricted ? { y: [0, -3, 0] } : {}}
+                          transition={{ duration: 2, repeat: Infinity, delay: index * 0.2 }}
+                        >
+                          {action.icon}
+                        </motion.div>
+                      </div>
+                      <div className="relative z-10 flex-1 min-w-0">
+                        <span className={`block text-base font-semibold ${isRestricted ? 'text-gray-500' : 'text-[#2B3A3B]'}`}>
+                          {action.title}
+                        </span>
+                        {action.subtitle && (
+                          <span className={`block text-xs mt-1 ${isRestricted ? 'text-gray-400' : 'text-[#777]'}`}>
+                            {action.subtitle}
+                          </span>
+                        )}
+                      </div>
+                      {/* 懸停光暈效果 */}
+                      {!isRestricted && (
+                        <motion.div
+                          className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                          style={{
+                            boxShadow: '0 0 30px rgba(255, 182, 193, 0.3)'
+                          }}
+                        />
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </motion.div>
           </div>
+
+          {/* 移動端管理按鈕區 - 僅在小屏幕上顯示 */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="lg:hidden w-full mt-6"
+          >
+            <motion.h3
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="text-lg font-semibold text-[#2B3A3B] mb-4 flex items-center gap-2"
+            >
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 3, repeat: Infinity }}
+                className="w-5 h-5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center"
+              >
+                <ChartBarIcon className="w-3 h-3 text-white" />
+              </motion.div>
+              管理功能
+            </motion.h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 place-items-center gap-4 mb-10 px-2 w-full">
+              {quickActions.map((action, index) => {
+                const isRestricted = !action.hasAccess;
+                
+                return (
+                  <motion.button
+                    key={action.key}
+                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: 0.6 + index * 0.1, duration: 0.4 }}
+                    whileHover={!isRestricted ? { y: -6, scale: 1.03, rotateX: 2 } : {}}
+                    whileTap={!isRestricted ? { scale: 0.97 } : {}}
+                    className={`relative ${
+                      isRestricted
+                        ? 'bg-gray-200 border-2 border-gray-300 opacity-60 cursor-not-allowed'
+                        : 'bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md border-2 border-[#EADBC8] hover:border-[#FFD59A] shadow-lg hover:shadow-2xl'
+                    } p-4 rounded-3xl text-center transition-all duration-500 h-full w-full flex flex-col items-center justify-center overflow-hidden group`}
+                    onClick={() => {
+                      if (isRestricted) {
+                        toast.error('權限不足，未能進入', {
+                          duration: 2000,
+                        });
+                        return;
+                      }
+                      action.onClick();
+                    }}
+                    disabled={isRestricted}
+                  >
+                    {/* 動態背景裝飾 */}
+                    {!isRestricted && (
+                      <motion.div
+                        animate={{
+                          background: [
+                            "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)",
+                            "radial-gradient(circle at 80% 80%, rgba(255, 213, 154, 0.1) 0%, transparent 50%)",
+                            "radial-gradient(circle at 20% 20%, rgba(255, 182, 193, 0.1) 0%, transparent 50%)"
+                          ]
+                        }}
+                        transition={{ duration: 8, repeat: Infinity }}
+                        className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                      />
+                    )}
+                    <div className={`relative z-10 w-12 h-12 mb-2 flex items-center justify-center ${isRestricted ? 'opacity-50' : ''}`}>
+                      <motion.div
+                        animate={!isRestricted ? { y: [0, -3, 0] } : {}}
+                        transition={{ duration: 2, repeat: Infinity, delay: index * 0.2 }}
+                      >
+                        {action.icon}
+                      </motion.div>
+                    </div>
+                    <span className={`relative z-10 text-lg font-semibold ${isRestricted ? 'text-gray-500' : 'text-[#2B3A3B]'}`}>
+                      {action.title}
+                    </span>
+                    {action.subtitle && (
+                      <span className={`relative z-10 text-xs mt-1 ${isRestricted ? 'text-gray-400' : 'text-[#777]'}`}>
+                        {action.subtitle}
+                      </span>
+                    )}
+                    {/* 懸停光暈效果 */}
+                    {!isRestricted && (
+                      <motion.div
+                        className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                        style={{
+                          boxShadow: '0 0 30px rgba(255, 182, 193, 0.3)'
+                        }}
+                      />
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </motion.div>
         </div>
       </div>
 

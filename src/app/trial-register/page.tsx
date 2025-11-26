@@ -279,9 +279,9 @@ export default function TrialRegisterPage() {
       
       console.log('🔍 清理後的資料:', cleanData);
       
-      const { error } = await supabase
-        .from('hanami_trial_queue')
-        .insert([cleanData]);
+      const { error } = await (supabase
+        .from('hanami_trial_queue') as any)
+        .insert([cleanData] as any);
       
       if (!error) {
         // 同時插入到 hanami_trial_students 表
@@ -333,9 +333,9 @@ export default function TrialRegisterPage() {
 
           console.log('🔍 準備插入到 hanami_trial_students 的資料:', trialStudentData);
 
-          const { error: trialStudentError } = await supabase
-            .from('hanami_trial_students')
-            .insert([trialStudentData]);
+          const { error: trialStudentError } = await (supabase
+            .from('hanami_trial_students') as any)
+            .insert([trialStudentData] as any);
 
           if (trialStudentError) {
             console.error('❌ 插入 hanami_trial_students 錯誤:', trialStudentError);

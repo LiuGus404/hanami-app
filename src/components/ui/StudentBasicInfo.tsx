@@ -217,10 +217,12 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
     const fetchCourseOptions = async () => {
       setCourseOptions(null); // 標示正在載入中
-      const { data, error } = await supabase
+      const { data: dataRaw, error } = await supabase
         .from('Hanami_CourseTypes')
         .select('name, status')
         .eq('status', true);
+      
+      const data = dataRaw as Array<{ name: string | null; status: boolean; [key: string]: any; }> | null;
 
       console.log('📦 課程載入結果：', data, error);
 

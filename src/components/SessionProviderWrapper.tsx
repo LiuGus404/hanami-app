@@ -63,7 +63,7 @@ export default function SessionProviderWrapper({
   return (
     <SessionContextProvider
       initialSession={supabaseSession}
-      supabaseClient={supabaseClient}
+      supabaseClient={supabaseClient as any}
     >
       {children}
     </SessionContextProvider>

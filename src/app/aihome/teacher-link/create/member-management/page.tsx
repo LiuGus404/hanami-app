@@ -16,6 +16,7 @@ import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
 import TeacherManagementNavBar from '@/components/ui/TeacherManagementNavBar';
 import RolePermissionsGuide from '@/components/teacher-link/RolePermissionsGuide';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 type RoleType = 'owner' | 'admin' | 'teacher' | 'member';
 
@@ -119,17 +120,21 @@ function MemberManagementContent() {
     });
   }, [saasUser, saasAuthLoading]);
 
-  // 從 URL 參數、localStorage 或 TeacherLinkShell 的狀態中獲取 orgId
+  // 從 localStorage 或 TeacherLinkShell 的狀態中獲取 orgId（不再從 URL 讀取）
   useEffect(() => {
     setInitializing(true);
     
-    // 優先從 URL 參數獲取
-    const urlOrgId = searchParams?.get('orgId');
-    if (urlOrgId && urlOrgId !== 'unassigned-org-placeholder' && urlOrgId !== 'default-org') {
-      console.log('從 URL 獲取 orgId:', urlOrgId);
-      setOrgId(urlOrgId);
-      setInitializing(false);
-      return;
+    // 如果 URL 中有機構參數，先清除它們
+    if (typeof window !== 'undefined' && searchParams?.get('orgId')) {
+      const newParams = new URLSearchParams(window.location.search);
+      newParams.delete('orgId');
+      newParams.delete('orgName');
+      newParams.delete('orgSlug');
+      const newQueryString = newParams.toString();
+      const newUrl = newQueryString 
+        ? `${window.location.pathname}?${newQueryString}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
     }
 
     // 從 localStorage 獲取（TeacherLinkShell 使用的 key）
@@ -1570,7 +1575,9 @@ export default function MemberManagementPage() {
       currentPath="/aihome/teacher-link/create/member-management"
       contentClassName="bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E6] to-[#FFE1F0]"
     >
-      <MemberManagementContent />
+      <WithPermissionCheck pageKey="members">
+        <MemberManagementContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

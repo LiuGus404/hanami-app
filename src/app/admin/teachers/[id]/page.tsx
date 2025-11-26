@@ -61,15 +61,15 @@ export default function TeacherDetailPage() {
 
   useEffect(() => {
     const fetchRoles = async () => {
-      const { data, error } = await supabase
-        .from('hanami_employee')
+      const { data, error } = await (supabase
+        .from('hanami_employee') as any)
         .select('teacher_role');
       if (!error && data) {
         const uniqueRoles = Array.from(new Set(
-          data.map((r) => r.teacher_role?.trim())
-            .filter((r): r is string => !!r && !['', 'undefined'].includes(r)),
+          data.map((r: any) => r.teacher_role?.trim())
+            .filter((r: any): r is string => !!r && !['', 'undefined'].includes(r)),
         ));
-        setRoleOptions(uniqueRoles.map((r) => ({ label: translateRole(r), value: r })));
+        setRoleOptions(uniqueRoles.map((r: any) => ({ label: translateRole(r), value: r })));
       }
     };
     fetchRoles();
@@ -79,8 +79,8 @@ export default function TeacherDetailPage() {
     setLoading(true);
     setError(null);
     const fetchTeacher = async () => {
-      const { data, error } = await supabase
-        .from('hanami_employee')
+      const { data, error } = await (supabase
+        .from('hanami_employee') as any)
         .select('*')
         .eq('id', id as string)
         .single();
@@ -140,8 +140,8 @@ export default function TeacherDetailPage() {
       updateData[key] = value;
     });
 
-    const { error } = await supabase
-      .from('hanami_employee')
+    const { error } = await (supabase
+      .from('hanami_employee') as any)
       .update(updateData)
       .eq('id', id as string);
     setSaving(false);

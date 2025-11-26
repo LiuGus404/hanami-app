@@ -229,10 +229,11 @@ export default function ResourceActivitiesPage() {
         { id: 'performance', name: '表演活動' },
       ];
 
-      const customTypes = customData?.map(item => ({
+      const typedCustomData = (customData || []) as Array<{ option_value: string; option_name: string; [key: string]: any }>;
+      const customTypes = typedCustomData.map(item => ({
         id: item.option_value,
         name: item.option_name,
-      })) || [];
+      }));
 
       setActivityTypes([...defaultTypes, ...customTypes]);
     } catch (error) {
@@ -257,10 +258,11 @@ export default function ResourceActivitiesPage() {
         { id: 'archived', name: '已封存' },
       ];
 
-      const customStatuses = customData?.map(item => ({
+      const typedCustomStatusData = (customData || []) as Array<{ option_value: string; option_name: string; [key: string]: any }>;
+      const customStatuses = typedCustomStatusData.map(item => ({
         id: item.option_value,
         name: item.option_name,
-      })) || [];
+      }));
 
       setStatuses([...defaultStatuses, ...customStatuses]);
     } catch (error) {
@@ -394,9 +396,9 @@ export default function ResourceActivitiesPage() {
       }
 
       if (action !== 'delete') {
-        const { error } = await supabase
-          .from('hanami_teaching_activities')
-          .update(updates)
+        const { error } = await (supabase
+          .from('hanami_teaching_activities') as any)
+          .update(updates as any)
           .in('id', selectedActivities);
         
         if (error) throw error;
@@ -430,9 +432,9 @@ export default function ResourceActivitiesPage() {
         status: 'draft',
       };
 
-      const { error } = await supabase
-        .from('hanami_teaching_activities')
-        .insert([newActivity]);
+      const { error } = await (supabase
+        .from('hanami_teaching_activities') as any)
+        .insert([newActivity] as any);
 
       if (error) throw error;
       

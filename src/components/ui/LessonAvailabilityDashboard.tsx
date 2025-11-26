@@ -143,8 +143,15 @@ export default function LessonAvailabilityDashboard() {
         
       // 建立課程類型映射表
       const courseTypesMap: {[id: string]: string} = {};
-      courseTypesData?.forEach(course => {
-        courseTypesMap[course.id] = course.name || course.id;
+      const typedCourseTypesData = (courseTypesData || []) as Array<{
+        id?: string;
+        name?: string | null;
+        [key: string]: any;
+      }>;
+      typedCourseTypesData.forEach(course => {
+        if (course.id) {
+          courseTypesMap[course.id] = course.name || course.id;
+        }
       });
       setCourseTypes(courseTypesMap);
       console.log('課程類型映射表：', courseTypesMap);
@@ -169,9 +176,13 @@ export default function LessonAvailabilityDashboard() {
       }
         
       // 調試信息：檢查時段資料
-      console.log('時段資料總數：', scheduleData?.length || 0);
-      console.log('時段資料範例：', scheduleData?.slice(0, 3));
-      console.log('時段資料星期六：', scheduleData?.filter(s => s.weekday === 6));
+      const typedScheduleData = (scheduleData || []) as Array<{
+        weekday?: number;
+        [key: string]: any;
+      }>;
+      console.log('時段資料總數：', typedScheduleData.length);
+      console.log('時段資料範例：', typedScheduleData.slice(0, 3));
+      console.log('時段資料星期六：', typedScheduleData.filter(s => s.weekday === 6));
         
       // 3. 取得所有常規學生（只計算 active 學生）
       // 使用 API 端點繞過 RLS
@@ -274,11 +285,18 @@ export default function LessonAvailabilityDashboard() {
 
       // 試堂學生的課堂記錄直接從 hanami_trial_students 表獲取
       // 將試堂學生資料轉換為課堂記錄格式
-      const trialLessonData = (trialData || []).map(trial => ({
-        lesson_date: trial.lesson_date,
-        actual_timeslot: trial.actual_timeslot,
-        course_type: trial.course_type,
-        student_id: trial.id,
+      const typedTrialData = (trialData || []) as Array<{
+        lesson_date?: string | null;
+        actual_timeslot?: string | null;
+        course_type?: string | null;
+        id?: string;
+        [key: string]: any;
+      }>;
+      const trialLessonData = typedTrialData.map(trial => ({
+        lesson_date: trial.lesson_date || null,
+        actual_timeslot: trial.actual_timeslot || null,
+        course_type: trial.course_type || null,
+        student_id: trial.id || '',
       }));
 
       // 合併常規學生和試堂學生的課堂記錄
@@ -291,11 +309,11 @@ export default function LessonAvailabilityDashboard() {
       const trialMap: { [key: string]: TrialStudent[] } = {};
       const unmatchedTrialStudents: TrialStudent[] = [];
       // 收集所有 schedule key
-      const allScheduleKeys = (scheduleData || []).map(s => `${s.weekday}_${s.timeslot}_${s.course_type || ''}`);
+      const allScheduleKeys = typedScheduleData.map(s => `${s.weekday || 0}_${s.timeslot || ''}_${s.course_type || ''}`);
         
 
         
-      for (const t of trialData || []) {
+      for (const t of typedTrialData) {
         if (!t.actual_timeslot || !t.lesson_date) {
           continue;
         }
@@ -314,12 +332,12 @@ export default function LessonAvailabilityDashboard() {
           if (allScheduleKeys.includes(key)) {
             if (!trialMap[key]) trialMap[key] = [];
             trialMap[key].push({
-              ...t,
+              id: t.id || '',
               full_name: t.full_name || '',
               lesson_date: t.lesson_date || '',
               actual_timeslot: t.actual_timeslot || '',
               weekday: weekdayNum,
-              student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : t.student_age,
+              student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : (t.student_age || null),
               course_type: courseType, // 使用 course_types 的 ID
             });
             matched = true;
@@ -328,12 +346,12 @@ export default function LessonAvailabilityDashboard() {
         }
         if (!matched) {
           unmatchedTrialStudents.push({
-            ...t,
+            id: t.id || '',
             full_name: t.full_name || '',
             lesson_date: t.lesson_date || '',
             actual_timeslot: t.actual_timeslot || '',
             weekday: weekdayNum,
-            student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : t.student_age,
+            student_age: typeof t.student_age === 'string' ? parseInt(t.student_age) : (t.student_age || null),
             course_type: courseType, // 使用 course_types 的 ID
           });
         }
@@ -392,7 +410,7 @@ export default function LessonAvailabilityDashboard() {
         
       // 先按時段和課程分組
       const scheduleGroups: {[key: string]: any[]} = {};
-      scheduleData?.forEach(schedule => {
+      typedScheduleData.forEach(schedule => {
         const courseType = schedule.course_type || '';
         const key = `${schedule.weekday}_${schedule.timeslot}_${courseType}`;
         if (!scheduleGroups[key]) scheduleGroups[key] = [];
@@ -400,9 +418,9 @@ export default function LessonAvailabilityDashboard() {
       });
         
       // 為每個 schedule 分配學生
-      scheduleData?.forEach((schedule) => {
+      typedScheduleData.forEach((schedule) => {
         const courseType = schedule.course_type || '';
-        const weekdayNum = schedule.weekday;
+        const weekdayNum = schedule.weekday ?? 0;
         const groupKey = `${weekdayNum}_${schedule.timeslot}_${courseType}`;
         const groupSchedules = scheduleGroups[groupKey] || [];
         const scheduleIndex = groupSchedules.findIndex(s => s.id === schedule.id);
@@ -432,7 +450,7 @@ export default function LessonAvailabilityDashboard() {
         });
 
         // 取得該時段該課程的所有試堂學生
-        const allTrialStudents = (trialData || []).filter(t => {
+        const allTrialStudents = typedTrialData.filter(t => {
           if (!t.actual_timeslot || !t.lesson_date) return false;
           const lessonDate = getHongKongDate(new Date(t.lesson_date));
           const tWeekdayNum = lessonDate.getDay();
@@ -537,11 +555,13 @@ export default function LessonAvailabilityDashboard() {
       // 2. 查詢 hanami_trial_queue 輪候學生
 
         
-      const { data: queueData, error: queueError } = await supabase
+      const { data: queueDataRaw, error: queueError } = await supabase
         .from('hanami_trial_queue')
         .select('id, full_name, student_age, phone_no, prefer_time, notes, course_types, created_at')
         .eq('org_id', validOrgId as string)
         .order('created_at', { ascending: true }); // 按舊到新排序
+      
+      const queueData = queueDataRaw as Array<{ id: string; full_name: string; student_age: number | string | null; phone_no: string | null; prefer_time: string | null; notes: string | null; course_types: string | null; created_at: string | null; [key: string]: any; }> | null;
         
 
         

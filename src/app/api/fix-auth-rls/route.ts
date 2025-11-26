@@ -12,7 +12,7 @@ export async function POST() {
 
     // 1. 修復 hanami_admin 表
     console.log('修復 hanami_admin 表...');
-    const { error: adminError } = await supabase.rpc('exec_sql', {
+    const { error: adminError } = await (supabase.rpc as any)('exec_sql', {
       sql: `
         DROP POLICY IF EXISTS "Admin authentication access" ON hanami_admin;
         DROP POLICY IF EXISTS "Allow all authenticated access" ON hanami_admin;
@@ -31,7 +31,7 @@ export async function POST() {
 
     // 2. 修復 hanami_employee 表
     console.log('修復 hanami_employee 表...');
-    const { error: employeeError } = await supabase.rpc('exec_sql', {
+    const { error: employeeError } = await (supabase.rpc as any)('exec_sql', {
       sql: `
         ALTER TABLE hanami_employee ENABLE ROW LEVEL SECURITY;
         
@@ -52,7 +52,7 @@ export async function POST() {
 
     // 3. 修復 Hanami_Students 表
     console.log('修復 Hanami_Students 表...');
-    const { error: studentsError } = await supabase.rpc('exec_sql', {
+    const { error: studentsError } = await (supabase.rpc as any)('exec_sql', {
       sql: `
         DROP POLICY IF EXISTS "Role-based student access" ON "Hanami_Students";
         DROP POLICY IF EXISTS "Allow all authenticated access" ON "Hanami_Students";
@@ -71,7 +71,7 @@ export async function POST() {
 
     // 4. 修復 hanami_user_permissions_v2 表
     console.log('修復 hanami_user_permissions_v2 表...');
-    const { error: permissionsError } = await supabase.rpc('exec_sql', {
+    const { error: permissionsError } = await (supabase.rpc as any)('exec_sql', {
       sql: `
         ALTER TABLE hanami_user_permissions_v2 ENABLE ROW LEVEL SECURITY;
         

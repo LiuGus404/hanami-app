@@ -298,22 +298,27 @@ export default function PermissionManagementPage() {
         throw new Error(`找不到角色: ${request.role}`);
       }
 
-      console.log('找到角色:', roleData);
+      const typedRoleData = roleData as { id: string; role_name: string } | null;
+      if (!typedRoleData || !typedRoleData.id) {
+        throw new Error(`找不到角色: ${request.role}`);
+      }
+
+      console.log('找到角色:', typedRoleData);
       
       // 3. 創建用戶權限記錄
       const permissionData = {
         user_email: request.email,
         user_phone: request.phone || '',
-        role_id: roleData.id,
+        role_id: typedRoleData.id,
         status: 'approved',
         is_active: true
       };
 
       console.log('準備創建的權限數據:', permissionData);
 
-      const { data: newPermission, error: insertError } = await supabase
-        .from('hanami_user_permissions_v2')
-        .insert(permissionData)
+      const { data: newPermission, error: insertError } = await (supabase
+        .from('hanami_user_permissions_v2') as any)
+        .insert(permissionData as any)
         .select()
         .single();
 
@@ -346,14 +351,14 @@ export default function PermissionManagementPage() {
       switch (request.role) {
         case 'admin': {
           // 創建管理員帳號
-          const { error: adminError } = await supabase
-            .from('hanami_admin')
+          const { error: adminError } = await (supabase
+            .from('hanami_admin') as any)
             .insert({
               admin_email: request.email,
               admin_name: request.full_name,
               role: 'admin',
               admin_password: userPassword
-            });
+            } as any);
           
           if (adminError) {
             console.error('創建管理員帳號錯誤:', adminError);
@@ -383,9 +388,9 @@ export default function PermissionManagementPage() {
           
           console.log('準備插入的教師數據:', teacherData);
           
-          const { data: newTeacher, error: teacherError } = await supabase
-            .from('hanami_employee')
-            .insert(teacherData)
+          const { data: newTeacher, error: teacherError } = await (supabase
+            .from('hanami_employee') as any)
+            .insert(teacherData as any)
             .select();
           
           if (teacherError) {
@@ -412,9 +417,9 @@ export default function PermissionManagementPage() {
           
           console.log('準備插入的家長數據:', parentData);
           
-          const { data: newParent, error: parentError } = await supabase
-            .from('hanami_parents')
-            .insert(parentData)
+          const { data: newParent, error: parentError } = await (supabase
+            .from('hanami_parents') as any)
+            .insert(parentData as any)
             .select();
           
           if (parentError) {

@@ -93,8 +93,8 @@ export default function TeachingActivitiesPage({
 
   const normalizedForcedOrgId =
     forcedOrgId &&
-    UUID_REGEX.test(forcedOrgId) &&
-    !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
+      UUID_REGEX.test(forcedOrgId) &&
+      !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
       ? forcedOrgId
       : null;
 
@@ -154,7 +154,7 @@ export default function TeachingActivitiesPage({
   const [isAutoLoading, setIsAutoLoading] = useState(false);
   const [loadComplete, setLoadComplete] = useState(false);
   const [loadSuccess, setLoadSuccess] = useState(false);
-  
+
   // 使用 useRef 來避免閉包問題
   const autoLoadingRef = useRef(false);
   const nextCursorRef = useRef('');
@@ -182,61 +182,61 @@ export default function TeachingActivitiesPage({
     { value: 'estimated_duration', label: '時長' },
   ];
 
-const NOTION_TOKEN = process.env.NEXT_PUBLIC_NOTION_TOKEN || '';
+  const NOTION_TOKEN = process.env.NEXT_PUBLIC_NOTION_TOKEN || '';
 
-const loadMasterOptions = async () => {
-  if (orgDataDisabled) {
-    setActivityTypeOptions(DEFAULT_ACTIVITY_TYPES);
-    setStatusOptions(DEFAULT_STATUSES);
-    setTagOptions([]);
-    return;
-  }
+  const loadMasterOptions = async () => {
+    if (orgDataDisabled) {
+      setActivityTypeOptions(DEFAULT_ACTIVITY_TYPES);
+      setStatusOptions(DEFAULT_STATUSES);
+      setTagOptions([]);
+      return;
+    }
 
-  try {
-    let typeQuery = supabase
-      .from('hanami_custom_options')
-      .select('*')
-      .eq('option_type', 'activity_type')
-      .eq('is_active', true)
-      .order('sort_order');
-    typeQuery = applyOrgFilter(typeQuery);
-    const { data: typeData } = await typeQuery;
+    try {
+      let typeQuery = (supabase
+        .from('hanami_custom_options') as any)
+        .select('*')
+        .eq('option_type', 'activity_type')
+        .eq('is_active', true)
+        .order('sort_order');
+      typeQuery = applyOrgFilter(typeQuery);
+      const { data: typeData } = await typeQuery;
 
-    const customTypes = (typeData || []).map((item: any) => ({
-      value: item.option_value,
-      label: item.option_name,
-    }));
-    setActivityTypeOptions([...DEFAULT_ACTIVITY_TYPES, ...customTypes]);
+      const customTypes = (typeData || []).map((item: any) => ({
+        value: item.option_value,
+        label: item.option_name,
+      }));
+      setActivityTypeOptions([...DEFAULT_ACTIVITY_TYPES, ...customTypes]);
 
-    let statusQuery = supabase
-      .from('hanami_custom_options')
-      .select('*')
-      .eq('option_type', 'status')
-      .eq('is_active', true)
-      .order('sort_order');
-    statusQuery = applyOrgFilter(statusQuery);
-    const { data: statusData } = await statusQuery;
+      let statusQuery = (supabase
+        .from('hanami_custom_options') as any)
+        .select('*')
+        .eq('option_type', 'status')
+        .eq('is_active', true)
+        .order('sort_order');
+      statusQuery = applyOrgFilter(statusQuery);
+      const { data: statusData } = await statusQuery;
 
-    const customStatuses = (statusData || []).map((item: any) => ({
-      value: item.option_value,
-      label: item.option_name,
-    }));
-    setStatusOptions([...DEFAULT_STATUSES, ...customStatuses]);
+      const customStatuses = (statusData || []).map((item: any) => ({
+        value: item.option_value,
+        label: item.option_name,
+      }));
+      setStatusOptions([...DEFAULT_STATUSES, ...customStatuses]);
 
-    let tagQuery = supabase
-      .from('hanami_resource_tags')
-      .select('*')
-      .eq('is_active', true)
-      .order('tag_name');
-    tagQuery = applyOrgFilter(tagQuery);
-    const { data: tagData } = await tagQuery;
-    setTagOptions(
-      (tagData || []).map((item: any) => ({ value: item.tag_name, label: item.tag_name })),
-    );
-  } catch (error) {
-    console.error('載入篩選選項失敗:', error);
-  }
-};
+      let tagQuery = (supabase
+        .from('hanami_resource_tags') as any)
+        .select('*')
+        .eq('is_active', true)
+        .order('tag_name');
+      tagQuery = applyOrgFilter(tagQuery);
+      const { data: tagData } = await tagQuery;
+      setTagOptions(
+        (tagData || []).map((item: any) => ({ value: item.tag_name, label: item.tag_name })),
+      );
+    } catch (error) {
+      console.error('載入篩選選項失敗:', error);
+    }
+  };
 
   // 搜尋功能
   useEffect(() => {
@@ -245,25 +245,25 @@ const loadMasterOptions = async () => {
     } else {
       const filtered = notionData.filter((item) => {
         const properties = item.properties || {};
-        
+
         // 搜尋標題
-        const title = properties['名稱']?.title?.[0]?.plain_text || 
-                      properties.Name?.title?.[0]?.plain_text || 
-                      properties.Title?.title?.[0]?.plain_text || 
-                      properties['活動名稱']?.title?.[0]?.plain_text || '';
-        
+        const title = properties['名稱']?.title?.[0]?.plain_text ||
+          properties.Name?.title?.[0]?.plain_text ||
+          properties.Title?.title?.[0]?.plain_text ||
+          properties['活動名稱']?.title?.[0]?.plain_text || '';
+
         // 搜尋 ID
         const id = properties['ID']?.unique_id?.number?.toString() || '';
-        
+
         // 搜尋其他文字欄位
         const notes = properties['備註']?.rich_text?.map((text: any) => text.plain_text).join(' ') || '';
         const tags = properties['Tags']?.multi_select?.map((tag: any) => tag.name).join(' ') || '';
-        
+
         const searchLower = searchTerm.toLowerCase();
         return title.toLowerCase().includes(searchLower) ||
-               id.includes(searchLower) ||
-               notes.toLowerCase().includes(searchLower) ||
-               tags.toLowerCase().includes(searchLower);
+          id.includes(searchLower) ||
+          notes.toLowerCase().includes(searchLower) ||
+          tags.toLowerCase().includes(searchLower);
       });
       setFilteredNotionData(filtered);
     }
@@ -279,15 +279,15 @@ const loadMasterOptions = async () => {
       }
 
       setLoading(true);
-      let activitiesQuery = supabase
-        .from('hanami_teaching_activities')
+      let activitiesQuery = (supabase
+        .from('hanami_teaching_activities') as any)
         .select('*')
         .order('activity_name');
       activitiesQuery = applyOrgFilter(activitiesQuery);
       const { data, error } = await activitiesQuery;
 
       if (error) throw error;
-      
+
       // 欄位轉換與 null 處理
       const fixedActivities = (data || []).map((a: any) => ({
         ...a,
@@ -328,7 +328,7 @@ const loadMasterOptions = async () => {
     }
 
     const filtered = activities.filter(activity => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         activity.activity_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         activity.activity_description?.toLowerCase().includes(searchTerm.toLowerCase());
       // 多選活動類型
@@ -389,7 +389,7 @@ const loadMasterOptions = async () => {
   const handleUpdateActivity = async (activityData: Partial<TeachingActivity>) => {
     if (!editingActivity) return;
     if (!ensureOrgAvailable()) return;
-    
+
     try {
       const payload = validOrgId
         ? { ...activityData, org_id: validOrgId }
@@ -424,15 +424,15 @@ const loadMasterOptions = async () => {
     if (!ensureOrgAvailable()) return;
 
     try {
-      let deleteQuery = supabase
-        .from('hanami_teaching_activities')
+      let deleteQuery = (supabase
+        .from('hanami_teaching_activities') as any)
         .delete()
         .eq('id', id);
       deleteQuery = applyOrgFilter(deleteQuery);
       const { error } = await deleteQuery;
 
       if (error) throw error;
-      
+
       await loadActivities();
       setShowDetailModal(false);
       setSelectedActivity(null);
@@ -464,12 +464,12 @@ const loadMasterOptions = async () => {
         org_id: validOrgId ?? (activity as any).org_id ?? null,
       };
 
-      const { error } = await supabase
-        .from('hanami_teaching_activities')
+      const { error } = await (supabase
+        .from('hanami_teaching_activities') as any)
         .insert([newActivityData]);
 
       if (error) throw error;
-      
+
       await loadActivities();
       toast.success('活動複製成功！');
     } catch (error) {
@@ -560,7 +560,7 @@ const loadMasterOptions = async () => {
       }
 
       const data = await response.json();
-      
+
       if (loadMore) {
         setNotionData(prev => {
           const newData = [...prev, ...data.results];
@@ -571,15 +571,15 @@ const loadMasterOptions = async () => {
         setNotionData(data.results || []);
         setTotalLoaded(data.results?.length || 0);
       }
-      
+
       setHasMoreData(data.has_more || false);
       setNextCursor(data.next_cursor || '');
-      
+
       if (!loadMore) {
         setShowNotionModal(true);
         setShowDatabaseSelect(false);
       }
-      
+
     } catch (error) {
       console.error('載入 Notion 資料失敗:', error);
       toast.error(`載入 Notion 資料失敗: ${error instanceof Error ? error.message : String(error)}`);
@@ -603,7 +603,7 @@ const loadMasterOptions = async () => {
         toast.error('請先選擇一個資料庫');
         return;
       }
-      
+
       autoLoadingRef.current = true;
       setIsAutoLoading(true);
       setIsLoadingAll(true);
@@ -612,7 +612,7 @@ const loadMasterOptions = async () => {
       setLoadSuccess(false);
       nextCursorRef.current = nextCursor;
       console.log('開始自動載入所有資料...');
-      
+
       setTimeout(() => {
         autoLoadAllData();
       }, 100);
@@ -624,10 +624,10 @@ const loadMasterOptions = async () => {
       console.log('自動載入已停止');
       return;
     }
-    
+
     try {
       const currentCursor = nextCursorRef.current;
-      
+
       const response = await fetch('/api/notion/fetch-data', {
         method: 'POST',
         headers: {
@@ -646,17 +646,17 @@ const loadMasterOptions = async () => {
       }
 
       const data = await response.json();
-      
+
       setNotionData(prev => {
         const newData = [...prev, ...data.results];
         return newData;
       });
-      
+
       setTotalLoaded(prev => prev + data.results.length);
       setHasMoreData(data.has_more || false);
       setNextCursor(data.next_cursor || '');
       nextCursorRef.current = data.next_cursor || '';
-      
+
       if (data.has_more && data.next_cursor && autoLoadingRef.current) {
         setTimeout(() => {
           autoLoadAllData();
@@ -669,12 +669,12 @@ const loadMasterOptions = async () => {
         setAutoLoadAll(false);
         setLoadComplete(true);
         setLoadSuccess(true);
-        
+
         setTimeout(() => {
           toast.success(`載入完成！共載入 ${totalLoaded + data.results.length} 筆資料`);
         }, 500);
       }
-      
+
     } catch (error) {
       console.error('自動載入失敗:', error);
       autoLoadingRef.current = false;
@@ -689,13 +689,13 @@ const loadMasterOptions = async () => {
 
   const renderNotionPage = (page: any) => {
     const properties = page.properties || {};
-    
-    const title = properties['名稱']?.title?.[0]?.plain_text || 
-                  properties.Name?.title?.[0]?.plain_text || 
-                  properties.Title?.title?.[0]?.plain_text || 
-                  properties['活動名稱']?.title?.[0]?.plain_text ||
-                  '無標題';
-    
+
+    const title = properties['名稱']?.title?.[0]?.plain_text ||
+      properties.Name?.title?.[0]?.plain_text ||
+      properties.Title?.title?.[0]?.plain_text ||
+      properties['活動名稱']?.title?.[0]?.plain_text ||
+      '無標題';
+
     const status = properties['狀態']?.status?.name || '';
     const tags = properties['Tags']?.multi_select?.map((tag: any) => tag.name).join(', ') || '';
     const category = properties['類別']?.multi_select?.map((cat: any) => cat.name).join(', ') || '';
@@ -770,7 +770,7 @@ const loadMasterOptions = async () => {
             <p className="text-sm text-[#A68A64]">{notes}</p>
           </div>
         )}
-        
+
         <div className="mt-3 text-xs text-[#A68A64]">
           頁面 ID: {page.id}
         </div>
@@ -941,8 +941,8 @@ const loadMasterOptions = async () => {
           <PopupSelect
             errorMsg={
               (showPopup.field === 'activity_types' && activityTypeOptions.length === 0) ||
-              (showPopup.field === 'statuses' && statusOptions.length === 0) ||
-              (showPopup.field === 'tags' && tagOptions.length === 0)
+                (showPopup.field === 'statuses' && statusOptions.length === 0) ||
+                (showPopup.field === 'tags' && tagOptions.length === 0)
                 ? '目前無可選項目' : undefined
             }
             mode={showPopup.field === 'sort' ? 'single' : 'multi'}
@@ -1011,7 +1011,7 @@ const loadMasterOptions = async () => {
                   </button>
                 </div>
               </div>
-              
+
               <div className="space-y-2 mb-4">
                 <div className="flex items-center text-sm text-hanami-text-secondary gap-4">
                   <span className="flex items-center gap-1">
@@ -1028,7 +1028,7 @@ const loadMasterOptions = async () => {
                   </span>
                 </div>
               </div>
-              
+
               {activity.materials_needed && activity.materials_needed.length > 0 && (
                 <div className="mb-4">
                   <p className="text-sm font-medium text-hanami-text mb-2">所需材料:</p>
@@ -1049,7 +1049,7 @@ const loadMasterOptions = async () => {
                   </div>
                 </div>
               )}
-              
+
               {activity.instructions && (
                 <div>
                   <p className="text-sm font-medium text-hanami-text mb-2">操作說明:</p>
@@ -1132,11 +1132,10 @@ const loadMasterOptions = async () => {
                   <h2 className="text-xl font-bold text-[#2B3A3B]">Notion 教學活動資料</h2>
                   <div className="flex items-center gap-3">
                     <button
-                      className={`text-sm px-3 py-1 rounded-lg transition-colors ${
-                        isAutoLoading 
-                          ? 'bg-red-500 text-white hover:bg-red-600' 
+                      className={`text-sm px-3 py-1 rounded-lg transition-colors ${isAutoLoading
+                          ? 'bg-red-500 text-white hover:bg-red-600'
                           : 'bg-green-500 text-white hover:bg-green-600'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                       disabled={!selectedDatabase || notionLoading}
                       onClick={toggleAutoLoad}
                     >
@@ -1152,7 +1151,7 @@ const loadMasterOptions = async () => {
                     </button>
                   </div>
                 </div>
-                
+
                 {/* 搜尋框 */}
                 <div className="mt-3">
                   <div className="relative">
@@ -1175,7 +1174,7 @@ const loadMasterOptions = async () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="mt-2 text-sm text-[#A68A64]">
                   {isAutoLoading ? (
                     <span className="text-green-600 font-medium">
@@ -1193,7 +1192,7 @@ const loadMasterOptions = async () => {
                   )}
                 </div>
               </div>
-              
+
               {/* 內容區域 */}
               <div className="flex-1 overflow-y-auto p-6">
                 {filteredNotionData.length > 0 ? (

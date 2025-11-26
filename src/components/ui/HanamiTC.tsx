@@ -176,35 +176,64 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     console.log('Fetched trial lessons:', trialLessonsData);
 
     // 使用現有的 calculateRemainingLessonsBatch 函數計算剩餘堂數
-    const regularStudentIds = [...new Set((regularLessonsData || []).map(lesson => lesson.student_id).filter((id): id is string => Boolean(id)))];
+    const typedRegularLessonsData = (regularLessonsData || []) as Array<{
+      student_id?: string;
+      [key: string]: any;
+    }>;
+    const regularStudentIds = [...new Set(typedRegularLessonsData.map(lesson => lesson.student_id).filter((id): id is string => Boolean(id)))];
     const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
 
     console.log('Remaining lessons map:', remainingLessonsMap);
 
     // 處理常規學生數據
-    const processedRegularLessons: ProcessedLesson[] = (regularLessonsData || []).map((lesson) => ({
-      id: lesson.id,
+    const typedRegularLessonsDataForMap = (regularLessonsData || []) as Array<{
+      id?: string;
+      student_id?: string;
+      lesson_date?: string | null;
+      regular_timeslot?: string | null;
+      course_type?: string | null;
+      lesson_status?: string | null;
+      lesson_duration?: string | null;
+      Hanami_Students?: {
+        full_name?: string | null;
+        student_age?: number | null;
+        contact_number?: string | null;
+      } | null;
+      [key: string]: any;
+    }>;
+    const processedRegularLessons: ProcessedLesson[] = typedRegularLessonsDataForMap.map((lesson) => ({
+      id: lesson.id || '',
       student_id: lesson.student_id || '',
       lesson_date: lesson.lesson_date || '',
       regular_timeslot: lesson.regular_timeslot && lesson.regular_timeslot !== '' ? lesson.regular_timeslot : '未設定',
       course_type: lesson.course_type && lesson.course_type !== '' ? lesson.course_type : '未設定',
       full_name: lesson.Hanami_Students?.full_name || '未命名學生',
       student_age: lesson.Hanami_Students?.student_age || null,
-      lesson_status: lesson.lesson_status,
+      lesson_status: lesson.lesson_status || null,
       remaining_lessons: remainingLessonsMap[lesson.student_id!] || 0,
       is_trial: false,
       lesson_duration: lesson.lesson_duration || null,
     }));
 
     // 處理試堂學生數據
-    const processedTrialLessons: ProcessedLesson[] = (trialLessonsData || []).map((trial) => ({
-      id: trial.id,
-      student_id: trial.id,
+    const typedTrialLessonsData = (trialLessonsData || []) as Array<{
+      id?: string;
+      lesson_date?: string | null;
+      actual_timeslot?: string | null;
+      course_type?: string | null;
+      full_name?: string | null;
+      student_age?: number | null;
+      lesson_duration?: string | null;
+      [key: string]: any;
+    }>;
+    const processedTrialLessons: ProcessedLesson[] = typedTrialLessonsData.map((trial) => ({
+      id: trial.id || '',
+      student_id: trial.id || '',
       lesson_date: trial.lesson_date || '',
       regular_timeslot: trial.actual_timeslot && trial.actual_timeslot !== '' ? trial.actual_timeslot : '未設定',
       course_type: trial.course_type && trial.course_type !== '' ? trial.course_type : '未設定',
       full_name: trial.full_name || '未命名學生',
-      student_age: trial.student_age,
+      student_age: trial.student_age || null,
       lesson_status: null,
       remaining_lessons: null,
       is_trial: true,
@@ -237,10 +266,16 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     }
 
     // 轉換為 Student 類型
-    const processedStudents: Student[] = (studentsData || []).map(student => ({
-      id: student.id,
+    const typedStudentsData = (studentsData || []) as Array<{
+      id?: string;
+      full_name?: string | null;
+      student_age?: number | null;
+      [key: string]: any;
+    }>;
+    const processedStudents: Student[] = typedStudentsData.map(student => ({
+      id: student.id || '',
       full_name: student.full_name || '未命名學生',
-      student_age: student.student_age,
+      student_age: student.student_age || null,
       student_type: '常規',
       course_type: null,
       regular_weekday: null,
@@ -295,13 +330,16 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     
     // 檢查 plans 是否真的需要更新
     setPlans(prevPlans => {
-      const newPlans = data || [];
+      const typedNewPlans = (data || []) as Array<{
+        id?: string;
+        [key: string]: any;
+      }>;
       // 如果內容相同，不更新狀態
-      if (prevPlans.length === newPlans.length && 
-          prevPlans.every((plan, index) => plan.id === newPlans[index].id)) {
+      if (prevPlans.length === typedNewPlans.length && 
+          prevPlans.every((plan, index) => plan.id === typedNewPlans[index]?.id)) {
         return prevPlans;
       }
-      return newPlans;
+      return typedNewPlans as any;
     });
   };
 
@@ -705,13 +743,16 @@ const HanamiTC: React.FC<HanamiTCProps> = ({ teachers }) => {
     
     // 檢查 plans 是否真的需要更新
     setPlans(prevPlans => {
-      const newPlans = data || [];
+      const typedNewPlans = (data || []) as Array<{
+        id?: string;
+        [key: string]: any;
+      }>;
       // 如果內容相同，不更新狀態
-      if (prevPlans.length === newPlans.length && 
-          prevPlans.every((plan, index) => plan.id === newPlans[index].id)) {
+      if (prevPlans.length === typedNewPlans.length && 
+          prevPlans.every((plan, index) => plan.id === typedNewPlans[index]?.id)) {
         return prevPlans;
       }
-      return newPlans;
+      return typedNewPlans as any;
     });
   };
 

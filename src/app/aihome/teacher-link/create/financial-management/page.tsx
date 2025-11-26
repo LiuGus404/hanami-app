@@ -10,6 +10,7 @@ import BackButton from '@/components/ui/BackButton';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 import { CircularChart, PieChart } from '@/components/ui/CircularChart';
 import FinancialManagementNavBar from '@/components/ui/FinancialManagementNavBar';
 
@@ -840,7 +841,9 @@ function FinancialManagementContent() {
 export default function FinancialManagementPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/financial-management">
-      <FinancialManagementContent />
+      <WithPermissionCheck pageKey="finance">
+        <FinancialManagementContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

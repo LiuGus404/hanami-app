@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 檢查用戶是否有權限管理該機構
-    const { data: identityData } = await oldSupabase
+    const { data: identityData } = await (oldSupabase as any)
       .from('hanami_org_identities')
       .select('role_type')
       .eq('org_id', orgId)
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     const identity = identityData as { role_type: string } | null;
 
-    const { data: admin } = await oldSupabase
+    const { data: admin } = await (oldSupabase as any)
       .from('hanami_admin')
       .select('role')
       .eq('org_id', orgId)
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     };
 
     // 檢查該用戶在該機構的身份
-    const { data: existingIdentity } = await oldSupabase
+    const { data: existingIdentity } = await (oldSupabase as any)
       .from('hanami_org_identities')
       .select('*')
       .eq('org_id', orgId)

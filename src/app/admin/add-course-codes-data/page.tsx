@@ -3,6 +3,11 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+interface CourseType {
+  id: string;
+  name: string;
+}
+
 export default function AddCourseCodesDataPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [result, setResult] = useState<string>('');
@@ -25,7 +30,9 @@ export default function AddCourseCodesDataPage() {
         throw new Error('獲取課程類型失敗：' + courseTypesError.message);
       }
 
-      console.log('獲取到的課程類型：', courseTypes);
+      const typedCourseTypes = (courseTypes || []) as CourseType[];
+
+      console.log('獲取到的課程類型：', typedCourseTypes);
 
       // 2. 獲取教師列表
       const { data: teachers, error: teachersError } = await supabase
@@ -43,7 +50,7 @@ export default function AddCourseCodesDataPage() {
       const courseCodesData = [
         // 鋼琴課程
         {
-          course_type_id: courseTypes?.find(ct => ct.name === '鋼琴')?.id,
+          course_type_id: typedCourseTypes.find(ct => ct.name === '鋼琴')?.id,
           course_code: 'PIANO_001',
           course_name: '鋼琴初級班A',
           course_description: '適合初學者的鋼琴基礎課程，學習基本指法和簡單樂曲',
@@ -53,7 +60,7 @@ export default function AddCourseCodesDataPage() {
           is_active: true
         },
         {
-          course_type_id: courseTypes?.find(ct => ct.name === '鋼琴')?.id,
+          course_type_id: typedCourseTypes.find(ct => ct.name === '鋼琴')?.id,
           course_code: 'PIANO_002',
           course_name: '鋼琴初級班B',
           course_description: '適合初學者的鋼琴基礎課程，學習基本指法和簡單樂曲',
@@ -63,7 +70,7 @@ export default function AddCourseCodesDataPage() {
           is_active: true
         },
         {
-          course_type_id: courseTypes?.find(ct => ct.name === '鋼琴')?.id,
+          course_type_id: typedCourseTypes.find(ct => ct.name === '鋼琴')?.id,
           course_code: 'PIANO_003',
           course_name: '鋼琴中級班A',
           course_description: '適合有基礎的學生，學習更複雜的樂曲和技巧',
@@ -74,7 +81,7 @@ export default function AddCourseCodesDataPage() {
         },
         // 音樂專注力課程
         {
-          course_type_id: courseTypes?.find(ct => ct.name === '音樂專注力')?.id,
+          course_type_id: typedCourseTypes.find(ct => ct.name === '音樂專注力')?.id,
           course_code: 'MUSIC_FOCUS_001',
           course_name: '音樂專注力初級班A',
           course_description: '音樂專注力初級課程 - 適合初學者',
@@ -84,7 +91,7 @@ export default function AddCourseCodesDataPage() {
           is_active: true
         },
         {
-          course_type_id: courseTypes?.find(ct => ct.name === '音樂專注力')?.id,
+          course_type_id: typedCourseTypes.find(ct => ct.name === '音樂專注力')?.id,
           course_code: 'MUSIC_FOCUS_002',
           course_name: '音樂專注力初級班B',
           course_description: '音樂專注力初級課程 - 適合初學者',
@@ -94,7 +101,7 @@ export default function AddCourseCodesDataPage() {
           is_active: true
         },
         {
-          course_type_id: courseTypes?.find(ct => ct.name === '音樂專注力')?.id,
+          course_type_id: typedCourseTypes.find(ct => ct.name === '音樂專注力')?.id,
           course_code: 'MUSIC_FOCUS_003',
           course_name: '音樂專注力中級班A',
           course_description: '音樂專注力中級課程 - 適合有基礎的學生',
@@ -105,7 +112,7 @@ export default function AddCourseCodesDataPage() {
         },
         // 試聽課程
         {
-          course_type_id: courseTypes?.find(ct => ct.name === '鋼琴')?.id,
+          course_type_id: typedCourseTypes.find(ct => ct.name === '鋼琴')?.id,
           course_code: 'PIANO_TRIAL_001',
           course_name: '鋼琴試聽課',
           course_description: '鋼琴試聽課程，讓學生體驗鋼琴學習',
@@ -115,7 +122,7 @@ export default function AddCourseCodesDataPage() {
           is_active: true
         },
         {
-          course_type_id: courseTypes?.find(ct => ct.name === '音樂專注力')?.id,
+          course_type_id: typedCourseTypes.find(ct => ct.name === '音樂專注力')?.id,
           course_code: 'MUSIC_FOCUS_TRIAL_001',
           course_name: '音樂專注力試聽課',
           course_description: '音樂專注力試聽課程，讓學生體驗音樂專注力訓練',
@@ -131,7 +138,7 @@ export default function AddCourseCodesDataPage() {
       // 4. 插入課程代碼數據
       const { data: insertedData, error: insertError } = await supabase
         .from('hanami_course_codes')
-        .insert(courseCodesData)
+        .insert(courseCodesData as any)
         .select();
 
       if (insertError) {

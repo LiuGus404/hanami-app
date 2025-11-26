@@ -22,7 +22,17 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     // 轉換資料結構以向後兼容
-    const transformedData = data?.map(template => {
+    const typedData = (data || []) as Array<{
+      id: string;
+      template_name: string;
+      template_description: string | null;
+      template_schema: any;
+      template_type: string;
+      created_at: string;
+      updated_at: string;
+      [key: string]: any;
+    }>;
+    const transformedData = typedData.map(template => {
       let fields = [];
       if (Array.isArray(template.template_schema)) {
         fields = template.template_schema;
@@ -150,9 +160,9 @@ export async function POST(request: NextRequest) {
       console.log(`- ${key}: ${typeof insertData[key]} = ${JSON.stringify(insertData[key])}`);
     });
 
-    const { data, error } = await supabase
-      .from('hanami_resource_templates')
-      .insert(insertData)
+    const { data, error } = await (supabase
+      .from('hanami_resource_templates') as any)
+      .insert(insertData as any)
       .select()
       .single();
 

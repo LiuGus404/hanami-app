@@ -41,8 +41,8 @@ export default function VersionManagementPage() {
     setLoading(true);
     try {
       // 載入成長樹列表
-      const { data: treesData } = await supabase
-        .from('hanami_growth_trees')
+      const { data: treesData } = await (supabase
+        .from('hanami_growth_trees') as any)
         .select('*')
         .order('tree_name');
 
@@ -191,16 +191,15 @@ export default function VersionManagementPage() {
                     {new Date(change.created_at).toLocaleString()}
                   </div>
                 </div>
-                <span className={`px-2 py-1 text-xs rounded ${
-                  change.change_type === 'goal_added' ? 'bg-green-100 text-green-700' :
-                  change.change_type === 'goal_removed' ? 'bg-red-100 text-red-700' :
-                  change.change_type === 'goal_modified' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-blue-100 text-blue-700'
-                }`}>
+                <span className={`px-2 py-1 text-xs rounded ${change.change_type === 'goal_added' ? 'bg-green-100 text-green-700' :
+                    change.change_type === 'goal_removed' ? 'bg-red-100 text-red-700' :
+                      change.change_type === 'goal_modified' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-blue-100 text-blue-700'
+                  }`}>
                   {change.change_type === 'goal_added' ? '新增' :
-                   change.change_type === 'goal_removed' ? '移除' :
-                   change.change_type === 'goal_modified' ? '修改' :
-                   change.change_type === 'goal_reordered' ? '重新排序' : '變更'}
+                    change.change_type === 'goal_removed' ? '移除' :
+                      change.change_type === 'goal_modified' ? '修改' :
+                        change.change_type === 'goal_reordered' ? '重新排序' : '變更'}
                 </span>
               </div>
             </div>

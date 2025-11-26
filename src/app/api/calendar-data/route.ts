@@ -30,16 +30,22 @@ export async function POST(request: Request) {
       .single();
 
     if (courseTypeError || !courseTypeData) {
+      const typedAllCourseTypes = (allCourseTypes || []) as Array<{ name: string; [key: string]: any }>;
       console.error('❌ 找不到課程類型:', courseTypeError);
       console.error('🔍 查詢的課程名稱:', courseType);
-      console.error('🔍 資料庫中的課程名稱:', allCourseTypes?.map(c => c.name));
+      console.error('🔍 資料庫中的課程名稱:', typedAllCourseTypes.map(c => c.name));
       return NextResponse.json({ 
         error: '找不到指定的課程類型' 
       }, { status: 404 });
     }
 
-    const trialLimit = courseTypeData.trial_limit || 1;
-    const maxStudents = courseTypeData.max_students || 6;
+    const typedCourseTypeData = courseTypeData as {
+      trial_limit?: number;
+      max_students?: number;
+      [key: string]: any;
+    };
+    const trialLimit = typedCourseTypeData.trial_limit || 1;
+    const maxStudents = typedCourseTypeData.max_students || 6;
 
     console.log('📚 課程類型資訊:', { trialLimit, maxStudents });
 

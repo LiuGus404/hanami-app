@@ -31,21 +31,21 @@ export default function TeacherManagementPage() {
   useEffect(() => {
     const fetchTeachers = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('hanami_employee')
+      const { data, error } = await (supabase
+        .from('hanami_employee') as any)
         .select('*');
       if (!error) setTeachers(data || []);
       setLoading(false);
     };
 
     const fetchRoles = async () => {
-      const { data, error } = await supabase
-        .from('hanami_employee')
+      const { data, error } = await (supabase
+        .from('hanami_employee') as any)
         .select('teacher_role')
         .not('teacher_role', 'is', null);
       if (!error && data) {
         const roleMap = new Map<string, string>();
-        data.forEach(r => {
+        data.forEach((r: any) => {
           const raw = r.teacher_role;
           const normalized = raw?.trim().toLowerCase();
           if (normalized && !roleMap.has(normalized)) {
@@ -185,8 +185,8 @@ export default function TeacherManagementPage() {
           <div className="text-sm text-[#2B3A3B] mt-2 ml-1 flex items-center gap-4">
             <span>
               已篩選：
-              {filterRole && `職位：${filterRole}`} 
-              {filterRole && filterStatus && '，'} 
+              {filterRole && `職位：${filterRole}`}
+              {filterRole && filterStatus && '，'}
               {filterStatus && `狀態：${filterStatus === 'full time' ? '全職' : '兼職'}`}
             </span>
             <button
@@ -233,70 +233,70 @@ export default function TeacherManagementPage() {
           <div className="bg-white rounded-xl border border-[#EADBC8] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-max">
-              <thead>
-                <tr className="bg-[#FFF9F2] border-b border-[#EADBC8]">
-                  <th className="w-12 p-3 text-left text-sm font-medium text-[#2B3A3B]">
-                    <Checkbox
-                      checked={selectedTeachers.length === filteredTeachers.length}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedTeachers(filteredTeachers.map(t => t.id));
-                        } else {
-                          setSelectedTeachers([]);
-                        }
-                      }}
-                    />
-                  </th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">姓名</th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">暱稱</th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">職位</th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">狀態</th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">電話</th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">Email</th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">月薪</th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">時薪</th>
-                  <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td className="text-center p-6" colSpan={10}>載入中...</td></tr>
-                ) : filteredTeachers.length === 0 ? (
-                  <tr><td className="text-center p-6" colSpan={10}>沒有符合條件的老師</td></tr>
-                ) : filteredTeachers.map(teacher => (
-                  <tr key={teacher.id} className="border-b border-[#EADBC8] hover:bg-[#FFF9F2] cursor-pointer">
-                    <td className="p-3">
+                <thead>
+                  <tr className="bg-[#FFF9F2] border-b border-[#EADBC8]">
+                    <th className="w-12 p-3 text-left text-sm font-medium text-[#2B3A3B]">
                       <Checkbox
-                        checked={selectedTeachers.includes(teacher.id)}
+                        checked={selectedTeachers.length === filteredTeachers.length}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedTeachers([...selectedTeachers, teacher.id]);
+                            setSelectedTeachers(filteredTeachers.map(t => t.id));
                           } else {
-                            setSelectedTeachers(selectedTeachers.filter(id => id !== teacher.id));
+                            setSelectedTeachers([]);
                           }
                         }}
                       />
-                    </td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_fullname || '—'}</td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_nickname || '—'}</td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_role || '—'}</td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_status || '—'}</td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_phone || '—'}</td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_email || '—'}</td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_msalary ?? '—'}</td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_hsalary ?? '—'}</td>
-                    <td className="p-3 text-sm text-[#2B3A3B]">
-                      <button
-                        className="text-[#A68A64] underline hover:text-[#2B3A3B]"
-                        onClick={() => router.push(`/admin/teachers/${teacher.id}`)}
-                      >
-                        查看/編輯
-                      </button>
-                    </td>
+                    </th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">姓名</th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">暱稱</th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">職位</th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">狀態</th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">電話</th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">Email</th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">月薪</th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">時薪</th>
+                    <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td className="text-center p-6" colSpan={10}>載入中...</td></tr>
+                  ) : filteredTeachers.length === 0 ? (
+                    <tr><td className="text-center p-6" colSpan={10}>沒有符合條件的老師</td></tr>
+                  ) : filteredTeachers.map(teacher => (
+                    <tr key={teacher.id} className="border-b border-[#EADBC8] hover:bg-[#FFF9F2] cursor-pointer">
+                      <td className="p-3">
+                        <Checkbox
+                          checked={selectedTeachers.includes(teacher.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedTeachers([...selectedTeachers, teacher.id]);
+                            } else {
+                              setSelectedTeachers(selectedTeachers.filter(id => id !== teacher.id));
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_fullname || '—'}</td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_nickname || '—'}</td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_role || '—'}</td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_status || '—'}</td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_phone || '—'}</td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_email || '—'}</td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_msalary ?? '—'}</td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">{teacher.teacher_hsalary ?? '—'}</td>
+                      <td className="p-3 text-sm text-[#2B3A3B]">
+                        <button
+                          className="text-[#A68A64] underline hover:text-[#2B3A3B]"
+                          onClick={() => router.push(`/admin/teachers/${teacher.id}`)}
+                        >
+                          查看/編輯
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

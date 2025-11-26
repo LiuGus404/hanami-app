@@ -26,7 +26,7 @@ const EmergencyDiagnosisPage = () => {
       // 2. 檢查 RLS 狀態
       console.log('=== 步驟 2: 檢查 RLS 狀態 ===');
       const { data: rlsCheck, error: rlsError } = await supabase
-        .rpc('check_table_rls_status', { table_name: 'hanami_course_codes' });
+        .rpc('check_table_rls_status', { table_name: 'hanami_course_codes' } as any);
       
       results.rlsStatus = rlsCheck;
       results.rlsError = rlsError?.message || null;
@@ -89,10 +89,10 @@ const EmergencyDiagnosisPage = () => {
         is_active: true
       };
 
-      const { data: insertData, error: insertError } = await supabase
+      const { data: insertData, error: insertError } = await (supabase
         .from('hanami_course_codes')
-        .insert([testCourseCode])
-        .select();
+        .insert([testCourseCode] as any)
+        .select() as any);
       
       results.insertData = insertData;
       results.insertError = insertError?.message || null;

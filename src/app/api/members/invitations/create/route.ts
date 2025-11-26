@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 檢查用戶是否有權限管理該機構
-    const { data: identityData } = await oldSupabase
-      .from('hanami_org_identities')
+    const { data: identityData } = await ((oldSupabase as any)
+      .from('hanami_org_identities'))
       .select('role_type')
       .eq('org_id', orgId)
       .eq('user_email', userEmail)
@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
 
     const identity = identityData as { role_type: string } | null;
 
-    const { data: admin } = await oldSupabase
-      .from('hanami_admin')
+    const { data: admin } = await ((oldSupabase as any)
+      .from('hanami_admin'))
       .select('role')
       .eq('org_id', orgId)
       .eq('admin_email', userEmail)

@@ -82,8 +82,8 @@ function SelectOrganizationContent() {
       console.log('SelectOrganizationPage: 已保存機構到 localStorage', org);
     }
 
-    // 跳轉回主頁面，並帶上機構 ID 參數
-    router.push(`/aihome/teacher-link/create?orgId=${encodeURIComponent(org.id)}`);
+    // 跳轉回主頁面，不再在 URL 中顯示機構 ID（機構信息已保存在 localStorage）
+    router.push('/aihome/teacher-link/create');
   };
 
   const handleCreateNew = () => {

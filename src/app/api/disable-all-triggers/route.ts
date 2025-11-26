@@ -17,7 +17,7 @@ export async function POST() {
       DROP FUNCTION IF EXISTS log_version_change();
     `;
 
-    const { error: disableError } = await supabase.rpc('exec_sql', {
+    const { error: disableError } = await (supabase.rpc as any)('exec_sql', {
       sql: disableTriggersSQL
     });
 

@@ -420,15 +420,17 @@ const LessonPlanModal = ({
       console.log('planData:', planData);
 
       if (existingPlan?.id) {
-        const { error } = await supabase
+        // hanami_lesson_plan table type may not be fully defined
+        const { error } = await ((supabase as any)
           .from('hanami_lesson_plan')
           .update(planData)
-          .eq('id', existingPlan.id);
+          .eq('id', existingPlan.id));
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        // hanami_lesson_plan table type may not be fully defined
+        const { error } = await ((supabase as any)
           .from('hanami_lesson_plan')
-          .insert(planData);
+          .insert(planData));
         if (error) throw error;
       }
 

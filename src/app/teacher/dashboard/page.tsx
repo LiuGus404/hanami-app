@@ -610,7 +610,7 @@ export default function TeacherDashboard() {
         
         console.log('用email查詢結果:', teacherByEmail);
         const completeTeacherData: TeacherProfile = {
-          ...teacherByEmail,
+          ...(teacherByEmail as any),
           course_roles_note: null
         };
         setTeacherData(completeTeacherData);
@@ -622,7 +622,7 @@ export default function TeacherDashboard() {
         // ID 查詢成功，設置教師資料
         console.log('ID 查詢成功，設置教師資料');
         const completeTeacherData: TeacherProfile = {
-          ...teacherData,
+          ...(teacherData as any),
           course_roles_note: null
         };
         setTeacherData(completeTeacherData);
@@ -731,13 +731,14 @@ export default function TeacherDashboard() {
         console.log('✅ 所有課程記錄查詢結果:', lessonRecords);
         
         // 如果有課程記錄，再查詢學生資料
-        if (lessonRecords && lessonRecords.length > 0) {
-          const studentIds = lessonRecords.map(record => record.student_id);
+        const typedLessonRecords = (lessonRecords || []) as Array<{ student_id: string; lesson_date?: string; id?: string; lesson_teacher?: string; [key: string]: any }>;
+        if (typedLessonRecords.length > 0) {
+          const studentIds = typedLessonRecords.map(record => record.student_id);
           console.log('📋 需要查詢的學生ID:', studentIds);
           
           // 調試：檢查課程記錄中的 lesson_teacher 字段
           console.log('🔍 調試：檢查課程記錄中的 lesson_teacher 字段');
-          lessonRecords.forEach((record, index) => {
+          typedLessonRecords.forEach((record, index) => {
             console.log(`📝 課程 ${index + 1}:`, {
               id: record.id,
               lesson_teacher: record.lesson_teacher,
@@ -754,7 +755,7 @@ export default function TeacherDashboard() {
           });
           
           // 調試：顯示所有不同的 lesson_teacher 值
-          const uniqueLessonTeachers = [...new Set(lessonRecords.map(r => r.lesson_teacher).filter(Boolean))];
+          const uniqueLessonTeachers = [...new Set(typedLessonRecords.map(r => r.lesson_teacher).filter(Boolean))];
           console.log('📋 所有不同的 lesson_teacher 值:', uniqueLessonTeachers);
           
           const { data: studentsData, error: studentsError } = await supabase
@@ -769,7 +770,8 @@ export default function TeacherDashboard() {
             
             // 調試：檢查學生資料中的 student_teacher 字段
             console.log('🔍 調試：檢查學生資料中的 student_teacher 字段');
-            studentsData?.forEach((student, index) => {
+            const typedStudentsData = (studentsData || []) as Array<{ id: string; full_name: string; nick_name: string | null; student_teacher: string | null; [key: string]: any }>;
+            typedStudentsData.forEach((student, index) => {
               console.log(`👤 學生 ${index + 1}:`, {
                 id: student.id,
                 full_name: student.full_name,
@@ -779,20 +781,20 @@ export default function TeacherDashboard() {
             });
             
             // 調試：顯示所有不同的 student_teacher 值
-            const uniqueStudentTeachers = [...new Set(studentsData?.map(s => s.student_teacher).filter(Boolean))];
+            const uniqueStudentTeachers = [...new Set(typedStudentsData.map(s => s.student_teacher).filter(Boolean))];
             console.log('📋 所有不同的 student_teacher 值:', uniqueStudentTeachers);
             
             // 創建學生資料映射
             studentsMap = new Map();
-            studentsData?.forEach(student => {
+            typedStudentsData.forEach(student => {
               studentsMap.set(student.id, student);
             });
             
             // 篩選該教師的課程
-            const teacherLessons = lessonRecords.filter(record => {
+            const teacherLessons = typedLessonRecords.filter(record => {
               const isMatch = record.lesson_teacher === teacher.teacher_nickname ||
-                             record.lesson_teacher === teacher.teacher_email ||
-                             record.lesson_teacher === teacher.id;
+                              record.lesson_teacher === teacher.teacher_email ||
+                              record.lesson_teacher === teacher.id;
               console.log(`🔍 課程 ${record.id} 匹配檢查:`, {
                 lesson_teacher: record.lesson_teacher,
                 teacher_nickname: teacher.teacher_nickname,
@@ -807,7 +809,7 @@ export default function TeacherDashboard() {
             // 如果沒有找到課程，嘗試根據學生的教師資訊篩選
             if (teacherLessons.length === 0) {
               console.log('🔄 嘗試根據學生的教師資訊篩選課程...');
-              const teacherLessonsByStudent = lessonRecords.filter(record => {
+              const teacherLessonsByStudent = typedLessonRecords.filter(record => {
                 const studentData = studentsMap.get(record.student_id);
                 const isMatch = studentData && (
                   studentData.student_teacher === teacher.teacher_nickname ||
@@ -858,11 +860,12 @@ export default function TeacherDashboard() {
       } else {
         console.log('✅ 所有試聽學生查詢結果:', trialRecords);
         // 篩選該教師的試聽學生
-        const teacherTrials = trialRecords?.filter(record => 
+        const typedTrialRecords = (trialRecords || []) as Array<{ student_teacher?: string; [key: string]: any }>;
+        const teacherTrials = typedTrialRecords.filter(record =>
           record.student_teacher === teacher.teacher_nickname ||
           record.student_teacher === teacher.teacher_email ||
           record.student_teacher === teacher.id
-        ) || [];
+        );
         console.log('👨‍🏫 該教師的試聽學生:', teacherTrials);
       }
     
@@ -894,11 +897,12 @@ export default function TeacherDashboard() {
       } else {
         console.log('✅ 今日有排程的所有學生:', scheduledStudents);
         // 篩選該教師的學生
-        const teacherScheduledStudents = scheduledStudents?.filter(student => 
+        const typedScheduledStudents = (scheduledStudents || []) as Array<{ student_teacher?: string; [key: string]: any }>;
+        const teacherScheduledStudents = typedScheduledStudents.filter(student =>
           student.student_teacher === teacher.teacher_nickname ||
           student.student_teacher === teacher.teacher_email ||
           student.student_teacher === teacher.id
-        ) || [];
+        );
         console.log('👨‍🏫 該教師今日有排程的學生:', teacherScheduledStudents);
       }
     
@@ -906,11 +910,12 @@ export default function TeacherDashboard() {
       const allLessons: any[] = [];
     
       // 處理正式學生課程記錄 - 教師今日上班，顯示所有今日的課程
+      const typedLessonRecordsForToday = (lessonRecords || []) as Array<{ lesson_date?: string; id?: string; [key: string]: any }>;
       if (lessonRecords && lessonRecords.length > 0) {
         console.log('🎯 教師今日有上班，顯示所有今日的課程記錄');
         
         // 篩選今日的課程記錄
-        const todayLessons = lessonRecords.filter(record => {
+        const todayLessons = typedLessonRecordsForToday.filter(record => {
           const isToday = record.lesson_date === today;
           console.log('🔍 檢查課程日期:', {
             record_id: record.id,
@@ -959,7 +964,8 @@ export default function TeacherDashboard() {
         console.log('🎯 處理試聽學生記錄');
         
         // 篩選今日的試聽學生
-        const todayTrials = trialRecords.filter(record => {
+        const typedTrialRecordsForToday = (trialRecords || []) as Array<{ lesson_date?: string; id?: string; [key: string]: any }>;
+        const todayTrials = typedTrialRecordsForToday.filter(record => {
           const isToday = record.lesson_date === today;
           console.log('🔍 檢查試聽學生日期:', {
             record_id: record.id,
@@ -996,7 +1002,8 @@ export default function TeacherDashboard() {
         console.log('🎯 使用排程學生作為備用');
         
         // 篩選今日有排程的學生
-        const todayScheduledStudents = scheduledStudents.filter(student => {
+        const typedScheduledStudentsForToday = (scheduledStudents || []) as Array<{ regular_weekday?: number; id?: string; full_name?: string; [key: string]: any }>;
+        const todayScheduledStudents = typedScheduledStudentsForToday.filter(student => {
           const hasSchedule = student.regular_weekday === todayWeekdayNum;
           console.log('🔍 檢查學生排程:', {
             student_id: student.id,
@@ -1109,7 +1116,8 @@ export default function TeacherDashboard() {
       if (studentTreesError) throw studentTreesError;
       
       // 獲取選擇日期有上課的學生ID列表（保持時間順序）
-      const todayStudentIds = [...new Set((todayLessonsData || []).map(lesson => lesson.student_id).filter((id): id is string => id !== null))];
+      const typedTodayLessonsData = (todayLessonsData || []) as Array<{ student_id?: string | null; [key: string]: any }>;
+      const todayStudentIds = [...new Set(typedTodayLessonsData.map(lesson => lesson.student_id).filter((id): id is string => id !== null && id !== undefined))];
       
       console.log('當日有課程的學生數量:', todayStudentIds.length);
       
@@ -1124,18 +1132,20 @@ export default function TeacherDashboard() {
         
         // 建立映射表以提高查詢效率
         const lessonTimeMap = new Map();
-        (todayLessonsData || []).forEach(lesson => {
+        typedTodayLessonsData.forEach(lesson => {
           lessonTimeMap.set(lesson.student_id, lesson.actual_timeslot);
         });
         
+        const typedStudentTreesData = (studentTreesData || []) as Array<{ student_id?: string; tree_id?: string; [key: string]: any }>;
         const studentTreeMap = new Map();
-        (studentTreesData || []).forEach(item => {
+        typedStudentTreesData.forEach(item => {
           studentTreeMap.set(item.student_id, item.tree_id);
         });
         
         // 建立學生最後評估日期映射
+        const typedAllAssessmentsData = (allAssessmentsData || []) as Array<{ student_id?: string; assessment_date?: string; [key: string]: any }>;
         const lastAssessmentMap = new Map();
-        (allAssessmentsData || []).forEach(assessment => {
+        typedAllAssessmentsData.forEach(assessment => {
           if (!lastAssessmentMap.has(assessment.student_id)) {
             lastAssessmentMap.set(assessment.student_id, assessment.assessment_date);
           }
@@ -1143,7 +1153,7 @@ export default function TeacherDashboard() {
         
         // 獲取選擇日期有評估記錄的學生ID列表
         const todayAssessedStudentIds = new Set(
-          (allAssessmentsData || [])
+          typedAllAssessmentsData
             .filter(assessment => assessment.assessment_date === todayAssessmentDate)
             .map(assessment => assessment.student_id)
         );
@@ -1156,9 +1166,10 @@ export default function TeacherDashboard() {
         };
         
         // 處理每個學生（使用緩存的數據，避免重複查詢）
-        for (const student of studentsData || []) {
+        const typedStudentsDataForToday = (studentsData || []) as Array<{ id?: string; [key: string]: any }>;
+        for (const student of typedStudentsDataForToday) {
           const studentWithData = {
-            ...student,
+            ...(student as any),
             last_assessment_date: lastAssessmentMap.get(student.id) || null,
             lesson_time: lessonTimeMap.get(student.id) || ''
           };
@@ -1268,7 +1279,8 @@ export default function TeacherDashboard() {
       if (allMediaError) throw allMediaError;
       
       // 獲取選擇日期有上課的學生ID列表（保持時間順序）
-      const todayStudentIds = [...new Set((todayLessonsData || []).map(lesson => lesson.student_id).filter((id): id is string => id !== null))];
+      const typedTodayLessonsDataForMedia = (todayLessonsData || []) as Array<{ student_id?: string | null; [key: string]: any }>;
+      const todayStudentIds = [...new Set(typedTodayLessonsDataForMedia.map(lesson => lesson.student_id).filter((id): id is string => id !== null && id !== undefined))];
       
       console.log('當日有課程的學生數量（媒體狀態）:', todayStudentIds.length);
       
@@ -1283,13 +1295,14 @@ export default function TeacherDashboard() {
         
         // 建立映射表以提高查詢效率
         const lessonTimeMap = new Map();
-        (todayLessonsData || []).forEach(lesson => {
+        typedTodayLessonsDataForMedia.forEach(lesson => {
           lessonTimeMap.set(lesson.student_id, lesson.actual_timeslot);
         });
         
         // 建立學生最後媒體上傳日期映射
+        const typedAllMediaData = (allMediaData || []) as Array<{ student_id?: string; created_at?: string; [key: string]: any }>;
         const lastMediaMap = new Map();
-        (allMediaData || []).forEach(media => {
+        typedAllMediaData.forEach(media => {
           if (!lastMediaMap.has(media.student_id)) {
             lastMediaMap.set(media.student_id, media.created_at);
           }
@@ -1297,8 +1310,8 @@ export default function TeacherDashboard() {
         
         // 獲取選擇日期有媒體上傳的學生ID列表
         const todayMediaStudentIds = new Set(
-          (allMediaData || [])
-            .filter(media => media.created_at.startsWith(todayMediaDate))
+          typedAllMediaData
+            .filter(media => media.created_at?.startsWith(todayMediaDate))
             .map(media => media.student_id)
         );
         
@@ -1309,9 +1322,10 @@ export default function TeacherDashboard() {
         };
         
         // 處理每個學生（使用緩存的數據，避免重複查詢）
-        for (const student of studentsData || []) {
+        const typedStudentsDataForMedia = (studentsData || []) as Array<{ id?: string; [key: string]: any }>;
+        for (const student of typedStudentsDataForMedia) {
           const studentWithData = {
-            ...student,
+            ...(student as any),
             last_assessment_date: lastMediaMap.get(student.id) || null,
             lesson_time: lessonTimeMap.get(student.id) || ''
           };
@@ -1426,8 +1440,8 @@ export default function TeacherDashboard() {
         const mediaType = file.type.startsWith('video/') ? 'video' : 'photo';
 
         // 插入資料庫記錄
-        const { data: mediaData, error: mediaError } = await supabase
-          .from('hanami_student_media')
+        const { data: mediaData, error: mediaError } = await (supabase
+          .from('hanami_student_media') as any)
           .insert({
             student_id: selectedStudentForMediaUpload.id,
             media_type: mediaType,
@@ -1436,7 +1450,7 @@ export default function TeacherDashboard() {
             file_size: file.size,
             title: file.name,
             uploaded_by: teacherData?.teacher_email || 'teacher'
-          })
+          } as any)
           .select()
           .single();
 
@@ -1489,9 +1503,9 @@ export default function TeacherDashboard() {
   // 切換收藏狀態
   const toggleFavorite = async (mediaId: string, currentFavorite: boolean) => {
     try {
-      const { error } = await supabase
-        .from('hanami_student_media')
-        .update({ is_favorite: !currentFavorite })
+      const { error } = await (supabase
+        .from('hanami_student_media') as any)
+        .update({ is_favorite: !currentFavorite } as any)
         .eq('id', mediaId);
 
       if (error) throw error;
@@ -1634,7 +1648,8 @@ export default function TeacherDashboard() {
           return;
         }
 
-        if (currentTeacher?.teacher_password !== profileForm.old_password) {
+        const typedCurrentTeacher = currentTeacher as { teacher_password?: string } | null;
+        if (typedCurrentTeacher?.teacher_password !== profileForm.old_password) {
           setSaveMessage({ type: 'error', text: '舊密碼不正確' });
           return;
         }
@@ -1679,9 +1694,9 @@ export default function TeacherDashboard() {
         setSaveMessage({ type: 'error', text: '教師資料不完整，無法更新' });
         return;
       }
-      const { data, error } = await supabase
-        .from('hanami_employee')
-        .update(updateData)
+      const { data, error } = await (supabase
+        .from('hanami_employee') as any)
+        .update(updateData as any)
         .eq('id', teacherData.id)
         .select()
         .single();
@@ -1729,8 +1744,8 @@ export default function TeacherDashboard() {
       console.log('目標資料:', goals);
       
       // 1. 新增成長樹
-      const { data: treeInsert, error: treeError } = await supabase
-        .from('hanami_growth_trees')
+      const { data: treeInsert, error: treeError } = await (supabase
+        .from('hanami_growth_trees') as any)
         .insert([{
           tree_name: treeData.tree_name,
           tree_description: treeData.tree_description,
@@ -1738,7 +1753,7 @@ export default function TeacherDashboard() {
           course_type_id: treeData.course_type,
           tree_level: treeData.tree_level,
           is_active: true,
-        }])
+        }] as any)
         .select()
         .single();
       
@@ -1772,9 +1787,9 @@ export default function TeacherDashboard() {
           };
         });
         
-        const { data: goalsData, error: goalsError } = await supabase
-          .from('hanami_growth_goals')
-          .insert(goalsInsert)
+        const { data: goalsData, error: goalsError } = await (supabase
+          .from('hanami_growth_goals') as any)
+          .insert(goalsInsert as any)
           .select();
           
         if (goalsError) {
@@ -1805,8 +1820,8 @@ export default function TeacherDashboard() {
       }
       
       // 1. 更新成長樹
-      const { error: treeError } = await supabase
-        .from('hanami_growth_trees')
+      const { error: treeError } = await (supabase
+        .from('hanami_growth_trees') as any)
         .update({
           tree_name: treeData.tree_name,
           tree_description: treeData.tree_description,
@@ -1814,7 +1829,7 @@ export default function TeacherDashboard() {
           course_type_id: treeData.course_type,
           tree_level: treeData.tree_level,
           is_active: treeData.is_active,
-        })
+        } as any)
         .eq('id', editingTree.id);
       
       if (treeError) {
@@ -1855,9 +1870,9 @@ export default function TeacherDashboard() {
           };
         });
         
-        const { data: goalsData, error: goalsError } = await supabase
-          .from('hanami_growth_goals')
-          .insert(goalsInsert)
+        const { data: goalsData, error: goalsError } = await (supabase
+          .from('hanami_growth_goals') as any)
+          .insert(goalsInsert as any)
           .select();
           
         if (goalsError) {
@@ -2272,7 +2287,8 @@ export default function TeacherDashboard() {
         throw new Error(`無法找到成長樹: ${checkError.message}`);
       }
       
-      if (!existingTree) {
+      const typedExistingTree = existingTree as { tree_name?: string; id?: string } | null;
+      if (!typedExistingTree) {
         throw new Error('成長樹不存在');
       }
       
@@ -2355,7 +2371,7 @@ export default function TeacherDashboard() {
       setDeletingTree(null);
       
       // 7. 顯示成功訊息
-      alert(`成長樹 "${existingTree.tree_name}" 已成功刪除`);
+      alert(`成長樹 "${typedExistingTree.tree_name}" 已成功刪除`);
       
     } catch (error: any) {
       console.error('刪除成長樹失敗:', error);
@@ -2514,9 +2530,9 @@ export default function TeacherDashboard() {
       });
       
       // ActivityForm 已經處理了數據格式，直接使用
-      const { data, error } = await supabase
-        .from('hanami_teaching_activities')
-        .insert([activityData])
+      const { data, error } = await (supabase
+        .from('hanami_teaching_activities') as any)
+        .insert([activityData] as any)
         .select();
 
       if (error) {
@@ -2558,9 +2574,9 @@ export default function TeacherDashboard() {
       }
 
       // ActivityForm 已經處理了數據格式，直接使用
-      const { data, error } = await supabase
-        .from('hanami_teaching_activities')
-        .update(activityData)
+      const { data, error } = await (supabase
+        .from('hanami_teaching_activities') as any)
+        .update(activityData as any)
         .eq('id', editingActivity.id)
         .select();
 
@@ -2699,7 +2715,8 @@ export default function TeacherDashboard() {
         { id: 'artistic', name: '藝術發展' },
       ];
 
-      const customCategories = (customData || []).map(item => ({
+      const typedCustomData = (customData || []) as Array<{ option_value?: string; option_name?: string; [key: string]: any }>;
+      const customCategories = typedCustomData.map(item => ({
         id: item.option_value,
         name: item.option_name,
       }));
@@ -2760,7 +2777,8 @@ export default function TeacherDashboard() {
       console.log('能力頁面：修改後的預設類別:', modifiedDefaultCategories);
       console.log('能力頁面：自訂預設類別:', customDefaultCategories);
       
-      const customCategories = (customData || []).map(item => ({
+      const typedCustomDataForAbility = (customData || []) as Array<{ option_value?: string; option_name?: string; [key: string]: any }>;
+      const customCategories = typedCustomDataForAbility.map(item => ({
         id: item.option_value,
         name: item.option_name,
         is_default: false,
@@ -2851,12 +2869,12 @@ export default function TeacherDashboard() {
 
   const createAbility = async () => {
     try {
-      const { data, error } = await supabase
-        .from('hanami_development_abilities')
+      const { data, error } = await (supabase
+        .from('hanami_development_abilities') as any)
         .insert([{
           ...newAbility,
           category: newAbility.category || null,
-        }])
+        }] as any)
         .select()
         .single();
 
@@ -2909,8 +2927,9 @@ export default function TeacherDashboard() {
 
       if (treesError) throw treesError;
 
-      if (growthTreesData && growthTreesData.length > 0) {
-        toast.error(`無法刪除：此能力正在被以下成長目標使用：${growthTreesData.map(g => g.goal_name).join(', ')}`);
+      const typedGrowthTreesData = (growthTreesData || []) as Array<{ goal_name?: string; [key: string]: any }>;
+      if (typedGrowthTreesData.length > 0) {
+        toast.error(`無法刪除：此能力正在被以下成長目標使用：${typedGrowthTreesData.map(g => g.goal_name).join(', ')}`);
         return;
       }
 
@@ -3099,15 +3118,15 @@ export default function TeacherDashboard() {
         // 新增為自訂類別：保存到資料庫
         const optionValue = newOptionName.toLowerCase().replace(/\s+/g, '_');
         
-        const { error } = await supabase
-          .from('hanami_custom_options')
+        const { error } = await (supabase
+          .from('hanami_custom_options') as any)
           .insert({
             option_type: 'activity_type',
             option_name: newOptionName.trim(),
             option_value: optionValue,
             sort_order: customOptions.ability_categories.length + 100,
             is_active: true,
-          });
+          } as any);
 
         if (error) throw error;
 
@@ -3174,11 +3193,11 @@ export default function TeacherDashboard() {
       } else {
         // 自訂類別：更新資料庫
         console.log('編輯自訂類別:', editingOption.name);
-        const { error } = await supabase
-          .from('hanami_custom_options')
+        const { error } = await (supabase
+          .from('hanami_custom_options') as any)
           .update({
             option_name: newOptionName.trim(),
-          })
+          } as any)
           .eq('option_type', 'activity_type')
           .eq('option_value', editingOption.id);
 
@@ -3261,9 +3280,9 @@ export default function TeacherDashboard() {
       } else {
         // 自訂類別：軟刪除（設為非活躍）
         console.log('刪除自訂類別:', optionToDelete.name);
-        const { error } = await supabase
-          .from('hanami_custom_options')
-          .update({ is_active: false })
+        const { error } = await (supabase
+          .from('hanami_custom_options') as any)
+          .update({ is_active: false } as any)
           .eq('option_type', 'activity_type')
           .eq('option_value', optionId);
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   ArrowLeftIcon,
   UserIcon,
   PhoneIcon,
@@ -67,23 +67,23 @@ export default function WaitingListRegistrationPage() {
     if (formData.childBirthDate) {
       const birthDate = new Date(formData.childBirthDate);
       const today = new Date();
-      
+
       // 計算年歲（用於顯示）
       let ageInYears = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
-      
+
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
         ageInYears--;
       }
-      
+
       // 計算月齡（用於資料庫存儲）
       let ageInMonths = (today.getFullYear() - birthDate.getFullYear()) * 12 + (today.getMonth() - birthDate.getMonth());
       if (today.getDate() < birthDate.getDate()) {
         ageInMonths--;
       }
-      
+
       setChildAge(ageInYears);
-      
+
       // 更新表單資料中的月齡
       setFormData(prev => ({ ...prev, childAgeInMonths: ageInMonths }));
     } else {
@@ -95,22 +95,22 @@ export default function WaitingListRegistrationPage() {
   // 計算年齡範圍顯示文字 - 參考 page.tsx 中的邏輯
   const getAgeRangeText = (minAge?: number, maxAge?: number, ageRange?: string) => {
     console.log('🎯 getAgeRangeText 輸入參數:', { minAge, maxAge, ageRange });
-    
+
     // 優先使用資料庫的 age_range 文字
     if (ageRange) {
       console.log('✅ 使用 age_range:', ageRange);
       return ageRange;
     }
-    
+
     // 如果有 min_age 和 max_age，計算年齡範圍
     if (minAge !== undefined && minAge !== null) {
       const minYears = Math.floor(minAge / 12);
       const minMonths = minAge % 12;
-      
+
       if (maxAge !== undefined && maxAge !== null) {
         const maxYears = Math.floor(maxAge / 12);
         const maxMonths = maxAge % 12;
-        
+
         // 格式化最小年齡
         let minAgeText = '';
         if (minYears > 0) {
@@ -121,7 +121,7 @@ export default function WaitingListRegistrationPage() {
         } else {
           minAgeText = `${minMonths}個月`;
         }
-        
+
         // 格式化最大年齡
         let maxAgeText = '';
         if (maxYears > 0) {
@@ -132,7 +132,7 @@ export default function WaitingListRegistrationPage() {
         } else {
           maxAgeText = `${maxMonths}個月`;
         }
-        
+
         const result = `${minAgeText} - ${maxAgeText}`;
         console.log('✅ 計算結果（有最大年齡）:', result);
         return result;
@@ -151,7 +151,7 @@ export default function WaitingListRegistrationPage() {
         return result;
       }
     }
-    
+
     console.log('⚠️ 沒有年齡資料，使用預設值');
     return '適合所有年齡';
   };
@@ -171,10 +171,10 @@ export default function WaitingListRegistrationPage() {
     const loadInstitutionsAndCourses = async () => {
       try {
         setLoadingInstitutions(true);
-        
+
         // 載入課程類型
-        const { data: courseData, error: courseError } = await getSupabaseClient()
-          .from('Hanami_CourseTypes')
+        const { data: courseData, error: courseError } = await (getSupabaseClient()
+          .from('Hanami_CourseTypes') as any)
           .select('*')
           .eq('status', true)
           .order('display_order', { ascending: true });
@@ -187,14 +187,14 @@ export default function WaitingListRegistrationPage() {
         console.log('📊 從資料庫讀取的原始課程資料:', courseData);
 
         // 為每個課程添加顯示屬性 - 參考 page.tsx 中的邏輯
-        const coursesWithDisplay = (courseData || []).map((course, index) => {
+        const coursesWithDisplay = (courseData || []).map((course: any, index: number) => {
           console.log(`🔍 處理課程 ${index + 1}:`, {
             name: course.name,
             min_age: course.min_age,
             max_age: course.max_age,
             age_range: course.age_range
           });
-          
+
           // 圖標對應表
           const iconMap: Record<string, any> = {
             'sparkles': SparklesIcon,
@@ -213,10 +213,10 @@ export default function WaitingListRegistrationPage() {
             'from-yellow-400 to-orange-400',
             'from-red-400 to-pink-400'
           ];
-          
+
           const calculatedAge = getAgeRangeText(course.min_age, course.max_age, course.age_range);
           console.log(`📝 課程 "${course.name}" 最終年齡範圍:`, calculatedAge);
-          
+
           return {
             ...course,
             // 使用資料庫的顏色，如果沒有則使用預設
@@ -242,7 +242,7 @@ export default function WaitingListRegistrationPage() {
         setInstitutions(institutionData);
         setCourses(coursesWithDisplay);
         console.log('✅ 成功載入課程（完整資料）:', coursesWithDisplay);
-        
+
         // 自動選擇第一個機構和課程
         if (institutionData.length > 0) {
           setFormData(prev => ({ ...prev, selectedInstitution: institutionData[0].id }));
@@ -275,7 +275,7 @@ export default function WaitingListRegistrationPage() {
       if (user.phone) {
         const countryCodes = ['+852', '+86', '+886', '+65', '+60', '+66', '+84', '+63', '+62', '+1', '+44', '+81', '+82', '+61', '+64'];
         const foundCountry = countryCodes.find(code => user.phone!.startsWith(code));
-        
+
         if (foundCountry) {
           const phoneOnly = user.phone!.replace(foundCountry, '').trim();
           setFormData(prev => ({
@@ -308,7 +308,7 @@ export default function WaitingListRegistrationPage() {
         newErrors.parentPhone = phoneValidation.error || '電話號碼格式不正確';
       }
     }
-    
+
     // 驗證電郵地址
     if (!formData.parentEmail) {
       newErrors.parentEmail = '請輸入電郵地址';
@@ -318,7 +318,7 @@ export default function WaitingListRegistrationPage() {
         newErrors.parentEmail = emailValidation.error || '電郵地址格式不正確';
       }
     }
-    
+
     if (!formData.parentTitle) {
       newErrors.parentTitle = '請輸入您的稱呼';
     }
@@ -374,7 +374,7 @@ export default function WaitingListRegistrationPage() {
         };
 
         const weekNumbers: number[] = [];
-        
+
         availableTimes.forEach(timeKey => {
           const [day] = timeKey.split('-');
           if (dayMap[day] !== undefined) {
@@ -384,7 +384,7 @@ export default function WaitingListRegistrationPage() {
 
         // 去重並排序
         const uniqueWeekNumbers = [...new Set(weekNumbers)].sort((a, b) => a - b);
-        
+
         // 根據 CSV 數據格式，返回包含 week 和 range 的對象
         return {
           week: uniqueWeekNumbers,
@@ -409,7 +409,7 @@ export default function WaitingListRegistrationPage() {
       if (formData.childBirthDate) {
         submitData.student_dob = formData.childBirthDate;
       }
-      
+
       if (formData.childAgeInMonths !== null) {
         submitData.student_age = formData.childAgeInMonths;
       }
@@ -418,19 +418,19 @@ export default function WaitingListRegistrationPage() {
       if (formData.childSchool) {
         submitData.school = formData.childSchool;
       }
-      
+
       if (formData.childSchoolSchedule) {
         submitData.school_schedule = formData.childSchoolSchedule;
       }
-      
+
       if (selectedCourse) {
         submitData.course_types = [selectedCourse.name];
       }
-      
+
       if (formData.availableTimes.length > 0) {
         submitData.prefer_time = preferTimeData;
       }
-      
+
       // 準備備註內容，包含孩子姓名
       let notesContent = '';
       if (formData.childName) {
@@ -440,7 +440,7 @@ export default function WaitingListRegistrationPage() {
         if (notesContent) notesContent += '\n';
         notesContent += formData.remarks.trim();
       }
-      
+
       if (notesContent) {
         submitData.notes = notesContent;
       }
@@ -466,10 +466,10 @@ export default function WaitingListRegistrationPage() {
 
       // 提交到等候區 - 使用基本的插入操作
       const supabaseClient = getSupabaseClient();
-      
+
       // 先嘗試完整的插入操作
-      let { data, error } = await supabaseClient
-        .from('hanami_trial_queue')
+      let { data, error } = await (supabaseClient
+        .from('hanami_trial_queue') as any)
         .insert(submitData)
         .select();
 
@@ -483,15 +483,15 @@ export default function WaitingListRegistrationPage() {
           phone_no: formData.parentCountryCode + formData.parentPhone,
           status: '未試堂'
         };
-        
-        const basicResult = await supabaseClient
-          .from('hanami_trial_queue')
+
+        const basicResult = await (supabaseClient
+          .from('hanami_trial_queue') as any)
           .insert(basicData)
           .select();
-        
+
         data = basicResult.data;
         error = basicResult.error;
-        
+
         console.log('基本插入結果:', { data, error });
       }
 
@@ -578,11 +578,10 @@ export default function WaitingListRegistrationPage() {
                       setErrors(prev => ({ ...prev, parentTitle: '' }));
                     }
                   }}
-                  className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                    errors.parentTitle
+                  className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.parentTitle
                       ? 'border-red-500 focus:border-red-500'
                       : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                  } focus:outline-none`}
+                    } focus:outline-none`}
                   placeholder="請輸入您的稱呼"
                 />
                 {errors.parentTitle && (
@@ -603,8 +602,8 @@ export default function WaitingListRegistrationPage() {
                   value={formData.parentPhone}
                   countryCode={formData.parentCountryCode}
                   onChange={(phone, countryCode) => {
-                    setFormData(prev => ({ 
-                      ...prev, 
+                    setFormData(prev => ({
+                      ...prev,
                       parentPhone: phone,
                       parentCountryCode: countryCode
                     }));
@@ -652,11 +651,10 @@ export default function WaitingListRegistrationPage() {
                       setErrors(prev => ({ ...prev, childName: '' }));
                     }
                   }}
-                  className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                    errors.childName
+                  className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.childName
                       ? 'border-red-500 focus:border-red-500'
                       : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                  } focus:outline-none`}
+                    } focus:outline-none`}
                   placeholder="請輸入孩子姓名"
                 />
                 {errors.childName && (
@@ -681,11 +679,10 @@ export default function WaitingListRegistrationPage() {
                       setErrors(prev => ({ ...prev, childBirthDate: '' }));
                     }
                   }}
-                  className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                    errors.childBirthDate
+                  className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.childBirthDate
                       ? 'border-red-500 focus:border-red-500'
                       : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                  } focus:outline-none`}
+                    } focus:outline-none`}
                 />
                 {errors.childBirthDate && (
                   <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -724,16 +721,15 @@ export default function WaitingListRegistrationPage() {
                         }}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
-                          formData.selectedInstitution === institution.id
+                        className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${formData.selectedInstitution === institution.id
                             ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
                             : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 text-[#4B4036]'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center">
                           <div className="w-12 h-12 mr-4">
-                            <img 
-                              src={institution.logo} 
+                            <img
+                              src={institution.logo}
                               alt={institution.name}
                               className="w-full h-full object-contain"
                             />
@@ -785,11 +781,10 @@ export default function WaitingListRegistrationPage() {
                         }}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 text-left relative ${
-                          formData.selectedCourse === course.id
+                        className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 text-left relative ${formData.selectedCourse === course.id
                             ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
                             : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                        }`}
+                          }`}
                       >
                         {/* 精選標籤 */}
                         {course.is_featured && (
@@ -798,12 +793,12 @@ export default function WaitingListRegistrationPage() {
                             <span>精選</span>
                           </div>
                         )}
-                        
+
                         <div className="flex items-start space-x-3 mb-3">
                           <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gradient-to-br ${course.color} flex items-center justify-center flex-shrink-0 overflow-hidden`}>
                             {imageIconMap[course.name] || imageIconMap[course.icon_type] ? (
-                              <img 
-                                src={imageIconMap[course.name] || imageIconMap[course.icon_type]} 
+                              <img
+                                src={imageIconMap[course.name] || imageIconMap[course.icon_type]}
                                 alt={course.name}
                                 className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
                               />
@@ -833,7 +828,7 @@ export default function WaitingListRegistrationPage() {
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* 課程描述 */}
                         {course.description && (
                           <p className="text-xs sm:text-sm text-[#2B3A3B]/80 line-clamp-2">
@@ -866,11 +861,10 @@ export default function WaitingListRegistrationPage() {
                       setErrors(prev => ({ ...prev, childSchool: '' }));
                     }
                   }}
-                  className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${
-                    errors.childSchool
+                  className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.childSchool
                       ? 'border-red-500 focus:border-red-500'
                       : 'border-[#EADBC8] focus:border-[#FFD59A]'
-                  } focus:outline-none`}
+                    } focus:outline-none`}
                   placeholder="請輸入孩子就讀的學校名稱"
                 />
                 {errors.childSchool && (
@@ -904,11 +898,10 @@ export default function WaitingListRegistrationPage() {
                       }}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
-                        formData.childSchoolSchedule === schedule.value
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${formData.childSchoolSchedule === schedule.value
                           ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
                           : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 text-[#4B4036]'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center mb-2">
                         <schedule.icon className={`w-6 h-6 mr-3 ${schedule.color}`} />
@@ -954,11 +947,10 @@ export default function WaitingListRegistrationPage() {
                               }}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
-                              className={`w-full px-3 py-2 text-xs rounded-lg border-2 transition-all duration-200 ${
-                                isSelected
+                              className={`w-full px-3 py-2 text-xs rounded-lg border-2 transition-all duration-200 ${isSelected
                                   ? 'border-[#FFD59A] bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
                                   : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-                              }`}
+                                }`}
                             >
                               {period}
                             </motion.button>
@@ -992,11 +984,10 @@ export default function WaitingListRegistrationPage() {
                 disabled={isSubmitting}
                 whileHover={!isSubmitting ? { scale: 1.02 } : {}}
                 whileTap={!isSubmitting ? { scale: 0.98 } : {}}
-                className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 ${
-                  isSubmitting
+                className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 ${isSubmitting
                     ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                     : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:shadow-lg'
-                }`}
+                  }`}
               >
                 {isSubmitting ? '提交中...' : '提交等候區申請'}
               </motion.button>
@@ -1037,9 +1028,9 @@ export default function WaitingListRegistrationPage() {
               )}
               <p className="text-[#2B3A3B]">學校：{formData.childSchool}</p>
               <p className="text-[#2B3A3B]">
-                時段：{formData.childSchoolSchedule === 'morning' ? '上午班' : 
-                      formData.childSchoolSchedule === 'afternoon' ? '下午班' : 
-                      formData.childSchoolSchedule === 'fulltime' ? '全日制' : '未選擇'}
+                時段：{formData.childSchoolSchedule === 'morning' ? '上午班' :
+                  formData.childSchoolSchedule === 'afternoon' ? '下午班' :
+                    formData.childSchoolSchedule === 'fulltime' ? '全日制' : '未選擇'}
               </p>
               {formData.availableTimes.length > 0 && (
                 <p className="text-[#2B3A3B]">

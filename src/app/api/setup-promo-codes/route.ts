@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
       console.log('🔨 創建 hanami_promo_codes 表格...');
       
       // 嘗試直接插入來觸發表格創建
-      const { error } = await supabase
-        .from('hanami_promo_codes')
+      const { error } = await (supabase
+        .from('hanami_promo_codes') as any)
         .insert({
           code: 'TEMP_SETUP',
           name: 'Setup Test',
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
           discount_type: 'percentage',
           discount_value: 0,
           is_active: false
-        });
+        } as any);
 
       if (error) {
         console.error('❌ 創建表格錯誤:', error);
@@ -55,8 +55,8 @@ export async function POST(request: NextRequest) {
       // 嘗試插入來測試表格結構
       console.log('🧪 測試 saas_coupons 表格結構...');
       try {
-        const { error: testError } = await supabase
-          .from('saas_coupons')
+        const { error: testError } = await (supabase
+          .from('saas_coupons') as any)
           .insert({
             coupon_code: 'TEMP_SETUP',
             coupon_name: 'Setup Test',
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
             discount_type: 'percentage',
             discount_value: 0,
             is_active: false
-          });
+          } as any);
         
         if (testError) {
           console.log('⚠️ saas_coupons 需要擴展欄位:', testError.message);
@@ -136,9 +136,9 @@ export async function POST(request: NextRequest) {
           }
         ];
 
-        const { error: insertError } = await supabase
-          .from('hanami_promo_codes')
-          .insert(testData);
+        const { error: insertError } = await (supabase
+          .from('hanami_promo_codes') as any)
+          .insert(testData as any);
 
         if (insertError) {
           console.error('❌ 插入數據錯誤:', insertError);
@@ -197,9 +197,9 @@ export async function POST(request: NextRequest) {
           }
         ];
 
-        const { error: insertError } = await supabase
-          .from('saas_coupons')
-          .insert(testData);
+        const { error: insertError } = await (supabase
+          .from('saas_coupons') as any)
+          .insert(testData as any);
 
         if (insertError) {
           console.error('❌ 插入數據錯誤:', insertError);

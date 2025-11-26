@@ -188,13 +188,15 @@ export default function LessonEditorModal({
 
   // 從 Supabase 撈取該學生最近一筆課堂記錄的 regular_timeslot、actual_timeslot 及 lesson_date
   const fetchRegularTimeslot = async () => {
-    const { data, error } = await supabase
+    const { data: dataRaw, error } = await supabase
       .from('hanami_student_lesson')
       .select('regular_timeslot, actual_timeslot, lesson_date')
       .eq('student_id', studentId)
       .order('lesson_date', { ascending: false })
       .limit(1)
       .single();
+    
+    const data = dataRaw as { regular_timeslot: string | null; actual_timeslot: string | null; lesson_date: string | null; [key: string]: any; } | null;
 
     if (data) {
       setForm(prev => ({
@@ -207,10 +209,11 @@ export default function LessonEditorModal({
 
   // 從歷史課堂記錄撈取最常見的課程類別
   const fetchHistoricalCourseType = async () => {
-    const { data, error } = await supabase
+    const { data: dataRaw, error } = await supabase
       .from('hanami_student_lesson')
       .select('course_type')
       .eq('student_id', studentId);
+    const data = dataRaw as Array<{ course_type: string | null; [key: string]: any; }> | null;
     if (data && data.length > 0) {
       const countMap: Record<string, number> = {};
       data.forEach(item => {
@@ -482,11 +485,13 @@ export default function LessonEditorModal({
   };
 
   const fetchCourseTypeFromStudent = async () => {
-    const { data, error } = await supabase
+    const { data: dataRaw, error } = await supabase
       .from('Hanami_Students')
       .select('course_type')
       .eq('id', studentId)
       .single();
+    
+    const data = dataRaw as { course_type: string | null; [key: string]: any; } | null;
 
     if (data?.course_type) {
       setForm((prev) => ({
@@ -534,14 +539,14 @@ export default function LessonEditorModal({
       }
 
       // 1. 從 Supabase 取得學生資料
-      let studentData = null;
+      let studentData: { student_oid: string | null; regular_weekday: number | null; full_name: string | null; org_id: string | null; [key: string]: any; } | null = null;
       try {
         const { data } = await supabase
           .from('Hanami_Students')
           .select('student_oid, regular_weekday, full_name, org_id')
           .eq('id', studentId)
           .single();
-        studentData = data;
+        studentData = data as { student_oid: string | null; regular_weekday: number | null; full_name: string | null; org_id: string | null; [key: string]: any; } | null;
       } catch (e) {
         console.error('Error fetching student data:', e);
       }
@@ -601,10 +606,11 @@ export default function LessonEditorModal({
           id: lesson.id, // 只在更新時包含id
         };
         
-        const { error } = await supabase
+        // hanami_student_lesson table type may not be fully defined
+        const { error } = await ((supabase as any)
           .from('hanami_student_lesson')
           .update(updatePayload)
-          .eq('id', lesson.id);
+          .eq('id', lesson.id));
         
         if (error) {
           console.error('Error updating lesson:', error);
@@ -645,18 +651,19 @@ export default function LessonEditorModal({
             lesson_activities: form.lesson_activities ?? null,
             org_id: resolvedOrgId,
           }));
-          const { data, error } = await supabase
+          // hanami_student_lesson table type may not be fully defined
+          const { data, error } = await ((supabase as any)
             .from('hanami_student_lesson')
             .insert(newLessons)
-            .select();
+            .select());
           if (error) {
             console.error('Error inserting multiple lessons:', error);
             alert(`新增多堂課記錄失敗，請稍後再試\n${error.message}`);
             return;
           }
           if (data) {
-            const summary = data
-              .map(d => `日期：${d.lesson_date} 時間：${d.actual_timeslot || d.regular_timeslot}`)
+            const summary = (data as Array<{ lesson_date: string; actual_timeslot: string | null; regular_timeslot: string | null; [key: string]: any; }>)
+              .map((d: { lesson_date: string; actual_timeslot: string | null; regular_timeslot: string | null; [key: string]: any; }) => `日期：${d.lesson_date} 時間：${d.actual_timeslot || d.regular_timeslot}`)
               .join('\n');
             alert(`課堂已成功新增！\n${summary}`);
           }
@@ -669,10 +676,11 @@ export default function LessonEditorModal({
             updated_at: nowISOString,
             org_id: resolvedOrgId,
           };
-          const { data, error } = await supabase
+          // hanami_student_lesson table type may not be fully defined
+          const { data, error } = await ((supabase as any)
             .from('hanami_student_lesson')
             .insert(singlePayload)
-            .select();
+            .select());
           if (error) {
             console.error('Error inserting single lesson:', error);
             alert(`新增課堂記錄失敗，請稍後再試\n${error.message}`);

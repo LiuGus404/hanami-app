@@ -14,6 +14,7 @@ import StudentPhoneProfile from '@/components/ui/StudentPhoneProfile';
 import { supabase } from '@/lib/supabase';
 import { useTeacherLinkOrganization, TeacherLinkShell } from '../../TeacherLinkShell';
 import { toast } from 'react-hot-toast';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
 
@@ -133,7 +134,7 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
         }
 
         const result = await response.json();
-        
+
         if (!result.success || !result.data) {
           setError('找不到學生資料或您沒有權限存取。');
           setStudent(null);
@@ -143,7 +144,7 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
         }
 
         const studentData = result.data;
-        
+
         // 檢查是否為停用學生
         if (result.isInactive) {
           setIsInactiveStudent(true);
@@ -204,8 +205,8 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
         student_remarks: student.student_remarks,
       };
 
-      const { error: restoreError } = await supabase
-        .from('Hanami_Students')
+      const { error: restoreError } = await (supabase
+        .from('Hanami_Students') as any)
         .upsert(studentData, { onConflict: 'id' });
 
       if (restoreError) {
@@ -335,42 +336,41 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
             ].map(({ key, label, icon: Icon, description }) => {
               const isPremiumOrg = orgId === PREMIUM_AI_ORG_ID;
               const isDisabled = (key === 'media' || key === 'phone') && !isPremiumOrg;
-              
+
               return (
-              <div key={key} className="relative">
-                <motion.button
-                  onClick={() => handleTabChange(key as any)}
-                  onMouseEnter={() => setShowTooltip(key)}
-                  onMouseLeave={() => setShowTooltip(null)}
-                  className={`
+                <div key={key} className="relative">
+                  <motion.button
+                    onClick={() => handleTabChange(key as any)}
+                    onMouseEnter={() => setShowTooltip(key)}
+                    onMouseLeave={() => setShowTooltip(null)}
+                    className={`
                     flex items-center rounded-lg px-2 py-3 text-sm font-medium transition-colors sm:px-4
-                    ${
-                      isDisabled
+                    ${isDisabled
                         ? 'opacity-50 cursor-pointer text-gray-400'
                         : activeTab === key
                           ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
                           : 'text-[#2B3A3B]/70 hover:bg-white/60 hover:text-[#2B3A3B]'
-                    }
+                      }
                   `}
-                  whileHover={isDisabled ? {} : { scale: 1.02 }}
-                  whileTap={isDisabled ? {} : { scale: 0.98 }}
-                >
-                  <Icon className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">{label}</span>
-                </motion.button>
-                {showTooltip === key && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-full left-1/2 z-50 mb-2 w-40 -translate-x-1/2 rounded-lg bg-[#2B3A3B] px-3 py-2 text-center text-xs text-white shadow-lg sm:hidden"
+                    whileHover={isDisabled ? {} : { scale: 1.02 }}
+                    whileTap={isDisabled ? {} : { scale: 0.98 }}
                   >
-                    <div className="font-medium">{label}</div>
-                    <div className="mt-1 text-[#EADBC8]">{description}</div>
-                    <div className="absolute top-full left-1/2 -ml-1 h-2 w-2 rotate-45 bg-[#2B3A3B]" />
-                  </motion.div>
-                )}
-              </div>
+                    <Icon className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">{label}</span>
+                  </motion.button>
+                  {showTooltip === key && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute bottom-full left-1/2 z-50 mb-2 w-40 -translate-x-1/2 rounded-lg bg-[#2B3A3B] px-3 py-2 text-center text-xs text-white shadow-lg sm:hidden"
+                    >
+                      <div className="font-medium">{label}</div>
+                      <div className="mt-1 text-[#EADBC8]">{description}</div>
+                      <div className="absolute top-full left-1/2 -ml-1 h-2 w-2 rotate-45 bg-[#2B3A3B]" />
+                    </motion.div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -444,15 +444,17 @@ export default function TeacherStudentDetailPage() {
 
   return (
     <TeacherLinkShell currentPath={`/aihome/teacher-link/create/students/${studentId}`}>
-      <div className="px-4 py-6 sm:px-6 lg:px-8">
-        {studentId ? (
-          <TeacherStudentDetailContent studentId={studentId} />
-        ) : (
-          <div className="rounded-2xl border border-[#EADBC8] bg-[#FFF9F2] p-6 text-center text-[#4B4036]">
-            無法取得學生識別碼。
-          </div>
-        )}
-      </div>
+      <WithPermissionCheck pageKey="students">
+        <div className="px-4 py-6 sm:px-6 lg:px-8">
+          {studentId ? (
+            <TeacherStudentDetailContent studentId={studentId} />
+          ) : (
+            <div className="rounded-2xl border border-[#EADBC8] bg-[#FFF9F2] p-6 text-center text-[#4B4036]">
+              無法取得學生識別碼。
+            </div>
+          )}
+        </div>
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

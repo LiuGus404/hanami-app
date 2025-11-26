@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 export async function POST() {
   try {
     // 嘗試刪除有問題的觸發器
-    const { error: dropError } = await supabase.rpc('exec_sql', {
+    const { error: dropError } = await (supabase.rpc as any)('exec_sql', {
       sql: 'DROP TRIGGER IF EXISTS trigger_log_assessment_compatibility ON hanami_growth_goals;'
     });
 

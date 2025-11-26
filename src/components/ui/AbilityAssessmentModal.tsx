@@ -82,9 +82,13 @@ export default function AbilityAssessmentModal({
       if (goalsError) throw goalsError;
 
       // 提取所有需要的能力ID
+      const typedGoalsData = (goalsData || []) as Array<{
+        required_abilities?: string[] | null;
+        [key: string]: any;
+      }>;
       const abilityIds = new Set<string>();
-      (goalsData || []).forEach(goal => {
-        if (goal.required_abilities) {
+      typedGoalsData.forEach(goal => {
+        if (goal.required_abilities && Array.isArray(goal.required_abilities)) {
           goal.required_abilities.forEach((abilityId: string) => {
             abilityIds.add(abilityId);
           });

@@ -34,7 +34,8 @@ export async function POST() {
 
     // 3. 統計教師工作日期
     const teacherWorkDates = new Map<string, Set<string>>();
-    lessons?.forEach(lesson => {
+    const typedLessons = (lessons || []) as Array<{ lesson_teacher?: string | null; lesson_date?: string | null; [key: string]: any }>;
+    typedLessons.forEach(lesson => {
       if (lesson.lesson_teacher && lesson.lesson_date) {
         if (!teacherWorkDates.has(lesson.lesson_teacher)) {
           teacherWorkDates.set(lesson.lesson_teacher, new Set());
@@ -45,9 +46,10 @@ export async function POST() {
 
     // 4. 生成排班記錄
     const schedules = [];
+    const typedTeachers = (teachers || []) as Array<{ id: string; teacher_nickname?: string | null; teacher_fullname?: string | null; [key: string]: any }>;
     for (const [teacherName, dates] of teacherWorkDates) {
       // 找到對應的教師ID
-      const teacher = teachers?.find(t => 
+      const teacher = typedTeachers.find(t => 
         t.teacher_nickname === teacherName || 
         t.teacher_fullname === teacherName
       );
@@ -79,8 +81,11 @@ export async function POST() {
       .from('teacher_schedule')
       .select('teacher_id, scheduled_date');
 
-    existingData?.forEach(schedule => {
-      existingSchedules.add(`${schedule.teacher_id}-${schedule.scheduled_date}`);
+    const typedExistingData = (existingData || []) as Array<{ teacher_id?: string | null; scheduled_date?: string | null; [key: string]: any }>;
+    typedExistingData.forEach(schedule => {
+      if (schedule.teacher_id && schedule.scheduled_date) {
+        existingSchedules.add(`${schedule.teacher_id}-${schedule.scheduled_date}`);
+      }
     });
 
     // 過濾掉已存在的排班記錄
@@ -96,9 +101,9 @@ export async function POST() {
     }
 
     // 6. 插入新的排班記錄
-    const { error: insertError } = await supabase
-      .from('teacher_schedule')
-      .insert(newSchedules);
+    const { error: insertError } = await (supabase
+      .from('teacher_schedule') as any)
+      .insert(newSchedules as any);
 
     if (insertError) {
       console.error('❌ 插入排班記錄失敗:', insertError);

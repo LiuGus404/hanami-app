@@ -142,7 +142,7 @@ export default function CheckAIToolDataPage() {
       console.log('創建測試資料...');
       const { data, error } = await supabase
         .from('ai_tasks')
-        .insert(testRecords)
+        .insert(testRecords as any)
         .select();
 
       if (error) {

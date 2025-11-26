@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     const supabase = createSaasAdminClient();
 
     // 檢查約束是否存在
-    const { data: constraints, error } = await supabase.rpc('exec_sql', {
+    const { data: constraints, error } = await (supabase.rpc as any)('exec_sql', {
       sql: `
         SELECT constraint_name, constraint_type 
         FROM information_schema.table_constraints 

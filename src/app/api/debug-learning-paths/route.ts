@@ -92,11 +92,13 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
     
+    const typedCourseTypeData = courseTypeData as { id: string; name: string; [key: string]: any };
+    
     // 2. 根據課程類型ID獲取成長樹
-    const { data: growthTrees, error: treesError } = await supabase
+    const { data: growthTrees, error: treesError } = await (supabase as any)
       .from('hanami_growth_trees')
       .select('id, tree_name, course_type_id, is_active')
-      .eq('course_type_id', courseTypeData.id)
+      .eq('course_type_id', typedCourseTypeData.id)
       .eq('is_active', true);
     
     console.log('🌳 成長樹查詢結果:', { growthTrees, treesError });
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       debug: {
-        courseType: courseTypeData,
+        courseType: typedCourseTypeData,
         growthTrees,
         learningPaths: learningPathsResults
       }

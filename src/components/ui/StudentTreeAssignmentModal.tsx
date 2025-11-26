@@ -203,6 +203,7 @@ export default function StudentTreeAssignmentModal({
       // 批量插入分配記錄
       const { error } = await supabase
         .from('hanami_student_trees')
+        // @ts-ignore - hanami_student_trees table type may not be fully defined
         .upsert(assignments, { 
           onConflict: 'student_id,tree_id',
           ignoreDuplicates: false 

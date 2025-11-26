@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabaseClient();
 
     // 獲取 like counts
-    const { data: likeCounts, error: likeError } = await supabase
-      .from('hanami_org_likes')
+    const { data: likeCounts, error: likeError } = await ((supabase as any)
+      .from('hanami_org_likes'))
       .select('org_id')
       .in('org_id', orgIds);
 
@@ -50,8 +50,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 獲取 review counts（嘗試查詢 hanami_org_reviews）
-    const { data: reviews, error: reviewError } = await supabase
-      .from('hanami_org_reviews')
+    const { data: reviews, error: reviewError } = await ((supabase as any)
+      .from('hanami_org_reviews'))
       .select('org_id, status')
       .in('org_id', orgIds)
       .eq('status', 'active');

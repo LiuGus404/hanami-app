@@ -67,14 +67,15 @@ export default function AbilityCategoryManager({
         { id: 'artistic', name: '藝術發展', is_default: true, sort_order: 5 },
       ];
 
-      const customCategories = (customData || []).map(item => ({
+      const typedCustomData = (customData || []) as Array<{ option_value?: string; option_name?: string; sort_order?: number; [key: string]: any }>;
+      const customCategories = typedCustomData.map(item => ({
         id: item.option_value,
         name: item.option_name,
         is_default: false,
         sort_order: item.sort_order,
       }));
 
-      setCategories([...defaultCategories, ...customCategories]);
+      setCategories([...defaultCategories, ...customCategories] as any);
     } catch (err) {
       console.error('載入類別失敗：', err);
       toast.error('載入類別失敗');
@@ -142,9 +143,9 @@ export default function AbilityCategoryManager({
           updateData.org_id = orgId;
         }
         
-        let updateQuery = supabase
-          .from('hanami_custom_options')
-          .update(updateData)
+        let updateQuery = (supabase
+          .from('hanami_custom_options') as any)
+          .update(updateData as any)
           .eq('option_type', 'activity_type')
           .eq('option_value', editingCategory.id);
         
@@ -182,9 +183,9 @@ export default function AbilityCategoryManager({
       }
       
       // 自訂類別：軟刪除（設為非活躍）
-      let deleteQuery = supabase
-        .from('hanami_custom_options')
-        .update({ is_active: false })
+      let deleteQuery = (supabase
+        .from('hanami_custom_options') as any)
+        .update({ is_active: false } as any)
         .eq('option_type', 'activity_type')
         .eq('option_value', categoryId);
       

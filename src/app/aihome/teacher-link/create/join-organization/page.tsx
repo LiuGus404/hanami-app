@@ -200,8 +200,8 @@ function JoinOrganizationContent() {
     try {
       const supabase = getSupabaseClient();
       // 檢查用戶是否已經在該機構中
-      const { data: existingIdentity, error: checkError } = await supabase
-        .from('hanami_org_identities')
+      const { data: existingIdentity, error: checkError } = await (supabase
+        .from('hanami_org_identities') as any)
         .select('id')
         .eq('org_id', orgInfo.id)
         .eq('user_email', user.email)
@@ -222,8 +222,8 @@ function JoinOrganizationContent() {
       }
 
       // 創建機構身份記錄（默認為 member 角色，需要管理員批准）
-      const { error: insertError } = await supabase
-        .from('hanami_org_identities')
+      const { error: insertError } = await (supabase
+        .from('hanami_org_identities') as any)
         .insert({
           org_id: orgInfo.id,
           user_id: user.id,
@@ -340,7 +340,7 @@ function JoinOrganizationContent() {
               </div>
             </motion.button>
           </div>
-          
+
           {/* 提示訊息 */}
           <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-200">
             <p className="text-sm text-gray-600 text-center">

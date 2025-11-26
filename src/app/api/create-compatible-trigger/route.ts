@@ -96,7 +96,7 @@ export async function POST() {
         FOR EACH ROW EXECUTE FUNCTION log_growth_goal_version_changes();
     `;
 
-    const { error: createError } = await supabase.rpc('exec_sql', {
+    const { error: createError } = await (supabase.rpc as any)('exec_sql', {
       sql: compatibleTriggerSQL
     });
 

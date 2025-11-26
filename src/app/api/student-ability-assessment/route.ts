@@ -50,13 +50,13 @@ export async function POST(request: NextRequest) {
     });
 
     // 檢查是否已存在該日期的評估記錄
-    const { data: existingAssessmentData, error: checkError } = await supabase
+    const { data: existingAssessmentData, error: checkError } = await ((supabase as any)
       .from('hanami_ability_assessments')
       .select('id')
       .eq('student_id', student_id)
       .eq('tree_id', tree_id)
       .eq('assessment_date', assessment_date)
-      .maybeSingle();
+      .maybeSingle());
 
     const existingAssessment = existingAssessmentData as { id: string } | null;
 
@@ -71,11 +71,11 @@ export async function POST(request: NextRequest) {
     // 如果沒有提供 org_id，從學生記錄中獲取
     let finalOrgId = org_id;
     if (!finalOrgId) {
-      const { data: studentDataRaw } = await supabase
+      const { data: studentDataRaw } = await ((supabase as any)
         .from('Hanami_Students')
         .select('org_id')
         .eq('id', student_id)
-        .single();
+        .single());
       
       const studentData = studentDataRaw as { org_id: string } | null;
       
@@ -128,14 +128,14 @@ export async function POST(request: NextRequest) {
       // 創建新記錄
       console.log('創建新評估記錄');
       
-      const { data: newAssessmentData, error: insertError } = await supabase
+      const { data: newAssessmentData, error: insertError } = await ((supabase as any)
         .from('hanami_ability_assessments')
         .insert({
           ...updateData,
           created_at: new Date().toISOString()
-        })
+        } as any)
         .select()
-        .single();
+        .single());
 
       if (insertError || !newAssessmentData) {
         console.error('創建評估記錄時出錯:', insertError);
@@ -156,11 +156,11 @@ export async function POST(request: NextRequest) {
     });
 
     // 獲取更新後的完整評估記錄（分別查詢避免 RLS 遞歸）
-    const { data: finalAssessmentData, error: fetchError } = await supabase
+    const { data: finalAssessmentData, error: fetchError } = await ((supabase as any)
       .from('hanami_ability_assessments')
       .select('*')
       .eq('id', assessmentId)
-      .single();
+      .single());
 
     if (fetchError || !finalAssessmentData) {
       console.error('獲取最終評估記錄時出錯:', fetchError);
@@ -174,12 +174,12 @@ export async function POST(request: NextRequest) {
 
     // 分別查詢學生和成長樹資料
     const [studentResult, treeResult] = await Promise.all([
-      supabase
+      (supabase as any)
         .from('Hanami_Students')
         .select('full_name, nick_name, course_type')
         .eq('id', student_id)
         .single(),
-      supabase
+      (supabase as any)
         .from('hanami_growth_trees')
         .select('tree_name, tree_description')
         .eq('id', tree_id)
@@ -244,13 +244,13 @@ export async function GET(request: NextRequest) {
     });
 
     // 分別查詢評估記錄、學生和成長樹資料（避免 RLS 遞歸）
-    const { data: assessmentData, error } = await supabase
+    const { data: assessmentData, error } = await ((supabase as any)
       .from('hanami_ability_assessments')
       .select('*')
       .eq('student_id', studentId)
       .eq('tree_id', treeId)
       .eq('assessment_date', date)
-      .maybeSingle();
+      .maybeSingle());
 
     if (error) {
       console.error('獲取評估記錄時出錯:', error);
@@ -272,12 +272,12 @@ export async function GET(request: NextRequest) {
 
     // 分別查詢學生和成長樹資料
     const [studentResult, treeResult] = await Promise.all([
-      supabase
+      (supabase as any)
         .from('Hanami_Students')
         .select('full_name, nick_name, course_type')
         .eq('id', studentId)
         .single(),
-      supabase
+      (supabase as any)
         .from('hanami_growth_trees')
         .select('tree_name, tree_description')
         .eq('id', treeId)

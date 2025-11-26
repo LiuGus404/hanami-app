@@ -72,7 +72,7 @@ export default function SimpleStudentDetailPage() {
       }
     }
   }, [student, activeTab]);
-  
+
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
   const currentIdRef = useRef<string | null>(null);
@@ -97,17 +97,17 @@ export default function SimpleStudentDetailPage() {
   useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
     if (loading || !user) return;
-    
+
     // 如果 ID 沒有變化且已經載入過，不重複載入
     if (currentIdRef.current === id && dataFetchedRef.current) return;
-    
+
     // 防止重複載入
     if (loadingRef.current) return;
     loadingRef.current = true;
-    
+
     // 更新當前 ID
     currentIdRef.current = id as string;
-    
+
     setPageLoading(true);
     setStudent(null);
     setError(null);
@@ -129,7 +129,7 @@ export default function SimpleStudentDetailPage() {
         setPageLoading(false);
         dataFetchedRef.current = true;
         loadingRef.current = false;
-        
+
         await logAccess(payload.data.id, institution, 'view');
         await checkBindingStatus(payload.data.id);
         await checkLessonData(payload.data.id);
@@ -145,32 +145,32 @@ export default function SimpleStudentDetailPage() {
       try {
         console.log('🔍 檢查課堂資料表...');
         const supabase = getSupabaseClient();
-        const { data: allLessons, error: allError } = await supabase
-          .from('hanami_student_lesson')
+        const { data: allLessons, error: allError } = await (supabase
+          .from('hanami_student_lesson') as any)
           .select('*')
           .limit(5);
-        
-        console.log('📊 課堂資料表檢查:', { 
+
+        console.log('📊 課堂資料表檢查:', {
           hasData: allLessons && allLessons.length > 0,
           totalRecords: allLessons?.length || 0,
-          sampleData: allLessons?.slice(0, 2).map((l) => ({
+          sampleData: allLessons?.slice(0, 2).map((l: any) => ({
             id: l.id,
             student_id: l.student_id,
             lesson_date: l.lesson_date,
           })),
           error: allError?.message || '無錯誤',
         });
-        
-        const { data: studentLessons, error: studentError } = await supabase
-          .from('hanami_student_lesson')
+
+        const { data: studentLessons, error: studentError } = await (supabase
+          .from('hanami_student_lesson') as any)
           .select('id, lesson_date, course_type, student_id')
           .eq('student_id', studentId)
           .limit(5);
-        
+
         console.log('📋 學生課堂資料檢查:', {
           studentId,
           lessonCount: studentLessons?.length || 0,
-          lessons: studentLessons?.map((l) => ({
+          lessons: studentLessons?.map((l: any) => ({
             id: l.id,
             date: l.lesson_date,
             type: l.course_type,
@@ -214,16 +214,16 @@ export default function SimpleStudentDetailPage() {
   // 檢查孩子綁定狀態
   const checkBindingStatus = async (studentId: string) => {
     if (!parentId) return;
-    
+
     try {
       const response = await fetch(`/api/parent/bind-student?parentId=${parentId}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success && data.bindings) {
         const isBound = data.bindings.some((binding: any) => binding.student_id === studentId);
         setIsStudentBound(isBound);
@@ -292,72 +292,71 @@ export default function SimpleStudentDetailPage() {
 
   const detailContent = (
     <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6">
-        <div className="mb-4 sm:mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-            <motion.button
-              onClick={handleBack}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors text-sm sm:text-base"
-            >
-              <span>←</span>
-              <span className="hidden sm:inline">返回家長連結</span>
-              <span className="sm:hidden">返回</span>
-            </motion.button>
-            
-            <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4">
-              <BindingStatusIndicator isBound={isStudentBound} />
-              <div className="flex items-center space-x-2 px-2 py-1.5 sm:px-3 sm:py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8]">
-                <Building className="w-3 h-3 sm:w-4 sm:h-4 text-[#4B4036]" />
-                <span className="text-xs sm:text-sm font-medium text-[#4B4036]">{institution}</span>
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+          <motion.button
+            onClick={handleBack}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors text-sm sm:text-base"
+          >
+            <span>←</span>
+            <span className="hidden sm:inline">返回家長連結</span>
+            <span className="sm:hidden">返回</span>
+          </motion.button>
+
+          <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4">
+            <BindingStatusIndicator isBound={isStudentBound} />
+            <div className="flex items-center space-x-2 px-2 py-1.5 sm:px-3 sm:py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8]">
+              <Building className="w-3 h-3 sm:w-4 sm:h-4 text-[#4B4036]" />
+              <span className="text-xs sm:text-sm font-medium text-[#4B4036]">{institution}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isInactiveStudent && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path clipRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" fillRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">此學生已停用</h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
+                <p>停用原因：{student.inactive_reason}</p>
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {isInactiveStudent && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path clipRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" fillRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">此學生已停用</h3>
-                <div className="mt-2 text-sm text-yellow-700">
-                  <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
-                  <p>停用原因：{student.inactive_reason}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="mb-4 sm:mb-6">
+        <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1 overflow-x-auto">
+          {[
+            { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理', shortLabel: '基本' },
+            { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄', shortLabel: '課程' },
+            { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度', shortLabel: '狀態' },
+            { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片', shortLabel: '媒體' }
+          ].map(({ key, label, icon: Icon, description, shortLabel }) => {
+            const studentOrgId = student?.org_id ?? null;
+            const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
+            const isDisabled = key === 'media' && !isPremiumOrg;
 
-        <div className="mb-4 sm:mb-6">
-          <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1 overflow-x-auto">
-            {[
-              { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理', shortLabel: '基本' },
-              { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄', shortLabel: '課程' },
-              { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度', shortLabel: '狀態' },
-              { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片', shortLabel: '媒體' }
-            ].map(({ key, label, icon: Icon, description, shortLabel }) => {
-              const studentOrgId = student?.org_id ?? null;
-              const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
-              const isDisabled = key === 'media' && !isPremiumOrg;
-              
-              return (
+            return (
               <motion.button
                 key={key}
                 onClick={() => handleTabChange(key as any)}
                 className={`
                   flex items-center px-2 py-2 sm:px-4 sm:py-3 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0
-                  ${
-                    isDisabled
-                      ? 'opacity-50 cursor-pointer text-gray-400'
-                      : activeTab === key
-                        ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
-                        : 'text-[#2B3A3B]/70 hover:text-[#4B4036] hover:bg-white/50'
+                  ${isDisabled
+                    ? 'opacity-50 cursor-pointer text-gray-400'
+                    : activeTab === key
+                      ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
+                      : 'text-[#2B3A3B]/70 hover:text-[#4B4036] hover:bg-white/50'
                   }
                 `}
                 whileHover={isDisabled ? {} : { scale: 1.02 }}
@@ -368,105 +367,105 @@ export default function SimpleStudentDetailPage() {
                 <span className="hidden sm:inline">{label}</span>
                 <span className="sm:hidden">{shortLabel}</span>
               </motion.button>
-              );
-            })}
-          </div>
+            );
+          })}
         </div>
+      </div>
 
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-        >
-          {activeTab === 'basic' && (
-            <StudentBasicInfo 
-              isInactive={isInactiveStudent} 
-              student={student}
-              hideTeacherInfo
-              hideSensitiveInfo
-              hideContactDays
-              readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
-              visibleFields={['full_name', 'nick_name', 'student_age', 'gender', 'course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'duration_months', 'school', 'address', 'health_notes', 'student_remarks']}
-              onUpdate={(newData) => {
-                setStudent(newData);
-              }}
-            />
-          )}
+      <motion.div
+        key={activeTab}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.3 }}
+      >
+        {activeTab === 'basic' && (
+          <StudentBasicInfo
+            isInactive={isInactiveStudent}
+            student={student}
+            hideTeacherInfo
+            hideSensitiveInfo
+            hideContactDays
+            readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
+            visibleFields={['full_name', 'nick_name', 'student_age', 'gender', 'course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'duration_months', 'school', 'address', 'health_notes', 'student_remarks']}
+            onUpdate={(newData) => {
+              setStudent(newData);
+            }}
+          />
+        )}
 
-          {activeTab === 'lessons' && student && (
-            <div className="mt-2 sm:mt-4">
-              {(() => {
-                const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
-                console.log('🎯 準備載入課堂資料:', {
-                  lessonStudentId,
-                  isInactiveStudent,
-                  studentOriginalId: student.original_id,
-                  currentStudentId: student.id,
-                  studentType: student.student_type,
-                });
-                return (
-                  <StudentLessonPanel 
-                    contactNumber={student.contact_number} 
-                    studentId={lessonStudentId}
-                    studentName={student.full_name}
-                    studentType={student.student_type}
-                    studentData={student}
-                    hideActionButtons
-                    hideTeacherColumn
-                    hideCareAlert
-                    disableSelection
-                    orgId={student.org_id ?? null}
-                    organizationName={
-                      (student as any)?.organization_name ??
-                      (student as any)?.organizationName ??
-                      null
-                    }
-                  />
-                );
-              })()}
-            </div>
-          )}
+        {activeTab === 'lessons' && student && (
+          <div className="mt-2 sm:mt-4">
+            {(() => {
+              const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
+              console.log('🎯 準備載入課堂資料:', {
+                lessonStudentId,
+                isInactiveStudent,
+                studentOriginalId: student.original_id,
+                currentStudentId: student.id,
+                studentType: student.student_type,
+              });
+              return (
+                <StudentLessonPanel
+                  contactNumber={student.contact_number}
+                  studentId={lessonStudentId}
+                  studentName={student.full_name}
+                  studentType={student.student_type}
+                  studentData={student}
+                  hideActionButtons
+                  hideTeacherColumn
+                  hideCareAlert
+                  disableSelection
+                  orgId={student.org_id ?? null}
+                  organizationName={
+                    (student as any)?.organization_name ??
+                    (student as any)?.organizationName ??
+                    null
+                  }
+                />
+              );
+            })()}
+          </div>
+        )}
 
-          {activeTab === 'avatar' && student && (
-            <EnhancedStudentAvatarTab 
-              student={student}
+        {activeTab === 'avatar' && student && (
+          <EnhancedStudentAvatarTab
+            student={student}
+            className="mt-2 sm:mt-4"
+          />
+        )}
+
+        {activeTab === 'media' && student && (
+          <>
+            {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', {
+              studentId: student.id,
+              studentName: student.full_name,
+              studentObject: student
+            })}
+            <StudentMediaTimeline
+              studentId={student.id}
+              studentName={student.full_name}
               className="mt-2 sm:mt-4"
             />
-          )}
-
-          {activeTab === 'media' && student && (
-            <>
-              {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', { 
-                studentId: student.id, 
-                studentName: student.full_name,
-                studentObject: student 
-              })}
-              <StudentMediaTimeline 
-                studentId={student.id}
-                studentName={student.full_name}
-                className="mt-2 sm:mt-4"
-              />
-            </>
-          )}
-        </motion.div>
-        <LessonEditorModal
-          lesson={editingLesson}
-          mode={editingLesson ? 'edit' : 'add'}
-          open={isModalOpen}
-          studentId={student.id}
-          orgId={student.org_id ?? null}
-          onClose={() => {
-            setIsModalOpen(false);
-            setEditingLesson(null);
-          }}
-          onSaved={() => {
-            setIsModalOpen(false);
-            setEditingLesson(null);
-          }}
-        />
-          </div>
+          </>
+        )}
+      </motion.div>
+      <LessonEditorModal
+        lesson={editingLesson}
+        mode={editingLesson ? 'edit' : 'add'}
+        open={isModalOpen}
+        studentId={student.id}
+        orgId={student.org_id ?? null}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingLesson(null);
+        }}
+        onSaved={() => {
+          setIsModalOpen(false);
+          setEditingLesson(null);
+        }}
+      />
+    </div>
   );
 
   return (

@@ -2526,7 +2526,12 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
               console.log('從 Supabase 載入的活動數量:', supabaseActivities.length);
               
               // 創建活動節點
-              const activityNodes = supabaseActivities.map((treeActivity: any, index: number) => {
+              const typedSupabaseActivities = (supabaseActivities || []) as Array<{
+                activity_id?: string;
+                id?: string;
+                [key: string]: any;
+              }>;
+              const activityNodes = typedSupabaseActivities.map((treeActivity: any, index: number) => {
                 const activity = treeActivity.hanami_teaching_activities || treeActivity;
                 const activityId = treeActivity.activity_id || activity.id;
                 const activityName = activity.activity_name || treeActivity.custom_activity_name || `活動 ${index + 1}`;
@@ -2539,13 +2544,13 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                   description: activityDescription,
                   duration: activity.estimated_duration || activity.duration_minutes || treeActivity.duration_minutes || 30,
                   difficulty: activity.difficulty_level || treeActivity.difficulty_level || 1,
-                  prerequisites: index === 0 ? ['start'] : [`tree_activity_${supabaseActivities[index - 1].activity_id || supabaseActivities[index - 1].id}`],
+                  prerequisites: index === 0 ? ['start'] : [`tree_activity_${typedSupabaseActivities[index - 1]?.activity_id || typedSupabaseActivities[index - 1]?.id || ''}`],
                   reward: `完成 ${activityName}`,
                   position: { 
                     x: 200 + (index + 1) * 150, 
                     y: 200 + (index % 2) * 100 
                   },
-                  connections: index === supabaseActivities.length - 1 ? ['end'] : [`tree_activity_${supabaseActivities[index + 1].activity_id || supabaseActivities[index + 1].id}`],
+                  connections: index === typedSupabaseActivities.length - 1 ? ['end'] : [`tree_activity_${typedSupabaseActivities[index + 1]?.activity_id || typedSupabaseActivities[index + 1]?.id || ''}`],
                   isCompleted: false,
                   isLocked: false,
                   // 包含完整的活動詳細信息
@@ -2905,17 +2910,25 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                 .eq('id', treeActivityId)
                 .single();
               
-              if (treeActivityResult.data) {
-                if (treeActivityResult.data.hanami_teaching_activities) {
+              const typedTreeActivityResult = treeActivityResult as {
+                data?: {
+                  hanami_teaching_activities?: any;
+                  activity_id?: string;
+                  [key: string]: any;
+                } | null;
+                error?: any;
+              };
+              if (typedTreeActivityResult.data) {
+                if (typedTreeActivityResult.data.hanami_teaching_activities) {
                   // 如果有關聯的教學活動數據，直接使用
-                  data = treeActivityResult.data.hanami_teaching_activities;
+                  data = typedTreeActivityResult.data.hanami_teaching_activities;
                   error = null;
                   if (process.env.NODE_ENV === 'development') {
                     console.log('✅ 從樹活動表成功獲取教學活動數據:', data);
                   }
-                } else if (treeActivityResult.data.activity_id) {
+                } else if (typedTreeActivityResult.data.activity_id) {
                   // 如果有 activity_id，查詢教學活動表
-                  const realActivityId = treeActivityResult.data.activity_id;
+                  const realActivityId = typedTreeActivityResult.data.activity_id;
                   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                   if (uuidRegex.test(realActivityId)) {
                     const result = await supabase
@@ -3071,12 +3084,17 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       
       if (pathError) throw pathError;
       
-      if (pathData?.nodes && Array.isArray(pathData.nodes)) {
+      const typedPathData = pathData as {
+        nodes?: any[];
+        [key: string]: any;
+      } | null;
+      
+      if (typedPathData?.nodes && Array.isArray(typedPathData.nodes)) {
         // 從 JSON 格式的 nodes 欄位中提取節點順序
         const nodeOrder: Record<string, number> = {};
         const activityOrder: Record<string, number> = {};
         
-        pathData.nodes.forEach((node: any, index: number) => {
+        typedPathData.nodes.forEach((node: any, index: number) => {
           if (node.id && typeof node.order === 'number') {
             nodeOrder[node.id] = node.order;
             
@@ -3481,18 +3499,24 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
               .select('id, activity_name')
               .limit(5);
             
+            const typedResultData = (result.data || []) as Array<{
+              id?: string;
+              activity_name?: string;
+              [key: string]: any;
+            }>;
+            
             if (process.env.NODE_ENV === 'development') {
               console.log('表結構檢查結果:', result);
-              console.log('前5個ID示例:', result.data?.map(item => item.id));
-              console.log('前5個活動名稱:', result.data?.map(item => item.activity_name));
+              console.log('前5個ID示例:', typedResultData.map(item => item.id));
+              console.log('前5個活動名稱:', typedResultData.map(item => item.activity_name));
             }
             
             // 如果表可以訪問，檢查是否有匹配的ID
-            if (result.data && result.data.length > 0) {
-              const matchingActivity = result.data.find(item => 
-                item.id === activityId || 
-                item.id.includes(activityId) ||
-                item.activity_name.includes(activityId)
+            if (typedResultData && typedResultData.length > 0) {
+              const matchingActivity = typedResultData.find(item =>
+                item.id === activityId ||
+                (item.id && item.id.includes(activityId)) ||
+                (item.activity_name && item.activity_name.includes(activityId))
               );
               
               if (matchingActivity) {
@@ -3501,11 +3525,11 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                 }
                 
                 // 重新查詢完整的活動數據
-                const fullResult = await supabase
-                  .from('hanami_teaching_activities')
-                  .select('*')
-                  .eq('id', matchingActivity.id)
-                  .single();
+                  const fullResult = await supabase
+                    .from('hanami_teaching_activities')
+                    .select('*')
+                    .eq('id', matchingActivity.id || '')
+                    .single();
                 
                 data = fullResult.data;
                 error = fullResult.error;
@@ -3534,8 +3558,12 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                   console.log('textSearch查詢結果:', textSearchResult);
                 }
                 
-                if (textSearchResult.data && !textSearchResult.error) {
-                  data = textSearchResult.data;
+                const typedTextSearchResult = textSearchResult as {
+                  data?: any;
+                  error?: any;
+                };
+                if (typedTextSearchResult.data && !typedTextSearchResult.error) {
+                  data = typedTextSearchResult.data;
                   error = null;
                 }
               } catch (textSearchError) {
@@ -3561,13 +3589,21 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
                   console.log('所有活動查詢結果:', allActivitiesResult);
                 }
                 
-                if (allActivitiesResult.data && !allActivitiesResult.error) {
+                const typedAllActivitiesResult = allActivitiesResult as {
+                  data?: Array<{
+                    id?: string;
+                    activity_name?: string;
+                    [key: string]: any;
+                  }>;
+                  error?: any;
+                };
+                if (typedAllActivitiesResult.data && !typedAllActivitiesResult.error) {
                   // 在客戶端查找匹配的活動
-                  const clientSideMatch = allActivitiesResult.data.find(item => 
+                  const clientSideMatch = typedAllActivitiesResult.data.find(item => 
                     item.id === activityId || 
-                    item.id.includes(activityId) ||
-                    item.activity_name.includes(activityId) ||
-                    item.activity_name.toLowerCase().includes(activityId.toLowerCase())
+                    (item.id && item.id.includes(activityId)) ||
+                    (item.activity_name && item.activity_name.includes(activityId)) ||
+                    (item.activity_name && activityId && item.activity_name.toLowerCase().includes(activityId.toLowerCase()))
                   );
                   
                   if (clientSideMatch) {
@@ -3778,15 +3814,24 @@ export default function LearningPathBuilder({ treeId, initialPath, activities, o
       }
       
       // 將教學活動詳細信息保存到節點metadata中
+      const typedData = data as {
+        duration_minutes?: number | null;
+        estimated_duration?: number | null;
+        category?: string | null;
+        difficulty_level?: number | null;
+        activity_type?: string | null;
+        [key: string]: any;
+      } | null;
+      
       const updatedNode = {
         ...node,
         metadata: {
           ...node.metadata,
           activityDetails: {
-            duration_minutes: (data.duration_minutes || data.estimated_duration) ?? undefined,
-            category: data.category ?? undefined,
-            difficulty_level: data.difficulty_level ?? undefined,
-            activity_type: data.activity_type ?? ''
+            duration_minutes: (typedData?.duration_minutes || typedData?.estimated_duration) ?? undefined,
+            category: typedData?.category ?? undefined,
+            difficulty_level: typedData?.difficulty_level ?? undefined,
+            activity_type: typedData?.activity_type ?? ''
           }
         }
       };

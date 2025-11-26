@@ -131,8 +131,16 @@ export default function PermissionManagementPanel() {
         setError(`載入管理員資料失敗: ${adminsError.message}`);
       } else {
         console.log('管理員資料載入成功:', adminsData?.length || 0, '筆');
-        setAdmins((adminsData || []).map(a => ({
-          ...a,
+        const typedAdminsData = (adminsData || []) as Array<{
+          id?: string;
+          created_at?: string;
+          admin_name?: string | null;
+          admin_email?: string | null;
+          role?: string | null;
+          [key: string]: any;
+        }>;
+        setAdmins(typedAdminsData.map(a => ({
+          id: a.id || '',
           created_at: a.created_at ?? '',
           admin_name: a.admin_name ?? null,
           admin_email: a.admin_email ?? null,
@@ -156,7 +164,7 @@ export default function PermissionManagementPanel() {
           can_export_data: true,
           is_active: true,
         },
-        ...(teachersData?.map((teacher, index) => ({
+        ...((teachersData || []) as Teacher[]).map((teacher, index) => ({
           id: `teacher-${index + 1}`,
           user_id: teacher.id,
           user_type: 'teacher' as const,
@@ -169,7 +177,7 @@ export default function PermissionManagementPanel() {
           can_view_financial_data: false,
           can_export_data: false,
           is_active: teacher.teacher_status === 'active',
-        })) || []),
+        })),
       ];
 
       console.log('權限資料創建成功:', mockPermissions.length, '筆');
@@ -347,9 +355,9 @@ export default function PermissionManagementPanel() {
           break;
       }
 
-      const { error } = await supabase
-        .from(tableName as any)
-        .update({ [statusField]: newStatus })
+      const { error } = await (supabase
+        .from(tableName as any) as any)
+        .update({ [statusField]: newStatus } as any)
         .eq('id', userId);
 
       if (error) {

@@ -598,20 +598,20 @@ export default function StudentLessonPanel({
   // 新增/更新課堂處理函式
   const handleAddLesson = async (newLesson: Lesson) => {
     // 1. 從 Supabase 取得學生資料
-    let studentData = null;
+    let studentData: { org_id: string | null; [key: string]: any; } | null = null;
     try {
       const { data } = await supabase
         .from('Hanami_Students')
         .select('student_oid, regular_weekday, full_name, org_id')
         .eq('id', newLesson.student_id)
         .single();
-      studentData = data;
+      studentData = data as { org_id: string | null; [key: string]: any; } | null;
     } catch (e) {
       // 可視情況處理錯誤
       studentData = null;
     }
 
-    const resolvedOrgId = orgId || newLesson.org_id || studentData?.org_id || null;
+    const resolvedOrgId = orgId || (newLesson as any).org_id || studentData?.org_id || null;
     if (!resolvedOrgId) {
       toast.error('無法確認機構 ID，請重新整理或聯繫管理員。');
       return;
@@ -670,9 +670,10 @@ export default function StudentLessonPanel({
     }
 
     try {
-      const { data, error } = await supabase
+      // hanami_student_lesson table type may not be fully defined
+      const { data, error } = await ((supabase as any)
         .from('hanami_student_lesson')
-        .upsert([dbLessonData], { onConflict: 'id' });
+        .upsert([dbLessonData], { onConflict: 'id' }));
 
       if (error) {
         console.error('Error saving lesson:', error);
@@ -1404,10 +1405,11 @@ export default function StudentLessonPanel({
                             onCancel={handleStatusPopupClose}
                             onChange={handleStatusChange}
                             onConfirm={async () => {
-                              await supabase
+                              // hanami_student_lesson table type may not be fully defined
+                              await ((supabase as any)
                                 .from('hanami_student_lesson')
                                 .update({ lesson_status: tempStatus })
-                                .eq('id', lesson.id);
+                                .eq('id', lesson.id));
                               await fetchLessons();
                               handleStatusPopupClose();
                             }}

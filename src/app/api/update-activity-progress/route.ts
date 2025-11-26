@@ -40,13 +40,19 @@ async function handleUpdate(request: NextRequest) {
       );
     }
 
-    const existing = existingData as { id: string; student_id: string };
+    const existing = existingData as unknown as { id: string; student_id: string } | null;
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: '指定的學生活動不存在' },
+        { status: 404 }
+      );
+    }
 
     // 如果沒有提供 org_id，從學生記錄中獲取
     let finalOrgId = org_id;
     if (!finalOrgId && existing.student_id) {
-      const { data: studentDataRaw } = await supabase
-        .from('Hanami_Students')
+      const { data: studentDataRaw } = await (supabase
+        .from('Hanami_Students' as any) as any)
         .select('org_id')
         .eq('id', existing.student_id)
         .single();

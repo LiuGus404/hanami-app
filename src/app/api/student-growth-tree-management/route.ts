@@ -115,8 +115,9 @@ export async function POST(request: NextRequest) {
         .eq('id', studentId)
         .single();
       
-      if (studentData?.org_id) {
-        finalOrgId = studentData.org_id;
+      const typedStudentData = studentData as { org_id?: string; [key: string]: any } | null;
+      if (typedStudentData?.org_id) {
+        finalOrgId = typedStudentData.org_id;
       }
     }
 
@@ -209,15 +210,17 @@ export async function PUT(request: NextRequest) {
         .eq('id', studentTreeId)
         .single();
       
-      if (studentTreeData?.student_id) {
+      const typedStudentTreeData = studentTreeData as { student_id: string } | null;
+      if (typedStudentTreeData?.student_id) {
         const { data: studentData } = await supabase
           .from('Hanami_Students')
           .select('org_id')
-          .eq('id', studentTreeData.student_id)
+          .eq('id', typedStudentTreeData.student_id)
           .single();
         
-        if (studentData?.org_id) {
-          finalOrgId = studentData.org_id;
+        const typedStudentData = studentData as { org_id: string } | null;
+        if (typedStudentData?.org_id) {
+          finalOrgId = typedStudentData.org_id;
         }
       }
     }
@@ -241,9 +244,9 @@ export async function PUT(request: NextRequest) {
     }
 
     // 更新成長樹狀態
-    const { data, error } = await supabase
-      .from('hanami_student_trees')
-      .update(updateData)
+    const { data, error } = await (supabase
+      .from('hanami_student_trees') as any)
+      .update(updateData as any)
       .eq('id', studentTreeId)
       .select(`
         id,

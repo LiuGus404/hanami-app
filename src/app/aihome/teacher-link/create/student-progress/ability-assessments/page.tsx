@@ -6,6 +6,7 @@ import AbilityAssessmentsPage from '@/app/admin/student-progress/ability-assessm
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import BackButton from '@/components/ui/BackButton';
 import StudentProgressNavBar from '@/components/ui/StudentProgressNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -89,7 +90,9 @@ function TeacherLinkAbilityAssessmentsContent() {
 export default function TeacherLinkAbilityAssessmentsPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/student-progress/ability-assessments">
-      <TeacherLinkAbilityAssessmentsContent />
+      <WithPermissionCheck pageKey="progress">
+        <TeacherLinkAbilityAssessmentsContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

@@ -25,15 +25,30 @@ export async function POST(request: NextRequest) {
 
     console.log('原始評估記錄:', assessment);
 
+    if (!assessment) {
+      return NextResponse.json({
+        success: false,
+        error: '找不到評估記錄'
+      }, { status: 404 });
+    }
+
+    const typedAssessment = assessment as {
+      id: string;
+      tree_id: string;
+      selected_goals?: any[];
+      ability_assessments?: Record<string, any>;
+      [key: string]: any;
+    };
+
     // 檢查是否為舊版格式
-    const selectedGoalsCount = Array.isArray(assessment.selected_goals) ? assessment.selected_goals.length : 0;
-    const abilityAssessmentsCount = assessment.ability_assessments ? Object.keys(assessment.ability_assessments).length : 0;
+    const selectedGoalsCount = Array.isArray(typedAssessment.selected_goals) ? typedAssessment.selected_goals.length : 0;
+    const abilityAssessmentsCount = typedAssessment.ability_assessments ? Object.keys(typedAssessment.ability_assessments).length : 0;
 
     if (selectedGoalsCount > 0) {
       return NextResponse.json({
         success: true,
         message: '此評估記錄已經是新版格式，無需修復',
-        data: assessment
+        data: typedAssessment
       });
     }
 
@@ -41,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: '此評估記錄沒有評估資料',
-        data: assessment
+        data: typedAssessment
       });
     }
 
@@ -49,7 +64,7 @@ export async function POST(request: NextRequest) {
     const { data: goals, error: goalsError } = await supabase
       .from('hanami_growth_goals')
       .select('*')
-      .eq('tree_id', assessment.tree_id)
+      .eq('tree_id', typedAssessment.tree_id)
       .order('goal_order');
 
     if (goalsError) {
@@ -60,15 +75,16 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log('成長樹目標:', goals);
+    const typedGoals = (goals || []) as Array<{ id: string; goal_name: string; goal_order?: number; [key: string]: any }>;
+    console.log('成長樹目標:', typedGoals);
 
     // 轉換舊版資料為新版格式
     const convertedGoals: any[] = [];
-    const processedAbilityAssessments = { ...assessment.ability_assessments };
+    const processedAbilityAssessments = { ...(typedAssessment.ability_assessments || {}) };
 
-    Object.entries(assessment.ability_assessments).forEach(([goalId, data]: [string, any]) => {
+    Object.entries(typedAssessment.ability_assessments || {}).forEach(([goalId, data]: [string, any]) => {
       // 查找對應的目標資訊
-      const goal = goals.find(g => g.id === goalId);
+      const goal = typedGoals.find(g => g.id === goalId);
       if (goal) {
         console.log(`處理目標 ${goal.goal_name}:`, data);
         
@@ -104,25 +120,25 @@ export async function POST(request: NextRequest) {
         success: true,
         message: '模擬修復完成',
         data: {
-          original: assessment,
+          original: typedAssessment,
           converted: {
             selected_goals: convertedGoals,
             ability_assessments: processedAbilityAssessments
           },
           goalsFound: convertedGoals.length,
-          goalsTotal: goals.length
+          goalsTotal: typedGoals.length
         }
       });
     }
 
     // 實際更新資料庫
-    const { data: updatedAssessment, error: updateError } = await supabase
-      .from('hanami_ability_assessments')
+    const { data: updatedAssessment, error: updateError } = await (supabase
+      .from('hanami_ability_assessments') as any)
       .update({
         selected_goals: convertedGoals,
         ability_assessments: processedAbilityAssessments,
         updated_at: new Date().toISOString()
-      })
+      } as any)
       .eq('id', assessmentId)
       .select()
       .single();

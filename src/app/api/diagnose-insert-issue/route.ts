@@ -25,9 +25,9 @@ export async function GET() {
       progress_max: 1
     };
 
-    const { data: insertData, error: insertError } = await supabase
-      .from('hanami_growth_goals')
-      .insert([minimalData])
+    const { data: insertData, error: insertError } = await (supabase
+      .from('hanami_growth_goals') as any)
+      .insert([minimalData] as any)
       .select();
 
     if (insertError) {

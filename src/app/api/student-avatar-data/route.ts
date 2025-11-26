@@ -37,14 +37,14 @@ export async function GET(request: NextRequest) {
       studentActivitiesResult
     ] = await Promise.all([
       // 學生基本資料
-      supabaseAdmin
+      (supabaseAdmin as any)
         .from('Hanami_Students')
         .select('*')
         .eq('id', studentId)
         .single(),
 
       // 學生的成長樹資料 - 查詢學生實際參與的成長樹
-      supabaseAdmin
+      (supabaseAdmin as any)
         .from('hanami_student_trees')
         .select(`
           *,
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
         .eq('tree.is_active', true),
 
       // 學生能力資料
-      supabaseAdmin
+      (supabaseAdmin as any)
         .from('hanami_student_abilities')
         .select(`
           *,
@@ -80,14 +80,14 @@ export async function GET(request: NextRequest) {
         .eq('student_id', studentId),
 
       // 近期教學活動
-      supabaseAdmin
+      (supabaseAdmin as any)
         .from('hanami_teaching_activities')
         .select('*')
         .limit(10)
         .order('created_at', { ascending: false }),
 
       // 即將到來的課程
-      supabaseAdmin
+      (supabaseAdmin as any)
         .from('hanami_student_lesson')
         .select('*')
         .eq('student_id', studentId)
@@ -99,13 +99,13 @@ export async function GET(request: NextRequest) {
       Promise.resolve({ data: [], error: null }),
 
       // 學生的能力評估記錄
-      supabaseAdmin
+      (supabaseAdmin as any)
         .from('hanami_ability_assessments')
         .select('id, assessment_date, tree_id')
         .eq('student_id', studentId),
 
       // 學生的學習活動記錄
-      supabaseAdmin
+      (supabaseAdmin as any)
         .from('hanami_student_activities')
         .select('id, activity_id, completion_status')
         .eq('student_id', studentId)
@@ -215,7 +215,7 @@ export async function GET(request: NextRequest) {
       achievements: mockAchievements,
       summary: {
         totalProgress: processedAbilities.length > 0 
-          ? Math.round(processedAbilities.reduce((sum, ability) => sum + ability.progress_percentage, 0) / processedAbilities.length)
+          ? Math.round(processedAbilities.reduce((sum: number, ability: any) => sum + (ability.progress_percentage || 0), 0) / processedAbilities.length)
           : 0,
         totalAbilities: (assessmentRecordsResult.data || []).length, // 能力評估記錄數量
         activeGrowthTrees: processedGrowthTrees.length, // 學生實際參與的成長樹數量

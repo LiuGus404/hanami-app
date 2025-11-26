@@ -70,7 +70,12 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
     const fetchCourses = async () => {
       const supabase = getSupabaseClient();
       const { data } = await supabase.from('Hanami_CourseTypes').select('id, name').eq('status', true);
-      setCourseTypes(Array.isArray(data) ? data.map(c => ({ ...c, name: c.name ?? '' })) : []);
+      const typedData = (data || []) as Array<{
+        id?: string;
+        name?: string | null;
+        [key: string]: any;
+      }>;
+      setCourseTypes(typedData.map(c => ({ id: c.id || '', name: c.name ?? '' })));
     };
     fetchCourses();
   }, [open]);
@@ -298,9 +303,9 @@ const AITeacherSchedulerModal: React.FC<AITeacherSchedulerModalProps> = ({
     teacher.courses.forEach(c => {
       course_roles[c.courseId] = { main: c.main, assist: c.assist };
     });
-    const { error } = await supabase
-      .from('hanami_employee')
-      .update({})
+    const { error } = await (supabase
+      .from('hanami_employee') as any)
+      .update({} as any)
       .eq('id', teacher.teacherId);
     if (!error) {
       setSaveMessage(msg => ({ ...msg, [teacher.teacherId]: '已儲存' }));

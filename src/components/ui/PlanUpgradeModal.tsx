@@ -100,7 +100,8 @@ export function PlanUpgradeModal({ isOpen, onClose, student, onUpgradeSuccess }:
 
     setLoading(true);
     try {
-      const { error } = await supabase
+      // hanami_student_media_quota table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_student_media_quota')
         .update({
           plan_type: selectedPlan,
@@ -108,7 +109,7 @@ export function PlanUpgradeModal({ isOpen, onClose, student, onUpgradeSuccess }:
           photo_limit: planOptions.find(p => p.id === selectedPlan)?.photoLimit || 10,
           last_updated: new Date().toISOString()
         })
-        .eq('student_id', student.id);
+        .eq('student_id', student.id));
 
       if (error) {
         console.error('更改方案失敗:', error);

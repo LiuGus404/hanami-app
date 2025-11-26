@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
 
-type AssessmentRow = Database['public']['Tables']['hanami_ability_assessments']['Row'] & {
+type AssessmentRow = {
+  id: string;
+  student_id: string;
+  tree_id: string;
+  assessment_date: string;
+  [key: string]: any;
+} & {
   student?: {
     full_name?: string | null;
     nick_name?: string | null;
@@ -40,7 +46,7 @@ export async function GET(request: NextRequest) {
     console.log('載入學生評估進度:', { studentId, assessmentDate });
 
     // 獲取學生的最新評估記錄
-    let query = supabaseAdmin
+    let query = (supabaseAdmin as any)
       .from('hanami_ability_assessments')
       .select(`
         *,
@@ -83,7 +89,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 獲取所有可用的評估日期
-    const { data: allDates, error: datesError } = await supabaseAdmin
+    const { data: allDates, error: datesError } = await (supabaseAdmin as any)
       .from('hanami_ability_assessments')
       .select('assessment_date')
       .eq('student_id', studentId)
@@ -98,13 +104,18 @@ export async function GET(request: NextRequest) {
     const abilityAssessments = latestAssessment.ability_assessments || {};
 
     // 載入成長目標資料
-    const { data: goals, error: goalsError } = await supabaseAdmin
+    const { data: goals, error: goalsError } = await (supabaseAdmin as any)
       .from('hanami_growth_goals')
       .select('*')
       .eq('tree_id', latestAssessment.tree_id)
       .order('goal_order');
 
-    type GrowthGoalRow = Database['public']['Tables']['hanami_growth_goals']['Row'] & {
+    type GrowthGoalRow = {
+      id: string;
+      tree_id: string;
+      goal_order: number;
+      [key: string]: any;
+    } & {
       tree_color?: string;
       assessment_mode?: string;
     };

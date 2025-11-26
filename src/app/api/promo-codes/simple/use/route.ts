@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 調用統一資料庫函數記錄使用
-    const { data, error } = await supabase.rpc('use_promo_code_unified', {
+    const { data, error } = await (supabase.rpc as any)('use_promo_code_unified', {
       p_promo_code_id: body.promo_code_id,
       p_user_id: body.user_id || null,
       p_user_email: body.user_email || null,

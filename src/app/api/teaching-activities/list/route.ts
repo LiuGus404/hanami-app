@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     // 驗證用戶是否有權限訪問該機構
     if (userEmail) {
-      const { data: identity, error: identityError } = await supabase
+      const { data: identity, error: identityError } = await (supabase as any)
         .from('hanami_org_identities')
         .select('role_type, status')
         .eq('org_id', orgId)
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       }
 
       if (!identity) {
-        const { data: employee, error: employeeError } = await supabase
+        const { data: employee, error: employeeError } = await (supabase as any)
           .from('hanami_employee')
           .select('teacher_email, teacher_status, org_id')
           .eq('teacher_email', userEmail)
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 構建查詢
-    let query = supabase
+    let query = (supabase as any)
       .from('hanami_teaching_activities')
       .select('*')
       .eq('org_id', orgId);

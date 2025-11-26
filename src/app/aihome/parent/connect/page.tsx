@@ -181,7 +181,7 @@ export default function ParentConnectPage() {
 
     try {
       const supabase = getSupabaseClient();
-      await supabase.from('parent_access_logs').insert({
+      await (supabase.from('parent_access_logs') as any).insert({
         parent_id: user.id,
         action,
         timestamp: new Date().toISOString(),

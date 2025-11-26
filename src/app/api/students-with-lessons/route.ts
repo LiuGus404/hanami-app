@@ -15,20 +15,20 @@ export async function POST(request: Request) {
     const supabase = getServerSupabaseClient();
 
     // 查詢常規學生
-    let regularStudentQuery = supabase
+    let regularStudentQuery = (supabase as any)
       .from('Hanami_Students')
       .select('*')
       .eq('student_type', '常規')
       .eq('org_id', orgId);
 
     // 查詢試堂學生
-    let trialStudentQuery = supabase
+    let trialStudentQuery = (supabase as any)
       .from('hanami_trial_students')
       .select('*')
       .eq('org_id', orgId);
 
     // 查詢停用學生
-    let inactiveStudentQuery = supabase
+    let inactiveStudentQuery = (supabase as any)
       .from('inactive_student_list')
       .select('*');
 
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
         .filter((id): id is string => Boolean(id));
 
       if (inactiveOriginalIds.length > 0) {
-        const { data: originalStudentsData, error: originalError } = await supabase
+        const { data: originalStudentsData, error: originalError } = await (supabase as any)
           .from('Hanami_Students')
           .select('id, org_id')
           .in('id', inactiveOriginalIds);
@@ -249,7 +249,7 @@ export async function POST(request: Request) {
         // 查詢常規學生的課堂記錄
         let regularLessons: any[] = [];
         if (regularStudentIds.length > 0) {
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from('hanami_student_lesson')
             .select('student_id, lesson_date')
             .in('student_id', regularStudentIds)
@@ -265,7 +265,7 @@ export async function POST(request: Request) {
         // 查詢試堂學生的課堂記錄（試堂學生可能直接有 lesson_date 欄位）
         let trialLessons: any[] = [];
         if (trialStudentIds.length > 0) {
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from('hanami_trial_students')
             .select('id, lesson_date')
             .in('id', trialStudentIds)
@@ -281,7 +281,7 @@ export async function POST(request: Request) {
         // 查詢停用學生的課堂記錄
         let inactiveLessons: any[] = [];
         if (inactiveStudentIds.length > 0) {
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from('inactive_student_list')
             .select('id, lesson_date')
             .in('id', inactiveStudentIds)

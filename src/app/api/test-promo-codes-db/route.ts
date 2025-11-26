@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const functionNames = [];
     
     try {
-      const { error: validateError } = await supabase.rpc('validate_promo_code_unified', {
+      const { error: validateError } = await (supabase.rpc as any)('validate_promo_code_unified', {
         p_code: 'TEST',
         p_user_id: null,
         p_user_email: null,
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const { error: useError } = await supabase.rpc('use_promo_code_unified', {
+      const { error: useError } = await (supabase.rpc as any)('use_promo_code_unified', {
         p_promo_code_id: '00000000-0000-0000-0000-000000000000',
         p_user_id: null,
         p_user_email: null,
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'validate') {
       // 測試驗證函數
-      const { data, error } = await supabase.rpc('validate_promo_code_unified', {
+      const { data, error } = await (supabase.rpc as any)('validate_promo_code_unified', {
         p_code: 'HANAMI10',
         p_user_id: null,
         p_user_email: null,
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'use') {
       // 測試使用函數（需要先有有效的 promo_code_id）
-      const { data, error } = await supabase.rpc('use_promo_code_unified', {
+      const { data, error } = await (supabase.rpc as any)('use_promo_code_unified', {
         p_promo_code_id: '00000000-0000-0000-0000-000000000000', // 測試用的假 ID
         p_user_id: 'test-user',
         p_user_email: 'test@example.com',

@@ -431,11 +431,13 @@ export default function SimpleAbilityAssessmentModal({
         console.log('當日所有課程記錄:', allTodayLessons);
         
         // 先獲取當日有課程的學生ID
-        const { data: todayLessonData, error: lessonError } = await supabase
+        const { data: todayLessonDataRaw, error: lessonError } = await supabase
           .from('hanami_student_lesson')
           .select('student_id')
           .eq('lesson_date', today)
           .not('student_id', 'is', null);
+        
+        const todayLessonData = todayLessonDataRaw as Array<{ student_id: string; [key: string]: any; }> | null;
 
         if (lessonError) {
           console.error('載入當日課程失敗:', lessonError);
@@ -462,11 +464,13 @@ export default function SimpleAbilityAssessmentModal({
           console.log('最近7天日期:', recentDates);
           
           // 查詢最近7天的課程記錄
-          const { data: recentLessonData, error: recentError } = await supabase
+          const { data: recentLessonDataRaw, error: recentError } = await supabase
             .from('hanami_student_lesson')
             .select('student_id')
             .in('lesson_date', recentDates)
             .not('student_id', 'is', null);
+          
+          const recentLessonData = recentLessonDataRaw as Array<{ student_id: string; [key: string]: any; }> | null;
 
           if (recentError) {
             console.error('載入最近課程失敗:', recentError);
@@ -692,10 +696,12 @@ export default function SimpleAbilityAssessmentModal({
       setTrees(treesData || []);
 
       // 載入教師資料
-      const { data: teachersData, error: teachersError } = await supabase
+      const { data: teachersDataRaw, error: teachersError } = await supabase
         .from('hanami_employee')
         .select('id, teacher_fullname, teacher_nickname, teacher_email, teacher_role, teacher_status')
         .order('teacher_nickname');
+      
+      const teachersData = teachersDataRaw as Array<{ id: string; teacher_fullname: string | null; teacher_nickname: string | null; teacher_email: string | null; teacher_role: string | null; teacher_status: string | null; [key: string]: any; }> | null;
 
       if (teachersError) {
         console.error('載入教師失敗:', teachersError);
@@ -705,10 +711,12 @@ export default function SimpleAbilityAssessmentModal({
       console.log('原始員工資料:', teachersData);
 
       // 載入管理員資料
-      const { data: adminsData, error: adminsError } = await supabase
+      const { data: adminsDataRaw, error: adminsError } = await supabase
         .from('hanami_admin')
         .select('id, admin_name, admin_email, role')
         .order('admin_name');
+      
+      const adminsData = adminsDataRaw as Array<{ id: string; admin_name: string | null; admin_email: string | null; role: string | null; [key: string]: any; }> | null;
 
       if (adminsError) {
         console.error('載入管理員失敗:', adminsError);
@@ -792,11 +800,13 @@ export default function SimpleAbilityAssessmentModal({
       // 先查詢符合 org_id 的成長樹ID列表
       let validTreeIds: string[] = [];
       if (validOrgId) {
-        const { data: validTreesData, error: validTreesError } = await supabase
+        const { data: validTreesDataRaw, error: validTreesError } = await supabase
           .from('hanami_growth_trees')
           .select('id')
           .eq('is_active', true)
           .eq('org_id', validOrgId);
+        
+        const validTreesData = validTreesDataRaw as Array<{ id: string; [key: string]: any; }> | null;
         
         if (validTreesError) {
           console.error('查詢符合 org_id 的成長樹失敗:', validTreesError);
@@ -829,7 +839,9 @@ export default function SimpleAbilityAssessmentModal({
         studentTreesQuery = studentTreesQuery.eq('tree_id', '00000000-0000-0000-0000-000000000000');
       }
       
-      const { data: studentTreesData, error: studentTreesError } = await studentTreesQuery;
+      const { data: studentTreesDataRaw, error: studentTreesError } = await studentTreesQuery;
+      
+      const studentTreesData = studentTreesDataRaw as Array<{ hanami_growth_trees: { id: string; tree_name: string; tree_description: string | null; } | null; [key: string]: any; }> | null;
 
       if (studentTreesError) {
         console.error('載入學生成長樹失敗:', studentTreesError);
@@ -967,12 +979,14 @@ export default function SimpleAbilityAssessmentModal({
       
       // 如果沒有指定成長樹，載入該學生的最新評估記錄（任何成長樹）
       console.log('🔍 查詢學生的任何成長樹評估記錄');
-      const { data: allAssessments, error: allError } = await supabase
+      const { data: allAssessmentsRaw, error: allError } = await supabase
         .from('hanami_ability_assessments')
         .select('*')
         .eq('student_id', studentId)
         .order('assessment_date', { ascending: false })
         .limit(1);
+      
+      const allAssessments = allAssessmentsRaw as Array<{ tree_id: string; [key: string]: any; }> | null;
       
       if (allError) {
         console.error('載入最新評估記錄失敗:', allError);
@@ -1190,7 +1204,9 @@ export default function SimpleAbilityAssessmentModal({
         goalsQuery = goalsQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
       }
       
-      const { data: goalsData, error: goalsError } = await goalsQuery.order('goal_order');
+      const { data: goalsDataRaw, error: goalsError } = await goalsQuery.order('goal_order');
+      
+      const goalsData = goalsDataRaw as Array<{ required_abilities: string[] | null; [key: string]: any; }> | null;
 
       if (goalsError) throw goalsError;
 
@@ -1217,11 +1233,13 @@ export default function SimpleAbilityAssessmentModal({
         abilitiesData = abilitiesResult || [];
         
         // 載入能力等級內容
-        const { data: levelContentsData, error: levelContentsError } = await supabase
+        const { data: levelContentsDataRaw, error: levelContentsError } = await supabase
           .from('hanami_ability_levels')
           .select('*')
           .in('ability_id', Array.from(abilityIds))
           .order('level');
+        
+        const levelContentsData = levelContentsDataRaw as Array<{ ability_id: string; level: number; level_title: string | null; level_description: string | null; [key: string]: any; }> | null;
 
         if (!levelContentsError && levelContentsData) {
           // 將等級內容組織到能力中
@@ -1245,11 +1263,13 @@ export default function SimpleAbilityAssessmentModal({
 
       // 載入學生的能力進度記錄
       if (selectedStudentId) {
-        const { data: progressData, error: progressError } = await supabase
+        const { data: progressDataRaw, error: progressError } = await supabase
           .from('hanami_student_abilities')
           .select('*')
           .eq('student_id', selectedStudentId)
           .eq('tree_id', treeId);
+        
+        const progressData = progressDataRaw as Array<{ ability_id: string; [key: string]: any; }> | null;
 
         if (!progressError && progressData) {
           console.log('載入的進度資料:', progressData);
@@ -1547,7 +1567,7 @@ export default function SimpleAbilityAssessmentModal({
             }
           });
 
-          setGoals(goalsWithProgress);
+          setGoals(goalsWithProgress as any);
         } else {
           // 如果沒有進度資料，設置預設值
           abilitiesData = abilitiesData.map(ability => ({
@@ -1562,7 +1582,7 @@ export default function SimpleAbilityAssessmentModal({
             completion_percentage: 0
           }));
 
-          setGoals(goalsWithDefault);
+          setGoals(goalsWithDefault as any);
         }
       } else {
         // 如果沒有選擇學生，設置預設值
@@ -1578,13 +1598,13 @@ export default function SimpleAbilityAssessmentModal({
           completion_percentage: 0
         }));
 
-        setGoals(goalsWithDefault);
+        setGoals(goalsWithDefault as any);
       }
 
       // 修復過往評估記錄的顯示問題
       if (initialData && (goalsData || []).length > 0 && (abilitiesData || []).length > 0) {
         console.log('🔧 在載入目標和能力後修復評估記錄');
-        const fixedInitialData = fixHistoricalAssessmentData(initialData, goalsData || [], abilitiesData);
+        const fixedInitialData = fixHistoricalAssessmentData(initialData, (goalsData || []) as any, abilitiesData);
         
         // 更新狀態中的評估資料
         setAbilityAssessments(fixedInitialData.ability_assessments || {});

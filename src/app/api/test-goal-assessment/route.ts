@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
       .eq('general_notes', '測試目標評估儲存');
 
     // 創建新記錄
-    const { data: newAssessment, error: insertError } = await supabase
-      .from('hanami_ability_assessments')
-      .insert(testData)
+    const { data: newAssessment, error: insertError } = await (supabase
+      .from('hanami_ability_assessments') as any)
+      .insert(testData as any)
       .select()
       .single();
 
@@ -70,17 +70,25 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log('📖 讀取的記錄:', savedAssessment);
-    console.log('🎯 selected_goals 內容:', savedAssessment.selected_goals);
+    const typedSavedAssessment = savedAssessment as { selected_goals?: any; [key: string]: any } | null;
+    if (!typedSavedAssessment) {
+      return NextResponse.json({
+        success: false,
+        error: '無法讀取測試記錄'
+      }, { status: 500 });
+    }
+
+    console.log('📖 讀取的記錄:', typedSavedAssessment);
+    console.log('🎯 selected_goals 內容:', typedSavedAssessment.selected_goals);
 
     // 驗證 selected_goals 是否正確儲存
-    const selectedGoals = savedAssessment.selected_goals;
+    const selectedGoals = typedSavedAssessment.selected_goals;
     const isGoalsCorrect = Array.isArray(selectedGoals) && selectedGoals.length === 2;
 
     return NextResponse.json({
       success: true,
       data: {
-        assessment: savedAssessment,
+        assessment: typedSavedAssessment,
         selectedGoals: selectedGoals,
         isGoalsCorrect: isGoalsCorrect,
         goalsCount: Array.isArray(selectedGoals) ? selectedGoals.length : 0

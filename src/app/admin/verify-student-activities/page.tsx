@@ -94,8 +94,8 @@ export default function VerifyStudentActivities() {
       };
 
       // 1. 檢查學生是否存在
-      const { data: studentData, error: studentError } = await supabase
-        .from('Hanami_Students')
+      const { data: studentData, error: studentError } = await (supabase
+        .from('Hanami_Students') as any)
         .select('*')
         .eq('id', results.studentId)
         .single();
@@ -112,8 +112,8 @@ export default function VerifyStudentActivities() {
 
       // 2. 檢查每個活動是否存在
       for (const activity of userProvidedActivities) {
-        const { data: activityData, error: activityError } = await supabase
-          .from('hanami_student_activities')
+        const { data: activityData, error: activityError } = await (supabase
+          .from('hanami_student_activities') as any)
           .select(`
             id,
             student_id,
@@ -181,8 +181,8 @@ export default function VerifyStudentActivities() {
 
       // 3. 查詢該學生的實際活動
       if (results.verification.studentExists) {
-        const { data: actualActivities, error: actualError } = await supabase
-          .from('hanami_student_activities')
+        const { data: actualActivities, error: actualError } = await (supabase
+          .from('hanami_student_activities') as any)
           .select(`
             id,
             student_id,
@@ -226,7 +226,7 @@ export default function VerifyStudentActivities() {
       <div className="max-w-6xl mx-auto">
         <div className="bg-[#FFFDF8] rounded-xl shadow-lg p-6 border border-[#EADBC8]">
           <h1 className="text-2xl font-bold text-[#4B4036] mb-6">🔍 學生活動驗證工具</h1>
-          
+
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <h2 className="font-semibold text-[#4B4036] mb-2">📋 用戶提供的活動資料</h2>
             <p className="text-sm text-[#2B3A3B] mb-2">
@@ -315,13 +315,12 @@ export default function VerifyStudentActivities() {
                         <h3 className="font-medium text-[#4B4036]">
                           活動 {index + 1}: {result.provided.hanami_teaching_activities.activity_name}
                         </h3>
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          result.actual ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
+                        <span className={`px-2 py-1 rounded text-xs ${result.actual ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
                           {result.actual ? '存在' : '不存在'}
                         </span>
                       </div>
-                      
+
                       {result.actual && result.matches && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
                           {Object.entries(result.matches).map(([key, value]: [string, any]) => (
@@ -384,11 +383,10 @@ export default function VerifyStudentActivities() {
                               {activity.hanami_teaching_activities?.activity_name || '無關聯教學活動'}
                             </td>
                             <td className="py-2 text-[#4B4036]">
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                activity.activity_type === 'ongoing' 
-                                  ? 'bg-blue-100 text-blue-800' 
+                              <span className={`px-2 py-1 rounded text-xs ${activity.activity_type === 'ongoing'
+                                  ? 'bg-blue-100 text-blue-800'
                                   : 'bg-green-100 text-green-800'
-                              }`}>
+                                }`}>
                                 {activity.activity_type}
                               </span>
                             </td>

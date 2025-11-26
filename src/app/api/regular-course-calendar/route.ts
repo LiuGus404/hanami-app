@@ -27,7 +27,8 @@ export async function POST(request: Request) {
       }, { status: 404 });
     }
 
-    const maxStudents = courseTypeData.max_students || 6;
+    const typedCourseTypeData = courseTypeData as { id: string; name: string; trial_limit?: number; max_students?: number; [key: string]: any };
+    const maxStudents = typedCourseTypeData.max_students || 6;
     console.log('📚 課程類型資訊:', { maxStudents });
 
     // 獲取常規課程排程資料
@@ -54,13 +55,15 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    console.log('📋 常規課程排程資料數量:', scheduleData?.length || 0);
-    if (scheduleData && scheduleData.length > 0) {
-      console.log('📋 排程資料範例:', scheduleData.slice(0, 3));
-      console.log('📋 weekday 分佈:', scheduleData.map(s => s.weekday).sort());
+    const typedScheduleData = (scheduleData || []) as Array<{ weekday: number; timeslot: string; [key: string]: any }>;
+    
+    console.log('📋 常規課程排程資料數量:', typedScheduleData.length || 0);
+    if (typedScheduleData.length > 0) {
+      console.log('📋 排程資料範例:', typedScheduleData.slice(0, 3));
+      console.log('📋 weekday 分佈:', typedScheduleData.map(s => s.weekday).sort());
       
       // 特別檢查星期日的排程
-      const sundaySchedules = scheduleData.filter(s => s.weekday === 0);
+      const sundaySchedules = typedScheduleData.filter(s => s.weekday === 0);
       console.log('📋 星期日排程數量:', sundaySchedules.length);
       if (sundaySchedules.length > 0) {
         console.log('📋 星期日排程詳情:', sundaySchedules);
@@ -84,16 +87,16 @@ export async function POST(request: Request) {
 
     // 處理周曆資料 - 直接返回星期幾的排程，不依賴具體日期
     const weekCalendarData = processWeekCalendarData({
-      scheduleData: scheduleData || [],
+      scheduleData: typedScheduleData,
       maxStudents
     });
 
     return NextResponse.json({
       success: true,
       data: weekCalendarData,
-      courseType: courseTypeData,
+      courseType: typedCourseTypeData,
       stats: {
-        totalSchedules: scheduleData?.length || 0
+        totalSchedules: typedScheduleData.length || 0
       }
     });
 

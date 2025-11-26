@@ -15,7 +15,8 @@ export async function GET(
       .eq('table_schema', 'public')
       .in('table_name', ['hanami_promo_codes', 'saas_coupons']);
 
-    const tableNames = tablesData?.map(t => t.table_name) || [];
+    const typedTablesData = (tablesData || []) as Array<{ table_name: string; [key: string]: any }>;
+    const tableNames = typedTablesData.map(t => t.table_name);
     
     let result: {
       used_count?: number;

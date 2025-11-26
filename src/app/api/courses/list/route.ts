@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabaseClient();
 
     // 構建查詢
-    let query = supabase
+    let query = (supabase as any)
       .from('Hanami_CourseTypes')
       .select('id, name, description, duration_minutes, difficulty_level, max_students, price_per_lesson, images, status, org_id, discount_configs, min_age, max_age, display_order')
       .order('display_order', { ascending: true });

@@ -10,6 +10,7 @@ import BackButton from '@/components/ui/BackButton';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 import { createPortal } from 'react-dom';
 import FinancialManagementNavBar from '@/components/ui/FinancialManagementNavBar';
 
@@ -1059,7 +1060,9 @@ function ExpensesManagementContent() {
 export default function ExpensesManagementPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/financial-management/expenses">
-      <ExpensesManagementContent />
+      <WithPermissionCheck pageKey="finance">
+        <ExpensesManagementContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

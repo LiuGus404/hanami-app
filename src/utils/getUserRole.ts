@@ -39,7 +39,7 @@ export async function getUserRole(supabase: SupabaseClient<Database>): Promise<s
     }
 
     // 檢查 hanami_admin 表
-    const { data: adminData, error: adminError } = await supabase
+    const { data: adminData, error: adminError } = await (supabase as any)
       .from('hanami_admin')
       .select('admin_email')
       .eq('admin_email', userEmail)
@@ -53,7 +53,7 @@ export async function getUserRole(supabase: SupabaseClient<Database>): Promise<s
     }
 
     // 檢查 hanami_employee 表
-    const { data: employeeData, error: employeeError } = await supabase
+    const { data: employeeData, error: employeeError } = await (supabase as any)
       .from('hanami_employee')
       .select('teacher_email')
       .eq('teacher_email', userEmail)
@@ -67,7 +67,7 @@ export async function getUserRole(supabase: SupabaseClient<Database>): Promise<s
     }
 
     // 檢查 Hanami_Students 表
-    const { data: studentData, error: studentError } = await supabase
+    const { data: studentData, error: studentError } = await (supabase as any)
       .from('Hanami_Students')
       .select('parent_email')
       .eq('parent_email', userEmail)

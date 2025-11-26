@@ -96,9 +96,9 @@ export async function POST(request: NextRequest) {
       console.log(`${key}: ${typeof (testData as Record<string, any>)[key]} = ${JSON.stringify((testData as Record<string, any>)[key])}`);
     });
     
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('hanami_teaching_activities')
-      .insert(testData)
+      .insert(testData as any)
       .select()
       .single();
     

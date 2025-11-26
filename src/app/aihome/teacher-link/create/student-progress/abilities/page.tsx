@@ -6,6 +6,7 @@ import AbilitiesPage from '@/app/admin/student-progress/abilities/page';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import BackButton from '@/components/ui/BackButton';
 import StudentProgressNavBar from '@/components/ui/StudentProgressNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -89,7 +90,9 @@ function TeacherLinkAbilitiesContent() {
 export default function TeacherLinkAbilitiesPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/student-progress/abilities">
-      <TeacherLinkAbilitiesContent />
+      <WithPermissionCheck pageKey="progress">
+        <TeacherLinkAbilitiesContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

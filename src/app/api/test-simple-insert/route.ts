@@ -17,9 +17,9 @@ export async function GET() {
       progress_contents: []
     };
 
-    const { data: insertData, error: insertError } = await supabase
-      .from('hanami_growth_goals')
-      .insert([simpleTestData])
+    const { data: insertData, error: insertError } = await (supabase
+      .from('hanami_growth_goals') as any)
+      .insert([simpleTestData] as any)
       .select();
 
     if (insertError) {

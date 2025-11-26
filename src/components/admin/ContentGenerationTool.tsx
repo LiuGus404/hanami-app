@@ -115,8 +115,8 @@ export function ContentGenerationTool({
     
     try {
       // 跳過插入，因為 hanami_ai_tool_usage 表不存在於類型定義中
-      const { error } = await supabase
-        .from('ai_tasks')
+      const { error } = await (supabase
+        .from('ai_tasks') as any)
         .insert({
           status: 'completed',
           title: 'content-generation',
@@ -124,7 +124,7 @@ export function ContentGenerationTool({
           prompt: formData.input_text,
           result: result,
           finished_at: new Date().toISOString()
-        });
+        } as any);
 
       if (error) throw error;
       toast.success('已儲存結果');

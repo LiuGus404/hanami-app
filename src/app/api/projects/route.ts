@@ -63,31 +63,32 @@ export async function POST(request: NextRequest) {
 
     // 獲取當前用戶 ID (這裡需要從認證中獲取)
     // 暫時使用第一個用戶作為示例
-    const { data: users } = await supabase
+    const { data: users } = await ((supabase as any)
       .from('saas_users')
       .select('id')
-      .limit(1);
+      .limit(1));
 
-    if (!users || users.length === 0) {
+    const typedUsers = (users || []) as Array<{ id: string; [key: string]: any }>;
+    if (typedUsers.length === 0) {
       return NextResponse.json(
         { error: 'No users found' },
         { status: 400 }
       );
     }
 
-    const owner_id = users[0].id;
+    const owner_id = typedUsers[0].id;
 
     // 創建項目
-    const { data: project, error } = await supabase
+    const { data: project, error } = await ((supabase as any)
       .from('hanami_projects')
       .insert([{
         name: body.name,
         description: body.description,
         is_public: body.is_public || false,
         owner_id: owner_id
-      }])
+      }] as any)
       .select()
-      .single();
+      .single());
 
     if (error) {
       console.error('Error creating project:', error);

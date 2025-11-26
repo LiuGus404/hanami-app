@@ -51,16 +51,19 @@ export async function GET(
     console.log('incoming_messages 結果:', incomingMessages);
     console.log('outgoing_messages 結果:', outgoingMessages);
     
-    if (incomingMessages && incomingMessages.length > 0) {
-      const incomingTime = new Date(incomingMessages[0].timestamp);
+    const typedIncomingMessages = (incomingMessages || []) as Array<{ timestamp: string; [key: string]: any }>;
+    const typedOutgoingMessages = (outgoingMessages || []) as Array<{ sent_at: string; [key: string]: any }>;
+    
+    if (typedIncomingMessages.length > 0) {
+      const incomingTime = new Date(typedIncomingMessages[0].timestamp);
       console.log('最新的 incoming 時間:', incomingTime);
       if (!lastContactTime || incomingTime > (lastContactTime as Date)) {
         lastContactTime = incomingTime;
       }
     }
 
-    if (outgoingMessages && outgoingMessages.length > 0) {
-      const outgoingTime = new Date(outgoingMessages[0].sent_at);
+    if (typedOutgoingMessages.length > 0) {
+      const outgoingTime = new Date(typedOutgoingMessages[0].sent_at);
       console.log('最新的 outgoing 時間:', outgoingTime);
       if (!lastContactTime || outgoingTime > (lastContactTime as Date)) {
         lastContactTime = outgoingTime;

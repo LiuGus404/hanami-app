@@ -86,9 +86,9 @@ export function QuickEditAgeGroupModal({
       setLoading(true);
 
       // 跳過更新，因為 hanami_child_development_milestones 表不存在於類型定義中
-      const { error } = await supabase
-        .from('ai_tasks')
-        .update({ status: 'completed' })
+      const { error } = await (supabase
+        .from('ai_tasks') as any)
+        .update({ status: 'completed' } as any)
         .eq('id', ageGroup.id);
 
       if (error) throw error;

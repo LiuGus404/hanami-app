@@ -24,7 +24,7 @@ export default function CheckTriggersPage() {
 
       // 檢查 hanami_growth_goals 表上的觸發器
       const { data, error: triggerError } = await supabase
-        .rpc('get_table_triggers', { table_name: 'hanami_growth_goals' });
+        .rpc('get_table_triggers', { table_name: 'hanami_growth_goals' } as any);
 
       if (triggerError) {
         // 如果 RPC 函數不存在，嘗試直接查詢
@@ -62,7 +62,7 @@ export default function CheckTriggersPage() {
       const { error } = await supabase.rpc('drop_trigger_if_exists', {
         trigger_name: triggerName,
         table_name: 'hanami_growth_goals'
-      });
+      } as any);
 
       if (error) {
         // 如果 RPC 函數不存在，提供 SQL 語句
@@ -109,7 +109,7 @@ export default function CheckTriggersPage() {
         }
 
         console.log('hanami_version_change_logs 表結構:', columns);
-        setError(`表存在，但可能缺少 version_id 欄位。欄位列表: ${columns?.map(c => c.column_name).join(', ')}`);
+        setError(`表存在，但可能缺少 version_id 欄位。欄位列表: ${(columns as any[])?.map((c: any) => c.column_name).join(', ')}`);
       } else {
         setError('hanami_version_change_logs 表不存在');
       }

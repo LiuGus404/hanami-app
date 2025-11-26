@@ -59,7 +59,7 @@ export function useUserPoints() {
         throw error;
       }
 
-      setPoints(data);
+      setPoints(data as unknown as UserPoints | null);
     } catch (err) {
       console.error('獲取用戶積分失敗:', err);
       setError(err instanceof Error ? err.message : '獲取積分失敗');
@@ -87,7 +87,7 @@ export function useUserPoints() {
 
       if (error) throw error;
 
-      setPoints(data);
+      setPoints(data as unknown as UserPoints | null);
 
       // 創建初始積分交易記錄
       await supabase
@@ -119,7 +119,7 @@ export function useUserPoints() {
         .limit(20);
 
       if (error) throw error;
-      setTransactions(data || []);
+      setTransactions((data as unknown as PointTransaction[]) || []);
     } catch (err) {
       console.error('獲取交易記錄失敗:', err);
     }

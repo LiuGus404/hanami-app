@@ -61,13 +61,34 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false }
           .select('id, admin_name, admin_email')
           .order('admin_name');
 
-        setStudents(studentsData || []);
-        setEmployees(employeesData || []);
-        setAdmins(adminsData || []);
+        const typedStudentsData = (studentsData || []) as Array<{
+          id: string;
+          full_name?: string;
+          contact_number?: string;
+          nick_name?: string | null;
+          [key: string]: any;
+        }>;
+        const typedEmployeesData = (employeesData || []) as Array<{
+          id: string;
+          teacher_fullname?: string;
+          teacher_nickname?: string | null;
+          teacher_email?: string;
+          [key: string]: any;
+        }>;
+        const typedAdminsData = (adminsData || []) as Array<{
+          id: string;
+          admin_name?: string | null;
+          admin_email?: string | null;
+          [key: string]: any;
+        }>;
+        
+        setStudents(typedStudentsData);
+        setEmployees(typedEmployeesData);
+        setAdmins(typedAdminsData);
 
         // 如果有電話號碼，查找對應學生
         if (task?.phone) {
-          const student = studentsData?.find(s => s.contact_number === task.phone);
+          const student = typedStudentsData.find(s => s.contact_number === task.phone);
           setSelectedStudent(student || null);
         }
       } catch (error) {

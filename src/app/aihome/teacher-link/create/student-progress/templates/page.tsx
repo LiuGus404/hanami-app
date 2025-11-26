@@ -6,6 +6,7 @@ import TemplatesPage from '@/app/admin/student-progress/templates/page';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import BackButton from '@/components/ui/BackButton';
 import StudentProgressNavBar from '@/components/ui/StudentProgressNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 function TeacherLinkTemplatesContent() {
   const { orgId, organization, organizationResolved } = useTeacherLinkOrganization();
@@ -78,7 +79,9 @@ function TeacherLinkTemplatesContent() {
 export default function TeacherLinkTemplatesPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/student-progress/templates">
-      <TeacherLinkTemplatesContent />
+      <WithPermissionCheck pageKey="progress">
+        <TeacherLinkTemplatesContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

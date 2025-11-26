@@ -117,10 +117,10 @@ export async function GET(request: NextRequest) {
       const studentIds = bindings.map((binding: any) => binding.student_id);
       
       // 從主要學生資料庫獲取學生詳細資訊
-      const { data: studentsData, error: studentsError } = await mainSupabase
+      const { data: studentsData, error: studentsError } = await ((mainSupabase as any)
         .from('Hanami_Students')
         .select('id, full_name, student_age, student_dob, course_type, student_oid')
-        .in('id', studentIds);
+        .in('id', studentIds));
 
       if (studentsError) {
         console.error('獲取學生詳細資訊錯誤:', studentsError);

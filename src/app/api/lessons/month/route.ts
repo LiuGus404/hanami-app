@@ -54,8 +54,8 @@ export async function GET(request: NextRequest) {
 
     // 驗證用戶是否有權限訪問該機構
     if (userEmail) {
-      const { data: identity, error: identityError } = await supabase
-        .from('hanami_org_identities')
+      const { data: identity, error: identityError } = await ((supabase as any)
+        .from('hanami_org_identities'))
         .select('role_type, status')
         .eq('org_id', orgId)
         .eq('user_email', userEmail)
@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
       }
 
       if (!identity) {
-        const { data: employee, error: employeeError } = await supabase
-          .from('hanami_employee')
+        const { data: employee, error: employeeError } = await ((supabase as any)
+          .from('hanami_employee'))
           .select('teacher_email, teacher_status, org_id')
           .eq('teacher_email', userEmail)
           .eq('org_id', orgId)
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     const [lessonsResult, trialLessonsResult] = await Promise.all([
       // 查詢正式學生課程
       supabase
-        .from('hanami_student_lesson')
+        .from('hanami_student_lesson' as any)
         .select(`
           id,
           student_id,
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
       
       // 查詢試聽學生課程
       supabase
-        .from('hanami_trial_students')
+        .from('hanami_trial_students' as any)
         .select(`
           id,
           lesson_date,
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
       
       if (studentIds.length > 0) {
         const { data: studentsData } = await supabase
-          .from('Hanami_Students')
+          .from('Hanami_Students' as any)
           .select('id, full_name, student_age')
           .in('id', studentIds)
           .eq('org_id', orgId);

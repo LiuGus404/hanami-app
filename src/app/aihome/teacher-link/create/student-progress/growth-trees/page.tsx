@@ -6,6 +6,7 @@ import GrowthTreesPage from '@/app/admin/student-progress/growth-trees/page';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import BackButton from '@/components/ui/BackButton';
 import StudentProgressNavBar from '@/components/ui/StudentProgressNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 function TeacherLinkGrowthTreesContent() {
   const { orgId, organization, organizationResolved } = useTeacherLinkOrganization();
@@ -74,7 +75,9 @@ function TeacherLinkGrowthTreesContent() {
 export default function TeacherLinkGrowthTreesPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/student-progress/growth-trees">
-      <TeacherLinkGrowthTreesContent />
+      <WithPermissionCheck pageKey="progress">
+        <TeacherLinkGrowthTreesContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

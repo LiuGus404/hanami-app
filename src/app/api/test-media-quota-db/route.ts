@@ -61,8 +61,8 @@ export async function GET(request: NextRequest) {
     let rlsStatus = null;
     try {
       // 嘗試插入一條測試記錄來檢查 RLS
-      const { error: insertError } = await supabase
-        .from('hanami_media_quota_levels')
+      const { error: insertError } = await (supabase
+        .from('hanami_media_quota_levels') as any)
         .insert({
           level_name: 'test_rls_check',
           video_limit: 1,
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
           photo_size_limit_mb: 1,
           description: 'RLS 測試記錄',
           is_active: false
-        });
+        } as any);
       
       if (insertError) {
         rlsError = insertError;
@@ -150,8 +150,8 @@ export async function POST(request: NextRequest) {
     }
     
     if (action === 'insert_sample_data') {
-      const { data, error } = await supabase
-        .from('hanami_media_quota_levels')
+      const { data, error } = await (supabase
+        .from('hanami_media_quota_levels') as any)
         .insert([
           {
             level_name: '測試等級',
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
             description: '測試用配額等級',
             is_active: true
           }
-        ])
+        ] as any)
         .select();
       
       if (error) {

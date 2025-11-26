@@ -56,7 +56,7 @@ export async function POST() {
         FOR EACH ROW EXECUTE FUNCTION log_growth_goal_changes();
     `;
 
-    const { error: fixError } = await supabase.rpc('exec_sql', {
+    const { error: fixError } = await (supabase.rpc as any)('exec_sql', {
       sql: fixTriggerSQL
     });
 

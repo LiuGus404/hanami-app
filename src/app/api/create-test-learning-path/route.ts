@@ -27,10 +27,11 @@ export async function POST(request: NextRequest) {
         }, { status: 404 });
       }
       
-      const { data: growthTrees, error: treesError } = await supabase
+      const typedCourseTypeData = courseTypeData as { id: string; [key: string]: any };
+      const { data: growthTrees, error: treesError } = await (supabase as any)
         .from('hanami_growth_trees')
         .select('id, tree_name')
-        .eq('course_type_id', courseTypeData.id)
+        .eq('course_type_id', typedCourseTypeData.id)
         .eq('is_active', true)
         .order('tree_level', { ascending: true })
         .limit(1);
@@ -102,9 +103,9 @@ export async function POST(request: NextRequest) {
     
     console.log('📝 準備插入的學習路徑資料:', testLearningPath);
     
-    const { data: insertResult, error: insertError } = await supabase
-      .from('hanami_learning_paths')
-      .insert(testLearningPath)
+    const { data: insertResult, error: insertError } = await (supabase
+      .from('hanami_learning_paths') as any)
+      .insert(testLearningPath as any)
       .select()
       .single();
     

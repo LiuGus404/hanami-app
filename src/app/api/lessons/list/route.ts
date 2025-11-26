@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
 
     // 驗證用戶是否有權限訪問該機構
     if (userEmail) {
-      const { data: identity, error: identityError } = await supabase
-        .from('hanami_org_identities')
+      const { data: identity, error: identityError } = await ((supabase as any)
+        .from('hanami_org_identities'))
         .select('role_type, status')
         .eq('org_id', orgId)
         .eq('user_email', userEmail)
@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
       }
 
       if (!identity) {
-        const { data: employee, error: employeeError } = await supabase
-          .from('hanami_employee')
+        const { data: employee, error: employeeError } = await ((supabase as any)
+          .from('hanami_employee'))
           .select('teacher_email, teacher_status, org_id')
           .eq('teacher_email', userEmail)
           .eq('org_id', orgId)
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 構建查詢（避免關聯查詢以繞過 RLS 遞歸）
-    let query = supabase
+    let query = (supabase as any)
       .from('hanami_student_lesson')
       .select('*')
       .eq('org_id', orgId);
@@ -95,8 +95,8 @@ export async function GET(request: NextRequest) {
       const studentIds = [...new Set(lessons.map((lesson: any) => lesson.student_id).filter(Boolean))];
       
       if (studentIds.length > 0) {
-        const { data: studentsData } = await supabase
-          .from('Hanami_Students')
+        const { data: studentsData } = await ((supabase as any)
+          .from('Hanami_Students'))
           .select('id, full_name, student_age, contact_number, student_dob')
           .in('id', studentIds)
           .eq('org_id', orgId);

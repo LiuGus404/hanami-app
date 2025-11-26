@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabaseClient();
     
     // 驗證欄位是否存在
-    const { data: courseTypes, error: verifyError } = await supabase
+    const { data: courseTypes, error: verifyError } = await (supabase as any)
       .from('Hanami_CourseTypes')
       .select('*')
       .limit(1);

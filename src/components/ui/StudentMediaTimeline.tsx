@@ -501,14 +501,16 @@ export default function StudentMediaTimeline({
       
       console.log('✅ 查詢該學生課堂記錄成功');
 
-      console.log('📚 該學生的所有課堂記錄:', allLessons);
-      console.log('📊 課堂記錄數量:', allLessons?.length || 0);
+      const typedAllLessons = (allLessons || []) as Array<{ lesson_date: string | null; [key: string]: any }>;
+      console.log('📚 該學生的所有課堂記錄:', typedAllLessons);
+      console.log('📊 課堂記錄數量:', typedAllLessons.length);
 
       // 查找當日的課堂記錄
       console.log('🔍 查找當日的課堂記錄...');
       console.log('🔍 今日日期:', todayStr);
       
-      const todayLesson = allLessons?.find(lesson => {
+      const todayLesson = typedAllLessons.find(lesson => {
+        if (!lesson.lesson_date) return false;
         const lessonDate = new Date(lesson.lesson_date);
         lessonDate.setHours(0, 0, 0, 0);
         const isToday = lessonDate.getTime() === today.getTime();
@@ -525,7 +527,7 @@ export default function StudentMediaTimeline({
         console.log('✅ 當日課堂記錄載入成功:', todayLesson);
       } else {
         // 如果沒有當日的記錄，使用最近的記錄
-        const recentLesson = allLessons?.[0];
+        const recentLesson = typedAllLessons[0];
         if (recentLesson) {
           setTodayLessonRecord(recentLesson);
           console.log('📅 使用最近的課堂記錄:', recentLesson);

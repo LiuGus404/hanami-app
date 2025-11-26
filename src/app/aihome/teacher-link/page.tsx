@@ -8,7 +8,13 @@ export default function TeacherLinkIndexPage() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const queryString = searchParams.toString();
+    // 移除機構相關參數，只保留其他查詢參數
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('orgId');
+    params.delete('orgName');
+    params.delete('orgSlug');
+    
+    const queryString = params.toString();
     const targetPath = queryString
       ? `/aihome/teacher-link/create?${queryString}`
       : '/aihome/teacher-link/create';

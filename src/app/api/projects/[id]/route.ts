@@ -52,11 +52,11 @@ export async function PUT(
     if (body.description !== undefined) updateData.description = body.description;
     if (body.is_public !== undefined) updateData.is_public = body.is_public;
 
-    const { data: project, error } = await supabase
+    const { data: project, error } = await ((supabase as any)
       .from('hanami_projects')
-      .update(updateData)
+      .update(updateData as any)
       .eq('id', params.id)
-      .select()
+      .select())
       .single();
 
     if (error) {

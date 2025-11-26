@@ -81,8 +81,8 @@ export async function GET(request: NextRequest) {
     // 檢查用戶是否有權限管理該機構
     console.log('[API /api/members/invitations/list] 檢查權限，orgId:', orgId, 'userEmail:', userEmail);
     
-    const { data: identityData, error: identityError } = await oldSupabase
-      .from('hanami_org_identities')
+    const { data: identityData, error: identityError } = await ((oldSupabase as any)
+      .from('hanami_org_identities'))
       .select('role_type')
       .eq('org_id', orgId)
       .eq('user_email', userEmail)
@@ -97,8 +97,8 @@ export async function GET(request: NextRequest) {
       error: identityError?.message,
     });
 
-    const { data: admin, error: adminError } = await oldSupabase
-      .from('hanami_admin')
+    const { data: admin, error: adminError } = await ((oldSupabase as any)
+      .from('hanami_admin'))
       .select('role')
       .eq('org_id', orgId)
       .eq('admin_email', userEmail)
@@ -136,8 +136,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 獲取邀請列表
-    const { data: invitations, error } = await oldSupabase
-      .from('hanami_org_invitations')
+    const { data: invitations, error } = await ((oldSupabase as any)
+      .from('hanami_org_invitations'))
       .select('*')
       .eq('org_id', orgId)
       .order('created_at', { ascending: false });

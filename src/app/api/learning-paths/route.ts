@@ -53,10 +53,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const typedExistingPath = existingPath as { id: string; [key: string]: any } | null;
+
     let result;
     let message;
 
-    if (existingPath) {
+    if (typedExistingPath) {
       // 如果已存在，則更新現有的學習路線
       const updateData: any = {
         name: pathData.name,
@@ -75,10 +77,10 @@ export async function POST(request: NextRequest) {
         updateData.org_id = orgId;
       }
 
-      const { data, error } = await supabase
-        .from('hanami_learning_paths')
-        .update(updateData)
-        .eq('id', existingPath.id)
+      const { data, error } = await (supabase
+        .from('hanami_learning_paths') as any)
+        .update(updateData as any)
+        .eq('id', typedExistingPath.id)
         .select()
         .single();
 
@@ -115,9 +117,9 @@ export async function POST(request: NextRequest) {
         learningPathData.org_id = orgId;
       }
 
-      const { data, error } = await supabase
-        .from('hanami_learning_paths')
-        .insert(learningPathData)
+      const { data, error } = await (supabase
+        .from('hanami_learning_paths') as any)
+        .insert(learningPathData as any)
         .select()
         .single();
 
@@ -137,8 +139,8 @@ export async function POST(request: NextRequest) {
       success: true,
       data: result,
       message,
-      isUpdate: !!existingPath
-    }, { status: existingPath ? 200 : 201 });
+      isUpdate: !!typedExistingPath
+    }, { status: typedExistingPath ? 200 : 201 });
 
   } catch (error) {
     console.error('儲存學習路徑時發生錯誤:', error);
@@ -240,9 +242,9 @@ export async function PUT(request: NextRequest) {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
-      .from('hanami_learning_paths')
-      .update(updateData)
+    const { data, error } = await (supabase
+      .from('hanami_learning_paths') as any)
+      .update(updateData as any)
       .eq('id', pathId)
       .select()
       .single();

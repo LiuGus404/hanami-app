@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       `;
 
       try {
-        const { data: sqlData, error: sqlError } = await supabase.rpc('exec_sql', {
+        const { data: sqlData, error: sqlError } = await (supabase.rpc as any)('exec_sql', {
           sql: sqlQuery
         });
 
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     let rlsStatus: any = null;
     let rlsError: any = null;
     try {
-      const result = await supabase.rpc('exec_sql', {
+      const result = await (supabase.rpc as any)('exec_sql', {
         sql: `
           SELECT 
             relname,

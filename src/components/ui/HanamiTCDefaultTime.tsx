@@ -120,7 +120,12 @@ const HanamiTCDefaultTime: React.FC<HanamiTCDefaultTimeProps> = ({ teachers }) =
       }
 
       // 過濾掉無效的時間段
-      const validStudents = (studentsData || []).filter(student =>
+      const typedStudentsData = (studentsData || []) as Array<{
+        regular_weekday?: number | null;
+        regular_timeslot?: string | null;
+        [key: string]: any;
+      }>;
+      const validStudents = typedStudentsData.filter(student =>
         student.regular_weekday !== null &&
         student.regular_timeslot !== null &&
         student.regular_timeslot !== '' &&
@@ -135,8 +140,8 @@ const HanamiTCDefaultTime: React.FC<HanamiTCDefaultTimeProps> = ({ teachers }) =
       const processedDefaultLessons: ProcessedDefaultLesson[] = validStudents.map((student) => ({
         id: student.id,
         student_id: student.id,
-        regular_weekday: student.regular_weekday,
-        regular_timeslot: student.regular_timeslot,
+        regular_weekday: student.regular_weekday || null,
+        regular_timeslot: student.regular_timeslot || null,
         course_type: student.course_type,
         full_name: student.full_name || '未命名學生',
         student_age: student.student_age,
@@ -430,11 +435,15 @@ const HanamiTCDefaultTime: React.FC<HanamiTCDefaultTimeProps> = ({ teachers }) =
     setPlans(prevPlans => {
       const newPlans = data || [];
       // 如果內容相同，不更新狀態
-      if (prevPlans.length === newPlans.length && 
-          prevPlans.every((plan, index) => plan.id === newPlans[index].id)) {
+      const typedNewPlans = (newPlans || []) as Array<{
+        id?: string;
+        [key: string]: any;
+      }>;
+      if (prevPlans.length === typedNewPlans.length && 
+          prevPlans.every((plan, index) => plan.id === typedNewPlans[index]?.id)) {
         return prevPlans;
       }
-      return newPlans;
+      return typedNewPlans as any;
     });
   };
 

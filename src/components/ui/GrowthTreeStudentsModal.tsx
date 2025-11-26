@@ -161,12 +161,26 @@ export default function GrowthTreeStudentsModal({
         throw allStudentsError;
       }
       console.log('載入到的所有學生:', allStudentsData);
-      if (allStudentsData) {
-        const fixedAllStudents = allStudentsData.map(s => ({
-          ...s,
+      const typedAllStudentsData = (allStudentsData || []) as Array<{
+        id: string;
+        full_name?: string | null;
+        nick_name?: string | null;
+        student_age?: number | null;
+        course_type?: string | null;
+        student_preference?: string | null;
+        student_remarks?: string | null;
+        [key: string]: any;
+      }>;
+      
+      if (typedAllStudentsData.length > 0) {
+        const fixedAllStudents = typedAllStudentsData.map(s => ({
+          id: s.id,
+          full_name: s.full_name || '',
           nick_name: s.nick_name ?? undefined,
           student_age: s.student_age ?? undefined,
           course_type: s.course_type ?? undefined,
+          student_preference: s.student_preference ?? undefined,
+          student_remarks: s.student_remarks ?? undefined,
         }));
         setAllStudents(fixedAllStudents);
       } else {
@@ -174,9 +188,9 @@ export default function GrowthTreeStudentsModal({
       }
 
       // 3. 載入學生統計資訊（學習時長和上堂數）
-      if (allStudentsData && allStudentsData.length > 0) {
+      if (typedAllStudentsData.length > 0) {
         console.log('步驟3: 載入學生統計');
-        await loadStudentStats(allStudentsData.map(s => s.id));
+        await loadStudentStats(typedAllStudentsData.map(s => s.id));
       }
 
       // 4. 簡化版本：跳過能力載入
@@ -222,8 +236,13 @@ export default function GrowthTreeStudentsModal({
 
         if (error) continue;
 
+        const typedLessonData = (lessonData || []) as Array<{
+          lesson_activities?: string | null;
+          [key: string]: any;
+        }>;
+        
         let totalParticipations = 0;
-        (lessonData || []).forEach(lesson => {
+        typedLessonData.forEach(lesson => {
           if (lesson.lesson_activities) {
             // 簡單的字串匹配（可以改進為更精確的解析）
             relatedActivities.forEach(activityId => {
@@ -343,8 +362,12 @@ export default function GrowthTreeStudentsModal({
       console.log('備用查詢結果:', allLessonData);
 
       // 按學生分組課堂記錄
+      const typedAllLessonData = (allLessonData || []) as Array<{
+        student_id?: string;
+        [key: string]: any;
+      }>;
       const lessonsByStudent = new Map<string, any[]>();
-      (allLessonData || []).forEach(lesson => {
+      typedAllLessonData.forEach(lesson => {
         if (lesson.student_id && !lessonsByStudent.has(lesson.student_id)) {
           lessonsByStudent.set(lesson.student_id, []);
         }
@@ -445,7 +468,11 @@ export default function GrowthTreeStudentsModal({
       
       if (checkError) throw checkError;
       
-      const existingStudentIds = (existingStudents || []).map(s => s.student_id);
+      const typedExistingStudents = (existingStudents || []) as Array<{
+        student_id?: string;
+        [key: string]: any;
+      }>;
+      const existingStudentIds = typedExistingStudents.map(s => s.student_id || '');
       const newStudentIds = selectedStudents.filter(id => !existingStudentIds.includes(id));
       
       if (newStudentIds.length === 0) {
@@ -456,14 +483,14 @@ export default function GrowthTreeStudentsModal({
       }
       
       // 添加新學生到成長樹（使用新的欄位名稱）
-      const { error } = await supabase
-        .from('hanami_student_trees')
+      const { error } = await (supabase
+        .from('hanami_student_trees') as any)
         .insert(newStudentIds.map(studentId => ({
           student_id: studentId,
           tree_id: treeId,
           start_date: new Date().toISOString().split('T')[0],
           status: 'active'
-        })));
+        })) as any);
 
       if (error) throw error;
 

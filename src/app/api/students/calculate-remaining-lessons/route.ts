@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     // 驗證用戶是否有權限訪問該機構
     if (userEmail) {
-      const { data: identity, error: identityError } = await supabase
+      const { data: identity, error: identityError } = await (supabase as any)
         .from('hanami_org_identities')
         .select('role_type, status')
         .eq('org_id', orgId)
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!identity) {
-        const { data: employee, error: employeeError } = await supabase
+        const { data: employee, error: employeeError } = await (supabase as any)
           .from('hanami_employee')
           .select('teacher_email, teacher_status, org_id')
           .eq('teacher_email', userEmail)
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 驗證所有學生都屬於該機構
-    const { data: studentsData, error: studentsError } = await supabase
+    const { data: studentsData, error: studentsError } = await (supabase as any)
       .from('Hanami_Students')
       .select('id, org_id')
       .in('id', studentIds);
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       
       try {
         // 備用方法：直接查詢 hanami_student_lesson 表
-        const { data: lessonsData, error: lessonsError } = await supabase
+        const { data: lessonsData, error: lessonsError } = await (supabase as any)
           .from('hanami_student_lesson')
           .select('student_id, lesson_date')
           .in('student_id', studentIds)

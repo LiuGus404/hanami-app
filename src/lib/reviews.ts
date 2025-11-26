@@ -161,14 +161,15 @@ export async function getOrgReviewStats(orgId: string): Promise<OrgReviewStats |
       };
     }
     
+    const typedData = data as { total_reviews?: number | null; average_rating?: number | null; five_star_count?: number | null; four_star_count?: number | null; three_star_count?: number | null; two_star_count?: number | null; one_star_count?: number | null; [key: string]: any; };
     const stats: OrgReviewStats = {
-      totalReviews: Number(data.total_reviews) || 0,
-      averageRating: Number(data.average_rating) || 0,
-      fiveStarCount: Number(data.five_star_count) || 0,
-      fourStarCount: Number(data.four_star_count) || 0,
-      threeStarCount: Number(data.three_star_count) || 0,
-      twoStarCount: Number(data.two_star_count) || 0,
-      oneStarCount: Number(data.one_star_count) || 0,
+      totalReviews: Number(typedData.total_reviews) || 0,
+      averageRating: Number(typedData.average_rating) || 0,
+      fiveStarCount: Number(typedData.five_star_count) || 0,
+      fourStarCount: Number(typedData.four_star_count) || 0,
+      threeStarCount: Number(typedData.three_star_count) || 0,
+      twoStarCount: Number(typedData.two_star_count) || 0,
+      oneStarCount: Number(typedData.one_star_count) || 0,
     };
     
     console.log('✅ 獲取評論統計成功:', stats);
@@ -265,14 +266,15 @@ export async function getUserOrgReview(
       return null;
     }
     
+    const typedData = data as { id: string; user_id: string; user_name?: string | null; content: string; rating: number; created_at: string; updated_at: string; [key: string]: any; };
     const review: OrgReview = {
-      id: data.id,
-      userId: data.user_id,
-      userName: data.user_name || '匿名用戶',
-      content: data.content,
-      rating: data.rating,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
+      id: typedData.id,
+      userId: typedData.user_id,
+      userName: typedData.user_name || '匿名用戶',
+      content: typedData.content,
+      rating: typedData.rating,
+      createdAt: typedData.created_at,
+      updatedAt: typedData.updated_at,
     };
     
     console.log('✅ 獲取用戶評論成功');

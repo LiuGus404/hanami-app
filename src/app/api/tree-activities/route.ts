@@ -200,12 +200,12 @@ export async function PUT(request: NextRequest) {
         throw new Error(`活動 ${id}: 難度等級必須在1-5之間`);
       }
 
-      const { data, error } = await supabase
-        .from('hanami_tree_activities' as any)
+      const { data, error } = await (supabase
+        .from('hanami_tree_activities') as any)
         .update({
           ...updates,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', id)
         .select()
         .single();
@@ -277,7 +277,8 @@ export async function DELETE(request: NextRequest) {
           .select('activity_name')
           .eq('id', (activityExists as any).activity_id)
           .single();
-        activityName = teachingActivity?.activity_name || '教學活動';
+        const typedTeachingActivity = teachingActivity as { activity_name?: string } | null;
+        activityName = typedTeachingActivity?.activity_name || '教學活動';
       } else {
         activityName = '教學活動';
       }

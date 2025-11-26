@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!teacher.linked_user_id) {
+    const typedTeacher = teacher as { linked_user_id: string | null; teacher_fullname?: string; teacher_email?: string; teacher_phone?: string; teacher_role?: string; [key: string]: any };
+    
+    if (!typedTeacher.linked_user_id) {
       return NextResponse.json(
         { success: false, error: '该老师记录未链接到成员，无法同步' },
         { status: 400 }
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
     const { data: saasUser, error: userError } = await saas
       .from('saas_users')
       .select('id, email, full_name, phone')
-      .eq('id', teacher.linked_user_id)
+      .eq('id', typedTeacher.linked_user_id!)
       .single();
 
     if (userError || !saasUser) {
@@ -68,12 +70,12 @@ export async function POST(request: NextRequest) {
     const { getServerSupabaseClient } = await import('@/lib/supabase');
     const oldSupabase = getServerSupabaseClient();
     const saasUserData = saasUser as { id: string; email: string; full_name: string; phone: string };
-    const { data: identity, error: identityError } = await oldSupabase
+    const { data: identity, error: identityError } = await ((oldSupabase as any)
       .from('hanami_org_identities')
       .select('id, role_type, status')
       .eq('user_email', saasUserData.email)
       .eq('org_id', orgId)
-      .maybeSingle();
+      .maybeSingle());
 
     const updates: any = {};
     let syncCount = 0;
@@ -81,21 +83,21 @@ export async function POST(request: NextRequest) {
     // 4. 根据方向执行同步
     if (direction === 'member_to_teacher' || direction === 'bidirectional') {
       // 从成员同步到老师
-      if (saasUserData.full_name && saasUserData.full_name !== teacher.teacher_fullname) {
+      if (saasUserData.full_name && saasUserData.full_name !== typedTeacher.teacher_fullname) {
         updates.teacher_fullname = saasUserData.full_name;
         syncCount++;
       }
-      if (saasUserData.email && saasUserData.email !== teacher.teacher_email) {
+      if (saasUserData.email && saasUserData.email !== typedTeacher.teacher_email) {
         updates.teacher_email = saasUserData.email;
         syncCount++;
       }
-      if (saasUserData.phone && saasUserData.phone !== teacher.teacher_phone) {
+      if (saasUserData.phone && saasUserData.phone !== typedTeacher.teacher_phone) {
         updates.teacher_phone = saasUserData.phone;
         syncCount++;
       }
       if (identity) {
         const identityData = identity as { id: string; role_type: string; status: string };
-        if (identityData.role_type === 'teacher' && identityData.role_type !== teacher.teacher_role) {
+        if (identityData.role_type === 'teacher' && identityData.role_type !== typedTeacher.teacher_role) {
         // 如果成员身份是 teacher，可以同步角色
         // 注意：这里可能需要根据实际业务逻辑调整
         }
@@ -105,16 +107,16 @@ export async function POST(request: NextRequest) {
     if (direction === 'teacher_to_member' || direction === 'bidirectional') {
       // 从老师同步到成员（更新 saas_users）
       const userUpdates: any = {};
-      if (teacher.teacher_fullname && teacher.teacher_fullname !== saasUserData.full_name) {
-        userUpdates.full_name = teacher.teacher_fullname;
+      if (typedTeacher.teacher_fullname && typedTeacher.teacher_fullname !== saasUserData.full_name) {
+        userUpdates.full_name = typedTeacher.teacher_fullname;
         syncCount++;
       }
-      if (teacher.teacher_email && teacher.teacher_email !== saasUserData.email) {
-        userUpdates.email = teacher.teacher_email;
+      if (typedTeacher.teacher_email && typedTeacher.teacher_email !== saasUserData.email) {
+        userUpdates.email = typedTeacher.teacher_email;
         syncCount++;
       }
-      if (teacher.teacher_phone && teacher.teacher_phone !== saasUserData.phone) {
-        userUpdates.phone = teacher.teacher_phone;
+      if (typedTeacher.teacher_phone && typedTeacher.teacher_phone !== saasUserData.phone) {
+        userUpdates.phone = typedTeacher.teacher_phone;
         syncCount++;
       }
 
@@ -140,9 +142,9 @@ export async function POST(request: NextRequest) {
       updates.last_synced_at = new Date().toISOString();
       updates.updated_at = new Date().toISOString();
 
-      const { error: updateTeacherError } = await supabase
-        .from('hanami_employee')
-        .update(updates)
+      const { error: updateTeacherError } = await (supabase
+        .from('hanami_employee') as any)
+        .update(updates as any)
         .eq('id', teacherId);
 
       if (updateTeacherError) {

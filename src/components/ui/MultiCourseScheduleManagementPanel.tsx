@@ -779,9 +779,10 @@ export default function MultiCourseScheduleManagementPanel() {
 
       console.log('準備插入的數據：', insertData);
       
-      const { error } = await supabase
+      // hanami_schedule table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_schedule')
-        .insert([insertData]);
+        .insert([insertData]));
 
       console.log('新增時段結果：', { error });
 
@@ -852,11 +853,12 @@ export default function MultiCourseScheduleManagementPanel() {
 
       console.log('準備更新的數據：', updateData);
       
-      const { error } = await supabase
+      // hanami_schedule table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_schedule')
         .update(updateData)
         .eq('id', editSlot.id)
-        .eq('org_id', validOrgId as string);
+        .eq('org_id', validOrgId as string));
 
       console.log('更新時段結果：', { error });
 
@@ -1035,7 +1037,8 @@ export default function MultiCourseScheduleManagementPanel() {
       const validTeacherId = newCourseCode.teacher_id || null;
       console.log('記錄教師/管理員 ID:', validTeacherId);
 
-      const { error } = await supabase
+      // hanami_course_codes table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_course_codes')
         .insert([{
           ...newCourseCode,
@@ -1044,7 +1047,7 @@ export default function MultiCourseScheduleManagementPanel() {
           teacher_id: validTeacherId,
           room_location: newCourseCode.room_location || null,
           course_type_id: newCourseCode.course_type_id || null,
-        }]);
+        }]));
 
       if (error) {
         console.error('新增課程代碼失敗：', error);
@@ -1124,12 +1127,14 @@ export default function MultiCourseScheduleManagementPanel() {
       });
 
       // 先檢查記錄是否存在
-      const { data: existingData, error: checkError } = await supabase
+      const { data: existingDataRaw, error: checkError } = await supabase
         .from('hanami_course_codes')
         .select('id, course_code, course_name')
         .eq('id', editingCourseCode.id)
         .eq('org_id', validOrgId as string)
         .single();
+      
+      const existingData = existingDataRaw as { id: string; course_code: string; course_name: string; [key: string]: any; } | null;
 
       if (checkError) {
         console.error('檢查記錄存在性失敗：', checkError);
@@ -1150,12 +1155,14 @@ export default function MultiCourseScheduleManagementPanel() {
       console.log('  - 是否相同:', editingCourseCode.course_name === existingData.course_name);
       
       // 檢查是否有實際的變更 - 需要先獲取完整的資料庫記錄
-      const { data: fullExistingData, error: fullDataError } = await supabase
+      const { data: fullExistingDataRaw, error: fullDataError } = await supabase
         .from('hanami_course_codes')
         .select('*')
         .eq('id', editingCourseCode.id)
         .eq('org_id', validOrgId as string)
         .single();
+      
+      const fullExistingData = fullExistingDataRaw as { course_name: string; course_description: string | null; max_students: number | null; teacher_id: string | null; room_location: string | null; is_active: boolean | null; course_type_id: string | null; [key: string]: any; } | null;
 
       if (fullDataError || !fullExistingData) {
         console.error('無法獲取完整的資料庫記錄：', fullDataError);
@@ -1245,11 +1252,12 @@ export default function MultiCourseScheduleManagementPanel() {
       
       console.log('準備更新的資料:', updateData);
       
-      const { error } = await supabase
+      // hanami_course_codes table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('hanami_course_codes')
         .update(updateData)
         .eq('id', editingCourseCode.id)
-        .eq('org_id', validOrgId as string);
+        .eq('org_id', validOrgId as string));
 
       if (error) {
         console.error('更新課程代碼失敗：', error);
@@ -1261,11 +1269,13 @@ export default function MultiCourseScheduleManagementPanel() {
       console.log('更新操作完成，開始驗證更新結果...');
       
       // 使用驗證查詢來確認更新是否成功
-      const { data: verifyData, error: verifyError } = await supabase
+      const { data: verifyDataRaw, error: verifyError } = await supabase
         .from('hanami_course_codes')
         .select('*')
         .eq('id', editingCourseCode.id)
         .maybeSingle();
+      
+      const verifyData = verifyDataRaw as { course_name: string; course_description: string | null; [key: string]: any; } | null;
       
       if (verifyError) {
         console.error('驗證更新結果失敗：', verifyError);
@@ -1485,11 +1495,12 @@ export default function MultiCourseScheduleManagementPanel() {
     }
     try {
       const nextStatus = !(courseType.status ?? true);
-      const { error } = await supabase
+      // Hanami_CourseTypes table type may not be fully defined
+      const { error } = await ((supabase as any)
         .from('Hanami_CourseTypes')
         .update({ status: nextStatus, updated_at: new Date().toISOString() })
         .eq('id', courseType.id)
-        .eq('org_id', validOrgId as string);
+        .eq('org_id', validOrgId as string));
       if (error) {
         console.error('更新課程類型狀態失敗：', error);
         alert('更新課程類型狀態失敗：' + error.message);
@@ -1831,11 +1842,12 @@ export default function MultiCourseScheduleManagementPanel() {
       };
 
       if (editingCourseType) {
-        const { error } = await supabase
+        // Hanami_CourseTypes table type may not be fully defined
+        const { error } = await ((supabase as any)
           .from('Hanami_CourseTypes')
           .update(payload)
           .eq('id', editingCourseType.id)
-          .eq('org_id', validOrgId as string);
+          .eq('org_id', validOrgId as string));
 
         if (error) {
           console.error('更新課程類型失敗：', error);
@@ -1843,9 +1855,10 @@ export default function MultiCourseScheduleManagementPanel() {
           return;
         }
       } else {
-        const { error } = await supabase
+        // Hanami_CourseTypes table type may not be fully defined
+        const { error } = await ((supabase as any)
           .from('Hanami_CourseTypes')
-          .insert([{ ...payload, org_id: validOrgId }]);
+          .insert([{ ...payload, org_id: validOrgId }]));
 
         if (error) {
           console.error('新增課程類型失敗：', error);

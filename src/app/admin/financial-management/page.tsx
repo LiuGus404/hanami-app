@@ -202,8 +202,22 @@ export default function FinancialManagementPage() {
       console.log('課程類型數據:', courseTypeData);
 
       // 計算堂數統計（參考 Hanami 日曆邏輯）
-      const totalLessons = lessonData?.length || 0;
-      const actualLessons = lessonData?.filter(lesson => 
+      const typedLessonData = (lessonData || []) as Array<{
+        lesson_status?: string;
+        status?: string;
+        course_type?: string;
+        full_name?: string;
+        notes?: string;
+        remarks?: string;
+        [key: string]: any;
+      }>;
+      const typedCourseTypeData = (courseTypeData || []) as Array<{
+        name?: string;
+        price_per_lesson?: number;
+        [key: string]: any;
+      }>;
+      const totalLessons = typedLessonData.length || 0;
+      const actualLessons = typedLessonData.filter(lesson => 
         (lesson.lesson_status === 'attended' || lesson.lesson_status === 'completed') ||
         (lesson.status === 'attended' || lesson.status === 'completed')
       ).length || 0;
@@ -213,7 +227,7 @@ export default function FinancialManagementPage() {
       const trialFromTrialTable = trialData?.length || 0;
       
       // 2. 從 hanami_student_lesson 表中篩選試堂相關記錄
-      const trialFromLessonTable = lessonData?.filter(lesson => 
+      const trialFromLessonTable = typedLessonData.filter(lesson => 
         lesson.lesson_status === 'trial' || 
         lesson.status === 'trial' ||
         lesson.course_type?.includes('試堂') ||
@@ -221,27 +235,27 @@ export default function FinancialManagementPage() {
         lesson.notes?.includes('試堂') ||
         lesson.remarks?.includes('試堂')
       ).length || 0;
-      
+
       // 3. 總試堂數
       const trialLessons = trialFromTrialTable + trialFromLessonTable;
 
       // 計算財務數據
       // 本月收入 = 常規課程收入 + 試堂收入
-      const lessonCount = lessonData?.length || 0;
+      const lessonCount = typedLessonData.length || 0;
       
       // 根據課程類型計算常規課程收入
       let regularIncome = 0;
-      if (lessonData && courseTypeData) {
+      if (typedLessonData.length > 0 && typedCourseTypeData.length > 0) {
         // 建立課程類型價格映射
         const courseTypePrices: { [key: string]: number } = {};
-        courseTypeData.forEach(courseType => {
+        typedCourseTypeData.forEach(courseType => {
           if (courseType.name && courseType.price_per_lesson) {
             courseTypePrices[courseType.name] = courseType.price_per_lesson;
           }
         });
         
         // 計算每堂課的收入（排除試堂）
-        lessonData.forEach(lesson => {
+        typedLessonData.forEach(lesson => {
           // 檢查是否為試堂
           const isTrial = lesson.lesson_status === 'trial' || 
                          lesson.status === 'trial' ||
@@ -258,7 +272,7 @@ export default function FinancialManagementPage() {
         });
       } else {
         // 如果沒有課程類型數據，使用預設價格（排除試堂）
-        const nonTrialLessons = lessonData?.filter(lesson => {
+        const nonTrialLessons = typedLessonData.filter(lesson => {
           const isTrial = lesson.lesson_status === 'trial' || 
                          lesson.status === 'trial' ||
                          lesson.course_type?.includes('試堂') ||
@@ -276,32 +290,33 @@ export default function FinancialManagementPage() {
       // 總收入 = 常規課程收入 + 試堂收入
       const totalIncome = regularIncome + trialIncome;
       
-      const totalExpenses = expenseData?.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0;
+      const typedExpenseData = (expenseData || []) as Array<{ amount?: number; [key: string]: any }>;
+      const totalExpenses = typedExpenseData.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0;
       const netProfit = totalIncome - totalExpenses;
       const studentCount = studentData?.length || 0;
       const activePackages = packageData?.length || 0;
 
       // 統計各種課程狀態（同時檢查 lesson_status 和 status 欄位）
       const newLessonStatusStats = {
-        attended: lessonData?.filter(lesson => 
+        attended: typedLessonData.filter(lesson => 
           lesson.lesson_status === 'attended' || lesson.status === 'attended'
         ).length || 0,
-        completed: lessonData?.filter(lesson => 
+        completed: typedLessonData.filter(lesson => 
           lesson.lesson_status === 'completed' || lesson.status === 'completed'
         ).length || 0,
-        absent: lessonData?.filter(lesson => 
+        absent: typedLessonData.filter(lesson => 
           lesson.lesson_status === 'absent' || lesson.status === 'absent'
         ).length || 0,
-        cancelled: lessonData?.filter(lesson => 
+        cancelled: typedLessonData.filter(lesson => 
           lesson.lesson_status === 'cancelled' || lesson.status === 'cancelled'
         ).length || 0,
-        makeup: lessonData?.filter(lesson => 
+        makeup: typedLessonData.filter(lesson => 
           lesson.lesson_status === 'makeup' || lesson.status === 'makeup'
         ).length || 0,
-        trial: lessonData?.filter(lesson => 
+        trial: typedLessonData.filter(lesson => 
           lesson.lesson_status === 'trial' || lesson.status === 'trial'
         ).length || 0,
-        other: lessonData?.filter(lesson => {
+        other: typedLessonData.filter(lesson => {
           const lessonStatus = lesson.lesson_status || lesson.status || '';
           return !['attended', 'completed', 'absent', 'cancelled', 'makeup', 'trial'].includes(lessonStatus);
         }).length || 0
@@ -346,7 +361,7 @@ export default function FinancialManagementPage() {
         fromLessonTable: trialFromLessonTable,
         total: trialLessons,
         trialData: trialData,
-        lessonDataWithTrial: lessonData?.filter(lesson => 
+        lessonDataWithTrial: typedLessonData.filter(lesson => 
           lesson.lesson_status === 'trial' || 
           lesson.status === 'trial' ||
           lesson.course_type?.includes('試堂') ||
@@ -372,8 +387,8 @@ export default function FinancialManagementPage() {
       }
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('hanami_financial_expenses')
+      const { error } = await (supabase
+        .from('hanami_financial_expenses') as any)
         .insert({
           expense_date: newExpense.expense_date,
           expense_category: newExpense.expense_category,
@@ -381,7 +396,7 @@ export default function FinancialManagementPage() {
           amount: newExpense.amount,
           payment_method: newExpense.payment_method,
           notes: newExpense.notes || null
-        });
+        } as any);
 
       if (error) throw error;
 
@@ -436,9 +451,9 @@ export default function FinancialManagementPage() {
 
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('Hanami_Student_Package')
-        .update({ price: newPrice })
+      const { error } = await (supabase
+        .from('Hanami_Student_Package') as any)
+        .update({ price: newPrice } as any)
         .eq('id', editingPackage.id);
 
       if (error) throw error;
@@ -468,9 +483,9 @@ export default function FinancialManagementPage() {
 
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('Hanami_CourseTypes')
-        .update({ price_per_lesson: newCourseTypePrice })
+      const { error } = await (supabase
+        .from('Hanami_CourseTypes') as any)
+        .update({ price_per_lesson: newCourseTypePrice } as any)
         .eq('id', editingCourseType.id);
 
       if (error) throw error;

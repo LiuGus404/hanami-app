@@ -6,6 +6,7 @@ import LearningPathsPage from '@/app/admin/student-progress/learning-paths/page'
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../../TeacherLinkShell';
 import BackButton from '@/components/ui/BackButton';
 import StudentProgressNavBar from '@/components/ui/StudentProgressNavBar';
+import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 
 function TeacherLinkLearningPathsContent() {
   const { orgId, organization, organizationResolved } = useTeacherLinkOrganization();
@@ -74,7 +75,9 @@ function TeacherLinkLearningPathsContent() {
 export default function TeacherLinkLearningPathsPage() {
   return (
     <TeacherLinkShell currentPath="/aihome/teacher-link/create/student-progress/learning-paths">
-      <TeacherLinkLearningPathsContent />
+      <WithPermissionCheck pageKey="progress">
+        <TeacherLinkLearningPathsContent />
+      </WithPermissionCheck>
     </TeacherLinkShell>
   );
 }

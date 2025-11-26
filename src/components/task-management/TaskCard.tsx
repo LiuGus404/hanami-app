@@ -54,17 +54,29 @@ export default function TaskCard({
           .order('admin_name');
 
         // 合併數據
-        const employees = employeesData?.map(emp => ({
+        const typedEmployeesData = (employeesData || []) as Array<{
+          id: string;
+          teacher_nickname?: string | null;
+          teacher_fullname?: string | null;
+          [key: string]: any;
+        }>;
+        const typedAdminsData = (adminsData || []) as Array<{
+          id: string;
+          admin_name?: string | null;
+          [key: string]: any;
+        }>;
+        
+        const employees = typedEmployeesData.map(emp => ({
           id: emp.id,
-          name: emp.teacher_nickname || emp.teacher_fullname,
+          name: emp.teacher_nickname || emp.teacher_fullname || '',
           type: 'employee'
-        })) || [];
+        }));
 
-        const admins = adminsData?.map(admin => ({
+        const admins = typedAdminsData.map(admin => ({
           id: admin.id,
-          name: admin.admin_name,
+          name: admin.admin_name || '',
           type: 'admin'
-        })) || [];
+        }));
 
         setAllStaff([...employees, ...admins]);
         setLoadingData(false);

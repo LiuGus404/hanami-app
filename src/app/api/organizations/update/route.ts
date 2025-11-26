@@ -41,13 +41,13 @@ export async function PUT(request: NextRequest) {
 
     // 驗證用戶是否有權限更新該機構（必須是 owner 或 admin）
     if (userEmail) {
-      const { data: identityData, error: identityError } = await supabase
+      const { data: identityData, error: identityError } = await ((supabase as any)
         .from('hanami_org_identities')
         .select('role_type, status')
         .eq('org_id', orgId)
         .eq('user_email', userEmail)
         .eq('status', 'active')
-        .maybeSingle();
+        .maybeSingle());
 
       const identity = identityData as { role_type: string; status: string } | null;
 
@@ -62,12 +62,12 @@ export async function PUT(request: NextRequest) {
       // 檢查是否為 owner 或 admin
       if (!identity || (identity.role_type !== 'owner' && identity.role_type !== 'admin')) {
         // 檢查是否為管理員
-        const { data: admin, error: adminError } = await supabase
+        const { data: admin, error: adminError } = await ((supabase as any)
           .from('hanami_admin')
           .select('admin_email, org_id')
           .eq('admin_email', userEmail)
           .eq('org_id', orgId)
-          .maybeSingle();
+          .maybeSingle());
 
         if (adminError || !admin) {
           return NextResponse.json(

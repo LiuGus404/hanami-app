@@ -92,7 +92,7 @@ export default function AbilitiesPage({
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedAbility, setSelectedAbility] = useState<DevelopmentAbility | null>(null);
   const [editingAbility, setEditingAbility] = useState<DevelopmentAbility | null>(null);
-  
+
   // 刪除確認狀態
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [abilityToDelete, setAbilityToDelete] = useState<DevelopmentAbility | null>(null);
@@ -137,8 +137,8 @@ export default function AbilitiesPage({
 
   const normalizedForcedOrgId =
     forcedOrgId &&
-    UUID_REGEX.test(forcedOrgId) &&
-    !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
+      UUID_REGEX.test(forcedOrgId) &&
+      !PLACEHOLDER_ORG_IDS.has(forcedOrgId)
       ? forcedOrgId
       : null;
 
@@ -228,7 +228,7 @@ export default function AbilitiesPage({
         { id: 'artistic', name: '藝術發展' },
       ];
 
-      const customCategories = (customData || []).map(item => ({
+      const customCategories = ((customData as any[]) || []).map(item => ({
         id: item.option_value,
         name: item.option_name,
       }));
@@ -307,8 +307,8 @@ export default function AbilitiesPage({
 
       console.log('能力頁面：修改後的預設類別:', modifiedDefaultCategories);
       console.log('能力頁面：自訂預設類別:', customDefaultCategories);
-      
-      const customCategories = (customData || []).map(item => ({
+
+      const customCategories = ((customData as any[]) || []).map(item => ({
         id: item.option_value,
         name: item.option_name,
         is_default: false,
@@ -408,7 +408,7 @@ export default function AbilitiesPage({
     return abilities.filter(ability => {
       // 搜尋篩選
       if (filters.search && !ability.ability_name.toLowerCase().includes(filters.search.toLowerCase()) &&
-          !(ability.ability_description && ability.ability_description.toLowerCase().includes(filters.search.toLowerCase()))) {
+        !(ability.ability_description && ability.ability_description.toLowerCase().includes(filters.search.toLowerCase()))) {
         return false;
       }
 
@@ -425,7 +425,7 @@ export default function AbilitiesPage({
       // 成長樹篩選
       if (filters.growth_trees.length > 0) {
         const treesForAbility = getGrowthTreesForAbility(ability.id);
-        const hasMatchingTree = treesForAbility.some(tree => 
+        const hasMatchingTree = treesForAbility.some(tree =>
           filters.growth_trees.includes(tree.id)
         );
         if (!hasMatchingTree) {
@@ -459,7 +459,7 @@ export default function AbilitiesPage({
       console.log('=== 開始新增操作 ===');
       console.log('新增類別名稱:', newOptionName.trim());
       console.log('是否設為預設:', isDefaultOption);
-      
+
       if (isDefaultOption) {
         // 新增為預設類別：保存到 localStorage
         const newId = `custom_${Date.now()}`;
@@ -468,16 +468,16 @@ export default function AbilitiesPage({
           name: newOptionName.trim(),
           is_default: true,
         };
-        
+
         // 保存到 localStorage
         const userModifiedDefaults = JSON.parse(localStorage.getItem('hanami_modified_defaults') || '{}');
-        userModifiedDefaults[newId] = { 
+        userModifiedDefaults[newId] = {
           name: newOptionName.trim(),
           is_custom_default: true // 標記為自訂預設
         };
         localStorage.setItem('hanami_modified_defaults', JSON.stringify(userModifiedDefaults));
         console.log('已保存新預設類別到 localStorage:', userModifiedDefaults);
-        
+
         setCustomOptions(prev => {
           const newCategories = [...prev.ability_categories, newDefaultCategory];
           console.log('新增後的類別列表:', newCategories);
@@ -486,7 +486,7 @@ export default function AbilitiesPage({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('預設類別新增完成');
         toast.success(`已新增預設類別「${newOptionName.trim()}」！`);
       } else {
@@ -504,8 +504,8 @@ export default function AbilitiesPage({
           insertPayload.org_id = validOrgId;
         }
 
-        const { error } = await supabase
-          .from('hanami_custom_options')
+        const { error } = await (supabase
+          .from('hanami_custom_options') as any)
           .insert(insertPayload);
 
         if (error) throw error;
@@ -521,7 +521,7 @@ export default function AbilitiesPage({
           ...prev,
           ability_categories: [...prev.ability_categories, newOption],
         }));
-        
+
         console.log('自訂類別新增完成');
         toast.success('新增類別成功！');
       }
@@ -543,20 +543,20 @@ export default function AbilitiesPage({
       console.log('編輯選項:', editingOption);
       console.log('新名稱:', newOptionName.trim());
       console.log('當前所有類別:', customOptions.ability_categories);
-      
+
       if (editingOption.is_default) {
         // 預設類別：保存到 localStorage
         console.log('編輯預設類別:', editingOption.name);
-        
+
         // 保存編輯操作到 localStorage
         const userModifiedDefaults = JSON.parse(localStorage.getItem('hanami_modified_defaults') || '{}');
-        userModifiedDefaults[editingOption.id] = { 
+        userModifiedDefaults[editingOption.id] = {
           ...userModifiedDefaults[editingOption.id],
-          name: newOptionName.trim() 
+          name: newOptionName.trim()
         };
         localStorage.setItem('hanami_modified_defaults', JSON.stringify(userModifiedDefaults));
         console.log('已保存編輯操作到 localStorage:', userModifiedDefaults);
-        
+
         setCustomOptions(prev => {
           const newCategories = prev.ability_categories.map(option =>
             option.id === editingOption.id ? { ...option, name: newOptionName.trim() } : option,
@@ -567,14 +567,14 @@ export default function AbilitiesPage({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('預設類別編輯完成');
         toast.success(`已更新預設類別「${editingOption.name}」為「${newOptionName.trim()}」！`);
       } else {
         // 自訂類別：更新資料庫
         console.log('編輯自訂類別:', editingOption.name);
-        let updateQuery = supabase
-          .from('hanami_custom_options')
+        let updateQuery = (supabase
+          .from('hanami_custom_options') as any)
           .update({
             option_name: newOptionName.trim(),
           })
@@ -601,7 +601,7 @@ export default function AbilitiesPage({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('自訂類別編輯完成');
         toast.success('更新類別成功！');
       }
@@ -618,7 +618,7 @@ export default function AbilitiesPage({
   const handleDeleteCustomOption = async (optionId: string) => {
     try {
       const optionToDelete = customOptions.ability_categories.find(opt => opt.id === optionId);
-      
+
       if (!optionToDelete) {
         console.error('未找到要刪除的選項！');
         toast.error('未找到要刪除的選項');
@@ -633,7 +633,7 @@ export default function AbilitiesPage({
 
       // 刪除確認對話框
       const confirmMessage = `確定要刪除類別「${optionToDelete.name}」嗎？\n\n此操作無法撤銷。`;
-      
+
       const isConfirmed = confirm(confirmMessage);
       if (!isConfirmed) {
         console.log('用戶取消刪除操作');
@@ -644,13 +644,13 @@ export default function AbilitiesPage({
       console.log('刪除選項 ID:', optionId);
       console.log('當前所有類別:', customOptions.ability_categories);
       console.log('找到要刪除的選項:', optionToDelete);
-      
+
       // 自訂類別：軟刪除（設為非活躍）
       console.log('刪除自訂類別:', optionToDelete.name);
       if (!ensureOrgAvailable()) return;
 
-      let deleteOptionQuery = supabase
-        .from('hanami_custom_options')
+      let deleteOptionQuery = (supabase
+        .from('hanami_custom_options') as any)
         .update({ is_active: false })
         .eq('option_type', 'activity_type')
         .eq('option_value', optionId);
@@ -673,10 +673,10 @@ export default function AbilitiesPage({
           ability_categories: newCategories,
         };
       });
-      
+
       console.log('自訂類別刪除完成');
       toast.success('刪除類別成功！');
-      
+
       console.log('=== 能力頁面：刪除操作完成 ===');
     } catch (error) {
       console.error('刪除類別失敗:', error);
@@ -727,13 +727,13 @@ export default function AbilitiesPage({
         try {
           const session = getUserSession();
           const userEmail = session?.email || null;
-          
+
           const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
-          
+
           const response = await fetch(apiUrl, {
             credentials: 'include',
           });
-          
+
           if (response.ok) {
             const result = await response.json();
             const allStudents = result.students || result.data || [];
@@ -757,7 +757,7 @@ export default function AbilitiesPage({
               .select('id, full_name, nick_name, student_age, course_type')
               .eq('org_id', validOrgId)
               .order('full_name');
-            
+
             if (studentsError) {
               console.error('直接查詢也失敗:', studentsError);
               throw studentsError;
@@ -772,7 +772,7 @@ export default function AbilitiesPage({
             .select('id, full_name, nick_name, student_age, course_type')
             .eq('org_id', validOrgId)
             .order('full_name');
-          
+
           if (studentsError) {
             console.error('直接查詢也失敗:', studentsError);
             throw studentsError;
@@ -850,8 +850,8 @@ export default function AbilitiesPage({
         payload.org_id = validOrgId;
       }
 
-      const { data, error } = await supabase
-        .from('hanami_development_abilities')
+      const { data, error } = await (supabase
+        .from('hanami_development_abilities') as any)
         .insert([payload])
         .select()
         .single();
@@ -917,7 +917,7 @@ export default function AbilitiesPage({
       if (treesError) throw treesError;
 
       if (growthTreesData && growthTreesData.length > 0) {
-        toast.error(`無法刪除：此能力正在被以下成長目標使用：${growthTreesData.map(g => g.goal_name).join(', ')}`);
+        toast.error(`無法刪除：此能力正在被以下成長目標使用：${(growthTreesData as any[]).map(g => g.goal_name).join(', ')}`);
         return;
       }
 
@@ -951,7 +951,7 @@ export default function AbilitiesPage({
   };
 
   const getStudentAbility = (studentId: string, abilityId: string) => {
-    return studentAbilities.find(sa => 
+    return studentAbilities.find(sa =>
       sa.student_id === studentId && sa.ability_id === abilityId,
     );
   };
@@ -960,7 +960,7 @@ export default function AbilitiesPage({
   const getGrowthTreesForAbility = (abilityId: string) => {
     return growthTrees.filter(tree => {
       if (!tree.goals || !Array.isArray(tree.goals)) return false;
-      
+
       return tree.goals.some((goal: any) => {
         if (!goal.required_abilities || !Array.isArray(goal.required_abilities)) return false;
         return goal.required_abilities.includes(abilityId);
@@ -972,7 +972,7 @@ export default function AbilitiesPage({
   const getAbilityRequirementCount = (treeId: string, abilityId: string) => {
     const tree = growthTrees.find(t => t.id === treeId);
     if (!tree || !tree.goals || !Array.isArray(tree.goals)) return 0;
-    
+
     return tree.goals.filter((goal: any) => {
       if (!goal.required_abilities || !Array.isArray(goal.required_abilities)) return false;
       return goal.required_abilities.includes(abilityId);
@@ -1061,7 +1061,7 @@ export default function AbilitiesPage({
                 onChange={(value) => handleFilterChange('search', value)}
               />
             </div>
-            
+
             {/* 能力類別多選篩選 */}
             <div className="relative">
               <button
@@ -1183,21 +1183,21 @@ export default function AbilitiesPage({
           </div>
           <div className="text-sm text-hanami-text-secondary">總能力數</div>
         </HanamiCard>
-        
+
         <HanamiCard className="p-6 text-center">
           <div className="text-2xl font-bold text-green-600 mb-2">
             {getFilteredAbilities().filter(a => a.category).length}
           </div>
           <div className="text-sm text-hanami-text-secondary">已分類</div>
         </HanamiCard>
-        
+
         <HanamiCard className="p-6 text-center">
           <div className="text-2xl font-bold text-blue-600 mb-2">
             {growthTrees.length}
           </div>
           <div className="text-sm text-hanami-text-secondary">成長樹</div>
         </HanamiCard>
-        
+
         <HanamiCard className="p-6 text-center">
           <div className="text-2xl font-bold text-purple-600 mb-2">
             {customOptions.ability_categories.length}
@@ -1212,23 +1212,23 @@ export default function AbilitiesPage({
           <HanamiCard key={ability.id} className="hover:shadow-lg transition-all duration-300 hover:scale-[1.02] group">
             <div className="p-4 text-center">
               {/* 能力圖標 */}
-              <div 
+              <div
                 className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow"
                 style={{ backgroundColor: ability.ability_color || '#FFB6C1' }}
               >
                 <StarIcon className="h-8 w-8 text-white" />
               </div>
-              
+
               {/* 能力名稱 */}
               <h3 className="font-bold text-base text-hanami-text mb-2">
                 {ability.ability_name}
               </h3>
-              
+
               {/* 能力描述 */}
               <p className="text-xs text-hanami-text-secondary mb-3 leading-relaxed line-clamp-2">
                 {ability.ability_description}
               </p>
-              
+
               {/* 能力類別標籤 */}
               {ability.category && (
                 <div className="mb-3">
@@ -1237,7 +1237,7 @@ export default function AbilitiesPage({
                   </span>
                 </div>
               )}
-              
+
               {/* 操作按鈕 */}
               <div className="mb-3 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <button
@@ -1270,7 +1270,7 @@ export default function AbilitiesPage({
                   </svg>
                 </button>
               </div>
-              
+
               {/* 需要此能力的成長樹 */}
               <div className="space-y-1 pt-2 border-t border-[#EADBC8]/50">
                 <div className="text-xs text-hanami-text-secondary font-medium mb-1">相關成長樹</div>
@@ -1315,19 +1315,19 @@ export default function AbilitiesPage({
         <PopupSelect
           mode="multiple"
           options={
-            showPopup.field === 'categories' 
+            showPopup.field === 'categories'
               ? customOptions.ability_categories.map(cat => ({ value: cat.name, label: cat.name }))
               : showPopup.field === 'ability_levels'
-              ? [1, 2, 3, 4, 5].map(level => ({ value: level, label: `等級 ${level}` }))
-              : showPopup.field === 'growth_trees'
-              ? growthTrees.map(tree => ({ value: tree.id, label: tree.tree_name }))
-              : []
+                ? [1, 2, 3, 4, 5].map(level => ({ value: level, label: `等級 ${level}` }))
+                : showPopup.field === 'growth_trees'
+                  ? growthTrees.map(tree => ({ value: tree.id, label: tree.tree_name }))
+                  : []
           }
           selected={popupSelected}
           title={
             showPopup.field === 'categories' ? '選擇能力類別' :
-            showPopup.field === 'ability_levels' ? '選擇能力等級' :
-            showPopup.field === 'growth_trees' ? '選擇成長樹' : '選擇'
+              showPopup.field === 'ability_levels' ? '選擇能力等級' :
+                showPopup.field === 'growth_trees' ? '選擇成長樹' : '選擇'
           }
           onCancel={handleFilterPopupCancel}
           onChange={(value: string | string[]) => setPopupSelected(value)}
@@ -1389,7 +1389,7 @@ export default function AbilitiesPage({
                           value={newOptionName}
                           onChange={(value) => setNewOptionName(value)}
                         />
-                        
+
                         {/* 預設類別選擇 */}
                         {!editingOption && (
                           <div className="flex items-center gap-2">
@@ -1408,7 +1408,7 @@ export default function AbilitiesPage({
                             </span>
                           </div>
                         )}
-                        
+
                         <div className="flex gap-2">
                           <HanamiButton
                             variant="primary"
@@ -1417,8 +1417,8 @@ export default function AbilitiesPage({
                           >
                             {editingOption ? '更新' : '新增'}
                           </HanamiButton>
-                          <HanamiButton 
-                            variant="secondary" 
+                          <HanamiButton
+                            variant="secondary"
                             onClick={() => {
                               setEditingOption(null);
                               setNewOptionName('');
@@ -1506,17 +1506,17 @@ export default function AbilitiesPage({
               <h2 className="text-xl font-bold text-hanami-text mb-4">
                 新增發展能力
               </h2>
-              
+
               <div className="space-y-4">
                 {/* 機構資訊 */}
                 {(validOrgId || forcedOrgName) && (
                   <div className="bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] rounded-xl p-4 border border-[#EADBC8] mb-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Image 
-                        src="/star-icon.png" 
-                        alt="機構" 
-                        width={20} 
-                        height={20} 
+                      <Image
+                        src="/star-icon.png"
+                        alt="機構"
+                        width={20}
+                        height={20}
                         className="animate-pulse"
                       />
                       <span className="text-sm font-semibold text-[#4B4036]">機構資訊</span>

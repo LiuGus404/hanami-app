@@ -52,7 +52,26 @@ export function FoodTransactionHistory({
       
       if (error) throw error;
       
-      setTransactions(data || []);
+      const typedTransactions = (data || []) as Array<{
+        id: string;
+        transaction_type: string;
+        amount: number;
+        balance_after: number;
+        description: string | null;
+        created_at: string | null;
+        [key: string]: any;
+      }>;
+      
+      setTransactions(typedTransactions.map(t => ({
+        id: t.id,
+        transaction_type: (['earn', 'spend', 'monthly_allowance', 'purchase'].includes(t.transaction_type) 
+          ? t.transaction_type 
+          : 'spend') as 'earn' | 'spend' | 'monthly_allowance' | 'purchase',
+        amount: t.amount,
+        balance_after: t.balance_after,
+        description: t.description || '',
+        created_at: t.created_at || '',
+      })));
     } catch (error) {
       console.error('載入交易記錄錯誤:', error);
     } finally {

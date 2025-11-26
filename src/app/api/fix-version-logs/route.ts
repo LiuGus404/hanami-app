@@ -19,7 +19,7 @@ export async function POST() {
       );
     `;
 
-    const { error: createError } = await supabase.rpc('exec_sql', {
+    const { error: createError } = await (supabase.rpc as any)('exec_sql', {
       sql: createTableSQL
     });
 
@@ -42,7 +42,7 @@ export async function POST() {
       DROP TRIGGER IF EXISTS trigger_version_log ON hanami_growth_goals;
     `;
 
-    const { error: dropError } = await supabase.rpc('exec_sql', {
+    const { error: dropError } = await (supabase.rpc as any)('exec_sql', {
       sql: dropTriggersSQL
     });
 

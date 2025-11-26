@@ -53,7 +53,7 @@ export default function CustomDomainOrganizationPage() {
         const matchedOrg = allOrgs?.find((org: any) => {
           const settings = (org.settings as OrganizationSettings) || {};
           return settings.customDomain?.toLowerCase() === customDomain;
-        });
+        }) as { status?: string; [key: string]: any } | undefined;
 
         if (!matchedOrg) {
           setError('找不到對應的機構');

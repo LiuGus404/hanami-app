@@ -35,8 +35,8 @@ export default function DirectSupabaseCheckPage() {
     try {
       // 步驟 1: 直接查詢 hanami_employee 表
       addLog('步驟 1: 查詢 hanami_employee 表');
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('hanami_employee')
+      const { data: employeeData, error: employeeError } = await (supabase
+        .from('hanami_employee') as any)
         .select('id, teacher_email, teacher_fullname, teacher_nickname, teacher_role, teacher_status')
         .eq('teacher_email', user.email)
         .single();
@@ -118,7 +118,7 @@ export default function DirectSupabaseCheckPage() {
 
       // 步驟 5: 教師權限驗證完成（不再顯示通知）
       addLog('步驟 5: 教師權限驗證完成');
-      
+
       // 延遲跳轉
       setTimeout(() => {
         addLog('自動跳轉到教師專區');
@@ -158,7 +158,7 @@ export default function DirectSupabaseCheckPage() {
     }
 
     addLog('手動設置教師權限數據');
-    
+
     const manualData = {
       success: true,
       email: user.email,
@@ -182,11 +182,11 @@ export default function DirectSupabaseCheckPage() {
       addLog('手動數據已設置到會話存儲');
       setCheckResult(manualData);
       toast.success('手動設置成功！');
-      
+
       setTimeout(() => {
         router.push('/aihome/teacher-zone');
       }, 1500);
-      
+
     } catch (error) {
       addLog(`手動設置失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
       toast.error('手動設置失敗');
@@ -207,7 +207,7 @@ export default function DirectSupabaseCheckPage() {
           <h1 className="text-3xl font-bold text-hanami-text mb-6 text-center">
             🔍 直接 Supabase 教師權限檢查
           </h1>
-          
+
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-hanami-text mb-4">當前狀態</h2>
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -216,10 +216,9 @@ export default function DirectSupabaseCheckPage() {
               <p><strong>檢查結果:</strong> {checkResult ? '已獲取' : '未檢查'}</p>
               {checkResult && (
                 <>
-                  <p><strong>教師權限:</strong> 
-                    <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
-                      checkResult.hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                  <p><strong>教師權限:</strong>
+                    <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${checkResult.hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
                       {checkResult.hasTeacherAccess ? '✓ 有權限' : '✗ 無權限'}
                     </span>
                   </p>
@@ -232,7 +231,7 @@ export default function DirectSupabaseCheckPage() {
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-hanami-text mb-4">檢查操作</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <HanamiButton 
+              <HanamiButton
                 onClick={directSupabaseCheck}
                 disabled={!user || isChecking}
                 variant="cute"
@@ -240,8 +239,8 @@ export default function DirectSupabaseCheckPage() {
               >
                 {isChecking ? '檢查中...' : '🔍 直接 Supabase 檢查'}
               </HanamiButton>
-              
-              <HanamiButton 
+
+              <HanamiButton
                 onClick={manualSetAccess}
                 disabled={!user}
                 variant="primary"
@@ -249,16 +248,16 @@ export default function DirectSupabaseCheckPage() {
               >
                 🔧 手動設置權限
               </HanamiButton>
-              
-              <HanamiButton 
+
+              <HanamiButton
                 onClick={clearAll}
                 variant="danger"
                 className="w-full"
               >
                 🗑️ 清除所有數據
               </HanamiButton>
-              
-              <HanamiButton 
+
+              <HanamiButton
                 onClick={() => router.push('/aihome/teacher-zone')}
                 disabled={!checkResult?.hasTeacherAccess}
                 variant="secondary"
@@ -296,7 +295,7 @@ export default function DirectSupabaseCheckPage() {
           </div>
 
           <div className="flex space-x-4">
-            <HanamiButton 
+            <HanamiButton
               onClick={() => router.push('/aihome')}
               variant="secondary"
             >

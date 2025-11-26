@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
 
     for (const tableName of tablesToCheck) {
       try {
-        const { data, error } = await supabase
-          .from(tableName)
+        const { data, error } = await (supabase
+          .from(tableName as any) as any)
           .select('*')
           .limit(3);
 

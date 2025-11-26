@@ -92,9 +92,9 @@ export async function POST(request: Request) {
 
       // 還原備份資料
       if (backupData.length > 0) {
-        const { error: insertError } = await supabase
-          .from('teacher_schedule')
-          .insert(backupData);
+        const { error: insertError } = await (supabase
+          .from('teacher_schedule') as any)
+          .insert(backupData as any);
 
         if (insertError) {
           console.error('❌ 還原備份資料失敗:', insertError);

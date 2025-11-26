@@ -43,16 +43,16 @@ export default function TrialQueueListPage() {
   // 從會話中獲取機構信息（admin 頁面可能沒有 OrganizationProvider）
   const session = getUserSession();
   const currentOrganization = session?.organization || null;
-  
+
   const validOrgId = useMemo(() => {
     if (!currentOrganization?.id) {
       return null;
     }
     return UUID_REGEX.test(currentOrganization.id) ? currentOrganization.id : null;
   }, [currentOrganization?.id]);
-  
+
   const isAllowedOrg = validOrgId === 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
-  
+
   const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,8 +78,8 @@ export default function TrialQueueListPage() {
   // 載入課程類型
   useEffect(() => {
     const loadCourseTypes = async () => {
-      const { data, error } = await supabase
-        .from('Hanami_CourseTypes')
+      const { data, error } = await (supabase
+        .from('Hanami_CourseTypes') as any)
         .select('name')
         .eq('status', true)
         .order('name');
@@ -114,21 +114,21 @@ export default function TrialQueueListPage() {
   // 更新狀態
   const handleStatusUpdate = async (id: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('hanami_trial_queue')
+      const { error } = await (supabase
+        .from('hanami_trial_queue') as any)
         .update({ status: newStatus })
         .eq('id', id);
-      
+
       if (error) {
         alert(`更新狀態失敗：${error.message}`);
         return;
       }
-      
+
       // 更新本地狀態
-      setQueue(prev => prev.map(student => 
+      setQueue(prev => prev.map(student =>
         student.id === id ? { ...student, status: newStatus } : student,
       ));
-      
+
       setEditingStatus(null);
       setCustomStatus('');
     } catch (err) {
@@ -151,8 +151,8 @@ export default function TrialQueueListPage() {
 
   // 切換課程選擇
   const toggleCourse = (course: string) => {
-    setSelectedCourses(prev => 
-      prev.includes(course) 
+    setSelectedCourses(prev =>
+      prev.includes(course)
         ? prev.filter(c => c !== course)
         : [...prev, course],
     );
@@ -167,8 +167,8 @@ export default function TrialQueueListPage() {
 
   // 切換星期選擇
   const toggleWeek = (week: number) => {
-    setSelectedWeeks(prev => 
-      prev.includes(week) 
+    setSelectedWeeks(prev =>
+      prev.includes(week)
         ? prev.filter(w => w !== week)
         : [...prev, week],
     );
@@ -209,15 +209,15 @@ export default function TrialQueueListPage() {
   const sortedQueue = [...queue].sort((a, b) => {
     let aValue = a[sortField];
     let bValue = b[sortField];
-    
+
     if (aValue === null || aValue === undefined) aValue = '';
     if (bValue === null || bValue === undefined) bValue = '';
-    
+
     if (sortField === 'created_at' || sortField === 'student_dob') {
       aValue = new Date(aValue).getTime();
       bValue = new Date(bValue).getTime();
     }
-    
+
     if (sortField === 'student_age') {
       // 處理年齡排序：將年月格式轉換為月齡進行比較
       const getAgeInMonths = (age: any) => {
@@ -246,10 +246,10 @@ export default function TrialQueueListPage() {
       aValue = getAgeInMonths(aValue);
       bValue = getAgeInMonths(bValue);
     }
-    
+
     if (typeof aValue === 'string') aValue = aValue.toLowerCase();
     if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-    
+
     if (sortDirection === 'asc') {
       return aValue > bValue ? 1 : -1;
     } else {
@@ -258,14 +258,14 @@ export default function TrialQueueListPage() {
   });
 
   // 星期篩選
-  const weekFilteredQueue = selectedWeeks.length === 0 
-    ? sortedQueue 
+  const weekFilteredQueue = selectedWeeks.length === 0
+    ? sortedQueue
     : sortedQueue.filter(student => {
       // 檢查是否選擇了未分類
       if (selectedWeeks.includes(-1)) {
         // 如果選擇了未分類，檢查學生是否有 prefer_time 或 prefer_time.week 為空
         if (!student.prefer_time) return true;
-          
+
         let prefer = student.prefer_time;
         if (typeof prefer === 'string') {
           try {
@@ -274,22 +274,22 @@ export default function TrialQueueListPage() {
             return true; // JSON 解析失敗也算未分類
           }
         }
-          
+
         if (typeof prefer === 'object' && prefer !== null) {
           if (!prefer.week || !Array.isArray(prefer.week) || prefer.week.length === 0) {
             return true; // 沒有 week 陣列或陣列為空算未分類
           }
         }
       }
-        
+
       // 檢查是否有選擇其他星期
       const otherWeeks = selectedWeeks.filter(w => w !== -1);
       if (otherWeeks.length === 0) {
         return selectedWeeks.includes(-1); // 只選擇了未分類
       }
-        
+
       if (!student.prefer_time) return false;
-        
+
       let prefer = student.prefer_time;
       if (typeof prefer === 'string') {
         try {
@@ -298,11 +298,11 @@ export default function TrialQueueListPage() {
           return false;
         }
       }
-        
+
       if (typeof prefer === 'object' && prefer !== null && Array.isArray(prefer.week)) {
         return prefer.week.some((week: any) => otherWeeks.includes(week));
       }
-        
+
       return false;
     });
 
@@ -314,7 +314,7 @@ export default function TrialQueueListPage() {
       if (selectedCourses.includes('未分類')) {
         // 如果選擇了未分類，檢查學生是否有 course_types 或 course_types 為空
         if (!student.course_types) return true;
-          
+
         let courses = student.course_types;
         if (typeof courses === 'string') {
           try {
@@ -323,7 +323,7 @@ export default function TrialQueueListPage() {
             return true; // JSON 解析失敗也算未分類
           }
         }
-          
+
         if (Array.isArray(courses)) {
           if (courses.length === 0) {
             return true; // 陣列為空算未分類
@@ -332,15 +332,15 @@ export default function TrialQueueListPage() {
           return true; // 不是陣列也算未分類
         }
       }
-        
+
       // 檢查是否有選擇其他課程
       const otherCourses = selectedCourses.filter(c => c !== '未分類');
       if (otherCourses.length === 0) {
         return selectedCourses.includes('未分類'); // 只選擇了未分類
       }
-        
+
       if (!student.course_types) return false;
-        
+
       let courses = student.course_types;
       if (typeof courses === 'string') {
         try {
@@ -349,11 +349,11 @@ export default function TrialQueueListPage() {
           return false;
         }
       }
-        
+
       if (Array.isArray(courses)) {
         return courses.some(course => otherCourses.includes(course));
       }
-        
+
       return false;
     });
 
@@ -377,7 +377,7 @@ export default function TrialQueueListPage() {
     pageSize === Infinity
       ? filteredQueue
       : filteredQueue.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-      
+
   console.log('🔍 過濾後筆數:', filteredQueue.length);
   console.log('🔍 分頁後筆數:', pagedQueue.length);
   console.log('🔍 目前頁數:', currentPage, '每頁筆數:', pageSize);
@@ -386,19 +386,19 @@ export default function TrialQueueListPage() {
     const fetchQueue = async () => {
       setLoading(true);
       setError(null);
-      const { data: allData, error: allError } = await supabase
-        .from('hanami_trial_queue')
+      const { data: allData, error: allError } = await (supabase
+        .from('hanami_trial_queue') as any)
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       console.log('🔍 查詢到的總資料筆數:', allData?.length || 0);
-      
+
       if (allError) {
         setError(allError.message);
         setLoading(false);
         return;
       }
-      
+
       setQueue(allData || []);
       setLoading(false);
     };
@@ -410,30 +410,30 @@ export default function TrialQueueListPage() {
     if (!confirm(`確定要刪除輪候學生「${name}」嗎？此操作無法復原。`)) {
       return;
     }
-    
+
     try {
-      const { error } = await supabase
-        .from('hanami_trial_queue')
+      const { error } = await (supabase
+        .from('hanami_trial_queue') as any)
         .delete()
         .eq('id', id);
-      
+
       if (error) {
         alert(`刪除失敗：${error.message}`);
         return;
       }
-      
+
       alert('刪除成功！');
       // 重新載入資料
-      const { data: allData, error: allError } = await supabase
-        .from('hanami_trial_queue')
+      const { data: allData, error: allError } = await (supabase
+        .from('hanami_trial_queue') as any)
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (allError) {
         setError(allError.message);
         return;
       }
-      
+
       setQueue(allData || []);
     } catch (err) {
       console.error('刪除錯誤:', err);
@@ -448,11 +448,10 @@ export default function TrialQueueListPage() {
           <h2 className="text-2xl font-bold text-[#4B4036]">輪候中學生列表</h2>
           <Image alt="icon" height={32} src="/rabbit.png" width={32} />
           <a
-            className={`ml-4 px-4 py-2 rounded-full font-semibold shadow transition-colors text-sm md:text-base ${
-              isAllowedOrg
-                ? 'bg-[#FFD59A] text-[#4B4036] hover:bg-[#FFB84C]'
-                : 'bg-gray-400 opacity-60 text-white cursor-pointer'
-            }`}
+            className={`ml-4 px-4 py-2 rounded-full font-semibold shadow transition-colors text-sm md:text-base ${isAllowedOrg
+              ? 'bg-[#FFD59A] text-[#4B4036] hover:bg-[#FFB84C]'
+              : 'bg-gray-400 opacity-60 text-white cursor-pointer'
+              }`}
             href="/admin/add-trial-students"
             onClick={(e) => {
               if (!isAllowedOrg) {
@@ -479,16 +478,15 @@ export default function TrialQueueListPage() {
             {/* 星期篩選按鈕 */}
             <div className="relative">
               <button
-                className={`px-4 py-2 rounded-full text-sm border transition-colors ${
-                  selectedWeeks.length > 0
-                    ? 'bg-[#FDE6B8] text-[#4B4036] border-[#EADBC8]'
-                    : 'bg-white text-[#4B4036] border-[#EADBC8] hover:bg-[#FFF9F2]'
-                }`}
+                className={`px-4 py-2 rounded-full text-sm border transition-colors ${selectedWeeks.length > 0
+                  ? 'bg-[#FDE6B8] text-[#4B4036] border-[#EADBC8]'
+                  : 'bg-white text-[#4B4036] border-[#EADBC8] hover:bg-[#FFF9F2]'
+                  }`}
                 onClick={() => setShowWeekFilter(!showWeekFilter)}
               >
                 星期篩選 {selectedWeeks.length > 0 && `(${selectedWeeks.length})`}
               </button>
-              
+
               {showWeekFilter && (
                 <div className="absolute top-full left-0 mt-1 bg-white border border-[#EADBC8] rounded-lg shadow-lg z-10 min-w-[200px]">
                   <div className="p-3">
@@ -524,16 +522,15 @@ export default function TrialQueueListPage() {
             {/* 課程篩選按鈕 */}
             <div className="relative">
               <button
-                className={`px-4 py-2 rounded-full text-sm border transition-colors ${
-                  selectedCourses.length > 0
-                    ? 'bg-[#FDE6B8] text-[#4B4036] border-[#EADBC8]'
-                    : 'bg-white text-[#4B4036] border-[#EADBC8] hover:bg-[#FFF9F2]'
-                }`}
+                className={`px-4 py-2 rounded-full text-sm border transition-colors ${selectedCourses.length > 0
+                  ? 'bg-[#FDE6B8] text-[#4B4036] border-[#EADBC8]'
+                  : 'bg-white text-[#4B4036] border-[#EADBC8] hover:bg-[#FFF9F2]'
+                  }`}
                 onClick={() => setShowCourseFilter(!showCourseFilter)}
               >
                 課程篩選 {selectedCourses.length > 0 && `(${selectedCourses.length})`}
               </button>
-              
+
               {showCourseFilter && (
                 <div className="absolute top-full left-0 mt-1 bg-white border border-[#EADBC8] rounded-lg shadow-lg z-10 min-w-[200px]">
                   <div className="p-3">
@@ -577,11 +574,10 @@ export default function TrialQueueListPage() {
             {/* 狀態篩選按鈕 */}
             <div className="relative">
               <button
-                className={`px-4 py-2 rounded-full text-sm border transition-colors ${
-                  selectedStatus.length > 0
-                    ? 'bg-[#FDE6B8] text-[#4B4036] border-[#EADBC8]'
-                    : 'bg-white text-[#4B4036] border-[#EADBC8] hover:bg-[#FFF9F2]'
-                }`}
+                className={`px-4 py-2 rounded-full text-sm border transition-colors ${selectedStatus.length > 0
+                  ? 'bg-[#FDE6B8] text-[#4B4036] border-[#EADBC8]'
+                  : 'bg-white text-[#4B4036] border-[#EADBC8] hover:bg-[#FFF9F2]'
+                  }`}
                 onClick={() => setShowStatusFilter(!showStatusFilter)}
               >
                 狀態篩選 {selectedStatus.length > 0 && `(${selectedStatus.length})`}
@@ -675,25 +671,25 @@ export default function TrialQueueListPage() {
               <thead>
                 <tr className="bg-[#FFF9F2] border-b border-[#EADBC8]">
                   <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">#</th>
-                  <th 
+                  <th
                     className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition"
                     onClick={() => handleSort('full_name')}
                   >
                     姓名 {sortField === 'full_name' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th 
+                  <th
                     className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition"
                     onClick={() => handleSort('student_dob')}
                   >
                     出生日期 {sortField === 'student_dob' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th 
+                  <th
                     className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition"
                     onClick={() => handleSort('student_age')}
                   >
                     年齡 {sortField === 'student_age' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th 
+                  <th
                     className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition"
                     onClick={() => handleSort('phone_no')}
                   >
@@ -702,13 +698,13 @@ export default function TrialQueueListPage() {
                   <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">偏好時段</th>
                   <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">課程</th>
                   <th className="p-3 text-left text-sm font-medium text-[#2B3A3B]">備註</th>
-                  <th 
+                  <th
                     className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition"
                     onClick={() => handleSort('status')}
                   >
                     狀態 {sortField === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th 
+                  <th
                     className="p-3 text-left text-sm font-medium text-[#2B3A3B] cursor-pointer hover:bg-[#FDE6B8] transition"
                     onClick={() => handleSort('created_at')}
                   >
@@ -733,7 +729,7 @@ export default function TrialQueueListPage() {
                       <td className="p-3 text-sm text-[#2B3A3B]">{
                         (() => {
                           if (!stu.student_age) return '';
-                          
+
                           // 如果是數字（月齡），轉換為年月格式
                           if (typeof stu.student_age === 'number') {
                             const years = Math.floor(stu.student_age / 12);
@@ -743,7 +739,7 @@ export default function TrialQueueListPage() {
                             if (months === 0) return `${years}Y`;
                             return `${years}Y${months}M`;
                           }
-                          
+
                           // 如果已經是字串格式，直接顯示
                           return stu.student_age;
                         })()
@@ -759,10 +755,10 @@ export default function TrialQueueListPage() {
                             target="_blank"
                             title="開啟 WhatsApp 聊天"
                           >
-                            <svg 
-                              className="text-green-500 hover:text-green-600 transition-colors" 
-                              fill="currentColor" 
-                              height="16" 
+                            <svg
+                              className="text-green-500 hover:text-green-600 transition-colors"
+                              fill="currentColor"
+                              height="16"
                               viewBox="0 0 24 24"
                               width="16"
                             >
@@ -785,10 +781,10 @@ export default function TrialQueueListPage() {
                           }
                           if (typeof prefer === 'object' && prefer !== null) {
                             const weekMap = ['日', '一', '二', '三', '四', '五', '六'];
-                            const week = Array.isArray(prefer.week) 
+                            const week = Array.isArray(prefer.week)
                               ? prefer.week.map((w: number) => weekMap[w] || w).join('、')
                               : '';
-                            
+
                             let range = '';
                             if (Array.isArray(prefer.range) && prefer.range.length > 0) {
                               range = prefer.range.join('、');
@@ -797,7 +793,7 @@ export default function TrialQueueListPage() {
                             } else {
                               range = prefer.range;
                             }
-                            
+
                             return `星期：${week || '未指定'} | 時段：${range}`;
                           }
                           return '';
@@ -807,7 +803,7 @@ export default function TrialQueueListPage() {
                       <td className="p-3 text-sm text-[#2B3A3B]">{
                         (() => {
                           if (!stu.course_types) return '';
-                          
+
                           let courses = stu.course_types;
                           if (typeof courses === 'string') {
                             try {
@@ -816,11 +812,11 @@ export default function TrialQueueListPage() {
                               return '';
                             }
                           }
-                          
+
                           if (Array.isArray(courses)) {
                             return courses.join('、');
                           }
-                          
+
                           return '';
                         })()
                       }
@@ -867,16 +863,16 @@ export default function TrialQueueListPage() {
                             </div>
                           </div>
                         ) : (
-                          <div 
+                          <div
                             className="cursor-pointer hover:bg-[#FDE6B8] px-2 py-1 rounded transition border border-dashed border-[#EADBC8] hover:border-[#FFB84C] group relative"
                             title="點擊編輯狀態"
                             onClick={() => startEditStatus(stu.id, stu.status || '')}
                           >
                             <span className="text-[#4B4036]">{stu.status || '未設定'}</span>
-                            <svg 
-                              className="absolute right-1 top-1/2 transform -translate-y-1/2 w-3 h-3 text-[#87704e] opacity-0 group-hover:opacity-100 transition-opacity" 
-                              fill="none" 
-                              stroke="currentColor" 
+                            <svg
+                              className="absolute right-1 top-1/2 transform -translate-y-1/2 w-3 h-3 text-[#87704e] opacity-0 group-hover:opacity-100 transition-opacity"
+                              fill="none"
+                              stroke="currentColor"
                               viewBox="0 0 24 24"
                             >
                               <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
@@ -887,11 +883,10 @@ export default function TrialQueueListPage() {
                       <td className="p-3 text-sm text-[#2B3A3B]">{stu.created_at ? stu.created_at.replace('T', ' ').slice(0, 16) : ''}</td>
                       <td className="p-3 text-sm text-[#2B3A3B]">
                         <button
-                          className={`px-3 py-1 rounded font-semibold border transition mr-2 ${
-                            isAllowedOrg
-                              ? 'bg-[#FFD59A] text-[#4B4036] hover:bg-[#FDE6B8] border-[#EADBC8]'
-                              : 'bg-gray-400 opacity-60 text-white border-gray-400 cursor-pointer'
-                          }`}
+                          className={`px-3 py-1 rounded font-semibold border transition mr-2 ${isAllowedOrg
+                            ? 'bg-[#FFD59A] text-[#4B4036] hover:bg-[#FDE6B8] border-[#EADBC8]'
+                            : 'bg-gray-400 opacity-60 text-white border-gray-400 cursor-pointer'
+                            }`}
                           onClick={() => {
                             if (!isAllowedOrg) {
                               toast.error('功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com');

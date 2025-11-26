@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabaseClient();
     
     // 刪除所有名為「測試課程類型」的記錄
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('Hanami_CourseTypes')
       .delete()
       .eq('name', '測試課程類型')

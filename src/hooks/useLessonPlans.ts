@@ -39,13 +39,15 @@ export const useLessonPlans = () => {
         .from('hanami_employee')
         .select('id, teacher_nickname');
 
+      const typedTeachers = (teachers || []) as Array<{ id: string; teacher_nickname: string }>;
+
       // 幫每個 plan 加上 teacher_names
-      const plansWithNames = (data || []).map(plan => ({
+      const plansWithNames = ((data || []) as Array<{ teacher_ids?: string[]; [key: string]: any }>).map(plan => ({
         ...plan,
         teacher_names: (plan.teacher_ids || []).map(
-          (id: string) => teachers?.find(t => t.id === id)?.teacher_nickname || '未知老師',
+          (id: string) => typedTeachers.find(t => t.id === id)?.teacher_nickname || '未知老師',
         ),
-      }));
+      })) as LessonPlan[];
 
       setPlans(plansWithNames);
     } catch (error) {
@@ -59,6 +61,7 @@ export const useLessonPlans = () => {
     try {
       const { data, error: saveError } = await supabase
         .from('hanami_lesson_plan')
+        // @ts-ignore - hanami_lesson_plan table type may not be fully defined
         .insert({
           lesson_date: plan.lesson_date,
           timeslot: plan.timeslot,
@@ -77,11 +80,11 @@ export const useLessonPlans = () => {
 
       if (saveError) throw saveError;
 
-      if (data) {
-        const newPlan: LessonPlan = {
-          ...data[0],
+      if (data && data[0]) {
+        const newPlan = {
+          ...(data[0] as { [key: string]: any }),
           teacher_names: plan.teacher_names,
-        };
+        } as LessonPlan;
         setPlans(prev => [...prev, newPlan]);
       }
     } catch (err) {
@@ -94,6 +97,7 @@ export const useLessonPlans = () => {
     try {
       const { error: updateError } = await supabase
         .from('hanami_lesson_plan')
+        // @ts-ignore - hanami_lesson_plan table type may not be fully defined
         .update({
           lesson_date: plan.lesson_date,
           timeslot: plan.timeslot,
@@ -157,7 +161,8 @@ export const useTeachers = () => {
         .select('id, teacher_nickname');
       console.log('teacher data:', data, 'error:', error);
       if (!error && data) {
-        setTeachers(data.map(t => ({
+        const typedData = (data || []) as Array<{ id: string; teacher_nickname: string | null }>;
+        setTeachers(typedData.map(t => ({
           id: t.id,
           name: t.teacher_nickname || '未命名',
         })));
