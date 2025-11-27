@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { 
@@ -13,6 +13,7 @@ import {
   CheckIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface MinimalStudentGrowthTreeManagerProps {
   studentId: string;
@@ -27,6 +28,18 @@ export default function MinimalStudentGrowthTreeManager({
   onTreeChange,
   className = ''
 }: MinimalStudentGrowthTreeManagerProps) {
+  const { currentOrganization } = useOrganization();
+  
+  const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const PLACEHOLDER_ORG_IDS = new Set(['default-org', 'unassigned-org-placeholder']);
+  
+  const validOrgId = useMemo(() => {
+    if (!currentOrganization?.id) return null;
+    return UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id)
+      ? currentOrganization.id
+      : null;
+  }, [currentOrganization?.id]);
+  
   const [studentTrees, setStudentTrees] = useState<any[]>([]);
   const [availableTrees, setAvailableTrees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,9 +53,28 @@ export default function MinimalStudentGrowthTreeManager({
   const loadStudentTrees = async () => {
     try {
       setLoading(true);
+      
+      // 驗證 studentId
+      if (!studentId || typeof studentId !== 'string' || studentId.trim() === '') {
+        console.warn('載入學生成長樹：studentId 無效，跳過載入');
+        setStudentTrees([]);
+        if (onTreeChange) {
+          onTreeChange([]);
+        }
+        return;
+      }
+
       console.log('載入學生成長樹:', studentId);
 
-      const response = await fetch(`/api/student-growth-tree-management?studentId=${studentId}`);
+      const apiUrl = `/api/student-growth-tree-management?studentId=${encodeURIComponent(studentId.trim())}`;
+      console.log('載入學生成長樹 API URL:', apiUrl);
+
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const result = await response.json();
 
       if (!result.success) {
@@ -77,7 +109,29 @@ export default function MinimalStudentGrowthTreeManager({
     try {
       console.log('載入可用成長樹');
 
-      const response = await fetch(`/api/available-growth-trees?studentId=${studentId}`);
+      // 驗證 studentId
+      if (!studentId || typeof studentId !== 'string' || studentId.trim() === '') {
+        console.warn('載入可用成長樹：studentId 無效，跳過載入');
+        setAvailableTrees([]);
+        return;
+      }
+
+      // 構建查詢參數，包含 orgId
+      const params = new URLSearchParams();
+      params.append('studentId', studentId.trim());
+      if (validOrgId && typeof validOrgId === 'string' && validOrgId.trim() !== '') {
+        params.append('orgId', validOrgId.trim());
+      }
+
+      const apiUrl = `/api/available-growth-trees?${params.toString()}`;
+      console.log('載入可用成長樹 API URL:', apiUrl);
+
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const result = await response.json();
 
       if (!result.success) {

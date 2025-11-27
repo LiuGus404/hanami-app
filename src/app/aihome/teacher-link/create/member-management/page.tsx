@@ -470,7 +470,13 @@ function MemberManagementContent() {
     if (!foundUser || !orgId) return;
 
     try {
-      const accessToken = await getAccessToken();
+      // 添加超时处理，避免等待时间过长
+      const tokenPromise = getAccessToken();
+      const tokenTimeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 2000); // 2秒超时
+      });
+      
+      const accessToken = await Promise.race([tokenPromise, tokenTimeoutPromise]);
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       
       if (accessToken) {
@@ -482,7 +488,8 @@ function MemberManagementContent() {
         headers['X-User-Email'] = saasUser.email;
       }
       
-      const response = await fetch('/api/members/set-identity', {
+      // 添加请求超时处理
+      const fetchPromise = fetch('/api/members/set-identity', {
         method: 'POST',
         credentials: 'include', // 確保 cookies 被發送
         headers,
@@ -496,14 +503,23 @@ function MemberManagementContent() {
         }),
       });
 
+      const fetchTimeoutPromise = new Promise<Response>((_, reject) => {
+        setTimeout(() => reject(new Error('請求超時（10秒）')), 10000);
+      });
+
+      const response = await Promise.race([fetchPromise, fetchTimeoutPromise]);
       const result = await response.json();
 
       if (result.success) {
         toast.success(`成功${result.action === 'created' ? '設定' : '更新'}身份`);
         setExistingIdentity(result.identity);
-        await loadIdentities();
+        // 不等待 loadIdentities，改为在后台异步加载，立即更新 UI
         setFoundUser(null);
         setSearchEmail('');
+        // 异步加载，不阻塞 UI
+        loadIdentities().catch(err => {
+          console.error('后台加载身份列表失败:', err);
+        });
       } else {
         throw new Error(result.error);
       }

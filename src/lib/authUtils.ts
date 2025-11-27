@@ -351,7 +351,7 @@ export async function validateUserCredentials(email: string, password: string): 
     }
 
     // 如果所有檢查都失敗，提供更具體的錯誤訊息
-    // 先檢查郵箱是否存在
+    // 先檢查郵箱是否存在（不檢查密碼），以確定是郵箱未註冊還是密碼錯誤
     const emailExists = await checkEmailExistsInAllTables(supabase, email);
     
     if (!emailExists) {
@@ -360,6 +360,7 @@ export async function validateUserCredentials(email: string, password: string): 
         error: '此電子郵件地址尚未註冊。請確認您輸入的郵箱是否正確，或前往註冊頁面創建新帳號。',
       };
     } else {
+      // 郵箱存在但密碼錯誤
       return {
         success: false,
         error: '密碼錯誤。請確認您輸入的密碼是否正確，注意大小寫。如果忘記密碼，請使用忘記密碼功能。',

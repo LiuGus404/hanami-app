@@ -395,19 +395,15 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   const loadRegularStudents = async () => {
     try {
       setLoadingRegularStudents(true);
-      console.log('🔍 開始載入正式學生列表...');
       
       const response = await fetch('/api/admin/regular-students');
       const result = await response.json();
-      
-      console.log('🔍 正式學生 API 響應:', result);
 
       if (!result.success) {
         throw new Error(result.error?.message || '載入失敗');
       }
       
       setRegularStudents(result.data || []);
-      console.log('✅ 成功載入正式學生:', result.count || 0, '個');
     } catch (error) {
       console.error('❌ 載入正式學生失敗:', error);
     } finally {

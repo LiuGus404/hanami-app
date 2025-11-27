@@ -116,6 +116,9 @@ const EMPTY_TEACHER_LINK_ORG: OrganizationProfile = {
   status: null,
 };
 
+// 允許使用學生媒體狀態功能的機構ID
+const ALLOWED_MEDIA_STATUS_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
+
 type StudentProgressPageProps = {
   forcedOrgId?: string | null;
   forcedOrgName?: string | null;
@@ -1324,6 +1327,7 @@ export default function StudentProgressDashboard(
                 <button
                   className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                   onClick={() => setShowMediaDatePicker(true)}
+                  disabled={effectiveOrgId !== ALLOWED_MEDIA_STATUS_ORG_ID}
                 >
                   <CalendarIcon className="h-4 w-4" />
                   {selectedMediaDate}
@@ -1332,6 +1336,32 @@ export default function StudentProgressDashboard(
               </div>
             </div>
 
+            {/* 檢查機構ID，如果不是允許的機構，顯示禁用消息 */}
+            {effectiveOrgId !== ALLOWED_MEDIA_STATUS_ORG_ID ? (
+              <div className="p-8 text-center">
+                <div className="mb-4 flex justify-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-full flex items-center justify-center">
+                    <VideoCameraIcon className="h-8 w-8 text-amber-600" />
+                  </div>
+                </div>
+                <p className="text-lg font-semibold text-hanami-text mb-2">
+                  暫未啟用
+                </p>
+                <p className="text-sm text-hanami-text-secondary mb-4">
+                  敬請期待
+                </p>
+                <p className="text-sm text-hanami-text-secondary">
+                  企業用戶請聯繫{' '}
+                  <a
+                    className="font-medium text-[#FFB6C1] underline hover:text-[#FFD59A] transition-colors"
+                    href="mailto:BuildThinkai@gmail.com"
+                  >
+                    BuildThinkai@gmail.com
+                  </a>
+                </p>
+              </div>
+            ) : (
+              <>
             {/* 載入動畫 */}
             {loadingStudents && (
               <div className="flex items-center justify-center py-8">
@@ -1489,6 +1519,8 @@ export default function StudentProgressDashboard(
                 <VideoCameraIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                 <p>該日期沒有學生課程安排</p>
               </div>
+                )}
+              </>
             )}
           </HanamiCard>
               </div>

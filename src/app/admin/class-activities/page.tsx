@@ -365,6 +365,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
   const [displayMode, setDisplayMode] = useState<'student' | 'class'>('class');
   const [classGroups, setClassGroups] = useState<ClassGroup[]>([]);
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set()); // 預設為空 Set，即所有班級都收起
+  const [expandedTimeSlots, setExpandedTimeSlots] = useState<Set<string>>(new Set()); // 預設為空 Set，即所有時段都收起（按學生模式）
   
   // 老師選擇模態框狀態
   const [showTeacherSelectionModal, setShowTeacherSelectionModal] = useState(false);
@@ -489,6 +490,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
   // 檢查是否為 member 或 teacher，並獲取對應的 teacher_id
   const isMemberOrTeacher = currentOrgRole === 'member' || currentOrgRole === 'teacher';
   const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
+  const [hasTeacherSchedule, setHasTeacherSchedule] = useState<boolean | null>(null); // null = 未檢查, true = 有排程, false = 無排程
   
   // 獲取當前用戶對應的 teacher_id（通過 linked_user_id）
   useEffect(() => {
@@ -568,6 +570,19 @@ const PLACEHOLDER_ORG_IDS = new Set([
         newSet.delete(classId);
       } else {
         newSet.add(classId);
+      }
+      return newSet;
+    });
+  };
+
+  // 切換時段展開/收起狀態（按學生模式）
+  const toggleTimeSlotExpansion = (timeSlotKey: string) => {
+    setExpandedTimeSlots(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(timeSlotKey)) {
+        newSet.delete(timeSlotKey);
+      } else {
+        newSet.add(timeSlotKey);
       }
       return newSet;
     });
@@ -717,13 +732,22 @@ const PLACEHOLDER_ORG_IDS = new Set([
           
           if (scheduleError) {
             console.error('查詢教師排程失敗:', scheduleError);
+            setHasTeacherSchedule(false);
           } else {
             teacherSchedule = scheduleData || [];
+            setHasTeacherSchedule(teacherSchedule.length > 0);
             console.log('🔍 [ClassActivities] 教師排程:', teacherSchedule);
           }
         } catch (error) {
           console.error('查詢教師排程時發生錯誤:', error);
+          setHasTeacherSchedule(false);
         }
+      } else if (isMemberOrTeacher && (!currentTeacherId || !validOrgId)) {
+        // 如果沒有 teacherId 或 orgId，視為沒有排程
+        setHasTeacherSchedule(false);
+      } else {
+        // 如果不是 member/teacher，視為有排程（管理員可以看到所有數據）
+        setHasTeacherSchedule(true);
       }
       
       // 查詢 hanami_schedule 表
@@ -795,8 +819,110 @@ const PLACEHOLDER_ORG_IDS = new Set([
           }
         });
       
+        // 批量獲取所有學生數據（只調用一次API）
+        let allStudentsData: any[] = [];
+        if (validOrgId) {
+          try {
+            const session = getUserSession();
+            const userEmail = session?.email || null;
+            const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+            
+            const response = await fetch(apiUrl, {
+              credentials: 'include',
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              allStudentsData = result.students || result.data || [];
+              console.log(`✅ 批量載入所有學生數據: ${allStudentsData.length} 個學生`);
+            } else {
+              console.error('⚠️ 無法載入學生數據，API 返回錯誤:', response.status);
+            }
+          } catch (apiError) {
+            console.error('⚠️ 批量載入學生數據失敗:', apiError);
+          }
+        }
+        
+        // 批量獲取所有老師信息（並行調用）
+        const teacherInfoPromises = schedulesToProcess.map(async (schedule: any) => {
+          if (!schedule.id || !validOrgId) {
+            return { scheduleId: schedule.id, teacherMainName: '', teacherAssistName: '' };
+          }
+          
+          try {
+            const response = await fetch(
+              `/api/schedule-daily/get?scheduleTemplateId=${encodeURIComponent(schedule.id)}&lessonDate=${encodeURIComponent(dateStr)}&orgId=${encodeURIComponent(validOrgId)}`,
+              {
+                method: 'GET',
+                credentials: 'include',
+              }
+            );
+
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.data) {
+                return {
+                  scheduleId: schedule.id,
+                  teacherMainName: result.data.teacher_main_name || '',
+                  teacherAssistName: result.data.teacher_assist_name || ''
+                };
+              }
+            }
+          } catch (error) {
+            console.error(`❌ 查詢老師信息時發生錯誤: ${schedule.course_code}`, error);
+          }
+          
+          return { scheduleId: schedule.id, teacherMainName: '', teacherAssistName: '' };
+        });
+        
+        const teacherInfoResults = await Promise.all(teacherInfoPromises);
+        const teacherInfoMap = new Map<string, { teacherMainName: string; teacherAssistName: string }>();
+        teacherInfoResults.forEach(result => {
+          teacherInfoMap.set(result.scheduleId, {
+            teacherMainName: result.teacherMainName,
+            teacherAssistName: result.teacherAssistName
+          });
+        });
+        
+        // 批量獲取所有試堂學生
+        const allTrialStudentIds = new Set<string>();
+        schedulesToProcess.forEach((schedule: any) => {
+          const scheduleTimeslot = schedule.timeslot || '';
+          const isFirstClassInTimeslot = timeslotToFirstClass.get(scheduleTimeslot) === schedule.id;
+          
+          if (isFirstClassInTimeslot) {
+            const trialLessonsForThisSlot = trialLessons.filter(lesson => 
+              lesson.lesson_date === dateStr && 
+              lesson.actual_timeslot === scheduleTimeslot
+            );
+            trialLessonsForThisSlot.forEach(lesson => {
+              allTrialStudentIds.add(lesson.id);
+            });
+          }
+        });
+        
+        let allTrialStudents: any[] = [];
+        if (allTrialStudentIds.size > 0 && validOrgId) {
+          try {
+            const trialQuery = supabase
+              .from('hanami_trial_students')
+              .select('*')
+              .in('id', Array.from(allTrialStudentIds))
+              .eq('org_id', validOrgId);
+
+            const { data: trialStudentsData, error: trialStudentsError } = await trialQuery;
+            
+            if (!trialStudentsError && trialStudentsData) {
+              allTrialStudents = trialStudentsData || [];
+              console.log(`✅ 批量載入試堂學生: ${allTrialStudents.length} 個學生`);
+            }
+          } catch (error) {
+            console.error('批量載入試堂學生失敗:', error);
+          }
+        }
+        
         // 結合課程資料和學生資料
-        const groupsWithStudents: ClassGroup[] = await Promise.all(schedulesToProcess.map(async (schedule: any, scheduleIndex: number) => {
+        const groupsWithStudents: ClassGroup[] = schedulesToProcess.map((schedule: any, scheduleIndex: number) => {
           // 找到該班級在選中日期的課程記錄
           const matchedLessons = [
             ...lessons.filter(lesson => 
@@ -809,103 +935,20 @@ const PLACEHOLDER_ORG_IDS = new Set([
             )
           ];
           
-          // 獲取該班級在選中日期的老師資訊
-          let teacherMainName = '';
-          let teacherAssistName = '';
+          // 從緩存中獲取老師信息
+          const teacherInfo = teacherInfoMap.get(schedule.id) || { teacherMainName: '', teacherAssistName: '' };
+          const teacherMainName = teacherInfo.teacherMainName;
+          const teacherAssistName = teacherInfo.teacherAssistName;
           
-          if (schedule.id && validOrgId) {
-            try {
-              // 使用 API 端點來查詢，繞過 RLS 限制
-              const response = await fetch(
-                `/api/schedule-daily/get?scheduleTemplateId=${encodeURIComponent(schedule.id)}&lessonDate=${encodeURIComponent(dateStr)}&orgId=${encodeURIComponent(validOrgId)}`,
-                {
-                  method: 'GET',
-                  credentials: 'include',
-                }
-              );
-
-              if (response.ok) {
-                const result = await response.json();
-                if (result.success && result.data) {
-                  teacherMainName = result.data.teacher_main_name || '';
-                  teacherAssistName = result.data.teacher_assist_name || '';
-                  console.log(`✅ 載入老師信息成功: ${schedule.course_code} - 主教: ${teacherMainName}, 助教: ${teacherAssistName}`);
-                } else {
-                  console.warn(`⚠️ 查詢老師信息返回失敗: ${schedule.course_code}`, result);
-                }
-              } else {
-                const errorText = await response.text();
-                console.warn(`⚠️ 查詢老師信息失敗 (${response.status}): ${schedule.course_code}`, errorText);
-              }
-            } catch (error) {
-              console.error(`❌ 查詢老師信息時發生錯誤: ${schedule.course_code}`, error);
-            }
-          }
-          
-          // 獲取該班級的所有常規學生
-          // 使用 API 端點繞過 RLS
+          // 從批量獲取的學生數據中過濾出該班級的學生
           let assignedStudents: any[] = [];
           if (schedule.assigned_student_ids && schedule.assigned_student_ids.length > 0) {
-            try {
-              // 獲取 userEmail
-              const session = getUserSession();
-              const userEmail = session?.email || null;
-              
-              // 使用 API 端點獲取所有學生
-              const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
-              
-              const response = await fetch(apiUrl, {
-                credentials: 'include',
-              });
-              
-              if (response.ok) {
-                const result = await response.json();
-                const allStudents = result.students || result.data || [];
-                // 過濾出該班級分配的學生
-                assignedStudents = allStudents.filter((s: any) => 
-                  schedule.assigned_student_ids.includes(s.id)
-                );
-                console.log(`通過 API 載入班級 ${schedule.course_code || schedule.id} 的常規學生數量:`, assignedStudents.length);
-              } else {
-                console.error('⚠️ 無法載入常規學生，API 返回錯誤:', response.status);
-                // Fallback 到直接查詢（可能也會失敗）
-                let studentQuery = supabase
-                  .from('Hanami_Students')
-                  .select('*')
-                  .in('id', schedule.assigned_student_ids);
-
-                if (validOrgId) {
-                  studentQuery = studentQuery.eq('org_id', validOrgId);
-                }
-
-                const { data: studentData, error: studentError } = await studentQuery;
-
-                if (!studentError && studentData) {
-                  assignedStudents = studentData || [];
-                }
-              }
-            } catch (apiError) {
-              console.error('⚠️ API 調用異常，嘗試直接查詢:', apiError);
-              // Fallback 到直接查詢
-              let studentQuery = supabase
-                .from('Hanami_Students')
-                .select('*')
-                .in('id', schedule.assigned_student_ids);
-
-              if (validOrgId) {
-                studentQuery = studentQuery.eq('org_id', validOrgId);
-              }
-
-              const { data: studentData, error: studentError } = await studentQuery;
-
-              if (!studentError && studentData) {
-                assignedStudents = studentData || [];
-              }
-            }
+            assignedStudents = allStudentsData.filter((s: any) => 
+              schedule.assigned_student_ids.includes(s.id)
+            );
           }
         
-          // 查詢試堂學生（只在該時段的第一個班級顯示）
-          // 試堂學生沒有分配到 assigned_student_ids，所以我們查詢該時段的所有試堂學生
+          // 從批量獲取的試堂學生數據中過濾出該時段的試堂學生
           const scheduleTimeslot = schedule.timeslot || '';
           const isFirstClassInTimeslot = timeslotToFirstClass.get(scheduleTimeslot) === schedule.id;
         
@@ -919,20 +962,9 @@ const PLACEHOLDER_ORG_IDS = new Set([
             const trialStudentIds = trialLessonsForThisSlot.map(lesson => lesson.id);
             
             if (trialStudentIds.length > 0) {
-              let trialQuery = supabase
-                .from('hanami_trial_students')
-                .select('*')
-                .in('id', trialStudentIds);
-
-          if (validOrgId) {
-            trialQuery = trialQuery.eq('org_id', validOrgId);
-              }
-
-              const { data: trialStudentsData, error: trialStudentsError } = await trialQuery;
-              
-              if (!trialStudentsError && trialStudentsData) {
-                trialStudents = trialStudentsData || [];
-              }
+              trialStudents = allTrialStudents.filter((s: any) => 
+                trialStudentIds.includes(s.id)
+              );
             }
           }
         
@@ -980,23 +1012,23 @@ const PLACEHOLDER_ORG_IDS = new Set([
             };
           });
         
-        return {
-          id: schedule.id,
-          course_code: schedule.course_code || '未設定',
-          course_section: schedule.course_section || 'A',
-          course_type: schedule.course_type || '未設定',
-          weekday: schedule.weekday,
-          timeslot: schedule.timeslot || '',
-          max_students: schedule.max_students || 0,
-          assigned_teachers: schedule.assigned_teachers || '未分配',
-          assigned_student_ids: schedule.assigned_student_ids || [],
-          room_id: schedule.room_id || '未設定',
-          lessons: matchedLessons,
-          students: students,
-          teacher_main_name: teacherMainName,
-          teacher_assist_name: teacherAssistName
-        };
-      }));
+          return {
+            id: schedule.id,
+            course_code: schedule.course_code || '未設定',
+            course_section: schedule.course_section || 'A',
+            course_type: schedule.course_type || '未設定',
+            weekday: schedule.weekday,
+            timeslot: schedule.timeslot || '',
+            max_students: schedule.max_students || 0,
+            assigned_teachers: schedule.assigned_teachers || '未分配',
+            assigned_student_ids: schedule.assigned_student_ids || [],
+            room_id: schedule.room_id || '未設定',
+            lessons: matchedLessons,
+            students: students,
+            teacher_main_name: teacherMainName,
+            teacher_assist_name: teacherAssistName
+          };
+        });
       
       setClassGroups(groupsWithStudents);
       console.log('處理後的班別資料:', groupsWithStudents);
@@ -1021,6 +1053,77 @@ const PLACEHOLDER_ORG_IDS = new Set([
         setAssignedActivities([]);
         setLoading(false);
         return;
+      }
+
+      // 如果是 member/teacher，先檢查是否有當日排程
+      if (isMemberOrTeacher && currentTeacherId && validOrgId) {
+        const formatLocalDateInLoad = (date: Date) => {
+          const hongKongTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Hong_Kong"}));
+          const year = hongKongTime.getFullYear();
+          const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
+          const day = String(hongKongTime.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        
+        const dateStr = selectedDates.length > 1 
+          ? formatLocalDateInLoad(selectedDate) // 多選模式使用第一個選中日期
+          : formatLocalDateInLoad(selectedDate);
+        
+        try {
+          const { data: scheduleData, error: scheduleError } = await supabase
+            .from('teacher_schedule')
+            .select('scheduled_date, start_time, end_time')
+            .eq('teacher_id', currentTeacherId)
+            .eq('scheduled_date', dateStr)
+            .eq('org_id', validOrgId)
+            .order('start_time', { ascending: true });
+          
+          if (scheduleError) {
+            console.error('查詢教師排程失敗:', scheduleError);
+            setHasTeacherSchedule(false);
+            setLessons([]);
+            setTrialLessons([]);
+            setTreeActivities([]);
+            setAssignedActivities([]);
+            setLoading(false);
+            return;
+          } else {
+            const teacherSchedule = scheduleData || [];
+            const hasSchedule = teacherSchedule.length > 0;
+            setHasTeacherSchedule(hasSchedule);
+            
+            if (!hasSchedule) {
+              // 沒有排程，清空所有數據
+              setLessons([]);
+              setTrialLessons([]);
+              setTreeActivities([]);
+              setAssignedActivities([]);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('查詢教師排程時發生錯誤:', error);
+          setHasTeacherSchedule(false);
+          setLessons([]);
+          setTrialLessons([]);
+          setTreeActivities([]);
+          setAssignedActivities([]);
+          setLoading(false);
+          return;
+        }
+      } else if (isMemberOrTeacher && (!currentTeacherId || !validOrgId)) {
+        // 如果沒有 teacherId 或 orgId，視為沒有排程
+        setHasTeacherSchedule(false);
+        setLessons([]);
+        setTrialLessons([]);
+        setTreeActivities([]);
+        setAssignedActivities([]);
+        setLoading(false);
+        return;
+      } else {
+        // 如果不是 member/teacher，視為有排程（管理員可以看到所有數據）
+        setHasTeacherSchedule(true);
       }
 
       setLoading(true);
@@ -2657,6 +2760,11 @@ const PLACEHOLDER_ORG_IDS = new Set([
 
   // 按時段分組課程
   const groupLessonsByTimeSlot = (): TimeSlotGroup[] => {
+    // 如果是 member/teacher 且沒有排程，返回空數組
+    if (isMemberOrTeacher && hasTeacherSchedule === false) {
+      return [];
+    }
+    
     let allLessons = [...lessons, ...trialLessons];
     
     // 調試信息
@@ -3023,7 +3131,11 @@ const PLACEHOLDER_ORG_IDS = new Set([
               >
                 {/* 時段標題卡片 */}
                 <div 
-                  className="time-slot-header hanami-card-glow rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
+                  className="time-slot-header hanami-card-glow rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+                  onClick={() => {
+                    const timeSlotKey = `${group.date}_${group.timeSlot}`;
+                    toggleTimeSlotExpansion(timeSlotKey);
+                  }}
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-8 w-full sm:w-auto">
@@ -3057,15 +3169,155 @@ const PLACEHOLDER_ORG_IDS = new Set([
                     {/* 右側裝飾 */}
                     <div className="text-white flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-0 w-full sm:w-auto">
                       <div className="flex items-center space-x-2 sm:space-x-0 sm:flex-col sm:mb-2">
-                        <MusicalNoteIcon className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white/90" />
-                        <div className="text-xs sm:text-sm text-white/70 font-medium">音樂時光</div>
+                        <img 
+                          src="/tree ui.png" 
+                          alt="學習時光" 
+                          className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 object-contain"
+                        />
+                        <div className="text-xs sm:text-sm text-white/70 font-medium">學習時光</div>
+                      </div>
+                      <div className="mt-0 sm:mt-2">
+                        {(() => {
+                          const timeSlotKey = `${group.date}_${group.timeSlot}`;
+                          return expandedTimeSlots.has(timeSlotKey) ? (
+                            <ChevronUpIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white/70" />
+                          ) : (
+                            <ChevronDownIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white/70" />
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 學生卡片網格 */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+                {/* 收起狀態下的學生小圖卡 */}
+                {(() => {
+                  const timeSlotKey = `${group.date}_${group.timeSlot}`;
+                  const isExpanded = expandedTimeSlots.has(timeSlotKey);
+                  
+                  if (!isExpanded && group.lessons.length > 0) {
+                    return (
+                      <div className="bg-gray-50 rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 border border-gray-200 mt-4 sm:mt-6">
+                        <div className="flex flex-wrap gap-2 sm:gap-3">
+                          {group.lessons.map((lesson, lessonIndex) => {
+                            const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
+                            const isTrial = 'trial_status' in lesson;
+                            const studentName = getStudentName(lesson);
+                            const studentNickname = getStudentNickname(lesson);
+                            
+                            return (
+                              <div 
+                                key={`mini-${studentId}-${lessonIndex}`}
+                                className="flex items-center space-x-2 sm:space-x-3 bg-white rounded-lg p-2 sm:p-3 shadow-sm border-2 border-hanami-primary/30 hover:border-hanami-primary/50 transition-all duration-200 hover:shadow-md"
+                              >
+                                {/* 學生頭像 */}
+                                <div className="relative">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-sm">
+                                    {studentName.charAt(0)}
+                                  </div>
+                                  <div className="absolute -bottom-0.5 sm:-bottom-1 -right-0.5 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border border-white bg-gradient-to-br from-green-400 to-green-500"></div>
+                                  {/* 試堂徽章 */}
+                                  {isTrial && (
+                                    <div className="absolute -top-0.5 sm:-top-1 -left-0.5 sm:-left-1 w-3 h-3 sm:w-4 sm:h-4 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center">
+                                      <SparklesIcon className="w-1.5 h-1.5 sm:w-2 sm:h-2 text-white" />
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* 學生資訊 */}
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-semibold text-xs sm:text-sm truncate text-hanami-text">
+                                    {studentName}
+                                  </h4>
+                                  {studentNickname && (
+                                    <p className="text-xs text-hanami-text-secondary hidden sm:block">
+                                      {studentNickname}
+                                    </p>
+                                  )}
+                                  {/* 狀態指示點 */}
+                                  <div className="flex items-center space-x-1 mt-0.5">
+                                    {/* 評估狀態點 */}
+                                    <div className="flex items-center space-x-0.5">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${
+                                        studentAssessmentStatus[studentId] 
+                                          ? 'bg-green-500' 
+                                          : 'bg-orange-500'
+                                      }`}></div>
+                                      <AcademicCapIcon className="w-3 h-3 text-hanami-text-secondary" />
+                                    </div>
+                                    {/* 媒體狀態點 */}
+                                    <div className="flex items-center space-x-0.5">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${
+                                        studentMediaStatus[studentId] 
+                                          ? 'bg-green-500' 
+                                          : 'bg-orange-500'
+                                      }`}></div>
+                                      <VideoCameraIcon className="w-3 h-3 text-hanami-text-secondary" />
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* 按鍵 */}
+                                <div className="flex items-center space-x-1">
+                                  {/* 評估按鈕 */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const student = {
+                                        id: studentId,
+                                        full_name: studentName,
+                                        nick_name: studentNickname
+                                      };
+                                      openAbilityAssessmentModal(student);
+                                    }}
+                                    className="p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-hanami-primary/10 text-hanami-primary hover:bg-hanami-primary/20"
+                                  >
+                                    <img 
+                                      src="/tree ui.png" 
+                                      alt="評估" 
+                                      className="w-8 h-8 sm:w-8 sm:h-8 object-contain"
+                                    />
+                                  </button>
+                                  
+                                  {/* 媒體按鈕 */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const studentData = {
+                                        student_id: studentId,
+                                        id: studentId,
+                                        full_name: studentName,
+                                        nick_name: studentNickname,
+                                        course_type: getCourseType(lesson) || ''
+                                      };
+                                      openStudentMediaModal(studentData);
+                                    }}
+                                    className="group/media relative cursor-pointer p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-105 bg-gray-200 text-gray-500 hover:bg-gray-300 opacity-60"
+                                  >
+                                    <div className="flex items-center space-x-1">
+                                      {/* 移除圖標顯示 */}
+                                    </div>
+                                    {/* 懸停提示 */}
+                                    <div className="hidden sm:block absolute top-10 sm:top-12 right-0 bg-gray-600/90 text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover/media:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20">
+                                      上傳/編輯媒體（功能未開放）
+                                      <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-600/90 transform rotate-45"></div>
+                                    </div>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // 展開狀態下的完整學生卡片網格
+                  if (isExpanded) {
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6 animate-fade-in mt-4 sm:mt-6">
                   {group.lessons.map((lesson, lessonIndex) => {
                     const studentId = 'student_id' in lesson ? lesson.student_id : lesson.id;
                     const studentAssignedActivities = studentActivitiesMap.get(studentId) || [];
@@ -3261,19 +3513,27 @@ const PLACEHOLDER_ORG_IDS = new Set([
                           </div>
 
                           {/* 剩餘堂數徽章 */}
-                          {!isTrial && (
-                            <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
-                              <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 ${
-                                remainingLessons === 0 
-                                  ? 'bg-red-500 text-white' 
-                                  : remainingLessons <= 2 
-                                  ? 'bg-orange-500 text-white' 
-                                  : 'bg-green-500 text-white'
-                              }`}>
-                                <span>{remainingLessons} 堂</span>
+                          {/* owner 或 admin：顯示所有數字；其他身份：只在少於或等於2堂時或試堂時顯示 */}
+                          {(() => {
+                            const isOwnerOrAdmin = currentOrgRole === 'owner' || currentOrgRole === 'admin';
+                            const shouldShowBadge = isTrial || isOwnerOrAdmin || remainingLessons <= 2;
+                            
+                            if (!shouldShowBadge) return null;
+                            
+                            return (
+                              <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
+                                <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 ${
+                                  remainingLessons === 0 
+                                    ? 'bg-red-500 text-white' 
+                                    : remainingLessons <= 2 
+                                    ? 'bg-orange-500 text-white' 
+                                    : 'bg-green-500 text-white'
+                                }`}>
+                                  <span>{remainingLessons} 堂</span>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                           {/* 學生頭像和資訊 */}
                           <div className="relative z-10 mb-3 sm:mb-4">
@@ -3570,7 +3830,12 @@ const PLACEHOLDER_ORG_IDS = new Set([
                       </div>
                     );
                   })}
-                </div>
+                      </div>
+                    );
+                  }
+                  
+                  return null;
+                })()}
               </div>
             ))
               )}
@@ -3879,19 +4144,27 @@ const PLACEHOLDER_ORG_IDS = new Set([
                                 </div>
 
                                 {/* 剩餘堂數徽章 */}
-                                {!isTrial && (
-                                  <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
-                                    <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 ${
-                                      remainingLessons === 0 
-                                        ? 'bg-red-500 text-white' 
-                                        : remainingLessons <= 2 
-                                        ? 'bg-orange-500 text-white' 
-                                        : 'bg-green-500 text-white'
-                                    }`}>
-                                      <span>{remainingLessons} 堂</span>
+                                {/* owner 或 admin：顯示所有數字；其他身份：只在少於或等於2堂時或試堂時顯示 */}
+                                {(() => {
+                                  const isOwnerOrAdmin = currentOrgRole === 'owner' || currentOrgRole === 'admin';
+                                  const shouldShowBadge = isTrial || isOwnerOrAdmin || remainingLessons <= 2;
+                                  
+                                  if (!shouldShowBadge) return null;
+                                  
+                                  return (
+                                    <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
+                                      <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-bold shadow-md flex items-center space-x-1 ${
+                                        remainingLessons === 0 
+                                          ? 'bg-red-500 text-white' 
+                                          : remainingLessons <= 2 
+                                          ? 'bg-orange-500 text-white' 
+                                          : 'bg-green-500 text-white'
+                                      }`}>
+                                        <span>{remainingLessons} 堂</span>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  );
+                                })()}
 
                                 {/* 學生頭像和資訊 */}
                                 <div className="relative z-10 mb-3 sm:mb-4">

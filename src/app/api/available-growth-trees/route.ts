@@ -6,15 +6,25 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('studentId');
+    const orgId = searchParams.get('orgId'); // 新增：從查詢參數獲取 orgId
 
-    console.log('獲取可用成長樹列表:', { studentId });
+    console.log('獲取可用成長樹列表:', { studentId, orgId });
 
-    // 獲取所有活躍的成長樹
-    const { data: allTrees, error: treesError } = await supabase
+    // 獲取所有活躍的成長樹（根據 org_id 過濾）
+    let treesQuery = supabase
       .from('hanami_growth_trees')
       .select('*')
-      .eq('is_active', true)
-      .order('tree_name', { ascending: true });
+      .eq('is_active', true);
+    
+    // 如果有 orgId，根據 org_id 過濾
+    if (orgId) {
+      treesQuery = treesQuery.eq('org_id', orgId);
+    } else {
+      // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
+      treesQuery = treesQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
+    }
+    
+    const { data: allTrees, error: treesError } = await treesQuery.order('tree_name', { ascending: true });
 
     if (treesError) {
       console.error('獲取成長樹列表失敗:', treesError);

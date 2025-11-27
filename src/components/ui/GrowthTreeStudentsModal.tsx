@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
 import { XMarkIcon, MagnifyingGlassIcon, UserIcon, StarIcon, AcademicCapIcon, HeartIcon, ChatBubbleLeftIcon } from '@heroicons/react/24/outline';
 import { HanamiButton, HanamiCard } from './index';
 import { supabase } from '@/lib/supabase';
@@ -73,148 +75,227 @@ export default function GrowthTreeStudentsModal({
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // 安全檢查：確保 document.body 存在且是有效的 DOM 元素
+  const canUsePortal = useMemo(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return false;
+    }
+    return isMounted && document.body && document.body instanceof HTMLElement;
+  }, [isMounted]);
 
   useEffect(() => {
     loadData();
   }, [treeId, treeCourseType, validOrgId]);
 
   const loadData = async () => {
-    console.log('開始載入學生管理資料...');
+    console.log('[GrowthTreeStudentsModal] 開始載入資料，treeId:', treeId, 'validOrgId:', validOrgId);
     setLoading(true);
     
     // 添加超時機制
     const timeout = setTimeout(() => {
-      console.log('載入超時，強制設置載入狀態為 false');
+      console.log('[GrowthTreeStudentsModal] 載入超時');
       setLoading(false);
     }, 10000); // 10秒超時
 
     try {
-      console.log('載入參數:', { treeId, treeCourseType, requiredAbilities, relatedActivities });
       
-      // 1. 載入在此成長樹的學生（使用現有的關聯表）
-      console.log('步驟1: 載入在此成長樹的學生');
-      const { data: studentsData, error: studentsError } = await supabase
+      // 1. 載入在此成長樹的學生（分步查詢避免 RLS 問題）
+      console.log('[GrowthTreeStudentsModal] 步驟1: 載入在此成長樹的學生');
+      // 先查詢 hanami_student_trees 表獲取 student_id 列表
+      let studentTreesQuery = supabase
         .from('hanami_student_trees')
-        .select(`
-          student_id,
-          enrollment_date,
-          completion_date,
-          tree_status,
-          teacher_notes,
-          start_date,
-          status,
-          completed_goals,
-          Hanami_Students!inner (
-            id,
-            full_name,
-            nick_name,
-            student_age,
-            course_type,
-            student_preference,
-            student_remarks
-          )
-        `)
+        .select('student_id, enrollment_date, completion_date, tree_status, teacher_notes, start_date, status, completed_goals')
         .eq('tree_id', treeId)
         .or('status.eq.active,tree_status.eq.active');
-
-      if (studentsError) {
-        console.error('載入學生失敗:', studentsError);
-        throw studentsError;
-      }
       
-      // 轉換資料格式
-      const formattedStudents = (studentsData || []).map((item: any) => ({
-        id: item.Hanami_Students.id,
-        full_name: item.Hanami_Students.full_name,
-        nick_name: item.Hanami_Students.nick_name ?? undefined,
-        student_age: item.Hanami_Students.student_age ?? undefined,
-        course_type: item.Hanami_Students.course_type ?? undefined,
-        student_preference: item.Hanami_Students.student_preference ?? undefined,
-        student_remarks: item.Hanami_Students.student_remarks ?? undefined,
-        // 額外的關聯資訊
-        start_date: item.start_date || item.enrollment_date,
-        status: item.status || item.tree_status,
-        completed_goals: item.completed_goals || []
-      }));
-      
-      // 在客戶端排序
-      formattedStudents.sort((a, b) => a.full_name.localeCompare(b.full_name));
-      
-      console.log('載入到的學生:', formattedStudents);
-      setStudents(formattedStudents);
-
-      // 2. 載入所有學生（用於選擇器）
-      console.log('步驟2: 載入所有學生', { validOrgId });
-      let allStudentsQuery = supabase
-        .from('Hanami_Students')
-        .select('id, full_name, nick_name, student_age, course_type');
-      
-      // 根據 org_id 過濾
       if (validOrgId) {
-        allStudentsQuery = allStudentsQuery.eq('org_id', validOrgId);
+        studentTreesQuery = studentTreesQuery.eq('org_id', validOrgId);
       }
       
-      const { data: allStudentsData, error: allStudentsError } = await allStudentsQuery.order('full_name');
+      const { data: studentTreesData, error: treesError } = await studentTreesQuery;
 
-      if (allStudentsError) {
-        console.error('載入所有學生失敗:', allStudentsError);
-        throw allStudentsError;
+      if (treesError) {
+        console.error('[GrowthTreeStudentsModal] 載入學生樹關聯失敗:', treesError);
+        throw treesError;
       }
-      console.log('載入到的所有學生:', allStudentsData);
-      const typedAllStudentsData = (allStudentsData || []) as Array<{
-        id: string;
-        full_name?: string | null;
-        nick_name?: string | null;
-        student_age?: number | null;
-        course_type?: string | null;
-        student_preference?: string | null;
-        student_remarks?: string | null;
-        [key: string]: any;
-      }>;
-      
-      if (typedAllStudentsData.length > 0) {
-        const fixedAllStudents = typedAllStudentsData.map(s => ({
-          id: s.id,
-          full_name: s.full_name || '',
-          nick_name: s.nick_name ?? undefined,
-          student_age: s.student_age ?? undefined,
-          course_type: s.course_type ?? undefined,
-          student_preference: s.student_preference ?? undefined,
-          student_remarks: s.student_remarks ?? undefined,
-        }));
-        setAllStudents(fixedAllStudents);
+
+      console.log('[GrowthTreeStudentsModal] 學生樹關聯數量:', studentTreesData?.length || 0);
+
+      if (!studentTreesData || studentTreesData.length === 0) {
+        console.log('[GrowthTreeStudentsModal] 沒有學生在此成長樹');
+        setStudents([]);
+        // 繼續載入所有學生，即使沒有學生在此成長樹
       } else {
-        setAllStudents([]);
+        // 提取所有 student_id
+        const studentIds = studentTreesData.map((item: any) => item.student_id).filter(Boolean);
+
+        if (studentIds.length === 0) {
+          console.log('[GrowthTreeStudentsModal] 沒有有效的學生ID');
+          setStudents([]);
+        } else {
+          // 查詢學生詳細資料 - 使用 API 路由繞過 RLS
+          console.log('[GrowthTreeStudentsModal] 查詢學生詳細資料，學生ID數量:', studentIds.length);
+          
+          if (!validOrgId) {
+            console.error('[GrowthTreeStudentsModal] 無法查詢學生詳細資料：缺少 validOrgId');
+            setStudents([]);
+          } else {
+            try {
+              // 使用 API 路由繞過 RLS
+              const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}&studentType=all&studentIds=${studentIds.join(',')}`;
+              console.log('[GrowthTreeStudentsModal] 調用 API 查詢學生詳細資料:', apiUrl);
+              
+              const response = await fetch(apiUrl);
+              const result = await response.json();
+              
+              if (!response.ok || !result.success) {
+                console.error('[GrowthTreeStudentsModal] API 查詢學生詳細資料失敗:', result.error || result);
+                setStudents([]);
+              } else {
+                const studentsData = (result.data || result.students || []) as Array<{
+                  id: string;
+                  full_name?: string | null;
+                  nick_name?: string | null;
+                  student_age?: number | null;
+                  course_type?: string | null;
+                  student_preference?: string | null;
+                  student_remarks?: string | null;
+                  [key: string]: any;
+                }>;
+                
+                console.log('[GrowthTreeStudentsModal] API 返回學生資料，數量:', studentsData.length);
+                
+                // 合併資料
+                const studentsMap = new Map(studentsData.map((s: any) => [s.id, s]));
+                const formattedStudents = studentTreesData
+                  .map((item: any) => {
+                    const student = studentsMap.get(item.student_id);
+                    if (!student) return null;
+                    return {
+                      id: student.id,
+                      full_name: student.full_name,
+                      nick_name: student.nick_name ?? undefined,
+                      student_age: student.student_age ?? undefined,
+                      course_type: student.course_type ?? undefined,
+                      student_preference: student.student_preference ?? undefined,
+                      student_remarks: student.student_remarks ?? undefined,
+                      start_date: item.start_date || item.enrollment_date,
+                      status: item.status || item.tree_status,
+                      completed_goals: item.completed_goals || []
+                    };
+                  })
+                  .filter((item): item is NonNullable<typeof item> => item !== null);
+                
+                // 在客戶端排序
+                formattedStudents.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+                
+                setStudents(formattedStudents);
+                console.log('[GrowthTreeStudentsModal] 成功載入在此成長樹的學生，數量:', formattedStudents.length);
+              }
+            } catch (apiError) {
+              console.error('[GrowthTreeStudentsModal] API 調用異常:', apiError);
+              setStudents([]);
+            }
+          }
+        }
       }
 
-      // 3. 載入學生統計資訊（學習時長和上堂數）
-      if (typedAllStudentsData.length > 0) {
-        console.log('步驟3: 載入學生統計');
-        await loadStudentStats(typedAllStudentsData.map(s => s.id));
+      // 2. 載入所有學生（用於選擇器）- 使用 API 路由繞過 RLS
+      console.log('[GrowthTreeStudentsModal] 步驟2: 開始載入所有學生，validOrgId:', validOrgId);
+      
+      if (!validOrgId) {
+        console.log('[GrowthTreeStudentsModal] 警告: 沒有 validOrgId，無法載入學生');
+        setAllStudents([]);
+      } else {
+        try {
+          // 使用 API 路由繞過 RLS 遞歸問題
+          const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}&studentType=all`;
+          console.log('[GrowthTreeStudentsModal] 調用 API:', apiUrl);
+          
+          const response = await fetch(apiUrl);
+          const result = await response.json();
+          
+          if (!response.ok || !result.success) {
+            console.error('[GrowthTreeStudentsModal] API 載入所有學生失敗:', result.error || result);
+            setAllStudents([]);
+          } else {
+            const typedAllStudentsData = (result.data || result.students || []) as Array<{
+              id: string;
+              full_name?: string | null;
+              nick_name?: string | null;
+              student_age?: number | null;
+              course_type?: string | null;
+              student_preference?: string | null;
+              student_remarks?: string | null;
+              [key: string]: any;
+            }>;
+            
+            console.log('[GrowthTreeStudentsModal] 成功載入所有學生，數量:', typedAllStudentsData.length);
+            
+            if (typedAllStudentsData.length > 0) {
+              const fixedAllStudents = typedAllStudentsData.map(s => ({
+                id: s.id,
+                full_name: s.full_name || '',
+                nick_name: s.nick_name ?? undefined,
+                student_age: s.student_age ?? undefined,
+                course_type: s.course_type ?? undefined,
+                student_preference: s.student_preference ?? undefined,
+                student_remarks: s.student_remarks ?? undefined,
+              }));
+              setAllStudents(fixedAllStudents);
+              console.log('[GrowthTreeStudentsModal] 已設置 allStudents，數量:', fixedAllStudents.length);
+
+              // 3. 載入學生統計資訊（學習時長和上堂數）
+              console.log('[GrowthTreeStudentsModal] 步驟3: 載入學生統計');
+              try {
+                await loadStudentStats(typedAllStudentsData.map(s => s.id));
+              } catch (statsError) {
+                console.error('[GrowthTreeStudentsModal] 載入學生統計失敗:', statsError);
+                // 統計載入失敗不影響主流程
+              }
+            } else {
+              console.log('[GrowthTreeStudentsModal] 沒有找到學生');
+              setAllStudents([]);
+            }
+          }
+        } catch (apiError) {
+          console.error('[GrowthTreeStudentsModal] API 調用異常:', apiError);
+          setAllStudents([]);
+        }
       }
 
       // 4. 簡化版本：跳過能力載入
-      console.log('步驟4: 跳過能力載入');
+      console.log('[GrowthTreeStudentsModal] 步驟4: 跳過能力載入');
       setStudentAbilities([]);
 
       // 5. 簡化版本：跳過活動統計
-      console.log('步驟5: 跳過活動統計');
-      if (formattedStudents && formattedStudents.length > 0) {
+      console.log('[GrowthTreeStudentsModal] 步驟5: 跳過活動統計');
+      const currentStudents = students;
+      if (currentStudents && currentStudents.length > 0) {
         const defaultActivityStats: {[key: string]: number} = {};
-        formattedStudents.forEach(student => {
+        currentStudents.forEach(student => {
           defaultActivityStats[student.id] = 0;
         });
         setActivityStats(defaultActivityStats);
       }
 
-      console.log('所有資料載入完成');
+      console.log('[GrowthTreeStudentsModal] 所有資料載入完成');
 
     } catch (error) {
-      console.error('載入資料失敗:', error);
+      console.error('[GrowthTreeStudentsModal] 載入資料失敗:', error);
+      console.error('[GrowthTreeStudentsModal] 錯誤詳情:', JSON.stringify(error, null, 2));
+      // 確保即使出錯也設置空數組
+      setAllStudents([]);
     } finally {
       clearTimeout(timeout);
-      console.log('設置載入狀態為 false');
       setLoading(false);
+      console.log('[GrowthTreeStudentsModal] 載入完成，loading 設置為 false');
     }
   };
 
@@ -457,51 +538,107 @@ export default function GrowthTreeStudentsModal({
 
   const addStudentsToTree = async () => {
     try {
-      console.log('添加學生到成長樹:', selectedStudents);
+      console.log('[GrowthTreeStudentsModal] 添加學生到成長樹:', selectedStudents);
+      console.log('[GrowthTreeStudentsModal] treeId:', treeId, 'validOrgId:', validOrgId);
       
-      // 檢查學生是否已經在此成長樹中
-      const { data: existingStudents, error: checkError } = await supabase
-        .from('hanami_student_trees')
-        .select('student_id')
-        .eq('tree_id', treeId)
-        .in('student_id', selectedStudents);
-      
-      if (checkError) throw checkError;
-      
-      const typedExistingStudents = (existingStudents || []) as Array<{
-        student_id?: string;
-        [key: string]: any;
-      }>;
-      const existingStudentIds = typedExistingStudents.map(s => s.student_id || '');
-      const newStudentIds = selectedStudents.filter(id => !existingStudentIds.includes(id));
-      
-      if (newStudentIds.length === 0) {
-        console.log('所有選中的學生都已經在此成長樹中');
-        setShowStudentSelector(false);
-        setSelectedStudents([]);
+      if (!validOrgId) {
+        console.error('[GrowthTreeStudentsModal] 無法添加學生：缺少 validOrgId');
+        alert('無法添加學生：缺少機構 ID');
         return;
       }
       
-      // 添加新學生到成長樹（使用新的欄位名稱）
-      const { error } = await (supabase
-        .from('hanami_student_trees') as any)
-        .insert(newStudentIds.map(studentId => ({
-          student_id: studentId,
-          tree_id: treeId,
-          start_date: new Date().toISOString().split('T')[0],
-          status: 'active'
-        })) as any);
-
-      if (error) throw error;
-
-      console.log('成功添加學生到成長樹');
+      if (selectedStudents.length === 0) {
+        console.log('[GrowthTreeStudentsModal] 沒有選中的學生');
+        return;
+      }
       
-      // 重新載入資料
-      await loadData();
-      setShowStudentSelector(false);
-      setSelectedStudents([]);
+      // 使用 API 路由來添加學生，避免 RLS 問題
+      try {
+        const response = await fetch('/api/growth-trees/add-students', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            treeId,
+            studentIds: selectedStudents,
+            orgId: validOrgId,
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok || !result.success) {
+          console.error('[GrowthTreeStudentsModal] API 添加學生失敗:', result);
+          const errorMessage = result.details || result.error || '未知錯誤';
+          const errorCode = result.code ? ` (錯誤代碼: ${result.code})` : '';
+          alert(`添加學生失敗: ${errorMessage}${errorCode}`);
+          return;
+        }
+        
+        console.log('[GrowthTreeStudentsModal] 成功添加學生到成長樹:', result);
+        
+        // 重新載入資料
+        await loadData();
+        setShowStudentSelector(false);
+        setSelectedStudents([]);
+      } catch (apiError) {
+        console.error('[GrowthTreeStudentsModal] API 調用異常:', apiError);
+        // 如果 API 不存在，嘗試直接插入（可能會有 RLS 問題）
+        console.log('[GrowthTreeStudentsModal] 嘗試直接插入...');
+        
+        // 檢查學生是否已經在此成長樹中（使用 API 或直接查詢）
+        let existingStudentIds: string[] = [];
+        try {
+          // 先嘗試使用現有查詢（可能因為 RLS 返回空，但不影響）
+          const { data: existingStudents } = await supabase
+            .from('hanami_student_trees')
+            .select('student_id')
+            .eq('tree_id', treeId)
+            .eq('org_id', validOrgId)
+            .in('student_id', selectedStudents);
+          
+          existingStudentIds = (existingStudents || []).map((s: any) => s.student_id || '').filter(Boolean);
+        } catch (checkError) {
+          console.warn('[GrowthTreeStudentsModal] 檢查現有學生失敗，繼續添加:', checkError);
+        }
+        
+        const newStudentIds = selectedStudents.filter(id => !existingStudentIds.includes(id));
+        
+        if (newStudentIds.length === 0) {
+          console.log('[GrowthTreeStudentsModal] 所有選中的學生都已經在此成長樹中');
+          setShowStudentSelector(false);
+          setSelectedStudents([]);
+          return;
+        }
+        
+        // 添加新學生到成長樹
+        const { error } = await (supabase
+          .from('hanami_student_trees') as any)
+          .insert(newStudentIds.map(studentId => ({
+            student_id: studentId,
+            tree_id: treeId,
+            org_id: validOrgId,
+            start_date: new Date().toISOString().split('T')[0],
+            status: 'active',
+            tree_status: 'active'
+          })) as any);
+
+        if (error) {
+          console.error('[GrowthTreeStudentsModal] 插入失敗:', error);
+          throw error;
+        }
+
+        console.log('[GrowthTreeStudentsModal] 成功添加學生到成長樹');
+        
+        // 重新載入資料
+        await loadData();
+        setShowStudentSelector(false);
+        setSelectedStudents([]);
+      }
     } catch (error) {
-      console.error('添加學生失敗:', error);
+      console.error('[GrowthTreeStudentsModal] 添加學生失敗:', error);
+      alert(`添加學生失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
     }
   };
 
@@ -559,9 +696,18 @@ export default function GrowthTreeStudentsModal({
     setStudentToDelete(null);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+  if (!canUsePortal) {
+    return null;
+  }
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" style={{ pointerEvents: 'auto' }}>
+      <div 
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{ position: 'relative', zIndex: 101, pointerEvents: 'auto' }}
+      >
         {/* 標題欄 */}
         <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
           <div className="flex items-center justify-between">
@@ -588,9 +734,9 @@ export default function GrowthTreeStudentsModal({
         </div>
 
         {/* 內容區域 */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
           {/* 搜尋和操作欄 */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-6" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-4">
               <div className="relative">
                 <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -606,13 +752,26 @@ export default function GrowthTreeStudentsModal({
                 共 {filteredStudents.length} 位學生
               </span>
             </div>
-            <HanamiButton
-              onClick={() => setShowStudentSelector(true)}
-              className="bg-gradient-to-r from-hanami-primary to-hanami-secondary"
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('添加學生按鈕被點擊');
+                setShowStudentSelector(true);
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              className="inline-flex items-center px-4 py-3 rounded-xl bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white font-medium transition-all shadow-lg hover:shadow-xl cursor-pointer"
+              type="button"
+              style={{ position: 'relative', zIndex: 10001, pointerEvents: 'auto' }}
             >
-              <UserIcon className="h-4 w-4 mr-2" />
+              <UserIcon className="h-5 w-5 mr-2" />
               添加學生
-            </HanamiButton>
+            </motion.button>
           </div>
 
           {loading ? (
@@ -767,15 +926,36 @@ export default function GrowthTreeStudentsModal({
         </div>
 
         {/* 學生選擇器 */}
-        {showStudentSelector && (
-          <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+        {showStudentSelector && canUsePortal ? createPortal(
+          <div 
+            className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 p-4"
+            style={{ pointerEvents: 'auto' }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowStudentSelector(false);
+              }
+            }}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-hanami-text">選擇學生</h3>
                   <button
-                    onClick={() => setShowStudentSelector(false)}
-                    className="text-hanami-text hover:text-hanami-text-secondary"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowStudentSelector(false);
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="text-hanami-text hover:text-hanami-text-secondary transition-colors cursor-pointer p-2"
+                    type="button"
+                    style={{ position: 'relative', zIndex: 10001 }}
                   >
                     <XMarkIcon className="h-6 w-6" />
                   </button>
@@ -797,27 +977,51 @@ export default function GrowthTreeStudentsModal({
               </div>
               
               <div className="flex-1 overflow-y-auto p-4">
-                <div className="space-y-2">
-                  {allStudents
-                    .filter(student => !students.find(s => s.id === student.id))
-                    .filter(student => 
-                      student.full_name.toLowerCase().includes(studentSelectorSearch.toLowerCase()) ||
-                      (student.nick_name && student.nick_name.toLowerCase().includes(studentSelectorSearch.toLowerCase()))
-                    )
-                    .map((student) => {
+                {allStudents.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-hanami-text-secondary">載入中或暫無可選學生</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {allStudents
+                      .filter(student => !students.find(s => s.id === student.id))
+                      .filter(student => 
+                        student.full_name.toLowerCase().includes(studentSelectorSearch.toLowerCase()) ||
+                        (student.nick_name && student.nick_name.toLowerCase().includes(studentSelectorSearch.toLowerCase()))
+                      )
+                      .length === 0 ? (
+                        <div className="text-center py-12">
+                          <p className="text-hanami-text-secondary">
+                            {studentSelectorSearch ? '沒有找到符合搜尋條件的學生' : '所有學生已在此成長樹中'}
+                          </p>
+                        </div>
+                      ) : (
+                        allStudents
+                          .filter(student => !students.find(s => s.id === student.id))
+                          .filter(student => 
+                            student.full_name.toLowerCase().includes(studentSelectorSearch.toLowerCase()) ||
+                            (student.nick_name && student.nick_name.toLowerCase().includes(studentSelectorSearch.toLowerCase()))
+                          )
+                          .map((student) => {
                       const stats = studentStats[student.id] || { learningDuration: '未開始', lessonCount: 0 };
                       return (
-                        <label key={student.id} className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <label 
+                          key={student.id} 
+                          className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <input
                             type="checkbox"
                             checked={selectedStudents.includes(student.id)}
                             onChange={(e) => {
+                              e.stopPropagation();
                               if (e.target.checked) {
                                 setSelectedStudents([...selectedStudents, student.id]);
                               } else {
                                 setSelectedStudents(selectedStudents.filter(id => id !== student.id));
                               }
                             }}
+                            onClick={(e) => e.stopPropagation()}
                             className="rounded"
                           />
                           <div className="flex-1">
@@ -842,37 +1046,81 @@ export default function GrowthTreeStudentsModal({
                           </div>
                         </label>
                       );
-                    })}
-                </div>
+                    })
+                    )}
+                  </div>
+                )}
               </div>
               
-              <div className="p-6 border-t border-gray-200 flex justify-between items-center">
+              <div 
+                className="p-6 border-t border-gray-200 flex justify-between items-center"
+                onClick={(e) => e.stopPropagation()}
+                style={{ position: 'relative', zIndex: 10000 }}
+              >
                 <div className="text-sm text-gray-600">
                   已選擇 {selectedStudents.length} 位學生
                 </div>
-                <div className="flex gap-3">
-                  <HanamiButton
-                    variant="secondary"
-                    onClick={() => setShowStudentSelector(false)}
+                <div className="flex gap-3" onClick={(e) => e.stopPropagation()}>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowStudentSelector(false);
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="px-4 py-3 rounded-xl bg-[#FFD59A] hover:bg-[#EBC9A4] text-[#4B4036] font-medium transition-all shadow-lg hover:shadow-xl cursor-pointer"
+                    type="button"
+                    style={{ position: 'relative', zIndex: 10001 }}
                   >
                     取消
-                  </HanamiButton>
-                  <HanamiButton
-                    onClick={addStudentsToTree}
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: selectedStudents.length === 0 ? 1 : 1.05 }}
+                    whileTap={{ scale: selectedStudents.length === 0 ? 1 : 0.95 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      addStudentsToTree();
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                     disabled={selectedStudents.length === 0}
+                    className={`px-4 py-3 rounded-xl bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white font-medium transition-all shadow-lg hover:shadow-xl cursor-pointer ${selectedStudents.length === 0 ? 'opacity-75 cursor-not-allowed' : ''}`}
+                    type="button"
+                    style={{ position: 'relative', zIndex: 10001 }}
                   >
                     添加選中的學生 ({selectedStudents.length})
-                  </HanamiButton>
+                  </motion.button>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          </div>,
+          document.body
+        ) : null}
 
         {/* 刪除確認視窗 */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        {showDeleteConfirm && canUsePortal ? createPortal(
+          <div 
+            className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4"
+            style={{ pointerEvents: 'auto' }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                cancelDeleteStudent();
+              }
+            }}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+              style={{ position: 'relative', zIndex: 10001 }}
+            >
               <div className="bg-gradient-to-r from-hanami-primary to-hanami-secondary px-6 py-4 border-b border-[#EADBC8] rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <Image
@@ -886,7 +1134,7 @@ export default function GrowthTreeStudentsModal({
                 </div>
               </div>
               
-              <div className="p-6">
+              <div className="p-6" style={{ position: 'relative', zIndex: 10001 }}>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-hanami-primary to-hanami-secondary rounded-full flex items-center justify-center">
                     <UserIcon className="h-6 w-6 text-white" />
@@ -915,25 +1163,56 @@ export default function GrowthTreeStudentsModal({
                   您確定要將學生 <strong>"{filteredStudents.find(s => s.id === studentToDelete)?.full_name}"</strong> 從成長樹中移除嗎？
                 </p>
                 
-                <div className="flex gap-3 justify-end">
-                  <button
-                    className="px-4 py-2 text-sm font-medium text-hanami-text-secondary bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                    onClick={cancelDeleteStudent}
+                <div 
+                  className="flex gap-3 justify-end"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ position: 'relative', zIndex: 10002 }}
+                >
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelDeleteStudent();
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="px-4 py-3 rounded-xl bg-[#FFD59A] hover:bg-[#EBC9A4] text-[#4B4036] font-medium transition-all shadow-lg hover:shadow-xl cursor-pointer"
+                    style={{ position: 'relative', zIndex: 10002 }}
                   >
                     取消
-                  </button>
-                  <button
-                    className="px-4 py-2 text-sm font-medium text-hanami-text-secondary bg-gray-100 from-hanami-primary to-hanami-secondary hover:from-hanami-secondary hover:to-hanami-accent rounded-lg transition-colors"
-                    onClick={confirmDeleteStudent}
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      confirmDeleteStudent();
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="px-4 py-3 rounded-xl bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white font-medium transition-all shadow-lg hover:shadow-xl cursor-pointer"
+                    style={{ position: 'relative', zIndex: 10002 }}
                   >
                     確認移除
-                  </button>
+                  </motion.button>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          </div>,
+          document.body
+        ) : null}
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 } 

@@ -55,13 +55,26 @@ export async function GET(request: NextRequest) {
     }
 
     // 查詢學生列表
-    const query = (supabase as any)
+    let query = (supabase as any)
       .from('Hanami_Students')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('student_type', studentType);
+      .select('id, full_name, nick_name, student_age, course_type, student_preference, student_remarks')
+      .eq('org_id', orgId);
+    
+    // 如果提供了 studentIds 參數（逗號分隔的 ID 列表），則只查詢這些學生
+    const studentIdsParam = searchParams.get('studentIds');
+    if (studentIdsParam) {
+      const studentIds = studentIdsParam.split(',').filter(Boolean);
+      if (studentIds.length > 0) {
+        query = query.in('id', studentIds);
+      }
+    }
+    
+    // 如果指定了 studentType 且不是 'all'，則過濾學生類型
+    if (studentType && studentType !== 'all') {
+      query = query.eq('student_type', studentType);
+    }
 
-    const { data, error } = await query;
+    const { data, error } = await query.order('full_name');
 
     if (error) {
       console.error('API: 查詢學生列表錯誤', error);

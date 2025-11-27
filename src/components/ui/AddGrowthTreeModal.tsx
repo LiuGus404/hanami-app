@@ -375,21 +375,30 @@ export default function AddGrowthTreeModal(props: AddGrowthTreeModalProps) {
         {/* 表單內容 - 可滾動 */}
         <div className="flex-1 overflow-y-auto">
           <form className="p-6 space-y-6" onSubmit={handleSubmit}>
-            {/* 機構信息 */}
-            {(props.organizationName || props.organizationId) && (
-              <div className="bg-[#FFF9F2] border border-[#EADBC8] rounded-lg p-4 mb-4">
+            {/* 機構信息 - 根據 org_id 顯示 */}
+            {props.organizationId && (
+              <div className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] border-2 border-[#EADBC8] rounded-lg p-4 mb-4 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">🏢</span>
+                      <div className="text-sm font-semibold text-[#4B4036]">
+                        當前機構
+                      </div>
+                    </div>
                     {props.organizationName && (
-                      <div className="text-sm font-medium text-[#2B3A3B] mb-1">
-                        機構名稱：{props.organizationName}
+                      <div className="text-sm font-medium text-[#2B3A3B] mb-1 ml-7">
+                        {props.organizationName}
                       </div>
                     )}
                     {props.organizationId && (
-                      <div className="text-xs text-[#87704e]">
-                        機構 ID：{props.organizationId}
+                      <div className="text-xs text-[#87704e] ml-7">
+                        ID: {props.organizationId}
                       </div>
                     )}
+                    <div className="text-xs text-[#A68A64] mt-2 ml-7 italic">
+                      所有選項（能力、活動、教師、課程類型）已根據此機構過濾
+                    </div>
                   </div>
                 </div>
               </div>

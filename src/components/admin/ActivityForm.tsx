@@ -262,8 +262,26 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       
       const { data: categoriesData } = await categoriesQuery;
       
-      if (categoriesData) {
-        setCategories(categoriesData);
+      // 預設分類選項（如果資料庫中沒有分類，則使用這些預設選項）
+      const defaultCategories = [
+        { id: 'default-1', category_name: '基礎訓練', category_description: '基礎音樂技能訓練活動，包含節奏、音感、視譜等基礎能力培養', sort_order: 1, is_active: true, is_default: true },
+        { id: 'default-2', category_name: '遊戲活動', category_description: '音樂遊戲和互動活動，讓學習變得有趣且有效', sort_order: 2, is_active: true, is_default: true },
+        { id: 'default-3', category_name: '繪本教學', category_description: '結合繪本的音樂教學，透過故事引導音樂學習', sort_order: 3, is_active: true, is_default: true },
+        { id: 'default-4', category_name: '創作活動', category_description: '音樂創作和表達活動，培養創造力和音樂表達能力', sort_order: 4, is_active: true, is_default: true },
+        { id: 'default-5', category_name: '表演活動', category_description: '音樂表演和展示活動，提升舞台表現和自信心', sort_order: 5, is_active: true, is_default: true },
+        { id: 'default-6', category_name: '團體合奏', category_description: '團體合奏和協作活動，培養團隊合作精神', sort_order: 6, is_active: true, is_default: true },
+        { id: 'default-7', category_name: '個別指導', category_description: '適合個別指導的活動，針對個人需求進行教學', sort_order: 7, is_active: true, is_default: true },
+      ];
+      
+      // 如果資料庫中有分類，使用資料庫的分類；否則使用預設分類
+      if (categoriesData && categoriesData.length > 0) {
+        // 合併預設分類和資料庫分類，確保預設分類始終存在
+        const existingCategoryNames = new Set(categoriesData.map((c: any) => c.category_name));
+        const missingDefaults = defaultCategories.filter(d => !existingCategoryNames.has(d.category_name));
+        setCategories([...categoriesData, ...missingDefaults].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0)));
+      } else {
+        // 如果沒有資料庫分類，使用預設分類
+        setCategories(defaultCategories);
       }
 
       // 載入標籤 - 根據 orgId 過濾

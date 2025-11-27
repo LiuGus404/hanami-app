@@ -285,24 +285,47 @@ export default function GrowthTreesPage({
       console.log('開始新增成長樹:', treeData);
       console.log('目標資料:', goals);
 
+      // 驗證必要欄位
+      if (!treeData.tree_name || !treeData.tree_name.trim()) {
+        throw new Error('成長樹名稱不能為空');
+      }
+
+      if (!validOrgId) {
+        throw new Error('缺少機構 ID，無法新增成長樹');
+      }
+
       // 1. 新增成長樹
+      const insertData: any = {
+        tree_name: treeData.tree_name.trim(),
+        tree_description: treeData.tree_description?.trim() || null,
+        tree_icon: treeData.tree_icon || '/tree ui.png',
+        tree_level: Number(treeData.tree_level) || 1,
+        is_active: true,
+        org_id: validOrgId,
+      };
+
+      // 只有當 course_type 存在且不為空時才添加
+      if (treeData.course_type && treeData.course_type.trim() !== '') {
+        insertData.course_type_id = treeData.course_type.trim();
+      }
+
+      console.log('準備新增成長樹資料:', insertData);
+
       const { data: treeInsert, error: treeError } = await (supabase
         .from('hanami_growth_trees') as any)
-        .insert([{
-          tree_name: treeData.tree_name,
-          tree_description: treeData.tree_description,
-          tree_icon: treeData.tree_icon,
-          course_type_id: treeData.course_type,
-          tree_level: treeData.tree_level,
-          is_active: true,
-          org_id: validOrgId,
-        }])
+        .insert([insertData])
         .select()
         .single();
 
       if (treeError) {
         console.error('新增成長樹失敗:', treeError);
-        throw treeError;
+        console.error('錯誤詳情:', {
+          message: treeError.message,
+          code: treeError.code,
+          details: treeError.details,
+          hint: treeError.hint
+        });
+        throw new Error(`新增成長樹失敗: ${treeError.message || treeError.code || '未知錯誤'}`);
       }
 
       console.log('成長樹新增成功:', treeInsert);
@@ -538,7 +561,6 @@ export default function GrowthTreesPage({
 
   const getGoalsForTree = (treeId: string) => {
     const treeGoals = goals.filter(goal => goal.tree_id === treeId);
-    console.log(`取得成長樹 ${treeId} 的目標:`, treeGoals);
     return treeGoals;
   };
 
@@ -625,52 +647,74 @@ export default function GrowthTreesPage({
     try {
       console.log('載入在此成長樹的學生資料:', treeId);
 
-      // 使用現有的關聯表查詢學生
-      let studentsQuery = (supabase
+      // 先查詢 hanami_student_trees 表獲取 student_id 列表
+      let studentTreesQuery = (supabase
         .from('hanami_student_trees') as any)
-        .select(`
-          student_id,
-          enrollment_date,
-          completion_date,
-          tree_status,
-          teacher_notes,
-          start_date,
-          status,
-          completed_goals,
-          Hanami_Students!inner (
-            id,
-            full_name,
-            nick_name,
-            student_age,
-            course_type
-          )
-        `)
+        .select('student_id, enrollment_date, completion_date, tree_status, teacher_notes, start_date, status, completed_goals')
         .eq('tree_id', treeId)
         .or('status.eq.active,tree_status.eq.active');
-      studentsQuery = applyOrgFilter(studentsQuery);
-      const { data: studentsData, error } = await studentsQuery;
+      studentTreesQuery = applyOrgFilter(studentTreesQuery);
+      const { data: studentTreesData, error: treesError } = await studentTreesQuery;
 
-      if (error) {
-        console.error('載入學生資料失敗:', error);
+      if (treesError) {
+        console.error('載入學生樹關聯失敗:', treesError);
         setStudentsInTree([]);
         return;
       }
 
-      console.log('載入到的學生資料:', studentsData);
-      console.log('學生數量:', studentsData?.length || 0);
+      if (!studentTreesData || studentTreesData.length === 0) {
+        setStudentsInTree([]);
+        return;
+      }
 
-      // 轉換資料格式以符合現有介面
-      const formattedStudents = (studentsData || []).map((item: any) => ({
-        id: item.Hanami_Students.id,
-        full_name: item.Hanami_Students.full_name,
-        nick_name: item.Hanami_Students.nick_name,
-        student_age: item.Hanami_Students.student_age,
-        course_type: item.Hanami_Students.course_type,
-        // 額外的關聯資訊
-        start_date: item.start_date || item.enrollment_date,
-        status: item.status || item.tree_status,
-        completed_goals: item.completed_goals || []
-      }));
+      // 提取所有 student_id
+      const studentIds = studentTreesData.map((item: any) => item.student_id).filter(Boolean);
+
+      if (studentIds.length === 0) {
+        setStudentsInTree([]);
+        return;
+      }
+
+      // 使用 API 路由獲取學生詳細資料，避免 RLS 問題
+      const apiUrl = `/api/students/list?orgId=${validOrgId}&studentIds=${studentIds.join(',')}`;
+      console.log('調用 API 查詢學生詳細資料:', apiUrl);
+
+      const response = await fetch(apiUrl);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error('API 查詢學生詳細資料失敗:', result.error || result);
+        setStudentsInTree([]);
+        return;
+      }
+
+      const studentsData = (result.data || result.students || []) as Array<{
+        id: string;
+        full_name?: string | null;
+        nick_name?: string | null;
+        student_age?: number | null;
+        course_type?: string | null;
+        [key: string]: any;
+      }>;
+
+      // 合併資料
+      const studentsMap = new Map((studentsData || []).map((s: any) => [s.id, s]));
+      const formattedStudents = studentTreesData
+        .map((item: any) => {
+          const student = studentsMap.get(item.student_id);
+          if (!student) return null;
+          return {
+            id: student.id,
+            full_name: student.full_name,
+            nick_name: student.nick_name,
+            student_age: student.student_age,
+            course_type: student.course_type,
+            start_date: item.start_date || item.enrollment_date,
+            status: item.status || item.tree_status,
+            completed_goals: item.completed_goals || []
+          };
+        })
+        .filter(Boolean);
 
       // 在客戶端排序
       formattedStudents.sort((a: any, b: any) => a.full_name.localeCompare(b.full_name));
@@ -778,11 +822,7 @@ export default function GrowthTreesPage({
 
   // 獲取篩選後的成長樹
   const getFilteredTrees = () => {
-    console.log('開始篩選成長樹，總數:', trees.length);
-    console.log('當前篩選條件:', filters);
-
     // 暫時禁用所有篩選，直接返回所有成長樹
-    console.log('暫時禁用篩選，返回所有成長樹');
     return trees;
 
     /*
@@ -792,7 +832,6 @@ export default function GrowthTreesPage({
       // 搜尋篩選
       if (filters.search && !tree.tree_name.toLowerCase().includes(filters.search.toLowerCase()) &&
           !(tree.tree_description && tree.tree_description.toLowerCase().includes(filters.search.toLowerCase()))) {
-        console.log(`- 搜尋篩選失敗: ${tree.tree_name}`);
         return false;
       }
 
@@ -801,7 +840,6 @@ export default function GrowthTreesPage({
         filters.tree_levels.length > 0 &&
         (tree.tree_level === undefined || !filters.tree_levels.includes(tree.tree_level))
       ) {
-        console.log(`- 等級篩選失敗: ${tree.tree_name}, 等級: ${tree.tree_level}`);
         return false;
       }
 
@@ -809,7 +847,6 @@ export default function GrowthTreesPage({
       if (filters.statuses.length > 0) {
         const isActive = tree.is_active ? 'active' : 'inactive';
         if (!filters.statuses.includes(isActive)) {
-          console.log(`- 狀態篩選失敗: ${tree.tree_name}, 狀態: ${isActive}`);
           return false;
         }
       }
@@ -823,7 +860,6 @@ export default function GrowthTreesPage({
           )
         );
         if (!hasMatchingAbility) {
-          console.log(`- 能力篩選失敗: ${tree.tree_name}`);
           return false;
         }
       }
@@ -837,16 +873,13 @@ export default function GrowthTreesPage({
           )
         );
         if (!hasMatchingActivity) {
-          console.log(`- 活動篩選失敗: ${tree.tree_name}`);
           return false;
         }
       }
 
-      console.log(`- 通過所有篩選: ${tree.tree_name}`);
       return true;
     });
     
-    console.log('篩選完成，結果數量:', filtered.length);
     return filtered;
     */
   };

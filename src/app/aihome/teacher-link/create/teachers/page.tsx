@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutGrid, List, Search, User, Mail, Phone, DollarSign, Filter, X, Link2, RefreshCw, Unlink } from 'lucide-react';
+import { LayoutGrid, List, Search, User, Mail, Phone, DollarSign, Filter, X, Link2, RefreshCw, Unlink, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
@@ -270,7 +270,7 @@ function TeachersContent() {
               </motion.button>
             </div>
 
-            {/* 右側：搜尋 */}
+            {/* 右側：搜尋和新增按鈕 */}
             <div className="flex flex-wrap gap-3 items-center w-full lg:w-auto">
               <div className="relative flex-1 lg:flex-initial">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#A68A64]" />
@@ -282,6 +282,15 @@ function TeachersContent() {
                   onChange={e => setSearchTerm(e.target.value)}
                 />
               </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/aihome/teacher-link/create/teachers/new')}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white font-medium transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                新增老師
+              </motion.button>
             </div>
           </div>
 

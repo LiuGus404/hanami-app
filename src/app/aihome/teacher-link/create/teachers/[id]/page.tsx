@@ -85,8 +85,45 @@ function TeacherDetailContent() {
     fetchRoles();
   }, []);
 
+  const isNew = id === 'new';
+
   useEffect(() => {
-    if (!organizationResolved || !orgId) return;
+    if (!organizationResolved) return;
+
+    // 如果是新增模式，需要等待 orgId 準備好
+    if (isNew) {
+      if (!orgId) {
+        setError('請先選擇機構');
+        setLoading(false);
+        return;
+      }
+      const newTeacher: Teacher = {
+        id: '',
+        teacher_fullname: '',
+        teacher_nickname: '',
+        teacher_role: null,
+        teacher_status: null,
+        teacher_email: null,
+        teacher_phone: null,
+        teacher_address: null,
+        teacher_gender: null,
+        teacher_dob: null,
+        teacher_hsalary: null,
+        teacher_msalary: null,
+        teacher_background: null,
+        teacher_bankid: null,
+        created_at: null,
+        updated_at: null,
+      };
+      setTeacher(newTeacher);
+      setEditData(newTeacher);
+      setEditMode(true); // 新增模式默認為編輯狀態
+      setLoading(false);
+      return;
+    }
+
+    // 編輯模式需要 orgId
+    if (!orgId) return;
 
     setLoading(true);
     setError(null);
@@ -108,11 +145,11 @@ function TeacherDetailContent() {
       setLoading(false);
     };
     fetchTeacher();
-  }, [id, orgId, organizationResolved]);
+  }, [id, orgId, organizationResolved, isNew]);
 
   // 載入鏈接狀態
   useEffect(() => {
-    if (!orgId || !organizationResolved || !id) return;
+    if (!orgId || !organizationResolved || !id || isNew) return;
 
     const loadLinkStatus = async () => {
       try {
@@ -135,7 +172,7 @@ function TeacherDetailContent() {
 
   // 同步資料
   const handleSync = async (direction: 'member_to_teacher' | 'teacher_to_member' | 'bidirectional' = 'bidirectional') => {
-    if (!orgId || !id) {
+    if (!orgId || !id || isNew) {
       toast.error('缺少必要信息');
       return;
     }
@@ -204,6 +241,13 @@ function TeacherDetailContent() {
   const handleSave = async () => {
     setSaving(true);
     if (!editData) return;
+    
+    if (!orgId) {
+      toast.error('請先選擇機構');
+      setSaving(false);
+      return;
+    }
+
     const allowedFields = [
       'teacher_fullname',
       'teacher_nickname',
@@ -219,7 +263,9 @@ function TeacherDetailContent() {
       'teacher_bankid',
     ];
 
-    const updateData: any = {};
+    const updateData: any = {
+      org_id: orgId,
+    };
     allowedFields.forEach((key) => {
       let value = (editData as any)[key];
       if (typeof value === 'string' && value.trim() === '') value = null;
@@ -230,17 +276,48 @@ function TeacherDetailContent() {
       updateData[key] = value;
     });
 
-    const { error } = await (supabase
-      .from('hanami_employee') as any)
-      .update(updateData)
-      .eq('id', id as string);
-    setSaving(false);
-    if (error) {
-      alert('儲存失敗');
-    } else {
-      alert('已儲存');
-      setTeacher(editData);
-      setEditMode(false);
+    try {
+      if (isNew) {
+        // 新增模式：使用 insert
+        const { data, error } = await (supabase
+          .from('hanami_employee') as any)
+          .insert(updateData)
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('新增失敗:', error);
+          toast.error('新增失敗: ' + (error.message || '未知錯誤'));
+        } else {
+          toast.success('新增成功');
+          const normalized = normalizeTeacher(data);
+          setTeacher(normalized);
+          setEditData(normalized);
+          setEditMode(false);
+          // 跳轉到新創建的老師頁面
+          router.push(`/aihome/teacher-link/create/teachers/${data.id}`);
+        }
+      } else {
+        // 編輯模式：使用 update
+        const { error } = await (supabase
+          .from('hanami_employee') as any)
+          .update(updateData)
+          .eq('id', id as string);
+        
+        if (error) {
+          console.error('儲存失敗:', error);
+          toast.error('儲存失敗: ' + (error.message || '未知錯誤'));
+        } else {
+          toast.success('已儲存');
+          setTeacher(editData);
+          setEditMode(false);
+        }
+      }
+    } catch (error) {
+      console.error('操作失敗:', error);
+      toast.error('操作失敗: ' + (error instanceof Error ? error.message : '未知錯誤'));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -255,7 +332,7 @@ function TeacherDetailContent() {
       </div>
     );
   }
-  if (error) {
+  if (error && !isNew) {
     return (
       <div className="flex items-center justify-center min-h-screen text-red-500">
         {error}
@@ -265,7 +342,7 @@ function TeacherDetailContent() {
   if (!teacher || !editData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        找不到老師資料
+        {isNew ? '準備新增老師...' : '找不到老師資料'}
       </div>
     );
   }
@@ -334,9 +411,9 @@ function TeacherDetailContent() {
                 />
               </motion.div>
               <h1 className="text-3xl font-bold text-[#4B4036] mb-2">
-                {editData.teacher_fullname || '未命名'}
+                {isNew ? '新增老師' : (editData.teacher_fullname || '未命名')}
               </h1>
-              <p className="text-lg text-[#A68A64] mb-4">{editData.teacher_nickname || '—'}</p>
+              {!isNew && <p className="text-lg text-[#A68A64] mb-4">{editData.teacher_nickname || '—'}</p>}
 
               {/* 鏈接狀態和操作按鈕 */}
               <div className="flex flex-col items-center gap-3">
@@ -356,7 +433,7 @@ function TeacherDetailContent() {
                   </motion.div>
                 )}
                 <div className="flex gap-2">
-                  {!editMode && linkStatus && (
+                  {!editMode && linkStatus && !isNew && (
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}

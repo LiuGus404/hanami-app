@@ -41,54 +41,59 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '無法獲取用戶郵箱' }, { status: 400 });
     }
 
-    // 檢查用戶是否有權限管理該機構
-    const { data: identityData } = await ((oldSupabase as any)
-      .from('hanami_org_identities'))
-      .select('role_type')
-      .eq('org_id', orgId)
-      .eq('user_email', currentUserEmail)
-      .eq('status', 'active')
-      .single();
+    // 檢查用戶是否有權限管理該機構（並行查詢以提高速度）
+    const [identityResult, adminResult] = await Promise.all([
+      (oldSupabase as any)
+        .from('hanami_org_identities')
+        .select('role_type')
+        .eq('org_id', orgId)
+        .eq('user_email', currentUserEmail)
+        .eq('status', 'active')
+        .maybeSingle(),
+      (oldSupabase as any)
+        .from('hanami_admin')
+        .select('role')
+        .eq('org_id', orgId)
+        .eq('admin_email', currentUserEmail)
+        .maybeSingle()
+    ]);
 
-    const identity = identityData as { role_type: string } | null;
-
-    const { data: admin } = await ((oldSupabase as any)
-      .from('hanami_admin'))
-      .select('role')
-      .eq('org_id', orgId)
-      .eq('admin_email', currentUserEmail)
-      .single();
+    const identity = identityResult.data as { role_type: string } | null;
+    const admin = adminResult.data as { role: string } | null;
 
     const isAuthorized = 
       (identity && ['owner', 'admin'].includes(identity.role_type)) ||
-      (admin && (admin as any).role === 'admin');
+      (admin && admin.role === 'admin');
 
     if (!isAuthorized) {
       return NextResponse.json({ error: '無權限管理該機構' }, { status: 403 });
     }
 
-    // 檢查用戶是否存在
-    if (userId) {
-      const saasSupabase = getSaasServerSupabaseClient();
-      const { data: user } = await saasSupabase
-        .from('saas_users')
-        .select('id, email')
-        .eq('id', userId)
-        .eq('email', userEmail)
-        .single();
+    // 並行檢查用戶是否存在和是否已存在身份記錄
+    const [userCheckResult, existingIdentityResult] = await Promise.all([
+      userId ? (async () => {
+        const saasSupabase = getSaasServerSupabaseClient();
+        const { data: user } = await saasSupabase
+          .from('saas_users')
+          .select('id, email')
+          .eq('id', userId)
+          .eq('email', userEmail)
+          .single();
+        return user;
+      })() : Promise.resolve(null),
+      (oldSupabase as any)
+        .from('hanami_org_identities')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('user_email', userEmail)
+        .maybeSingle()
+    ]);
 
-      if (!user) {
-        return NextResponse.json({ error: '用戶不存在' }, { status: 404 });
-      }
+    if (userId && !userCheckResult) {
+      return NextResponse.json({ error: '用戶不存在' }, { status: 404 });
     }
 
-    // 檢查是否已存在身份記錄
-    const { data: existingIdentity } = await ((oldSupabase as any)
-      .from('hanami_org_identities'))
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('user_email', userEmail)
-      .single();
+    const existingIdentity = existingIdentityResult.data;
 
     if (existingIdentity) {
       // 更新現有身份
@@ -108,14 +113,21 @@ export async function POST(request: NextRequest) {
         throw error;
       }
 
-      // 如果設置為主要身份，將其他身份設為非主要
+      // 如果設置為主要身份，將其他身份設為非主要（不等待完成，在后台執行）
       if (isPrimary) {
-        await (oldSupabase as any)
+        (oldSupabase as any)
           .from('hanami_org_identities')
           .update({ is_primary: false })
           .eq('org_id', orgId)
           .eq('user_email', userEmail)
-          .neq('id', (existingIdentity as any).id);
+          .neq('id', (existingIdentity as any).id)
+          .then(() => {
+            // 后台完成，不阻塞响应
+          })
+          .catch((err: any) => {
+            console.error('更新其他身份為非主要失敗:', err);
+            // 不影響主流程，繼續返回成功
+          });
       }
 
       return NextResponse.json({
@@ -145,14 +157,21 @@ export async function POST(request: NextRequest) {
         throw error;
       }
 
-      // 如果設置為主要身份，將其他身份設為非主要
+      // 如果設置為主要身份，將其他身份設為非主要（不等待完成，在后台執行）
       if (isPrimary && userId) {
-        await (oldSupabase as any)
+        (oldSupabase as any)
           .from('hanami_org_identities')
           .update({ is_primary: false })
           .eq('org_id', orgId)
           .eq('user_email', userEmail)
-          .neq('id', (data as any).id);
+          .neq('id', (data as any).id)
+          .then(() => {
+            // 后台完成，不阻塞响应
+          })
+          .catch((err: any) => {
+            console.error('更新其他身份為非主要失敗:', err);
+            // 不影響主流程，繼續返回成功
+          });
       }
 
       return NextResponse.json({

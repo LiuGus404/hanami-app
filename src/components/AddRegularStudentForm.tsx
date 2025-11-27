@@ -395,7 +395,7 @@ export default function AddRegularStudentForm({
       if (formData.student_type === '試堂') {
         table = 'hanami_trial_students';
         const weekdayNumber = formData.trial_date
-          ? (new Date(`${formData.trial_date}T00:00:00+08:00`)).getUTCDay().toString()
+          ? new Date(`${formData.trial_date}T00:00:00`).getDay().toString()
           : '';
         payload = {
           id: formData.id,

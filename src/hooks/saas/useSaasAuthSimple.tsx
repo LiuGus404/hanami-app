@@ -381,8 +381,18 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
 
       if (authError) {
         console.error('登入失敗:', authError);
-        // 提供更具體的錯誤訊息
-        const emailExists = await checkEmailExistsInSaas(supabase, email);
+        console.log('錯誤詳情:', {
+          message: authError.message,
+          status: authError.status,
+          name: authError.name
+        });
+        
+        // 對於 Supabase Auth，Invalid login credentials 可能意味著：
+        // 1. 郵箱不存在
+        // 2. 密碼錯誤
+        // 我們需要檢查郵箱是否在 Supabase Auth 系統中存在
+        const emailExists = await checkEmailExistsInSupabaseAuth(supabase, email);
+        console.log('郵箱在 Supabase Auth 中存在:', emailExists);
         
         if (!emailExists) {
           return { 
@@ -390,6 +400,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
             error: '此電子郵件地址尚未註冊。請確認您輸入的郵箱是否正確，或前往註冊頁面創建新帳號。' 
           };
         } else {
+          // 郵箱存在但密碼錯誤
           return { 
             success: false, 
             error: '密碼錯誤。請確認您輸入的密碼是否正確，注意大小寫。如果忘記密碼，請使用忘記密碼功能。' 
@@ -399,7 +410,8 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
 
       if (!authData.user) {
         // 提供更具體的錯誤訊息
-        const emailExists = await checkEmailExistsInSaas(supabase, email);
+        const emailExists = await checkEmailExistsInSupabaseAuth(supabase, email);
+        console.log('郵箱在 Supabase Auth 中存在:', emailExists);
         
         if (!emailExists) {
           return { 
@@ -407,6 +419,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
             error: '此電子郵件地址尚未註冊。請確認您輸入的郵箱是否正確，或前往註冊頁面創建新帳號。' 
           };
         } else {
+          // 郵箱存在但密碼錯誤
           return { 
             success: false, 
             error: '密碼錯誤。請確認您輸入的密碼是否正確，注意大小寫。如果忘記密碼，請使用忘記密碼功能。' 
@@ -588,26 +601,62 @@ export function useSaasAuth() {
 
 export { SaasAuthProvider };
 
-// 檢查郵箱是否在 SAAS 系統中存在的輔助函數
-async function checkEmailExistsInSaas(supabase: any, email: string): Promise<boolean> {
+// 檢查郵箱是否在 Supabase Auth 系統中存在的輔助函數
+async function checkEmailExistsInSupabaseAuth(supabase: any, email: string): Promise<boolean> {
   try {
-    // 檢查 saas_users 表
-    const { data: userData, error } = await supabase
+    console.log('開始檢查郵箱在 Supabase Auth 中是否存在:', email);
+    
+    // 方法1: 嘗試使用 admin API 檢查用戶是否存在（需要服務端權限）
+    // 由於我們在客戶端，無法直接使用 admin API，所以使用其他方法
+    
+    // 方法2: 檢查 saas_users 表（如果用戶已註冊，應該在這個表中）
+    const { data: userData, error: userError } = await supabase
       .from('saas_users')
       .select('id')
       .eq('email', email)
       .limit(1);
 
-    if (error) {
-      console.error('檢查郵箱存在性時發生錯誤:', error);
-      // 如果檢查失敗，返回 false 以顯示郵箱未註冊的錯誤
-      return false;
+    if (userError) {
+      console.error('檢查 saas_users 表時發生錯誤:', userError);
+    } else if (userData && userData.length > 0) {
+      console.log('在 saas_users 表中找到郵箱');
+      return true;
     }
 
-    return userData && userData.length > 0;
+    // 方法3: 嘗試使用 resetPasswordForEmail 來檢查郵箱是否存在
+    // 如果郵箱不存在，這個方法會返回錯誤
+    // 但這個方法會發送重置密碼郵件，所以不適合用於檢查
+    
+    // 方法4: 檢查其他可能的表（hanami_user_permissions_v2 等）
+    const { data: permissionData, error: permissionError } = await supabase
+      .from('hanami_user_permissions_v2')
+      .select('id')
+      .eq('user_email', email)
+      .limit(1);
+
+    if (permissionError) {
+      console.error('檢查 hanami_user_permissions_v2 表時發生錯誤:', permissionError);
+    } else if (permissionData && permissionData.length > 0) {
+      console.log('在 hanami_user_permissions_v2 表中找到郵箱');
+      return true;
+    }
+
+    // 方法5: 嘗試使用 signInWithOtp 來檢查（不會發送郵件，只是檢查）
+    // 但這需要配置，可能不適用
+    
+    // 由於 Supabase Auth 的 "Invalid login credentials" 錯誤不區分郵箱不存在和密碼錯誤
+    // 我們採用保守策略：如果無法確定郵箱是否存在，假設郵箱存在（顯示密碼錯誤）
+    // 這樣可以避免誤報"郵箱未註冊"
+    console.log('無法確定郵箱是否存在，採用保守策略：假設郵箱存在（顯示密碼錯誤）');
+    return true; // 保守策略：假設郵箱存在，顯示密碼錯誤
   } catch (error) {
-    console.error('檢查郵箱存在性時發生錯誤:', error);
-    // 如果檢查失敗，返回 false 以顯示郵箱未註冊的錯誤
-    return false;
+    console.error('檢查郵箱存在性時發生異常:', error);
+    // 保守策略：假設郵箱存在，顯示密碼錯誤
+    return true;
   }
+}
+
+// 保留舊函數以向後兼容（已棄用，使用 checkEmailExistsInSupabaseAuth）
+async function checkEmailExistsInSaas(supabase: any, email: string): Promise<boolean> {
+  return checkEmailExistsInSupabaseAuth(supabase, email);
 }
