@@ -7,14 +7,14 @@ import { createIngressClient } from '@/lib/ingress';
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 [API] 開始處理 POST 請求...');
-    
+
     const body = await request.json();
     console.log('📦 [API] 請求 Body:', body);
-    
-    const { 
-      threadId, 
-      userId, 
-      content, 
+
+    const {
+      threadId,
+      userId,
+      content,
       roleHint = 'hibi',
       selectedRole,  // 新增：選擇的角色設定
       projectInfo,   // 新增：專案資訊
@@ -34,9 +34,9 @@ export async function POST(request: NextRequest) {
 
     // 驗證必要參數
     if (!threadId || !userId || !content) {
-      console.error('❌ [API] 參數驗證失敗:', { 
-        threadId: !!threadId, 
-        userId: !!userId, 
+      console.error('❌ [API] 參數驗證失敗:', {
+        threadId: !!threadId,
+        userId: !!userId,
         content: !!content
       });
       return NextResponse.json(
@@ -47,15 +47,15 @@ export async function POST(request: NextRequest) {
 
     const clientMsgId = generateULID();
     const supabase = createSaasClient();
-    
+
     console.log('📝 [API] 開始發送到 n8n...', { threadId, clientMsgId });
 
     // === 步驟 1: 直接發送到 n8n（讓 /api/webhook/ingress 負責插入訊息）===
     try {
       const ingressClient = createIngressClient();
-      
+
       console.log('🚀 [API] 開始發送到 n8n...');
-      
+
       const ingressResponse = await ingressClient.sendMessage(threadId, content, {
         roleHint,
         messageType: 'user_request',
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
       if (ingressResponse.success) {
         console.log('✅ [API] 成功發送到 n8n:', ingressResponse);
-        
+
         return NextResponse.json({
           success: true,
           messageId: ingressResponse.message_id || clientMsgId,
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         });
       } else {
         console.error('❌ [API] n8n 發送失敗:', ingressResponse.error);
-        
+
         return NextResponse.json({
           success: false,
           error: ingressResponse.error,
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (n8nError) {
       console.error('❌ [API] n8n 發送異常:', n8nError);
-      
+
       return NextResponse.json({
         success: false,
         error: n8nError instanceof Error ? n8nError.message : 'n8n 發送異常',
@@ -102,9 +102,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ [API] 意外錯誤:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : '未知錯誤' 
+      {
+        success: false,
+        error: error instanceof Error ? error.message : '未知錯誤'
       },
       { status: 500 }
     );

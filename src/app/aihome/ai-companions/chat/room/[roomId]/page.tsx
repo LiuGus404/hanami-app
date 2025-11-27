@@ -4,8 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { 
-  Bars3Icon, 
+import {
+  Bars3Icon,
   PaperAirplaneIcon,
   ArrowLeftIcon,
   MicrophoneIcon,
@@ -42,7 +42,7 @@ const addWatermarkToImage = async (blob: Blob): Promise<Blob> => {
     // 創建圖片對象
     const img = document.createElement('img');
     const watermarkImg = document.createElement('img');
-    
+
     // 載入原始圖片
     img.onload = () => {
       // 載入水印圖片
@@ -51,38 +51,38 @@ const addWatermarkToImage = async (blob: Blob): Promise<Blob> => {
           // 創建 Canvas
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          
+
           if (!ctx) {
             reject(new Error('無法創建 Canvas 上下文'));
             return;
           }
-          
+
           // 設置 Canvas 尺寸為原始圖片尺寸
           canvas.width = img.width;
           canvas.height = img.height;
-          
+
           console.log('📐 [Watermark] 圖片尺寸:', img.width, 'x', img.height);
-          
+
           // 繪製原始圖片
           ctx.drawImage(img, 0, 0);
-          
+
           // 計算水印尺寸（約為圖片寬度的 4-6%，但確保不超過圖片尺寸）
           const baseSize = Math.min(img.width, img.height);
           const watermarkSize = Math.min(
             Math.max(baseSize * 0.05, 24), // 最小 24px
             Math.min(baseSize * 0.08, 48) // 最大 48px
           );
-          
+
           console.log('🎯 [Watermark] 水印尺寸:', watermarkSize);
-          
+
           // 計算水印位置（右下角，留一些邊距）
           // 邊距為水印尺寸的 20%，至少 4px
           const padding = Math.max(4, watermarkSize * 0.2);
-          
+
           // 計算水印位置，確保不超出邊界
           let watermarkX = canvas.width - watermarkSize - padding;
           let watermarkY = canvas.height - watermarkSize - padding;
-          
+
           // 邊界檢查：確保水印完全在圖片範圍內
           if (watermarkX < 0) {
             watermarkX = padding;
@@ -92,7 +92,7 @@ const addWatermarkToImage = async (blob: Blob): Promise<Blob> => {
             watermarkY = padding;
             console.warn('⚠️ [Watermark] Y 位置超出，調整為:', watermarkY);
           }
-          
+
           // 最終檢查：確保水印不會超出 canvas 邊界
           if (watermarkX + watermarkSize > canvas.width) {
             watermarkX = canvas.width - watermarkSize - padding;
@@ -104,9 +104,9 @@ const addWatermarkToImage = async (blob: Blob): Promise<Blob> => {
             if (watermarkY < 0) watermarkY = 0;
             console.warn('⚠️ [Watermark] Y 位置調整為:', watermarkY);
           }
-          
+
           console.log('📍 [Watermark] 最終位置:', watermarkX, watermarkY);
-          
+
           // 繪製水印（帶透明度）
           ctx.globalAlpha = 0.7; // 70% 透明度
           ctx.drawImage(
@@ -117,9 +117,9 @@ const addWatermarkToImage = async (blob: Blob): Promise<Blob> => {
             watermarkSize
           );
           ctx.globalAlpha = 1.0; // 恢復透明度
-          
+
           console.log('✅ [Watermark] 水印繪製完成');
-          
+
           // 轉換為 Blob
           canvas.toBlob(
             (resultBlob) => {
@@ -139,23 +139,23 @@ const addWatermarkToImage = async (blob: Blob): Promise<Blob> => {
           reject(error);
         }
       };
-      
+
       watermarkImg.onerror = (error) => {
         // 如果水印載入失敗，直接返回原始圖片
         console.warn('⚠️ [Download] 水印圖片載入失敗，使用原始圖片:', error);
         resolve(blob);
       };
-      
+
       // 載入水印圖片
       watermarkImg.crossOrigin = 'anonymous';
       watermarkImg.src = '/@hanami.png';
     };
-    
+
     img.onerror = (error) => {
       console.error('❌ [Download] 原始圖片載入失敗:', error);
       reject(new Error('原始圖片載入失敗'));
     };
-    
+
     // 載入原始圖片
     img.crossOrigin = 'anonymous';
     img.src = URL.createObjectURL(blob);
@@ -169,17 +169,17 @@ const downloadImage = async (imageUrl: string, filename?: string) => {
     const isAuthenticated = imageUrl.includes('/authenticated/');
     const isPublic = imageUrl.includes('/public/');
     const isSigned = imageUrl.includes('/sign/');
-    
+
     // 提取 storage path
     const storagePath = extractStoragePath(imageUrl);
-    
+
     // 提取檔案名稱（格式：hanamiEcho + ID）
     const getFilename = () => {
       if (filename) return filename;
-      
+
       // 從 storage path 或 URL 中提取檔案名稱
       let fileName = '';
-      
+
       if (storagePath) {
         // 如果有 storage path，直接取最後一部分（檔案名）
         const pathParts = storagePath.split('/');
@@ -189,28 +189,28 @@ const downloadImage = async (imageUrl: string, filename?: string) => {
         const urlParts = imageUrl.split('/');
         fileName = urlParts[urlParts.length - 1].split('?')[0];
       }
-      
+
       // 移除查詢參數
       fileName = fileName.split('?')[0];
-      
+
       // 提取副檔名（先移除副檔名，避免重複）
       const fileNameWithoutExt = fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
       const fileExt = fileName.includes('.') ? fileName.split('.').pop() : 'png';
-      
+
       // 處理檔案名：移除 gemini_ 前綴和時間戳，只保留 UUID 部分
       // 格式：gemini_1761836671505_adf71822_2121_41b5_9ead_2356e314b2c4.png
       // 目標：hanamiEcho_adf71822_2121_41b5_9ead_2356e314b2c4.png
       let imageId = fileNameWithoutExt;
-      
+
       // 移除 gemini_ 前綴
       if (imageId.startsWith('gemini_')) {
         imageId = imageId.replace(/^gemini_/, '');
       }
-      
+
       // 移除時間戳（通常是數字，格式：1761836671505_）
       // 匹配：數字_開頭的模式
       imageId = imageId.replace(/^\d+_/, '');
-      
+
       // 如果移除後為空或格式不對，嘗試從原始檔案名提取 UUID
       if (!imageId || imageId.length < 10) {
         // 嘗試提取 UUID（格式：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 或 xxxxxxxx_xxxx_xxxx_xxxx_xxxxxxxxxxxx）
@@ -228,20 +228,20 @@ const downloadImage = async (imageUrl: string, filename?: string) => {
           }
         }
       }
-      
+
       // 確保 imageId 不包含副檔名
       imageId = imageId.split('.')[0];
-      
+
       // 組合最終檔案名：hanamiEcho + ID + 副檔名
       const finalFileName = `hanamiEcho_${imageId}.${fileExt}`;
-      
+
       return finalFileName;
     };
-    
+
     if (!storagePath) {
       throw new Error('無法提取 storage path');
     }
-    
+
     // 如果是 authenticated 或 signed URL，必須使用代理 API
     // 如果是 public URL，可以先嘗試直接下載，失敗再用代理 API
     if (isAuthenticated || isSigned) {
@@ -253,13 +253,13 @@ const downloadImage = async (imageUrl: string, filename?: string) => {
           mode: 'cors',
           credentials: 'omit'
         });
-        
+
         if (response.ok) {
           const blob = await response.blob();
-          
+
           // 添加水印
           const watermarkedBlob = await addWatermarkToImage(blob);
-          
+
           // 創建 Blob URL 並強制下載
           const url = window.URL.createObjectURL(watermarkedBlob);
           const a = document.createElement('a');
@@ -268,12 +268,12 @@ const downloadImage = async (imageUrl: string, filename?: string) => {
           a.style.display = 'none';
           document.body.appendChild(a);
           a.click();
-          
+
           setTimeout(() => {
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
           }, 100);
-          
+
           const { default: toast } = await import('react-hot-toast');
           toast.success('圖片下載成功', {
             icon: <ArrowDownTrayIcon className="w-5 h-5 text-green-600" />,
@@ -291,23 +291,23 @@ const downloadImage = async (imageUrl: string, filename?: string) => {
         console.warn('⚠️ [Download] 直接下載異常:', directError, '改用代理 API');
       }
     }
-    
+
     // 使用代理 API 下載
     const proxyUrl = `/api/storage/proxy-image?path=${encodeURIComponent(storagePath)}&download=1`;
-    
+
     const response = await fetch(proxyUrl);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ [Download] 代理 API 失敗:', response.status);
       throw new Error(`代理 API 失敗: ${response.status} - ${errorText}`);
     }
-    
+
     const blob = await response.blob();
-    
+
     // 添加水印
     const watermarkedBlob = await addWatermarkToImage(blob);
-    
+
     // 創建 Blob URL 並強制下載
     const url = window.URL.createObjectURL(watermarkedBlob);
     const a = document.createElement('a');
@@ -316,13 +316,13 @@ const downloadImage = async (imageUrl: string, filename?: string) => {
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    
+
     // 清理
     setTimeout(() => {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     }, 100);
-    
+
     const { default: toast } = await import('react-hot-toast');
     toast.success('圖片下載成功', {
       icon: <ArrowDownTrayIcon className="w-5 h-5 text-green-600" />,
@@ -334,7 +334,7 @@ const downloadImage = async (imageUrl: string, filename?: string) => {
     });
   } catch (error) {
     console.error('❌ [Download] 下載圖片失敗:', error instanceof Error ? error.message : '未知錯誤');
-    
+
     const { default: toast } = await import('react-hot-toast');
     toast.error(`下載失敗: ${error instanceof Error ? error.message : '未知錯誤'}`, {
       icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
@@ -438,17 +438,17 @@ interface Room {
 }
 
 // TaskPanelContent 組件 - 可重用的任務面板內容
-const TaskPanelContent = ({ 
-  tasks, 
-  activeRoles, 
-  room, 
-  editingProject, 
-  editProjectName, 
-  setEditProjectName, 
-  editProjectDescription, 
-  setEditProjectDescription, 
-  handleStartEditProject, 
-  handleUpdateProject, 
+const TaskPanelContent = ({
+  tasks,
+  activeRoles,
+  room,
+  editingProject,
+  editProjectName,
+  setEditProjectName,
+  editProjectDescription,
+  setEditProjectDescription,
+  handleStartEditProject,
+  handleUpdateProject,
   setEditingProject
 }: {
   tasks: any[];
@@ -487,7 +487,7 @@ const TaskPanelContent = ({
           </div>
           <span>專案資訊</span>
         </h3>
-        
+
         {!editingProject && (
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -502,7 +502,7 @@ const TaskPanelContent = ({
           </motion.button>
         )}
       </div>
-      
+
       {editingProject ? (
         /* 編輯模式 */
         <div className="space-y-3 p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
@@ -516,7 +516,7 @@ const TaskPanelContent = ({
               placeholder="輸入專案名稱..."
             />
           </div>
-          
+
           <div>
             <label className="block text-xs font-medium text-[#4B4036] mb-1">專案指引</label>
             <textarea
@@ -527,7 +527,7 @@ const TaskPanelContent = ({
               placeholder="輸入專案指引..."
             />
           </div>
-          
+
           <div className="flex space-x-2">
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -589,12 +589,12 @@ const safeJsonParse = async (response: Response, context: string = 'API') => {
   try {
     const responseText = await response.text();
     console.log(`🔍 ${context} 原始響應文本:`, responseText);
-    
+
     if (!responseText || responseText.trim() === '') {
       console.log(`⚠️ ${context} 收到空響應`);
       return { success: false, error: 'Empty response' };
     }
-    
+
     return JSON.parse(responseText);
   } catch (jsonError) {
     console.error(`❌ ${context} JSON 解析失敗:`, jsonError);
@@ -607,25 +607,44 @@ export default function RoomChatPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const roomId = params.roomId as string;
-  
+
   // 使用 SaaS 系統的 Supabase 客戶端
   const saasSupabase = getSaasSupabaseClient();
-  // 使用更可靠的方法獲取 URL 參數
-  const [urlParams, setUrlParams] = useState<{initialRole?: string, companion?: string}>({});
-  
+  // 使用更可靠的方法獲取 URL 參數 - 使用 Next.js 的 useSearchParams
+  const [urlParams, setUrlParams] = useState<{ initialRole?: string, companion?: string }>({});
+
   useEffect(() => {
-    // 直接從 window.location 獲取參數，更可靠
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const initialRole = urlSearchParams.get('initialRole');
-    const companion = urlSearchParams.get('companion');
-    
-    
-    setUrlParams({ initialRole: initialRole || undefined, companion: companion || undefined });
-  }, []);
-  
+    // 使用 Next.js 的 searchParams，避免直接訪問 window.location
+    try {
+      const initialRole = searchParams.get('initialRole');
+      const companion = searchParams.get('companion');
+
+      setUrlParams({
+        initialRole: initialRole || undefined,
+        companion: companion || undefined
+      });
+    } catch (error) {
+      // 如果 searchParams 不可用，嘗試從 window.location 獲取（僅客戶端）
+      if (typeof window !== 'undefined') {
+        try {
+          const urlSearchParams = new URLSearchParams(window.location.search);
+          const initialRole = urlSearchParams.get('initialRole');
+          const companion = urlSearchParams.get('companion');
+
+          setUrlParams({
+            initialRole: initialRole || undefined,
+            companion: companion || undefined
+          });
+        } catch (fallbackError) {
+          console.error('❌ 無法獲取 URL 參數:', fallbackError);
+        }
+      }
+    }
+  }, [searchParams]);
+
   const initialRoleParam = urlParams.initialRole;
   const companionParam = urlParams.companion;
-  
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // 直接使用 React 狀態，不使用 sessionStorage
   const [messages, setMessages] = useState<Message[]>([]);
@@ -640,7 +659,7 @@ export default function RoomChatPage() {
   const subscriptionRef = useRef<any>(null);  // ⭐ 保存訂閱引用
   const processedMessageIds = useRef(new Set<string>());  // ⭐ 追蹤已處理的訊息 ID
   const [forceRender, setForceRender] = useState(0);  // ⭐ 選擇性重新渲染計數器
-  
+
   // 選擇性重新渲染函數 - 只在特定情況下觸發
   const triggerSelectiveRender = useCallback((reason: string) => {
     console.log(`🔄 [選擇性渲染] 觸發原因: ${reason}`);
@@ -654,7 +673,7 @@ export default function RoomChatPage() {
   const [selectedCompanion, setSelectedCompanion] = useState<'hibi' | 'mori' | 'pico'>('hibi'); // 預設 hibi 統籌
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
-  
+
   // Pico 圖片生成快捷選項
   const [picoImageSize, setPicoImageSize] = useState<string>(() => {
     // 從 localStorage 讀取上次選擇的尺寸
@@ -708,17 +727,17 @@ export default function RoomChatPage() {
     }
     return false;
   });
-  
+
   // 所有角色模型選擇相關狀態
   const DEFAULT_MODEL_SENTINEL = '__default__';
-  
+
   // 皮可角色模型選擇狀態
   const [picoSelectedModel, setPicoSelectedModel] = useState<string>(DEFAULT_MODEL_SENTINEL);
   const [picoRoleDefaultModel, setPicoRoleDefaultModel] = useState<string>('google/gemini-2.5-flash-image-preview');
   const [picoModelSearch, setPicoModelSearch] = useState('');
   const [showAllPicoModels, setShowAllPicoModels] = useState(false);
   const [picoModelOptionsExpanded, setPicoModelOptionsExpanded] = useState<boolean>(false);
-  
+
   // 墨墨角色模型選擇狀態
   const [moriSelectedModel, setMoriSelectedModel] = useState<string>(DEFAULT_MODEL_SENTINEL);
   const [moriRoleDefaultModel, setMoriRoleDefaultModel] = useState<string>('deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini');
@@ -726,19 +745,19 @@ export default function RoomChatPage() {
   const [moriModelSearch, setMoriModelSearch] = useState('');
   const [showAllMoriModels, setShowAllMoriModels] = useState(false);
   const [moriModelOptionsExpanded, setMoriModelOptionsExpanded] = useState<boolean>(false);
-  
+
   // Hibi 角色模型選擇狀態
   const [hibiSelectedModel, setHibiSelectedModel] = useState<string>(DEFAULT_MODEL_SENTINEL);
   const [hibiRoleDefaultModel, setHibiRoleDefaultModel] = useState<string>('openai/gpt-5');
   const [hibiModelSearch, setHibiModelSearch] = useState('');
   const [showAllHibiModels, setShowAllHibiModels] = useState(false);
   const [hibiModelOptionsExpanded, setHibiModelOptionsExpanded] = useState<boolean>(false);
-  
+
   // 模型選擇區域展開狀態（每個角色獨立）
   const [picoModelOptionsExpandedForModal, setPicoModelOptionsExpandedForModal] = useState(false);
   const [moriModelOptionsExpandedForModal, setMoriModelOptionsExpandedForModal] = useState(false);
   const [hibiModelOptionsExpandedForModal, setHibiModelOptionsExpandedForModal] = useState(false);
-  
+
   // 模型選擇模態窗口狀態（每個角色獨立）
   const [picoModelSelectOpen, setPicoModelSelectOpen] = useState(false);
   const [moriModelSelectOpen, setMoriModelSelectOpen] = useState(false);
@@ -752,13 +771,13 @@ export default function RoomChatPage() {
   const [picoModelDropdownPosition, setPicoModelDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [moriModelDropdownPosition, setMoriModelDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [hibiModelDropdownPosition, setHibiModelDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  
+
   // 共用狀態
   const [availableModels, setAvailableModels] = useState<any[]>([]);
   const [loadingPicoModels, setLoadingPicoModels] = useState(false);
   const [loadingMoriModels, setLoadingMoriModels] = useState(false);
   const [loadingHibiModels, setLoadingHibiModels] = useState(false);
-  
+
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(roomId);
   // 兼容的 UUID 生成函數
   const generateUUID = () => {
@@ -767,7 +786,7 @@ export default function RoomChatPage() {
       return crypto.randomUUID();
     }
     // Fallback：使用 Math.random 生成 UUID v4 格式
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = Math.random() * 16 | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
@@ -825,7 +844,7 @@ export default function RoomChatPage() {
     key_questions: ['', '', ''],
     seed_keywords: [{ kw: '', variants: [''] }],
     evidence_criteria: [],
-    
+
     // 建議加上（可選）
     must_cover: [],
     must_avoid: [],
@@ -833,7 +852,7 @@ export default function RoomChatPage() {
     domain_blocklist: [],
     notes: ''
   });
-  
+
   // 滾動到訊息底部的函數
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -896,7 +915,7 @@ export default function RoomChatPage() {
       };
     });
   }, [isPicoMessageRecord]);
-  
+
   // 切換 Pico 選項展開狀態並保存到 localStorage
   const togglePicoOptions = () => {
     const newState = !picoOptionsExpanded;
@@ -905,7 +924,7 @@ export default function RoomChatPage() {
       localStorage.setItem('picoOptionsExpanded', String(newState));
     }
   };
-  
+
   // 監聽 Pico 圖片尺寸變化並保存到 localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -916,7 +935,7 @@ export default function RoomChatPage() {
       }
     }
   }, [picoImageSize]);
-  
+
   // 監聽 Pico 圖片風格變化並保存到 localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -927,7 +946,7 @@ export default function RoomChatPage() {
       }
     }
   }, [picoImageStyle]);
-  
+
   // 監聽 Pico 自訂尺寸變化並保存到 localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -938,7 +957,7 @@ export default function RoomChatPage() {
       }
     }
   }, [picoCustomSize]);
-  
+
   // 監聽 Pico 自訂風格變化並保存到 localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -982,49 +1001,49 @@ export default function RoomChatPage() {
   // 載入角色模型設定的通用函數
   const loadRoleModelSettings = async (roleId: 'hibi' | 'mori' | 'pico') => {
     if (!user?.id) return;
-    
+
     try {
       // 設置載入狀態
       if (roleId === 'pico') setLoadingPicoModels(true);
       else if (roleId === 'mori') setLoadingMoriModels(true);
       else setLoadingHibiModels(true);
-      
+
       const supabase = getSaasSupabaseClient();
-      
+
       // 映射 companion.id 到實際的 slug
       const getRoleSlug = (companionId: string) => {
         const slugMap: Record<string, string> = {
           'hibi': 'hibi-manager',
-          'mori': 'mori-researcher', 
+          'mori': 'mori-researcher',
           'pico': 'pico-artist'
         };
         return slugMap[companionId] || companionId;
       };
-      
+
       const roleSlug = getRoleSlug(roleId);
-      
+
       // 1. 先查角色基本資訊以獲取 role_id 和系統預設模型
       const { data: roleData, error: roleError } = await supabase
         .from('ai_roles')
         .select('id, default_model')
         .eq('slug', roleSlug)
         .maybeSingle();
-      
+
       if (roleError || !roleData) {
         console.error(`載入${roleId}角色設定錯誤:`, roleError);
         return;
       }
-      
-      const systemDefault = (roleData as any)?.default_model || 
+
+      const systemDefault = (roleData as any)?.default_model ||
         (roleId === 'pico' ? 'google/gemini-2.5-flash-image-preview' :
-         roleId === 'mori' ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini' :
-         'openai/gpt-5');
-      
+          roleId === 'mori' ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini' :
+            'openai/gpt-5');
+
       // 設置系統預設模型
       if (roleId === 'pico') setPicoRoleDefaultModel(systemDefault);
       else if (roleId === 'mori') setMoriRoleDefaultModel(systemDefault);
       else setHibiRoleDefaultModel(systemDefault);
-      
+
       // 2. 查詢用戶覆寫設定
       const { data: userSettings } = await supabase
         .from('user_role_settings')
@@ -1033,9 +1052,9 @@ export default function RoomChatPage() {
         .eq('role_id', (roleData as any).id)
         .eq('is_active', true)
         .maybeSingle();
-      
+
       const userOverrideModel = (userSettings as any)?.model_override;
-      
+
       if (userOverrideModel) {
         // 用戶有覆寫設定
         if (roleId === 'pico') {
@@ -1097,17 +1116,17 @@ export default function RoomChatPage() {
 
   // 載入皮可角色的模型設定（保留舊函數名稱以保持兼容性）
   const loadPicoModelSettings = () => loadRoleModelSettings('pico');
-  
+
   // 載入墨墨角色的模型設定
   const loadMoriModelSettings = () => loadRoleModelSettings('mori');
-  
+
   // 載入 Hibi 角色的模型設定
   const loadHibiModelSettings = () => loadRoleModelSettings('hibi');
 
   // 當可用模型列表載入完成後，更新所有角色的搜尋框顯示
   useEffect(() => {
     if (availableModels.length === 0) return;
-    
+
     // 更新皮可的搜尋框
     if (picoSelectedModel !== DEFAULT_MODEL_SENTINEL && !picoModelSearch) {
       const modelData = availableModels.find((m: any) => m.model_id === picoSelectedModel);
@@ -1117,7 +1136,7 @@ export default function RoomChatPage() {
         setPicoModelSearch(picoSelectedModel);
       }
     }
-    
+
     // 更新墨墨的搜尋框
     if (moriSelectedModel !== DEFAULT_MODEL_SENTINEL && !moriModelSearch) {
       const modelData = availableModels.find((m: any) => m.model_id === moriSelectedModel);
@@ -1127,7 +1146,7 @@ export default function RoomChatPage() {
         setMoriModelSearch(moriSelectedModel);
       }
     }
-    
+
     // 更新 Hibi 的搜尋框
     if (hibiSelectedModel !== DEFAULT_MODEL_SENTINEL && !hibiModelSearch) {
       const modelData = availableModels.find((m: any) => m.model_id === hibiSelectedModel);
@@ -1141,29 +1160,29 @@ export default function RoomChatPage() {
   // 保存角色模型設定的通用函數（使用 user_role_settings 表）
   const saveRoleModelSettings = async (roleId: 'hibi' | 'mori' | 'pico', modelId: string | string[]) => {
     if (!user?.id) return;
-    
+
     try {
       const supabase = getSaasSupabaseClient();
-      
+
       // 映射 companion.id 到實際的 slug
       const getRoleSlug = (companionId: string) => {
         const slugMap: Record<string, string> = {
           'hibi': 'hibi-manager',
-          'mori': 'mori-researcher', 
+          'mori': 'mori-researcher',
           'pico': 'pico-artist'
         };
         return slugMap[companionId] || companionId;
       };
-      
+
       const roleSlug = getRoleSlug(roleId);
-      
+
       // 1. 先獲取角色 ID
       const { data: roleData, error: roleError } = await supabase
         .from('ai_roles')
         .select('id, system_prompt, tone')
         .eq('slug', roleSlug)
         .maybeSingle();
-      
+
       if (roleError || !roleData) {
         console.error(`找不到角色: ${roleSlug}`, roleError);
         const { default: toast } = await import('react-hot-toast');
@@ -1177,16 +1196,16 @@ export default function RoomChatPage() {
         });
         return;
       }
-      
+
       const roleId_db = (roleData as any).id;
-      
+
       // 2. 獲取系統預設的指引和語氣以便比較
       const systemGuidance = (roleData as any)?.system_prompt || '';
       const systemTone = (roleData as any)?.tone || '';
-      
+
       // 處理模型 ID（支援多選）
       const resolvedModel = Array.isArray(modelId) ? modelId.join(',') : modelId;
-      
+
       // 如果選擇預設，刪除用戶覆寫記錄
       if (resolvedModel === DEFAULT_MODEL_SENTINEL || (Array.isArray(modelId) && modelId.length === 0)) {
         const { error } = await supabase
@@ -1194,7 +1213,7 @@ export default function RoomChatPage() {
           .delete()
           .eq('user_id', user.id)
           .eq('role_id', roleId_db);
-        
+
         if (error) {
           console.error('刪除用戶覆寫記錄錯誤:', error);
           const { default: toast } = await import('react-hot-toast');
@@ -1208,7 +1227,7 @@ export default function RoomChatPage() {
           });
           return;
         }
-        
+
         // 更新本地狀態
         if (roleId === 'pico') {
           setPicoSelectedModel(DEFAULT_MODEL_SENTINEL);
@@ -1221,7 +1240,7 @@ export default function RoomChatPage() {
           setHibiSelectedModel(DEFAULT_MODEL_SENTINEL);
           setHibiModelSearch('');
         }
-        
+
         const { default: toast } = await import('react-hot-toast');
         toast.success('已恢復預設模型', {
           icon: <CpuChipIcon className="w-5 h-5 text-green-600" />,
@@ -1233,7 +1252,7 @@ export default function RoomChatPage() {
         });
         return;
       }
-      
+
       // 儲存或更新 user_role_settings（只儲存非預設的設定）
       const { data, error } = await (supabase as any)
         .from('user_role_settings')
@@ -1250,7 +1269,7 @@ export default function RoomChatPage() {
         })
         .select()
         .single();
-      
+
       if (error) {
         console.error(`保存${roleId}模型設定錯誤:`, error);
         const { default: toast } = await import('react-hot-toast');
@@ -1264,7 +1283,7 @@ export default function RoomChatPage() {
         });
         return;
       }
-      
+
       // 更新本地狀態
       if (roleId === 'pico') {
         setPicoSelectedModel(resolvedModel);
@@ -1285,7 +1304,7 @@ export default function RoomChatPage() {
         const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
         setHibiModelSearch(modelData?.display_name || resolvedModel);
       }
-      
+
       const { default: toast } = await import('react-hot-toast');
       toast.success('模型設定已更新', {
         icon: <CpuChipIcon className="w-5 h-5 text-green-600" />,
@@ -1295,7 +1314,7 @@ export default function RoomChatPage() {
           color: '#4B4036',
         }
       });
-      
+
       console.log(`✅ ${roleId}模型設定已保存:`, data);
     } catch (error) {
       console.error(`保存${roleId}模型設定異常:`, error);
@@ -1315,12 +1334,12 @@ export default function RoomChatPage() {
   const savePicoModelSettings = async (modelId: string) => {
     await saveRoleModelSettings('pico', modelId);
   };
-  
+
   // 保存墨墨角色的模型設定
   const saveMoriModelSettings = async (modelId: string | string[]) => {
     await saveRoleModelSettings('mori', modelId);
   };
-  
+
   // 保存 Hibi 角色的模型設定
   const saveHibiModelSettings = async (modelId: string) => {
     await saveRoleModelSettings('hibi', modelId);
@@ -1329,7 +1348,7 @@ export default function RoomChatPage() {
   // 根據角色過濾模型
   const getFilteredPicoModels = () => {
     if (showAllPicoModels) return availableModels;
-    
+
     return availableModels.filter((m) => {
       const caps: string[] = Array.isArray(m.capabilities) ? m.capabilities : [];
       const hasVision = caps.includes('vision') || m.model_type === 'multimodal';
@@ -1340,7 +1359,7 @@ export default function RoomChatPage() {
   // 根據角色過濾模型（墨墨需要 search 能力）
   const getFilteredMoriModels = () => {
     if (showAllMoriModels) return availableModels;
-    
+
     return availableModels.filter((m) => {
       const caps: string[] = Array.isArray(m.capabilities) ? m.capabilities : [];
       const hasSearch = caps.includes('web_search') || /perplexity|sonar|search/.test((m.provider || '') + ' ' + (m.model_name || '') + ' ' + (m.model_id || ''));
@@ -1351,7 +1370,7 @@ export default function RoomChatPage() {
   // 根據角色過濾模型（Hibi 需要 code 能力）
   const getFilteredHibiModels = () => {
     if (showAllHibiModels) return availableModels;
-    
+
     return availableModels.filter((m) => {
       const caps: string[] = Array.isArray(m.capabilities) ? m.capabilities : [];
       const hasCode = caps.includes('code') || m.model_type === 'code';
@@ -1375,7 +1394,7 @@ export default function RoomChatPage() {
   // 格式化模型顯示名稱（支援多選模型）
   const formatModelDisplay = (modelId: string | undefined): string => {
     if (!modelId) return '';
-    
+
     // 如果包含逗號，表示是多選模型
     if (modelId.includes(',')) {
       const modelIds = modelId.split(',').map((id: string) => id.trim()).filter(Boolean);
@@ -1388,11 +1407,11 @@ export default function RoomChatPage() {
       });
       return names.join('、');
     }
-    
+
     // 單選模型
     const model = availableModels.find((m: any) => m.model_id === modelId);
     if (!model) return modelId;
-    
+
     const displayName = model.display_name || modelId;
     return stripFree(displayName);
   };
@@ -1433,7 +1452,7 @@ export default function RoomChatPage() {
     } else if (containsSimplifiedChinese(recentUserMessages)) {
       return 'simplified';
     }
-    
+
     return 'other';
   };
 
@@ -1446,23 +1465,23 @@ export default function RoomChatPage() {
     description: '正在載入專案資訊...',
     activeCompanions: [] // 空陣列，稍後會被實際資料覆蓋
   });
-  
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 載入房間資訊和角色
   const loadRoomInfo = async () => {
     try {
       console.log('🔍 載入房間資訊:', roomId);
-      
+
       const supabase = getSaasSupabaseClient();
-      
+
       // 載入房間基本資訊
       const { data: roomData, error: roomError } = await supabase
         .from('ai_rooms')
         .select('id, title, description, room_type, created_at')
         .eq('id', roomId)
         .single() as { data: { id: string; title: string; description?: string; room_type?: string; created_at: string } | null; error: any };
-      
+
       // 載入房間角色（兩段式查詢避免 400/406 並確保完整資料）
       let roomRoles: string[] = [];
       try {
@@ -1509,7 +1528,7 @@ export default function RoomChatPage() {
                 const rawSlugs = (aiRoles || [])
                   .map((ar: any) => ar?.slug)
                   .filter(Boolean);
-                
+
                 // 將資料庫中的 slug 轉換為內部使用的格式
                 roomRoles = rawSlugs.map(slug => {
                   if (slug.includes('hibi-manager')) return 'hibi';
@@ -1517,7 +1536,7 @@ export default function RoomChatPage() {
                   if (slug.includes('pico-artist')) return 'pico';
                   return slug; // 保持其他格式不變
                 });
-                
+
                 console.log('✅ 從資料庫載入的房間角色:', roomRoles);
               }
             }
@@ -1536,7 +1555,7 @@ export default function RoomChatPage() {
             if (n.includes('pico') || n.includes('皮可')) return 'pico';
             return null;
           };
-          const normalized = Array.from(new Set(roomRoles.map(normalize).filter(Boolean))) as ('hibi'|'mori'|'pico')[];
+          const normalized = Array.from(new Set(roomRoles.map(normalize).filter(Boolean))) as ('hibi' | 'mori' | 'pico')[];
           setActiveRoles(normalized);
           if (roomRoles.length === 1) {
             setSelectedCompanion(normalized[0]);
@@ -1548,7 +1567,7 @@ export default function RoomChatPage() {
       } catch (error) {
         console.error('載入房間角色錯誤:', error);
       }
-      
+
       if (roomError) {
         console.error('❌ 載入房間資訊失敗:', roomError);
         // 使用預設資訊
@@ -1579,28 +1598,28 @@ export default function RoomChatPage() {
   const loadRoleSettings = async (roleId: string, userId: string) => {
     try {
       const supabase = getSaasSupabaseClient();
-      
+
       // 映射 companion.id 到實際的 slug
       const getRoleSlug = (companionId: string) => {
         const slugMap: Record<string, string> = {
           'hibi': 'hibi-manager',
-          'mori': 'mori-researcher', 
+          'mori': 'mori-researcher',
           'pico': 'pico-artist'
         };
         return slugMap[companionId] || companionId;
       };
-      
+
       const roleSlug = getRoleSlug(roleId);
-      
+
       // 1. 先查角色基本資訊以獲取 role_id
       const { data: roleData } = await supabase
         .from('ai_roles' as any)
         .select('id, slug, name, default_model, system_prompt, tone')
         .eq('slug', roleSlug)
         .maybeSingle();
-      
+
       if (!roleData) return {};
-      
+
       // 2. 再查用戶覆寫設定
       const { data: userSettings } = await supabase
         .from('user_role_settings' as any)
@@ -1609,17 +1628,17 @@ export default function RoomChatPage() {
         .eq('role_id', (roleData as any).id)
         .eq('is_active', true)
         .maybeSingle();
-      
+
       // 處理多模型：將逗號分隔的字串轉換為陣列
       const getModels = (modelString: string | null) => {
         if (!modelString) return [];
         return modelString.split(',').map(m => m.trim()).filter(Boolean);
       };
-      
+
       const userModels = (userSettings as any)?.model_override ? getModels((userSettings as any).model_override) : [];
       const defaultModels = (roleData as any).default_model ? getModels((roleData as any).default_model) : [];
       const finalModels = userModels.length > 0 ? userModels : defaultModels;
-      
+
       return {
         id: (roleData as any).slug,
         name: (roleData as any).name,
@@ -1650,13 +1669,13 @@ export default function RoomChatPage() {
     console.log('🔄 角色設置 useEffect 觸發, urlParams:', urlParams);
 
     const normalizeRole = (name: any) => {
-      if (!name) return null as unknown as 'hibi'|'mori'|'pico';
+      if (!name) return null as unknown as 'hibi' | 'mori' | 'pico';
       const n = String(name).toLowerCase();
       // 支援新的 slug 格式和舊的格式
       if (n.includes('hibi') || n.includes('希希') || n.includes('hibi-manager')) return 'hibi';
       if (n.includes('mori') || n.includes('墨墨') || n.includes('mori-researcher')) return 'mori';
       if (n.includes('pico') || n.includes('皮可') || n.includes('pico-artist')) return 'pico';
-      return null as unknown as 'hibi'|'mori'|'pico';
+      return null as unknown as 'hibi' | 'mori' | 'pico';
     };
 
     if (urlParams.initialRole || urlParams.companion) {
@@ -1674,7 +1693,7 @@ export default function RoomChatPage() {
       if (savedRoles) {
         try {
           const parsedRoles = JSON.parse(savedRoles) as string[];
-          const normalized = Array.from(new Set(parsedRoles.map(r => normalizeRole(r)).filter(Boolean))) as ('hibi'|'mori'|'pico')[];
+          const normalized = Array.from(new Set(parsedRoles.map(r => normalizeRole(r)).filter(Boolean))) as ('hibi' | 'mori' | 'pico')[];
           console.log('🔄 從 sessionStorage 恢復角色(正規化):', normalized);
           setActiveRoles(normalized);
           if (normalized.length === 1) setSelectedCompanion(normalized[0]);
@@ -1700,27 +1719,27 @@ export default function RoomChatPage() {
         // 基於房間標題推斷角色
         const roomTitle = room.title?.toLowerCase() || '';
         let inferredRole: string | null = null;
-        
+
         console.log('🔍 房間標題分析:', roomTitle);
-        
+
         // 擴展推斷關鍵字
-        if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') || 
-            roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
-            roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
+        if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') ||
+          roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
+          roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
           inferredRole = 'pico';
-        } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') || 
-                   roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') || 
-                   roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
-                   roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
-                   roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
+        } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') ||
+          roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') ||
+          roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
+          roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
+          roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
           inferredRole = 'mori';
-        } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') || 
-                   roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
-                   roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
-                   roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
+        } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') ||
+          roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
+          roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
+          roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
           inferredRole = 'hibi';
         }
-        
+
         if (inferredRole) {
           console.log('🔍 基於房間標題推斷角色:', inferredRole, '房間標題:', roomTitle);
           setActiveRoles([inferredRole as 'hibi' | 'mori' | 'pico']);
@@ -1738,21 +1757,21 @@ export default function RoomChatPage() {
   // === 新增: Realtime 訊息同步 ===
   useEffect(() => {
     if (!roomId || !user) return;
-    
+
     let cleanup: (() => void) | null = null;
     let isSubscribed = true;  // 追蹤訂閱狀態
-    
+
     const setupRealtime = async () => {
       if (!isSubscribed) return;  // 如果已經取消訂閱，就不要設置
-      
+
       const { createSimpleMessageSync } = await import('@/lib/simpleMessageSync');
-      
+
       console.log('📡 [Realtime] 開始簡單訊息同步:', roomId);
-      
+
       const subscription = createSimpleMessageSync(roomId, {
         onInsert: (newMsg) => {
           if (!isSubscribed) return;  // 檢查訂閱狀態
-          
+
           console.log('📨 [Realtime] 收到新訊息:', newMsg);
           console.log('📨 [Realtime] 訊息詳情:', {
             id: newMsg.id,
@@ -1761,38 +1780,38 @@ export default function RoomChatPage() {
             status: newMsg.status,
             content_json: newMsg.content_json
           });
-          
+
           // ⭐ 全局檢查是否已處理過（雙重檢查）
           if (processedMessageIds.current.has(newMsg.id)) {
             console.log('📨 [Realtime] 訊息已在全局追蹤中，跳過:', newMsg.id);
             return;
           }
-          
+
           // 標記為已處理
           processedMessageIds.current.add(newMsg.id);
           console.log('📨 [Realtime] 已添加到全局追蹤:', newMsg.id, '總數:', processedMessageIds.current.size);
-          
+
           // 避免重複添加
           setMessages(prev => {
             console.log('📨 [Realtime] 當前訊息數量:', prev.length);
             console.log('📨 [Realtime] 檢查是否重複:', prev.some(m => m.id === newMsg.id));
             console.log('📨 [Realtime] 新訊息 ID:', newMsg.id);
-            
+
             if (prev.some(m => m.id === newMsg.id)) {
               console.log('📨 [Realtime] 訊息已存在，跳過');
               return prev;
             }
-            
+
             // ⭐ 檢查是否已存在相同內容的訊息（防止重複顯示）
-            if (newMsg.role === 'user' && prev.some(m => 
-              m.content === newMsg.content && 
-              m.sender === 'user' && 
+            if (newMsg.role === 'user' && prev.some(m =>
+              m.content === newMsg.content &&
+              m.sender === 'user' &&
               Math.abs(new Date(newMsg.created_at).getTime() - new Date(m.timestamp).getTime()) < 10000 // 10 秒內
             )) {
               console.log('📨 [Realtime] 訊息已存在（內容），跳過重複的用戶訊息');
               return prev;
             }
-            
+
             // 判斷 sender
             let sender: any = 'user';
             if (newMsg.role === 'assistant' || newMsg.role === 'agent') {
@@ -1804,7 +1823,7 @@ export default function RoomChatPage() {
             } else {
               console.log('📨 [Realtime] 判斷為用戶訊息');
             }
-            
+
             const newMessage = {
               id: newMsg.id,
               content: newMsg.content,
@@ -1814,9 +1833,9 @@ export default function RoomChatPage() {
               status: newMsg.status,
               content_json: newMsg.content_json // 新增：保存完整的 content_json
             };
-            
+
             console.log('📨 [Realtime] 添加新訊息:', newMessage);
-            
+
             // ⭐ 如果是 AI 回應，隱藏思考 UI 並更新最後一條用戶訊息狀態為 completed
             console.log('🔍 [調試] 檢查是否需要隱藏思考 UI:', {
               sender,
@@ -1826,19 +1845,19 @@ export default function RoomChatPage() {
               currentIsLoading: isLoading,
               currentIsTyping: isTyping
             });
-            
+
             // ⭐ 強制隱藏思考 UI - 當任何非用戶訊息到達時
             if (sender !== 'user' && sender !== 'system') {
               console.log('🤖 [Realtime] AI 回應到達，強制隱藏思考 UI，sender:', sender);
               // 使用 setTimeout 確保狀態更新在下一幀執行
               setTimeout(() => {
-              setIsLoading(false);
-              setIsTyping(false);
-              setQueueCount(0); // 重置輪候人數
-              setProcessingCompanion(null); // ⭐ 解除圖標鎖定
-              console.log('✅ [Realtime] 思考 UI 已隱藏');
+                setIsLoading(false);
+                setIsTyping(false);
+                setQueueCount(0); // 重置輪候人數
+                setProcessingCompanion(null); // ⭐ 解除圖標鎖定
+                console.log('✅ [Realtime] 思考 UI 已隱藏');
               }, 0);
-              
+
               // ⭐ 將最後一條 processing 狀態的用戶訊息改為 completed
               return prev.map((msg, index) => {
                 if (msg.sender === 'user' && msg.status === 'processing') {
@@ -1851,16 +1870,16 @@ export default function RoomChatPage() {
                 return msg;
               }).concat([newMessage]);
             }
-            
+
             return [...prev, newMessage];
           });
-          
+
           // ⭐ 不觸發重新渲染，讓 React 自然更新訊息列表
         },
-        
+
         onUpdate: (updatedMsg) => {
           if (!isSubscribed) return;  // 檢查訂閱狀態
-          
+
           console.log('🔄 [Realtime UPDATE] 訊息狀態更新:', {
             id: updatedMsg.id,
             role: updatedMsg.role,
@@ -1868,11 +1887,11 @@ export default function RoomChatPage() {
             content_length: updatedMsg.content?.length,
             has_content_json: !!updatedMsg.content_json
           });
-          
+
           // ⭐ 處理錯誤狀態
           if (updatedMsg.status === 'error') {
             console.log('❌ [Realtime UPDATE] 訊息處理錯誤:', updatedMsg.error_message, updatedMsg.content_json);
-            
+
             // 隱藏思考 UI
             setTimeout(() => {
               setIsLoading(false);
@@ -1881,7 +1900,7 @@ export default function RoomChatPage() {
               setProcessingCompanion(null); // ⭐ 解除圖標鎖定
               console.log('✅ [Realtime UPDATE] 錯誤時隱藏思考 UI');
             }, 0);
-            
+
             // 更新訊息狀態並顯示錯誤資訊
             setMessages(prev => prev.map(m => {
               if (m.id === updatedMsg.id) {
@@ -1897,10 +1916,10 @@ export default function RoomChatPage() {
               }
               return m;
             }));
-            
+
             return;
           }
-          
+
           // ⭐ 判斷 sender（用於 AI 回應）
           let sender: any = 'user';
           if (updatedMsg.role === 'assistant' || updatedMsg.role === 'agent') {
@@ -1913,7 +1932,7 @@ export default function RoomChatPage() {
             sender = 'user';
             console.log('🔄 [Realtime UPDATE] 判斷為用戶訊息');
           }
-          
+
           // ⭐ 如果 AI 回應狀態更新為 completed，隱藏思考 UI
           console.log('🔍 [調試] 檢查 onUpdate 是否需要隱藏思考 UI:', {
             status: updatedMsg.status,
@@ -1925,7 +1944,7 @@ export default function RoomChatPage() {
             currentIsLoading: isLoading,
             currentIsTyping: isTyping
           });
-          
+
           if (updatedMsg.status === 'completed' && updatedMsg.role !== 'user' && updatedMsg.role !== 'system') {
             console.log('🤖 [Realtime UPDATE] AI 回應完成，強制隱藏思考 UI');
             // 使用 setTimeout 確保狀態更新在下一幀執行
@@ -1936,11 +1955,11 @@ export default function RoomChatPage() {
               setProcessingCompanion(null); // ⭐ 解除圖標鎖定
               console.log('✅ [Realtime UPDATE] 思考 UI 已隱藏（onUpdate）');
             }, 0);
-            
+
             // ⭐ 如果這是一條新訊息（之前未見過），添加到列表
             setMessages(prev => {
               const messageExists = prev.some(m => m.id === updatedMsg.id);
-              
+
               if (!messageExists && updatedMsg.content && updatedMsg.content.trim()) {
                 console.log('📨 [Realtime UPDATE] 首次收到 AI 回應，添加到列表');
                 const newMessage = {
@@ -1952,7 +1971,7 @@ export default function RoomChatPage() {
                   status: updatedMsg.status,
                   content_json: updatedMsg.content_json
                 };
-                
+
                 // 更新用戶訊息的狀態為 completed
                 return prev.map(m => {
                   if (m.sender === 'user' && m.status === 'processing') {
@@ -1961,16 +1980,16 @@ export default function RoomChatPage() {
                   return m;
                 }).concat([newMessage]);
               }
-              
+
               // ⭐ 更新已存在的訊息
               return prev.map(m => {
                 if (m.id === updatedMsg.id) {
                   console.log('🔄 [Realtime UPDATE] 更新已存在的訊息:', m.id);
-                  return { 
-                    ...m, 
-                    status: updatedMsg.status, 
-                    content: updatedMsg.content, 
-                    content_json: updatedMsg.content_json, 
+                  return {
+                    ...m,
+                    status: updatedMsg.status,
+                    content: updatedMsg.content,
+                    content_json: updatedMsg.content_json,
                     sender: sender // 更新 sender（以防有變化）
                   };
                 }
@@ -1981,42 +2000,42 @@ export default function RoomChatPage() {
             // ⭐ 非 completed 狀態，只更新訊息
             setMessages(prev => prev.map(m => {
               if (m.id === updatedMsg.id) {
-                return { 
-                  ...m, 
-                  status: updatedMsg.status, 
-                  content: updatedMsg.content, 
-                  content_json: updatedMsg.content_json 
+                return {
+                  ...m,
+                  status: updatedMsg.status,
+                  content: updatedMsg.content,
+                  content_json: updatedMsg.content_json
                 };
               }
               return m;
             }));
           }
         },
-        
+
         onDelete: (messageId) => {
           if (!isSubscribed) return;
-          
+
           console.log('🗑️ [Realtime DELETE] 刪除訊息:', messageId);
-          
+
           // 從訊息列表中移除
           setMessages(prev => prev.filter(m => m.id !== messageId));
         }
       });
-      
+
       // 保存訂閱引用，以便手動觸發檢查
       subscriptionRef.current = subscription;
-      
+
       cleanup = () => {
         console.log('🔌 [Realtime] 取消訂閱:', roomId);
         subscription.unsubscribe();
         subscriptionRef.current = null;
       };
     };
-    
+
     setupRealtime().catch(err => {
       console.error('❌ [Realtime] 設置失敗:', err);
     });
-    
+
     // 清理函數
     return () => {
       console.log('🧹 [Realtime] useEffect 清理:', roomId);
@@ -2034,26 +2053,26 @@ export default function RoomChatPage() {
       if (activeRoles.length === 0 && hasLoadedFromDatabase) {
         console.log('🚨 最終 fallback：沒有任何角色，基於房間標題推斷');
         const roomTitle = room.title?.toLowerCase() || '';
-        
+
         // 使用相同的推斷邏輯
-        if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') || 
-            roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
-            roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
+        if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') ||
+          roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
+          roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
           console.log('🔍 最終推斷為皮可角色');
           setActiveRoles(['pico']);
           setSelectedCompanion('pico');
-        } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') || 
-                   roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') || 
-                   roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
-                   roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
-                   roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
+        } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') ||
+          roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') ||
+          roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
+          roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
+          roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
           console.log('🔍 最終推斷為墨墨角色');
           setActiveRoles(['mori']);
           setSelectedCompanion('mori');
-        } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') || 
-                   roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
-                   roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
-                   roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
+        } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') ||
+          roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
+          roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
+          roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
           console.log('🔍 最終推斷為 Hibi 角色');
           setActiveRoles(['hibi']);
           setSelectedCompanion('hibi');
@@ -2064,7 +2083,7 @@ export default function RoomChatPage() {
         }
       }
     }, 2000); // 2秒後的最終檢查
-    
+
     return () => clearTimeout(timer);
   }, [activeRoles.length, hasLoadedFromDatabase, room.title]);
 
@@ -2110,7 +2129,7 @@ export default function RoomChatPage() {
     };
 
     updateDropdownPosition();
-    
+
     // 監聽滾動和視窗大小改變
     if (inviteRoleSelectOpen) {
       const handleScroll = () => {
@@ -2119,7 +2138,7 @@ export default function RoomChatPage() {
       const handleResize = () => {
         requestAnimationFrame(updateDropdownPosition);
       };
-      
+
       window.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', handleResize);
 
@@ -2128,7 +2147,7 @@ export default function RoomChatPage() {
         window.removeEventListener('resize', handleResize);
       };
     }
-    
+
     return undefined;
   }, [inviteRoleSelectOpen]);
 
@@ -2138,7 +2157,7 @@ export default function RoomChatPage() {
       const target = event.target as Node;
       const isClickInsideInput = inviteRoleSelectRef.current?.contains(target);
       const isClickInsideDropdown = (event.target as HTMLElement)?.closest('[data-invite-role-dropdown]');
-      
+
       if (!isClickInsideInput && !isClickInsideDropdown) {
         setInviteRoleSelectOpen(false);
       }
@@ -2173,7 +2192,7 @@ export default function RoomChatPage() {
     };
 
     updateDropdownPosition();
-    
+
     if (picoModelSelectOpen) {
       const handleScroll = () => {
         requestAnimationFrame(updateDropdownPosition);
@@ -2181,7 +2200,7 @@ export default function RoomChatPage() {
       const handleResize = () => {
         requestAnimationFrame(updateDropdownPosition);
       };
-      
+
       window.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', handleResize);
 
@@ -2208,7 +2227,7 @@ export default function RoomChatPage() {
     };
 
     updateDropdownPosition();
-    
+
     if (moriModelSelectOpen) {
       const handleScroll = () => {
         requestAnimationFrame(updateDropdownPosition);
@@ -2216,7 +2235,7 @@ export default function RoomChatPage() {
       const handleResize = () => {
         requestAnimationFrame(updateDropdownPosition);
       };
-      
+
       window.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', handleResize);
 
@@ -2244,7 +2263,7 @@ export default function RoomChatPage() {
     };
 
     updateDropdownPosition();
-    
+
     if (hibiModelSelectOpen) {
       const handleScroll = () => {
         requestAnimationFrame(updateDropdownPosition);
@@ -2252,7 +2271,7 @@ export default function RoomChatPage() {
       const handleResize = () => {
         requestAnimationFrame(updateDropdownPosition);
       };
-      
+
       window.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', handleResize);
 
@@ -2270,7 +2289,7 @@ export default function RoomChatPage() {
       const target = event.target as Node;
       const isClickInsideInput = picoModelSelectRef.current?.contains(target);
       const isClickInsideDropdown = (event.target as HTMLElement)?.closest('[data-pico-model-dropdown]');
-      
+
       if (!isClickInsideInput && !isClickInsideDropdown) {
         setPicoModelSelectOpen(false);
       }
@@ -2295,7 +2314,7 @@ export default function RoomChatPage() {
       const target = event.target as Node;
       const isClickInsideInput = moriModelSelectRef.current?.contains(target);
       const isClickInsideDropdown = (event.target as HTMLElement)?.closest('[data-mori-model-dropdown]');
-      
+
       if (!isClickInsideInput && !isClickInsideDropdown) {
         setMoriModelSelectOpen(false);
       }
@@ -2320,7 +2339,7 @@ export default function RoomChatPage() {
       const target = event.target as Node;
       const isClickInsideInput = hibiModelSelectRef.current?.contains(target);
       const isClickInsideDropdown = (event.target as HTMLElement)?.closest('[data-hibi-model-dropdown]');
-      
+
       if (!isClickInsideInput && !isClickInsideDropdown) {
         setHibiModelSelectOpen(false);
       }
@@ -2341,7 +2360,7 @@ export default function RoomChatPage() {
 
   // 當 activeRoles 變化時更新 room 的 activeCompanions
   useEffect(() => {
-    if (!['hibi','mori','pico'].includes(selectedCompanion as any) && activeRoles.length > 0) {
+    if (!['hibi', 'mori', 'pico'].includes(selectedCompanion as any) && activeRoles.length > 0) {
       setSelectedCompanion(activeRoles[0]);
     }
     setRoom(prev => ({ ...prev, activeCompanions: activeRoles }));
@@ -2359,28 +2378,28 @@ export default function RoomChatPage() {
     const isConfirmed = window.confirm(
       `⚠️ 確定要移除 ${companion?.name} 嗎？\n\n移除後該角色將不再參與專案對話。`
     );
-    
+
     if (!isConfirmed) return;
 
     const newActiveRoles = activeRoles.filter(role => role !== roleId);
     setActiveRoles(newActiveRoles);
-    
+
     // 更新 sessionStorage
     sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(newActiveRoles));
-    
+
     // 同步到資料庫
     try {
       console.log('🗑️ 從資料庫移除角色:', roleId);
       const response = await fetch('/api/remove-room-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          roomId: roomId, 
+        body: JSON.stringify({
+          roomId: roomId,
           roleName: roleId === 'hibi' ? 'Hibi' : roleId === 'mori' ? '墨墨' : '皮可'
         })
       });
       const result = await safeJsonParse(response, '移除角色 API');
-      
+
       if (result.success) {
         console.log('✅ 角色已從資料庫移除:', roleId);
         // 通知主頁面重新載入聊天室列表
@@ -2391,7 +2410,7 @@ export default function RoomChatPage() {
     } catch (error) {
       console.log('⚠️ 資料庫移除錯誤:', error);
     }
-    
+
     // 添加離開訊息
     if (companion) {
       const leaveMessage: Message = {
@@ -2401,7 +2420,7 @@ export default function RoomChatPage() {
         timestamp: new Date(),
         type: 'text'
       };
-      
+
       await addMessage(leaveMessage);
       console.log(`👋 ${companion.name} 已離開專案`);
     }
@@ -2416,31 +2435,31 @@ export default function RoomChatPage() {
 
     try {
       console.log('🔄 更新專案資訊:', editProjectName, editProjectDescription);
-      
+
       const response = await fetch('/api/update-room', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           roomId: roomId,
           title: editProjectName.trim(),
           description: editProjectDescription.trim()
         })
       });
       const result = await safeJsonParse(response, '更新專案 API');
-      
+
       if (result.success) {
         console.log('✅ 專案資訊已更新');
-        
+
         // 更新本地狀態
         setRoom(prev => ({
           ...prev,
           title: editProjectName.trim(),
           description: editProjectDescription.trim()
         }));
-        
+
         // 通知主頁面重新載入
         localStorage.setItem('rooms_need_refresh', Date.now().toString());
-        
+
         // 添加更新訊息
         const updateMessage: Message = {
           id: `update-${Date.now()}`,
@@ -2449,9 +2468,9 @@ export default function RoomChatPage() {
           timestamp: new Date(),
           type: 'text'
         };
-        
+
         await addMessage(updateMessage);
-        
+
         // 關閉編輯模式
         setEditingProject(false);
         alert('✅ 專案資訊更新成功！');
@@ -2476,24 +2495,24 @@ export default function RoomChatPage() {
     if (!activeRoles.includes(roleId)) {
       const newActiveRoles = [...activeRoles, roleId];
       setActiveRoles(newActiveRoles);
-      
+
       // 更新 sessionStorage
       sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(newActiveRoles));
-      
+
       // 同步到資料庫
       try {
         console.log('🔄 同步角色到資料庫:', roleId);
         const response = await fetch('/api/fix-room-role', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            roomId: roomId, 
+          body: JSON.stringify({
+            roomId: roomId,
             roleName: roleId === 'hibi' ? 'Hibi' : roleId === 'mori' ? '墨墨' : '皮可',
             action: 'add' // 添加角色而不是替換
           })
         });
         const result = await safeJsonParse(response, '同步角色 API');
-        
+
         if (result.success) {
           console.log('✅ 角色已同步到資料庫:', roleId);
           // 通知主頁面重新載入聊天室列表
@@ -2504,7 +2523,7 @@ export default function RoomChatPage() {
       } catch (error) {
         console.log('⚠️ 資料庫同步錯誤:', error);
       }
-      
+
       // 添加邀請訊息
       const invitedCompanion = companions.find(c => c.id === roleId);
       if (invitedCompanion) {
@@ -2515,12 +2534,12 @@ export default function RoomChatPage() {
           timestamp: new Date(),
           type: 'text'
         };
-        
+
         await addMessage(inviteMessage);
         console.log(`✅ ${invitedCompanion.name} 已加入專案`);
       }
     }
-    
+
     // 如果不是從設定界面邀請，關閉邀請模態框
     if (!fromSettings) {
       setShowInviteModal(false);
@@ -2771,16 +2790,16 @@ export default function RoomChatPage() {
 
   const handleMessagesScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const target = event.currentTarget;
-    
+
     // 檢查是否向上滾動且距離底部超過 200px
     const scrollTop = target.scrollTop;
     const scrollHeight = target.scrollHeight;
     const clientHeight = target.clientHeight;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    
+
     // 當距離底部超過 200px 時顯示「返回最新」按鈕
     setShowScrollToBottomButton(distanceFromBottom > 200);
-    
+
     // 原有的載入更多訊息邏輯
     if (scrollTop <= 40) {
       if (!hasLoadedHistory) return;
@@ -2845,51 +2864,51 @@ export default function RoomChatPage() {
           console.log(`✅ 生成單成員團隊歡迎訊息: ${selectedCompanionData.name}`);
         }
       } else {
-      // 多成員團隊專案 - 多個 AI 團隊成員依序歡迎
-      const welcomeOrder = activeRoles.includes('hibi') ? ['hibi', 'mori', 'pico'] : activeRoles;
-      const validRoles = welcomeOrder.filter(roleId => activeRoles.includes(roleId as any));
-      
-      welcomeMessages = validRoles
-        .filter(roleId => companions.find(c => c.id === roleId))
-        .map((roleId, index) => {
-          let content = '';
-          if (roleId === 'hibi') {
-            content = `歡迎來到 ${room.title}！我是 Hibi，系統總管，很高興為您統籌和協調各項任務。`;
-          } else if (roleId === 'mori') {
-            content = `我是墨墨，專精於研究和學習分析。有任何學術或研究需求都可以找我！`;
-          } else if (roleId === 'pico') {
-            content = `嗨！我是皮可，負責創意和視覺設計。讓我們一起創造美好的作品吧！`;
-          }
-          
-          return {
-            id: `welcome-${roleId}`,
-            content,
-            sender: roleId as 'pico' | 'mori' | 'hibi',
-            timestamp: new Date(Date.now() - (validRoles.length - index) * 1000),
-            type: 'text' as const
-          };
-        });
-      
-      // 如果有 Hibi，添加總結歡迎訊息
-      if (activeRoles.includes('hibi')) {
-        welcomeMessages.push({
-          id: 'welcome-summary',
-          content: `我們${activeRoles.length}位會協作為您提供最佳的服務。您可以直接說出需求，我會安排最適合的團隊成員來協助！`,
-          sender: 'hibi',
-          timestamp: new Date(),
-          type: 'text'
-        });
-      }
-    }
+        // 多成員團隊專案 - 多個 AI 團隊成員依序歡迎
+        const welcomeOrder = activeRoles.includes('hibi') ? ['hibi', 'mori', 'pico'] : activeRoles;
+        const validRoles = welcomeOrder.filter(roleId => activeRoles.includes(roleId as any));
 
-    // 設置歡迎訊息並保存到資料庫
-    setMessages(welcomeMessages);
-    
-    // 保存所有歡迎訊息到資料庫
-    for (const welcomeMessage of welcomeMessages) {
-      await saveMessageToSupabase(welcomeMessage);
-    }
-    console.log('📝 設置歡迎訊息完成，已保存到資料庫');
+        welcomeMessages = validRoles
+          .filter(roleId => companions.find(c => c.id === roleId))
+          .map((roleId, index) => {
+            let content = '';
+            if (roleId === 'hibi') {
+              content = `歡迎來到 ${room.title}！我是 Hibi，系統總管，很高興為您統籌和協調各項任務。`;
+            } else if (roleId === 'mori') {
+              content = `我是墨墨，專精於研究和學習分析。有任何學術或研究需求都可以找我！`;
+            } else if (roleId === 'pico') {
+              content = `嗨！我是皮可，負責創意和視覺設計。讓我們一起創造美好的作品吧！`;
+            }
+
+            return {
+              id: `welcome-${roleId}`,
+              content,
+              sender: roleId as 'pico' | 'mori' | 'hibi',
+              timestamp: new Date(Date.now() - (validRoles.length - index) * 1000),
+              type: 'text' as const
+            };
+          });
+
+        // 如果有 Hibi，添加總結歡迎訊息
+        if (activeRoles.includes('hibi')) {
+          welcomeMessages.push({
+            id: 'welcome-summary',
+            content: `我們${activeRoles.length}位會協作為您提供最佳的服務。您可以直接說出需求，我會安排最適合的團隊成員來協助！`,
+            sender: 'hibi',
+            timestamp: new Date(),
+            type: 'text'
+          });
+        }
+      }
+
+      // 設置歡迎訊息並保存到資料庫
+      setMessages(welcomeMessages);
+
+      // 保存所有歡迎訊息到資料庫
+      for (const welcomeMessage of welcomeMessages) {
+        await saveMessageToSupabase(welcomeMessage);
+      }
+      console.log('📝 設置歡迎訊息完成，已保存到資料庫');
     }, 100); // 延遲 100ms 等待 activeRoles 穩定
 
     return () => clearTimeout(timer);
@@ -2917,7 +2936,7 @@ export default function RoomChatPage() {
   // 計時器管理（從個人對話頁面複製）
   useEffect(() => {
     let queueUpdateInterval: NodeJS.Timeout | null = null;
-    
+
     if (isLoading || isTyping) {
       // 當開始思考時，定期更新輪候人數
       const updateQueueCount = async () => {
@@ -2932,20 +2951,20 @@ export default function RoomChatPage() {
           console.log(`⚠️ [輪候更新] roleHint 無效或不在支援列表中: ${roleHint}`);
         }
       };
-      
+
       // 立即查詢一次
       console.log(`🚀 [輪候更新] 立即執行第一次查詢`);
       updateQueueCount();
-      
+
       // 每 5 秒更新一次輪候人數
       queueUpdateInterval = setInterval(() => {
         console.log(`⏰ [輪候更新] 定期更新觸發 (每5秒)`);
         updateQueueCount();
       }, 5000);
-      
+
       // 根據 companion 和任務類型設定預估時間
       let estimatedSeconds = 5; // 預設 5 秒
-      
+
       if (processingCompanion === 'pico') {
         // Pico 的任務類型判斷
         const lastMessage = messages[messages.length - 1]?.content || '';
@@ -2965,10 +2984,10 @@ export default function RoomChatPage() {
           estimatedSeconds = 8; // 一般問答
         }
       }
-      
+
       setEstimatedTime(estimatedSeconds);
       setElapsedTime(0);
-      
+
       // 開始計時
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
@@ -2982,7 +3001,7 @@ export default function RoomChatPage() {
       // 重置輪候人數
       setQueueCount(0);
     }
-    
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -2996,38 +3015,38 @@ export default function RoomChatPage() {
   // 將研究計畫 JSON 轉換為自然語言
   const convertResearchPlanToNaturalLanguage = (researchPlan: any): string => {
     let response = '太好了！先幫你把幼兒成長研究的範圍與計畫框起來，並給你一個可直接使用的 JSON 草案。你只要回覆勾選或補充關鍵選項，我就能把研究素材與內容開始產出。\n\n';
-    
+
     response += '📋 **立即需要你確認的事項**\n\n';
-    
+
     response += '**研究類型（擇一或多選）**\n';
     response += '1) 系統性文獻綜述/統合分析\n';
     response += '2) 二手資料分析（政府或公開資料庫）\n';
     response += '3) 原始資料收集（橫斷/縱貫追蹤）\n\n';
-    
+
     response += '**年齡範圍：** 0–12月、1–3歲、3–6歲、0–6歲\n\n';
-    
+
     response += '**主題面向：** 身高體重/營養、運動發展、語言、認知、社會情緒、睡眠、屏幕時間、口腔/視聽力、育兒環境/家庭社經\n\n';
-    
+
     response += '**地區/族群：** 台灣、華語地區、全球；一般兒童或特定族群（早產、低出生體重等）\n\n';
-    
+
     response += '**交付物：** 計畫書、文獻報告、家長友善指南、簡報、量表工具包、分析程式碼（R/Python）\n\n';
-    
+
     response += '**期限與頁數/深度：** 例如4週完成計畫書＋文獻綜述20頁；或12週完成含原始收案之試點\n\n';
-    
+
     response += '📄 **今次內容 JSON（草案，可直接修改）**\n\n';
-    
+
     if (researchPlan.topic) {
       response += `**主題：** ${researchPlan.topic}\n\n`;
     }
-    
+
     if (researchPlan.goal) {
       response += `**目標：** ${researchPlan.goal}\n\n`;
     }
-    
+
     if (researchPlan.audience && Array.isArray(researchPlan.audience)) {
       response += `**受眾：** ${researchPlan.audience.join('、')}\n\n`;
     }
-    
+
     if (researchPlan.deliverable && Array.isArray(researchPlan.deliverable)) {
       response += '**交付物：**\n';
       researchPlan.deliverable.forEach((item: string, index: number) => {
@@ -3035,7 +3054,7 @@ export default function RoomChatPage() {
       });
       response += '\n';
     }
-    
+
     if (researchPlan.date_range) {
       if (typeof researchPlan.date_range === 'object') {
         response += `**時間範圍：**\n`;
@@ -3050,15 +3069,15 @@ export default function RoomChatPage() {
         response += `**時間範圍：** ${researchPlan.date_range}\n\n`;
       }
     }
-    
+
     if (researchPlan.languages && Array.isArray(researchPlan.languages)) {
       response += `**語言：** ${researchPlan.languages.join('、')}\n\n`;
     }
-    
+
     if (researchPlan.region_bias) {
       response += `**地區偏好：** ${researchPlan.region_bias}\n\n`;
     }
-    
+
     if (researchPlan.key_questions && Array.isArray(researchPlan.key_questions)) {
       response += '**關鍵問題：**\n';
       researchPlan.key_questions.forEach((question: string, index: number) => {
@@ -3066,7 +3085,7 @@ export default function RoomChatPage() {
       });
       response += '\n';
     }
-    
+
     if (researchPlan.notes && Array.isArray(researchPlan.notes)) {
       response += '📝 **重要注意事項：**\n';
       researchPlan.notes.forEach((note: string, index: number) => {
@@ -3074,15 +3093,15 @@ export default function RoomChatPage() {
       });
       response += '\n';
     }
-    
+
     response += '🚀 **建議的執行步驟（濃縮版）**\n\n';
     response += '• **第1週：** 確定範圍與題目、地區與族群、主要指標與量表；完成檢索策略與納入/排除條件\n';
     response += '• **第2–4週：** 文獻檢索與雙人篩選、品質評估、資料擷取；初步統合分析與視覺化（森林圖、成長曲線）\n';
     response += '• **第5–8週：** 撰寫報告與建議；如需原始資料，並行準備IRB文件、問卷與資料蒐集SOP、試點收案\n';
     response += '• **第9–12週（選配）：** 完成試點分析、修訂報告、交付工具包與簡報\n\n';
-    
+
     response += '若你先回覆上述「需要你確認的事項」，我就能立刻把檢索式、量表套件、以及第一版的研究計畫書與報告大綱產出給你。需要雙語或特定學校/園所合作模板也可以直接指定。';
-    
+
     return response;
   };
 
@@ -3095,25 +3114,25 @@ export default function RoomChatPage() {
     // 檢測研究類型
     const detectResearchType = (message: string): string => {
       const lowerMsg = message.toLowerCase();
-      
+
       if (lowerMsg.includes('學術研究') || lowerMsg.includes('論文') || lowerMsg.includes('研究報告')) return 'academic';
       if (lowerMsg.includes('市場分析') || lowerMsg.includes('商業分析') || lowerMsg.includes('競爭分析')) return 'market';
       if (lowerMsg.includes('技術分析') || lowerMsg.includes('程式') || lowerMsg.includes('代碼') || lowerMsg.includes('開發')) return 'technical';
       if (lowerMsg.includes('資料分析') || lowerMsg.includes('統計') || lowerMsg.includes('數據')) return 'data';
       if (lowerMsg.includes('文獻回顧') || lowerMsg.includes('資料蒐集') || lowerMsg.includes('調研')) return 'literature';
       if (lowerMsg.includes('解釋') || lowerMsg.includes('說明') || lowerMsg.includes('教學')) return 'explanation';
-      
+
       return 'general'; // 一般研究
     };
 
     // 檢測分析深度
     const detectAnalysisDepth = (message: string): string => {
       const lowerMsg = message.toLowerCase();
-      
+
       if (lowerMsg.includes('深入') || lowerMsg.includes('詳細') || lowerMsg.includes('全面')) return 'deep';
       if (lowerMsg.includes('簡單') || lowerMsg.includes('簡要') || lowerMsg.includes('概要')) return 'simple';
       if (lowerMsg.includes('中等') || lowerMsg.includes('適中')) return 'medium';
-      
+
       return 'medium'; // 預設中等深度
     };
 
@@ -3123,18 +3142,18 @@ export default function RoomChatPage() {
     // 檢查墨墨研究設定是否有資料（現在只有主題是必填的，其他都是可選）
     const hasValidMoriSettings = () => {
       const hasSettings = (moriSettings.topic && moriSettings.topic.trim() !== '') ||
-             (moriSettings.goal && moriSettings.goal.trim() !== '') ||
-             (moriSettings.audience && moriSettings.audience.trim() !== '') ||
-             (moriSettings.deliverable && moriSettings.deliverable.trim() !== '') ||
-             (moriSettings.date_range && typeof moriSettings.date_range === 'string' && moriSettings.date_range.trim() !== '') ||
-             (moriSettings.languages && moriSettings.languages.length > 0) ||
-             (moriSettings.region_bias && moriSettings.region_bias.length > 0) ||
-             (moriSettings.key_questions && moriSettings.key_questions.some(q => q && q.trim() !== '')) ||
-             (moriSettings.seed_keywords && moriSettings.seed_keywords.some(k => k && k.kw && k.kw.trim() !== '')) ||
-             (moriSettings.evidence_criteria && moriSettings.evidence_criteria.length > 0) ||
-             (moriSettings.models && moriSettings.models.length > 0) ||
-             (moriSettings.notes && moriSettings.notes.trim() !== '');
-      
+        (moriSettings.goal && moriSettings.goal.trim() !== '') ||
+        (moriSettings.audience && moriSettings.audience.trim() !== '') ||
+        (moriSettings.deliverable && moriSettings.deliverable.trim() !== '') ||
+        (moriSettings.date_range && typeof moriSettings.date_range === 'string' && moriSettings.date_range.trim() !== '') ||
+        (moriSettings.languages && moriSettings.languages.length > 0) ||
+        (moriSettings.region_bias && moriSettings.region_bias.length > 0) ||
+        (moriSettings.key_questions && moriSettings.key_questions.some(q => q && q.trim() !== '')) ||
+        (moriSettings.seed_keywords && moriSettings.seed_keywords.some(k => k && k.kw && k.kw.trim() !== '')) ||
+        (moriSettings.evidence_criteria && moriSettings.evidence_criteria.length > 0) ||
+        (moriSettings.models && moriSettings.models.length > 0) ||
+        (moriSettings.notes && moriSettings.notes.trim() !== '');
+
       console.log('🔍 檢查墨墨設定狀態:', {
         hasSettings,
         moriSettings,
@@ -3144,7 +3163,7 @@ export default function RoomChatPage() {
         languages: moriSettings.languages,
         region_bias: moriSettings.region_bias
       });
-      
+
       return hasSettings;
     };
 
@@ -3224,19 +3243,19 @@ export default function RoomChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(webhookData)
       });
-      
+
       console.log('🔍 Mori API 響應狀態:', res.status, res.statusText);
       const out = await safeJsonParse(res, 'Mori webhook');
-      
+
       console.log('✅ Mori webhook 回應:', { status: res.status, data: out });
-      
+
       // 處理 Mori 的回應
       if (res.ok && out.data) {
         let responseContent = '';
-        
+
         // 處理不同格式的回應
         let tokenStats = null;
-        
+
         if (typeof out.data === 'string') {
           try {
             const parsedData = JSON.parse(out.data);
@@ -3253,12 +3272,12 @@ export default function RoomChatPage() {
           responseContent = out.data.raw;
         } else if (Array.isArray(out.data) && out.data.length > 0) {
           const firstItem = out.data[0];
-          
+
           // 檢查新的 JSON 格式，包含 text 和 token 統計
           if (firstItem.text && typeof firstItem.text === 'string') {
             responseContent = firstItem.text;
             console.log('📝 提取到 text 內容:', responseContent.substring(0, 100) + '...');
-            
+
             // 提取 token 統計
             if (firstItem.prompt_tokens || firstItem.completion_tokens || firstItem.total_tokens) {
               tokenStats = {
@@ -3307,10 +3326,10 @@ export default function RoomChatPage() {
             } : null
           } : undefined
         };
-        
+
         await addMessage(aiResponse);
         console.log('✅ 墨墨回應已添加');
-        
+
         // 如果有 token 統計，記錄到使用統計中
         if (tokenStats) {
           console.log('📊 記錄墨墨 token 使用統計:', tokenStats);
@@ -3321,7 +3340,7 @@ export default function RoomChatPage() {
             provider: out.data && Array.isArray(out.data) && out.data[0]?.raw ? out.data[0].raw.provider : 'unknown'
           });
         }
-        
+
         return { success: true, data: out };
       } else {
         // 處理錯誤回應
@@ -3332,7 +3351,7 @@ export default function RoomChatPage() {
           timestamp: new Date(),
           type: 'text'
         };
-        
+
         await addMessage(errorMessage);
         console.log('❌ Mori webhook 回應錯誤，顯示錯誤訊息');
         return { success: false, data: out };
@@ -3349,7 +3368,7 @@ export default function RoomChatPage() {
     // 智能檢測 style - 只有明確指定風格時才返回
     const detectStyle = (message: string): string => {
       const lowerMsg = message.toLowerCase();
-      
+
       // 具體風格檢測
       if (lowerMsg.includes('kawaii') || lowerMsg.includes('可愛風') || lowerMsg.includes('萌系')) return 'kawaii';
       if (lowerMsg.includes('realistic') || lowerMsg.includes('寫實') || lowerMsg.includes('真實')) return 'realistic';
@@ -3362,14 +3381,14 @@ export default function RoomChatPage() {
       if (lowerMsg.includes('watercolor') || lowerMsg.includes('水彩') || lowerMsg.includes('水墨')) return 'watercolor';
       if (lowerMsg.includes('chibi') || lowerMsg.includes('q版') || lowerMsg.includes('迷你')) return 'chibi';
       if (lowerMsg.includes('pastel') || lowerMsg.includes('粉彩') || lowerMsg.includes('淡色')) return 'pastel';
-      
+
       return ''; // 沒有明確指定風格時返回空字串
     };
-    
+
     // 檢測尺寸
     const detectSize = (message: string): string => {
       const lowerMsg = message.toLowerCase();
-      
+
       // 數位尺寸檢測
       if (lowerMsg.includes('1024x1024') || lowerMsg.includes('正方形') || lowerMsg.includes('方形')) return '1024x1024';
       if (lowerMsg.includes('1024x768') || lowerMsg.includes('橫向') || lowerMsg.includes('寬屏')) return '1024x768';
@@ -3377,24 +3396,24 @@ export default function RoomChatPage() {
       if (lowerMsg.includes('512x512') || lowerMsg.includes('小圖') || lowerMsg.includes('小尺寸')) return '512x512';
       if (lowerMsg.includes('1920x1080') || lowerMsg.includes('全高清橫向') || lowerMsg.includes('fhd橫向')) return '1920x1080';
       if (lowerMsg.includes('1080x1920') || lowerMsg.includes('全高清直向') || lowerMsg.includes('fhd直向')) return '1080x1920';
-      
+
       // 紙本大小檢測
       if (lowerMsg.includes('a4') || lowerMsg.includes('A4')) return 'A4';
       if (lowerMsg.includes('a3') || lowerMsg.includes('A3')) return 'A3';
       if (lowerMsg.includes('b5') || lowerMsg.includes('B5')) return 'B5';
       if (lowerMsg.includes('a5') || lowerMsg.includes('A5')) return 'A5';
       if (lowerMsg.includes('letter') || lowerMsg.includes('Letter') || lowerMsg.includes('信紙')) return 'Letter';
-      
+
       return ''; // 沒有明確指定尺寸時返回空字串
     };
-    
+
     // 檢測場景
     const detectScene = (message: string): boolean => {
       const lowerMsg = message.toLowerCase();
-      return lowerMsg.includes('場景') || lowerMsg.includes('背景') || lowerMsg.includes('環境') || 
-             lowerMsg.includes('室內') || lowerMsg.includes('戶外') || lowerMsg.includes('森林') ||
-             lowerMsg.includes('海邊') || lowerMsg.includes('城市') || lowerMsg.includes('咖啡廳') ||
-             lowerMsg.includes('花園') || lowerMsg.includes('星空') || lowerMsg.includes('童話');
+      return lowerMsg.includes('場景') || lowerMsg.includes('背景') || lowerMsg.includes('環境') ||
+        lowerMsg.includes('室內') || lowerMsg.includes('戶外') || lowerMsg.includes('森林') ||
+        lowerMsg.includes('海邊') || lowerMsg.includes('城市') || lowerMsg.includes('咖啡廳') ||
+        lowerMsg.includes('花園') || lowerMsg.includes('星空') || lowerMsg.includes('童話');
     };
 
     const detectedStyle = detectStyle(text);
@@ -3447,27 +3466,27 @@ export default function RoomChatPage() {
       const effectiveScene = picoSettings.defaultScene === '其他' ? picoSettings.customScene : picoSettings.defaultScene;
       const effectiveSize = picoSettings.defaultSize === '其他' ? picoSettings.customSize : picoSettings.defaultSize;
       const hasSystemPrompt = picoSettings.systemPrompt && picoSettings.systemPrompt.trim() !== '';
-      
+
       return (effectiveStyle && effectiveStyle !== '其他' && effectiveStyle.trim() !== '') ||
-             (effectiveScene && effectiveScene !== '其他' && effectiveScene.trim() !== '') ||
-             (effectiveSize && effectiveSize !== '其他' && effectiveSize.trim() !== '') ||
-             hasSystemPrompt;
+        (effectiveScene && effectiveScene !== '其他' && effectiveScene.trim() !== '') ||
+        (effectiveSize && effectiveSize !== '其他' && effectiveSize.trim() !== '') ||
+        hasSystemPrompt;
     };
 
     // 構建統一的 user_prompt 格式
     let finalUserPrompt = '';
     let promptParts = [];
-    
+
     // 1. 系統指引提示（如果有設定且有資料）
     if (hasValidSettings() && picoSettings.systemPrompt && picoSettings.systemPrompt.trim() !== '') {
       promptParts.push(`系統指引：${picoSettings.systemPrompt.trim()}`);
       console.log('📋 添加系統指引到 user_prompt');
     }
-    
+
     // 2. 用戶輸入
     promptParts.push(`用戶需求：${text}`);
     console.log('💬 添加用戶輸入到 user_prompt');
-    
+
     // 3. 預設場景背景（如果有設定且用戶沒明確指定）
     if (hasValidSettings() && !hasSceneInMessage) {
       const effectiveScene = picoSettings.defaultScene === '其他' ? picoSettings.customScene : picoSettings.defaultScene;
@@ -3476,7 +3495,7 @@ export default function RoomChatPage() {
         console.log('🏞️ 添加預設場景到 user_prompt:', effectiveScene);
       }
     }
-    
+
     // 4. 預設繪圖風格（如果有設定且用戶沒明確指定）
     if (hasValidSettings() && !detectedStyle) {
       const effectiveStyle = picoSettings.defaultStyle === '其他' ? picoSettings.customStyle : picoSettings.defaultStyle;
@@ -3485,7 +3504,7 @@ export default function RoomChatPage() {
         console.log('🎨 添加預設風格到 user_prompt:', effectiveStyle);
       }
     }
-    
+
     // 5. 預設圖片尺寸（如果有設定且用戶沒明確指定）
     if (hasValidSettings() && !detectedSize) {
       const effectiveSize = picoSettings.defaultSize === '其他' ? picoSettings.customSize : picoSettings.defaultSize;
@@ -3494,14 +3513,14 @@ export default function RoomChatPage() {
         console.log('📏 添加預設尺寸到 user_prompt:', effectiveSize);
       }
     }
-    
+
     // 組合最終的 user_prompt
     finalUserPrompt = promptParts.join('\n\n');
-    
+
     // 更新 webhook 資料使用統一的 user_prompt 格式
     webhookData.user_prompt = finalUserPrompt;
     webhookData.final_prompt = finalUserPrompt; // 保持向後兼容
-    
+
     // 如果用戶有明確指定參數，仍然添加到 webhook 參數中
     if (detectedStyle) {
       webhookData.style = detectedStyle;
@@ -3513,7 +3532,7 @@ export default function RoomChatPage() {
         console.log('🎨 使用皮可預設風格參數:', effectiveStyle);
       }
     }
-    
+
     if (detectedSize) {
       webhookData.size = detectedSize;
       console.log('📐 用戶明確指定尺寸，添加到 webhook 參數:', detectedSize);
@@ -3524,7 +3543,7 @@ export default function RoomChatPage() {
         console.log('📏 使用皮可預設尺寸參數:', effectiveSize);
       }
     }
-    
+
     console.log('📝 最終 user_prompt:', finalUserPrompt);
     console.log(hasValidSettings() ? '✅ 皮可創作設定已合併' : '📭 皮可創作設定為空，使用純用戶輸入');
 
@@ -3536,39 +3555,39 @@ export default function RoomChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(webhookData)
       });
-      
+
       console.log('🔍 API 響應狀態:', res.status, res.statusText);
-      
+
       // 檢查響應內容類型和長度
       const contentType = res.headers.get('content-type');
       const contentLength = res.headers.get('content-length');
       console.log('🔍 響應標頭:', { contentType, contentLength });
-      
+
       const out = await safeJsonParse(res, 'Pico webhook');
-      
+
       console.log('✅ 聊天室 webhook 回應:', { status: res.status, data: out });
-      
+
       // 處理 n8n 的回應並顯示給用戶
       if (res.ok) {
         let responseContent = '';
         let messageType: 'text' | 'image' = 'text';
         let imageUrl = '';
         let tokenUsage = null; // 移到函數開始處
-        
+
         console.log('🔍 分析聊天室 webhook 回應結構:', out);
         console.log('🔍 out.data 內容:', out.data);
         console.log('🔍 out.data 類型:', typeof out.data);
-        
+
         // 檢查不同的回應格式
         if (out.data) {
           let rawResponse = '';
-          
+
           // 首先嘗試解析 JSON 字串格式的回應
           if (typeof out.data === 'string') {
             try {
               const parsedData = JSON.parse(out.data);
               console.log('📝 解析 JSON 字串格式:', parsedData);
-              
+
               if (parsedData.image_url) {
                 imageUrl = parsedData.image_url;
                 responseContent = '🎨 我為您創作完成了！太可愛了！';
@@ -3579,7 +3598,7 @@ export default function RoomChatPage() {
                 rawResponse = parsedData.content || parsedData.text || parsedData.message;
                 console.log('📝 從 JSON 提取文字回應:', rawResponse);
               }
-              
+
               // 提取 token 使用量
               if (parsedData.prompt_tokens || parsedData.completion_tokens || parsedData.total_tokens) {
                 tokenUsage = {
@@ -3590,7 +3609,7 @@ export default function RoomChatPage() {
                 };
                 console.log('📊 提取 token 使用量:', tokenUsage);
               }
-              
+
             } catch (parseError) {
               // 如果不是 JSON，當作普通字串處理
               rawResponse = out.data;
@@ -3602,7 +3621,7 @@ export default function RoomChatPage() {
             responseContent = '🎨 我為您創作完成了！太可愛了！';
             messageType = 'image';
             // 圖片 URL 已提取
-            
+
             // 提取 token 使用量
             if (out.data.prompt_tokens || out.data.completion_tokens || out.data.total_tokens) {
               tokenUsage = {
@@ -3639,23 +3658,23 @@ export default function RoomChatPage() {
             console.log('🔍 out.data 的所有屬性:', Object.keys(out.data));
             console.log('🔍 完整的 out.data 物件:', JSON.stringify(out.data, null, 2));
           }
-          
+
           // 簡繁轉換處理
           if (rawResponse) {
             console.log('🔍 原始回應內容:', rawResponse);
-            
+
             // 檢查用戶的訊息是否使用繁體中文（檢查最近3條訊息）
             const recentUserMessages = messages.filter(msg => msg.sender === 'user').slice(-3);
             const isUserUsingTraditional = recentUserMessages.some(msg => containsTraditionalChinese(msg.content));
-            
+
             console.log('🔍 檢查用戶語言偏好:');
             console.log('📝 最近用戶訊息:', recentUserMessages.map(msg => msg.content));
             console.log('🌏 用戶是否使用繁體中文:', isUserUsingTraditional);
-            
+
             // 檢查回應是否包含簡體中文
             const containsSimplified = containsSimplifiedChinese(rawResponse);
             console.log('🔍 回應是否包含簡體中文:', containsSimplified);
-            
+
             // 如果用戶使用繁體，但回應是簡體，則轉換為繁體
             if (isUserUsingTraditional && containsSimplified) {
               rawResponse = convertToTraditional(rawResponse);
@@ -3663,7 +3682,7 @@ export default function RoomChatPage() {
             } else {
               console.log('🔍 不需要轉換:', { isUserUsingTraditional, containsSimplified });
             }
-            
+
             // 檢查是否包含 iframe
             if (rawResponse.includes('<iframe') && rawResponse.includes('https://')) {
               // 從 iframe srcdoc 中提取圖片 URL
@@ -3689,11 +3708,11 @@ export default function RoomChatPage() {
             }
           }
         }
-        
+
         console.log('🔍 最終 responseContent:', responseContent);
         // 圖片處理完成
         console.log('🔍 最終 tokenUsage:', tokenUsage);
-        
+
         // 如果沒有找到明確的回應，使用預設訊息
         if (!responseContent) {
           if (out.data && Object.keys(out.data).length === 0) {
@@ -3706,12 +3725,12 @@ export default function RoomChatPage() {
             responseContent = '🎨 我收到您的請求了！正在發揮創意為您創作...';
           }
         }
-        
+
         // 如果有圖片，添加圖片 URL 到內容
         if (imageUrl) {
           responseContent += `\n\n![創作作品](${imageUrl})`;
         }
-        
+
         // 創建 AI 回應訊息
         const aiResponse: Message = {
           id: generateUUID(), // 使用兼容的 UUID 格式
@@ -3720,16 +3739,16 @@ export default function RoomChatPage() {
           timestamp: new Date(),
           type: messageType
         };
-        
+
         // 添加到訊息列表並保存到資料庫
         await addMessage(aiResponse);
         console.log('🎨 聊天室中已添加 Pico 的回應:', aiResponse);
-        
+
         // 記錄 token 使用量到 ai_usage 表
         if (tokenUsage) {
           await saveTokenUsage(aiResponse.id, tokenUsage);
         }
-        
+
         return { success: true, data: out };
       } else {
         // 處理錯誤回應
@@ -3740,7 +3759,7 @@ export default function RoomChatPage() {
           timestamp: new Date(),
           type: 'text'
         };
-        
+
         await addMessage(errorMessage);
         console.log('❌ Webhook 回應錯誤，顯示錯誤訊息');
         return { success: false, data: out };
@@ -3820,7 +3839,7 @@ export default function RoomChatPage() {
 
     try {
       console.log('📊 保存 token 使用量:', tokenData);
-      
+
       const usageData = {
         room_id: roomId,
         session_id: currentSessionId,
@@ -3865,7 +3884,7 @@ export default function RoomChatPage() {
     const messageTypeMap = {
       'user': '👤 用戶訊息',
       'hibi': '🦊 Hibi 訊息',
-      'mori': '🦉 墨墨訊息', 
+      'mori': '🦉 墨墨訊息',
       'pico': '🦦 皮可訊息',
       'system': '⚙️ 系統訊息'
     };
@@ -3874,7 +3893,7 @@ export default function RoomChatPage() {
     try {
       const roomIdToUse = targetRoomId || currentRoomId || roomId;
       console.log('🔍 準備儲存訊息到房間:', roomIdToUse);
-      
+
       const messageData = {
         room_id: roomIdToUse,
         session_id: currentSessionId,
@@ -3913,15 +3932,15 @@ export default function RoomChatPage() {
         'mori': 'mori-researcher',
         'pico': 'pico-artist'
       };
-      
+
       const assignedRoleId = roleSlugMap[roleId];
       if (!assignedRoleId || !roomId) {
         console.log('⚠️ [輪候查詢] 缺少必要參數', { assignedRoleId, roomId, roleId });
         return 0;
       }
-      
+
       console.log(`🔍 [輪候查詢] 開始查詢: roleId=${roleId}, assignedRoleId=${assignedRoleId}, threadId=${roomId}, excludeClientMsgId=${excludeClientMsgId || 'none'}`);
-      
+
       // 構建查詢：查詢 chat_messages 表中該角色處於 processing 或 queued 狀態的訊息數量
       // 只查詢當前 thread 的訊息，排除用戶自己的訊息（role = 'user'）
       let query = saasSupabase
@@ -3931,22 +3950,22 @@ export default function RoomChatPage() {
         .eq('assigned_role_id', assignedRoleId)
         .in('status', ['queued', 'processing'])
         .neq('role', 'user'); // 排除用戶訊息
-      
+
       // 如果有排除的 client_msg_id，則排除它
       if (excludeClientMsgId) {
         query = query.neq('client_msg_id', excludeClientMsgId);
       }
-      
+
       const { data, count, error } = await query;
-      
+
       if (error) {
         console.error('❌ [輪候查詢] 查詢失敗:', error);
         console.error('❌ [輪候查詢] 錯誤詳情:', JSON.stringify(error, null, 2));
         return 0;
       }
-      
+
       const result = count || 0;
-      
+
       // 詳細日誌
       console.log(`📋 [輪候查詢] 查詢結果:`, {
         roleId,
@@ -3956,13 +3975,13 @@ export default function RoomChatPage() {
         data: data?.slice(0, 3), // 只顯示前3條用於調試
         totalDataLength: data?.length
       });
-      
+
       if (result > 0) {
         console.log(`📋 [輪候查詢] ✅ ${roleId} (${assignedRoleId}) 在 thread ${roomId} 中有 ${result} 個訊息在排隊/處理中`);
       } else {
         console.log(`📋 [輪候查詢] ℹ️ ${roleId} (${assignedRoleId}) 在 thread ${roomId} 中沒有排隊的訊息`);
       }
-      
+
       return result;
     } catch (error) {
       console.error('❌ [輪候查詢] 查詢異常:', error);
@@ -3973,23 +3992,23 @@ export default function RoomChatPage() {
   // 發送訊息處理函數 - 持久化版本
   const handleSendMessage = async () => {
     console.log('🚀 [持久化版] handleSendMessage 被呼叫');
-    
+
     // ⭐ 驗證輸入（先驗證，避免無效內容也加鎖）
     if (!inputMessage.trim() || isLoading || !user?.id) {
       console.warn('⚠️ [發送] 輸入無效，忽略請求');
       return;
     }
-    
+
     let messageContent = inputMessage.trim();
     const roleHint = selectedCompanion || (activeRoles[0] ?? 'auto');
-    
+
     // ⭐ 預先查詢該角色的 processing/queued 訊息數量並設置輪候人數（用於顯示初始狀態）
     if (roleHint && ['hibi', 'mori', 'pico'].includes(roleHint)) {
       try {
         const queueCount = await getProcessingQueueCount(roleHint as 'hibi' | 'mori' | 'pico');
         setQueueCount(queueCount);
         console.log(`📋 [初始查詢] ${roleHint} 前面還有 ${queueCount} 個訊息正在排隊/處理中`);
-        
+
         // 如果有輪候，顯示提示
         if (queueCount > 0) {
           const companionName = companions.find(c => c.id === roleHint)?.name || roleHint;
@@ -4010,7 +4029,7 @@ export default function RoomChatPage() {
     } else {
       setQueueCount(0);
     }
-    
+
     // ⭐ 如果是 Pico 且有選擇 size 或 style，則合併到訊息中
     if (roleHint === 'pico') {
       const additionalInfo = [];
@@ -4025,21 +4044,21 @@ export default function RoomChatPage() {
         console.log('🎨 [Pico] 添加圖片設定:', messageContent);
       }
     }
-    
+
     const lockKey = `${roomId}-${messageContent}`;  // 使用房間ID + 內容作為鎖鍵
-    
+
     // ⭐ 第一步：檢查全局鎖（防止 React Strict Mode 雙重掛載）
     if (globalSendingLock.get(lockKey)) {
       console.warn('⚠️ [發送] 全局鎖：正在發送中，忽略重複請求');
       return;
     }
-    
+
     // ⭐ 第二步：立即加全局鎖（跨組件實例有效）
     globalSendingLock.set(lockKey, true);
     isSendingRef.current = true;
     setIsSending(true);
     console.log('🔒 [發送] 已加全局鎖，鎖鍵:', lockKey);
-    
+
     // ⭐ 立即顯示用戶訊息（不等待 API 響應）
     const tempMessageId = generateUUID();
     const tempClientMsgId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -4051,7 +4070,7 @@ export default function RoomChatPage() {
       type: 'text' as const,
       status: 'processing'
     };
-    
+
     // 立即添加到 UI
     setMessages(prev => {
       const newMessages = [...prev, userMessage];
@@ -4060,24 +4079,24 @@ export default function RoomChatPage() {
       console.log('📨 [即時] 完整新訊息列表:', newMessages);
       return newMessages;
     });
-    
+
     // ⭐ 將臨時訊息 ID 添加到全局追蹤，防止重複
     processedMessageIds.current.add(tempMessageId);
     console.log('📨 [即時] 已添加臨時訊息 ID 到全局追蹤:', tempMessageId);
-    
+
     // ⭐ 不觸發重新渲染，讓 React 自然更新訊息列表
-    
+
     // 清空輸入框
     setInputMessage('');
     setIsLoading(true);
     setIsTyping(true);
-    
+
     // ⭐ 鎖定當前角色圖標（防止角色切換時圖標改變）
     if (roleHint && ['hibi', 'mori', 'pico'].includes(roleHint)) {
       setProcessingCompanion(roleHint as 'hibi' | 'mori' | 'pico');
       console.log(`🔒 [圖標鎖定] 鎖定角色圖標為: ${roleHint}`);
     }
-    
+
     // ⭐ 在發送前再次查詢輪候人數（排除即將發送的訊息）
     if (roleHint && ['hibi', 'mori', 'pico'].includes(roleHint)) {
       try {
@@ -4088,18 +4107,18 @@ export default function RoomChatPage() {
         console.error('❌ 查詢輪候人數時發生錯誤:', error);
       }
     }
-    
+
     try {
       // === 使用 API 路由發送訊息 ===
       console.log('📦 [API] 開始發送訊息到 API 路由...');
 
       // === 載入角色設定資訊 ===
       console.log('🔍 [角色設定] 開始載入角色設定...');
-      
+
       // 載入當前選擇的角色設定
       const selectedRoleData = await loadRoleSettings(selectedCompanion, user.id);
       console.log('✅ [角色設定] 選擇的角色設定:', selectedRoleData);
-      
+
       // 載入專案資訊
       const projectInfo = {
         title: room.title,
@@ -4107,7 +4126,7 @@ export default function RoomChatPage() {
         guidance: (room as any).guidance || room.description
       };
       console.log('✅ [專案資訊] 專案資訊:', projectInfo);
-      
+
       // 載入群組角色設定
       const groupRoles = await loadGroupRoles(activeRoles, user.id);
       console.log('✅ [群組角色] 群組角色設定:', groupRoles);
@@ -4122,7 +4141,7 @@ export default function RoomChatPage() {
         projectInfo: projectInfo,
         groupRoles: groupRoles
       });
-      
+
       console.log('🔍 [API] 用戶資訊檢查:', {
         user: !!user,
         userId: user?.id,
@@ -4131,7 +4150,7 @@ export default function RoomChatPage() {
         messageContent: messageContent,
         messageContentLength: messageContent?.length
       });
-      
+
       // 檢查必要參數
       if (!user?.id) {
         console.error('❌ [API] 用戶 ID 為空');
@@ -4139,21 +4158,21 @@ export default function RoomChatPage() {
         toast.error('用戶未登入');
         return;
       }
-      
+
       if (!roomId) {
         console.error('❌ [API] 房間 ID 為空');
         const { default: toast } = await import('react-hot-toast');
         toast.error('房間 ID 無效');
         return;
       }
-      
+
       if (!messageContent) {
         console.error('❌ [API] 訊息內容為空');
         const { default: toast } = await import('react-hot-toast');
         toast.error('訊息內容不能為空');
         return;
       }
-      
+
       console.log('🚀 [Fetch] 準備發送 fetch 請求...');
       console.log('📦 [Fetch] 請求參數:', {
         threadId: roomId,
@@ -4164,11 +4183,11 @@ export default function RoomChatPage() {
         projectInfo: projectInfo,
         groupRoles: groupRoles
       });
-      
+
       // 添加超時控制
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超時
-      
+
       const response = await fetch('/api/ai-companions/send-message-simple', {
         method: 'POST',
         headers: {
@@ -4185,7 +4204,7 @@ export default function RoomChatPage() {
         }),
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
 
       console.log('📡 [API] HTTP 響應狀態:', response.status, response.statusText);
@@ -4199,7 +4218,7 @@ export default function RoomChatPage() {
         toast.error(`發送失敗: ${response.status} ${response.statusText}`);
         return;
       }
-      
+
       console.log('🔍 [API] 準備解析 JSON...');
       const result = await response.json();
       console.log('📤 [API] 發送結果:', result);
@@ -4208,7 +4227,7 @@ export default function RoomChatPage() {
 
       // ⭐ 更新用戶訊息狀態（使用真實的 messageId）
       console.log('✅ 訊息已持久化:', result.messageId);
-      
+
       // 更新已顯示的用戶訊息狀態
       setMessages(prev => {
         return prev.map(msg => {
@@ -4223,42 +4242,42 @@ export default function RoomChatPage() {
           return msg;
         });
       });
-      
+
       // ⭐ 更新全局追蹤：移除臨時 ID，添加真實 ID
       processedMessageIds.current.delete(tempMessageId);
       processedMessageIds.current.add(result.messageId);
       console.log('📨 [即時] 已更新全局追蹤：移除臨時 ID，添加真實 ID:', tempMessageId, '->', result.messageId);
-      
+
       // ⭐ 不觸發重新渲染，讓 React 自然更新訊息狀態
-      
+
       // ⭐ 如果 n8n 失敗，顯示警告但不阻止 UI 更新
       if (!result.success) {
         console.warn('⚠️ n8n 工作流失敗，但用戶訊息已顯示:', result.error);
         const { default: toast } = await import('react-hot-toast');
         toast.error('AI 回應可能延遲，但您的訊息已發送');
       }
-      
+
       // ⭐ 檢查是否是重複請求錯誤（n8n 返回 success:true 但有 error）
       if (result.success && result.ingressResponse?.error === '重複請求') {
         console.warn('⚠️ n8n 檢測到重複請求，這通常意味著訊息已在處理中');
         const { default: toast } = await import('react-hot-toast');
-        toast('訊息已發送，正在等待 AI 回應...', { 
+        toast('訊息已發送，正在等待 AI 回應...', {
           icon: <ClockIcon className="w-5 h-5 text-blue-600" />
         });
       }
-          
-          
-              // ⭐ Realtime 會自動檢測並顯示 AI 回應，無需手動觸發檢查
-              console.log('✅ [發送] 訊息已發送，等待 Realtime 推送 AI 回應...');
 
-      } catch (error) {
+
+      // ⭐ Realtime 會自動檢測並顯示 AI 回應，無需手動觸發檢查
+      console.log('✅ [發送] 訊息已發送，等待 Realtime 推送 AI 回應...');
+
+    } catch (error) {
       console.error('❌ 發送訊息錯誤:', error);
       console.error('❌ 錯誤詳情:', {
         name: error instanceof Error ? error.name : 'Unknown',
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
       });
-      
+
       // 更新用戶訊息狀態為錯誤
       setMessages(prev => {
         return prev.map(msg => {
@@ -4271,26 +4290,26 @@ export default function RoomChatPage() {
           return msg;
         });
       });
-      
+
       // ⭐ 更新全局追蹤：移除臨時 ID（錯誤情況下保持臨時 ID）
       processedMessageIds.current.delete(tempMessageId);
       console.log('📨 [即時] 錯誤情況下已移除臨時 ID 從全局追蹤:', tempMessageId);
-      
+
       // ⭐ 不觸發重新渲染，讓 React 自然更新訊息狀態
-      
+
       const { default: toast } = await import('react-hot-toast');
       if (error instanceof Error && error.name === 'AbortError') {
         toast.error('請求超時，請重試');
-    } else {
+      } else {
         toast.error('發送失敗，請重試');
       }
     } finally {
       // ⭐ 不解鎖思考 UI，讓它在 AI 回應完成後自然消失
       // setIsLoading(false);
       // setIsTyping(false);
-      
+
       // ⭐ 注意：輪候人數在 Realtime 收到回應時重置，不在這裡重置
-      
+
       // ⭐ 解鎖（延遲 1 秒，確保 API 完成）
       setTimeout(() => {
         const lockKey = `${roomId}-${messageContent}`;
@@ -4298,7 +4317,7 @@ export default function RoomChatPage() {
         isSendingRef.current = false;
         setIsSending(false);
         console.log('🔓 [發送] 已解鎖全局鎖，鎖鍵:', lockKey);
-        
+
         // ⭐ 清除 Pico 選項（發送後重置，但保留在 localStorage 中供下次使用）
         // 注意：這裡不清除選項，讓用戶下次使用時可以直接使用相同的設定
         // 如果需要清除，用戶可以手動點擊清除按鈕
@@ -4309,10 +4328,10 @@ export default function RoomChatPage() {
   // 模擬 AI 回應
   const simulateAIResponse = async (userMessage: string) => {
     await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-    
+
     let responseContent = '';
     let sender: any = selectedCompanion || activeRoles[0] || 'hibi';
-    
+
     if (sender === 'hibi') {
       responseContent = `我了解您的需求。讓我為您統籌安排最適合的團隊成員來處理這個任務。`;
     } else if (sender === 'mori') {
@@ -4320,7 +4339,7 @@ export default function RoomChatPage() {
     } else {
       responseContent = `我會努力協助您完成這個任務！`;
     }
-    
+
     const aiResponse: Message = {
       id: generateUUID(),
       content: responseContent,
@@ -4328,19 +4347,19 @@ export default function RoomChatPage() {
       timestamp: new Date(),
       type: 'text'
     };
-    
+
     await addMessage(aiResponse);
   };
 
   // 刪除單個訊息（使用軟刪除）
   const handleDeleteMessage = async (messageId: string) => {
     const isConfirmed = window.confirm('確定要刪除這條訊息嗎？');
-    
+
     if (!isConfirmed) return;
 
     try {
       console.log('🗑️ 刪除單個訊息:', messageId);
-      
+
       // 先嘗試使用安全刪除 API
       try {
         const response = await fetch('/api/safe-delete-message', {
@@ -4350,15 +4369,15 @@ export default function RoomChatPage() {
           },
           body: JSON.stringify({ messageId }),
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
           console.log('✅ 通過 API 刪除成功:', result);
-          
+
           // 從前端訊息列表中移除
           setMessages(prev => prev.filter(msg => msg.id !== messageId));
-          
+
           // 觸發選擇性重新渲染 - 刪除訊息
           triggerSelectiveRender('刪除訊息');
           return;
@@ -4368,31 +4387,31 @@ export default function RoomChatPage() {
         }
       } catch (apiError) {
         console.warn('⚠️ API 刪除失敗，嘗試直接 Supabase 操作:', apiError);
-        
+
         // 回退到直接 Supabase 操作
-      const { error } = await (saasSupabase as any)
+        const { error } = await (saasSupabase as any)
           .from('chat_messages')
-          .update({ 
+          .update({
             status: 'deleted',
             updated_at: new Date().toISOString()
           })
-        .eq('id', messageId);
+          .eq('id', messageId);
 
-      if (error) {
+        if (error) {
           console.error('❌ 軟刪除訊息失敗:', error);
           alert(`刪除訊息失敗: ${error.message || error}\n\n錯誤代碼: ${error.code}\n詳細資訊: ${JSON.stringify(error, null, 2)}`);
-        return;
-      }
-        
+          return;
+        }
+
         console.log('✅ 訊息已標記為刪除');
 
-      // 從前端訊息列表中移除
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
-        
+        // 從前端訊息列表中移除
+        setMessages(prev => prev.filter(msg => msg.id !== messageId));
+
         // 觸發選擇性重新渲染 - 刪除訊息
         triggerSelectiveRender('刪除訊息');
       }
-      
+
     } catch (error) {
       console.error('❌ 刪除訊息錯誤:', error);
       alert(`刪除訊息時發生錯誤: ${error instanceof Error ? error.message : '未知錯誤'}\n\n請檢查控制台獲取詳細資訊。`);
@@ -4413,18 +4432,18 @@ export default function RoomChatPage() {
     const results = messages.filter(msg => {
       // 只搜尋非刪除的訊息
       if ((msg as any).status === 'deleted') return false;
-      
+
       // 搜尋內容（不分大小寫）
       const content = msg.content?.toLowerCase() || '';
       const query = searchQuery.toLowerCase();
-      
+
       return content.includes(query);
     });
 
     console.log('🔍 找到', results.length, '條符合的訊息');
     setSearchResults(results);
     setCurrentSearchIndex(results.length > 0 ? 0 : -1);
-    
+
     // 自動滾動到第一個結果
     if (results.length > 0) {
       scrollToMessage(results[0].id);
@@ -4435,11 +4454,11 @@ export default function RoomChatPage() {
   const scrollToMessage = (messageId: string) => {
     const messageElement = document.getElementById(`message-${messageId}`);
     if (messageElement) {
-      messageElement.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
+      messageElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
       });
-      
+
       // 高亮顯示訊息
       messageElement.classList.add('highlight-search-result');
       setTimeout(() => {
@@ -4451,7 +4470,7 @@ export default function RoomChatPage() {
   // 導航到下一個搜尋結果
   const navigateSearchNext = () => {
     if (searchResults.length === 0 || currentSearchIndex === -1) return;
-    
+
     const nextIndex = (currentSearchIndex + 1) % searchResults.length;
     setCurrentSearchIndex(nextIndex);
     scrollToMessage(searchResults[nextIndex].id);
@@ -4460,7 +4479,7 @@ export default function RoomChatPage() {
   // 導航到上一個搜尋結果
   const navigateSearchPrev = () => {
     if (searchResults.length === 0 || currentSearchIndex === -1) return;
-    
+
     const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1;
     setCurrentSearchIndex(prevIndex);
     scrollToMessage(searchResults[prevIndex].id);
@@ -4469,12 +4488,12 @@ export default function RoomChatPage() {
   // 清除歷史訊息
   const handleClearHistory = async () => {
     const isConfirmed = window.confirm('確定要清除所有歷史訊息嗎？此操作無法復原。');
-    
+
     if (!isConfirmed) return;
 
     try {
       console.log('🗑️ 開始清除房間歷史訊息:', roomId);
-      
+
       // 從資料庫刪除該房間的所有訊息 (使用正確的表名和欄位名)
       const { error } = await saasSupabase
         .from('chat_messages')
@@ -4491,10 +4510,10 @@ export default function RoomChatPage() {
       setMessages([]);
       setHasLoadedHistory(false); // 重置歷史載入狀態，允許重新顯示歡迎訊息
       console.log('✅ 歷史訊息已從資料庫清除');
-      
+
       // 顯示成功提示
       alert('歷史訊息已成功清除！');
-      
+
     } catch (error) {
       console.error('❌ 清除歷史訊息錯誤:', error);
       alert('清除歷史訊息時發生錯誤，請稍後再試。');
@@ -4507,7 +4526,7 @@ export default function RoomChatPage() {
       targetCompanion = companionParam as 'hibi' | 'mori' | 'pico';
     }
     const isTaskRequest = userMessage.includes('任務') || userMessage.includes('幫我') || userMessage.includes('協助');
-    
+
     if (isTaskRequest && targetCompanion === 'hibi') {
       // 協作任務交由 hibi 統籌
       const newTask: Task = {
@@ -4607,7 +4626,7 @@ export default function RoomChatPage() {
               >
                 <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
               </motion.button>
-              
+
               <div className="w-10 h-10 relative">
                 <Image
                   src="/@hanami.png"
@@ -4620,7 +4639,7 @@ export default function RoomChatPage() {
               <div>
                 <h1 className="text-xl font-bold text-[#4B4036]">{room.title}</h1>
                 <p className="text-sm text-[#2B3A3B]">
-                  {companionParam 
+                  {companionParam
                     ? `🎯 與 ${companions.find(c => c.id === companionParam)?.name} 一對一對話`
                     : '與 AI 助手協作'
                   }
@@ -4640,7 +4659,7 @@ export default function RoomChatPage() {
                       key={companionId}
                       whileHover={{ scale: 1.1, y: -2 }}
                       animate={{ y: [0, -2, 0] }}
-                      transition={{ 
+                      transition={{
                         y: { duration: 2, repeat: Infinity, delay: companions.findIndex(c => c.id === companionId) * 0.3 }
                       }}
                       className="relative group"
@@ -4676,14 +4695,14 @@ export default function RoomChatPage() {
                           )}
                         </div>
                       </div>
-                      
+
                       {/* 在線狀態指示器 */}
                       <motion.div
                         animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
                         transition={{ duration: 2, repeat: Infinity }}
                         className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white rounded-full shadow-sm"
                       />
-                      
+
                       {/* 角色專業圖標 */}
                       <motion.div
                         animate={{ rotate: companion?.id === 'hibi' ? 360 : 0 }}
@@ -4692,8 +4711,8 @@ export default function RoomChatPage() {
                       >
                         {companion && <companion.icon className="w-3 h-3 text-white" />}
                       </motion.div>
-                      
-                      
+
+
                       {/* 角色名稱提示 */}
                       <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/75 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                         {companion?.name}
@@ -4702,16 +4721,16 @@ export default function RoomChatPage() {
                   );
                 })}
               </div>
-              
+
               {/* 邀請 AI 角色按鈕 */}
               {activeRoles.length < 3 && (
                 <motion.button
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.95 }}
-                  animate={{ 
+                  animate={{
                     boxShadow: ["0 0 0 0 rgba(255, 182, 193, 0.4)", "0 0 0 8px rgba(255, 182, 193, 0)", "0 0 0 0 rgba(255, 182, 193, 0)"]
                   }}
-                  transition={{ 
+                  transition={{
                     boxShadow: { duration: 2, repeat: Infinity },
                     rotate: { duration: 0.3 }
                   }}
@@ -4720,7 +4739,7 @@ export default function RoomChatPage() {
                   title="邀請更多 AI 成員"
                 >
                   <PlusIcon className="w-5 h-5 text-white" />
-                  
+
                   {/* 脈衝效果 */}
                   <motion.div
                     animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
@@ -4737,7 +4756,7 @@ export default function RoomChatPage() {
               {user?.id && (
                 <FoodBalanceDisplay userId={user.id} />
               )}
-              
+
               {/* 團隊成員按鈕 */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -4747,7 +4766,7 @@ export default function RoomChatPage() {
               >
                 <UsersIcon className="w-4 h-4 text-white" />
                 <span className="text-xs font-medium text-white">{activeRoles.length}</span>
-                
+
                 {/* 在線指示器 */}
                 <motion.div
                   animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
@@ -4871,11 +4890,10 @@ export default function RoomChatPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowSearchBox(!showSearchBox)}
-                className={`p-2 rounded-xl transition-all shadow-md ${
-                  showSearchBox 
-                    ? 'bg-[#FFD59A] text-white shadow-lg' 
+                className={`p-2 rounded-xl transition-all shadow-md ${showSearchBox
+                    ? 'bg-[#FFD59A] text-white shadow-lg'
                     : 'hover:bg-[#FFD59A]/20 text-[#4B4036] hover:shadow-lg'
-                }`}
+                  }`}
                 title="搜尋對話"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4887,7 +4905,7 @@ export default function RoomChatPage() {
               <motion.button
                 whileHover={{ scale: 1.05, rotate: 15 }}
                 whileTap={{ scale: 0.95 }}
-                animate={{ 
+                animate={{
                   backgroundColor: showSettingsModal ? "#FFB6C1" : "transparent"
                 }}
                 transition={{ duration: 0.3 }}
@@ -4905,11 +4923,10 @@ export default function RoomChatPage() {
                     setInviteRoleSearch('');
                   }
                 }}
-                className={`p-2 rounded-xl transition-all shadow-md ${
-                  showSettingsModal 
-                    ? 'bg-[#FFB6C1] text-white shadow-lg' 
+                className={`p-2 rounded-xl transition-all shadow-md ${showSettingsModal
+                    ? 'bg-[#FFB6C1] text-white shadow-lg'
                     : 'hover:bg-[#FFB6C1]/20 text-[#4B4036] hover:shadow-lg'
-                }`}
+                  }`}
                 title="角色設定"
               >
                 <UserIcon className="w-6 h-6" />
@@ -4920,11 +4937,10 @@ export default function RoomChatPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowBlackboard(!showBlackboard)}
-                className={`p-2 rounded-xl transition-all shadow-md ${
-                  showBlackboard
+                className={`p-2 rounded-xl transition-all shadow-md ${showBlackboard
                     ? 'bg-[#FFD59A] text-[#4B4036] shadow-lg'
                     : 'hover:bg-[#FFD59A]/30 text-[#4B4036] hover:shadow-lg'
-                }`}
+                  }`}
                 title={showBlackboard ? '隱藏黑板' : '顯示黑板'}
               >
                 {/* Blackboard Icon (simple) */}
@@ -4962,7 +4978,7 @@ export default function RoomChatPage() {
               <motion.button
                 whileHover={{ scale: 1.05, rotate: 180 }}
                 whileTap={{ scale: 0.95 }}
-                animate={{ 
+                animate={{
                   rotate: showTaskPanel ? 180 : 0,
                   backgroundColor: showTaskPanel ? "#FFD59A" : "transparent"
                 }}
@@ -4973,11 +4989,10 @@ export default function RoomChatPage() {
                     setEditingProject(false); // 關閉編輯模式
                   }
                 }}
-                className={`p-2 rounded-xl transition-all shadow-md ${
-                  showTaskPanel 
-                    ? 'bg-[#FFD59A] text-[#4B4036] shadow-lg' 
+                className={`p-2 rounded-xl transition-all shadow-md ${showTaskPanel
+                    ? 'bg-[#FFD59A] text-[#4B4036] shadow-lg'
                     : 'hover:bg-[#FFD59A]/20 text-[#4B4036] hover:shadow-lg'
-                }`}
+                  }`}
                 title="切換任務面板"
               >
                 <Cog6ToothIcon className="w-6 h-6" />
@@ -4988,9 +5003,9 @@ export default function RoomChatPage() {
       </nav>
 
       {/* 側邊欄 */}
-      <AppSidebar 
-        isOpen={sidebarOpen} 
-        onClose={() => setSidebarOpen(false)} 
+      <AppSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         currentPath="/aihome/ai-companions"
       />
       <div className="flex h-[calc(100vh-64px)]">
@@ -5058,7 +5073,7 @@ export default function RoomChatPage() {
               </div>
             </motion.div>
           )}
-          
+
           {/* 訊息區域 或 黑板區域 */}
           <div
             ref={messagesContainerRef}
@@ -5073,43 +5088,42 @@ export default function RoomChatPage() {
               </div>
             )}
             {!showBlackboard && (
-            <>
-            {hasLoadedHistory && hasMoreMessages && messages.length > 0 && (
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => loadOlderMessages()}
-                  disabled={isLoadingOlderMessages}
-                  className={`px-4 py-2 mb-2 rounded-full border border-[#EADBC8] text-sm font-medium transition-all ${
-                    isLoadingOlderMessages
-                      ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed'
-                      : 'bg-white/80 text-[#4B4036] hover:bg-[#FFF4E0] shadow-sm'
-                  }`}
-                >
-                  {isLoadingOlderMessages ? '載入中…' : '載入更多訊息'}
-                </button>
-              </div>
-            )}
-            {hasLoadedHistory && !hasMoreMessages && messages.length > 0 && (
-              <div className="flex justify-center">
-                <span className="px-3 py-1 text-xs text-[#8F7A65] bg-white/70 border border-[#EADBC8] rounded-full">
-                  已顯示所有歷史訊息
-                </span>
-              </div>
-            )}
-            <AnimatePresence>
-              {messages.map((message, index) => (
-                <div key={`${message.id}-${index}`} id={`message-${message.id}`}>
-                <MessageBubble
-                  message={message}
-                  companion={getCompanionInfo(message.sender as any)}
-                  onDelete={handleDeleteMessage}
-                    isHighlighted={currentSearchIndex >= 0 && searchResults[currentSearchIndex]?.id === message.id}
-                />
-                </div>
-              ))}
-            </AnimatePresence>
-            </>
+              <>
+                {hasLoadedHistory && hasMoreMessages && messages.length > 0 && (
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => loadOlderMessages()}
+                      disabled={isLoadingOlderMessages}
+                      className={`px-4 py-2 mb-2 rounded-full border border-[#EADBC8] text-sm font-medium transition-all ${isLoadingOlderMessages
+                          ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed'
+                          : 'bg-white/80 text-[#4B4036] hover:bg-[#FFF4E0] shadow-sm'
+                        }`}
+                    >
+                      {isLoadingOlderMessages ? '載入中…' : '載入更多訊息'}
+                    </button>
+                  </div>
+                )}
+                {hasLoadedHistory && !hasMoreMessages && messages.length > 0 && (
+                  <div className="flex justify-center">
+                    <span className="px-3 py-1 text-xs text-[#8F7A65] bg-white/70 border border-[#EADBC8] rounded-full">
+                      已顯示所有歷史訊息
+                    </span>
+                  </div>
+                )}
+                <AnimatePresence>
+                  {messages.map((message, index) => (
+                    <div key={`${message.id}-${index}`} id={`message-${message.id}`}>
+                      <MessageBubble
+                        message={message}
+                        companion={getCompanionInfo(message.sender as any)}
+                        onDelete={handleDeleteMessage}
+                        isHighlighted={currentSearchIndex >= 0 && searchResults[currentSearchIndex]?.id === message.id}
+                      />
+                    </div>
+                  ))}
+                </AnimatePresence>
+              </>
             )}
 
             {/* 增強版等待指示器 */}
@@ -5123,21 +5137,20 @@ export default function RoomChatPage() {
                 >
                   <div className="flex items-end space-x-3 max-w-[80%]">
                     {/* AI 頭像 */}
-                    <motion.div 
-                      className={`w-8 h-8 rounded-full bg-gradient-to-br ${
-                        processingCompanion === 'pico'
+                    <motion.div
+                      className={`w-8 h-8 rounded-full bg-gradient-to-br ${processingCompanion === 'pico'
                           ? 'from-blue-400 to-cyan-500'
                           : processingCompanion === 'mori'
                             ? 'from-amber-400 to-orange-500'
                             : processingCompanion === 'hibi'
                               ? 'from-orange-400 to-red-500'
                               : 'from-purple-400 to-pink-500'
-                      } p-0.5 flex-shrink-0`}
-                      animate={{ 
+                        } p-0.5 flex-shrink-0`}
+                      animate={{
                         scale: [1, 1.1, 1],
                         rotate: [0, 5, -5, 0]
                       }}
-                      transition={{ 
+                      transition={{
                         duration: 2,
                         repeat: Infinity,
                         ease: "easeInOut"
@@ -5154,11 +5167,11 @@ export default function RoomChatPage() {
                                   ? '/3d-character-backgrounds/studio/lulu(front).png'
                                   : '/@hanami.png';
                           return src ? (
-                            <Image 
-                              src={src} 
-                              alt="AI 助手" 
-                              width={24} 
-                              height={24} 
+                            <Image
+                              src={src}
+                              alt="AI 助手"
+                              width={24}
+                              height={24}
                               className="w-6 h-6 object-cover"
                               unoptimized={src.includes('(') || src.includes(')')}
                             />
@@ -5166,7 +5179,7 @@ export default function RoomChatPage() {
                         })()}
                       </div>
                     </motion.div>
-                    
+
                     <div className="bg-white/70 backdrop-blur-sm px-4 py-3 rounded-2xl shadow-lg border border-[#EADBC8]">
                       {/* 動態狀態文字 */}
                       <div className="flex items-center space-x-2 mb-2">
@@ -5195,72 +5208,68 @@ export default function RoomChatPage() {
                           })()}
                         </motion.span>
                       </div>
-                      
+
                       {/* 輪候人數顯示 */}
                       {(queueCount > 0 || (isLoading || isTyping)) && (
-                        <motion.div 
+                        <motion.div
                           initial={{ opacity: 0, y: -5 }}
                           animate={{ opacity: 1, y: 0 }}
                           className="mb-2"
                         >
-                          <div className={`flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 ${
-                            queueCount > 0 
-                              ? 'bg-blue-50/50 border border-blue-200/50' 
+                          <div className={`flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 ${queueCount > 0
+                              ? 'bg-blue-50/50 border border-blue-200/50'
                               : 'bg-gray-50/50 border border-gray-200/50'
-                          }`}>
+                            }`}>
                             <ClockIcon className={`w-3.5 h-3.5 flex-shrink-0 ${queueCount > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
                             <span className={`font-medium ${queueCount > 0 ? 'text-blue-700' : 'text-gray-600'}`}>
-                              {queueCount > 0 
+                              {queueCount > 0
                                 ? `前面還有 ${queueCount} 個訊息正在處理中`
                                 : '正在處理中...'}
                             </span>
                           </div>
                         </motion.div>
                       )}
-                      
+
                       {/* 動畫點點 */}
                       <div className="flex items-center space-x-1 mb-2">
                         <motion.div
                           animate={{ scale: [1, 1.4, 1] }}
                           transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
-                          className={`w-2 h-2 rounded-full bg-gradient-to-r ${
-                            processingCompanion === 'pico'
+                          className={`w-2 h-2 rounded-full bg-gradient-to-r ${processingCompanion === 'pico'
                               ? 'from-blue-400 to-cyan-500'
                               : processingCompanion === 'mori'
                                 ? 'from-amber-400 to-orange-500'
                                 : processingCompanion === 'hibi'
                                   ? 'from-orange-400 to-red-500'
                                   : 'from-purple-400 to-pink-500'
-                          }`}
+                            }`}
                         />
                         <motion.div
                           animate={{ scale: [1, 1.4, 1] }}
                           transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
-                          className={`w-2 h-2 rounded-full bg-gradient-to-r ${
-                            processingCompanion === 'pico'
+                          className={`w-2 h-2 rounded-full bg-gradient-to-r ${processingCompanion === 'pico'
                               ? 'from-blue-400 to-cyan-500'
                               : processingCompanion === 'mori'
                                 ? 'from-amber-400 to-orange-500'
                                 : processingCompanion === 'hibi'
                                   ? 'from-orange-400 to-red-500'
                                   : 'from-purple-400 to-pink-500'
-                          }`}
+                            }`}
                         />
                         <motion.div
                           animate={{ scale: [1, 1.4, 1] }}
                           transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
-                          className={`w-2 h-2 rounded-full bg-gradient-to-r ${
-                            processingCompanion === 'pico'
+                          className={`w-2 h-2 rounded-full bg-gradient-to-r ${processingCompanion === 'pico'
                               ? 'from-blue-400 to-cyan-500'
                               : processingCompanion === 'mori'
                                 ? 'from-amber-400 to-orange-500'
                                 : processingCompanion === 'hibi'
                                   ? 'from-orange-400 to-red-500'
                                   : 'from-purple-400 to-pink-500'
-                          }`}
+                            }`}
                         />
                       </div>
-                      
+
                       {/* 時間顯示 */}
                       <div className="flex items-center justify-between text-xs text-[#2B3A3B]/70">
                         <span className={elapsedTime > estimatedTime ? 'text-orange-600 font-medium' : ''}>
@@ -5270,13 +5279,12 @@ export default function RoomChatPage() {
                           {elapsedTime > estimatedTime ? '處理中...' : `預估: ~${estimatedTime}s`}
                         </span>
                       </div>
-                      
+
                       {/* 進度條 */}
                       <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
                         <motion.div
-                          className={`h-1 rounded-full ${
-                            elapsedTime > estimatedTime 
-                              ? 'bg-gradient-to-r from-orange-400 to-red-500' 
+                          className={`h-1 rounded-full ${elapsedTime > estimatedTime
+                              ? 'bg-gradient-to-r from-orange-400 to-red-500'
                               : processingCompanion === 'pico'
                                 ? 'bg-gradient-to-r from-blue-400 to-cyan-500'
                                 : processingCompanion === 'mori'
@@ -5284,21 +5292,21 @@ export default function RoomChatPage() {
                                   : processingCompanion === 'hibi'
                                     ? 'bg-gradient-to-r from-orange-400 to-red-500'
                                     : 'bg-gradient-to-r from-purple-400 to-pink-500'
-                          }`}
+                            }`}
                           initial={{ width: 0 }}
-                          animate={{ 
-                            width: elapsedTime > estimatedTime 
+                          animate={{
+                            width: elapsedTime > estimatedTime
                               ? '100%'
                               : `${Math.min((elapsedTime / estimatedTime) * 100, 100)}%`,
                             opacity: elapsedTime > estimatedTime ? [0.5, 1, 0.5] : 1
                           }}
-                          transition={{ 
+                          transition={{
                             duration: elapsedTime > estimatedTime ? 1 : 0.5,
                             repeat: elapsedTime > estimatedTime ? Infinity : 0
                           }}
                         />
                       </div>
-                      
+
                       {/* 角色專屬提示 */}
                       {processingCompanion === 'pico' && (
                         <motion.div
@@ -5314,7 +5322,7 @@ export default function RoomChatPage() {
                           })()}
                         </motion.div>
                       )}
-                      
+
                       {processingCompanion === 'mori' && (
                         <motion.div
                           animate={{ opacity: [0, 1, 0] }}
@@ -5328,7 +5336,7 @@ export default function RoomChatPage() {
                           })()}
                         </motion.div>
                       )}
-                      
+
                       {processingCompanion === 'hibi' && (
                         <motion.div
                           animate={{ opacity: [0, 1, 0] }}
@@ -5349,7 +5357,7 @@ export default function RoomChatPage() {
             </AnimatePresence>
 
             <div ref={messagesEndRef} />
-            
+
             {/* 返回最新訊息按鈕 */}
             <AnimatePresence>
               {showScrollToBottomButton && (
@@ -5400,7 +5408,7 @@ export default function RoomChatPage() {
                   {activeRoles.length === 1 ? '團隊成員:' : 'AI 回應模式:'}
                 </span>
               </div>
-              
+
               <div className="flex items-center space-x-2 bg-white/80 backdrop-blur-sm rounded-xl p-1 shadow-md">
                 {(() => {
                   // 顯示當前活躍的角色
@@ -5409,20 +5417,20 @@ export default function RoomChatPage() {
                     { id: 'mori', label: '墨墨', purpose: '研究', icon: AcademicCapIcon, imagePath: '/3d-character-backgrounds/studio/Mori/Mori.png', color: 'from-[#D4A574] to-[#E6C8A0]' },
                     { id: 'pico', label: '皮可', purpose: '繪圖', icon: PaintBrushIcon, imagePath: '/3d-character-backgrounds/studio/Pico/Pico.png', color: 'from-[#FFB6C1] to-[#FFCDD6]' }
                   ];
-                  
+
                   // 只顯示活躍的角色
                   const availableModes = modes.filter(mode => activeRoles.includes(mode.id as any));
-                  
+
                   // 如果沒有任何角色，不顯示任何按鈕（而不是顯示全部角色）
                   if (availableModes.length === 0) {
                     return [];
                   }
-                  
+
                   // 多角色時，不再提供獨立的團隊模式，維持直接選角色
                   if (activeRoles.length > 1) {
                     return availableModes;
                   }
-                  
+
                   // 單角色模式，只顯示該角色
                   return availableModes;
                 })().map((mode) => (
@@ -5431,7 +5439,7 @@ export default function RoomChatPage() {
                     whileHover={{ scale: 1.05, y: -1 }}
                     whileTap={{ scale: 0.95 }}
                     animate={{
-                      boxShadow: selectedCompanion === mode.id 
+                      boxShadow: selectedCompanion === mode.id
                         ? ["0 0 0 0 rgba(255, 182, 193, 0.4)", "0 0 0 4px rgba(255, 182, 193, 0)", "0 0 0 0 rgba(255, 182, 193, 0.4)"]
                         : "none"
                     }}
@@ -5439,11 +5447,10 @@ export default function RoomChatPage() {
                       boxShadow: { duration: 2, repeat: Infinity }
                     }}
                     onClick={() => setSelectedCompanion(mode.id as any)}
-                    className={`relative flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                      selectedCompanion === mode.id 
-                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg transform scale-105' 
+                    className={`relative flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-xl text-sm font-medium transition-all ${selectedCompanion === mode.id
+                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg transform scale-105'
                         : 'text-[#4B4036] hover:bg-[#FFD59A]/20 hover:shadow-md'
-                    }`}
+                      }`}
                   >
                     {/* 桌面版：顯示圖標 */}
                     <motion.div
@@ -5453,7 +5460,7 @@ export default function RoomChatPage() {
                     >
                       <mode.icon className="w-4 h-4" />
                     </motion.div>
-                    
+
                     {/* 手機版：顯示角色圖像 */}
                     <div className="block sm:hidden">
                       <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${(mode as any).color} p-0.5 shadow-sm`}>
@@ -5467,7 +5474,7 @@ export default function RoomChatPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* 桌面版：顯示完整名稱和用途 */}
                     <div className="hidden sm:block text-left">
                       <div className="leading-tight">
@@ -5475,12 +5482,12 @@ export default function RoomChatPage() {
                         <span className="text-xs opacity-75 ml-1">({mode.purpose})</span>
                       </div>
                     </div>
-                    
+
                     {/* 移動端：只顯示簡單用途 */}
                     <span className="block sm:hidden text-xs font-medium">
                       {mode.purpose}
                     </span>
-                    
+
                     {/* 選中狀態指示器 */}
                     {selectedCompanion === mode.id && (
                       <motion.div
@@ -5496,7 +5503,7 @@ export default function RoomChatPage() {
           </div>
 
           {/* AI 對話輸入區域 - 添加底部間距避免被導航遮蓋 */}
-          <motion.div 
+          <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="p-6 pb-24 lg:pb-6 bg-gradient-to-r from-white/80 to-white/70 backdrop-blur-sm border-t border-[#EADBC8]"
@@ -5553,89 +5560,87 @@ export default function RoomChatPage() {
                             </svg>
                             圖片尺寸
                           </label>
-                    <div className="flex flex-wrap gap-2">
-                      {['1024x1024', '1024x768', '768x1024', '1920x1080', 'A4'].map((size) => (
-                        <motion.button
-                          key={size}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            setPicoImageSize(picoImageSize === size ? '' : size);
-                            setShowCustomSizeInput(false);
-                            setPicoCustomSize('');
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                            picoImageSize === size && !showCustomSizeInput
-                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                              : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
-                          }`}
-                        >
-                          {size}
-                        </motion.button>
-                      ))}
-                      
-                      {/* 自訂尺寸按鈕 */}
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                          setShowCustomSizeInput(!showCustomSizeInput);
-                          if (!showCustomSizeInput) {
-                            setPicoImageSize('');
-                          }
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-1 ${
-                          showCustomSizeInput
-                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                            : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
-                        }`}
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                        <span>自訂</span>
-                      </motion.button>
-                      
-                      {(picoImageSize || showCustomSizeInput) && (
-                        <motion.button
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => {
-                            setPicoImageSize('');
-                            setPicoCustomSize('');
-                            setShowCustomSizeInput(false);
-                          }}
-                          className="px-2 py-1.5 rounded-lg text-sm bg-red-100 text-red-600 hover:bg-red-200 transition-colors flex items-center"
-                          title="清除選擇"
-                        >
-                          <XMarkIcon className="w-4 h-4" />
-                        </motion.button>
-                      )}
-                    </div>
-                    
-                    {/* 自訂尺寸輸入框 */}
-                    <AnimatePresence>
-                      {showCustomSizeInput && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden"
-                        >
-                          <input
-                            type="text"
-                            value={picoCustomSize}
-                            onChange={(e) => {
-                              setPicoCustomSize(e.target.value);
-                              setPicoImageSize(e.target.value);
-                            }}
-                            placeholder="例如：1280x720、16:9、正方形"
-                            className="w-full mt-2 px-3 py-2 rounded-lg border border-[#FFB6C1]/30 bg-white/80 text-[#4B4036] text-sm focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]/50 placeholder-[#4B4036]/40"
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                          <div className="flex flex-wrap gap-2">
+                            {['1024x1024', '1024x768', '768x1024', '1920x1080', 'A4'].map((size) => (
+                              <motion.button
+                                key={size}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                  setPicoImageSize(picoImageSize === size ? '' : size);
+                                  setShowCustomSizeInput(false);
+                                  setPicoCustomSize('');
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${picoImageSize === size && !showCustomSizeInput
+                                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                                    : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                                  }`}
+                              >
+                                {size}
+                              </motion.button>
+                            ))}
+
+                            {/* 自訂尺寸按鈕 */}
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                setShowCustomSizeInput(!showCustomSizeInput);
+                                if (!showCustomSizeInput) {
+                                  setPicoImageSize('');
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-1 ${showCustomSizeInput
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                                  : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                                }`}
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                              <span>自訂</span>
+                            </motion.button>
+
+                            {(picoImageSize || showCustomSizeInput) && (
+                              <motion.button
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => {
+                                  setPicoImageSize('');
+                                  setPicoCustomSize('');
+                                  setShowCustomSizeInput(false);
+                                }}
+                                className="px-2 py-1.5 rounded-lg text-sm bg-red-100 text-red-600 hover:bg-red-200 transition-colors flex items-center"
+                                title="清除選擇"
+                              >
+                                <XMarkIcon className="w-4 h-4" />
+                              </motion.button>
+                            )}
+                          </div>
+
+                          {/* 自訂尺寸輸入框 */}
+                          <AnimatePresence>
+                            {showCustomSizeInput && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <input
+                                  type="text"
+                                  value={picoCustomSize}
+                                  onChange={(e) => {
+                                    setPicoCustomSize(e.target.value);
+                                    setPicoImageSize(e.target.value);
+                                  }}
+                                  placeholder="例如：1280x720、16:9、正方形"
+                                  className="w-full mt-2 px-3 py-2 rounded-lg border border-[#FFB6C1]/30 bg-white/80 text-[#4B4036] text-sm focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]/50 placeholder-[#4B4036]/40"
+                                />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
 
                         {/* 風格選項 */}
                         <div>
@@ -5645,97 +5650,95 @@ export default function RoomChatPage() {
                             </svg>
                             繪圖風格
                           </label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { value: 'kawaii', label: '可愛風' },
-                        { value: 'realistic', label: '寫實' },
-                        { value: 'cartoon', label: '卡通' },
-                        { value: 'anime', label: '動漫' },
-                        { value: 'watercolor', label: '水彩' },
-                        { value: 'chibi', label: 'Q版' },
-                        { value: 'pastel', label: '粉彩' }
-                      ].map((style) => (
-                        <motion.button
-                          key={style.value}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            setPicoImageStyle(picoImageStyle === style.value ? '' : style.value);
-                            setShowCustomStyleInput(false);
-                            setPicoCustomStyle('');
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                            picoImageStyle === style.value && !showCustomStyleInput
-                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                              : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
-                          }`}
-                        >
-                          {style.label}
-                        </motion.button>
-                      ))}
-                      
-                      {/* 自訂風格按鈕 */}
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                          setShowCustomStyleInput(!showCustomStyleInput);
-                          if (!showCustomStyleInput) {
-                            setPicoImageStyle('');
-                          }
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-1 ${
-                          showCustomStyleInput
-                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                            : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
-                        }`}
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                        <span>自訂</span>
-                      </motion.button>
-                      
-                      {(picoImageStyle || showCustomStyleInput) && (
-                        <motion.button
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => {
-                            setPicoImageStyle('');
-                            setPicoCustomStyle('');
-                            setShowCustomStyleInput(false);
-                          }}
-                          className="px-2 py-1.5 rounded-lg text-sm bg-red-100 text-red-600 hover:bg-red-200 transition-colors flex items-center"
-                          title="清除選擇"
-                        >
-                          <XMarkIcon className="w-4 h-4" />
-                        </motion.button>
-                      )}
-                    </div>
-                    
-                    {/* 自訂風格輸入框 */}
-                    <AnimatePresence>
-                      {showCustomStyleInput && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden"
-                        >
-                          <input
-                            type="text"
-                            value={picoCustomStyle}
-                            onChange={(e) => {
-                              setPicoCustomStyle(e.target.value);
-                              setPicoImageStyle(e.target.value);
-                            }}
-                            placeholder="例如：油畫風、像素風、扁平化、賽博龐克"
-                            className="w-full mt-2 px-3 py-2 rounded-lg border border-[#FFB6C1]/30 bg-white/80 text-[#4B4036] text-sm focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]/50 placeholder-[#4B4036]/40"
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                          <div className="flex flex-wrap gap-2">
+                            {[
+                              { value: 'kawaii', label: '可愛風' },
+                              { value: 'realistic', label: '寫實' },
+                              { value: 'cartoon', label: '卡通' },
+                              { value: 'anime', label: '動漫' },
+                              { value: 'watercolor', label: '水彩' },
+                              { value: 'chibi', label: 'Q版' },
+                              { value: 'pastel', label: '粉彩' }
+                            ].map((style) => (
+                              <motion.button
+                                key={style.value}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                  setPicoImageStyle(picoImageStyle === style.value ? '' : style.value);
+                                  setShowCustomStyleInput(false);
+                                  setPicoCustomStyle('');
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${picoImageStyle === style.value && !showCustomStyleInput
+                                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                                    : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                                  }`}
+                              >
+                                {style.label}
+                              </motion.button>
+                            ))}
+
+                            {/* 自訂風格按鈕 */}
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                setShowCustomStyleInput(!showCustomStyleInput);
+                                if (!showCustomStyleInput) {
+                                  setPicoImageStyle('');
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-1 ${showCustomStyleInput
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                                  : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                                }`}
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                              <span>自訂</span>
+                            </motion.button>
+
+                            {(picoImageStyle || showCustomStyleInput) && (
+                              <motion.button
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => {
+                                  setPicoImageStyle('');
+                                  setPicoCustomStyle('');
+                                  setShowCustomStyleInput(false);
+                                }}
+                                className="px-2 py-1.5 rounded-lg text-sm bg-red-100 text-red-600 hover:bg-red-200 transition-colors flex items-center"
+                                title="清除選擇"
+                              >
+                                <XMarkIcon className="w-4 h-4" />
+                              </motion.button>
+                            )}
+                          </div>
+
+                          {/* 自訂風格輸入框 */}
+                          <AnimatePresence>
+                            {showCustomStyleInput && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <input
+                                  type="text"
+                                  value={picoCustomStyle}
+                                  onChange={(e) => {
+                                    setPicoCustomStyle(e.target.value);
+                                    setPicoImageStyle(e.target.value);
+                                  }}
+                                  placeholder="例如：油畫風、像素風、扁平化、賽博龐克"
+                                  className="w-full mt-2 px-3 py-2 rounded-lg border border-[#FFB6C1]/30 bg-white/80 text-[#4B4036] text-sm focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]/50 placeholder-[#4B4036]/40"
+                                />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
 
 
                         {/* 當前選擇提示 */}
@@ -5773,7 +5776,7 @@ export default function RoomChatPage() {
               const roleId = selectedCompanion;
               const companion = companions.find(c => c.id === roleId);
               if (!companion) return null;
-              
+
               // 根據角色獲取對應的狀態和 refs
               const getRoleModelState = () => {
                 if (roleId === 'pico') {
@@ -5846,7 +5849,7 @@ export default function RoomChatPage() {
               };
               const modelState = getRoleModelState();
               const dropdownDataAttr = roleId === 'pico' ? 'data-pico-model-dropdown' : roleId === 'mori' ? 'data-mori-model-dropdown' : 'data-hibi-model-dropdown';
-              
+
               return (
                 <motion.div
                   key={roleId}
@@ -5866,12 +5869,12 @@ export default function RoomChatPage() {
                       <span className="text-sm font-medium text-[#4B4036]">
                         {companion.name} - 選擇 AI 模型
                       </span>
-                      {(modelState.selectedModel !== DEFAULT_MODEL_SENTINEL || 
+                      {(modelState.selectedModel !== DEFAULT_MODEL_SENTINEL ||
                         (roleId === 'mori' && modelState.selectedModelsMulti && modelState.selectedModelsMulti.length > 0)) && (
-                        <span className="px-2 py-0.5 bg-[#FFB6C1]/20 rounded-full text-xs text-[#FFB6C1]">
-                          已選擇
-                        </span>
-                      )}
+                          <span className="px-2 py-0.5 bg-[#FFB6C1]/20 rounded-full text-xs text-[#FFB6C1]">
+                            已選擇
+                          </span>
+                        )}
                     </div>
                     <motion.div
                       animate={{ rotate: modelState.expanded ? 180 : 0 }}
@@ -5911,9 +5914,9 @@ export default function RoomChatPage() {
                                     const v = e.target.value;
                                     modelState.setModelSearch(v);
                                     modelState.setModelSelectOpen(true);
-                                    
-                                    if (v === DEFAULT_MODEL_SENTINEL) { 
-                                      modelState.setSelectedModel(v); 
+
+                                    if (v === DEFAULT_MODEL_SENTINEL) {
+                                      modelState.setSelectedModel(v);
                                       modelState.setModelSearch('');
                                       if (roleId === 'mori' && modelState.setSelectedModelsMulti) {
                                         modelState.setSelectedModelsMulti([]);
@@ -5921,12 +5924,12 @@ export default function RoomChatPage() {
                                       return;
                                     }
                                     if (roleId !== 'mori') {
-                                    const exists = modelState.getFilteredModels().some((m: any) => m.model_id === v) || availableModels.some((m: any) => m.model_id === v);
+                                      const exists = modelState.getFilteredModels().some((m: any) => m.model_id === v) || availableModels.some((m: any) => m.model_id === v);
                                       if (exists) modelState.setSelectedModel(v);
                                     }
                                   }}
-                                  onFocus={() => {}}
-                                  onBlur={() => {}}
+                                  onFocus={() => { }}
+                                  onBlur={() => { }}
                                   placeholder={(() => {
                                     if (roleId === 'mori') {
                                       if (modelState.selectedModelsMulti && modelState.selectedModelsMulti.length === 0) {
@@ -5955,7 +5958,7 @@ export default function RoomChatPage() {
                                     </svg>
                                   </motion.div>
                                 </div>
-                                
+
                                 {/* 彈出模態窗口 - 使用 Portal 渲染到 body */}
                                 {typeof document !== 'undefined' && modelState.modelSelectOpen && createPortal(
                                   <AnimatePresence>
@@ -6003,7 +6006,7 @@ export default function RoomChatPage() {
                                             <XMarkIcon className="w-5 h-5 text-[#4B4036]" />
                                           </motion.button>
                                         </div>
-                                        
+
                                         {/* 搜尋框 */}
                                         <div className="px-6 py-4 border-b border-[#EADBC8]">
                                           <input
@@ -6018,7 +6021,7 @@ export default function RoomChatPage() {
                                             autoFocus
                                           />
                                         </div>
-                                        
+
                                         {/* 模型列表 */}
                                         <div className="overflow-y-auto flex-1">
                                           {/* 預設選項 */}
@@ -6035,11 +6038,10 @@ export default function RoomChatPage() {
                                                 modelState.setSelectedModelsMulti([]);
                                               }
                                             }}
-                                            className={`w-full text-left px-6 py-3 text-sm transition-colors border-b border-[#EADBC8]/30 ${
-                                              modelState.selectedModel === DEFAULT_MODEL_SENTINEL 
-                                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' 
+                                            className={`w-full text-left px-6 py-3 text-sm transition-colors border-b border-[#EADBC8]/30 ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL
+                                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
                                                 : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                            }`}
+                                              }`}
                                           >
                                             <div className="font-medium">預設（建議）</div>
                                             {modelState.roleDefaultModel && (
@@ -6048,7 +6050,7 @@ export default function RoomChatPage() {
                                               </div>
                                             )}
                                           </motion.button>
-                                          
+
                                           {/* 多選模型提示（僅 Mori） */}
                                           {roleId === 'mori' && modelState.selectedModelsMulti && (
                                             <div className="px-6 py-2 bg-[#FFF9F2] border-b border-[#EADBC8]/30">
@@ -6057,34 +6059,34 @@ export default function RoomChatPage() {
                                               </div>
                                             </div>
                                           )}
-                                          
+
                                           {/* 模型選項 */}
-                                  {modelState.getFilteredModels().filter((m: any) => {
-                                    if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
-                                    if (!modelState.modelSearch.trim()) return true;
-                                    const q = modelState.modelSearch.toLowerCase();
-                                    return (
-                                      (m.display_name || '').toLowerCase().includes(q) ||
-                                      (m.description || '').toLowerCase().includes(q) ||
-                                      (m.provider || '').toLowerCase().includes(q) ||
-                                      (m.model_id || '').toLowerCase().includes(q)
-                                    );
+                                          {modelState.getFilteredModels().filter((m: any) => {
+                                            if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
+                                            if (!modelState.modelSearch.trim()) return true;
+                                            const q = modelState.modelSearch.toLowerCase();
+                                            return (
+                                              (m.display_name || '').toLowerCase().includes(q) ||
+                                              (m.description || '').toLowerCase().includes(q) ||
+                                              (m.provider || '').toLowerCase().includes(q) ||
+                                              (m.model_id || '').toLowerCase().includes(q)
+                                            );
                                           }).map((model: any) => {
                                             const isMultiSelected = roleId === 'mori' && modelState.selectedModelsMulti && modelState.selectedModelsMulti.includes(model.model_id);
                                             const isSingleSelected = roleId !== 'mori' && modelState.selectedModel === model.model_id;
                                             const isSelected = isMultiSelected || isSingleSelected;
                                             const isDisabled = roleId === 'mori' && !isMultiSelected && modelState.selectedModelsMulti && modelState.selectedModelsMulti.length >= 4;
-                                            
+
                                             return (
                                               <motion.button
-                                      key={model.model_id}
+                                                key={model.model_id}
                                                 whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
                                                 whileTap={{ scale: 0.98 }}
                                                 type="button"
                                                 disabled={isDisabled}
                                                 onMouseDown={(e) => {
                                                   e.preventDefault();
-                                                  
+
                                                   if (roleId === 'mori' && modelState.setSelectedModelsMulti) {
                                                     let newMultiModels: string[];
                                                     if (isMultiSelected) {
@@ -6107,13 +6109,12 @@ export default function RoomChatPage() {
                                                     modelState.saveFunction(model.model_id);
                                                   }
                                                 }}
-                                                className={`w-full text-left px-6 py-3 text-sm transition-colors border-b border-[#EADBC8]/30 ${
-                                                  isSelected
-                                                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' 
+                                                className={`w-full text-left px-6 py-3 text-sm transition-colors border-b border-[#EADBC8]/30 ${isSelected
+                                                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
                                                     : isDisabled
                                                       ? 'text-gray-400 cursor-not-allowed'
                                                       : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                                }`}
+                                                  }`}
                                               >
                                                 <div className="flex items-center justify-between">
                                                   <div className="flex-1">
@@ -6135,9 +6136,8 @@ export default function RoomChatPage() {
                                                           </svg>
                                                         </motion.div>
                                                       ) : (
-                                                        <div className={`w-6 h-6 rounded-full border-2 ${
-                                                          isSelected ? 'border-white/80' : 'border-[#EADBC8]'
-                                                        }`} />
+                                                        <div className={`w-6 h-6 rounded-full border-2 ${isSelected ? 'border-white/80' : 'border-[#EADBC8]'
+                                                          }`} />
                                                       )}
                                                     </div>
                                                   )}
@@ -6152,7 +6152,7 @@ export default function RoomChatPage() {
                                   document.body
                                 )}
                               </div>
-                              
+
                               {/* 多選模型顯示（僅 Mori） */}
                               {roleId === 'mori' && modelState.selectedModelsMulti && modelState.selectedModelsMulti.length > 0 && (
                                 <div className="mt-2">
@@ -6184,26 +6184,26 @@ export default function RoomChatPage() {
                                         </motion.span>
                                       );
                                     })}
-                              </div>
+                                  </div>
                                   <div className="mt-2 text-xs text-[#4B4036]">
                                     已選 {modelState.selectedModelsMulti.length} / 4{modelState.selectedModelsMulti.length < 2 && '（至少 2 個）'}
                                   </div>
                                 </div>
                               )}
-                              
+
                               {/* 選中模型詳情 */}
                               <div className="p-3 bg-[#FFF9F2] border border-[#FFB6C1] rounded-lg">
                                 {(() => {
                                   if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL && (roleId !== 'mori' || !modelState.selectedModelsMulti || modelState.selectedModelsMulti.length === 0)) {
                                     return <div className="text-sm text-[#4B4036]">將使用角色的預設模型</div>;
                                   }
-                                  
+
                                   if (roleId === 'mori' && modelState.selectedModelsMulti && modelState.selectedModelsMulti.length > 0) {
                                     const multiModels = modelState.selectedModelsMulti.map((modelId: string) => {
-                                      return modelState.getFilteredModels().find((m: any) => m.model_id === modelId) || 
-                                             availableModels.find((m: any) => m.model_id === modelId);
+                                      return modelState.getFilteredModels().find((m: any) => m.model_id === modelId) ||
+                                        availableModels.find((m: any) => m.model_id === modelId);
                                     }).filter(Boolean);
-                                    
+
                                     if (multiModels.length > 0) {
                                       return (
                                         <>
@@ -6215,12 +6215,11 @@ export default function RoomChatPage() {
                                               <div key={idx} className="text-xs">
                                                 <div className="flex items-center justify-between">
                                                   <span className="text-[#4B4036]">{stripFree(model.display_name || '')}</span>
-                                                  <span className={`px-2 py-0.5 rounded-full text-xs ${
-                                                    stripFree(model.price_tier || '') === '免費' || model.price_tier === '免費' ? 'bg-green-100 text-green-800' :
-                                                    stripFree(model.price_tier || '') === '經濟' || model.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
-                                                    stripFree(model.price_tier || '') === '標準' || model.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-purple-100 text-purple-800'
-                                                  }`}>
+                                                  <span className={`px-2 py-0.5 rounded-full text-xs ${stripFree(model.price_tier || '') === '免費' || model.price_tier === '免費' ? 'bg-green-100 text-green-800' :
+                                                      stripFree(model.price_tier || '') === '經濟' || model.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
+                                                        stripFree(model.price_tier || '') === '標準' || model.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
+                                                          'bg-purple-100 text-purple-800'
+                                                    }`}>
                                                     {stripFree(model.price_tier || '')}
                                                   </span>
                                                 </div>
@@ -6231,19 +6230,18 @@ export default function RoomChatPage() {
                                       );
                                     }
                                   }
-                                  
+
                                   const effectiveModelId = modelState.selectedModel === DEFAULT_MODEL_SENTINEL ? modelState.roleDefaultModel : modelState.selectedModel;
                                   const selectedModelData = modelState.getFilteredModels().find((m: any) => m.model_id === effectiveModelId) || availableModels.find((m: any) => m.model_id === effectiveModelId);
                                   return selectedModelData ? (
                                     <>
                                       <div className="flex items-center justify-between">
                                         <div className="text-sm font-medium text-[#4B4036]">{stripFree(selectedModelData.display_name || '')}</div>
-                                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                          stripFree(selectedModelData.price_tier || '') === '免費' || selectedModelData.price_tier === '免費' ? 'bg-green-100 text-green-800' :
-                                          stripFree(selectedModelData.price_tier || '') === '經濟' || selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
-                                          stripFree(selectedModelData.price_tier || '') === '標準' || selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-purple-100 text-purple-800'
-                                        }`}>
+                                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${stripFree(selectedModelData.price_tier || '') === '免費' || selectedModelData.price_tier === '免費' ? 'bg-green-100 text-green-800' :
+                                            stripFree(selectedModelData.price_tier || '') === '經濟' || selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
+                                              stripFree(selectedModelData.price_tier || '') === '標準' || selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-purple-100 text-purple-800'
+                                          }`}>
                                           {stripFree(selectedModelData.price_tier || '')}
                                         </div>
                                       </div>
@@ -6272,10 +6270,10 @@ export default function RoomChatPage() {
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyDown={handleKeyPress}
                   placeholder={
-                    activeRoles.length === 1 
+                    activeRoles.length === 1
                       ? `與 ${companions.find(c => c.id === activeRoles[0])?.name} 對話...`
                       : selectedCompanion === 'hibi'
-                          ? '向 Hibi 總管尋求統籌和協調建議...'
+                        ? '向 Hibi 總管尋求統籌和協調建議...'
                         : selectedCompanion === 'mori'
                           ? '向墨墨提問研究或學習相關問題...'
                           : '向皮可尋求創意和設計建議...'
@@ -6291,7 +6289,7 @@ export default function RoomChatPage() {
                   whileHover={{ scale: 1.1, rotate: 5 }}
                   whileTap={{ scale: 0.9 }}
                   animate={{
-                    boxShadow: !inputMessage.trim() 
+                    boxShadow: !inputMessage.trim()
                       ? "none"
                       : ["0 0 0 0 rgba(255, 182, 193, 0.4)", "0 0 0 8px rgba(255, 182, 193, 0)", "0 0 0 0 rgba(255, 182, 193, 0.4)"]
                   }}
@@ -6300,11 +6298,10 @@ export default function RoomChatPage() {
                   }}
                   onClick={handleSendMessage}
                   disabled={!inputMessage.trim() || isLoading || isTyping || isSending}
-                  className={`relative p-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white rounded-xl shadow-lg hover:shadow-xl transition-all ${
-                    !inputMessage.trim() || isLoading || isTyping 
-                      ? 'opacity-50 cursor-not-allowed' 
+                  className={`relative p-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white rounded-xl shadow-lg hover:shadow-xl transition-all ${!inputMessage.trim() || isLoading || isTyping
+                      ? 'opacity-50 cursor-not-allowed'
                       : 'hover:scale-105'
-                  }`}
+                    }`}
                   title="發送訊息"
                 >
                   {isLoading || isTyping ? (
@@ -6318,7 +6315,7 @@ export default function RoomChatPage() {
                     <PaperAirplaneIcon className="w-6 h-6" />
                   )}
                 </motion.button>
-                
+
                 {/* 附件/圖片按鈕 */}
                 <motion.button
                   whileHover={{ scale: 1.1, y: -2 }}
@@ -6359,7 +6356,7 @@ export default function RoomChatPage() {
                     <XMarkIcon className="w-5 h-5 text-gray-500" />
                   </motion.button>
                 </div>
-                <TaskPanelContent 
+                <TaskPanelContent
                   tasks={tasks}
                   activeRoles={activeRoles}
                   room={room}
@@ -6408,7 +6405,7 @@ export default function RoomChatPage() {
 
                   {/* 移動端任務面板內容 */}
                   <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
-                    <TaskPanelContent 
+                    <TaskPanelContent
                       tasks={tasks}
                       activeRoles={activeRoles}
                       room={room}
@@ -6470,7 +6467,7 @@ export default function RoomChatPage() {
                       {activeRoles.map((companionId) => {
                         const companion = companions.find(c => c.id === companionId);
                         if (!companion) return null;
-                        
+
                         return (
                           <div
                             key={companionId}
@@ -6586,12 +6583,12 @@ export default function RoomChatPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-                  onClick={() => {
-                    setShowSettingsModal(false);
-                    setOpenPanels({ roles: false, invite: false }); // 關閉時重置面板狀態
-                    setInviteRoleSelectOpen(false);
-                    setInviteRoleSearch('');
-                  }}
+              onClick={() => {
+                setShowSettingsModal(false);
+                setOpenPanels({ roles: false, invite: false }); // 關閉時重置面板狀態
+                setInviteRoleSelectOpen(false);
+                setInviteRoleSearch('');
+              }}
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -6648,7 +6645,7 @@ export default function RoomChatPage() {
                         </span>
                       </div>
                       <motion.span animate={{ rotate: openPanels.roles ? 180 : 0 }}>
-                        <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd"/></svg>
+                        <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
                       </motion.span>
                     </button>
 
@@ -6664,49 +6661,49 @@ export default function RoomChatPage() {
                           <div className="px-4 pb-4 border-t border-[#EADBC8]">
                             <div className="mt-4 space-y-3">
                               {activeRoles.map((roleId) => {
-                            const companion = companions.find(c => c.id === roleId);
-                            if (!companion) return null;
-                            
-                            return (
-                              <motion.div
-                                key={roleId}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border border-green-200"
-                              >
-                                <div className="flex items-center space-x-4">
-                                  <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
-                                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                      <Image
-                                        src={companion.imagePath}
-                                        alt={companion.name}
-                                        width={40}
-                                        height={40}
-                                        className="w-10 h-10 object-cover"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <h4 className="font-semibold text-[#4B4036]">{companion.name}</h4>
-                                    <p className="text-sm text-green-700">{companion.specialty}</p>
-                                  </div>
-                                </div>
-                                
-                                {/* 移除按鈕（只有多於1個角色時顯示） */}
-                                {activeRoles.length > 1 && (
-                                  <motion.button
-                                    whileHover={{ scale: 1.1, rotate: 90 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={() => handleRemoveRole(roleId)}
-                                    className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all"
-                                    title={`移除 ${companion.name}`}
+                                const companion = companions.find(c => c.id === roleId);
+                                if (!companion) return null;
+
+                                return (
+                                  <motion.div
+                                    key={roleId}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border border-green-200"
                                   >
-                                    <XMarkIcon className="w-4 h-4" />
-                                  </motion.button>
-                                )}
-                              </motion.div>
-                            );
-                          })}
+                                    <div className="flex items-center space-x-4">
+                                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
+                                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                          <Image
+                                            src={companion.imagePath}
+                                            alt={companion.name}
+                                            width={40}
+                                            height={40}
+                                            className="w-10 h-10 object-cover"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <h4 className="font-semibold text-[#4B4036]">{companion.name}</h4>
+                                        <p className="text-sm text-green-700">{companion.specialty}</p>
+                                      </div>
+                                    </div>
+
+                                    {/* 移除按鈕（只有多於1個角色時顯示） */}
+                                    {activeRoles.length > 1 && (
+                                      <motion.button
+                                        whileHover={{ scale: 1.1, rotate: 90 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        onClick={() => handleRemoveRole(roleId)}
+                                        className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all"
+                                        title={`移除 ${companion.name}`}
+                                      >
+                                        <XMarkIcon className="w-4 h-4" />
+                                      </motion.button>
+                                    )}
+                                  </motion.div>
+                                );
+                              })}
                             </div>
                           </div>
                         </motion.div>
@@ -6735,7 +6732,7 @@ export default function RoomChatPage() {
                           </span>
                         </div>
                         <motion.span animate={{ rotate: openPanels.invite ? 180 : 0 }}>
-                          <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd"/></svg>
+                          <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
                         </motion.span>
                       </button>
 
@@ -6787,7 +6784,7 @@ export default function RoomChatPage() {
                                       </svg>
                                     </motion.div>
                                   </div>
-                                  
+
                                   {/* 下拉選單列表 - 使用 Portal 渲染到 body */}
                                   {typeof document !== 'undefined' && inviteRoleSelectOpen && inviteRoleDropdownPosition && createPortal(
                                     <AnimatePresence>
@@ -6851,19 +6848,19 @@ export default function RoomChatPage() {
                                               </div>
                                             </motion.button>
                                           ))}
-                                        {companions.filter(companion => 
+                                        {companions.filter(companion =>
                                           !activeRoles.includes(companion.id) &&
-                                          (!inviteRoleSearch.trim() || 
+                                          (!inviteRoleSearch.trim() ||
                                             companion.name.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
                                             companion.nameEn.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
                                             companion.description.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
                                             companion.specialty.toLowerCase().includes(inviteRoleSearch.toLowerCase())
                                           )
                                         ).length === 0 && (
-                                          <div className="px-3 py-4 text-center text-sm text-[#2B3A3B]">
-                                            沒有可邀請的角色
-                                          </div>
-                                        )}
+                                            <div className="px-3 py-4 text-center text-sm text-[#2B3A3B]">
+                                              沒有可邀請的角色
+                                            </div>
+                                          )}
                                       </motion.div>
                                     </AnimatePresence>,
                                     document.body
@@ -6936,147 +6933,147 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
 
   const renderPlainText = () => {
     return message.content.split('\n').map((line, index) => {
-                // ⭐ 優先檢查是否為圖片 markdown 格式（必須在直接 URL 檢查之前）
-                // 改進正則：匹配 ![alt](url) 格式，支援 URL 中包含特殊字符
-                const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
-                if (imageMatch && imageMatch.index !== undefined) {
-                  let imageUrl = imageMatch[2].trim(); // 捕獲組 2 是 URL，去除首尾空格
-                  
-                  // ⭐ 提取 Markdown 圖片前後的文字（完全移除 Markdown 標記）
-                  const markdownText = imageMatch[0]; // 完整的 ![alt](url)
-                  const textBefore = line.substring(0, imageMatch.index).trim();
-                  const textAfter = line.substring(imageMatch.index + markdownText.length).trim();
-                  
-                  // 如果是 iframe，提取其中的圖片 URL
-                  if (imageUrl.includes('<iframe')) {
-                    const urlExtract = imageUrl.match(/https:\/\/[^\s"<>]+\.(?:png|jpg|jpeg|webp|gif)/i);
-                    if (urlExtract) {
-                      imageUrl = urlExtract[0];
-                    } else {
-                      return <p key={index} className="text-red-500">圖片連結解析失敗</p>;
-                    }
-                  }
-                  
-                  // ⭐ 轉換為公開 URL（用於實際載入圖片）
-                  const publicUrl = convertToPublicUrl(imageUrl);
-                  // ⭐ 轉換為簡潔 URL（用於連結，包含完整路徑資訊）
-                  const shortUrl = convertToShortUrl(imageUrl);
-                  // ⭐ 獲取簡潔顯示 URL（僅用於顯示文字）
-                  const displayUrl = getShortDisplayUrl(imageUrl);
-                  
-                  return (
-                    <div key={index} className="mt-3">
-                      {/* 如果 Markdown 前有文字，顯示文字 */}
-                      {textBefore && <p className="mb-2 text-sm opacity-80">{textBefore}</p>}
-                      
-                      <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2 relative">
-                        {/* 食量顯示 - 圖片訊息框右上角 */}
-                        <div className="relative group">
-                          <SecureImageDisplay
-                            imageUrl={publicUrl}
-                            alt="Pico 創作作品"
-                            className="rounded-lg shadow-lg border-2 border-[#FFB6C1]/30"
-                            thumbnail={true}
-                            thumbnailSize={200}
-                            onDownload={() => downloadImage(imageUrl)}
-                          />
-                        </div>
-                        
-                        <div className="flex items-center justify-between bg-white/50 rounded-lg p-2">
-                          <button
-                            onClick={() => downloadImage(imageUrl)}
-                            className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate text-left"
-                            title="點擊下載圖片"
-                          >
-                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            <span className="truncate">點擊下載圖片</span>
-                          </button>
-                        </div>
-                        
-                        <p className="text-xs text-[#2B3A3B]/60 text-center">
-                          點擊圖片可放大查看，點擊連結可下載
-                        </p>
-                      </div>
-                      
-                      {/* 如果 Markdown 後有文字，顯示文字 */}
-                      {textAfter && <p className="mt-2 text-sm opacity-80">{textAfter}</p>}
-                    </div>
-                  );
-                }
-                
-                // 檢查是否為圖片 URL（支援多種格式）- 在 Markdown 檢查之後
-                const urlMatch = line.match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s]*)?/i);
-                
-                if (urlMatch) {
-                  const imageUrl = urlMatch[0];
-                  // ⭐ 轉換為公開 URL（用於實際載入圖片）
-                  const publicUrl = convertToPublicUrl(imageUrl);
-                  // ⭐ 轉換為簡潔 URL（用於連結，包含完整路徑資訊）
-                  const shortUrl = convertToShortUrl(imageUrl);
-                  // ⭐ 獲取簡潔顯示 URL（僅用於顯示文字）
-                  const displayUrl = getShortDisplayUrl(imageUrl);
+      // ⭐ 優先檢查是否為圖片 markdown 格式（必須在直接 URL 檢查之前）
+      // 改進正則：匹配 ![alt](url) 格式，支援 URL 中包含特殊字符
+      const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+      if (imageMatch && imageMatch.index !== undefined) {
+        let imageUrl = imageMatch[2].trim(); // 捕獲組 2 是 URL，去除首尾空格
+
+        // ⭐ 提取 Markdown 圖片前後的文字（完全移除 Markdown 標記）
+        const markdownText = imageMatch[0]; // 完整的 ![alt](url)
+        const textBefore = line.substring(0, imageMatch.index).trim();
+        const textAfter = line.substring(imageMatch.index + markdownText.length).trim();
+
+        // 如果是 iframe，提取其中的圖片 URL
+        if (imageUrl.includes('<iframe')) {
+          const urlExtract = imageUrl.match(/https:\/\/[^\s"<>]+\.(?:png|jpg|jpeg|webp|gif)/i);
+          if (urlExtract) {
+            imageUrl = urlExtract[0];
+          } else {
+            return <p key={index} className="text-red-500">圖片連結解析失敗</p>;
+          }
+        }
+
+        // ⭐ 轉換為公開 URL（用於實際載入圖片）
+        const publicUrl = convertToPublicUrl(imageUrl);
+        // ⭐ 轉換為簡潔 URL（用於連結，包含完整路徑資訊）
+        const shortUrl = convertToShortUrl(imageUrl);
+        // ⭐ 獲取簡潔顯示 URL（僅用於顯示文字）
+        const displayUrl = getShortDisplayUrl(imageUrl);
+
+        return (
+          <div key={index} className="mt-3">
+            {/* 如果 Markdown 前有文字，顯示文字 */}
+            {textBefore && <p className="mb-2 text-sm opacity-80">{textBefore}</p>}
+
+            <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2 relative">
+              {/* 食量顯示 - 圖片訊息框右上角 */}
+              <div className="relative group">
+                <SecureImageDisplay
+                  imageUrl={publicUrl}
+                  alt="Pico 創作作品"
+                  className="rounded-lg shadow-lg border-2 border-[#FFB6C1]/30"
+                  thumbnail={true}
+                  thumbnailSize={200}
+                  onDownload={() => downloadImage(imageUrl)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between bg-white/50 rounded-lg p-2">
+                <button
+                  onClick={() => downloadImage(imageUrl)}
+                  className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate text-left"
+                  title="點擊下載圖片"
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span className="truncate">點擊下載圖片</span>
+                </button>
+              </div>
+
+              <p className="text-xs text-[#2B3A3B]/60 text-center">
+                點擊圖片可放大查看，點擊連結可下載
+              </p>
+            </div>
+
+            {/* 如果 Markdown 後有文字，顯示文字 */}
+            {textAfter && <p className="mt-2 text-sm opacity-80">{textAfter}</p>}
+          </div>
+        );
+      }
+
+      // 檢查是否為圖片 URL（支援多種格式）- 在 Markdown 檢查之後
+      const urlMatch = line.match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s]*)?/i);
+
+      if (urlMatch) {
+        const imageUrl = urlMatch[0];
+        // ⭐ 轉換為公開 URL（用於實際載入圖片）
+        const publicUrl = convertToPublicUrl(imageUrl);
+        // ⭐ 轉換為簡潔 URL（用於連結，包含完整路徑資訊）
+        const shortUrl = convertToShortUrl(imageUrl);
+        // ⭐ 獲取簡潔顯示 URL（僅用於顯示文字）
+        const displayUrl = getShortDisplayUrl(imageUrl);
         const textBefore = line.substring(0, urlMatch.index!);
-                  const textAfter = line.substring(urlMatch.index! + imageUrl.length);
-                  
-                  return (
-                    <div key={index} className="mt-3">
-                      {/* 如果 URL 前有文字，顯示文字 */}
-                      {textBefore && <p className="mb-2 text-sm opacity-80">{textBefore}</p>}
-                      
-                      {/* 圖片預覽區域 */}
-                      <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2 relative">
-                        {/* 食量顯示 - 圖片訊息框右上角 */}
-                        {/* 圖片顯示 - 使用 SecureImageDisplay 組件處理 Public Bucket */}
-                        <div className="relative group">
-                          <SecureImageDisplay
-                            imageUrl={publicUrl}
-                            alt="AI 生成圖片"
-                            className="rounded-lg shadow-lg border-2 border-[#FFB6C1]/30"
-                            thumbnail={true}
-                            thumbnailSize={200}
-                            onDownload={() => downloadImage(imageUrl)}
-                          />
-                        </div>
-                        
-                        {/* 下載連結 */}
-                        <div className="flex items-center justify-between bg-white/50 rounded-lg p-2">
-                          <button
-                            onClick={() => downloadImage(imageUrl)}
-                            className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate text-left"
-                            title="點擊下載圖片"
-                          >
-                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            <span className="truncate">點擊下載圖片</span>
-                          </button>
-                        </div>
-                        
-                        <p className="text-xs text-[#2B3A3B]/60 text-center">
-                          點擊圖片可放大查看，點擊連結可下載
-                        </p>
-                      </div>
-                      
-                      {/* 如果 URL 後有文字，顯示文字 */}
-                      {textAfter && <p className="mt-2 text-sm opacity-80">{textAfter}</p>}
-                    </div>
-                  );
-                }
-                
-                // 一般文字內容（排除 Markdown 圖片格式）
-                // 如果整行包含 Markdown 圖片格式但沒有匹配成功，跳過顯示（避免顯示原始 Markdown）
-                if (line.includes('![') && line.includes('](') && line.includes(')')) {
-                  // 可能是未匹配成功的 Markdown 格式，跳過避免顯示原始標記
-                  return null;
-                }
-                
-                // 一般文字內容
-                if (line.trim()) {
-                  return <p key={index} className="mb-1">{line}</p>;
-                }
-                return null;
+        const textAfter = line.substring(urlMatch.index! + imageUrl.length);
+
+        return (
+          <div key={index} className="mt-3">
+            {/* 如果 URL 前有文字，顯示文字 */}
+            {textBefore && <p className="mb-2 text-sm opacity-80">{textBefore}</p>}
+
+            {/* 圖片預覽區域 */}
+            <div className="bg-white/30 rounded-xl p-3 shadow-sm space-y-2 relative">
+              {/* 食量顯示 - 圖片訊息框右上角 */}
+              {/* 圖片顯示 - 使用 SecureImageDisplay 組件處理 Public Bucket */}
+              <div className="relative group">
+                <SecureImageDisplay
+                  imageUrl={publicUrl}
+                  alt="AI 生成圖片"
+                  className="rounded-lg shadow-lg border-2 border-[#FFB6C1]/30"
+                  thumbnail={true}
+                  thumbnailSize={200}
+                  onDownload={() => downloadImage(imageUrl)}
+                />
+              </div>
+
+              {/* 下載連結 */}
+              <div className="flex items-center justify-between bg-white/50 rounded-lg p-2">
+                <button
+                  onClick={() => downloadImage(imageUrl)}
+                  className="text-xs text-[#FFB6C1] hover:text-[#FF9BB3] underline flex items-center space-x-1 flex-1 truncate text-left"
+                  title="點擊下載圖片"
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span className="truncate">點擊下載圖片</span>
+                </button>
+              </div>
+
+              <p className="text-xs text-[#2B3A3B]/60 text-center">
+                點擊圖片可放大查看，點擊連結可下載
+              </p>
+            </div>
+
+            {/* 如果 URL 後有文字，顯示文字 */}
+            {textAfter && <p className="mt-2 text-sm opacity-80">{textAfter}</p>}
+          </div>
+        );
+      }
+
+      // 一般文字內容（排除 Markdown 圖片格式）
+      // 如果整行包含 Markdown 圖片格式但沒有匹配成功，跳過顯示（避免顯示原始 Markdown）
+      if (line.includes('![') && line.includes('](') && line.includes(')')) {
+        // 可能是未匹配成功的 Markdown 格式，跳過避免顯示原始標記
+        return null;
+      }
+
+      // 一般文字內容
+      if (line.trim()) {
+        return <p key={index} className="mb-1">{line}</p>;
+      }
+      return null;
     });
   };
 
@@ -7136,22 +7133,20 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
             <button
               type="button"
               onClick={() => setMoriViewMode('stack')}
-              className={`px-3 py-1 rounded-full transition-all ${
-                moriViewMode === 'stack'
+              className={`px-3 py-1 rounded-full transition-all ${moriViewMode === 'stack'
                   ? 'bg-white shadow-sm text-[#B33B63]'
                   : 'text-[#B33B63]/70 hover:text-[#B33B63]'
-              }`}
+                }`}
             >
               清單
             </button>
             <button
               type="button"
               onClick={() => setMoriViewMode('deck')}
-              className={`px-3 py-1 rounded-full transition-all ${
-                moriViewMode === 'deck'
+              className={`px-3 py-1 rounded-full transition-all ${moriViewMode === 'deck'
                   ? 'bg-white shadow-sm text-[#B33B63]'
                   : 'text-[#B33B63]/70 hover:text-[#B33B63]'
-              }`}
+                }`}
             >
               卡片
             </button>
@@ -7173,9 +7168,8 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                       type="button"
                       onClick={handlePrevModel}
                       disabled={currentActiveIndex === 0}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#F3E0E8] bg-white transition-all ${
-                        currentActiveIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-x-0.5'
-                      }`}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#F3E0E8] bg-white transition-all ${currentActiveIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-x-0.5'
+                        }`}
                       aria-label="上一個模型"
                     >
                       <ArrowLeftIcon className="w-4 h-4 text-[#B33B63]" />
@@ -7184,9 +7178,8 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                       type="button"
                       onClick={handleNextModel}
                       disabled={currentActiveIndex === modelResponses.length - 1}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#F3E0E8] bg-white transition-all ${
-                        currentActiveIndex === modelResponses.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:translate-x-0.5'
-                      }`}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#F3E0E8] bg-white transition-all ${currentActiveIndex === modelResponses.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:translate-x-0.5'
+                        }`}
                       aria-label="下一個模型"
                     >
                       <ArrowLeftIcon className="w-4 h-4 text-[#B33B63] rotate-180" />
@@ -7200,11 +7193,10 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                           key={`indicator-${idx}`}
                           type="button"
                           onClick={() => setActiveMoriIndex(idx)}
-                          className={`max-w-[160px] truncate px-3 py-1.5 text-xs font-medium rounded-full transition-all border ${
-                            idx === currentActiveIndex
+                          className={`max-w-[160px] truncate px-3 py-1.5 text-xs font-medium rounded-full transition-all border ${idx === currentActiveIndex
                               ? 'bg-[#FF9CB5] text-white border-[#FF9CB5] shadow'
                               : 'bg-[#FDF2F7] text-[#B33B63] border-[#F5D3E0] hover:bg-[#FF9CB5]/80 hover:text-white'
-                          }`}
+                            }`}
                           aria-label={`切換至 ${label}`}
                         >
                           {label}
@@ -7340,10 +7332,10 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
+
         const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
-        
+
         if (successful) {
           console.log('✅ 訊息已複製到剪貼板（備用方案）');
         } else {
@@ -7386,15 +7378,15 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-    
+
     // 如果 showMobileActions 為 false，返回空的清理函數
-    return () => {};
+    return () => { };
   }, [showMobileActions]);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      animate={{ 
+      animate={{
         opacity: isHighlighted ? [1, 0.7, 1] : 1,
         scale: isHighlighted ? [1, 1.02, 1] : 1,
         backgroundColor: isHighlighted ? ['rgba(255, 213, 154, 0)', 'rgba(255, 213, 154, 0.3)', 'rgba(255, 213, 154, 0)'] : 'transparent'
@@ -7437,17 +7429,15 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
-            className={`group relative ${
-              isMoriDeck ? 'px-0 py-0' : 'px-4 py-3'
-            } rounded-2xl shadow-sm ${
-              isUser
+            className={`group relative ${isMoriDeck ? 'px-0 py-0' : 'px-4 py-3'
+              } rounded-2xl shadow-sm ${isUser
                 ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-br-md'
                 : isSystem
                   ? 'bg-[#F8F5EC] border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
                   : isMoriDeck
                     ? 'bg-transparent border border-transparent text-[#2B3A3B]'
                     : 'bg-white border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
-            }`}
+              }`}
           >
             {isMoriMulti ? (
               renderMoriMulti()
@@ -7462,16 +7452,16 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                             md:opacity-0 md:group-hover:opacity-100`}>
               {/* 食量顯示 - 僅 AI 回應訊息顯示，靠近時才顯示 */}
               {!isUser && message.content_json?.food?.total_food_cost && (
-                                  <motion.button
-                    whileHover={{ scale: 1.2 }}
-                    className="w-12 h-8 md:w-12 md:h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center touch-manipulation"
-                    title={`消耗 ${message.content_json.food.total_food_cost} 食量`}
-                  >
-                    <span className="text-xs font-medium flex items-center space-x-1">
-                      <img src="/apple-icon.svg" alt="蘋果" className="w-5 h-5" />
-                      <span>{message.content_json.food.total_food_cost}</span>
-                    </span>
-                  </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.2 }}
+                  className="w-12 h-8 md:w-12 md:h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center touch-manipulation"
+                  title={`消耗 ${message.content_json.food.total_food_cost} 食量`}
+                >
+                  <span className="text-xs font-medium flex items-center space-x-1">
+                    <img src="/apple-icon.svg" alt="蘋果" className="w-5 h-5" />
+                    <span>{message.content_json.food.total_food_cost}</span>
+                  </span>
+                </motion.button>
               )}
 
               {/* 複製按鈕 */}
@@ -7520,10 +7510,10 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
           {/* 時間戳與狀態 */}
           <div className={`flex items-center space-x-2 mt-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
             <span className="text-xs text-[#2B3A3B]/70">
-            {message.timestamp.toLocaleTimeString('zh-TW', {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
+              {message.timestamp.toLocaleTimeString('zh-TW', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
             </span>
             {/* 訊息狀態指示器（僅用戶訊息） */}
             {isUser && message.status && (
@@ -7579,13 +7569,13 @@ function TaskCard({ task }: TaskCardProps) {
           <h4 className="font-medium text-[#4B4036] text-sm mb-1">{task.title}</h4>
           <p className="text-xs text-[#2B3A3B] line-clamp-2">{task.description}</p>
         </div>
-        
+
         <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
           <StatusIcon className="w-3 h-3" />
           <span>
             {task.status === 'pending' ? '等待' :
-             task.status === 'in_progress' ? '進行中' :
-             task.status === 'completed' ? '完成' : '失敗'}
+              task.status === 'in_progress' ? '進行中' :
+                task.status === 'completed' ? '完成' : '失敗'}
           </span>
         </div>
       </div>
@@ -7593,11 +7583,10 @@ function TaskCard({ task }: TaskCardProps) {
       {/* 分配的角色 */}
       <div className="flex items-center space-x-2 mb-3">
         <span className="text-xs text-[#2B3A3B]">分配給:</span>
-        <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${
-          task.assignedTo === 'hibi' ? 'from-orange-400 to-red-500' :
-          task.assignedTo === 'mori' ? 'from-amber-400 to-orange-500' : 
-          'from-blue-400 to-cyan-500'
-        }`} />
+        <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${task.assignedTo === 'hibi' ? 'from-orange-400 to-red-500' :
+            task.assignedTo === 'mori' ? 'from-amber-400 to-orange-500' :
+              'from-blue-400 to-cyan-500'
+          }`} />
       </div>
 
       {/* 進度條 */}

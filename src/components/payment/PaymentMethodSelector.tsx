@@ -20,11 +20,11 @@ interface PaymentMethodSelectorProps {
   onPaymentError?: (error: string) => void;
   className?: string;
   showPaymentActions?: boolean;
-  user?: { 
-    id: string; 
-    full_name?: string; 
-    email?: string; 
-    phone?: string; 
+  user?: {
+    id: string;
+    full_name?: string;
+    email?: string;
+    phone?: string;
   } | null;
   orgPhone?: string | null; // 機構電話號碼
   orgId?: string | null; // 機構 ID
@@ -91,7 +91,7 @@ export default function PaymentMethodSelector({
         setPaymentInfo(info);
       } catch (error) {
         console.error('❌ 載入支付資訊失敗:', error);
-        
+
         // 如果 API 載入失敗，使用硬編碼的備用資料
         console.log('🔄 使用備用支付資訊...');
         const fallbackInfo: PaymentInfo = {
@@ -151,19 +151,19 @@ export default function PaymentMethodSelector({
     setAirwallexLoading(true);
     setErrors({});
     setShowRetryButton(false);
-    
+
     let paymentWindow: Window | null = null;
     let popupOpened = false;
-    
+
     console.log('🔍 開始嘗試打開新視窗，URL:', checkoutUrl);
-    
+
     try {
       // 方法 1: 標準 window.open 帶詳細參數
       console.log('🚀 嘗試方法1：使用詳細參數');
       paymentWindow = window.open(checkoutUrl, 'airwallex_payment', 'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no,popup=yes');
-      
+
       console.log('🔍 方法1結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
-      
+
       if (paymentWindow && !paymentWindow.closed) {
         popupOpened = true;
         console.log('✅ 方法1成功：使用詳細參數打開新視窗');
@@ -171,9 +171,9 @@ export default function PaymentMethodSelector({
         // 方法 2: 使用更寬鬆的參數
         console.log('🚀 嘗試方法2：使用寬鬆參數');
         paymentWindow = window.open(checkoutUrl, 'airwallex_payment', 'width=800,height=600,scrollbars=yes,resizable=yes');
-        
+
         console.log('🔍 方法2結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
-        
+
         if (paymentWindow && !paymentWindow.closed) {
           popupOpened = true;
           console.log('✅ 方法2成功：使用寬鬆參數打開新視窗');
@@ -181,9 +181,9 @@ export default function PaymentMethodSelector({
           // 方法 3: 使用 _blank 目標
           console.log('🚀 嘗試方法3：使用 _blank 目標');
           paymentWindow = window.open(checkoutUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-          
+
           console.log('🔍 方法3結果：', { paymentWindow: !!paymentWindow, closed: paymentWindow?.closed });
-          
+
           if (paymentWindow && !paymentWindow.closed) {
             popupOpened = true;
             console.log('✅ 方法3成功：使用 _blank 目標打開新視窗');
@@ -197,7 +197,7 @@ export default function PaymentMethodSelector({
             document.body.appendChild(tempLink);
             tempLink.click();
             document.body.removeChild(tempLink);
-            
+
             // 使用 _blank 會在新標籤頁打開，假設成功
             // 注意：_blank 打開新標籤頁時，window.open 可能返回 null，但實際上已經打開了
             popupOpened = true;
@@ -205,19 +205,19 @@ export default function PaymentMethodSelector({
           }
         }
       }
-      
-        // 處理成功打開視窗的情況
+
+      // 處理成功打開視窗的情況
       if (popupOpened) {
         console.log('✅ 新視窗打開成功');
-        
+
         // 如果有 paymentWindow 引用，設置監聽器
         if (paymentWindow) {
           console.log('✅ 設置視窗監聽器');
           setPaymentWindowRef(paymentWindow);
-          
+
           // 聚焦到新視窗
           paymentWindow.focus();
-          
+
           // 添加載入監聽
           paymentWindow.addEventListener('load', () => {
             console.log('🔄 Airwallex 頁面載入完成');
@@ -230,7 +230,7 @@ export default function PaymentMethodSelector({
           // 監聽支付完成消息
           const handleMessage = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return;
-            
+
             if (event.data.type === 'PAYMENT_SUCCESS') {
               clearInterval(checkClosed);
               clearPaymentWindow();
@@ -269,7 +269,7 @@ export default function PaymentMethodSelector({
           // 如果 paymentWindow 為 null（例如使用 _blank 打開新標籤頁），仍然視為成功
           console.log('✅ 使用 _blank 打開新標籤頁，無法設置監聽器，但視窗已打開');
         }
-        
+
         // 不立即調用 onPaymentSuccess，等待真正的支付完成
         console.log('✅ 新視窗已打開，等待支付完成...');
         setAirwallexLoading(false);
@@ -282,7 +282,7 @@ export default function PaymentMethodSelector({
         onPaymentError?.('無法打開支付視窗，請檢查瀏覽器設置或允許彈窗');
         setAirwallexLoading(false);
       }
-      
+
     } catch (error) {
       console.error('❌ 打開新視窗失敗:', error);
       setLastCheckoutUrl(checkoutUrl);
@@ -297,10 +297,45 @@ export default function PaymentMethodSelector({
   const handleAirwallexPayment = async () => {
     // 先清除舊視窗
     clearPaymentWindow();
-    
+
     setAirwallexLoading(true);
     setErrors({});
-    
+
+    // 1. 立即同步打開視窗 (解決移動端/瀏覽器攔截問題)
+    let tempWindow: Window | null = null;
+    try {
+      tempWindow = window.open('', 'airwallex_payment', 'width=1200,height=800,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no,popup=yes');
+
+      if (tempWindow) {
+        // 設置加載狀態
+        tempWindow.document.write(`
+          <html>
+            <head>
+              <title>正在連接支付網關...</title>
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f9fafb; }
+                .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 16px; }
+                .content { text-align: center; color: #4b5563; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+              </style>
+            </head>
+            <body>
+              <div class="content">
+                <div class="loader" style="margin: 0 auto 16px auto;"></div>
+                <h2>正在連接安全支付網關...</h2>
+                <p>請稍候，我們正在為您準備支付頁面</p>
+              </div>
+            </body>
+          </html>
+        `);
+        setPaymentWindowRef(tempWindow);
+      } else {
+        console.warn('⚠️ 無法立即打開視窗，可能是被攔截');
+      }
+    } catch (e) {
+      console.error('❌ 打開臨時視窗失敗:', e);
+    }
+
     try {
       const paymentRequest: PaymentRequest = {
         amount: finalAmount,
@@ -315,18 +350,20 @@ export default function PaymentMethodSelector({
       };
 
       const result = await createAirwallexPayment(paymentRequest);
-      
+
       if (result.success && result.checkout_url) {
         // 顯示調試信息
         if (result.debug_info) {
           console.log('🔍 Airwallex API 調試信息:', result.debug_info);
         }
-        
+
         // 檢查是否為測試模式
         console.log('🔍 檢查支付模式:', { is_test_mode: result.is_test_mode, checkout_url: result.checkout_url });
-        
+
         if (result.is_test_mode) {
           // 測試模式：模擬支付成功
+          if (tempWindow) tempWindow.close();
+
           console.log('🧪 測試模式：模擬 Airwallex 支付成功');
           onPaymentSuccess?.({
             success: true,
@@ -337,20 +374,27 @@ export default function PaymentMethodSelector({
             message: '測試支付成功'
           });
         } else {
-          // 生產模式：只在新視窗中打開 Airwallex 支付頁面
-          console.log('🚀 真實模式：只在新視窗中打開 Airwallex 支付');
-          console.log('📍 支付 URL:', result.checkout_url);
-          console.log('🆔 Payment Intent ID:', result.payment_intent_id);
-          console.log('🔐 Client Secret 狀態:', result.debug_info?.client_secret);
-          
-          // 使用通用函數打開支付視窗
-          handleOpenPaymentWindow(result.checkout_url);
+          // 生產模式：在新視窗中加載 Airwallex 支付頁面
+          console.log('🚀 真實模式：加載 Airwallex 支付頁面');
+
+          if (tempWindow && !tempWindow.closed) {
+            // 如果臨時視窗已打開，重定向它
+            tempWindow.location.href = result.checkout_url;
+            setupWindowListeners(tempWindow);
+          } else {
+            // 如果臨時視窗未打開（被攔截），嘗試再次打開（可能會失敗，但值得一試）
+            // 或者顯示手動打開按鈕
+            console.log('⚠️ 臨時視窗未打開或已關閉，嘗試使用 handleOpenPaymentWindow');
+            handleOpenPaymentWindow(result.checkout_url);
+          }
         }
 
       } else {
+        if (tempWindow && !tempWindow.closed) tempWindow.close();
         throw new Error(result.error || '支付創建失敗');
       }
     } catch (error) {
+      if (tempWindow && !tempWindow.closed) tempWindow.close();
       console.error('Airwallex 支付錯誤:', error);
       const errorMessage = error instanceof Error ? error.message : '支付創建失敗，請稍後再試';
       setErrors({ airwallex: errorMessage });
@@ -358,6 +402,53 @@ export default function PaymentMethodSelector({
     } finally {
       setAirwallexLoading(false);
     }
+  };
+
+  // 設置視窗監聽器 (從 handleOpenPaymentWindow 提取)
+  const setupWindowListeners = (targetWindow: Window) => {
+    setPaymentWindowRef(targetWindow);
+
+    // 聚焦到新視窗
+    targetWindow.focus();
+
+    // 監聽支付完成消息
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === 'PAYMENT_SUCCESS') {
+        clearInterval(checkClosed);
+        clearPaymentWindow();
+        onPaymentSuccess?.(event.data);
+        window.removeEventListener('message', handleMessage);
+      } else if (event.data.type === 'PAYMENT_CANCELLED') {
+        clearInterval(checkClosed);
+        clearPaymentWindow();
+        onPaymentError?.('支付已取消');
+        window.removeEventListener('message', handleMessage);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // 監聽視窗關閉
+    const checkClosed = setInterval(() => {
+      if (targetWindow.closed) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', handleMessage);
+        clearPaymentWindow();
+        console.log('🔄 支付視窗已關閉');
+      }
+    }, 1000);
+
+    // 10分鐘後自動清理
+    setTimeout(() => {
+      clearInterval(checkClosed);
+      if (targetWindow && !targetWindow.closed) {
+        targetWindow.close();
+      }
+      window.removeEventListener('message', handleMessage);
+      clearPaymentWindow();
+    }, 600000);
   };
 
   // 處理截圖上傳
@@ -387,7 +478,7 @@ export default function PaymentMethodSelector({
       };
 
       const result = await uploadScreenshot(uploadData);
-      
+
       if (result.success) {
         onPaymentSuccess?.(result);
         setUploadSuccess(true);
@@ -466,16 +557,16 @@ export default function PaymentMethodSelector({
   // 刪除已上傳的圖片
   const deleteUploadedImage = async () => {
     if (!uploadedImageUrl) return;
-    
+
     try {
       console.log('🔍 準備刪除圖片，URL:', uploadedImageUrl);
       console.log('🔍 用戶 ID:', user?.id);
-      
+
       // 驗證 URL 格式
       if (!uploadedImageUrl || typeof uploadedImageUrl !== 'string') {
         throw new Error('無效的圖片 URL');
       }
-      
+
       // 調用刪除 API
       const response = await fetch(`/api/aihome/payment/delete-screenshot?imageUrl=${encodeURIComponent(uploadedImageUrl)}&userId=${user?.id || ''}`, {
         method: 'DELETE',
@@ -486,11 +577,11 @@ export default function PaymentMethodSelector({
 
       const result = await response.json();
       console.log('🔍 刪除 API 回應:', result);
-      
+
       if (!result.success) {
         throw new Error(result.error || '刪除失敗');
       }
-      
+
       // 重置狀態
       setUploadedImageUrl(null);
       setBackupImageUrl(null);
@@ -498,13 +589,13 @@ export default function PaymentMethodSelector({
       setUploadedFile(null);
       setShowImagePreview(false);
       setErrors({});
-      
+
       // 清理檔案輸入
       const fileInput = document.getElementById('screenshot-upload') as HTMLInputElement;
       if (fileInput) {
         fileInput.value = '';
       }
-      
+
       // 通知父組件圖片已刪除，需要重新上傳
       if (onPaymentSuccess) {
         onPaymentSuccess({
@@ -513,7 +604,7 @@ export default function PaymentMethodSelector({
           message: '圖片已刪除，請重新上傳'
         });
       }
-      
+
       console.log('✅ 圖片刪除成功');
     } catch (error) {
       console.error('❌ 刪除圖片失敗:', error);
@@ -538,18 +629,16 @@ export default function PaymentMethodSelector({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onMethodChange(method.id)}
-              className={`p-6 rounded-xl border-2 transition-all duration-200 ${
-                selectedMethod === method.id
+              className={`p-6 rounded-xl border-2 transition-all duration-200 ${selectedMethod === method.id
                   ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
                   : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
-              }`}
+                }`}
             >
               <div className="flex items-center space-x-4">
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                  method.type === 'screenshot' 
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${method.type === 'screenshot'
                     ? 'bg-gradient-to-br from-green-500 to-green-600'
                     : 'bg-gradient-to-br from-blue-500 to-blue-600'
-                }`}>
+                  }`}>
                   <method.icon />
                 </div>
                 <div className="text-left">
@@ -570,14 +659,14 @@ export default function PaymentMethodSelector({
             <li>• 一經確認，費用將無法退回</li>
             <li>• 如有任何支付問題，歡迎與我們聯絡</li>
           </ul>
-          
+
           {/* WhatsApp 聯絡按鍵 */}
           {orgPhone && (() => {
             // 處理電話號碼格式：移除所有空格、括號、破折號等，保留數字和 + 號
             const cleanPhone = orgPhone.replace(/[\s\-\(\)]/g, '');
             // 如果沒有 + 號，確保有國家代碼（預設 +852）
             const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone.substring(1) : (cleanPhone.startsWith('852') ? cleanPhone : `852${cleanPhone}`);
-            
+
             return (
               <div className="mt-4 pt-4 border-t border-[#EADBC8]">
                 <p className="text-sm text-[#2B3A3B]/70 mb-3">
@@ -592,7 +681,7 @@ export default function PaymentMethodSelector({
                   className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
                   <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
                   </svg>
                   <span className="font-medium">WhatsApp 聯絡我們</span>
                 </motion.a>
@@ -644,7 +733,7 @@ export default function PaymentMethodSelector({
             <div className="text-center mb-4">
               <h3 className="text-lg font-bold text-[#4B4036] mb-2">支付詳情</h3>
               <p className="text-sm text-[#2B3A3B]">{description}</p>
-              
+
               {/* 價格顯示 */}
               <div className="mt-2">
                 {discountInfo ? (
@@ -835,7 +924,7 @@ export default function PaymentMethodSelector({
                         <p>• 我們將在 1 個工作天內確認您的付款</p>
                         <p>• 如有任何問題，歡迎與我們聯絡</p>
                       </div>
-                      
+
                       {/* WhatsApp 聯絡按鍵 */}
                       {orgPhone && (
                         <div className="mt-3 pt-3 border-t border-[#EADBC8]">
@@ -854,7 +943,7 @@ export default function PaymentMethodSelector({
                             className="inline-flex items-center justify-center px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg text-sm"
                           >
                             <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488" />
                             </svg>
                             <span className="font-medium">WhatsApp 聯絡</span>
                           </motion.a>
@@ -868,7 +957,7 @@ export default function PaymentMethodSelector({
                   <label className="block text-sm font-medium text-[#4B4036] mb-2">
                     上傳付款截圖
                   </label>
-                  
+
                   {/* 檔案選擇區域 */}
                   {!showImagePreview && !uploadSuccess && (
                     <div className="border-2 border-dashed border-[#EADBC8] rounded-xl p-6 text-center hover:border-[#FFD59A] transition-colors">
@@ -920,7 +1009,7 @@ export default function PaymentMethodSelector({
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex space-x-3">
                         <motion.button
                           onClick={clearImagePreview}
@@ -935,11 +1024,10 @@ export default function PaymentMethodSelector({
                           disabled={uploading}
                           whileHover={!uploading ? { scale: 1.02 } : {}}
                           whileTap={!uploading ? { scale: 0.98 } : {}}
-                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all duration-200 ${
-                            uploading
+                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all duration-200 ${uploading
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:from-[#EBC9A4] hover:to-[#FFD59A] shadow-lg'
-                          }`}
+                            }`}
                         >
                           {uploading ? '上傳中...' : '確認上傳'}
                         </motion.button>
@@ -1042,7 +1130,7 @@ export default function PaymentMethodSelector({
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex justify-center">
                         <motion.button
                           onClick={deleteUploadedImage}
@@ -1088,11 +1176,10 @@ export default function PaymentMethodSelector({
                     disabled={!uploadedFile || uploading}
                     whileHover={!uploading && uploadedFile ? { scale: 1.02 } : {}}
                     whileTap={!uploading && uploadedFile ? { scale: 0.98 } : {}}
-                    className={`w-full py-3 px-6 rounded-xl font-bold transition-all duration-200 ${
-                      !uploadedFile || uploading
+                    className={`w-full py-3 px-6 rounded-xl font-bold transition-all duration-200 ${!uploadedFile || uploading
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 shadow-lg'
-                    }`}
+                      }`}
                   >
                     {uploading ? '上傳中...' : '上傳付款截圖'}
                   </motion.button>
@@ -1130,16 +1217,32 @@ export default function PaymentMethodSelector({
                   </p>
                 </div>
 
+                {/* 支付狀態顯示 */}
+                {paymentWindowRef && !paymentWindowRef.closed && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4"
+                  >
+                    <div className="flex items-center justify-center space-x-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                      <span className="font-medium text-blue-800">支付頁面已開啟，請在彈出視窗中完成支付...</span>
+                    </div>
+                    <p className="text-xs text-center text-blue-600 mt-2">
+                      如果視窗被關閉，請點擊下方的「重新打開支付視窗」
+                    </p>
+                  </motion.div>
+                )}
+
                 <motion.button
                   onClick={handleAirwallexPayment}
                   disabled={airwallexLoading}
                   whileHover={!airwallexLoading ? { scale: 1.02 } : {}}
                   whileTap={!airwallexLoading ? { scale: 0.98 } : {}}
-                  className={`w-full py-4 px-6 rounded-xl font-bold transition-all duration-200 ${
-                    airwallexLoading
+                  className={`w-full py-4 px-6 rounded-xl font-bold transition-all duration-200 ${airwallexLoading
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg'
-                  }`}
+                    }`}
                 >
                   {airwallexLoading ? (
                     <div className="flex items-center justify-center">
@@ -1151,7 +1254,7 @@ export default function PaymentMethodSelector({
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
-                      在新視窗中打開 Airwallex 支付
+                      {paymentWindowRef && !paymentWindowRef.closed ? '重新打開支付視窗' : '在新視窗中打開 Airwallex 支付'}
                     </div>
                   )}
                 </motion.button>
@@ -1166,18 +1269,17 @@ export default function PaymentMethodSelector({
                       <XCircleIcon className="w-4 h-4 mr-1" />
                       {errors.airwallex}
                     </p>
-                    
+
                     {showRetryButton && (
                       <motion.button
                         onClick={handleRetryPayment}
                         disabled={airwallexLoading}
                         whileHover={!airwallexLoading ? { scale: 1.02 } : {}}
                         whileTap={!airwallexLoading ? { scale: 0.98 } : {}}
-                        className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 ${
-                          airwallexLoading
+                        className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 ${airwallexLoading
                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 shadow-md'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-center">
                           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

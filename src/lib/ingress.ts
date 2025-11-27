@@ -206,7 +206,7 @@ export function createIngressClient(): IngressClient {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? '';
   // JWT Token for n8n webhook authentication
   const jwtToken = process.env.NEXT_PUBLIC_N8N_JWT_TOKEN || '';
-  
+
   return new IngressClient(secret, baseUrl, jwtToken);
 }
 
