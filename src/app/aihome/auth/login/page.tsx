@@ -11,7 +11,9 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import TurnstileWidget from '@/components/ui/TurnstileWidget';
 import toast from 'react-hot-toast';
 
-export default function LoginPage() {
+import { Suspense } from 'react';
+
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, loginWithGoogle, user, loading } = useSaasAuth();
@@ -362,5 +364,20 @@ export default function LoginPage() {
         </HanamiCard>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4B4036] mx-auto mb-4"></div>
+          <p className="text-[#4B4036]">載入中...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
