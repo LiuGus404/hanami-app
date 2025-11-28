@@ -55,9 +55,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 查詢學生列表
+    // 返回所有字段，因為 MultiCourseAvailabilityDashboard 需要 student_type, regular_weekday, regular_timeslot, primary_course_code 等字段
     let query = (supabase as any)
       .from('Hanami_Students')
-      .select('id, full_name, nick_name, student_age, course_type, student_preference, student_remarks')
+      .select('*')
       .eq('org_id', orgId);
     
     // 如果提供了 studentIds 參數（逗號分隔的 ID 列表），則只查詢這些學生

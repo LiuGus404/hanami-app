@@ -30,7 +30,8 @@ export function createSaasClient() {
         storageKey: 'hanamiecho-auth', // 使用獨立的 storageKey
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: false // 避免與主系統衝突
+        // 僅在 aihome 路由下檢測 URL 中的 session，以支持 OAuth 回調
+        detectSessionInUrl: typeof window !== 'undefined' && window.location.pathname.startsWith('/aihome')
       }
     });
   }

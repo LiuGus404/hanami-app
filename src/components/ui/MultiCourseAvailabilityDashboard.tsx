@@ -1174,6 +1174,14 @@ ${timeSlot}有一個位 ^^
           );
           console.log('通過 API 載入常規學生數量（已過濾已停用）:', regularStudentsData.length);
           console.log('通過 API 載入所有常規學生數量（用於未安排計算，已過濾已停用）:', allRegularStudentsData.length);
+          console.log('[調試] 學生數據範例（前 3 個）:', regularStudentsData.slice(0, 3).map(s => ({
+            id: s.id,
+            full_name: s.full_name,
+            student_type: s.student_type,
+            primary_course_code: s.primary_course_code,
+            regular_weekday: s.regular_weekday,
+            regular_timeslot: s.regular_timeslot
+          })));
         } else {
           console.error('無法載入常規學生，API 返回錯誤:', response.status);
           // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
@@ -1245,16 +1253,37 @@ ${timeSlot}有一個位 ^^
 
         // 使用 assigned_student_ids 直接獲取學生
         console.log(`時段 ${slot.timeslot} 課程 ${slot.course_code} 的 assigned_student_ids:`, slot.assigned_student_ids);
+        console.log(`[調試] regularStudentsData 總數:`, regularStudentsData?.length || 0);
+        console.log(`[調試] regularStudentsData 前 3 個學生的 ID 和類型:`, regularStudentsData?.slice(0, 3).map(s => ({ 
+          id: s.id, 
+          id_type: typeof s.id, 
+          student_type: s.student_type,
+          full_name: s.full_name 
+        })));
+        console.log(`[調試] assigned_student_ids 類型:`, slot.assigned_student_ids?.map((id: any) => ({ id, type: typeof id })));
         
         let regularStudents: any[] = [];
         
         // 完全依賴 assigned_student_ids 來顯示學生，不再回退到傳統邏輯
         if (slot.assigned_student_ids && slot.assigned_student_ids.length > 0) {
-          // 直接通過 assigned_student_ids 獲取學生，並過濾掉"已停用"的學生
-          regularStudents = regularStudentsData?.filter(student => 
-            slot.assigned_student_ids.includes(student.id) &&
-            student.student_type !== '已停用'
+          // 先找到所有匹配 ID 的學生（不過濾 student_type）
+          const allMatchedStudents = regularStudentsData?.filter(student => 
+            slot.assigned_student_ids.includes(student.id)
           ) || [];
+          
+          console.log(`[調試] 通過 ID 匹配找到 ${allMatchedStudents.length} 名學生（未過濾 student_type）:`, 
+            allMatchedStudents.map(s => ({ 
+              id: s.id, 
+              name: s.full_name, 
+              student_type: s.student_type,
+              student_type_is_undefined: s.student_type === undefined,
+              student_type_is_null: s.student_type === null
+            })));
+          
+          // 直接通過 assigned_student_ids 獲取學生，並過濾掉"已停用"的學生
+          regularStudents = allMatchedStudents.filter(student => 
+            student.student_type !== '已停用'
+          );
           
           // 如果發現有"已停用"的學生在 assigned_student_ids 中，自動從 assigned_student_ids 中移除
           const inactiveStudentIds = regularStudentsData?.filter(student => 
