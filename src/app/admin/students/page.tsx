@@ -22,6 +22,9 @@ import HanamiInput from '@/components/ui/HanamiInput';
 import Calendarui from '@/components/ui/Calendarui';
 import { usePageState } from '@/hooks/usePageState';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { toast } from 'react-hot-toast';
+
+const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
 
 type NavigationOverrides = Partial<{
   dashboard: string;
@@ -248,6 +251,8 @@ export default function StudentManagementPage({
     () => currentOrganization?.id || user?.organization?.id || null,
     [currentOrganization?.id, user?.organization?.id]
   );
+  const allowAiFeatures = effectiveOrgId === PREMIUM_AI_ORG_ID;
+  const aiFeatureMessage = '暫未開放，企業用戶請聯繫 BuildThinkai@gmail.com';
 
   // 添加防抖機制
   const dataFetchedRef = useRef(false);
@@ -1560,20 +1565,43 @@ export default function StudentManagementPage({
                           </button>
                           {/* AI 訊息按鈕 - 允許多選 */}
                           {selectedStudents.length > 0 && (
-                            <button
-                              className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={actionLoading}
-                              onClick={() => {
-                                const selected = students.filter((s: any) => selectedStudents.includes(s.id));
-                                if (selected.length > 0) {
-                                  setSelectedStudentsForAI(selected);
-                                  setShowAIMessageModal(true);
-                                }
-                              }}
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              <span>AI 訊息</span>
-                            </button>
+                            allowAiFeatures ? (
+                              <button
+                                className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={actionLoading}
+                                onClick={() => {
+                                  const selected = students.filter((s: any) => selectedStudents.includes(s.id));
+                                  if (selected.length > 0) {
+                                    setSelectedStudentsForAI(selected);
+                                    setShowAIMessageModal(true);
+                                  }
+                                }}
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                                <span>AI 訊息</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => toast(aiFeatureMessage, {
+                                  duration: 3000,
+                                  style: {
+                                    background: '#FFF9F2',
+                                    color: '#4B4036',
+                                    border: '1px solid #EADBC8',
+                                    borderRadius: '12px',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                  },
+                                })}
+                                className="flex items-center gap-2 px-4 py-2 bg-[#F0ECE1] text-[#8A7C70] rounded-full shadow-sm cursor-not-allowed hover:bg-[#E8E0D5] transition-colors"
+                                type="button"
+                                title={aiFeatureMessage}
+                                disabled
+                              >
+                                <MessageSquare className="w-4 h-4 opacity-50" />
+                                <span className="opacity-75">AI 訊息</span>
+                              </button>
+                            )
                           )}
                         </>
                       );

@@ -508,15 +508,22 @@ export default function LearningPathLevels({
           const currentLessonActivities = result.data.currentLessonActivities || [];
           const ongoingActivities = result.data.ongoingActivities || [];
           const previousLessonActivities = result.data.previousLessonActivities || [];
+          const completedOngoingActivities = result.data.completedOngoingActivities || [];
           
           console.log('學生活動記錄:', {
             currentLesson: currentLessonActivities.length,
             ongoing: ongoingActivities.length,
-            previous: previousLessonActivities.length
+            previous: previousLessonActivities.length,
+            completedOngoing: completedOngoingActivities.length
           });
           
-          // 合併所有活動
-          const allActivities = [...currentLessonActivities, ...ongoingActivities, ...previousLessonActivities];
+          // 合併所有活動（包括已完成的正在學習活動）
+          const allActivities = [
+            ...currentLessonActivities, 
+            ...ongoingActivities, 
+            ...previousLessonActivities,
+            ...completedOngoingActivities
+          ];
             
             // 更新節點的完成狀態（使用正確的活動數據）
             const updatedNodes = await Promise.all(nodes.map(async (node: any) => {
@@ -549,32 +556,85 @@ export default function LearningPathLevels({
                 const realActivityId = typedTreeActivity.activity_id;
                 
                 // 查找該活動的所有記錄（使用正確的活動數據）
+                // 支持多種ID匹配方式：activityId（處理後的）和原始activity_id
+                // 將ID轉換為字符串進行比較，避免類型問題
+                const realActivityIdStr = String(realActivityId);
                 const activityRecords = allActivities?.filter(
-                  (activity: any) => activity.activityId === realActivityId
+                  (activity: any) => {
+                    // 優先匹配 activityId（hanami_teaching_activities.id）
+                    if (String(activity.activityId || '') === realActivityIdStr) return true;
+                    // 也匹配原始的 activity_id（來自 hanami_student_activities）
+                    if (String(activity._raw?.activity_id || '') === realActivityIdStr) return true;
+                    // 也匹配 teachingActivityId
+                    if (String(activity.teachingActivityId || '') === realActivityIdStr) return true;
+                    return false;
+                  }
                 ) || [];
                 
-                console.log(`節點 ${node.title} (${actualActivityId} -> ${realActivityId}) 的活動記錄:`, activityRecords);
+                console.log(`節點 ${node.title} (${actualActivityId} -> ${realActivityIdStr}) 的活動記錄:`, activityRecords);
+                console.log(`🔍 匹配條件: activityId=${realActivityIdStr}, 找到 ${activityRecords.length} 條記錄`);
+                if (activityRecords.length === 0) {
+                  // 如果沒找到，輸出所有活動的ID以便調試
+                  console.log(`🔍 所有活動的ID列表:`, allActivities.map((a: any) => ({
+                    activityId: a.activityId,
+                    teachingActivityId: a.teachingActivityId,
+                    rawActivityId: a._raw?.activity_id,
+                    activityName: a.activityName
+                  })));
+                } else {
+                  console.log(`🔍 匹配的記錄詳情:`, activityRecords.map((r: any) => ({
+                    activityId: r.activityId,
+                    teachingActivityId: r.teachingActivityId,
+                    rawActivityId: r._raw?.activity_id,
+                    completionStatus: r.completionStatus,
+                    completion_status: r._raw?.completion_status,
+                    progress: r.progress,
+                    activityName: r.activityName
+                  })));
+                }
                 
                 if (activityRecords.length > 0) {
-                  // 檢查活動狀態
-                  const hasInProgress = activityRecords.some(
-                    (record: any) => record.completionStatus === 'in_progress'
-                  );
-                  const allCompleted = activityRecords.every(
-                    (record: any) => record.completionStatus === 'completed'
+                  // 檢查活動狀態 - 參考 StudentActivitiesPanel 的邏輯
+                  // 如果有任何記錄完成，就標記為完成
+                  const anyCompleted = activityRecords.some(
+                    (record: any) => {
+                      const status = record.completionStatus || record._raw?.completion_status || '';
+                      const progress = record.progress || 0;
+                      // 處理不同格式的進度值
+                      const normalizedProgress = progress > 1 ? progress : progress * 100;
+                      const completed = 
+                        status === 'completed' || 
+                        normalizedProgress >= 100;
+                      
+                      console.log(`  - 記錄檢查: status=${status}, progress=${progress}, normalized=${normalizedProgress}, completed=${completed}`);
+                      return completed;
+                    }
                   );
                   
-                  const isCompleted = allCompleted;
-                  const isInProgress = hasInProgress && !allCompleted;
+                  const isCompleted = anyCompleted;
+                  // 如果有記錄且未完成，標記為進行中
+                  const isInProgress = !anyCompleted && activityRecords.length > 0;
                   
-                  // 獲取進度數據（取最新的記錄）
+                  // 獲取進度數據（取最新的記錄，處理不同格式的進度值）
                   const latestRecord = activityRecords[activityRecords.length - 1];
-                  const progress = latestRecord?.progress || 0;
+                  let progress = latestRecord?.progress || 0;
+                  
+                  // 處理進度值格式：如果進度值在 0-1 之間，轉換為百分比；如果是 0-100，直接使用
+                  if (progress > 0 && progress <= 1) {
+                    progress = progress * 100;
+                  } else if (progress > 100) {
+                    progress = 100;
+                  }
+                  
+                  // 如果完成，確保進度為 100
+                  if (isCompleted) {
+                    progress = 100;
+                  }
                   
                   console.log(`節點 ${node.title} (${actualActivityId} -> ${realActivityId}): 完成狀態 = ${isCompleted}, 進行中 = ${isInProgress}, 進度 = ${progress}% (記錄數: ${activityRecords.length})`);
                   console.log(`🔍 活動記錄詳情:`, activityRecords);
                   console.log(`🔍 最新記錄:`, latestRecord);
-                  console.log(`🔍 進度值:`, progress);
+                  console.log(`🔍 進度值（原始）:`, latestRecord?.progress, `轉換後:`, progress);
                   
                   return { ...node, isCompleted, isInProgress, isLocked: false, progress };
                 } else {

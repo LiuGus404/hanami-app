@@ -14,7 +14,9 @@ import {
   TrophyIcon,
   LightBulbIcon
 } from '@heroicons/react/24/outline';
+import { Target } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 
 interface AbilityAssessment {
   id: string;
@@ -50,6 +52,8 @@ interface StudentAbilityAssessmentsProps {
   className?: string;
   maxAssessments?: number;
   showDetails?: boolean;
+  isTeacher?: boolean; // 是否為老師端
+  orgId?: string | null; // 機構 ID
 }
 
 // 評分星星組件
@@ -81,7 +85,8 @@ const AbilityAssessmentDetail: React.FC<{
   tree: GrowthTree;
   isExpanded: boolean;
   onToggle: () => void;
-}> = ({ assessment, abilities, tree, isExpanded, onToggle }) => {
+  latestProgressNotes?: {notes: string; lessonId: string; lessonDate: string} | null;
+}> = ({ assessment, abilities, tree, isExpanded, onToggle, latestProgressNotes }) => {
   const abilityAssessments = assessment.ability_assessments || {};
   
   return (
@@ -156,32 +161,21 @@ const AbilityAssessmentDetail: React.FC<{
           </div>
         )}
 
-        {/* 備註和下次重點 */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {assessment.general_notes && (
-            <div>
-              <h4 className="font-semibold text-gray-800 mb-2 flex items-center">
-                <LightBulbIcon className="w-5 h-5 mr-2 text-purple-500" />
-                備註
-              </h4>
-              <div className="text-sm text-gray-600 bg-white p-3 rounded-lg border">
-                {assessment.general_notes}
-              </div>
+        {/* 進度筆記 */}
+        {latestProgressNotes && (
+          <div className="mt-4">
+            <h4 className="font-semibold text-gray-800 mb-2 flex items-center">
+              <Target className="w-5 h-5 mr-2 text-green-500" />
+              進度筆記
+              <span className="ml-2 text-xs text-gray-500 font-normal">
+                ({new Date(latestProgressNotes.lessonDate).toLocaleDateString('zh-TW')})
+              </span>
+            </h4>
+            <div className="text-sm text-gray-600 bg-white p-3 rounded-lg border whitespace-pre-wrap leading-relaxed">
+              {latestProgressNotes.notes}
             </div>
-          )}
-          
-          {assessment.next_lesson_focus && (
-            <div>
-              <h4 className="font-semibold text-gray-800 mb-2 flex items-center">
-                <AcademicCapIcon className="w-5 h-5 mr-2 text-blue-500" />
-                下次課程重點
-              </h4>
-              <div className="text-sm text-gray-600 bg-white p-3 rounded-lg border">
-                {assessment.next_lesson_focus}
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -191,7 +185,9 @@ export default function StudentAbilityAssessments({
   studentId, 
   className = '', 
   maxAssessments = 5,
-  showDetails = true 
+  showDetails = true,
+  isTeacher = false,
+  orgId = null
 }: StudentAbilityAssessmentsProps) {
   const [loading, setLoading] = useState(true);
   const [assessments, setAssessments] = useState<AbilityAssessment[]>([]);
@@ -199,6 +195,7 @@ export default function StudentAbilityAssessments({
   const [trees, setTrees] = useState<GrowthTree[]>([]);
   const [expandedAssessment, setExpandedAssessment] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [latestProgressNotes, setLatestProgressNotes] = useState<{notes: string; lessonId: string; lessonDate: string} | null>(null);
 
   // 載入能力評估數據
   const loadAssessmentData = useCallback(async () => {
@@ -268,6 +265,53 @@ export default function StudentAbilityAssessments({
       loadAssessmentData();
     }
   }, [studentId, loadAssessmentData]);
+
+  // 載入最新的進度筆記
+  useEffect(() => {
+    const loadLatestProgressNotes = async () => {
+      if (!studentId) return;
+      
+      try {
+        let query = supabase
+          .from('hanami_student_lesson')
+          .select('id, progress_notes, lesson_date')
+          .eq('student_id', studentId)
+          .order('lesson_date', { ascending: false });
+
+        // 如果有 orgId，添加 org_id 過濾
+        if (orgId) {
+          query = query.eq('org_id', orgId);
+        }
+
+        const { data, error } = await query;
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('載入進度筆記失敗:', error);
+          return;
+        }
+
+        // 過濾掉空值和空字符串的記錄
+        const validNotes = (data || []).filter(
+          (item: any) => item && item.progress_notes && typeof item.progress_notes === 'string' && item.progress_notes.trim().length > 0
+        ) as Array<{ id: string; progress_notes: string; lesson_date: string }>;
+
+        if (validNotes.length > 0) {
+          const latestNote = validNotes[0];
+          setLatestProgressNotes({
+            notes: latestNote.progress_notes,
+            lessonId: latestNote.id,
+            lessonDate: latestNote.lesson_date
+          });
+        } else {
+          setLatestProgressNotes(null);
+        }
+      } catch (error) {
+        console.error('載入進度筆記時發生錯誤:', error);
+      }
+    };
+
+    loadLatestProgressNotes();
+  }, [studentId, orgId]);
 
   const toggleAssessmentDetail = (assessmentId: string) => {
     setExpandedAssessment(expandedAssessment === assessmentId ? null : assessmentId);
@@ -399,6 +443,7 @@ export default function StudentAbilityAssessments({
                   tree={trees.find(t => t.id === assessment.tree_id) || { id: '', tree_name: '未知', tree_description: '' }}
                   isExpanded={expandedAssessment === assessment.id}
                   onToggle={() => toggleAssessmentDetail(assessment.id)}
+                  latestProgressNotes={latestProgressNotes}
                 />
               )}
             </motion.div>

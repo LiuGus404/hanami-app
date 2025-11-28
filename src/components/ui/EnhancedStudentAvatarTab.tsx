@@ -24,7 +24,9 @@ import {
   Sparkles,
   GraduationCap,
   Check,
-  Lock
+  Lock,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { 
   StudentAvatarWidget, 
@@ -38,10 +40,14 @@ import DetailedAbilityProgress from '@/components/ui/DetailedAbilityProgress';
 import AbilityTrendModal from '@/components/ui/AbilityTrendModal';
 import { HanamiSelect } from '@/components/ui/HanamiSelect';
 import { useStudentAvatarData, useGrowthTreeInteraction } from '@/hooks/useStudentAvatarData';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 
 interface EnhancedStudentAvatarTabProps {
   student: any;
   className?: string;
+  isTeacher?: boolean; // 是否為老師端，如果是則可以編輯和刪除進度筆記
+  orgId?: string | null; // 機構 ID，用於更新資料
 }
 
 // 動態卡片組件
@@ -107,7 +113,7 @@ const FloatingIcon: React.FC<{
   );
 };
 
-export default function EnhancedStudentAvatarTab({ student, className = '' }: EnhancedStudentAvatarTabProps) {
+export default function EnhancedStudentAvatarTab({ student, className = '', isTeacher = false, orgId = null }: EnhancedStudentAvatarTabProps) {
   const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
   const isPremiumOrg = student?.org_id === PREMIUM_AI_ORG_ID;
   const [activeSection, setActiveSection] = useState<'overview' | 'avatar' | 'progress' | 'growth'>('overview');
@@ -141,6 +147,10 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
   const [selectedBackground, setSelectedBackground] = useState<string>('classroom');
   const [selectedAbility, setSelectedAbility] = useState<string | null>(null);
   const [showTrendModal, setShowTrendModal] = useState<boolean>(false);
+  const [latestProgressNotes, setLatestProgressNotes] = useState<{notes: string; lessonId: string; lessonDate: string} | null>(null);
+  const [isEditingProgressNotes, setIsEditingProgressNotes] = useState(false);
+  const [editedProgressNotes, setEditedProgressNotes] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // 使用自定義Hook載入學生資料
   const {
@@ -284,6 +294,140 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
     };
     loadAvailableDates();
   }, [student?.id, isPremiumOrg]);
+
+  // 載入最新的進度筆記
+  useEffect(() => {
+    const loadLatestProgressNotes = async () => {
+      if (!student?.id) return;
+      
+      try {
+        let query = supabase
+          .from('hanami_student_lesson')
+          .select('id, progress_notes, lesson_date')
+          .eq('student_id', student.id)
+          .order('lesson_date', { ascending: false });
+
+        // 如果有 orgId，添加 org_id 過濾
+        if (orgId) {
+          query = query.eq('org_id', orgId);
+        }
+
+        const { data, error } = await query;
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('載入進度筆記失敗:', error);
+          return;
+        }
+
+        // 過濾掉空值和空字符串的記錄
+        const validNotes = (data || []).filter(
+          (item: any) => item && item.progress_notes && typeof item.progress_notes === 'string' && item.progress_notes.trim().length > 0
+        ) as Array<{ id: string; progress_notes: string; lesson_date: string }>;
+
+        if (validNotes.length > 0) {
+          const latestNote = validNotes[0];
+          console.log('✅ 成功載入進度筆記:', latestNote);
+          setLatestProgressNotes({
+            notes: latestNote.progress_notes,
+            lessonId: latestNote.id,
+            lessonDate: latestNote.lesson_date
+          });
+        } else {
+          console.log('📝 沒有找到有效的進度筆記');
+          setLatestProgressNotes(null);
+        }
+      } catch (error) {
+        console.error('載入進度筆記時發生錯誤:', error);
+      }
+    };
+
+    loadLatestProgressNotes();
+  }, [student?.id, orgId]);
+
+  // 保存進度筆記
+  const handleSaveProgressNotes = async () => {
+    if (!latestProgressNotes) return;
+    
+    setIsSaving(true);
+    try {
+      const updateData: Record<string, any> = {
+        progress_notes: editedProgressNotes || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // 如果有 orgId，添加 org_id 欄位
+      if (orgId) {
+        updateData.org_id = orgId;
+      }
+
+      const { error: updateError } = await supabase
+        .from('hanami_student_lesson')
+        // @ts-ignore - Supabase type inference issue with dynamic update data
+        .update(updateData)
+        .eq('id', latestProgressNotes.lessonId);
+
+      if (updateError) {
+        console.error('更新進度筆記失敗:', updateError);
+        toast.error('儲存失敗，請稍後再試');
+        return;
+      }
+
+      // 更新本地狀態
+      setLatestProgressNotes({
+        ...latestProgressNotes,
+        notes: editedProgressNotes || '',
+      });
+
+      setIsEditingProgressNotes(false);
+      setEditedProgressNotes('');
+      toast.success('進度筆記已儲存');
+    } catch (error) {
+      console.error('儲存進度筆記時發生錯誤:', error);
+      toast.error('儲存失敗，請稍後再試');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 刪除進度筆記
+  const handleDeleteProgressNotes = async () => {
+    if (!latestProgressNotes) return;
+
+    setIsSaving(true);
+    try {
+      const updateData: Record<string, any> = {
+        progress_notes: null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // 如果有 orgId，添加 org_id 欄位
+      if (orgId) {
+        updateData.org_id = orgId;
+      }
+
+      const { error: updateError } = await supabase
+        .from('hanami_student_lesson')
+        // @ts-ignore - Supabase type inference issue with dynamic update data
+        .update(updateData)
+        .eq('id', latestProgressNotes.lessonId);
+
+      if (updateError) {
+        console.error('刪除進度筆記失敗:', updateError);
+        toast.error('刪除失敗，請稍後再試');
+        return;
+      }
+
+      // 清除本地狀態
+      setLatestProgressNotes(null);
+
+      toast.success('進度筆記已刪除');
+    } catch (error) {
+      console.error('刪除進度筆記時發生錯誤:', error);
+      toast.error('刪除失敗，請稍後再試');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // 根據選中日期載入評估數據
   useEffect(() => {
@@ -672,9 +816,9 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                           iconColor: 'text-orange-500'
                         },
                         { 
-                          label: '能力評估記錄', 
-                          value: studentStats?.totalAbilities || 0, 
-                          icon: Award, 
+                          label: '進度筆記', 
+                          value: latestProgressNotes ? '✓' : '-', 
+                          icon: Target, 
                           color: 'from-purple-100 to-purple-200',
                           iconColor: 'text-purple-500'
                         },
@@ -869,12 +1013,14 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                     
                   </DynamicCard>
 
-                  {/* 能力評估記錄 */}
+                  {/* 進度筆記 */}
                   <DynamicCard className="lg:col-span-3 p-8" delay={0.8}>
                     <StudentAbilityAssessments
                       studentId={student.id}
                       maxAssessments={3}
                       showDetails={true}
+                      isTeacher={isTeacher}
+                      orgId={orgId}
                     />
                   </DynamicCard>
                 </div>
@@ -1473,6 +1619,88 @@ export default function EnhancedStudentAvatarTab({ student, className = '' }: En
                       )}
                     </div>
                     
+                    {/* 進度筆記 */}
+                    {latestProgressNotes && (
+                      <DynamicCard className="p-6 mt-8" delay={0.7}>
+                        <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] rounded-xl p-6 border-2 border-[#EADBC8]">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center shadow-md">
+                                <Target className="w-5 h-5 text-[#2B3A3B]" />
+                              </div>
+                              <div>
+                                <h4 className="text-lg font-semibold text-[#4B4036]">進度筆記</h4>
+                                <p className="text-xs text-[#8A7C70]">
+                                  記錄時間: {new Date(latestProgressNotes.lessonDate).toLocaleDateString('zh-TW')}
+                                </p>
+                              </div>
+                            </div>
+                            {isTeacher && !isEditingProgressNotes && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditedProgressNotes(latestProgressNotes.notes);
+                                    setIsEditingProgressNotes(true);
+                                  }}
+                                  className="p-2 rounded-lg bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] hover:from-[#EBC9A4] hover:to-[#FFD59A] text-[#2B3A3B] transition-colors shadow-sm hover:shadow-md"
+                                  title="編輯進度筆記"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm('確定要刪除此進度筆記嗎？')) return;
+                                    await handleDeleteProgressNotes();
+                                  }}
+                                  className="p-2 rounded-lg bg-[#FFE0E0] hover:bg-[#FFCCCC] text-[#2B3A3B] transition-colors shadow-sm hover:shadow-md"
+                                  title="刪除進度筆記"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {isEditingProgressNotes ? (
+                            <div className="space-y-3">
+                              <textarea
+                                value={editedProgressNotes}
+                                onChange={(e) => setEditedProgressNotes(e.target.value)}
+                                className="w-full p-3 border border-[#EADBC8] rounded-lg text-sm text-[#4B4036] bg-[#FFFDF8] focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent resize-none placeholder-[#8A7C70]"
+                                rows={4}
+                                placeholder="請輸入學習進度..."
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setIsEditingProgressNotes(false);
+                                    setEditedProgressNotes('');
+                                  }}
+                                  className="px-4 py-2 text-sm rounded-full bg-[#FFFDF8] hover:bg-[#F8F5EC] text-[#4B4036] border-2 border-[#EADBC8] hover:border-[#FFD59A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                                  disabled={isSaving}
+                                >
+                                  取消
+                                </button>
+                                <button
+                                  onClick={handleSaveProgressNotes}
+                                  disabled={isSaving}
+                                  className="px-4 py-2 text-sm rounded-full bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] hover:from-[#EBC9A4] hover:to-[#FFD59A] text-[#2B3A3B] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg font-medium"
+                                >
+                                  {isSaving ? '儲存中...' : '儲存'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-white rounded-lg p-4 border border-[#EADBC8]">
+                              <div className="text-sm text-[#4B4036] whitespace-pre-wrap leading-relaxed">
+                                {latestProgressNotes.notes || '暫無進度筆記'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </DynamicCard>
+                    )}
+
                     {/* 狀態指示器 */}
                     <div className="flex items-center justify-center space-x-8 mb-8">
                       <motion.div

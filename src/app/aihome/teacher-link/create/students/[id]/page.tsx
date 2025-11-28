@@ -413,7 +413,12 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
           )}
 
           {activeTab === 'avatar' && student && (
-            <EnhancedStudentAvatarTab student={student} className="mt-4" />
+            <EnhancedStudentAvatarTab 
+              student={student} 
+              className="mt-4"
+              isTeacher={true}
+              orgId={orgId}
+            />
           )}
 
           {activeTab === 'media' && student && (
@@ -421,6 +426,8 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
               studentId={student.id}
               studentName={student.full_name}
               className="mt-4"
+              isTeacher={true}
+              orgId={orgId}
             />
           )}
 

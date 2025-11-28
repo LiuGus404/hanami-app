@@ -26,7 +26,9 @@ import {
   MessageSquare,
   ArrowLeft,
   ArrowRight,
-  X
+  X,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { StudentMedia } from '@/types/progress';
@@ -54,7 +56,7 @@ interface LessonData {
   actual_timeslot: string;
   lesson_teacher: string;
   lesson_activities: string;
-  progress_notes: string;
+  progress_notes: string | null;
   next_target: string;
   notes: string;
   course_type: string;
@@ -66,6 +68,8 @@ interface StudentMediaTimelineProps {
   studentId: string;
   studentName: string;
   className?: string;
+  isTeacher?: boolean; // 是否為老師端，如果是則可以編輯和刪除進度筆記
+  orgId?: string | null; // 機構 ID，用於更新資料
 }
 
 // 地鐵站樣式的時間軸節點
@@ -432,7 +436,9 @@ const MediaCard: React.FC<{
 export default function StudentMediaTimeline({ 
   studentId, 
   studentName, 
-  className = '' 
+  className = '',
+  isTeacher = false,
+  orgId = null
 }: StudentMediaTimelineProps) {
   const [lessons, setLessons] = useState<LessonData[]>([]);
   const [selectedLesson, setSelectedLesson] = useState<LessonData | null>(null);
@@ -445,6 +451,9 @@ export default function StudentMediaTimeline({
   const [selectedMedia, setSelectedMedia] = useState<StudentMedia | null>(null); // 選中的媒體
   const [selectedMediaLessonDate, setSelectedMediaLessonDate] = useState<string | null>(null); // 選中媒體的課程日期
   const [todayLessonRecord, setTodayLessonRecord] = useState<any>(null); // 當日課堂記錄
+  const [isEditingProgressNotes, setIsEditingProgressNotes] = useState(false); // 是否正在編輯進度筆記
+  const [editedProgressNotes, setEditedProgressNotes] = useState<string>(''); // 編輯中的進度筆記內容
+  const [isSaving, setIsSaving] = useState(false); // 是否正在儲存
 
   // 載入當日課堂記錄
   const loadTodayLessonRecord = async () => {
@@ -547,6 +556,128 @@ export default function StudentMediaTimeline({
     }
   };
 
+  // 保存進度筆記
+  const handleSaveProgressNotes = async () => {
+    if (!selectedLesson) return;
+    
+    setIsSaving(true);
+    try {
+      const lessonId = selectedLesson.id;
+      const updateData: Record<string, any> = {
+        progress_notes: editedProgressNotes || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // 如果有 orgId，添加 org_id 欄位
+      if (orgId) {
+        updateData.org_id = orgId;
+      }
+
+      const { error: updateError } = await supabase
+        .from('hanami_student_lesson')
+        // @ts-ignore - Supabase type inference issue with dynamic update data
+        .update(updateData)
+        .eq('id', lessonId);
+
+      if (updateError) {
+        console.error('更新進度筆記失敗:', updateError);
+        toast.error('儲存失敗，請稍後再試');
+        return;
+      }
+
+      // 更新本地狀態
+      const updatedLesson = {
+        ...selectedLesson,
+        progress_notes: editedProgressNotes || null,
+      };
+      setSelectedLesson(updatedLesson);
+      
+      // 更新 lessons 陣列中的對應項目
+      setLessons(lessons.map(lesson => 
+        lesson.id === lessonId 
+          ? { ...lesson, progress_notes: editedProgressNotes || null }
+          : lesson
+      ));
+
+      // 如果更新的是當日課堂記錄，也要更新 todayLessonRecord
+      if (todayLessonRecord && todayLessonRecord.id === lessonId) {
+        setTodayLessonRecord({
+          ...todayLessonRecord,
+          progress_notes: editedProgressNotes || null,
+        });
+      }
+
+      setIsEditingProgressNotes(false);
+      setEditedProgressNotes('');
+      toast.success('進度筆記已儲存');
+    } catch (error) {
+      console.error('儲存進度筆記時發生錯誤:', error);
+      toast.error('儲存失敗，請稍後再試');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 刪除進度筆記
+  const handleDeleteProgressNotes = async () => {
+    if (!selectedLesson) return;
+
+    setIsSaving(true);
+    try {
+      const lessonId = selectedLesson.id;
+      const updateData: Record<string, any> = {
+        progress_notes: null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // 如果有 orgId，添加 org_id 欄位
+      if (orgId) {
+        updateData.org_id = orgId;
+      }
+
+      const { error: updateError } = await supabase
+        .from('hanami_student_lesson')
+        // @ts-ignore - Supabase type inference issue with dynamic update data
+        .update(updateData)
+        .eq('id', lessonId);
+
+      if (updateError) {
+        console.error('刪除進度筆記失敗:', updateError);
+        toast.error('刪除失敗，請稍後再試');
+        return;
+      }
+
+      // 更新本地狀態
+      const updatedLesson = {
+        ...selectedLesson,
+        progress_notes: null,
+      };
+      setSelectedLesson(updatedLesson);
+      
+      // 更新 lessons 陣列中的對應項目
+      setLessons(lessons.map(lesson => 
+        lesson.id === lessonId 
+          ? { ...lesson, progress_notes: null }
+          : lesson
+      ));
+
+      // 如果更新的是當日課堂記錄，也要更新 todayLessonRecord
+      if (todayLessonRecord && todayLessonRecord.id === lessonId) {
+        setTodayLessonRecord({
+          ...todayLessonRecord,
+          progress_notes: null,
+        });
+      }
+
+      toast.success('進度筆記已刪除');
+    } catch (error) {
+      console.error('刪除進度筆記時發生錯誤:', error);
+      toast.error('刪除失敗，請稍後再試');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // 響應式監聽器
   useEffect(() => {
     const checkIsMobile = () => {
@@ -558,6 +689,12 @@ export default function StudentMediaTimeline({
     
     return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
+
+  // 當切換課程時，重置編輯狀態
+  useEffect(() => {
+    setIsEditingProgressNotes(false);
+    setEditedProgressNotes('');
+  }, [selectedLesson?.id]);
 
   // 載入課程資料和媒體
   useEffect(() => {
@@ -1093,25 +1230,87 @@ export default function StudentMediaTimeline({
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-gray-600">進度記錄</span>
-                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">已記錄</span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">已記錄</span>
+                            {isTeacher && !isEditingProgressNotes && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    const currentNotes = selectedLesson.progress_notes || todayLessonRecord?.progress_notes || '';
+                                    setEditedProgressNotes(currentNotes);
+                                    setIsEditingProgressNotes(true);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] hover:from-[#EBC9A4] hover:to-[#FFD59A] text-[#2B3A3B] transition-colors shadow-sm hover:shadow-md"
+                                  title="編輯進度筆記"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                {(selectedLesson.progress_notes || todayLessonRecord?.progress_notes) && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm('確定要刪除此進度筆記嗎？')) return;
+                                      await handleDeleteProgressNotes();
+                                    }}
+                                    className="p-1.5 rounded-lg bg-[#FFE0E0] hover:bg-[#FFCCCC] text-[#2B3A3B] transition-colors shadow-sm hover:shadow-md"
+                                    title="刪除進度筆記"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-gray-800">學習進度</span>
                             <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">進行中</span>
                           </div>
-                          <div className="text-sm text-gray-700 mb-2">
-                            {selectedLesson.progress_notes || todayLessonRecord?.progress_notes || '暫無進度筆記'}
-                          </div>
-                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                            <div className="flex space-x-2">
-                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">進度追蹤</span>
-                              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
-                                {selectedLesson.course_type || '課程學習'}
-                              </span>
+                          {isEditingProgressNotes ? (
+                            <div className="space-y-3">
+                              <textarea
+                                value={editedProgressNotes}
+                                onChange={(e) => setEditedProgressNotes(e.target.value)}
+                                className="w-full p-3 border border-[#EADBC8] rounded-lg text-sm text-[#4B4036] bg-[#FFFDF8] focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent resize-none placeholder-[#8A7C70]"
+                                rows={4}
+                                placeholder="請輸入學習進度..."
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setIsEditingProgressNotes(false);
+                                    setEditedProgressNotes('');
+                                  }}
+                                  className="px-4 py-2 text-sm rounded-full bg-[#FFFDF8] hover:bg-[#F8F5EC] text-[#4B4036] border-2 border-[#EADBC8] hover:border-[#FFD59A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                                  disabled={isSaving}
+                                >
+                                  取消
+                                </button>
+                                <button
+                                  onClick={handleSaveProgressNotes}
+                                  disabled={isSaving}
+                                  className="px-4 py-2 text-sm rounded-full bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] hover:from-[#EBC9A4] hover:to-[#FFD59A] text-[#2B3A3B] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg font-medium"
+                                >
+                                  {isSaving ? '儲存中...' : '儲存'}
+                                </button>
+                              </div>
                             </div>
-                            <span>記錄時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}</span>
-                          </div>
+                          ) : (
+                            <>
+                              <div className="text-sm text-[#4B4036] mb-2 whitespace-pre-wrap leading-relaxed">
+                                {selectedLesson.progress_notes || todayLessonRecord?.progress_notes || '暫無進度筆記'}
+                              </div>
+                              <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                                <div className="flex space-x-2">
+                                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">進度追蹤</span>
+                                  <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+                                    {selectedLesson.course_type || '課程學習'}
+                                  </span>
+                                </div>
+                                <span>記錄時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}</span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

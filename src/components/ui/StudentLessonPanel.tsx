@@ -117,7 +117,7 @@ export default function StudentLessonPanel({
     (studentData && (studentData.organization_name ?? studentData.organizationName)) ??
     null;
   const allowAiFeatures = orgId === PREMIUM_AI_ORG_ID;
-  const aiFeatureMessage = '功能未開放，企業用戶請聯繫 BuildThink@lingumiai.com';
+  const aiFeatureMessage = '暫未開放，企業用戶請聯繫 BuildThinkai@gmail.com';
   
   // 添加動畫樣式到 head
   useEffect(() => {
@@ -1074,12 +1074,23 @@ export default function StudentLessonPanel({
                 </button>
               ) : (
                 <button
-                  onClick={() => toast(aiFeatureMessage)}
-                  className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F0ECE1] rounded-xl shadow text-[#8A7C70] cursor-not-allowed"
+                  onClick={() => toast(aiFeatureMessage, {
+                    duration: 3000,
+                    style: {
+                      background: '#FFF9F2',
+                      color: '#4B4036',
+                      border: '1px solid #EADBC8',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                    },
+                  })}
+                  className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F0ECE1] rounded-xl shadow text-[#8A7C70] cursor-not-allowed hover:bg-[#E8E0D5] transition-colors relative"
                   type="button"
+                  title={aiFeatureMessage}
                 >
-                  <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" />
-                  <span className="text-[10px] sm:text-[11px]">AI 訊息</span>
+                  <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5 opacity-50" />
+                  <span className="text-[10px] sm:text-[11px] opacity-75">AI 訊息</span>
                 </button>
               )
             )}
