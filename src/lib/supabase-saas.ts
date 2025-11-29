@@ -25,6 +25,7 @@ export function createSaasAdminClient() {
 // 創建用戶客戶端（用於前端）
 export function createSaasClient() {
   if (!saasClient) {
+    console.log('createSaasClient: Creating NEW instance');
     saasClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         storageKey: 'hanamiecho-auth', // 使用獨立的 storageKey
@@ -34,6 +35,8 @@ export function createSaasClient() {
         detectSessionInUrl: typeof window !== 'undefined' && window.location.pathname.startsWith('/aihome')
       }
     });
+  } else {
+    // console.log('createSaasClient: Returning EXISTING instance');
   }
   return saasClient;
 }

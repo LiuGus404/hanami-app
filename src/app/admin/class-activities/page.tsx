@@ -4851,8 +4851,13 @@ const PLACEHOLDER_ORG_IDS = new Set([
             student={selectedStudentForMedia}
             orgId={validOrgId}
             onQuotaChanged={() => {
-              // 重新檢查媒體狀態
-              checkStudentMediaStatus();
+              // 只更新當前學生的媒體狀態，避免重新載入整個頁面
+              if (selectedStudentForMedia?.id) {
+                setStudentMediaStatus(prev => ({
+                  ...prev,
+                  [selectedStudentForMedia.id]: true
+                }));
+              }
             }}
           />
         )}

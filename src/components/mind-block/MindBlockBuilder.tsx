@@ -24,11 +24,14 @@ import {
     ArrowDownOnSquareIcon,
     CheckIcon,
     GlobeAltIcon,
-    LockClosedIcon
+    LockClosedIcon,
+    PencilIcon,
+    ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MindBlockNode, MindBlockType } from '@/types/mind-block';
 import { createSaasClient } from '@/lib/supabase-saas';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 
 // Initial Demo Data
 const initialBlocks: MindBlockNode[] = [
@@ -97,42 +100,109 @@ export default function MindBlockBuilder() {
     // Saved Templates State
     const [savedTemplates, setSavedTemplates] = useState<(MindBlockNode & { isPublic?: boolean })[]>([]);
     const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+    const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null); // Track if we are updating an existing template
     const [savePrivacy, setSavePrivacy] = useState<'private' | 'public'>('private');
-    const [currentUser, setCurrentUser] = useState<any>(null);
+
+    const { user: currentUser } = useSaasAuth();
 
     const allBlockTypes = [...DEFAULT_BLOCK_TYPES, ...customTypes];
 
-    // Fetch user and templates on load
+    // Fetch templates on load or when user changes
     useEffect(() => {
-        const init = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            console.log('MindBlockBuilder: User loaded', user);
-            setCurrentUser(user);
+        let mounted = true;
 
-            if (user) {
-                const { data, error } = await supabase
-                    .from('mind_blocks' as any)
-                    .select('*')
-                    .eq('is_template', true)
-                    .or(`is_public.eq.true,user_id.eq.${user.id}`);
+        const fetchTemplates = async (userId: string) => {
+            console.log('MindBlockBuilder: Fetching templates for user:', userId);
+            const { data, error } = await supabase
+                .from('mind_blocks' as any)
+                .select('*')
+                .eq('is_template', true)
+                .or(`is_public.eq.true,user_id.eq.${userId}`);
 
-                if (data) {
-                    const loadedTemplates = data.map((item: any) => ({
-                        id: item.id,
-                        type: item.block_type as MindBlockType,
-                        params: {
-                            ...item.content_json.params,
-                            label: item.title,
-                            customColor: item.color === '#FFD59A' ? undefined : item.color // Map back if needed, or store color name directly
-                        },
-                        isPublic: item.is_public
-                    }));
-                    setSavedTemplates(loadedTemplates);
-                }
+            if (error) {
+                console.error('MindBlockBuilder: Error fetching templates:', error);
+            }
+
+            if (data && mounted) {
+                console.log('MindBlockBuilder: Fetched templates count:', data.length);
+                const loadedTemplates = data.map((item: any) => ({
+                    id: item.id,
+                    type: item.block_type as MindBlockType,
+                    params: {
+                        ...item.content_json.params,
+                        label: item.title,
+                        customColor: item.color === '#FFD59A' ? undefined : item.color
+                    },
+                    isPublic: item.is_public
+                }));
+                setSavedTemplates(loadedTemplates);
             }
         };
+
+        const init = async () => {
+            try {
+                if (currentUser) {
+                    console.log('MindBlockBuilder: Current user present:', currentUser.id);
+                    const { data: { session }, error } = await supabase.auth.getSession();
+
+                    if (error) {
+                        console.error('MindBlockBuilder: Error getting session:', error);
+                    }
+
+                    console.log('MindBlockBuilder: Session check:', session ? 'Session found' : 'No session');
+
+                    if (session) {
+                        fetchTemplates(currentUser.id);
+                    } else {
+                        console.log('MindBlockBuilder: No session yet, waiting for auth change...');
+                    }
+                } else {
+                    console.log('MindBlockBuilder: No current user');
+                }
+            } catch (e) {
+                console.error('MindBlockBuilder: Exception in init:', e);
+            }
+        };
+
         init();
-    }, []);
+
+        // Listen for auth changes to retry fetch if session was missing
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            console.log('MindBlockBuilder: Auth state change:', event, session ? 'Session present' : 'No session');
+            if (session && currentUser && mounted) {
+                fetchTemplates(currentUser.id);
+            }
+        });
+
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
+    }, [currentUser]);
+
+    const refreshLibrary = async () => {
+        if (!currentUser) return;
+        const { data, error } = await supabase
+            .from('mind_blocks' as any)
+            .select('*')
+            .eq('is_template', true)
+            .or(`is_public.eq.true,user_id.eq.${currentUser.id}`);
+
+        if (data) {
+            const loadedTemplates = data.map((item: any) => ({
+                id: item.id,
+                type: item.block_type as MindBlockType,
+                params: {
+                    ...item.content_json.params,
+                    label: item.title,
+                    customColor: item.color === '#FFD59A' ? undefined : item.color
+                },
+                isPublic: item.is_public
+            }));
+            setSavedTemplates(loadedTemplates);
+            alert('積木庫已更新');
+        }
+    };
 
     // Load composition from URL if present
     useEffect(() => {
@@ -233,6 +303,8 @@ export default function MindBlockBuilder() {
     const cancelAddBlock = () => {
         setPendingBlock(null);
         setEditingBlockId(null);
+        setEditingTemplateId(null); // Clear template editing state
+        setIsSavingTemplate(false);
     };
 
     const updateBlockParams = (id: string, key: string, value: any) => {
@@ -267,6 +339,39 @@ export default function MindBlockBuilder() {
         setIsSavingTemplate(true);
     };
 
+    const handleEditTemplate = (template: MindBlockNode, e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Load template into pending block for editing
+        const newBlock: MindBlockNode = {
+            ...template,
+            id: Math.random().toString(36).substr(2, 9), // Temp ID for editor
+        };
+        setPendingBlock(newBlock);
+        setEditingBlockId(newBlock.id);
+        setEditingTemplateId(template.id); // Track the original template ID (UUID)
+        setSavePrivacy((template as any).isPublic ? 'public' : 'private');
+        setShowLibrary(false); // Close library to focus on editor
+    };
+
+    const handleDeleteTemplate = async (templateId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm('確定要刪除這個積木嗎？此動作無法復原。')) return;
+
+        // Optimistic update
+        setSavedTemplates(savedTemplates.filter(t => t.id !== templateId));
+
+        const { error } = await supabase
+            .from('mind_blocks')
+            .delete()
+            .eq('id', templateId);
+
+        if (error) {
+            console.error('Error deleting template:', error);
+            alert('刪除失敗');
+            // Revert would go here
+        }
+    };
+
     const confirmSaveTemplate = async () => {
         if (!editingBlock || !currentUser) {
             if (!currentUser) alert('請先登入以儲存積木！');
@@ -279,16 +384,24 @@ export default function MindBlockBuilder() {
         // Optimistic UI update
         const newTemplate = {
             ...editingBlock,
+            id: editingTemplateId || editingBlock.id, // Use existing ID if updating
             params: { ...editingBlock.params, label },
             isPublic
         };
-        setSavedTemplates([...savedTemplates, newTemplate]);
+
+        if (editingTemplateId) {
+            setSavedTemplates(savedTemplates.map(t => t.id === editingTemplateId ? newTemplate : t));
+        } else {
+            setSavedTemplates([...savedTemplates, newTemplate]);
+        }
+
         setIsSavingTemplate(false);
+        setEditingTemplateId(null); // Clear editing state
         setShowLibrary(true);
 
         // Persist to Supabase
         try {
-            const { error } = await (supabase.from('mind_blocks') as any).insert({
+            const payload = {
                 user_id: currentUser.id,
                 title: label,
                 description: editingBlock.params.content?.substring(0, 100) || '',
@@ -297,15 +410,29 @@ export default function MindBlockBuilder() {
                 block_type: editingBlock.type,
                 is_template: true,
                 is_public: isPublic,
-                category: 'Custom' // Default category
-            } as any);
+                category: 'Custom', // Default category
+                tags: editingBlock.params.tags ? editingBlock.params.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t) : []
+            } as any;
+
+            let error;
+            if (editingTemplateId) {
+                // Update existing
+                const { error: updateError } = await (supabase.from('mind_blocks') as any)
+                    .update(payload)
+                    .eq('id', editingTemplateId);
+                error = updateError;
+            } else {
+                // Insert new
+                const { error: insertError } = await (supabase.from('mind_blocks') as any)
+                    .insert(payload);
+                error = insertError;
+            }
 
             if (error) {
                 console.error('Error saving template:', error);
                 alert('儲存失敗，請稍後再試。');
-                // Revert optimistic update if needed (omitted for simplicity)
             } else {
-                alert('已成功同步至雲端！');
+                alert(editingTemplateId ? '積木已更新！' : '已成功同步至雲端！');
             }
         } catch (e) {
             console.error('Exception saving template:', e);
@@ -313,22 +440,8 @@ export default function MindBlockBuilder() {
     };
 
     const handleSave = async () => {
-        let userToUse = currentUser;
-
-        // Fallback: Try to get user directly from Supabase if hook returns null
-        if (!userToUse) {
-            console.log('handleSave: currentUser is null, trying direct fetch...');
-            const { data: { user }, error } = await supabase.auth.getUser();
-            if (user) {
-                console.log('handleSave: Direct fetch successful', user);
-                userToUse = user;
-            } else {
-                console.error('handleSave: Direct fetch failed', error);
-            }
-        }
-
-        if (!userToUse) {
-            alert('請先登入以儲存積木！(無法獲取使用者資訊)');
+        if (!currentUser) {
+            alert('請先登入以儲存積木！');
             return;
         }
 
@@ -337,7 +450,7 @@ export default function MindBlockBuilder() {
 
         try {
             const { error } = await (supabase.from('mind_blocks') as any).insert({
-                user_id: userToUse.id,
+                user_id: currentUser.id,
                 title: name,
                 description: compiledPrompt.substring(0, 100) + '...',
                 content_json: { blocks }, // Store the array of blocks
@@ -372,19 +485,28 @@ export default function MindBlockBuilder() {
                         initial={{ width: 0, opacity: 0 }}
                         animate={{ width: 280, opacity: 1 }}
                         exit={{ width: 0, opacity: 0 }}
-                        className="bg-white rounded-xl border border-[#EADBC8] shadow-sm flex flex-col overflow-hidden z-20"
+                        className="absolute md:relative h-full left-0 bg-white rounded-xl border border-[#EADBC8] shadow-sm flex flex-col overflow-hidden z-30 md:z-20"
                     >
                         <div className="p-4 border-b border-[#EADBC8] bg-[#FFF9F2]/30 flex items-center justify-between">
                             <h3 className="font-bold text-[#4B4036] flex items-center gap-2">
                                 <BookOpenIcon className="w-5 h-5 text-amber-500" />
                                 積木庫
                             </h3>
-                            <button
-                                onClick={() => setShowLibrary(false)}
-                                className="p-1 hover:bg-[#EADBC8]/20 rounded-full"
-                            >
-                                <XMarkIcon className="w-5 h-5 text-[#4B4036]" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={refreshLibrary}
+                                    className="p-1 hover:bg-[#EADBC8]/20 rounded-full text-[#4B4036]/60 hover:text-[#4B4036]"
+                                    title="重新整理"
+                                >
+                                    <ArrowPathIcon className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => setShowLibrary(false)}
+                                    className="p-1 hover:bg-[#EADBC8]/20 rounded-full"
+                                >
+                                    <XMarkIcon className="w-5 h-5 text-[#4B4036]" />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="p-4 border-b border-[#EADBC8]">
@@ -430,6 +552,24 @@ export default function MindBlockBuilder() {
                                                                 )}
                                                             </div>
                                                             <div className="text-[10px] text-[#4B4036]/50 truncate">{template.type}</div>
+                                                        </div>
+
+                                                        {/* Edit/Delete Actions */}
+                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={(e) => handleEditTemplate(template, e)}
+                                                                className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+                                                                title="編輯"
+                                                            >
+                                                                <PencilIcon className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleDeleteTemplate(template.id, e)}
+                                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                title="刪除"
+                                                            >
+                                                                <TrashIcon className="w-4 h-4" />
+                                                            </button>
                                                         </div>
                                                     </div>
                                                     <button
@@ -629,6 +769,7 @@ export default function MindBlockBuilder() {
                                         if (pendingBlock) cancelAddBlock();
                                         else setEditingBlockId(null);
                                         setIsSavingTemplate(false); // Reset save state
+                                        setEditingTemplateId(null); // Clear template editing
                                     }}
                                     className="p-2 hover:bg-[#EADBC8]/20 rounded-full transition-colors"
                                 >
@@ -726,7 +867,9 @@ export default function MindBlockBuilder() {
 
                                 {/* Label Input */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#4B4036]">標籤 (選填)</label>
+                                    <label className="text-sm font-bold text-[#4B4036]">
+                                        標題 <span className="text-red-500">*</span>
+                                    </label>
                                     <input
                                         type="text"
                                         value={editingBlock.params.label || ''}
@@ -735,6 +878,8 @@ export default function MindBlockBuilder() {
                                         className="w-full px-4 py-2 bg-[#FFF9F2] border border-[#EADBC8] rounded-xl focus:border-[#FFD59A] focus:ring-0 text-[#4B4036]"
                                     />
                                 </div>
+
+
 
                                 {/* Content Input */}
                                 <div className="space-y-2">
@@ -780,39 +925,48 @@ export default function MindBlockBuilder() {
                                                 onClick={confirmSaveTemplate}
                                                 className="w-full py-2 bg-[#FFD59A] text-[#4B4036] rounded-lg font-bold hover:bg-[#FFC56D] transition-colors"
                                             >
-                                                確認儲存
+                                                {editingTemplateId ? '確認更新' : '確認儲存'}
                                             </button>
                                         </div>
                                     )}
 
-                                    <div className="flex gap-3">
-                                        {pendingBlock ? (
-                                            <>
-                                                <button
-                                                    onClick={cancelAddBlock}
-                                                    className="flex-1 py-3 bg-white border border-[#EADBC8] text-[#4B4036] rounded-xl font-bold hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all"
-                                                >
-                                                    取消
-                                                </button>
-                                                <button
-                                                    onClick={confirmAddBlock}
-                                                    className="flex-1 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <CheckIcon className="w-5 h-5" />
-                                                    確認加入
-                                                </button>
-                                            </>
-                                        ) : (
-                                            !isSavingTemplate && (
-                                                <button
-                                                    onClick={initiateSaveTemplate}
-                                                    className="w-full flex items-center justify-center px-4 py-3 bg-white border border-[#EADBC8] text-[#4B4036] rounded-xl font-bold hover:bg-[#FFF9F2] hover:border-[#FFD59A] transition-all shadow-sm"
-                                                >
-                                                    <ArrowDownOnSquareIcon className="w-5 h-5 mr-2 text-amber-500" />
-                                                    儲存為自訂積木
-                                                </button>
-                                            )
+                                    <div className="flex flex-col gap-3">
+                                        {!isSavingTemplate && (
+                                            <button
+                                                onClick={initiateSaveTemplate}
+                                                className="w-full py-2 bg-white border border-[#FFD59A] text-[#FFD59A] rounded-xl font-bold hover:bg-[#FFF9F2] transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <ArrowDownOnSquareIcon className="w-5 h-5" />
+                                                {editingTemplateId ? '更新積木' : '儲存為積木模板'}
+                                            </button>
                                         )}
+
+                                        <div className="flex gap-3">
+                                            {pendingBlock ? (
+                                                <>
+                                                    <button
+                                                        onClick={cancelAddBlock}
+                                                        className="flex-1 py-3 bg-white border border-[#EADBC8] text-[#4B4036] rounded-xl font-bold hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all"
+                                                    >
+                                                        取消
+                                                    </button>
+                                                    <button
+                                                        onClick={confirmAddBlock}
+                                                        className="flex-1 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <PlusIcon className="w-5 h-5" />
+                                                        加入畫布
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setEditingBlockId(null)}
+                                                    className="w-full py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+                                                >
+                                                    完成編輯
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -828,7 +982,7 @@ export default function MindBlockBuilder() {
                         initial={{ width: 0, opacity: 0 }}
                         animate={{ width: 320, opacity: 1 }}
                         exit={{ width: 0, opacity: 0 }}
-                        className="bg-white rounded-xl border border-[#EADBC8] shadow-sm flex flex-col overflow-hidden z-10"
+                        className="absolute md:relative h-full right-0 bg-white rounded-xl border border-[#EADBC8] shadow-sm flex flex-col overflow-hidden z-30 md:z-10"
                     >
                         <div className="p-4 border-b border-[#EADBC8] bg-[#FFF9F2]/30 flex items-center justify-between">
                             <h3 className="font-bold text-[#4B4036] flex items-center gap-2">

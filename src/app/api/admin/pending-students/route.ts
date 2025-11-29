@@ -6,8 +6,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const orgId = searchParams.get('orgId');
     
-    console.log('🔍 API: 開始查詢待審核學生...', { orgId });
-    
     // 使用服務角色 key 繞過 RLS
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -19,9 +17,50 @@ export async function GET(request: NextRequest) {
       }
     });
     
+    // 只選擇需要的字段，提高查詢性能
+    const selectFields = `
+      id,
+      student_oid,
+      full_name,
+      nick_name,
+      student_age,
+      student_dob,
+      gender,
+      contact_number,
+      student_email,
+      parent_email,
+      address,
+      school,
+      course_type,
+      student_type,
+      regular_weekday,
+      regular_timeslot,
+      selected_plan_name,
+      selected_plan_id,
+      package_lessons,
+      package_price,
+      payment_amount,
+      payment_method,
+      review_status,
+      enrollment_date,
+      review_notes,
+      rejection_reason,
+      selected_regular_student_id,
+      selected_regular_student_name,
+      org_id,
+      created_at,
+      reviewed_at,
+      started_date,
+      duration_months,
+      ongoing_lessons,
+      upcoming_lessons,
+      student_preference,
+      health_notes
+    `;
+    
     let query = supabase
       .from('hanami_pending_students')
-      .select('*');
+      .select(selectFields);
     
     // 如果有 org_id，根據 org_id 過濾
     // 注意：如果表還沒有 org_id 欄位，需要先執行遷移文件 migrations/add_org_id_to_pending_students.sql
@@ -36,13 +75,11 @@ export async function GET(request: NextRequest) {
       console.warn('⚠️ org_id 欄位不存在，使用不帶過濾的查詢。請執行遷移文件: migrations/add_org_id_to_pending_students.sql');
       const fallbackQuery = supabase
         .from('hanami_pending_students')
-        .select('*');
+        .select(selectFields);
       const fallbackResult = await fallbackQuery.order('enrollment_date', { ascending: false });
       data = fallbackResult.data;
       error = fallbackResult.error;
     }
-
-    console.log('🔍 API: 查詢結果:', { data, error, orgId });
 
     if (error) throw error;
 
@@ -230,5 +267,63 @@ async function transferToRegularStudents(studentId: string, supabase: any) {
   } catch (error) {
     console.error('轉移學生失敗:', error);
     throw error;
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const studentIds = searchParams.get('ids');
+    
+    if (!studentIds) {
+      return NextResponse.json({
+        success: false,
+        error: '缺少學生 ID 參數'
+      }, { status: 400 });
+    }
+    
+    const ids = studentIds.split(',').filter(id => id.trim());
+    
+    if (ids.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: '沒有有效的學生 ID'
+      }, { status: 400 });
+    }
+    
+    console.log('🔍 API: 開始刪除待審核學生:', { ids });
+    
+    // 使用服務角色 key 繞過 RLS
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+    
+    const { error } = await supabase
+      .from('hanami_pending_students')
+      .delete()
+      .in('id', ids);
+    
+    if (error) throw error;
+    
+    console.log('✅ API: 成功刪除待審核學生:', ids.length, '個');
+    
+    return NextResponse.json({
+      success: true,
+      message: `成功刪除 ${ids.length} 個待審核學生`,
+      deletedCount: ids.length
+    });
+    
+  } catch (error: any) {
+    console.error('❌ API: 刪除失敗:', error);
+    return NextResponse.json({
+      success: false,
+      error: error.message || '刪除失敗'
+    }, { status: 500 });
   }
 }

@@ -52,6 +52,7 @@ export default function MusicFocusClassPage() {
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [pricingPlans, setPricingPlans] = useState<any[]>([]);
   const [courseTypesById, setCourseTypesById] = useState<Record<string, any>>({});
+  const [hanamiOrgId, setHanamiOrgId] = useState<string | null>(null);
 
   // 處理展開/收起
   const handleToggleExpanded = useCallback(() => {
@@ -65,6 +66,41 @@ export default function MusicFocusClassPage() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // 獲取 Hanami Music 機構 ID
+  useEffect(() => {
+    const loadHanamiOrgId = async () => {
+      try {
+        const response = await fetch('/api/organizations/get?orgSlug=hanami-music&bySlug=true', {
+          credentials: 'include',
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data?.id) {
+            setHanamiOrgId(result.data.id);
+          } else {
+            setHanamiOrgId('f8d269ec-b682-45d1-a796-3b74c2bf3eec');
+          }
+        } else {
+          setHanamiOrgId('f8d269ec-b682-45d1-a796-3b74c2bf3eec');
+        }
+      } catch (error) {
+        console.error('❌ 獲取機構 ID 錯誤:', error);
+        setHanamiOrgId('f8d269ec-b682-45d1-a796-3b74c2bf3eec');
+      }
+    };
+
+    loadHanamiOrgId();
+  }, []);
+
+  // 生成報名連結（包含機構 ID）
+  const getRegisterUrl = () => {
+    if (hanamiOrgId) {
+      return `/aihome/course-activities/register?orgId=${hanamiOrgId}`;
+    }
+    return '/aihome/course-activities/register';
+  };
 
   // 課堂照片列表
   const classPhotos = [
@@ -604,7 +640,7 @@ export default function MusicFocusClassPage() {
                     className="flex flex-col sm:flex-row gap-6 justify-center"
                   >
                     <motion.button
-                      onClick={() => router.push('/aihome/course-activities/register')}
+                      onClick={() => router.push(getRegisterUrl())}
                       whileHover={{ scale: 1.05, y: -2 }}
                       whileTap={{ scale: 0.95 }}
                       className="group px-10 py-4 bg-white text-[#4B4036] rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center space-x-3"
@@ -1489,7 +1525,7 @@ export default function MusicFocusClassPage() {
                               </div>
 
                               <motion.button
-                                onClick={() => router.push('/aihome/course-activities/register')}
+                                onClick={() => router.push(getRegisterUrl())}
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 className={`w-full px-4 py-3 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 ${plan.plan_type === 'trial'

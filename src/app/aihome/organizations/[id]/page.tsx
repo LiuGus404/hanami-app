@@ -149,7 +149,8 @@ export default function OrganizationDetailPage() {
           contactPhone={org.contact_phone || settings.contactPhone || null}
           contactEmail={org.contact_email || settings.contactEmail || null}
           socialLinks={settings.socialLinks || null}
-          showEnrollButton={false}
+          showEnrollButton={true}
+          onEnroll={() => router.push(`/aihome/course-activities/register?orgId=${org.id}`)}
         />
 
         {/* WhatsApp 聯繫按鈕 */}

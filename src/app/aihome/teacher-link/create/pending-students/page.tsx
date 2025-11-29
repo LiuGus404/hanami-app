@@ -19,7 +19,12 @@ import {
   DocumentTextIcon,
   CalendarDaysIcon,
   AcademicCapIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  TrashIcon,
+  LinkIcon,
+  DocumentDuplicateIcon,
+  XMarkIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import BackButton from '@/components/ui/BackButton';
@@ -29,6 +34,7 @@ import { AnimatePresence } from 'framer-motion';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
 import StudentManagementNavBar from '@/components/ui/StudentManagementNavBar';
 import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
+import { ChevronDown } from 'lucide-react';
 
 const UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -134,6 +140,51 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [newStudentForm, setNewStudentForm] = useState<any>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedTrialStudentIds, setSelectedTrialStudentIds] = useState<string[]>([]);
+  const [isDeletingTrial, setIsDeletingTrial] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [registrationLinks, setRegistrationLinks] = useState<any[]>([]);
+  const [loadingLinks, setLoadingLinks] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [showLinkFormModal, setShowLinkFormModal] = useState(false);
+  const [linkFormData, setLinkFormData] = useState({
+    organizationId: orgId || '',
+    courseNature: 'trial' as 'trial' | 'regular',
+    courseType: '',
+    selectedPlan: '',
+    childFullName: '',
+    childNickname: '',
+    childBirthDate: '',
+    childAge: 0,
+    childGender: '',
+    childPreferences: '',
+    childHealthNotes: '',
+    parentName: '',
+    parentPhone: '',
+    parentCountryCode: '+852',
+    parentEmail: '',
+    parentTitle: '',
+    selectedDate: '',
+    selectedTimeSlot: '',
+    availableTimes: [] as string[],
+    promotionCode: '',
+    remarks: '',
+    linkExpiryHours: 24 // 預設24小時
+  });
+  const [linkFormErrors, setLinkFormErrors] = useState<Record<string, string>>({});
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [courseTypes, setCourseTypes] = useState<any[]>([]);
+  const [pricingPlans, setPricingPlans] = useState<any[]>([]);
+  const [loadingOrganizations, setLoadingOrganizations] = useState(false);
+  const [loadingCourseTypes, setLoadingCourseTypes] = useState(false);
+  // 用於根據課程類型載入既有排程（星期 / 時段），再轉成具體日期
+  const [weekSchedule, setWeekSchedule] = useState<any[]>([]);
+  const [availableDates, setAvailableDates] = useState<
+    { date: string; weekday: number; weekdayName: string; timeSlots: any[] }[]
+  >([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
 
   // 載入待審核學生
   const loadPendingStudents = async () => {
@@ -155,6 +206,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
       }
       
       setPendingStudents(result.data || []);
+      setSelectedStudentIds([]); // 重新載入時清空選中
       console.log('✅ 成功載入待審核學生:', result.count || 0, '個');
     } catch (error) {
       console.error('❌ 載入待審核學生失敗:', error);
@@ -183,6 +235,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
       }
       
       setTrialStudents(result.data || []);
+      setSelectedTrialStudentIds([]); // 重新載入時清空選中
       console.log('✅ 成功載入試堂學生:', result.count || 0, '個');
     } catch (error) {
       console.error('❌ 載入試堂學生失敗:', error);
@@ -388,6 +441,438 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
     } catch (error) {
       console.error('審核學生失敗:', error);
       alert('審核失敗，請稍後再試');
+    }
+  };
+
+  // 刪除選中的學生
+  const deleteSelectedStudents = async () => {
+    if (selectedStudentIds.length === 0) {
+      alert('請先選擇要刪除的學生');
+      return;
+    }
+
+    if (!confirm(`確認要刪除選中的 ${selectedStudentIds.length} 個學生嗎？此操作無法撤銷。`)) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const response = await fetch(`/api/admin/pending-students?ids=${selectedStudentIds.join(',')}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || '刪除失敗');
+      }
+
+      // 重新載入資料
+      await loadPendingStudents();
+      setSelectedStudentIds([]);
+      alert(`成功刪除 ${result.deletedCount || selectedStudentIds.length} 個學生`);
+    } catch (error: any) {
+      console.error('刪除學生失敗:', error);
+      alert(error.message || '刪除失敗，請稍後再試');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // 切換單個學生的選中狀態
+  const toggleStudentSelection = (studentId: string) => {
+    setSelectedStudentIds(prev => 
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  // 全選/取消全選
+  const toggleSelectAll = () => {
+    if (selectedStudentIds.length === filteredStudents.length) {
+      setSelectedStudentIds([]);
+    } else {
+      setSelectedStudentIds(filteredStudents.map(s => s.id));
+    }
+  };
+
+  // 刪除選中的試堂學生
+  const deleteSelectedTrialStudents = async () => {
+    if (selectedTrialStudentIds.length === 0) {
+      alert('請先選擇要刪除的試堂學生');
+      return;
+    }
+
+    if (!confirm(`確認要刪除選中的 ${selectedTrialStudentIds.length} 個試堂學生嗎？此操作無法撤銷。`)) {
+      return;
+    }
+
+    try {
+      setIsDeletingTrial(true);
+      const response = await fetch(`/api/admin/trial-students?ids=${selectedTrialStudentIds.join(',')}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || '刪除失敗');
+      }
+
+      // 重新載入試堂學生列表
+      await loadTrialStudents();
+      setSelectedTrialStudentIds([]);
+      alert(`成功刪除 ${result.deletedCount || selectedTrialStudentIds.length} 個試堂學生`);
+    } catch (error: any) {
+      console.error('刪除試堂學生失敗:', error);
+      alert(error.message || '刪除失敗，請稍後再試');
+    } finally {
+      setIsDeletingTrial(false);
+    }
+  };
+
+  // 切換單個試堂學生的選中狀態
+  const toggleTrialStudentSelection = (studentId: string) => {
+    setSelectedTrialStudentIds(prev => 
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  // 試堂學生全選/取消全選
+  const toggleSelectAllTrial = () => {
+    if (selectedTrialStudentIds.length === trialStudents.length) {
+      setSelectedTrialStudentIds([]);
+    } else {
+      setSelectedTrialStudentIds(trialStudents.map(s => s.id));
+    }
+  };
+
+  // 載入報名連結列表
+  const loadRegistrationLinks = async (forceRefresh = false) => {
+    // 如果正在加載中，跳過重複請求
+    if (loadingLinks && !forceRefresh) {
+      return;
+    }
+    
+    try {
+      setLoadingLinks(true);
+      const url = orgId 
+        ? `/api/registrations/links?orgId=${encodeURIComponent(orgId)}`
+        : '/api/registrations/links';
+      
+      const response = await fetch(url, {
+        credentials: 'include',
+        cache: forceRefresh ? 'no-cache' : 'default',
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || '載入失敗');
+      }
+      
+      setRegistrationLinks(result.data || []);
+    } catch (error) {
+      console.error('❌ 載入報名連結失敗:', error);
+      // 只在非強制刷新時顯示錯誤提示，避免打擾用戶
+      if (forceRefresh) {
+        alert('載入報名連結失敗，請稍後再試');
+      }
+    } finally {
+      setLoadingLinks(false);
+    }
+  };
+
+  // 載入機構列表
+  const loadOrganizations = async () => {
+    try {
+      setLoadingOrganizations(true);
+      // 如果存在当前机构，只加载当前机构
+      if (orgId && organization && organization.id && organization.id !== 'unassigned-org-placeholder') {
+        setOrganizations([{
+          id: organization.id,
+          org_name: organization.name || '',
+          org_slug: organization.slug || '',
+          status: organization.status || 'active'
+        }]);
+      } else {
+        // 如果没有当前机构，加载所有机构
+        const response = await fetch('/api/organizations/list?status=active');
+        const result = await response.json();
+        if (result.success && result.data) {
+          setOrganizations(Array.isArray(result.data) ? result.data : [result.data]);
+        } else {
+          console.error('載入機構列表失敗:', result.error);
+          setOrganizations([]);
+        }
+      }
+    } catch (error) {
+      console.error('載入機構列表失敗:', error);
+      setOrganizations([]);
+    } finally {
+      setLoadingOrganizations(false);
+    }
+  };
+
+  // 載入課程類型
+  const loadCourseTypes = async (selectedOrgId?: string) => {
+    try {
+      setLoadingCourseTypes(true);
+      const targetOrgId = selectedOrgId || linkFormData.organizationId || orgId;
+      const url = targetOrgId 
+        ? `/api/course-types?orgId=${encodeURIComponent(targetOrgId)}`
+        : '/api/course-types';
+      
+      const response = await fetch(url);
+      const result = await response.json();
+      if (result.success && result.data) {
+        setCourseTypes(result.data || []);
+      }
+    } catch (error) {
+      console.error('載入課程類型失敗:', error);
+    } finally {
+      setLoadingCourseTypes(false);
+    }
+  };
+
+  // 根據課程類型和機構，載入現有排程（星期 / 時段）
+  const loadCourseSchedule = async (courseTypeId: string) => {
+    try {
+      if (!courseTypeId || !orgId) {
+        setWeekSchedule([]);
+        return;
+      }
+
+      const course = courseTypes.find((c: any) => c.id === courseTypeId);
+      if (!course || !course.name) {
+        setWeekSchedule([]);
+        return;
+      }
+
+      setLoadingSchedule(true);
+
+      // 使用常規課程日曆 API 取得該課程在本機構的星期 / 時段排程
+      const today = new Date();
+      const startDate = today.toISOString().slice(0, 10);
+      const end = new Date(today);
+      end.setDate(end.getDate() + 30);
+      const endDate = end.toISOString().slice(0, 10);
+
+      const response = await fetch('/api/regular-course-calendar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          courseType: course.name,
+          startDate,
+          endDate,
+          orgId
+        })
+      });
+
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data)) {
+        const weekData = result.data;
+        setWeekSchedule(weekData);
+
+        // 將星期排程轉成未來 30 天內的具體日期 / 時間選項
+        const dates: { date: string; weekday: number; weekdayName: string; timeSlots: any[] }[] = [];
+        const today = new Date();
+
+        for (let i = 0; i < 30; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() + i);
+          const weekday = d.getDay();
+
+          const day = weekData.find((wd: any) => {
+            const w = typeof wd.weekday === 'string' ? parseInt(wd.weekday, 10) : wd.weekday;
+            return w === weekday;
+          });
+
+          if (!day || !day.hasSchedule || !Array.isArray(day.timeSlots)) continue;
+
+          const availableSlots = day.timeSlots.filter((slot: any) => slot.isAvailable);
+          if (availableSlots.length === 0) continue;
+
+          dates.push({
+            date: d.toISOString().slice(0, 10),
+            weekday,
+            weekdayName: day.weekdayName || getWeekdayName(weekday),
+            timeSlots: availableSlots
+          });
+        }
+
+        setAvailableDates(dates);
+      } else {
+        console.error('載入課程排程失敗:', result.error);
+        setWeekSchedule([]);
+        setAvailableDates([]);
+      }
+    } catch (error) {
+      console.error('載入課程排程錯誤:', error);
+      setWeekSchedule([]);
+      setAvailableDates([]);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
+  // 載入價格計劃
+  const loadPricingPlans = async (courseTypeId: string) => {
+    try {
+      if (!courseTypeId) {
+        setPricingPlans([]);
+        return;
+      }
+      const response = await fetch(`/api/pricing-plans?courseTypeId=${encodeURIComponent(courseTypeId)}`);
+      const result = await response.json();
+      if (result.success && result.data) {
+        setPricingPlans(result.data || []);
+      }
+    } catch (error) {
+      console.error('載入價格計劃失敗:', error);
+    }
+  };
+
+  // 打開連結表單彈窗
+  const openLinkFormModal = () => {
+    const currentOrgId = orgId || '';
+    setLinkFormData({
+      organizationId: currentOrgId,
+      courseNature: 'trial',
+      courseType: '',
+      selectedPlan: '',
+      childFullName: '',
+      childNickname: '',
+      childBirthDate: '',
+      childAge: 0,
+      childGender: '',
+      childPreferences: '',
+      childHealthNotes: '',
+      parentName: '',
+      parentPhone: '',
+      parentCountryCode: '+852',
+      parentEmail: '',
+      parentTitle: '',
+      selectedDate: '',
+      selectedTimeSlot: '',
+      availableTimes: [],
+      promotionCode: '',
+      remarks: '',
+      linkExpiryHours: 24 // 預設24小時
+    });
+    setLinkFormErrors({});
+    loadOrganizations();
+    if (orgId) {
+      loadCourseTypes(orgId);
+    }
+    setShowLinkFormModal(true);
+  };
+
+  // 驗證表單
+  const validateLinkForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    
+    if (!linkFormData.organizationId) {
+      errors.organizationId = '請選擇機構';
+    }
+    if (!linkFormData.courseNature) {
+      errors.courseNature = '請選擇課程性質';
+    }
+    if (!linkFormData.courseType) {
+      errors.courseType = '請選擇課程類型';
+    }
+    if (!linkFormData.childFullName) {
+      errors.childFullName = '請輸入孩子姓名';
+    }
+    if (!linkFormData.childGender) {
+      errors.childGender = '請選擇性別';
+    }
+    
+    setLinkFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // 生成報名連結（從表單）
+  const generateLinkFromForm = async () => {
+    if (!validateLinkForm()) {
+      alert('請填寫所有必填欄位');
+      return;
+    }
+
+    try {
+      setGeneratingLink(true);
+      
+      const response = await fetch('/api/registrations/links', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          linkType: linkFormData.courseNature,
+          orgId: linkFormData.organizationId || null,
+          formData: linkFormData,
+          createdBy: user?.id || null,
+          expiresInHours: linkFormData.linkExpiryHours || 24,
+          notes: `為 ${linkFormData.childFullName || '學生'} 生成的${linkFormData.courseNature === 'trial' ? '試堂' : '常規'}報名連結`
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || '生成失敗');
+      }
+      
+      // 重新載入連結列表（強制刷新）
+      await loadRegistrationLinks(true);
+      setShowLinkFormModal(false);
+      alert('報名連結生成成功！');
+    } catch (error: any) {
+      console.error('生成報名連結失敗:', error);
+      alert(error.message || '生成失敗，請稍後再試');
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  // 刪除報名連結
+  const deleteRegistrationLink = async (linkId: string) => {
+    if (!confirm('確認要刪除此報名連結嗎？')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/registrations/links?id=${linkId}`, {
+        method: 'DELETE',
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || '刪除失敗');
+      }
+      
+      await loadRegistrationLinks();
+      alert('報名連結已刪除');
+    } catch (error: any) {
+      console.error('刪除報名連結失敗:', error);
+      alert(error.message || '刪除失敗，請稍後再試');
+    }
+  };
+
+  // 複製連結到剪貼板
+  const copyLinkToClipboard = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('連結已複製到剪貼板');
+    } catch (error) {
+      console.error('複製失敗:', error);
+      alert('複製失敗，請手動複製');
     }
   };
 
@@ -771,12 +1256,38 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   });
 
   useEffect(() => {
-    loadPendingStudents();
-    loadRegularStudents();
-    if (showTrialStudents) {
-      loadTrialStudents();
-    }
+    // 並行加載多個數據源，提高加載速度
+    const loadData = async () => {
+      const promises = [
+        loadPendingStudents(),
+        loadRegularStudents()
+      ];
+      
+      // 如果需要顯示試堂學生，也並行加載
+      if (showTrialStudents) {
+        promises.push(loadTrialStudents());
+      }
+      
+      // 並行執行所有加載操作
+      await Promise.all(promises);
+    };
+    
+    loadData();
   }, [orgId, showTrialStudents]);
+
+  // 當機構選擇變化時，載入課程類型
+  useEffect(() => {
+    if (linkFormData.organizationId) {
+      loadCourseTypes(linkFormData.organizationId);
+    }
+  }, [linkFormData.organizationId]);
+
+  // 當 orgId 變化時，更新表單中的機構選擇
+  useEffect(() => {
+    if (orgId && !linkFormData.organizationId) {
+      setLinkFormData(prev => ({ ...prev, organizationId: orgId }));
+    }
+  }, [orgId]);
 
   // 當選擇學生時載入付款截圖
   useEffect(() => {
@@ -988,6 +1499,18 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                 >
                   試堂學生
                 </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setShowLinkModal(true);
+                    loadRegistrationLinks();
+                  }}
+                  className="px-4 py-2 rounded-xl font-medium transition-all bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:from-[#EBC9A4] hover:to-[#FFD59A] shadow-sm flex items-center gap-2"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                  生成報名連結
+                </motion.button>
               </>
             )}
           </div>
@@ -1012,9 +1535,35 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
               </div>
             ) : (
               <div className="overflow-x-auto">
+                {/* 試堂學生批量操作欄 */}
+                {selectedTrialStudentIds.length > 0 && (
+                  <div className="bg-[#FFE0E0] border-b border-[#EADBC8] px-6 py-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-[#4B4036]">
+                      已選擇 {selectedTrialStudentIds.length} 個試堂學生
+                    </span>
+                    <motion.button
+                      onClick={deleteSelectedTrialStudents}
+                      disabled={isDeletingTrial}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="inline-flex items-center px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <TrashIcon className="w-4 h-4 mr-2" />
+                      {isDeletingTrial ? '刪除中...' : '刪除選中'}
+                    </motion.button>
+                  </div>
+                )}
                 <table className="w-full">
                   <thead className="bg-[#FFF9F2] border-b border-[#EADBC8]">
                     <tr>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">
+                        <input
+                          type="checkbox"
+                          checked={trialStudents.length > 0 && selectedTrialStudentIds.length === trialStudents.length}
+                          onChange={toggleSelectAllTrial}
+                          className="w-4 h-4 text-[#FFD59A] border-[#EADBC8] rounded focus:ring-[#FFD59A]"
+                        />
+                      </th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">學生資訊</th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">課程資訊</th>
                       <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">付款資訊</th>
@@ -1030,8 +1579,16 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="hover:bg-[#FFF9F2]/50"
+                        className={`hover:bg-[#FFF9F2]/50 ${selectedTrialStudentIds.includes(student.id) ? 'bg-[#FFE0E0]/30' : ''}`}
                       >
+                        <td className="px-6 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedTrialStudentIds.includes(student.id)}
+                            onChange={() => toggleTrialStudentSelection(student.id)}
+                            className="w-4 h-4 text-[#FFD59A] border-[#EADBC8] rounded focus:ring-[#FFD59A]"
+                          />
+                        </td>
                         <td className="px-6 py-4">
                           <div>
                             <p className="font-medium text-[#4B4036]">{student.full_name || '未填寫'}</p>
@@ -1122,9 +1679,35 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
             )
           ) : (
             <div className="overflow-x-auto">
+              {/* 批量操作欄 */}
+              {selectedStudentIds.length > 0 && (
+                <div className="bg-[#FFE0E0] border-b border-[#EADBC8] px-6 py-3 flex items-center justify-between">
+                  <span className="text-sm font-medium text-[#4B4036]">
+                    已選擇 {selectedStudentIds.length} 個學生
+                  </span>
+                  <motion.button
+                    onClick={deleteSelectedStudents}
+                    disabled={isDeleting}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="inline-flex items-center px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <TrashIcon className="w-4 h-4 mr-2" />
+                    {isDeleting ? '刪除中...' : '刪除選中'}
+                  </motion.button>
+                </div>
+              )}
               <table className="w-full">
                 <thead className="bg-[#FFF9F2] border-b border-[#EADBC8]">
                   <tr>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">
+                      <input
+                        type="checkbox"
+                        checked={filteredStudents.length > 0 && selectedStudentIds.length === filteredStudents.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 text-[#FFD59A] border-[#EADBC8] rounded focus:ring-[#FFD59A]"
+                      />
+                    </th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">學生資訊</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">課程資訊</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-[#4B4036]">付款資訊</th>
@@ -1140,8 +1723,16 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="hover:bg-[#FFF9F2]/50"
+                    className={`hover:bg-[#FFF9F2]/50 ${selectedStudentIds.includes(student.id) ? 'bg-[#FFE0E0]/30' : ''}`}
                   >
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudentIds.includes(student.id)}
+                        onChange={() => toggleStudentSelection(student.id)}
+                        className="w-4 h-4 text-[#FFD59A] border-[#EADBC8] rounded focus:ring-[#FFD59A]"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div>
                         <p className="font-medium text-[#4B4036]">{student.full_name}</p>
@@ -2014,6 +2605,726 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
             </motion.div>
           </div>
         )}
+
+        {/* 報名連結管理彈窗 */}
+        {showLinkModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-[#EADBC8]"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-[#4B4036] flex items-center gap-2">
+                  <LinkIcon className="w-6 h-6" />
+                  生成報名連結管理
+                </h2>
+                <button
+                  onClick={() => setShowLinkModal(false)}
+                  className="p-2 hover:bg-[#FFF9F2] rounded-lg transition-colors"
+                >
+                  <XMarkIcon className="w-5 h-5 text-[#4B4036]" />
+                </button>
+              </div>
+
+              {/* 生成新連結按鈕 */}
+              <div className="mb-6 flex gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={openLinkFormModal}
+                  disabled={generatingLink}
+                  className="px-4 py-2 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-lg font-medium hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                  創建新連結
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => loadRegistrationLinks()}
+                  disabled={loadingLinks}
+                  className="px-4 py-2 bg-white border border-[#EADBC8] text-[#4B4036] rounded-lg font-medium hover:bg-[#FFF9F2] transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  <ArrowPathIcon className={`w-4 h-4 ${loadingLinks ? 'animate-spin' : ''}`} />
+                  刷新
+                </motion.button>
+              </div>
+
+              {/* 連結列表 */}
+              {loadingLinks ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4B4036] mx-auto mb-4"></div>
+                  <p className="text-[#4B4036]">載入中...</p>
+                </div>
+              ) : registrationLinks.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-[#4B4036]">目前沒有報名連結</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {registrationLinks.map((link) => {
+                    const isExpired = new Date(link.expires_at) < new Date();
+                    const isCompleted = link.status === 'completed';
+                    const formData = link.form_data || {};
+                    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                    const registrationUrl = `${baseUrl}/aihome/course-activities/register?token=${link.token}`;
+                    
+                    return (
+                      <motion.div
+                        key={link.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-[#FFF9F2] border border-[#EADBC8] rounded-xl p-4"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                link.link_type === 'trial' 
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {link.link_type === 'trial' ? '試堂' : '常規'}
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                isExpired || link.status === 'expired'
+                                  ? 'bg-red-100 text-red-800'
+                                  : isCompleted
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {isExpired || link.status === 'expired' 
+                                  ? '已過期'
+                                  : isCompleted
+                                  ? '已完成'
+                                  : '有效'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-[#4B4036] font-medium mb-1">
+                              學生：{formData.childFullName || '未填寫'}
+                            </p>
+                            <p className="text-xs text-[#2B3A3B] mb-2">
+                              課程：{formData.courseType || '未指定'}
+                            </p>
+                            <div className="flex items-center gap-4 text-xs text-[#2B3A3B] mb-2">
+                              <span>創建時間：{new Date(link.created_at).toLocaleString('zh-TW')}</span>
+                              <span>過期時間：{new Date(link.expires_at).toLocaleString('zh-TW')}</span>
+                              {link.expiry_hours && (
+                                <span>時限：{link.expiry_hours} 小時
+                                  {link.expiry_hours >= 24 && (
+                                    <span>（{Math.floor(link.expiry_hours / 24)} 天{link.expiry_hours % 24 > 0 ? ` ${link.expiry_hours % 24} 小時` : ''}）</span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-3">
+                              <input
+                                type="text"
+                                value={registrationUrl}
+                                readOnly
+                                className="flex-1 px-3 py-2 text-xs border border-[#EADBC8] rounded-lg bg-white text-[#4B4036]"
+                              />
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => copyLinkToClipboard(registrationUrl)}
+                                className="px-3 py-2 bg-[#FFD59A] text-[#4B4036] rounded-lg hover:bg-[#EBC9A4] transition-colors flex items-center gap-1 text-xs"
+                              >
+                                <DocumentDuplicateIcon className="w-4 h-4" />
+                                複製
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => deleteRegistrationLink(link.id)}
+                                className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-1 text-xs"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                                刪除
+                              </motion.button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+
+        {/* 報名連結表單彈窗 */}
+        <AnimatePresence>
+          {showLinkFormModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onClick={() => setShowLinkFormModal(false)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="bg-white rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-[#FFD59A] to-[#FFB6C1] rounded-xl flex items-center justify-center">
+                      <LinkIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-[#4B4036]">創建報名連結</h2>
+                      <p className="text-sm text-[#2B3A3B] mt-1">填寫報名資料後生成連結發送給客戶</p>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowLinkFormModal(false)}
+                    className="p-2 rounded-full hover:bg-[#FFF9F2] transition-colors"
+                  >
+                    <XMarkIcon className="w-6 h-6 text-[#4B4036]" />
+                  </motion.button>
+                </div>
+
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  generateLinkFromForm();
+                }} className="space-y-6">
+                  {/* 機構選擇 */}
+                  <div>
+                    <label htmlFor="organizationId" className="block text-sm font-medium text-[#4B4036] mb-2">
+                      選擇機構 <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <motion.select
+                        id="organizationId"
+                        value={linkFormData.organizationId}
+                        onChange={(e) => {
+                          setLinkFormData(prev => ({ ...prev, organizationId: e.target.value, courseType: '', selectedPlan: '' }));
+                          if (e.target.value) {
+                            loadCourseTypes(e.target.value);
+                          }
+                        }}
+                        disabled={!!(orgId && organizations.length === 1)}
+                        whileHover={orgId && organizations.length === 1 ? {} : { scale: 1.01 }}
+                        whileTap={orgId && organizations.length === 1 ? {} : { scale: 0.99 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                        className={`w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none shadow-sm hover:shadow-md focus:shadow-lg ${
+                          orgId && organizations.length === 1 
+                            ? 'disabled:bg-[#F5F5F5] disabled:cursor-not-allowed disabled:opacity-50 cursor-not-allowed' 
+                            : 'cursor-pointer'
+                        }`}
+                      >
+                        <option value="">請選擇機構</option>
+                        {organizations.map(org => (
+                          <option key={org.id} value={org.id}>{org.org_name}</option>
+                        ))}
+                      </motion.select>
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <ChevronDown className="w-5 h-5 text-[#EBC9A4]" size={20} />
+                      </div>
+                    </div>
+                    {linkFormErrors.organizationId && (
+                      <p className="text-red-500 text-xs mt-1">{linkFormErrors.organizationId}</p>
+                    )}
+                  </div>
+
+                  {/* 課程性質 */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#4B4036] mb-3">
+                      課程性質 <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-4">
+                      <motion.label
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className={`flex items-center space-x-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+                          linkFormData.courseNature === 'trial'
+                            ? 'border-[#FFB6C1] bg-[#FFB6C1]/10'
+                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          value="trial"
+                          checked={linkFormData.courseNature === 'trial'}
+                          onChange={(e) => setLinkFormData(prev => ({ ...prev, courseNature: e.target.value as 'trial' | 'regular' }))}
+                          className="w-4 h-4 text-[#FFB6C1] focus:ring-[#FFB6C1]"
+                        />
+                        <span className="text-[#4B4036] font-medium">試堂</span>
+                      </motion.label>
+                      <motion.label
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className={`flex items-center space-x-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+                          linkFormData.courseNature === 'regular'
+                            ? 'border-[#FFB6C1] bg-[#FFB6C1]/10'
+                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          value="regular"
+                          checked={linkFormData.courseNature === 'regular'}
+                          onChange={(e) => setLinkFormData(prev => ({ ...prev, courseNature: e.target.value as 'trial' | 'regular' }))}
+                          className="w-4 h-4 text-[#FFB6C1] focus:ring-[#FFB6C1]"
+                        />
+                        <span className="text-[#4B4036] font-medium">常規</span>
+                      </motion.label>
+                    </div>
+                  </div>
+
+                  {/* 課程類型 */}
+                  <div>
+                    <label htmlFor="courseType" className="block text-sm font-medium text-[#4B4036] mb-2">
+                      課程類型 <span className="text-red-500">*</span>
+                    </label>
+                    {loadingCourseTypes ? (
+                      <div className="flex items-center space-x-2 text-sm text-[#2B3A3B]">
+                        <div className="w-4 h-4 border-2 border-[#FFB6C1] border-t-transparent rounded-full animate-spin"></div>
+                        <span>載入中...</span>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <motion.select
+                          id="courseType"
+                          value={linkFormData.courseType}
+                          onChange={(e) => {
+                            setLinkFormData(prev => ({ ...prev, courseType: e.target.value, selectedPlan: '', selectedDate: '', selectedTimeSlot: '' }));
+                            if (e.target.value) {
+                              loadPricingPlans(e.target.value);
+                              loadCourseSchedule(e.target.value);
+                            } else {
+                              setWeekSchedule([]);
+                              setAvailableDates([]);
+                            }
+                          }}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                          disabled={!linkFormData.organizationId}
+                          className="w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md focus:shadow-lg disabled:bg-[#F5F5F5] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <option value="">{linkFormData.organizationId ? '請選擇課程類型' : '請先選擇機構'}</option>
+                          {courseTypes.map(course => (
+                            <option key={course.id} value={course.id}>{course.name}</option>
+                          ))}
+                        </motion.select>
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                          <ChevronDown className="w-5 h-5 text-[#EBC9A4]" size={20} />
+                        </div>
+                      </div>
+                    )}
+                    {linkFormErrors.courseType && (
+                      <p className="text-red-500 text-xs mt-1">{linkFormErrors.courseType}</p>
+                    )}
+                  </div>
+
+                  {/* 日期時間區塊 */}
+                  <div className="bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl p-6 border border-[#EADBC8]">
+                    <h3 className="text-lg font-semibold text-[#4B4036] mb-4 flex items-center">
+                      <CalendarDaysIcon className="w-5 h-5 mr-2 text-[#FFB6C1]" />
+                      日期時間
+                    </h3>
+                    <div className="space-y-3">
+                      {loadingSchedule && (
+                        <div className="flex items-center space-x-2 text-sm text-[#2B3A3B] mb-2">
+                          <div className="w-4 h-4 border-2 border-[#FFB6C1] border-t-transparent rounded-full animate-spin"></div>
+                          <span>載入課程時間中...</span>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="selectedDate" className="block text-sm font-medium text-[#4B4036] mb-2">
+                            日期
+                          </label>
+                          <div className="relative">
+                            <motion.select
+                              id="selectedDate"
+                              value={linkFormData.selectedDate}
+                              onChange={(e) => {
+                                setLinkFormData(prev => ({ ...prev, selectedDate: e.target.value, selectedTimeSlot: '' }));
+                              }}
+                              whileHover={{ scale: 1.01 }}
+                              whileTap={{ scale: 0.99 }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                              disabled={!linkFormData.courseType || availableDates.length === 0}
+                              className="w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md focus:shadow-lg disabled:bg-[#F5F5F5] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <option value="">{linkFormData.courseType ? '請選擇日期' : '請先選擇課程類型'}</option>
+                              {availableDates.map((day) => (
+                                <option key={day.date} value={day.date}>
+                                  {day.date}（{day.weekdayName}）
+                                </option>
+                              ))}
+                            </motion.select>
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                              <ChevronDown className="w-5 h-5 text-[#EBC9A4]" size={20} />
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <label htmlFor="selectedTimeSlot" className="block text-sm font-medium text-[#4B4036] mb-2">
+                            時間
+                          </label>
+                          <div className="relative">
+                            <motion.select
+                              id="selectedTimeSlot"
+                              value={linkFormData.selectedTimeSlot}
+                              onChange={(e) => setLinkFormData(prev => ({ ...prev, selectedTimeSlot: e.target.value }))}
+                              whileHover={{ scale: 1.01 }}
+                              whileTap={{ scale: 0.99 }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                              disabled={!linkFormData.selectedDate || availableDates.length === 0}
+                              className="w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md focus:shadow-lg disabled:bg-[#F5F5F5] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <option value="">{linkFormData.selectedDate ? '請選擇時間' : '請先選擇日期'}</option>
+                              {availableDates
+                                .filter((day) => day.date === linkFormData.selectedDate)
+                                .flatMap((day) => day.timeSlots)
+                                .map((slot: any) => (
+                                  <option key={slot.timeslot} value={slot.timeslot}>
+                                    {slot.time || slot.timeslot}
+                                  </option>
+                                ))}
+                            </motion.select>
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                              <ChevronDown className="w-5 h-5 text-[#EBC9A4]" size={20} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 價格計劃（僅常規課程） */}
+                  {linkFormData.courseNature === 'regular' && linkFormData.courseType && (
+                    <div>
+                      <label htmlFor="selectedPlan" className="block text-sm font-medium text-[#4B4036] mb-2">
+                        價格計劃
+                      </label>
+                      <div className="relative">
+                        <motion.select
+                          id="selectedPlan"
+                          value={linkFormData.selectedPlan}
+                          onChange={(e) => setLinkFormData(prev => ({ ...prev, selectedPlan: e.target.value }))}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                          className="w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md focus:shadow-lg"
+                        >
+                          <option value="">請選擇價格計劃</option>
+                          {pricingPlans.map(plan => (
+                            <option key={plan.id} value={plan.id}>{plan.plan_name}</option>
+                          ))}
+                        </motion.select>
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                          <ChevronDown className="w-5 h-5 text-[#EBC9A4]" size={20} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 孩子資料區塊 */}
+                  <div className="bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl p-6 border border-[#EADBC8]">
+                    <h3 className="text-lg font-semibold text-[#4B4036] mb-4 flex items-center">
+                      <UserIcon className="w-5 h-5 mr-2 text-[#FFB6C1]" />
+                      孩子資料
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="childFullName" className="block text-sm font-medium text-[#4B4036] mb-2">
+                          孩子姓名 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="childFullName"
+                          type="text"
+                          value={linkFormData.childFullName}
+                          onChange={(e) => setLinkFormData(prev => ({ ...prev, childFullName: e.target.value }))}
+                          placeholder="請輸入孩子姓名"
+                          className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all bg-white"
+                        />
+                        {linkFormErrors.childFullName && (
+                          <p className="text-red-500 text-xs mt-1">{linkFormErrors.childFullName}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label htmlFor="childNickname" className="block text-sm font-medium text-[#4B4036] mb-2">
+                          暱稱
+                        </label>
+                        <input
+                          id="childNickname"
+                          type="text"
+                          value={linkFormData.childNickname}
+                          onChange={(e) => setLinkFormData(prev => ({ ...prev, childNickname: e.target.value }))}
+                          placeholder="請輸入暱稱（選填）"
+                          className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label htmlFor="childBirthDate" className="block text-sm font-medium text-[#4B4036] mb-2">
+                          生日
+                        </label>
+                        <input
+                          id="childBirthDate"
+                          type="date"
+                          value={linkFormData.childBirthDate}
+                          onChange={(e) => {
+                            const birthDate = e.target.value;
+                            let age = 0;
+                            if (birthDate) {
+                              const birth = new Date(birthDate);
+                              const now = new Date();
+                              age = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+                            }
+                            setLinkFormData(prev => ({ ...prev, childBirthDate: birthDate, childAge: age }));
+                          }}
+                          className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="childGender" className="block text-sm font-medium text-[#4B4036] mb-2">
+                          性別 <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <motion.select
+                            id="childGender"
+                            value={linkFormData.childGender}
+                            onChange={(e) => setLinkFormData(prev => ({ ...prev, childGender: e.target.value }))}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                            className="w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md focus:shadow-lg"
+                          >
+                            <option value="">請選擇</option>
+                            <option value="男">男</option>
+                            <option value="女">女</option>
+                          </motion.select>
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                            <ChevronDown className="w-5 h-5 text-[#EBC9A4]" size={20} />
+                          </div>
+                        </div>
+                        {linkFormErrors.childGender && (
+                          <p className="text-red-500 text-xs mt-1">{linkFormErrors.childGender}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label htmlFor="childPreferences" className="block text-sm font-medium text-[#4B4036] mb-2">
+                        喜好物
+                      </label>
+                      <input
+                        id="childPreferences"
+                        type="text"
+                        value={linkFormData.childPreferences}
+                        onChange={(e) => setLinkFormData(prev => ({ ...prev, childPreferences: e.target.value }))}
+                        placeholder="請輸入孩子的喜好物（選填）"
+                        className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all bg-white"
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label htmlFor="childHealthNotes" className="block text-sm font-medium text-[#4B4036] mb-2">
+                        健康/過敏情況
+                      </label>
+                      <textarea
+                        id="childHealthNotes"
+                        value={linkFormData.childHealthNotes}
+                        onChange={(e) => setLinkFormData(prev => ({ ...prev, childHealthNotes: e.target.value }))}
+                        rows={2}
+                        placeholder="請輸入健康狀況或過敏情況（選填）"
+                        className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all resize-none bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 聯絡方式區塊 */}
+                  <div className="bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl p-6 border border-[#EADBC8]">
+                    <h3 className="text-lg font-semibold text-[#4B4036] mb-4 flex items-center">
+                      <PhoneIcon className="w-5 h-5 mr-2 text-[#FFB6C1]" />
+                      聯絡方式
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="parentName" className="block text-sm font-medium text-[#4B4036] mb-2">
+                          家長姓名
+                        </label>
+                        <input
+                          id="parentName"
+                          type="text"
+                          value={linkFormData.parentName}
+                          onChange={(e) => setLinkFormData(prev => ({ ...prev, parentName: e.target.value }))}
+                          placeholder="請輸入家長姓名"
+                          className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="parentPhone" className="block text-sm font-medium text-[#4B4036] mb-2">
+                          電話
+                        </label>
+                        <div className="flex gap-2">
+                          <div className="relative">
+                            <motion.select
+                              value={linkFormData.parentCountryCode}
+                              onChange={(e) => setLinkFormData(prev => ({ ...prev, parentCountryCode: e.target.value }))}
+                              whileHover={{ scale: 1.01 }}
+                              whileTap={{ scale: 0.99 }}
+                              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                              className="px-3 py-3 pr-8 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md focus:shadow-lg"
+                            >
+                              <option value="+852">+852</option>
+                              <option value="+86">+86</option>
+                              <option value="+1">+1</option>
+                            </motion.select>
+                            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                              <ChevronDown className="w-4 h-4 text-[#EBC9A4]" size={16} />
+                            </div>
+                          </div>
+                          <input
+                            id="parentPhone"
+                            type="tel"
+                            value={linkFormData.parentPhone}
+                            onChange={(e) => setLinkFormData(prev => ({ ...prev, parentPhone: e.target.value }))}
+                            placeholder="請輸入電話號碼"
+                            className="flex-1 px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <label htmlFor="parentEmail" className="block text-sm font-medium text-[#4B4036] mb-2">
+                        電子郵件
+                      </label>
+                      <input
+                        id="parentEmail"
+                        type="email"
+                        value={linkFormData.parentEmail}
+                        onChange={(e) => setLinkFormData(prev => ({ ...prev, parentEmail: e.target.value }))}
+                        placeholder="請輸入電子郵件地址"
+                        className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 連結時限設定 */}
+                  <div>
+                    <label htmlFor="linkExpiryHours" className="block text-sm font-medium text-[#4B4036] mb-2">
+                      連結時限 <span className="text-gray-400">(選填，預設24小時)</span>
+                    </label>
+                    <div className="relative">
+                      <motion.select
+                        id="linkExpiryHours"
+                        value={[1, 6, 12, 24, 48, 72, 168].includes(linkFormData.linkExpiryHours) 
+                          ? linkFormData.linkExpiryHours.toString() 
+                          : 'custom'}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === 'custom') {
+                            // 如果選擇自訂，顯示輸入框
+                            const customHours = prompt('請輸入自訂時限（小時）:', linkFormData.linkExpiryHours.toString());
+                            if (customHours && !isNaN(Number(customHours)) && Number(customHours) > 0) {
+                              setLinkFormData(prev => ({ ...prev, linkExpiryHours: Number(customHours) }));
+                            }
+                          } else {
+                            setLinkFormData(prev => ({ ...prev, linkExpiryHours: Number(value) }));
+                          }
+                        }}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                        className="w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md focus:shadow-lg"
+                      >
+                        <option value="1">1 小時</option>
+                        <option value="6">6 小時</option>
+                        <option value="12">12 小時</option>
+                        <option value="24">24 小時（預設）</option>
+                        <option value="48">48 小時</option>
+                        <option value="72">72 小時</option>
+                        <option value="168">7 天（168 小時）</option>
+                        <option value="custom">
+                          {[1, 6, 12, 24, 48, 72, 168].includes(linkFormData.linkExpiryHours) 
+                            ? '自訂時限' 
+                            : `自訂：${linkFormData.linkExpiryHours} 小時`}
+                        </option>
+                      </motion.select>
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                        <ChevronDown className="w-5 h-5 text-[#EBC9A4]" size={20} />
+                      </div>
+                    </div>
+                    {linkFormData.linkExpiryHours && (
+                      <p className="text-xs text-[#2B3A3B] mt-2">
+                        連結將在 {linkFormData.linkExpiryHours} 小時後過期
+                        {linkFormData.linkExpiryHours >= 24 && (
+                          <span>（{Math.floor(linkFormData.linkExpiryHours / 24)} 天 {linkFormData.linkExpiryHours % 24 > 0 ? `${linkFormData.linkExpiryHours % 24} 小時` : ''}）</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 備註 */}
+                  <div>
+                    <label htmlFor="remarks" className="block text-sm font-medium text-[#4B4036] mb-2">
+                      備註 <span className="text-gray-400">(選填)</span>
+                    </label>
+                    <textarea
+                      id="remarks"
+                      value={linkFormData.remarks}
+                      onChange={(e) => setLinkFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                      rows={3}
+                      placeholder="請輸入備註資訊..."
+                      className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all resize-none bg-white"
+                    />
+                  </div>
+
+                  {/* 按鈕區域 */}
+                  <div className="flex space-x-3 pt-4 border-t border-[#EADBC8]">
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setShowLinkFormModal(false)}
+                      className="flex-1 px-6 py-3 border border-[#EADBC8] text-[#4B4036] rounded-xl font-medium hover:bg-[#F8F5EC] transition-all"
+                    >
+                      取消
+                    </motion.button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={generatingLink}
+                      className={`flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all ${
+                        generatingLink ? 'opacity-75 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {generatingLink ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>生成中...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center space-x-2">
+                          <LinkIcon className="w-5 h-5" />
+                          <span>生成連結</span>
+                        </div>
+                      )}
+                    </motion.button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

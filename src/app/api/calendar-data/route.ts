@@ -75,12 +75,19 @@ export async function POST(request: Request) {
     console.log('📋 排程資料數量:', scheduleData?.length || 0);
 
     // 獲取已預約的正式課程
-    const { data: bookedLessons, error: bookedLessonsError } = await supabase
+    let bookedLessonsQuery = supabase
       .from('hanami_student_lesson')
       .select('lesson_date, actual_timeslot, regular_timeslot, course_type')
       .eq('course_type', courseType)
       .gte('lesson_date', startDate)
       .lte('lesson_date', endDate);
+    
+    // 如果有 org_id，根據 org_id 過濾
+    if (orgId) {
+      bookedLessonsQuery = bookedLessonsQuery.eq('org_id', orgId);
+    }
+    
+    const { data: bookedLessons, error: bookedLessonsError } = await bookedLessonsQuery;
 
     if (bookedLessonsError) {
       console.error('❌ 獲取已預約課程失敗:', bookedLessonsError);
@@ -90,12 +97,19 @@ export async function POST(request: Request) {
     }
 
     // 獲取試堂預約
-    const { data: trialBookings, error: trialBookingsError } = await supabase
+    let trialBookingsQuery = supabase
       .from('hanami_trial_students')
       .select('lesson_date, actual_timeslot, regular_timeslot, course_type')
       .eq('course_type', courseType)
       .gte('lesson_date', startDate)
       .lte('lesson_date', endDate);
+    
+    // 如果有 org_id，根據 org_id 過濾
+    if (orgId) {
+      trialBookingsQuery = trialBookingsQuery.eq('org_id', orgId);
+    }
+    
+    const { data: trialBookings, error: trialBookingsError } = await trialBookingsQuery;
 
     if (trialBookingsError) {
       console.error('❌ 獲取試堂預約失敗:', trialBookingsError);

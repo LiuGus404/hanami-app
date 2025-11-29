@@ -93,6 +93,7 @@ export default function HanamiMusicHomePage() {
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
   const [mapError, setMapError] = useState(false);
+  const [hanamiOrgId, setHanamiOrgId] = useState<string | null>(null);
   
   // 地圖 URL - 使用簡單的香港地圖作為測試
   const mapUrl = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3691.123456789!2d114.1711689236447!3d22.31635215808169!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3404016b2580ddbf%3A0x306292da37e80235!2z6Iqx6KaL55C06IiNIEhhbmFtaSBNdXNpYw!5e0!3m2!1szh-TW!2sjp!4v1760902449350!5m2!1szh-TW!2sjp";
@@ -122,6 +123,48 @@ export default function HanamiMusicHomePage() {
   useEffect(() => {
     setIsLoaded(true);
   }, []);
+
+  // 獲取 Hanami Music 機構 ID
+  useEffect(() => {
+    const loadHanamiOrgId = async () => {
+      try {
+        // 通過 org_slug 獲取機構 ID
+        const response = await fetch('/api/organizations/get?orgSlug=hanami-music&bySlug=true', {
+          credentials: 'include',
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data?.id) {
+            console.log('✅ 獲取 Hanami Music 機構 ID:', result.data.id);
+            setHanamiOrgId(result.data.id);
+          } else {
+            // 如果通過 slug 找不到，嘗試使用已知的 ID
+            console.warn('⚠️ 無法通過 slug 獲取機構 ID，使用備用 ID');
+            setHanamiOrgId('f8d269ec-b682-45d1-a796-3b74c2bf3eec');
+          }
+        } else {
+          // 如果 API 失敗，使用已知的 ID 作為備用
+          console.warn('⚠️ 獲取機構 ID API 失敗，使用備用 ID');
+          setHanamiOrgId('f8d269ec-b682-45d1-a796-3b74c2bf3eec');
+        }
+      } catch (error) {
+        console.error('❌ 獲取機構 ID 錯誤:', error);
+        // 使用已知的 ID 作為備用
+        setHanamiOrgId('f8d269ec-b682-45d1-a796-3b74c2bf3eec');
+      }
+    };
+
+    loadHanamiOrgId();
+  }, []);
+
+  // 生成報名連結（包含機構 ID）
+  const getRegisterUrl = () => {
+    if (hanamiOrgId) {
+      return `/aihome/course-activities/register?orgId=${hanamiOrgId}`;
+    }
+    return '/aihome/course-activities/register';
+  };
 
   // 登出處理
   const handleLogout = async () => {
@@ -1132,7 +1175,7 @@ export default function HanamiMusicHomePage() {
                     {/* 行動按鈕 */}
                     <div className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start">
                       <motion.button
-                        onClick={() => router.push('/aihome/course-activities/register')}
+                        onClick={() => router.push(getRegisterUrl())}
                         whileHover={{ scale: 1.05, y: -2 }}
                         whileTap={{ scale: 0.95 }}
                         className="group px-10 py-4 bg-white text-[#4B4036] rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center space-x-3"
@@ -1201,7 +1244,7 @@ export default function HanamiMusicHomePage() {
                         </div>
                         <p className="text-lg text-[#2B3A3B] mb-4">立即預約試堂課程，體驗專業音樂教學</p>
                         <motion.button
-                          onClick={() => router.push('/aihome/course-activities/register')}
+                          onClick={() => router.push(getRegisterUrl())}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2"
@@ -1603,7 +1646,7 @@ export default function HanamiMusicHomePage() {
                       <ChevronRightIcon className="w-4 h-4" />
                     </motion.button>
                     <motion.button
-                      onClick={() => router.push('/aihome/course-activities/register')}
+                      onClick={() => router.push(getRegisterUrl())}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="w-full px-6 py-3 bg-white border-2 border-[#FFB6C1] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2"
@@ -1673,7 +1716,7 @@ export default function HanamiMusicHomePage() {
                       <ChevronRightIcon className="w-4 h-4" />
                     </motion.button>
                     <motion.button
-                      onClick={() => router.push('/aihome/course-activities/register')}
+                      onClick={() => router.push(getRegisterUrl())}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="w-full px-6 py-3 bg-white border-2 border-[#FFB6C1] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center space-x-2"

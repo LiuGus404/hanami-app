@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeftIcon,
   CalendarDaysIcon,
@@ -92,6 +92,7 @@ type CourseTypeWithOrg = CourseType & {
 
 export default function HanamiMusicRegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading, logout } = useSaasAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -151,6 +152,7 @@ export default function HanamiMusicRegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingCourses, setLoadingCourses] = useState(true); // 課程載入狀態
   const [isWaitingList, setIsWaitingList] = useState(false); // 等候區模式
+  const [registrationLinkToken, setRegistrationLinkToken] = useState<string | null>(null); // 當前報名連結 token
 
   // 步驟配置
   const steps = [
@@ -535,6 +537,123 @@ export default function HanamiMusicRegisterPage() {
     loadCourseTypes();
     loadOrganizations();
   }, [loadCourseTypes, loadOrganizations]);
+
+  // 從 URL 參數自動選擇機構或加載預填數據
+  useEffect(() => {
+    const orgIdFromUrl = searchParams.get('orgId');
+    const tokenFromUrl = searchParams.get('token');
+
+    // 優先處理 token（預填報名）
+    if (tokenFromUrl) {
+      const loadPrefilledData = async () => {
+        try {
+          console.log('📥 從 token 加載預填報名數據:', tokenFromUrl);
+          const response = await fetch(`/api/registrations/get-prefilled?token=${encodeURIComponent(tokenFromUrl)}`, {
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            if (errorData.expired) {
+              alert('報名鏈接已過期，請聯繫客服獲取新的鏈接');
+            } else if (errorData.completed) {
+              alert('此報名已完成');
+            } else {
+              alert('無法加載報名數據，請聯繫客服');
+            }
+            return;
+          }
+
+          const result = await response.json();
+          if (result.success && result.data) {
+            const prefilledData = result.data;
+            console.log('✅ 加載預填報名數據成功:', prefilledData);
+
+            // 保存 token 以便後續更新連結狀態
+            setRegistrationLinkToken(tokenFromUrl);
+
+            // 填充表單數據
+            setFormData(prev => ({
+              ...prev,
+              organizationId: prefilledData.organizationId || prev.organizationId,
+              courseType: prefilledData.courseTypeId || prev.courseType,
+              courseNature: prefilledData.courseNature || prev.courseNature,
+              selectedPlan: prefilledData.selectedPlan || prev.selectedPlan,
+              childFullName: prefilledData.childFullName || prev.childFullName,
+              childNickname: prefilledData.childNickname || prev.childNickname,
+              childBirthDate: prefilledData.childBirthDate || prev.childBirthDate,
+              childAge: prefilledData.childAge || prev.childAge,
+              childGender: prefilledData.childGender || prev.childGender,
+              childPreferences: prefilledData.childPreferences || prev.childPreferences,
+              childHealthNotes: prefilledData.childHealthNotes || prev.childHealthNotes,
+              parentName: prefilledData.parentName || prev.parentName,
+              parentPhone: prefilledData.parentPhone || prev.parentPhone,
+              parentCountryCode: prefilledData.parentCountryCode || prev.parentCountryCode,
+              parentEmail: prefilledData.parentEmail || prev.parentEmail,
+              parentTitle: prefilledData.parentTitle || prev.parentTitle,
+              selectedDate: prefilledData.selectedDate || prev.selectedDate,
+              selectedTimeSlot: prefilledData.selectedTimeSlot || prev.selectedTimeSlot,
+              availableTimes: prefilledData.availableTimes || prev.availableTimes,
+              remarks: prefilledData.remarks || prev.remarks,
+              promotionCode: prefilledData.promotionCode || prev.promotionCode,
+            }));
+
+            // 確定應該跳轉到哪一步（找到第一個未填寫的步驟）
+            let targetStep = 0;
+            if (!prefilledData.organizationId) targetStep = 0;
+            else if (!prefilledData.courseNature) targetStep = 1;
+            else if (!prefilledData.courseTypeId) targetStep = 2;
+            else if (!prefilledData.childFullName || !prefilledData.childGender) targetStep = 3;
+            else if (!prefilledData.selectedDate || !prefilledData.selectedTimeSlot) targetStep = 4;
+            else if (!prefilledData.parentName || !prefilledData.parentPhone || !prefilledData.parentEmail) targetStep = 5;
+            else if (!prefilledData.paymentMethod) targetStep = 6;
+            else targetStep = 7;
+
+            setCurrentStep(targetStep);
+            
+            // 清除 URL 參數中的 token，但保留其他參數
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete('token');
+            router.replace(newUrl.pathname + newUrl.search, { scroll: false });
+          }
+        } catch (error) {
+          console.error('❌ 加載預填報名數據失敗:', error);
+          alert('加載報名數據時發生錯誤，請聯繫客服');
+        }
+      };
+
+      loadPrefilledData();
+      return; // 如果有 token，不處理 orgId
+    }
+
+    // 處理 orgId（從機構頁面跳轉）
+    if (orgIdFromUrl && organizations.length > 0 && !formData.organizationId) {
+      // 檢查機構是否存在於列表中
+      const orgExists = organizations.some(org => org.id === orgIdFromUrl);
+      if (orgExists) {
+        console.log('✅ 從 URL 參數自動選擇機構:', orgIdFromUrl);
+        setFormData(prev => ({
+          ...prev,
+          organizationId: orgIdFromUrl,
+          courseType: '',
+          selectedPlan: '',
+          selectedDate: '',
+          selectedTimeSlot: ''
+        }));
+        setPriceCalculation(null);
+        setCouponValidation(null);
+        setErrors(prev => ({ ...prev, organizationId: '' }));
+        // 自動跳轉到第2步（課程性質）
+        setCurrentStep(1);
+        // 清除 URL 參數，避免刷新時重複選擇
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('orgId');
+        router.replace(newUrl.pathname + newUrl.search, { scroll: false });
+      } else {
+        console.warn('⚠️ URL 參數中的機構 ID 不存在於機構列表中:', orgIdFromUrl);
+      }
+    }
+  }, [organizations, searchParams, formData.organizationId, router]);
 
   // 當課程類型改變時，重新載入日曆資料和價格計劃
   useEffect(() => {
@@ -1456,6 +1575,22 @@ export default function HanamiMusicRegisterPage() {
       }
 
       // 顯示成功訊息
+      // 如果有報名連結 token，更新連結狀態為已完成
+      if (registrationLinkToken) {
+        try {
+          const linkResponse = await fetch(`/api/registrations/links/complete?token=${encodeURIComponent(registrationLinkToken)}`, {
+            method: 'POST',
+          });
+          const linkResult = await linkResponse.json();
+          if (linkResult.success) {
+            console.log('✅ 報名連結狀態已更新為已完成');
+          }
+        } catch (error) {
+          console.error('❌ 更新報名連結狀態失敗:', error);
+          // 不影響主流程，繼續顯示成功提示
+        }
+      }
+
       setShowSuccessModal(true);
 
       setTimeout(() => {

@@ -355,6 +355,7 @@ CREATE TABLE public.hanami_task_list (
   updated_at timestamp with time zone DEFAULT now(),
   follow_up_content text,
   assigned_to ARRAY,
+  org_id uuid,
   CONSTRAINT hanami_task_list_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.hanami_user_organizations (
@@ -424,6 +425,30 @@ CREATE TABLE public.message_processing_logs (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT message_processing_logs_pkey PRIMARY KEY (id),
   CONSTRAINT message_processing_logs_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.chat_messages(id)
+);
+CREATE TABLE public.mind_blocks (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  title text NOT NULL,
+  description text,
+  icon text DEFAULT '🧩'::text,
+  color text DEFAULT '#FFD59A'::text,
+  content_json jsonb NOT NULL DEFAULT '{}'::jsonb,
+  compiled_prompt text,
+  category text,
+  tags ARRAY,
+  block_type text,
+  is_template boolean DEFAULT false,
+  is_public boolean DEFAULT false,
+  is_official boolean DEFAULT false,
+  forked_from_id uuid,
+  usage_count integer DEFAULT 0,
+  likes_count integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT mind_blocks_pkey PRIMARY KEY (id),
+  CONSTRAINT mind_blocks_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT mind_blocks_forked_from_id_fkey FOREIGN KEY (forked_from_id) REFERENCES public.mind_blocks(id)
 );
 CREATE TABLE public.model_configs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -548,6 +573,18 @@ CREATE TABLE public.role_instances (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT role_instances_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.role_mind_blocks (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  role_id uuid NOT NULL,
+  mind_block_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT role_mind_blocks_pkey PRIMARY KEY (id),
+  CONSTRAINT role_mind_blocks_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.ai_roles(id),
+  CONSTRAINT role_mind_blocks_mind_block_id_fkey FOREIGN KEY (mind_block_id) REFERENCES public.mind_blocks(id),
+  CONSTRAINT role_mind_blocks_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.room_members (
   room_id uuid NOT NULL,

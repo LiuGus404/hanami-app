@@ -79,6 +79,7 @@ interface Lesson {
   remaining_lessons: number | null;
   is_trial: boolean;
   age_display?: string;
+  contact_number?: string | null; // 試堂學生的電話號碼
   Hanami_Students?: {
     full_name: string;
     student_age: number;
@@ -140,9 +141,16 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       : null;
   const disableData = forceEmpty || !effectiveOrgId;
 
-  // 提取所有有效的電話號碼用於批量載入
+  // 提取所有有效的電話號碼用於批量載入（包括常規學生和試堂學生）
   const allPhoneNumbers = lessons
-    .map(lesson => lesson.Hanami_Students?.contact_number)
+    .map(lesson => {
+      // 試堂學生直接從 contact_number 獲取，常規學生從 Hanami_Students 獲取
+      if (lesson.is_trial) {
+        return lesson.contact_number;
+      } else {
+        return lesson.Hanami_Students?.contact_number;
+      }
+    })
     .filter((phone): phone is string => !!phone && phone.trim() !== '');
 
   // 使用批量載入聯繫天數
@@ -470,6 +478,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             remaining_lessons: null,
             is_trial: true,
             lesson_duration: trial.lesson_duration || null,
+            contact_number: trial.contact_number || null, // 保留試堂學生的電話號碼
           }));
 
           // 合併常規和試堂學生的課堂
@@ -601,6 +610,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             remaining_lessons: null,
             is_trial: true,
             lesson_duration: trial.lesson_duration || null,
+            contact_number: trial.contact_number || null, // 保留試堂學生的電話號碼
           }));
 
           // 合併常規和試堂學生的課堂
@@ -724,6 +734,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             remaining_lessons: null,
             is_trial: true,
             lesson_duration: trial.lesson_duration || null,
+            contact_number: trial.contact_number || null, // 保留試堂學生的電話號碼
           }));
 
           // 合併常規和試堂學生的課堂
@@ -829,7 +840,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
     const dateStr = getDateString(date);
 
     // 獲取常規學生的課堂，明確指定關聯關係
-    const { data: regularLessonsData, error: regularLessonsError } = await supabase
+    let regularLessonsQuery = supabase
       .from('hanami_student_lesson')
       .select(`
         *,
@@ -839,12 +850,26 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         )
       `)
       .eq('lesson_date', dateStr);
+    
+    // 如果有 org_id，根據 org_id 過濾
+    if (effectiveOrgId) {
+      regularLessonsQuery = regularLessonsQuery.eq('org_id', effectiveOrgId);
+    }
+    
+    const { data: regularLessonsData, error: regularLessonsError } = await regularLessonsQuery;
 
     // 獲取試堂學生的課堂
-    const { data: trialLessonsData, error: trialLessonsError } = await supabase
+    let trialLessonsQuery = supabase
       .from('hanami_trial_students')
       .select('*')
       .eq('lesson_date', dateStr);
+    
+    // 如果有 org_id，根據 org_id 過濾
+    if (effectiveOrgId) {
+      trialLessonsQuery = trialLessonsQuery.eq('org_id', effectiveOrgId);
+    }
+    
+    const { data: trialLessonsData, error: trialLessonsError } = await trialLessonsQuery;
 
     if (regularLessonsError || trialLessonsError) {
       console.error('Fetch lessons error:', regularLessonsError || trialLessonsError);
@@ -907,6 +932,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         remaining_lessons: null,
         is_trial: true,
         health_note: trial.health_note ?? null,
+        contact_number: trial.contact_number || null, // 保留試堂學生的電話號碼
       } as Lesson;
     });
 
@@ -1156,7 +1182,6 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
     // 動畫 class
     const baseBtnClass = 'inline-block px-2 py-1 m-1 rounded-full text-[#4B4036] text-xs transition-all duration-200 flex items-center shadow-sm hover:scale-105 hover:shadow-lg active:scale-95 focus:outline-none';
     const statusBtnClass = 'ml-2 px-2 py-0.5 rounded text-xs transition-all duration-200 shadow-sm hover:scale-105 hover:shadow-lg active:scale-95 focus:outline-none';
-    const unsetBtnClass = 'ml-2 px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-600 border border-gray-300 transition-all duration-200 shadow-sm hover:scale-105 hover:bg-yellow-100 hover:shadow-lg active:scale-95 focus:outline-none';
 
     return (
       <div className="flex items-center gap-1 flex-wrap">
@@ -1181,8 +1206,12 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           )}
         </button>
         {/* 聯繫天數圖標 */}
-        <ContactDaysIcon phoneNumber={lesson?.Hanami_Students?.contact_number || null} />
-        {(lessonIsTodayOrPast && lesson?.lesson_status) ? (
+        <ContactDaysIcon phoneNumber={
+          lesson?.is_trial 
+            ? lesson?.contact_number || null 
+            : lesson?.Hanami_Students?.contact_number || null
+        } />
+        {lessonIsTodayOrPast && lesson?.lesson_status && (
           <button
             className={
               `${statusBtnClass} ${  
@@ -1195,16 +1224,6 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           >
             {lesson.lesson_status}
           </button>
-        ) : (
-          lessonIsTodayOrPast && !nameObj.is_trial && lesson && (
-            <button
-              className={unsetBtnClass}
-              title="設定出席狀態"
-              onClick={() => setPopupInfo({ lessonId: lesson.id })}
-            >
-              未設定
-            </button>
-          )
         )}
       </div>
     );
@@ -1271,13 +1290,39 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       const { data, error } = await query;
       if (!error && data) {
         console.log('📊 [HanamiCalendar] 載入的排班記錄數量:', data.length, 'effectiveOrgId:', effectiveOrgId);
-        const list: {name: string, start: string, end: string}[] = [];
+        // 使用 Map 來去重，key 為老師名稱
+        const teacherMap = new Map<string, {name: string, start: string, end: string}>();
+        
         data.forEach((row: any) => {
           if (row.hanami_employee?.teacher_nickname && row.start_time && row.end_time) {
-            list.push({ name: row.hanami_employee.teacher_nickname, start: row.start_time, end: row.end_time });
+            const teacherName = row.hanami_employee.teacher_nickname;
+            const startTime = row.start_time;
+            const endTime = row.end_time;
+            
+            // 如果該老師已存在，合併時間段（取最早開始時間和最晚結束時間）
+            if (teacherMap.has(teacherName)) {
+              const existing = teacherMap.get(teacherName)!;
+              // 比較時間，取最早和最晚
+              if (startTime < existing.start) {
+                existing.start = startTime;
+              }
+              if (endTime > existing.end) {
+                existing.end = endTime;
+              }
+            } else {
+              // 新老師，直接添加
+              teacherMap.set(teacherName, { 
+                name: teacherName, 
+                start: startTime, 
+                end: endTime 
+              });
+            }
           }
         });
-        console.log('📊 [HanamiCalendar] 載入的老師列表:', list.map(t => ({ name: t.name, start: t.start, end: t.end })));
+        
+        // 轉換為數組
+        const list = Array.from(teacherMap.values());
+        console.log('📊 [HanamiCalendar] 載入的老師列表（已去重）:', list.map(t => ({ name: t.name, start: t.start, end: t.end })));
         setSelectedDateTeachers(list);
       } else if (error) {
         console.error('❌ [HanamiCalendar] 查詢排班記錄錯誤:', error);
@@ -1753,7 +1798,6 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             { label: '缺席', value: '缺席' },
             { label: '病假', value: '病假' },
             { label: '事假', value: '事假' },
-            { label: '未設定', value: '未設定' },
           ]}
           selected={popupSelected}
           title="選擇出席狀態"
