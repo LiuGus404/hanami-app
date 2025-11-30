@@ -476,6 +476,24 @@ export default function MindBlockBuilder() {
         alert('Prompt copied to clipboard!');
     };
 
+    // Set default preview state based on screen size
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setShowPreview(false);
+            } else {
+                setShowPreview(true);
+            }
+        };
+
+        // Set initial state
+        handleResize();
+
+        // Optional: Listen for resize if we want dynamic behavior
+        // window.addEventListener('resize', handleResize);
+        // return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     return (
         <div className="flex h-full gap-6 relative">
             {/* Library Drawer (Left Side) */}
@@ -621,9 +639,9 @@ export default function MindBlockBuilder() {
                             className={`p-2 rounded-xl transition-colors flex items-center gap-2 font-bold text-sm ${showLibrary ? 'bg-[#FFD59A] text-[#4B4036]' : 'bg-white text-[#4B4036] border border-[#EADBC8]'}`}
                         >
                             <BookOpenIcon className="w-5 h-5" />
-                            {!showLibrary && "打開積木庫"}
+                            <span className="hidden md:inline">{!showLibrary && "打開積木庫"}</span>
                         </button>
-                        <h1 className="text-2xl font-bold text-[#4B4036]">思維積木構建器</h1>
+                        <h1 className="text-2xl font-bold text-[#4B4036] hidden md:block">思維積木構建器</h1>
                     </div>
 
                     <div className="flex space-x-2">
@@ -989,13 +1007,22 @@ export default function MindBlockBuilder() {
                                 <SparklesIcon className="w-5 h-5 text-amber-500" />
                                 即時預覽
                             </h3>
-                            <button
-                                onClick={copyToClipboard}
-                                className="p-1.5 hover:bg-[#EADBC8]/20 rounded-lg text-[#4B4036]/60 hover:text-[#4B4036] transition-colors"
-                                title="複製 Prompt"
-                            >
-                                <ClipboardDocumentIcon className="w-5 h-5" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={copyToClipboard}
+                                    className="p-1.5 hover:bg-[#EADBC8]/20 rounded-lg text-[#4B4036]/60 hover:text-[#4B4036] transition-colors"
+                                    title="複製 Prompt"
+                                >
+                                    <ClipboardDocumentIcon className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => setShowPreview(false)}
+                                    className="p-1.5 hover:bg-[#EADBC8]/20 rounded-lg text-[#4B4036]/60 hover:text-[#4B4036] transition-colors md:hidden"
+                                    title="關閉預覽"
+                                >
+                                    <XMarkIcon className="w-5 h-5" />
+                                </button>
+                            </div>
                         </div>
                         <div className="flex-1 p-4 overflow-y-auto bg-[#FAFAFA]">
                             <pre className="whitespace-pre-wrap text-sm text-[#4B4036] font-mono leading-relaxed">
