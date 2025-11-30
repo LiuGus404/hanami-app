@@ -16,11 +16,19 @@ import {
     MagnifyingGlassIcon,
     ArrowLeftIcon,
     Square2StackIcon,
-    CubeIcon
+    CubeIcon,
+    UserIcon,
+    PaintBrushIcon,
+    DocumentTextIcon,
+    ExclamationTriangleIcon,
+    LightBulbIcon,
+    ChevronDownIcon,
+    ChevronUpIcon,
+    ArrowPathIcon,
+    HeartIcon
 } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
-import MindBlockCard from '@/components/mind-block/MindBlockCard';
-import { MindBlock } from '@/types/mind-block';
+import { MindBlock, MindBlockType } from '@/types/mind-block';
 import { getSaasSupabaseClient } from '@/lib/supabase';
 
 export default function MindLibraryPage() {
@@ -35,6 +43,87 @@ export default function MindLibraryPage() {
     const [activeTab, setActiveTab] = useState<'composition' | 'block'>('composition');
     const [blocks, setBlocks] = useState<MindBlock[]>([]);
     const [loading, setLoading] = useState(true);
+    const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>({});
+
+    // 積木類型標籤映射
+    const blockTypeLabels: Record<MindBlockType, string> = {
+        'role': '角色',
+        'style': '風格',
+        'context': '背景',
+        'rule': '規則',
+        'task': '任務',
+        'variable': '變數',
+        'search': '搜尋',
+        'reason': '推理',
+        'output': '輸出'
+    };
+
+    // 積木類型圖標和顏色配置
+    const blockTypeConfig: Record<string, { icon: any; color: string; bg: string; borderColor: string }> = {
+        'role': { 
+            icon: UserIcon, 
+            color: 'text-purple-600', 
+            bg: 'bg-purple-100', 
+            borderColor: 'border-purple-300' 
+        },
+        'style': { 
+            icon: PaintBrushIcon, 
+            color: 'text-pink-600', 
+            bg: 'bg-pink-100', 
+            borderColor: 'border-pink-300' 
+        },
+        'context': { 
+            icon: DocumentTextIcon, 
+            color: 'text-blue-600', 
+            bg: 'bg-blue-100', 
+            borderColor: 'border-blue-300' 
+        },
+        'rule': { 
+            icon: ExclamationTriangleIcon, 
+            color: 'text-red-600', 
+            bg: 'bg-red-100', 
+            borderColor: 'border-red-300' 
+        },
+        'task': { 
+            icon: CubeIcon, 
+            color: 'text-amber-600', 
+            bg: 'bg-amber-100', 
+            borderColor: 'border-amber-300' 
+        },
+        'search': { 
+            icon: MagnifyingGlassIcon, 
+            color: 'text-cyan-600', 
+            bg: 'bg-cyan-100', 
+            borderColor: 'border-cyan-300' 
+        },
+        'reason': { 
+            icon: LightBulbIcon, 
+            color: 'text-yellow-600', 
+            bg: 'bg-yellow-100', 
+            borderColor: 'border-yellow-300' 
+        },
+        'variable': { 
+            icon: PuzzlePieceIcon, 
+            color: 'text-indigo-600', 
+            bg: 'bg-indigo-100', 
+            borderColor: 'border-indigo-300' 
+        },
+        'output': { 
+            icon: SparklesIcon, 
+            color: 'text-emerald-600', 
+            bg: 'bg-emerald-100', 
+            borderColor: 'border-emerald-300' 
+        }
+    };
+
+    // 獲取組合中的積木類型列表
+    const getBlockTypesFromComposition = (composition: any): string[] => {
+        if (!composition.content_json?.blocks || !Array.isArray(composition.content_json.blocks)) {
+            return [];
+        }
+        const types = composition.content_json.blocks.map((block: any) => block.type).filter(Boolean);
+        return Array.from(new Set(types)); // 去重
+    };
 
     // Fetch Blocks
     useEffect(() => {
@@ -75,18 +164,10 @@ export default function MindLibraryPage() {
         router.push('/aihome/ai-companions?view=' + tabId);
     };
 
-    const handleFork = (block: MindBlock) => {
-        console.log('Forking block:', block.title);
-        // If it's a composition, load it into the builder
-        if (activeTab === 'composition') {
-            // For now, just load it. In future, we might want to clone it first.
-            router.push(`/aihome/mind-builder?compositionId=${block.id}`);
-        } else {
-            // For single block, maybe copy to clipboard or add to user's library?
-            // Current builder doesn't support "adding single block from library" via URL yet easily without context.
-            // Let's just alert for now or maybe open builder with it?
-            alert('單一積木引用功能即將推出！');
-        }
+    const handleLoad = (block: MindBlock) => {
+        console.log('載入積木:', block.title);
+        // 無論是組合還是單一積木，都載入到 builder
+        router.push(`/aihome/mind-builder?compositionId=${block.id}`);
     };
 
     const filteredBlocks = blocks.filter(block =>
@@ -295,7 +376,7 @@ export default function MindLibraryPage() {
                                     }`}
                             >
                                 <Square2StackIcon className="w-5 h-5" />
-                                精選組合
+                                思維積木組合
                             </button>
                             <button
                                 onClick={() => setActiveTab('block')}
@@ -327,14 +408,174 @@ export default function MindLibraryPage() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {filteredBlocks.map(block => (
-                                <div key={block.id} className="h-[280px]">
-                                    <MindBlockCard
-                                        block={block}
-                                        onFork={handleFork}
-                                    />
-                                </div>
-                            ))}
+                            {filteredBlocks.map((item) => {
+                                const isComposition = activeTab === 'composition';
+                                const blockTypes = isComposition 
+                                    ? getBlockTypesFromComposition(item)
+                                    : item.block_type ? [item.block_type] : [];
+
+                                return (
+                                    <motion.div
+                                        key={item.id}
+                                        whileHover={{ y: -5 }}
+                                        className="group relative h-full"
+                                    >
+                                        <div className="absolute inset-0 bg-white/40 rounded-2xl transform translate-y-2 translate-x-0 transition-transform group-hover:translate-y-3 border border-[#EADBC8]"></div>
+                                        <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl border border-[#EADBC8] p-5 h-full flex flex-col transition-transform transform group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-[#FFD59A]">
+                                            {/* Header */}
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFF9F2] to-[#FFF0D4] flex items-center justify-center border border-[#EADBC8] shadow-sm group-hover:shadow-md transition-all flex-shrink-0">
+                                                        {isComposition ? (
+                                                            <Square2StackIcon className="w-6 h-6 text-[#4B4036]" />
+                                                        ) : (
+                                                            <CubeIcon className="w-6 h-6 text-[#4B4036]" />
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 text-[#4B4036] border border-[#EADBC8]">
+                                                                {isComposition ? '組合' : '積木'}
+                                                            </span>
+                                                            {item.is_official && (
+                                                                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white">
+                                                                    官方
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h3 className="font-bold text-[#4B4036] text-lg leading-tight group-hover:text-[#FFB6C1] transition-colors line-clamp-1">
+                                                            {item.title}
+                                                        </h3>
+                                                        <div className="flex items-center text-xs text-[#4B4036]/60 mt-1">
+                                                            <UserIcon className="w-3.5 h-3.5 mr-1.5" />
+                                                            <span>{item.user_id === 'system' ? '官方' : `用戶 ${item.user_id.substring(0, 8)}`}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Block Visualization - 顯示積木拼接圖示 */}
+                                            {blockTypes.length > 0 && (
+                                                <div className="mb-6 flex-1 flex items-center justify-center min-h-[100px]">
+                                                    <div className="flex items-center gap-3 flex-wrap justify-center">
+                                                        {blockTypes.map((type, idx) => {
+                                                            const config = blockTypeConfig[type] || {
+                                                                icon: PuzzlePieceIcon,
+                                                                color: 'text-gray-600',
+                                                                bg: 'bg-gray-100',
+                                                                borderColor: 'border-gray-300'
+                                                            };
+                                                            const Icon = config.icon;
+                                                            const typeLabel = blockTypeLabels[type as MindBlockType] || type;
+                                                            return (
+                                                                <motion.div
+                                                                    key={idx}
+                                                                    initial={{ scale: 0, rotate: -180 }}
+                                                                    animate={{ scale: 1, rotate: 0 }}
+                                                                    transition={{
+                                                                        delay: idx * 0.1,
+                                                                        type: "spring",
+                                                                        stiffness: 200,
+                                                                        damping: 15
+                                                                    }}
+                                                                    whileHover={{ 
+                                                                        scale: 1.05,
+                                                                        zIndex: 10
+                                                                    }}
+                                                                    className="flex flex-col items-center gap-2"
+                                                                >
+                                                                    <div
+                                                                        className={`
+                                                                            relative w-14 h-14 rounded-xl 
+                                                                            ${config.bg} ${config.color} 
+                                                                            border-2 ${config.borderColor}
+                                                                            flex items-center justify-center
+                                                                            shadow-md hover:shadow-xl
+                                                                            transition-all duration-200
+                                                                            cursor-default
+                                                                        `}
+                                                                    >
+                                                                        <Icon className="w-7 h-7" />
+                                                                        {/* 拼接連接點 */}
+                                                                        {idx < blockTypes.length - 1 && (
+                                                                            <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-3 h-3 bg-[#EADBC8] rounded-full border-2 border-white shadow-sm"></div>
+                                                                        )}
+                                                                    </div>
+                                                                    {/* 積木名稱 */}
+                                                                    <span className={`text-xs font-semibold ${config.color} text-center`}>
+                                                                        {typeLabel}
+                                                                    </span>
+                                                                </motion.div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* 單一積木的描述 - 可展開/收起 */}
+                                            {!isComposition && item.description && (
+                                                <div className="mb-4">
+                                                    <div className="text-sm text-[#4B4036]/70 leading-relaxed">
+                                                        {expandedDescriptions[item.id] ? (
+                                                            <span>{item.description}</span>
+                                                        ) : (
+                                                            <span>
+                                                                {item.description.length > 100 
+                                                                    ? `${item.description.substring(0, 100)}...` 
+                                                                    : item.description}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {item.description.length > 100 && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setExpandedDescriptions(prev => ({
+                                                                    ...prev,
+                                                                    [item.id]: !prev[item.id]
+                                                                }));
+                                                            }}
+                                                            className="mt-2 flex items-center gap-1 text-xs font-medium text-[#4B4036]/60 hover:text-[#FFB6C1] transition-colors group"
+                                                        >
+                                                            <span>{expandedDescriptions[item.id] ? '收起' : '展開'}</span>
+                                                            <motion.div
+                                                                animate={{ rotate: expandedDescriptions[item.id] ? 180 : 0 }}
+                                                                transition={{ duration: 0.2 }}
+                                                            >
+                                                                <ChevronDownIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                                            </motion.div>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Footer */}
+                                            <div className="mt-auto pt-4 border-t border-dashed border-[#EADBC8] flex items-center justify-between">
+                                                <div className="flex items-center space-x-4 text-xs font-semibold text-[#4B4036]/50">
+                                                    <div className="flex items-center hover:text-red-400 transition-colors">
+                                                        <HeartIcon className="w-4 h-4 mr-1.5" />
+                                                        {item.likes_count || 0}
+                                                    </div>
+                                                    <div className="flex items-center hover:text-blue-400 transition-colors">
+                                                        <ArrowPathIcon className="w-4 h-4 mr-1.5" />
+                                                        {item.usage_count || 0}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleLoad(item);
+                                                    }}
+                                                    className="flex items-center px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white text-xs font-bold rounded-xl hover:shadow-lg hover:scale-105 transition-all shadow-md active:scale-95"
+                                                >
+                                                    <PuzzlePieceIcon className="w-3.5 h-3.5 mr-2" />
+                                                    載入積木
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

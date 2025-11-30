@@ -233,10 +233,16 @@ export default function MindBlockBuilder() {
                         category: data.category,
                         is_template: data.is_template,
                         block_type: data.block_type,
+                        is_public: data.is_public,
                         content_json_keys: data.content_json ? Object.keys(data.content_json) : null,
                         has_blocks: data.content_json?.blocks ? 'yes' : 'no',
                         blocks_count: data.content_json?.blocks?.length || 0
                     });
+
+                    // 設置當前編輯的積木 ID 和公開狀態
+                    setEditingTemplateId(data.id);
+                    setSavePrivacy(data.is_public ? 'public' : 'private');
+                    console.log('✅ 設置編輯狀態:', { id: data.id, is_public: data.is_public, privacy: data.is_public ? 'public' : 'private' });
 
                     // 檢查是組合還是單一積木
                     const isComposition = data.category === 'Composition' || (data.content_json && data.content_json.blocks && Array.isArray(data.content_json.blocks));
@@ -574,25 +580,60 @@ export default function MindBlockBuilder() {
             return;
         }
 
-        const name = prompt('請為此思維積木組合命名：', '我的思維積木');
-        if (!name) return;
+        // 如果正在編輯現有積木，使用現有標題，否則提示輸入
+        let name: string;
+        if (editingTemplateId) {
+            // 從數據庫獲取現有標題
+            const { data } = await supabase
+                .from('mind_blocks' as any)
+                .select('title')
+                .eq('id', editingTemplateId)
+                .single();
+            name = (data as any)?.title || '我的思維積木';
+        } else {
+            const inputName = prompt('請為此思維積木組合命名：', '我的思維積木');
+            if (!inputName) return;
+            name = inputName;
+        }
+
+        const isPublic = savePrivacy === 'public';
 
         try {
-            const { error } = await supabase.from('mind_blocks' as any).insert({
+            const payload = {
                 user_id: currentUser.id,
                 title: name,
                 description: compiledPrompt.substring(0, 100) + '...',
                 content_json: { blocks }, // Store the array of blocks
                 is_template: false, // This is a composition, not a single block template
-                is_public: false,
-                category: 'Composition'
-            });
+                is_public: isPublic,
+                category: 'Composition',
+                updated_at: new Date().toISOString()
+            };
+
+            let error;
+            if (editingTemplateId) {
+                // 更新現有組合
+                const { error: updateError } = await supabase
+                    .from('mind_blocks' as any)
+                    .update(payload)
+                    .eq('id', editingTemplateId);
+                error = updateError;
+            } else {
+                // 創建新組合
+                const { error: insertError } = await supabase
+                    .from('mind_blocks' as any)
+                    .insert(payload);
+                error = insertError;
+            }
 
             if (error) {
                 console.error('Error saving composition:', error);
                 alert('儲存失敗：' + error.message);
             } else {
-                alert('思維積木組合已儲存！');
+                alert(editingTemplateId ? '思維積木組合已更新！' : '思維積木組合已儲存！');
+                // 清除編輯狀態
+                setEditingTemplateId(null);
+                setSavePrivacy('private');
             }
         } catch (e) {
             console.error('Exception saving composition:', e);
@@ -814,7 +855,7 @@ export default function MindBlockBuilder() {
 
             {/* Main Builder Area */}
             <div className="flex-1 flex flex-col h-full bg-[#FFF9F2] p-2 md:p-4 rounded-lg md:rounded-xl relative border-0 md:border border-[#EADBC8] shadow-sm z-10">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setShowLibrary(!showLibrary)}
@@ -826,20 +867,57 @@ export default function MindBlockBuilder() {
                         <h1 className="text-2xl font-bold text-[#4B4036] hidden md:block">思維積木構建器</h1>
                     </div>
 
-                    <div className="flex space-x-2">
-                        <button
-                            onClick={() => setShowPreview(!showPreview)}
-                            className={`p-2 rounded-xl transition-colors ${showPreview ? 'bg-[#FFD59A] text-[#4B4036]' : 'bg-white text-[#4B4036]/60 border border-[#EADBC8]'}`}
-                            title="切換預覽"
-                        >
-                            <EyeIcon className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            className="px-6 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all"
-                        >
-                            儲存
-                        </button>
+                    <div className="flex items-center gap-4 flex-wrap">
+                        {/* 公開/私人開關 - 當編輯積木時顯示 */}
+                        {editingTemplateId && (
+                            <div className="flex items-center gap-3 bg-white/60 backdrop-blur-sm rounded-xl px-3 py-2 border border-[#EADBC8]">
+                                <span className="text-xs font-semibold text-[#4B4036] whitespace-nowrap">
+                                    {savePrivacy === 'private' ? (
+                                        <span className="flex items-center gap-1.5">
+                                            <LockClosedIcon className="w-3.5 h-3.5" />
+                                            <span className="hidden sm:inline">私人</span>
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-1.5 text-[#FFB6C1]">
+                                            <GlobeAltIcon className="w-3.5 h-3.5" />
+                                            <span className="hidden sm:inline">公開</span>
+                                        </span>
+                                    )}
+                                </span>
+                                <button
+                                    onClick={() => setSavePrivacy(savePrivacy === 'private' ? 'public' : 'private')}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2 ${
+                                        savePrivacy === 'public' 
+                                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A]' 
+                                            : 'bg-[#EADBC8]'
+                                    }`}
+                                    role="switch"
+                                    aria-checked={savePrivacy === 'public'}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                            savePrivacy === 'public' ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+                        )}
+                        
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => setShowPreview(!showPreview)}
+                                className={`p-2 rounded-xl transition-colors ${showPreview ? 'bg-[#FFD59A] text-[#4B4036]' : 'bg-white text-[#4B4036]/60 border border-[#EADBC8]'}`}
+                                title="切換預覽"
+                            >
+                                <EyeIcon className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                className="px-6 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+                            >
+                                {editingTemplateId ? '更新' : '儲存'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 

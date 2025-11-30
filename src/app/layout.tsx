@@ -8,6 +8,7 @@ import { Toaster } from 'react-hot-toast';
 
 import SessionProviderWrapper from '@/components/SessionProviderWrapper';
 import SaasProviderWrapper from '@/components/SaasProviderWrapper';
+import LoadingScreen from '@/components/ui/LoadingScreen';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -96,7 +97,7 @@ export default async function RootLayout({
   const cookieStore = await cookies();
   const customSession = cookieStore.get('hanami_user_session')?.value;
   let userSession = null;
-  
+
   if (customSession) {
     try {
       const sessionData = JSON.parse(customSession);
@@ -119,18 +120,18 @@ export default async function RootLayout({
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-32.png" />
         <link rel="shortcut icon" href="/favicon-32.png" />
-        
+
         {/* Apple Touch Icons */}
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
         <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167x167.png" />
         <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
         <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png" />
-        
+
         {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#fcf6f2" />
-        
+
         {/* 結構化資料 */}
         <script
           dangerouslySetInnerHTML={{
@@ -161,8 +162,9 @@ export default async function RootLayout({
       >
         <SessionProviderWrapper initialSession={userSession}>
           <SaasProviderWrapper>
+            <LoadingScreen />
             {children}
-            <Toaster 
+            <Toaster
               position="top-right"
               toastOptions={{
                 duration: 3000,
