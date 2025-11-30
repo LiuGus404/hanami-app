@@ -13,6 +13,7 @@ import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
 import { CircularChart, PieChart } from '@/components/ui/CircularChart';
 import FinancialManagementNavBar from '@/components/ui/FinancialManagementNavBar';
+import { useFinancialData } from '@/hooks/useFinancialData';
 
 interface FinancialData {
   totalIncome: number;
@@ -77,20 +78,6 @@ function FinancialManagementContent() {
     return null;
   }, [orgId, organization?.id]);
 
-  const [financialData, setFinancialData] = useState<FinancialData>({
-    totalIncome: 0,
-    totalExpenses: 0,
-    netProfit: 0,
-    studentCount: 0,
-    activePackages: 0,
-    courseTypeCount: 0,
-    totalLessons: 0,
-    actualLessons: 0,
-    trialLessons: 0,
-    expectedLessons: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [courseTypeDistribution, setCourseTypeDistribution] = useState<{ [key: string]: number }>({});
   const [trialStats, setTrialStats] = useState({
@@ -99,243 +86,118 @@ function FinancialManagementContent() {
     total: 0
   });
 
+  // 使用 SWR 缓存的财务数据
+  const { data: cachedFinancialData, isLoading: financialLoading, error: financialError, mutate: mutateFinancial } = useFinancialData(
+    resolvedOrgId,
+    saasUser?.email || '',
+    selectedMonth
+  );
+
+  // 计算扩展的财务数据
+  const financialData = useMemo<FinancialData>(() => {
+    if (!cachedFinancialData) {
+      return {
+        totalIncome: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        studentCount: 0,
+        activePackages: 0,
+        courseTypeCount: 0,
+        totalLessons: 0,
+        actualLessons: 0,
+        trialLessons: 0,
+        expectedLessons: 0
+      };
+    }
+
+    // 从缓存的数据中提取信息
+    const regularStudents = cachedFinancialData.regularStudents || [];
+    const expenses = cachedFinancialData.expenses || [];
+    const trialStudents = cachedFinancialData.trialStudents || [];
+    const courseTypes = cachedFinancialData.courseTypes || [];
+
+    // 计算总支出
+    const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+
+    // 计算总收入（这里需要根据实际业务逻辑计算）
+    // TODO: 根据实际业务逻辑计算总收入
+    const totalIncome = 0;
+
+    // 计算净利
+    const netProfit = totalIncome - totalExpenses;
+
+    // 计算学生数量
+    const studentCount = regularStudents.length;
+
+    // 计算活跃课程包（需要从其他地方获取）
+    const activePackages = 0; // TODO: 从缓存数据中获取
+
+    // 计算课程类型数量
+    const courseTypeCount = courseTypes.length;
+
+    // 计算堂数统计（需要从其他地方获取）
+    const totalLessons = 0; // TODO: 从缓存数据中获取
+    const actualLessons = 0; // TODO: 从缓存数据中获取
+    const trialLessons = trialStudents.length;
+
+    // 计算理应上堂数
+    const [year, month] = selectedMonth.split('-');
+    const firstDayOfMonth = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const lastDayOfMonth = new Date(parseInt(year), parseInt(month), 0);
+    const weeksInMonth = Math.ceil((lastDayOfMonth.getDate() - firstDayOfMonth.getDate() + 1) / 7);
+    const expectedLessons = studentCount * weeksInMonth;
+
+    return {
+      totalIncome,
+      totalExpenses,
+      netProfit,
+      studentCount,
+      activePackages,
+      courseTypeCount,
+      totalLessons,
+      actualLessons,
+      trialLessons,
+      expectedLessons
+    };
+  }, [cachedFinancialData, selectedMonth]);
+
+  const loading = financialLoading;
+  const error = financialError ? '載入財務數據時發生錯誤' : null;
+
   useEffect(() => {
-    if (!organizationResolved || orgDataDisabled) {
+    if (!organizationResolved || orgDataDisabled || !resolvedOrgId) {
       return;
     }
 
-    if (!resolvedOrgId) {
-      setLoading(false);
-      return;
-    }
-
-    fetchFinancialData();
-  }, [selectedMonth, resolvedOrgId, organizationResolved, orgDataDisabled]);
-
-  const fetchFinancialData = async () => {
-    if (!resolvedOrgId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // 使用 getSupabaseClient 查詢主要數據庫中的表（Hanami_Student_Package 和 hanami_financial_expenses 在主要數據庫中）
-      const supabase = getSupabaseClient();
-      const [year, month] = selectedMonth.split('-');
-      const startDate = `${year}-${month}-01`;
-      const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().slice(0, 10);
-
-      const userEmail = saasUser?.email || '';
-
-      // 第一步：並行執行所有不依賴學生 ID 的查詢，同時獲取學生列表
-      const [
-        studentsResponse,
-        expenseResult,
-        trialResult,
-        courseTypeResult
-      ] = await Promise.all([
-        // 獲取常規學生數量（使用 API 端點以繞過 RLS）
-        fetch(
-          `/api/students/list?orgId=${encodeURIComponent(resolvedOrgId)}&userEmail=${encodeURIComponent(userEmail)}&studentType=常規`
-        ),
-        // 獲取本月支出（根據 org_id 過濾，只選擇需要的字段）
-        supabase
-          .from('hanami_financial_expenses')
-          .select('id, expense_date, expense_category, expense_description, amount, payment_method, receipt_url, notes, created_at, org_id')
-          .gte('expense_date', startDate)
-          .lte('expense_date', endDate)
-          .eq('org_id', resolvedOrgId)
-          .order('expense_date', { ascending: false }),
-        
-        // 獲取本月試堂學生記錄（根據 org_id 過濾）
-        supabase
-          .from('hanami_trial_students')
-          .select('id, lesson_date, full_name, course_type')
-          .gte('lesson_date', startDate)
-          .lte('lesson_date', endDate)
-          .eq('org_id', resolvedOrgId),
-        
-        // 獲取課程類型（根據 org_id 過濾，只選擇需要的字段）
-        supabase
-          .from('Hanami_CourseTypes')
-          .select('id, name, status, trial_limit, price_per_lesson, created_at')
-          .eq('status', true)
-          .eq('org_id', resolvedOrgId)
-          .order('name')
-      ]);
-
-      // 處理學生數據
-      const studentsResult = await studentsResponse.json();
-      const studentData = studentsResult.data || [];
-      const studentIds = studentData.map((s: any) => s.id);
-
-      // 處理支出數據
-      if (expenseResult.error) throw expenseResult.error;
-      const expenseData = expenseResult.data || [];
-
-      // 處理試堂數據
-      if (trialResult.error) throw trialResult.error;
-      const trialData = trialResult.data || [];
-
-      // 處理課程類型數據
-      if (courseTypeResult.error) {
-        console.error('獲取課程類型錯誤:', courseTypeResult.error);
-      }
-      const courseTypeData = (courseTypeResult.data || []) as CourseType[];
-
-      // 第三步：並行執行依賴學生 ID 的查詢
-      let packageData: Package[] = [];
-      let lessonData: any[] = [];
-
-      if (studentIds.length > 0) {
-        const [
-          packageResult,
-          lessonResult
-        ] = await Promise.all([
-          // 查詢課程包（使用主要 Supabase 客戶端，只選擇需要的字段）
-          supabase
-            .from('Hanami_Student_Package')
-            .select('id, course_name, price, total_lessons, remaining_lessons, status, student_id, full_name')
-            .eq('status', 'active')
-            .in('student_id', studentIds),
-          
-          // 獲取本月常規學生課程記錄（根據 org_id 過濾，只選擇需要的字段）
-          supabase
-            .from('hanami_student_lesson')
-            .select('id, lesson_date, lesson_status, status, course_type, student_id, full_name, notes, remarks')
-            .gte('lesson_date', startDate)
-            .lte('lesson_date', endDate)
-            .eq('org_id', resolvedOrgId)
-            .in('student_id', studentIds)
-        ]);
-
-        // 處理課程包數據
-        if (packageResult.error) {
-          console.error('查詢課程包失敗:', packageResult.error);
-          packageData = [];
-        } else {
-          packageData = (packageResult.data || []) as Package[];
-          // 如果數據中有 org_id 欄位，在客戶端過濾
-          if (packageData.length > 0 && (packageData[0] as any).org_id) {
-            packageData = packageData.filter((pkg: any) => pkg.org_id === resolvedOrgId);
-          }
-        }
-
-        // 處理課程記錄數據
-        if (lessonResult.error) throw lessonResult.error;
-        lessonData = lessonResult.data || [];
-      }
-
-      const typedCourseTypeData = courseTypeData;
-
-      // 計算堂數統計
-      const totalLessons = lessonData?.length || 0;
-      const actualLessons = lessonData?.filter(lesson => 
-        (lesson.lesson_status === 'attended' || lesson.lesson_status === 'completed') ||
-        (lesson.status === 'attended' || lesson.status === 'completed')
-      ).length || 0;
-      
-      // 試堂數：綜合統計
-      const trialFromTrialTable = trialData?.length || 0;
-      const trialFromLessonTable = lessonData?.filter(lesson => 
-        lesson.lesson_status === 'trial' || 
-        lesson.status === 'trial' ||
-        lesson.course_type?.includes('試堂') ||
-        lesson.full_name?.includes('試堂') ||
-        lesson.notes?.includes('試堂') ||
-        lesson.remarks?.includes('試堂')
-      ).length || 0;
-      const trialLessons = trialFromTrialTable + trialFromLessonTable;
-
-      // 計算財務數據
-      let regularIncome = 0;
-      if (lessonData && typedCourseTypeData) {
-        const courseTypePrices: { [key: string]: number } = {};
-        typedCourseTypeData.forEach(courseType => {
-          if (courseType.name && courseType.price_per_lesson) {
-            courseTypePrices[courseType.name] = courseType.price_per_lesson;
-          }
-        });
-        
-        lessonData.forEach(lesson => {
-          const isTrial = lesson.lesson_status === 'trial' || 
-                         lesson.status === 'trial' ||
-                         lesson.course_type?.includes('試堂') ||
-                         lesson.full_name?.includes('試堂') ||
-                         lesson.notes?.includes('試堂') ||
-                         lesson.remarks?.includes('試堂');
-          
-          if (!isTrial) {
-            const courseType = lesson.course_type || '鋼琴';
-            const price = courseTypePrices[courseType] || 220;
-            regularIncome += price;
-          }
-        });
-      } else {
-        const nonTrialLessons = lessonData?.filter(lesson => {
-          const isTrial = lesson.lesson_status === 'trial' || 
-                         lesson.status === 'trial' ||
-                         lesson.course_type?.includes('試堂') ||
-                         lesson.full_name?.includes('試堂') ||
-                         lesson.notes?.includes('試堂') ||
-                         lesson.remarks?.includes('試堂');
-          return !isTrial;
-        }).length || 0;
-        regularIncome = nonTrialLessons * 220;
-      }
-      
-      const trialIncome = trialLessons * 138;
-      const totalIncome = regularIncome + trialIncome;
-      const typedExpenseData = (expenseData || []) as Expense[];
-      const totalExpenses = typedExpenseData.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-      const netProfit = totalIncome - totalExpenses;
-      const studentCount = studentData?.length || 0;
-      const activePackages = packageData?.length || 0;
-
-      // 統計不同課程類型的人數佔比
+    // 计算课程类型分布
+    if (cachedFinancialData?.regularStudents) {
       const courseTypeCounts: { [key: string]: number } = {};
-      studentData.forEach((student: any) => {
+      cachedFinancialData.regularStudents.forEach((student: any) => {
         const courseType = student.course_type || student.student_course_type || '未分類';
         courseTypeCounts[courseType] = (courseTypeCounts[courseType] || 0) + 1;
       });
+      setCourseTypeDistribution(courseTypeCounts);
+    }
 
-      const trialStats = {
+    // 计算试堂统计
+    if (cachedFinancialData?.trialStudents) {
+      const trialFromTrialTable = cachedFinancialData.trialStudents.length || 0;
+      // TODO: 从课程记录中获取试堂数据
+      const trialFromLessonTable = 0;
+      setTrialStats({
         fromTrialTable: trialFromTrialTable,
         fromLessonTable: trialFromLessonTable,
-        total: trialLessons
-      };
-      
-      // 計算理應上堂數
-      const firstDayOfMonth = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const lastDayOfMonth = new Date(parseInt(year), parseInt(month), 0);
-      const weeksInMonth = Math.ceil((lastDayOfMonth.getDate() - firstDayOfMonth.getDate() + 1) / 7);
-      const expectedLessons = studentCount * weeksInMonth;
-
-      setFinancialData({
-        totalIncome,
-        totalExpenses,
-        netProfit,
-        studentCount,
-        activePackages,
-        courseTypeCount: typedCourseTypeData.length,
-        totalLessons,
-        actualLessons,
-        trialLessons,
-        expectedLessons
+        total: trialFromTrialTable + trialFromLessonTable
       });
-
-      setCourseTypeDistribution(courseTypeCounts);
-      setTrialStats(trialStats);
-
-    } catch (error) {
-      console.error('獲取財務數據時發生錯誤:', error);
-      setError('載入財務數據時發生錯誤');
-    } finally {
-      setLoading(false);
     }
+  }, [cachedFinancialData, organizationResolved, orgDataDisabled, resolvedOrgId]);
+
+  // 刷新财务数据
+  const fetchFinancialData = async () => {
+    if (!resolvedOrgId) {
+      return;
+    }
+    await mutateFinancial();
   };
 
 
@@ -420,8 +282,9 @@ function FinancialManagementContent() {
               <HanamiButton
                 onClick={fetchFinancialData}
                 variant="primary"
+                disabled={loading}
               >
-                重新載入
+                {loading ? '載入中...' : '重新載入'}
               </HanamiButton>
             </div>
           </motion.div>

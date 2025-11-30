@@ -345,12 +345,18 @@ export default function StudentManagementPage({
     });
   }, [effectiveOrgId]);
 
-  // 使用 SWR 進行資料獲取
+  // 使用 SWR 進行資料獲取（優化緩存配置）
   const shouldFetch = Boolean(effectiveOrgId);
-  const { data: apiData, error: apiError, isValidating } = useSWR(
+  const { data: apiData, error: apiError, isValidating, mutate } = useSWR(
     shouldFetch ? ['students-with-lessons', JSON.stringify(apiFilter)] : null,
     () => fetchStudentsWithLessons(apiFilter),
-    { revalidateOnFocus: false }
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30000, // 30秒内去重
+      refreshInterval: 300000, // 5分钟自动刷新
+      keepPreviousData: true, // 保持之前的数据，避免闪烁
+    }
   );
 
   // 取回的學生資料
