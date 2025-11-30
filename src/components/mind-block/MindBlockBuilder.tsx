@@ -139,47 +139,12 @@ export default function MindBlockBuilder() {
             }
         };
 
-        const init = async () => {
-            try {
-                if (currentUser) {
-                    console.log('MindBlockBuilder: Current user present:', currentUser.id);
-                    // Ensure session is ready before fetching templates
-                    const { data: { session }, error } = await supabase.auth.getSession();
-
-                    if (error) {
-                        console.error('MindBlockBuilder: Error getting session:', error);
-                    }
-
-                    console.log('MindBlockBuilder: Session check:', session ? 'Session found' : 'No session');
-
-                    if (session) {
-                        fetchTemplates(currentUser.id);
-                    } else {
-                        console.log('MindBlockBuilder: No session yet, waiting for auth change...');
-                    }
-                } else {
-                    console.log('MindBlockBuilder: No current user');
-                }
-            } catch (e) {
-                console.error('MindBlockBuilder: Exception in init:', e);
-            }
-        };
-
-        if (!authLoading) {
-            init();
+        if (!authLoading && currentUser) {
+            fetchTemplates(currentUser.id);
         }
-
-        // Listen for auth changes to retry fetch if session was missing
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            console.log('MindBlockBuilder: Auth state change:', event, session ? 'Session present' : 'No session');
-            if (session && currentUser && mounted) {
-                fetchTemplates(currentUser.id);
-            }
-        });
 
         return () => {
             mounted = false;
-            subscription.unsubscribe();
         };
     }, [currentUser, authLoading]);
 
@@ -662,7 +627,7 @@ export default function MindBlockBuilder() {
     }, []);
 
     return (
-        <div className="flex h-full gap-6 relative">
+        <div className="flex h-full md:gap-6 relative flex-col md:flex-row">
             {/* Library Drawer (Left Side) */}
             <AnimatePresence>
                 {showLibrary && (
@@ -848,7 +813,7 @@ export default function MindBlockBuilder() {
             </AnimatePresence>
 
             {/* Main Builder Area */}
-            <div className="flex-1 flex flex-col h-full bg-[#FFF9F2] p-4 rounded-xl relative border border-[#EADBC8] shadow-sm z-10">
+            <div className="flex-1 flex flex-col h-full bg-[#FFF9F2] p-2 md:p-4 rounded-lg md:rounded-xl relative border-0 md:border border-[#EADBC8] shadow-sm z-10">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
                         <button
@@ -937,7 +902,7 @@ export default function MindBlockBuilder() {
                                                         {/* Color Strip */}
                                                         <div className={`w-2 flex-shrink-0 ${bgClass.replace('bg-', 'bg-').replace('50', '400')}`}></div>
 
-                                                        <div className="flex-1 p-4 flex items-center gap-4">
+                                                        <div className="flex-1 p-3 md:p-4 flex items-center gap-3 md:gap-4">
                                                             {/* Icon */}
                                                             <div className={`
                                                                 w-10 h-10 rounded-lg flex items-center justify-center text-xl shadow-inner
@@ -958,7 +923,7 @@ export default function MindBlockBuilder() {
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <h3 className="font-bold text-[#4B4036] truncate text-sm">
+                                                                <h3 className="font-bold text-[#4B4036] text-sm line-clamp-2 whitespace-normal break-words">
                                                                     {block.params.content || block.params.query || block.params.prompt || '點擊編輯內容...'}
                                                                 </h3>
                                                             </div>
@@ -1005,7 +970,7 @@ export default function MindBlockBuilder() {
                             animate={{ y: 0 }}
                             exit={{ y: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-[#EADBC8] z-50 max-h-[80%] flex flex-col"
+                            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-[#EADBC8] z-50 max-h-[90%] md:max-h-[80%] flex flex-col"
                         >
                             <div className="p-4 border-b border-[#EADBC8] flex items-center justify-between bg-[#FFF9F2]/50 rounded-t-2xl">
                                 <div className="flex items-center gap-3">
@@ -1090,7 +1055,7 @@ export default function MindBlockBuilder() {
                                 {/* Color Picker */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-[#4B4036]">外觀顏色</label>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         {COLOR_PALETTE.map(c => (
                                             <button
                                                 key={c.name}

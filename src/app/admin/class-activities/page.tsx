@@ -37,7 +37,6 @@ import BackButton from '@/components/ui/BackButton';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useContext } from 'react';
 import { TeacherLinkShellContext } from '@/app/aihome/teacher-link/create/TeacherLinkShell';
-import { useStudentsData } from '@/hooks/useStudentsData';
 
 interface Lesson {
   id: string;
@@ -365,8 +364,6 @@ const PLACEHOLDER_ORG_IDS = new Set([
   // 新增：顯示模式狀態（按學生 vs 按班別）
   const [displayMode, setDisplayMode] = useState<'student' | 'class'>('class');
   const [classGroups, setClassGroups] = useState<ClassGroup[]>([]);
-  const [loadingTimeslots, setLoadingTimeslots] = useState<Set<string>>(new Set());
-  const [loadedTimeslots, setLoadedTimeslots] = useState<Set<string>>(new Set());
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set()); // 預設為空 Set，即所有班級都收起
   const [expandedTimeSlots, setExpandedTimeSlots] = useState<Set<string>>(new Set()); // 預設為空 Set，即所有時段都收起（按學生模式）
   
@@ -484,13 +481,6 @@ const PLACEHOLDER_ORG_IDS = new Set([
   
   // 當前教師信息（用於鎖定教師選擇）- 使用 SaaS 用戶信息
   const { user: saasUser } = useSaasAuth();
-  
-  // 使用 SWR 缓存学生数据
-  const { data: studentsData, isLoading: studentsLoading } = useStudentsData(
-    validOrgId,
-    saasUser?.email || '',
-    'all' // 获取所有类型的学生
-  );
   const [currentTeacher, setCurrentTeacher] = useState<{
     id: string;
     teacher_fullname?: string;
@@ -829,38 +819,27 @@ const PLACEHOLDER_ORG_IDS = new Set([
           }
         });
       
-        // 使用缓存的学生数据（如果可用）
+        // 批量獲取所有學生數據（只調用一次API）
         let allStudentsData: any[] = [];
         if (validOrgId) {
-          if (studentsData.students.length > 0) {
-            // 使用缓存的数据
-            allStudentsData = studentsData.students;
-            console.log(`✅ 使用缓存的學生數據: ${allStudentsData.length} 個學生`);
-          } else if (!studentsLoading) {
-            // 如果缓存为空且不在加载中，尝试从 API 获取（作为后备）
-            try {
-              const session = getUserSession();
-              const userEmail = session?.email || null;
-              const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
-              
-              const response = await fetch(apiUrl, {
-                credentials: 'include',
-              });
-              
-              if (response.ok) {
-                const result = await response.json();
-                allStudentsData = result.students || result.data || [];
-                console.log(`✅ 後備載入學生數據: ${allStudentsData.length} 個學生`);
-              } else {
-                console.error('⚠️ 無法載入學生數據，API 返回錯誤:', response.status);
-              }
-            } catch (apiError) {
-              console.error('⚠️ 後備載入學生數據失敗:', apiError);
+          try {
+            const session = getUserSession();
+            const userEmail = session?.email || null;
+            const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+            
+            const response = await fetch(apiUrl, {
+              credentials: 'include',
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              allStudentsData = result.students || result.data || [];
+              console.log(`✅ 批量載入所有學生數據: ${allStudentsData.length} 個學生`);
+            } else {
+              console.error('⚠️ 無法載入學生數據，API 返回錯誤:', response.status);
             }
-          } else {
-            // 如果正在加载，等待加载完成
-            console.log('⏳ 等待學生數據載入...');
-            return;
+          } catch (apiError) {
+            console.error('⚠️ 批量載入學生數據失敗:', apiError);
           }
         }
         
@@ -942,159 +921,117 @@ const PLACEHOLDER_ORG_IDS = new Set([
           }
         }
         
-        // 按時間段分組，實現逐步載入
-        const timeslotGroups = new Map<string, any[]>();
-        schedulesToProcess.forEach((schedule: any) => {
-          const timeslot = schedule.timeslot || '';
-          if (!timeslotGroups.has(timeslot)) {
-            timeslotGroups.set(timeslot, []);
+        // 結合課程資料和學生資料
+        const groupsWithStudents: ClassGroup[] = schedulesToProcess.map((schedule: any, scheduleIndex: number) => {
+          // 找到該班級在選中日期的課程記錄
+          const matchedLessons = [
+            ...lessons.filter(lesson => 
+              lesson.lesson_date === dateStr && 
+              lesson.actual_timeslot === schedule.timeslot
+            ),
+            ...trialLessons.filter(lesson => 
+              lesson.lesson_date === dateStr && 
+              lesson.actual_timeslot === schedule.timeslot
+            )
+          ];
+          
+          // 從緩存中獲取老師信息
+          const teacherInfo = teacherInfoMap.get(schedule.id) || { teacherMainName: '', teacherAssistName: '' };
+          const teacherMainName = teacherInfo.teacherMainName;
+          const teacherAssistName = teacherInfo.teacherAssistName;
+          
+          // 從批量獲取的學生數據中過濾出該班級的學生
+          let assignedStudents: any[] = [];
+          if (schedule.assigned_student_ids && schedule.assigned_student_ids.length > 0) {
+            assignedStudents = allStudentsData.filter((s: any) => 
+              schedule.assigned_student_ids.includes(s.id)
+            );
           }
-          timeslotGroups.get(timeslot)!.push(schedule);
-        });
         
-        // 按時間段排序（早到晚）
-        const sortedTimeslots = Array.from(timeslotGroups.keys()).sort();
+          // 從批量獲取的試堂學生數據中過濾出該時段的試堂學生
+          const scheduleTimeslot = schedule.timeslot || '';
+          const isFirstClassInTimeslot = timeslotToFirstClass.get(scheduleTimeslot) === schedule.id;
         
-        // 逐步載入每個時間段的數據
-        const allGroups: ClassGroup[] = [];
-        
-        for (let i = 0; i < sortedTimeslots.length; i++) {
-          const timeslot = sortedTimeslots[i];
-          const schedulesForTimeslot = timeslotGroups.get(timeslot) || [];
-          
-          // 更新載入提示
-          setLoadingText(`載入 ${timeslot} 時段的班級資料... (${i + 1}/${sortedTimeslots.length})`);
-          
-          // 處理這個時間段的班級
-          const groupsForTimeslot: ClassGroup[] = schedulesForTimeslot.map((schedule: any) => {
-            // 找到該班級在選中日期的課程記錄
-            const matchedLessons = [
-              ...lessons.filter(lesson => 
-                lesson.lesson_date === dateStr && 
-                lesson.actual_timeslot === schedule.timeslot
-              ),
-              ...trialLessons.filter(lesson => 
-                lesson.lesson_date === dateStr && 
-                lesson.actual_timeslot === schedule.timeslot
-              )
-            ];
+          let trialStudents: any[] = [];
+          if (isFirstClassInTimeslot) {
+            const trialLessonsForThisSlot = trialLessons.filter(lesson => 
+              lesson.lesson_date === dateStr && 
+              lesson.actual_timeslot === scheduleTimeslot
+            );
             
-            // 從緩存中獲取老師信息
-            const teacherInfo = teacherInfoMap.get(schedule.id) || { teacherMainName: '', teacherAssistName: '' };
-            const teacherMainName = teacherInfo.teacherMainName;
-            const teacherAssistName = teacherInfo.teacherAssistName;
+            const trialStudentIds = trialLessonsForThisSlot.map(lesson => lesson.id);
             
-            // 從批量獲取的學生數據中過濾出該班級的學生
-            let assignedStudents: any[] = [];
-            if (schedule.assigned_student_ids && schedule.assigned_student_ids.length > 0) {
-              assignedStudents = allStudentsData.filter((s: any) => 
-                schedule.assigned_student_ids.includes(s.id)
+            if (trialStudentIds.length > 0) {
+              trialStudents = allTrialStudents.filter((s: any) => 
+                trialStudentIds.includes(s.id)
               );
             }
+          }
+        
+          // 合併常規學生和試堂學生，去除重複（根據 ID 和名字）
+          const allStudents: any[] = [];
+          const seenIds = new Set<string>();
+          const seenNames = new Set<string>();
           
-            // 從批量獲取的試堂學生數據中過濾出該時段的試堂學生
-            const scheduleTimeslot = schedule.timeslot || '';
-            const isFirstClassInTimeslot = timeslotToFirstClass.get(scheduleTimeslot) === schedule.id;
-          
-            let trialStudents: any[] = [];
-            if (isFirstClassInTimeslot) {
-              const trialLessonsForThisSlot = trialLessons.filter(lesson => 
-                lesson.lesson_date === dateStr && 
-                lesson.actual_timeslot === scheduleTimeslot
-              );
-              
-              const trialStudentIds = trialLessonsForThisSlot.map(lesson => lesson.id);
-              
-              if (trialStudentIds.length > 0) {
-                trialStudents = allTrialStudents.filter((s: any) => 
-                  trialStudentIds.includes(s.id)
-                );
-              }
+          // 先添加常規學生
+          assignedStudents.forEach(student => {
+            if (!seenIds.has(student.id) && !seenNames.has(student.full_name)) {
+              allStudents.push(student);
+              seenIds.add(student.id);
+              seenNames.add(student.full_name);
             }
-          
-            // 合併常規學生和試堂學生，去除重複（根據 ID 和名字）
-            const allStudents: any[] = [];
-            const seenIds = new Set<string>();
-            const seenNames = new Set<string>();
-            
-            // 先添加常規學生
-            assignedStudents.forEach(student => {
-              if (!seenIds.has(student.id) && !seenNames.has(student.full_name)) {
-                allStudents.push(student);
-                seenIds.add(student.id);
-                seenNames.add(student.full_name);
-              }
-            });
-            
-            // 再添加試堂學生（避免重複）
-            trialStudents.forEach(student => {
-              if (!seenIds.has(student.id) && !seenNames.has(student.full_name)) {
-                allStudents.push(student);
-                seenIds.add(student.id);
-                seenNames.add(student.full_name);
-              }
-            });
-
-            // 為每個學生添加出席狀態標記和課程記錄
-            const students = allStudents.map(student => {
-              // 檢查該學生是否有出席記錄
-              const hasAttendance = matchedLessons.some(lesson => {
-                const lessonStudentId = 'student_id' in lesson ? lesson.student_id : student.id;
-                return lessonStudentId === student.id;
-              });
-              
-              // 獲取該學生的課程記錄
-              const lessonData = matchedLessons.find(lesson => {
-                const lessonStudentId = 'student_id' in lesson ? lesson.student_id : student.id;
-                return lessonStudentId === student.id;
-              });
-
-              return {
-                ...student,
-                hasAttendance,
-                lessonData
-              };
-            });
-          
-            return {
-              id: schedule.id,
-              course_code: schedule.course_code || '未設定',
-              course_section: schedule.course_section || 'A',
-              course_type: schedule.course_type || '未設定',
-              weekday: schedule.weekday,
-              timeslot: schedule.timeslot || '',
-              max_students: schedule.max_students || 0,
-              assigned_teachers: schedule.assigned_teachers || '未分配',
-              assigned_student_ids: schedule.assigned_student_ids || [],
-              room_id: schedule.room_id || '未設定',
-              lessons: matchedLessons,
-              students: students,
-              teacher_main_name: teacherMainName,
-              teacher_assist_name: teacherAssistName
-            };
           });
           
-          // 將這個時間段的班級添加到總列表
-          allGroups.push(...groupsForTimeslot);
-          
-          // 立即更新狀態，顯示已載入的時間段（讓用戶看到進度）
-          setClassGroups([...allGroups]);
-          setLoadedTimeslots(prev => new Set(prev).add(timeslot));
-          
-          // 添加小延遲，讓用戶看到進度（如果不是最後一個時間段）
-          // 使用 requestAnimationFrame 確保 UI 更新後再繼續
-          if (i < sortedTimeslots.length - 1) {
-            await new Promise(resolve => {
-              requestAnimationFrame(() => {
-                setTimeout(resolve, 50); // 50ms 延遲，讓用戶看到進度
-              });
+          // 再添加試堂學生（避免重複）
+          trialStudents.forEach(student => {
+            if (!seenIds.has(student.id) && !seenNames.has(student.full_name)) {
+              allStudents.push(student);
+              seenIds.add(student.id);
+              seenNames.add(student.full_name);
+            }
+          });
+
+          // 為每個學生添加出席狀態標記和課程記錄
+          const students = allStudents.map(student => {
+            // 檢查該學生是否有出席記錄
+            const hasAttendance = matchedLessons.some(lesson => {
+              const lessonStudentId = 'student_id' in lesson ? lesson.student_id : student.id;
+              return lessonStudentId === student.id;
             });
-          }
-        }
+            
+            // 獲取該學生的課程記錄
+            const lessonData = matchedLessons.find(lesson => {
+              const lessonStudentId = 'student_id' in lesson ? lesson.student_id : student.id;
+              return lessonStudentId === student.id;
+            });
+
+            return {
+              ...student,
+              hasAttendance,
+              lessonData
+            };
+          });
         
-        setLoadingText('');
-        setLoading(false); // 確保載入完成後關閉載入狀態
-        console.log('處理後的班別資料:', allGroups);
+          return {
+            id: schedule.id,
+            course_code: schedule.course_code || '未設定',
+            course_section: schedule.course_section || 'A',
+            course_type: schedule.course_type || '未設定',
+            weekday: schedule.weekday,
+            timeslot: schedule.timeslot || '',
+            max_students: schedule.max_students || 0,
+            assigned_teachers: schedule.assigned_teachers || '未分配',
+            assigned_student_ids: schedule.assigned_student_ids || [],
+            room_id: schedule.room_id || '未設定',
+            lessons: matchedLessons,
+            students: students,
+            teacher_main_name: teacherMainName,
+            teacher_assist_name: teacherAssistName
+          };
+        });
+      
+      setClassGroups(groupsWithStudents);
+      console.log('處理後的班別資料:', groupsWithStudents);
       
     } catch (error) {
       console.error('載入班別資料失敗:', error);
@@ -1278,23 +1215,22 @@ const PLACEHOLDER_ORG_IDS = new Set([
         throw new Error(result.error || '載入課堂資料失敗');
       }
       
-      const resultData = result.data;
-      console.log('API 返回的資料:', resultData);
-      console.log('試堂學生資料:', resultData.trialLessons);
+      console.log('API 返回的資料:', result.data);
+      console.log('試堂學生資料:', result.data.trialLessons);
       
       // 儲存到快取
       setLoadingText('處理資料中...');
-      setDataCache(prev => new Map(prev).set(cacheKey, resultData));
+      setDataCache(prev => new Map(prev).set(cacheKey, result.data));
       
-      // 如果是多選模式，需要過濾出只屬於選中日期的課程
-      if (selectedDates.length > 1) {
-        const selectedDateStrings = selectedDates.map(date => formatLocalDateInLoad(date));
+              // 如果是多選模式，需要過濾出只屬於選中日期的課程
+        if (selectedDates.length > 1) {
+          const selectedDateStrings = selectedDates.map(date => formatLocalDateInLoad(date));
         
-        const filteredLessons = (resultData.lessons || []).filter((lesson: Lesson) => 
+        const filteredLessons = (result.data.lessons || []).filter((lesson: Lesson) => 
           selectedDateStrings.includes(lesson.lesson_date)
         );
         
-        const filteredTrialLessons = (resultData.trialLessons || []).filter((trial: TrialLesson) => 
+        const filteredTrialLessons = (result.data.trialLessons || []).filter((trial: TrialLesson) => 
           selectedDateStrings.includes(trial.lesson_date)
         );
         
@@ -1304,93 +1240,68 @@ const PLACEHOLDER_ORG_IDS = new Set([
         setLessons(filteredLessons);
         setTrialLessons(filteredTrialLessons);
       } else {
-        setLessons(resultData.lessons || []);
-        setTrialLessons(resultData.trialLessons || []);
+        setLessons(result.data.lessons || []);
+        setTrialLessons(result.data.trialLessons || []);
       }
       
       // 成長樹活動延遲載入
       setTreeActivities([]);
-      setAssignedActivities(resultData.assignedActivities || []);
+      setAssignedActivities(result.data.assignedActivities || []);
       
-      // 載入學生關注狀態（使用缓存的学生数据）
+      // 載入學生關注狀態
       try {
         const allStudentIds = [
-          ...(resultData.lessons || []).map((lesson: any) => lesson.student_id),
-          ...(resultData.trialLessons || []).map((lesson: any) => lesson.student_id)
+          ...(result.data.lessons || []).map((lesson: any) => lesson.student_id),
+          ...(result.data.trialLessons || []).map((lesson: any) => lesson.student_id)
         ];
         
-          if (allStudentIds.length > 0 && validOrgId) {
-          // 使用缓存的学生数据获取关注状态
-          const allStudents = studentsData.students || [];
+        if (allStudentIds.length > 0 && validOrgId) {
+          // 使用 API 端點獲取學生關注狀態
+          const session = getUserSession();
+          const userEmail = session?.email || null;
           
-          // 過濾出相關學生並建立關注狀態映射
-          const careAlertMap: Record<string, boolean> = {};
-          const filteredIds = new Set(allStudentIds.filter((id): id is string => id !== null));
+          const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
           
-          allStudents.forEach((student: any) => {
-            if (filteredIds.has(student.id)) {
-              careAlertMap[student.id] = student.care_alert || false;
-            }
+          const response = await fetch(apiUrl, {
+            credentials: 'include',
           });
           
-          setStudentCareAlertStatus(careAlertMap);
-          console.log('通過緩存載入學生關注狀態成功:', Object.keys(careAlertMap).length);
-          
-          // 如果缓存中没有数据，使用 API 作为后备
-          if (allStudents.length === 0 && !studentsLoading) {
-            console.log('緩存為空，使用 API 載入學生關注狀態...');
-            try {
-              const session = getUserSession();
-              const userEmail = session?.email || null;
-              
-              const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
-              
-              const response = await fetch(apiUrl, {
-                credentials: 'include',
-              });
-              
-              if (response.ok) {
-                const apiResult = await response.json();
-                const apiStudents = apiResult.students || apiResult.data || [];
-                
-                apiStudents.forEach((student: any) => {
-                  if (filteredIds.has(student.id)) {
-                    careAlertMap[student.id] = student.care_alert || false;
-                  }
-                });
-                
-                setStudentCareAlertStatus(careAlertMap);
-                console.log('通過 API 載入學生關注狀態成功:', Object.keys(careAlertMap).length);
-              } else {
-                console.error('⚠️ 無法載入學生關注狀態，API 返回錯誤:', response.status);
+          if (response.ok) {
+            const apiResult = await response.json();
+            const allStudents = apiResult.students || apiResult.data || [];
+            
+            // 過濾出相關學生並建立關注狀態映射
+            const careAlertMap: Record<string, boolean> = {};
+            const filteredIds = new Set(allStudentIds.filter((id): id is string => id !== null));
+            
+            allStudents.forEach((student: any) => {
+              if (filteredIds.has(student.id)) {
+                careAlertMap[student.id] = student.care_alert || false;
               }
-            } catch (apiError) {
-              console.error('⚠️ API 載入學生關注狀態失敗:', apiError);
+            });
+            
+            setStudentCareAlertStatus(careAlertMap);
+            console.log('通過 API 載入學生關注狀態成功:', Object.keys(careAlertMap).length);
+          } else {
+            console.error('⚠️ 無法載入學生關注狀態，API 返回錯誤:', response.status);
+            // Fallback 到直接查詢
+            let studentCareQuery = supabase
+              .from('Hanami_Students')
+              .select('id, care_alert')
+              .in('id', allStudentIds.filter((id): id is string => id !== null));
+
+            if (validOrgId) {
+              studentCareQuery = studentCareQuery.eq('org_id', validOrgId);
             }
-          }
-          
-          // Fallback 到直接查詢（如果缓存和 API 都失败）
-          if (Object.keys(careAlertMap).length === 0) {
-            try {
-              let studentCareQuery = supabase
-                .from('Hanami_Students')
-                .select('id, care_alert')
-                .in('id', allStudentIds.filter((id): id is string => id !== null));
 
-              if (validOrgId) {
-                studentCareQuery = studentCareQuery.eq('org_id', validOrgId);
-              }
-
-              const { data: studentCareData, error: studentsError } = await studentCareQuery;
-              
-              if (!studentsError && studentCareData) {
-                studentCareData.forEach((student: any) => {
-                  careAlertMap[student.id] = student.care_alert || false;
-                });
-                setStudentCareAlertStatus(careAlertMap);
-              }
-            } catch (queryError) {
-              console.error('⚠️ 直接查詢學生關注狀態失敗:', queryError);
+            const { data: studentsData, error: studentsError } = await studentCareQuery;
+            
+            if (!studentsError && studentsData) {
+              const careAlertMap: Record<string, boolean> = {};
+              studentsData.forEach((student: any) => {
+                careAlertMap[student.id] = student.care_alert || false;
+              });
+              setStudentCareAlertStatus(careAlertMap);
             }
           }
         }
@@ -1399,8 +1310,8 @@ const PLACEHOLDER_ORG_IDS = new Set([
       }
       
       // 如果有課程資料，延遲載入成長樹活動
-      if ((resultData.lessons && resultData.lessons.length > 0) || 
-          (resultData.trialLessons && resultData.trialLessons.length > 0)) {
+      if ((result.data.lessons && result.data.lessons.length > 0) || 
+          (result.data.trialLessons && result.data.trialLessons.length > 0)) {
         setTimeout(async () => {
           try {
             setLoadingText('載入活動資料中...');
@@ -3932,7 +3843,7 @@ const PLACEHOLDER_ORG_IDS = new Set([
           ) : (
             // 按班別顯示模式
             <>
-              {classGroups.length === 0 && loading ? (
+              {classGroups.length === 0 ? (
                 <div className="bg-gradient-to-br from-hanami-primary/10 to-hanami-accent/10 backdrop-blur-sm rounded-xl sm:rounded-2xl p-6 sm:p-8 md:p-12 text-center border border-hanami-primary/20 shadow-lg">
                   <div className="animate-bounce mb-3 sm:mb-4">
                     <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gradient-to-br from-hanami-primary to-hanami-accent rounded-full mx-auto flex items-center justify-center">

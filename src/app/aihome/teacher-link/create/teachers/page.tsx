@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutGrid, List, Search, User, Mail, Phone, DollarSign, Filter, X, Link2, RefreshCw, Unlink, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { PopupSelect } from '@/components/ui/PopupSelect';
@@ -13,56 +13,90 @@ import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShel
 import toast from 'react-hot-toast';
 import TeacherManagementNavBar from '@/components/ui/TeacherManagementNavBar';
 import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
-import { useTeachersData } from '@/hooks/useTeachersData';
-import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 
 function TeachersContent() {
   const { orgId, organizationResolved } = useTeacherLinkOrganization();
-  const { data: teachersData, isLoading, mutate } = useTeachersData(orgId);
-  const { teachers, roles: roleOptions } = teachersData;
-  
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [tempRole, setTempRole] = useState(filterRole);
   const [filterStatus, setFilterStatus] = useState('');
   const [tempStatus, setTempStatus] = useState(filterStatus);
+  const [loading, setLoading] = useState(true);
   const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [roleOptions, setRoleOptions] = useState<string[]>([]);
   const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
   const [linkStatuses, setLinkStatuses] = useState<Record<string, any>>({});
   const [syncingTeachers, setSyncingTeachers] = useState<Set<string>>(new Set());
   const router = useRouter();
 
-  // 載入每個老師的鏈接狀態（優化：並行加載）
+  useEffect(() => {
+    if (!organizationResolved) return;
+
+    const fetchTeachers = async () => {
+      setLoading(true);
+      let query = supabase.from('hanami_employee').select('*');
+
+      if (orgId) {
+        query = query.eq('org_id', orgId);
+      }
+
+      const { data, error } = await query;
+      if (!error) setTeachers(data || []);
+      setLoading(false);
+    };
+
+    const fetchRoles = async () => {
+      let query = (supabase
+        .from('hanami_employee') as any)
+        .select('teacher_role')
+        .not('teacher_role', 'is', null);
+
+      if (orgId) {
+        query = query.eq('org_id', orgId);
+      }
+
+      const { data, error } = await query;
+      if (!error && data) {
+        const roleMap = new Map<string, string>();
+        data.forEach((r: any) => {
+          const raw = r.teacher_role;
+          const normalized = raw?.trim().toLowerCase();
+          if (normalized && !roleMap.has(normalized)) {
+            if (raw) {
+              roleMap.set(normalized, raw.trim());
+            }
+          }
+        });
+        setRoleOptions(Array.from(roleMap.values()));
+      }
+    };
+
+    fetchTeachers();
+    fetchRoles();
+  }, [orgId, organizationResolved]);
+
+  // 載入每個老師的鏈接狀態
   useEffect(() => {
     if (!orgId || !organizationResolved || teachers.length === 0) return;
 
     const loadLinkStatuses = async () => {
-      // 並行加載所有老師的鏈接狀態
-      const statusPromises = teachers.map(async (teacher) => {
+      const statuses: Record<string, any> = {};
+      for (const teacher of teachers) {
         try {
           const response = await fetch(
             `/api/members/link-teacher?teacherId=${encodeURIComponent(teacher.id)}&orgId=${encodeURIComponent(orgId)}`
           );
           const result = await response.json();
           if (result.success && result.linked) {
-            return { id: teacher.id, data: result.data };
+            statuses[teacher.id] = result.data;
           }
-          return null;
         } catch (error) {
           console.error(`載入老師 ${teacher.id} 的鏈接狀態失敗:`, error);
-          return null;
         }
-      });
-
-      const results = await Promise.all(statusPromises);
-      const statuses: Record<string, any> = {};
-      results.forEach((result) => {
-        if (result) {
-          statuses[result.id] = result.data;
-        }
-      });
+      }
       setLinkStatuses(statuses);
     };
 
@@ -92,8 +126,14 @@ function TeachersContent() {
 
       if (result.success) {
         toast.success(result.message || '同步成功');
-        // 使用 SWR 的 mutate 重新載入老師資料
-        await mutate();
+        // 重新載入老師資料
+        const { data, error } = await supabase
+          .from('hanami_employee')
+          .select('*')
+          .eq('org_id', orgId);
+        if (!error && data) {
+          setTeachers(data);
+        }
         // 重新載入鏈接狀態
         const statusResponse = await fetch(
           `/api/members/link-teacher?teacherId=${encodeURIComponent(teacherId)}&orgId=${encodeURIComponent(orgId)}`
@@ -120,8 +160,7 @@ function TeachersContent() {
     }
   };
 
-  // 使用 useMemo 优化过滤计算
-  const filteredTeachers = useMemo(() => teachers.filter((teacher) => {
+  const filteredTeachers = teachers.filter((teacher) => {
     const nameMatch = teacher.teacher_fullname?.includes(searchTerm.trim()) || teacher.teacher_nickname?.includes(searchTerm.trim());
     const roleMatch = filterRole
       ? teacher.teacher_role?.trim().toLowerCase() === filterRole.trim().toLowerCase()
@@ -130,7 +169,7 @@ function TeachersContent() {
       ? teacher.teacher_status?.trim().toLowerCase() === filterStatus.trim().toLowerCase()
       : true;
     return nameMatch && roleMatch && statusMatch;
-  }), [teachers, searchTerm, filterRole, filterStatus]);
+  });
 
   const toggleTeacher = (id: string) => {
     setSelectedTeachers(prev =>
@@ -342,8 +381,15 @@ function TeachersContent() {
         </motion.div>
 
         {/* 老師列表 */}
-        {isLoading ? (
-          <CuteLoadingSpinner message="正在載入老師資料..." className="h-full min-h-[400px] p-8" />
+        {loading ? (
+          <div className="text-center py-12">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              className="w-8 h-8 border-2 border-[#FFD59A] border-t-transparent rounded-full mx-auto mb-4"
+            />
+            <p className="text-[#2B3A3B]">正在載入老師資料...</p>
+          </div>
         ) : displayMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <AnimatePresence>

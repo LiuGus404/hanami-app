@@ -20,7 +20,6 @@ import {
   type OrganizationProfile,
 } from '@/lib/authUtils';
 import { resolveUserOrganization, getUserOrganizations, type UserOrganizationIdentity } from '@/lib/organizationUtils';
-import { useUserOrganizations } from '@/hooks/useUserOrganizations';
 import { supabase } from '@/lib/supabase';
 import { CreateOrganizationPanel } from './CreateOrganizationPanel';
 import { OrganizationSelectorPanel } from './OrganizationSelectorPanel';
@@ -90,11 +89,6 @@ export function TeacherLinkShell({
   const [organization, setOrganization] =
     useState<OrganizationProfile>(UNASSIGNED_ORG);
   const [organizationResolved, setOrganizationResolved] = useState(false);
-  // 使用 SWR 缓存用户机构列表
-  const { organizations: cachedUserOrganizations, isLoading: orgsLoading, mutate: mutateOrgs } = useUserOrganizations(
-    saasUser?.id || null,
-    saasUser?.email || null
-  );
   const [userOrganizations, setUserOrganizations] = useState<UserOrganizationIdentity[]>([]);
   const [showOrganizationSelector, setShowOrganizationSelector] = useState(false);
   const [showOnboardingPage, setShowOnboardingPage] = useState(false);
@@ -139,8 +133,8 @@ export function TeacherLinkShell({
       lastResolvedPath: lastResolvedPathRef.current,
     });
 
-    if (authLoading || orgsLoading) {
-      console.log('TeacherLinkShell: 認證或機構載入中，等待...', { authLoading, orgsLoading });
+    if (authLoading) {
+      console.log('TeacherLinkShell: 認證載入中，等待...');
       return;
     }
 
@@ -231,39 +225,35 @@ export function TeacherLinkShell({
       }
 
       try {
-        // 使用缓存的机构列表（如果可用）
+        // 獲取用戶所有機構身份（即使 allowOrgData 為 false 也獲取，用於顯示選擇面板）
+        console.log('TeacherLinkShell: 開始獲取機構身份...', {
+          userId: saasUser.id,
+          userEmail: saasUser.email,
+          allowOrgData,
+        });
+        
+        // 使用 API 端點查詢機構列表，繞過 RLS 問題
         let allOrgs: UserOrganizationIdentity[] = [];
-        
-        if (cachedUserOrganizations.length > 0) {
-          // 使用缓存的数据
-          allOrgs = cachedUserOrganizations;
-          console.log('TeacherLinkShell: 使用缓存的機構身份數量:', allOrgs.length, allOrgs);
-        } else if (!orgsLoading) {
-          // 如果缓存为空且不在加载中，尝试刷新
-          console.log('TeacherLinkShell: 缓存为空，刷新機構身份...');
-          await mutateOrgs();
-          allOrgs = cachedUserOrganizations;
-        } else {
-          // 如果正在加载，等待加载完成
-          console.log('TeacherLinkShell: 等待機構身份載入...');
-          return;
-        }
-        
-        // 如果仍然没有数据，回退到直接查询（作为后备方案）
-        if (allOrgs.length === 0 && !orgsLoading) {
-          console.log('TeacherLinkShell: 缓存为空，使用后备查询...');
-          try {
+        try {
+          const response = await fetch(
+            `/api/organizations/user-organizations?userId=${encodeURIComponent(saasUser.id)}&userEmail=${encodeURIComponent(saasUser.email)}`
+          );
+          if (response.ok) {
+            const result = await response.json();
+            allOrgs = result.data || [];
+            console.log('TeacherLinkShell: API 返回的機構身份數量:', allOrgs.length, allOrgs);
+          } else {
+            console.error('TeacherLinkShell: API 查詢失敗', response.status, await response.text());
+            // 如果 API 失敗，回退到直接查詢（可能會有 RLS 問題）
             allOrgs = await getUserOrganizations(supabase, saasUser.id, saasUser.email);
-            // 更新缓存
-            if (allOrgs.length > 0) {
-              mutateOrgs(allOrgs, false);
-            }
-          } catch (error) {
-            console.error('TeacherLinkShell: 后备查询失败', error);
           }
+        } catch (apiError) {
+          console.error('TeacherLinkShell: API 查詢異常', apiError);
+          // 如果 API 失敗，回退到直接查詢（可能會有 RLS 問題）
+          allOrgs = await getUserOrganizations(supabase, saasUser.id, saasUser.email);
         }
         
-        console.log('TeacherLinkShell: 最終獲取的機構身份數量:', allOrgs.length, allOrgs);
+        console.log('TeacherLinkShell: 獲取的機構身份數量:', allOrgs.length, allOrgs);
         setUserOrganizations(allOrgs);
 
         // 如果有機構身份，檢查是否需要跳轉到選擇機構頁面
