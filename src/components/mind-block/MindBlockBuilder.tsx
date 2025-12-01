@@ -91,11 +91,18 @@ export default function MindBlockBuilder() {
     const [showPreview, setShowPreview] = useState(true);
     const [showLibrary, setShowLibrary] = useState(false);
     const [compiledPrompt, setCompiledPrompt] = useState('');
+    const [isSavingComposition, setIsSavingComposition] = useState(false);
+    const [compositionMetadata, setCompositionMetadata] = useState({
+        title: '我的思維積木',
+        description: '',
+        isPublic: false
+    });
 
     // Custom Types State
     const [customTypes, setCustomTypes] = useState<any[]>([]);
     const [isCreatingType, setIsCreatingType] = useState(false);
     const [newTypeData, setNewTypeData] = useState({ name: '', color: 'text-gray-500', bg: 'bg-gray-50' });
+    const [templateDescription, setTemplateDescription] = useState('');
 
     // Saved Templates State
     const [savedTemplates, setSavedTemplates] = useState<(MindBlockNode & { isPublic?: boolean })[]>([]);
@@ -133,7 +140,8 @@ export default function MindBlockBuilder() {
                         label: item.title,
                         customColor: item.color === '#FFD59A' ? undefined : item.color
                     },
-                    isPublic: item.is_public
+                    isPublic: item.is_public,
+                    description: item.description // Load description
                 }));
                 setSavedTemplates(loadedTemplates);
             }
@@ -454,6 +462,7 @@ export default function MindBlockBuilder() {
         setEditingBlockId(newBlock.id);
         setEditingTemplateId(template.id); // Track the original template ID (UUID)
         setSavePrivacy((template as any).isPublic ? 'public' : 'private');
+        setTemplateDescription((template as any).description || ''); // Load description
         setShowLibrary(false); // Close library to focus on editor
     };
 
@@ -537,7 +546,7 @@ export default function MindBlockBuilder() {
             const payload = {
                 user_id: currentUser.id,
                 title: label,
-                description: editingBlock.params.content?.substring(0, 100) || '',
+                description: templateDescription, // Use user input description
                 color: editingBlock.params.customColor || '#FFD59A',
                 content_json: editingBlock, // Store full block structure
                 block_type: editingBlock.type,
@@ -580,32 +589,46 @@ export default function MindBlockBuilder() {
             return;
         }
 
-        // 如果正在編輯現有積木，使用現有標題，否則提示輸入
-        let name: string;
         if (editingTemplateId) {
-            // 從數據庫獲取現有標題
+            // 從數據庫獲取現有標題和描述
             const { data } = await supabase
                 .from('mind_blocks' as any)
-                .select('title')
+                .select('title, description, is_public')
                 .eq('id', editingTemplateId)
                 .single();
-            name = (data as any)?.title || '我的思維積木';
+
+            if (data) {
+                setCompositionMetadata({
+                    title: (data as any).title || '我的思維積木',
+                    description: (data as any).description || '',
+                    isPublic: (data as any).is_public || false
+                });
+            }
         } else {
-            const inputName = prompt('請為此思維積木組合命名：', '我的思維積木');
-            if (!inputName) return;
-            name = inputName;
+            setCompositionMetadata({
+                title: '我的思維積木',
+                description: '',
+                isPublic: false
+            });
         }
 
-        const isPublic = savePrivacy === 'public';
+        setIsSavingComposition(true);
+    };
+
+    const confirmSaveComposition = async () => {
+        if (!compositionMetadata.title.trim()) {
+            alert('請輸入標題');
+            return;
+        }
 
         try {
             const payload = {
-                user_id: currentUser.id,
-                title: name,
-                description: compiledPrompt.substring(0, 100) + '...',
+                user_id: currentUser!.id,
+                title: compositionMetadata.title,
+                description: compositionMetadata.description,
                 content_json: { blocks }, // Store the array of blocks
                 is_template: false, // This is a composition, not a single block template
-                is_public: isPublic,
+                is_public: compositionMetadata.isPublic,
                 category: 'Composition',
                 updated_at: new Date().toISOString()
             };
@@ -633,7 +656,7 @@ export default function MindBlockBuilder() {
                 alert(editingTemplateId ? '思維積木組合已更新！' : '思維積木組合已儲存！');
                 // 清除編輯狀態
                 setEditingTemplateId(null);
-                setSavePrivacy('private');
+                setIsSavingComposition(false);
             }
         } catch (e) {
             console.error('Exception saving composition:', e);
@@ -886,23 +909,21 @@ export default function MindBlockBuilder() {
                                 </span>
                                 <button
                                     onClick={() => setSavePrivacy(savePrivacy === 'private' ? 'public' : 'private')}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2 ${
-                                        savePrivacy === 'public' 
-                                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A]' 
-                                            : 'bg-[#EADBC8]'
-                                    }`}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2 ${savePrivacy === 'public'
+                                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A]'
+                                        : 'bg-[#EADBC8]'
+                                        }`}
                                     role="switch"
                                     aria-checked={savePrivacy === 'public'}
                                 >
                                     <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                                            savePrivacy === 'public' ? 'translate-x-6' : 'translate-x-1'
-                                        }`}
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${savePrivacy === 'public' ? 'translate-x-6' : 'translate-x-1'
+                                            }`}
                                     />
                                 </button>
                             </div>
                         )}
-                        
+
                         <div className="flex space-x-2">
                             <button
                                 onClick={() => setShowPreview(!showPreview)}
@@ -1194,6 +1215,17 @@ export default function MindBlockBuilder() {
                                                 <button onClick={() => setIsSavingTemplate(false)} className="text-[#4B4036]/40 hover:text-[#4B4036]">
                                                     <XMarkIcon className="w-5 h-5" />
                                                 </button>
+                                            </div>
+
+                                            {/* Description Input for Template */}
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-bold text-[#4B4036]">描述</label>
+                                                <textarea
+                                                    value={templateDescription}
+                                                    onChange={(e) => setTemplateDescription(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-white border border-[#EADBC8] rounded-lg focus:border-[#FFD59A] focus:ring-0 text-[#4B4036] text-sm min-h-[60px] resize-none"
+                                                    placeholder="輸入描述..."
+                                                />
                                             </div>
 
                                             <div className="flex gap-2">

@@ -27,12 +27,14 @@ import {
     ChevronDownIcon,
     ChevronUpIcon,
     PencilIcon,
-    CheckIcon
+    CheckIcon,
+    UserGroupIcon
 } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { getSaasSupabaseClient } from '@/lib/supabase';
-import { MindBlockType } from '@/types/mind-block';
+import { MindBlockType, MindBlock } from '@/types/mind-block';
+import MindBlockDetailModal from '@/components/mind-block/MindBlockDetailModal';
 
 export default function MyMindLibraryPage() {
     const router = useRouter();
@@ -51,6 +53,8 @@ export default function MyMindLibraryPage() {
     const [editingItem, setEditingItem] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState('');
     const [editDescription, setEditDescription] = useState('');
+    const [selectedBlock, setSelectedBlock] = useState<MindBlock | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
     // 積木類型標籤映射
     const blockTypeLabels: Record<MindBlockType, string> = {
@@ -67,59 +71,59 @@ export default function MyMindLibraryPage() {
 
     // 積木類型圖標和顏色配置
     const blockTypeConfig: Record<string, { icon: any; color: string; bg: string; borderColor: string }> = {
-        'role': { 
-            icon: UserIcon, 
-            color: 'text-purple-600', 
-            bg: 'bg-purple-100', 
-            borderColor: 'border-purple-300' 
+        'role': {
+            icon: UserIcon,
+            color: 'text-purple-600',
+            bg: 'bg-purple-100',
+            borderColor: 'border-purple-300'
         },
-        'style': { 
-            icon: PaintBrushIcon, 
-            color: 'text-pink-600', 
-            bg: 'bg-pink-100', 
-            borderColor: 'border-pink-300' 
+        'style': {
+            icon: PaintBrushIcon,
+            color: 'text-pink-600',
+            bg: 'bg-pink-100',
+            borderColor: 'border-pink-300'
         },
-        'context': { 
-            icon: DocumentTextIcon, 
-            color: 'text-blue-600', 
-            bg: 'bg-blue-100', 
-            borderColor: 'border-blue-300' 
+        'context': {
+            icon: DocumentTextIcon,
+            color: 'text-blue-600',
+            bg: 'bg-blue-100',
+            borderColor: 'border-blue-300'
         },
-        'rule': { 
-            icon: ExclamationTriangleIcon, 
-            color: 'text-red-600', 
-            bg: 'bg-red-100', 
-            borderColor: 'border-red-300' 
+        'rule': {
+            icon: ExclamationTriangleIcon,
+            color: 'text-red-600',
+            bg: 'bg-red-100',
+            borderColor: 'border-red-300'
         },
-        'task': { 
-            icon: CubeIcon, 
-            color: 'text-amber-600', 
-            bg: 'bg-amber-100', 
-            borderColor: 'border-amber-300' 
+        'task': {
+            icon: CubeIcon,
+            color: 'text-amber-600',
+            bg: 'bg-amber-100',
+            borderColor: 'border-amber-300'
         },
-        'search': { 
-            icon: MagnifyingGlassIcon, 
-            color: 'text-cyan-600', 
-            bg: 'bg-cyan-100', 
-            borderColor: 'border-cyan-300' 
+        'search': {
+            icon: MagnifyingGlassIcon,
+            color: 'text-cyan-600',
+            bg: 'bg-cyan-100',
+            borderColor: 'border-cyan-300'
         },
-        'reason': { 
-            icon: LightBulbIcon, 
-            color: 'text-yellow-600', 
-            bg: 'bg-yellow-100', 
-            borderColor: 'border-yellow-300' 
+        'reason': {
+            icon: LightBulbIcon,
+            color: 'text-yellow-600',
+            bg: 'bg-yellow-100',
+            borderColor: 'border-yellow-300'
         },
-        'variable': { 
-            icon: PuzzlePieceIcon, 
-            color: 'text-indigo-600', 
-            bg: 'bg-indigo-100', 
-            borderColor: 'border-indigo-300' 
+        'variable': {
+            icon: PuzzlePieceIcon,
+            color: 'text-indigo-600',
+            bg: 'bg-indigo-100',
+            borderColor: 'border-indigo-300'
         },
-        'output': { 
-            icon: SparklesIcon, 
-            color: 'text-emerald-600', 
-            bg: 'bg-emerald-100', 
-            borderColor: 'border-emerald-300' 
+        'output': {
+            icon: SparklesIcon,
+            color: 'text-emerald-600',
+            bg: 'bg-emerald-100',
+            borderColor: 'border-emerald-300'
         }
     };
 
@@ -258,11 +262,11 @@ export default function MyMindLibraryPage() {
         } else {
             // 更新本地狀態
             if (activeTab === 'composition') {
-                setMyCompositions(myCompositions.map(c => 
+                setMyCompositions(myCompositions.map(c =>
                     c.id === item.id ? { ...c, title: editTitle.trim() } : c
                 ));
             } else {
-                setMyBlocks(myBlocks.map(b => 
+                setMyBlocks(myBlocks.map(b =>
                     b.id === item.id ? { ...b, title: editTitle.trim(), description: editDescription.trim() || null } : b
                 ));
             }
@@ -270,6 +274,17 @@ export default function MyMindLibraryPage() {
             setEditTitle('');
             setEditDescription('');
         }
+    };
+
+    const handleOpenDetail = (item: any) => {
+        // Convert item to MindBlock format if needed, or just pass it if compatible
+        // The item structure from DB should be compatible with MindBlock interface
+        setSelectedBlock(item);
+        setIsDetailModalOpen(true);
+    };
+
+    const handleLoadBlock = (block: MindBlock) => {
+        router.push(`/aihome/mind-builder?compositionId=${block.id}`);
     };
 
     const filteredCompositions = myCompositions.filter(comp =>
@@ -450,9 +465,35 @@ export default function MyMindLibraryPage() {
 
                 {/* Header Section */}
                 <div className="mb-10 text-center">
-                    <h1 className="text-4xl font-extrabold text-[#4B4036] mb-3 tracking-tight">
-                        我的積木庫
-                    </h1>
+                    {/* Tab Switch */}
+                    <div className="flex justify-center mb-6">
+                        <div className="inline-flex bg-white/80 backdrop-blur-sm p-1 rounded-2xl border-2 border-[#EADBC8] shadow-lg">
+                            <motion.button
+                                onClick={() => router.push('/aihome/my-mind-library')}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="relative flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all min-w-[140px] justify-center"
+                            >
+                                <motion.div
+                                    layoutId="mindLibraryTab"
+                                    className="absolute inset-0 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-xl shadow-md"
+                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                />
+                                <UserIcon className="w-5 h-5 relative z-10 text-white" />
+                                <span className="relative z-10 text-white">我的積木庫</span>
+                            </motion.button>
+                            <motion.button
+                                onClick={() => router.push('/aihome/mind-library')}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-[#4B4036]/60 hover:text-[#4B4036] transition-all min-w-[140px] justify-center"
+                            >
+                                <UserGroupIcon className="w-5 h-5" />
+                                <span>社群積木</span>
+                            </motion.button>
+                        </div>
+                    </div>
+
                     <p className="text-lg text-[#4B4036]/60 max-w-2xl mx-auto mb-8">
                         管理您儲存的思維積木組合，隨時載入並繼續編輯
                     </p>
@@ -469,14 +510,26 @@ export default function MyMindLibraryPage() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full px-4 py-2 bg-transparent border-none text-[#4B4036] placeholder-[#4B4036]/30 focus:ring-0 text-base font-medium"
                             />
-                            <button className="px-6 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl text-sm font-bold hover:shadow-lg transition-all transform hover:scale-105 active:scale-95">
-                                搜尋
+                            <button className="p-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl hover:shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center">
+                                <MagnifyingGlassIcon className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
 
-                    {/* Type Tabs */}
-                    <div className="flex justify-center mb-8">
+                    {/* Action Bar - Create Button & Type Tabs */}
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+                        {/* Create Button */}
+                        <motion.button
+                            onClick={() => router.push('/aihome/mind-builder')}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="p-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
+                            title="創建新積木"
+                        >
+                            <PlusIcon className="w-6 h-6" />
+                        </motion.button>
+
+                        {/* Type Tabs */}
                         <div className="bg-white/50 backdrop-blur-sm p-1 rounded-xl border border-[#EADBC8] flex gap-1">
                             <button
                                 onClick={() => setActiveTab('composition')}
@@ -523,7 +576,7 @@ export default function MyMindLibraryPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {displayItems.map((item) => {
                                 const isComposition = activeTab === 'composition';
-                                const blockTypes = isComposition 
+                                const blockTypes = isComposition
                                     ? getBlockTypesFromComposition(item)
                                     : item.block_type ? [item.block_type] : [];
 
@@ -531,7 +584,8 @@ export default function MyMindLibraryPage() {
                                     <motion.div
                                         key={item.id}
                                         whileHover={{ y: -5 }}
-                                        className="group relative h-full"
+                                        className="group relative h-full cursor-pointer"
+                                        onClick={() => handleOpenDetail(item)}
                                     >
                                         <div className="absolute inset-0 bg-white/40 rounded-2xl transform translate-y-2 translate-x-0 transition-transform group-hover:translate-y-3 border border-[#EADBC8]"></div>
                                         <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl border border-[#EADBC8] p-5 h-full flex flex-col transition-transform transform group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-[#FFD59A]">
@@ -558,6 +612,7 @@ export default function MyMindLibraryPage() {
                                                             <input
                                                                 type="text"
                                                                 value={editTitle}
+                                                                onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => setEditTitle(e.target.value)}
                                                                 onKeyDown={(e) => {
                                                                     if (e.key === 'Enter') {
@@ -645,7 +700,7 @@ export default function MyMindLibraryPage() {
                                                                         stiffness: 200,
                                                                         damping: 15
                                                                     }}
-                                                                    whileHover={{ 
+                                                                    whileHover={{
                                                                         scale: 1.05,
                                                                         zIndex: 10
                                                                     }}
@@ -685,6 +740,7 @@ export default function MyMindLibraryPage() {
                                                     {editingItem === item.id ? (
                                                         <textarea
                                                             value={editDescription}
+                                                            onClick={(e) => e.stopPropagation()}
                                                             onChange={(e) => setEditDescription(e.target.value)}
                                                             placeholder="輸入描述..."
                                                             className="w-full px-3 py-2 text-sm text-[#4B4036] bg-white border-2 border-[#FFD59A] rounded-lg focus:outline-none focus:border-[#FFB6C1] resize-none"
@@ -697,8 +753,8 @@ export default function MyMindLibraryPage() {
                                                                     <span>{item.description}</span>
                                                                 ) : (
                                                                     <span>
-                                                                        {item.description.length > 100 
-                                                                            ? `${item.description.substring(0, 100)}...` 
+                                                                        {item.description.length > 100
+                                                                            ? `${item.description.substring(0, 100)}...`
                                                                             : item.description}
                                                                     </span>
                                                                 )}
@@ -735,14 +791,20 @@ export default function MyMindLibraryPage() {
                                             {/* Footer */}
                                             <div className="mt-auto pt-4 border-t border-dashed border-[#EADBC8] space-y-2">
                                                 <button
-                                                    onClick={() => router.push(`/aihome/mind-builder?compositionId=${item.id}`)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        router.push(`/aihome/mind-builder?compositionId=${item.id}`);
+                                                    }}
                                                     className="w-full py-2.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
                                                 >
                                                     <PuzzlePieceIcon className="w-4 h-4" />
                                                     載入積木
                                                 </button>
                                                 <button
-                                                    onClick={() => router.push(`/aihome/mind-builder?compositionId=${item.id}&edit=true`)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        router.push(`/aihome/mind-builder?compositionId=${item.id}&edit=true`);
+                                                    }}
                                                     className="w-full py-2 bg-white border-2 border-[#FFD59A] text-[#4B4036] rounded-xl font-semibold transition-all hover:bg-[#FFD59A]/10 hover:border-[#FFB6C1] flex items-center justify-center gap-2"
                                                 >
                                                     <PencilIcon className="w-4 h-4" />
@@ -757,6 +819,13 @@ export default function MyMindLibraryPage() {
                     )}
                 </div>
             </main>
+
+            <MindBlockDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={() => setIsDetailModalOpen(false)}
+                block={selectedBlock}
+                onLoadBlock={handleLoadBlock}
+            />
         </div>
     );
 }
