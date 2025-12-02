@@ -199,13 +199,14 @@ export default function LessonAvailabilityDashboard() {
         if (response.ok) {
           const result = await response.json();
           const allStudents = result.students || result.data || [];
-          // 過濾：只包含常規和試堂學生，且有設定上課日和時間
+          // 過濾：只包含常規和試堂學生，且有設定上課日和時間，並排除已停用的學生
           regularData = allStudents.filter((s: any) => 
             ['常規', '試堂'].includes(s.student_type) &&
+            s.student_type !== '已停用' &&
             s.regular_weekday != null &&
             s.regular_timeslot != null
           );
-          console.log('通過 API 載入常規學生數量:', regularData.length);
+          console.log('通過 API 載入常規學生數量（已過濾停用學生）:', regularData.length);
         } else {
           console.error('⚠️ 無法載入常規學生，API 返回錯誤:', response.status);
           // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
@@ -214,6 +215,7 @@ export default function LessonAvailabilityDashboard() {
             .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
             .eq('org_id', validOrgId as string)
             .in('student_type', ['常規', '試堂'])
+            .neq('student_type', '已停用')
             .not('regular_weekday', 'is', null)
             .not('regular_timeslot', 'is', null);
           
@@ -232,6 +234,7 @@ export default function LessonAvailabilityDashboard() {
           .select('id, full_name, student_age, regular_weekday, regular_timeslot, student_type, course_type')
           .eq('org_id', validOrgId as string)
           .in('student_type', ['常規', '試堂'])
+          .neq('student_type', '已停用')
           .not('regular_weekday', 'is', null)
           .not('regular_timeslot', 'is', null);
         

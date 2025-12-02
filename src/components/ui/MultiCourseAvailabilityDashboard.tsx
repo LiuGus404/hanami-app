@@ -691,9 +691,11 @@ ${timeSlot}有一個位 ^^
         if (response.ok) {
           const result = await response.json();
           allStudents = result.students || [];
+          // 過濾掉已停用的學生
+          allStudents = allStudents.filter((s: any) => s.student_type !== '已停用');
           // 按姓名排序
           allStudents.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
-          console.log('通過 API 載入所有學生數量:', allStudents.length);
+          console.log('通過 API 載入所有學生數量（已過濾停用學生）:', allStudents.length);
         } else {
           console.error('無法載入學生，API 返回錯誤:', response.status);
           // 如果 API 失敗，嘗試直接查詢（可能也會失敗，但至少不會崩潰）
@@ -702,6 +704,7 @@ ${timeSlot}有一個位 ^^
             .select('*')
             .eq('org_id', validOrgId as string)
             .eq('student_type', '常規')
+            .neq('student_type', '已停用')
             .order('full_name', { ascending: true });
           
           if (!studentsError && data) {
@@ -1202,18 +1205,22 @@ ${timeSlot}有一個位 ^^
         console.error('載入常規學生時發生錯誤:', error);
       }
 
-      // 5. 取得試聽學生
+      // 5. 取得試聽學生（今天及以後）
+      const todayISO = getTodayISO();
       const { data: trialStudentsDataRaw, error: trialStudentsError } = await supabase
         .from('hanami_trial_students')
         .select('*')
         .eq('org_id', validOrgId as string)
-        .not('trial_course_code', 'is', null);
+        .gte('lesson_date', todayISO)
+        .neq('student_type', '已停用');
       
       const trialStudentsData = trialStudentsDataRaw as Array<{ lesson_date: string; [key: string]: any; }> | null;
 
       if (trialStudentsError) {
         console.error('無法載入試聽學生：', trialStudentsError);
       }
+      
+      console.log('載入的試堂學生數量:', trialStudentsData?.length || 0);
 
       // 6. 等候區學生將在點擊時段詳情時才載入
 
@@ -2059,6 +2066,17 @@ ${timeSlot}有一個位 ^^
                       <div className="font-semibold text-[#4B4036] text-sm mb-1">
                         {slot.regular_students.length}{slot.trial_students.length > 0 ? `+${slot.trial_students.length}` : ''}/{slot.max}
                       </div>
+                      {/* 試堂學生提示框 */}
+                      {slot.trial_students && slot.trial_students.length > 0 && (
+                        <div className="text-[9px] text-yellow-700 font-medium mb-1 bg-gradient-to-r from-yellow-50 to-orange-50 px-1.5 py-0.5 rounded border border-yellow-300 cursor-pointer hover:from-yellow-100 hover:to-orange-100 transition-all"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedTrial(prev => ({ ...prev, [`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`]: !prev[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] }));
+                          }}
+                        >
+                          {expandedTrial[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] ? '▼' : '▶'} 試堂: {slot.trial_students.length}人
+                        </div>
+                      )}
                       {/* 顯示未安排進班別的學生數量 */}
                       {(() => {
                         // 標準化時間格式（與計算邏輯保持一致）
@@ -2176,8 +2194,8 @@ ${timeSlot}有一個位 ^^
                           slot.is_registration_open ? 'bg-blue-400' : 'bg-orange-400'
                         }`} title={slot.is_registration_open ? '報名開放' : '報名關閉'}></div>
                       </div>
-                      {/* 試堂學生展開按鈕 */}
-                      {slot.trial_students && slot.trial_students.length > 0 && (
+                      {/* 試堂學生展開按鈕（保留原有功能） */}
+                      {false && slot.trial_students && slot.trial_students.length > 0 && (
                         <div className="flex items-center justify-center gap-2 mt-1">
                           <button
                             className="text-[9px] px-2 py-1 rounded bg-gradient-to-r from-[#FFF9E2] to-[#FFEAA7] text-[#4B4036] border border-yellow-200 hover:from-[#FFEFC2] hover:to-[#FFD93D] transition-all duration-300 transform hover:scale-105"
