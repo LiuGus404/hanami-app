@@ -36,23 +36,23 @@ import type {
 
 export function useAIRoom(options: UseAIRoomOptions): UseAIRoomReturn {
   const { room_id, auto_load = true, real_time = true } = options;
-  
+
   const [room, setRoom] = useState<AIRoom | null>(null);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [roles, setRoles] = useState<RoleInstance[]>([]);
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const subscriptionRef = useRef<any>(null);
 
   // 載入房間資料
   const loadRoomData = useCallback(async () => {
     if (!room_id) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const [roomData, membersData, rolesData, messagesData] = await Promise.all([
         aiAPI.room.getRoomById(room_id),
@@ -60,7 +60,7 @@ export function useAIRoom(options: UseAIRoomOptions): UseAIRoomReturn {
         aiAPI.role.getRoomRoleInstances(room_id),
         aiAPI.message.getRoomMessages(room_id, 50),
       ]);
-      
+
       setRoom(roomData);
       setMembers(membersData);
       setRoles(rolesData);
@@ -155,6 +155,17 @@ export function useAIRoom(options: UseAIRoomOptions): UseAIRoomReturn {
     addRole,
     removeRole,
     updateRoom,
+    updateRoleInstance: async (instanceId: string, updates: Partial<RoleInstance>) => {
+      try {
+        const updatedInstance = await aiAPI.role.updateRoleInstance(instanceId, updates);
+        setRoles(prev => prev.map(r => r.id === instanceId ? updatedInstance : r));
+        toast.success('角色設定已更新');
+      } catch (err: any) {
+        setError(err.message || '更新角色失敗');
+        toast.error('更新角色失敗');
+        throw err;
+      }
+    },
   };
 }
 
@@ -170,7 +181,7 @@ export function useAIRooms() {
   const loadRooms = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const roomsData = await aiAPI.room.getUserRooms();
       setRooms(roomsData);
@@ -227,7 +238,7 @@ export function useAIRooms() {
 
 export function useAIRoles(options: UseAIRolesOptions = {}): UseAIRolesReturn {
   const { category, is_public, creator_user_id } = options;
-  
+
   const [roles, setRoles] = useState<AIRole[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -235,16 +246,16 @@ export function useAIRoles(options: UseAIRolesOptions = {}): UseAIRolesReturn {
   const loadRoles = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       let rolesData: AIRole[];
-      
+
       if (is_public !== false) {
         rolesData = await aiAPI.role.getPublicRoles(category);
       } else {
         rolesData = await aiAPI.role.getUserRoles();
       }
-      
+
       setRoles(rolesData);
     } catch (err: any) {
       setError(err.message || '載入角色列表失敗');
@@ -312,7 +323,7 @@ export function useAIRoles(options: UseAIRolesOptions = {}): UseAIRolesReturn {
 
 export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
   const { room_id, user_id, scope } = options;
-  
+
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -320,7 +331,7 @@ export function useMemory(options: UseMemoryOptions = {}): UseMemoryReturn {
   const loadMemories = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const memoriesData = await aiAPI.memory.getMemories(scope, room_id, user_id);
       setMemories(memoriesData);
@@ -408,12 +419,12 @@ export function useUsageStats(roomId?: string, days: number = 7) {
   const loadStats = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const statsData = roomId 
+      const statsData = roomId
         ? await aiAPI.usage.getRoomUsage(roomId, days)
         : await aiAPI.usage.getUserUsage(days);
-      
+
       setStats(statsData);
     } catch (err: any) {
       setError(err.message || '載入用量統計失敗');
@@ -446,7 +457,7 @@ const generateUUID = () => {
     return crypto.randomUUID();
   }
   // Fallback：使用 Math.random 生成 UUID v4 格式
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -458,28 +469,28 @@ export function useChatSession(roomId: string) {
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
-  const { 
-    room, 
-    roles, 
-    messages, 
-    is_loading: isLoading, 
-    error, 
-    sendMessage 
-  } = useAIRoom({ 
-    room_id: roomId, 
-    auto_load: true, 
-    real_time: true 
+  const {
+    room,
+    roles,
+    messages,
+    is_loading: isLoading,
+    error,
+    sendMessage
+  } = useAIRoom({
+    room_id: roomId,
+    auto_load: true,
+    real_time: true
   });
 
   const sendChatMessage = useCallback(async (
-    content: string, 
+    content: string,
     targetRoleId?: string,
     attachments?: File[]
   ) => {
     if (!content.trim() && !attachments?.length) return;
 
     setIsTyping(true);
-    
+
     try {
       await sendMessage({
         room_id: roomId,
@@ -507,6 +518,8 @@ export function useChatSession(roomId: string) {
     typingUsers,
     error,
     sendMessage: sendChatMessage,
+    updateRoleInstance: (instanceId: string, updates: Partial<RoleInstance>) =>
+      useAIRoom({ room_id: roomId, auto_load: false }).updateRoleInstance(instanceId, updates),
     startNewSession,
   };
 }
@@ -543,7 +556,7 @@ export function useRoleEditor(initialRole?: AIRole) {
 
   const updateRole = useCallback((updates: Partial<AIRole>) => {
     setRole(prev => prev ? { ...prev, ...updates } : undefined);
-    
+
     // 清除相關錯誤
     setErrors(prev => {
       const newErrors = { ...prev };
@@ -568,7 +581,7 @@ export function useRoleEditor(initialRole?: AIRole) {
 
     try {
       let savedRole: AIRole;
-      
+
       if (role.id) {
         savedRole = await aiAPI.role.updateRole(role.id, role);
       } else {

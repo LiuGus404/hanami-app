@@ -462,6 +462,7 @@ export default function StudentDetailPage() {
             <StudentBasicInfo
               isInactive={isInactiveStudent}
               student={student}
+              orgId={student?.org_id || null}
               onUpdate={(newData) => {
                 setStudent(newData);
                 // 如果是試堂學生且課程有更新，觸發課堂資料重新載入

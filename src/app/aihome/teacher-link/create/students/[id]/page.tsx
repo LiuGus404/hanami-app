@@ -387,6 +387,7 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
             <StudentBasicInfo
               isInactive={isInactiveStudent}
               student={student}
+              orgId={orgId || student?.org_id || null}
               onUpdate={(next) => {
                 setStudent(next);
                 setCourseUpdateTrigger((prev) => prev + 1);

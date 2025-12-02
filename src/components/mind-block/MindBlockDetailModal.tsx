@@ -26,6 +26,7 @@ interface MindBlockDetailModalProps {
     onClose: () => void;
     block: MindBlock | null;
     onLoadBlock: (block: MindBlock) => void;
+    onSelect?: (block: MindBlock) => void; // 可選的選擇回調
 }
 
 // 積木類型配置
@@ -73,7 +74,7 @@ interface Review {
     };
 }
 
-export default function MindBlockDetailModal({ isOpen, onClose, block, onLoadBlock }: MindBlockDetailModalProps) {
+export default function MindBlockDetailModal({ isOpen, onClose, block, onLoadBlock, onSelect }: MindBlockDetailModalProps) {
     const supabase = getSaasSupabaseClient();
     const { user: currentUser } = useSaasAuth();
     const [activeTab, setActiveTab] = useState<'details' | 'reviews'>('details'); // Merged examples into reviews
@@ -642,13 +643,31 @@ export default function MindBlockDetailModal({ isOpen, onClose, block, onLoadBlo
                                     </div>
                                 )}
 
-                                <button
-                                    onClick={() => onLoadBlock(block)}
-                                    className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all"
-                                >
-                                    <PuzzlePieceIcon className="w-5 h-5" />
-                                    載入此積木
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    {onSelect && (
+                                        <button
+                                            onClick={() => {
+                                                if (block) {
+                                                    onSelect(block);
+                                                    onClose();
+                                                }
+                                            }}
+                                            className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+                                        >
+                                            <CheckIcon className="w-5 h-5" />
+                                            選擇此積木
+                                        </button>
+                                    )}
+                                    {!onSelect && (
+                                        <button
+                                            onClick={() => onLoadBlock(block)}
+                                            className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+                                        >
+                                            <PuzzlePieceIcon className="w-5 h-5" />
+                                            載入此積木
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </motion.div>

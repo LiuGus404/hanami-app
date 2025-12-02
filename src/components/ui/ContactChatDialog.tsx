@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Send, MessageCircle, Phone, Clock, Calendar, User, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,11 +21,11 @@ interface ContactChatDialogProps {
   contactDays?: number | null;
 }
 
-export function ContactChatDialog({ 
-  isOpen, 
-  onClose, 
-  phoneNumber, 
-  contactDays 
+export function ContactChatDialog({
+  isOpen,
+  onClose,
+  phoneNumber,
+  contactDays
 }: ContactChatDialogProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -44,20 +45,20 @@ export function ContactChatDialog({
   // 根據日期分組訊息
   const groupMessagesByDate = (messages: Message[]) => {
     const groups: { [date: string]: Message[] } = {};
-    
+
     messages.forEach(message => {
       const dateKey = message.timestamp.toLocaleDateString('zh-TW', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
       });
-      
+
       if (!groups[dateKey]) {
         groups[dateKey] = [];
       }
       groups[dateKey].push(message);
     });
-    
+
     return groups;
   };
 
@@ -70,12 +71,12 @@ export function ContactChatDialog({
     try {
       const response = await fetch(`/api/messages/${encodeURIComponent(phoneNumber)}`);
       console.log('API 響應狀態:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('API 響應數據:', data);
         console.log('找到的對話記錄數量:', data.messages?.length || 0);
-        
+
         const historyMessages: Message[] = data.messages.map((msg: any) => ({
           id: msg.id,
           content: msg.content,
@@ -131,7 +132,7 @@ export function ContactChatDialog({
         }
       ];
       setMessages(initialMessages);
-      
+
       // 載入對話記錄
       loadMessageHistory();
     }
@@ -205,11 +206,19 @@ export function ContactChatDialog({
     }
   }, [handleSendMessage]);
 
-  if (!isOpen) return null;
+  // 使用 Portal 渲染到 document.body，避免被父容器的 overflow 限制
+  const [mounted, setMounted] = useState(false);
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
+
+  const dialogContent = (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
         {/* 背景遮罩 */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -224,16 +233,16 @@ export function ContactChatDialog({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ 
-            type: "spring", 
-            damping: 25, 
+          transition={{
+            type: "spring",
+            damping: 25,
             stiffness: 300,
             mass: 0.8
           }}
           className="relative bg-[#FFFDF8] rounded-3xl shadow-2xl w-full max-w-lg h-[700px] flex flex-col overflow-hidden border border-[#EADBC8]"
         >
           {/* 標題欄 */}
-          <motion.div 
+          <motion.div
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
@@ -245,9 +254,9 @@ export function ContactChatDialog({
               <div className="absolute bottom-1 left-4 w-8 h-8 bg-white rounded-full"></div>
               <div className="absolute top-4 left-1/3 w-4 h-4 bg-white rounded-full"></div>
             </div>
-            
+
             <div className="flex items-center gap-4 relative z-10">
-              <motion.div 
+              <motion.div
                 whileHover={{ scale: 1.1, rotate: 5 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-12 h-12 bg-white/90 rounded-2xl flex items-center justify-center shadow-lg"
@@ -266,7 +275,7 @@ export function ContactChatDialog({
                 )}
               </div>
             </div>
-            
+
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -283,18 +292,18 @@ export function ContactChatDialog({
               // 分離系統消息和對話消息
               const systemMessages = messages.filter(m => m.type === 'system');
               const chatMessages = messages.filter(m => m.type === 'text');
-              
+
               // 根據日期分組對話消息
               const messageGroups = groupMessagesByDate(chatMessages);
-              const sortedDates = Object.keys(messageGroups).sort((a, b) => 
+              const sortedDates = Object.keys(messageGroups).sort((a, b) =>
                 new Date(a).getTime() - new Date(b).getTime()
               );
-              
+
               return (
                 <>
                   {/* 系統消息 */}
                   {systemMessages.map((message, index) => (
-                    <motion.div 
+                    <motion.div
                       key={message.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -304,7 +313,7 @@ export function ContactChatDialog({
                       <div className="bg-white/80 backdrop-blur-sm text-[#2B3A3B] shadow-lg border border-[#EADBC8] rounded-3xl px-6 py-4 max-w-[90%] relative overflow-hidden">
                         {/* 背景裝飾 */}
                         <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#FFD59A]/20 to-[#EBC9A4]/20 rounded-full -translate-y-10 translate-x-10"></div>
-                        
+
                         <div className="flex items-start gap-3 relative z-10">
                           <div className="w-8 h-8 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center flex-shrink-0">
                             <Bot className="w-4 h-4 text-white" />
@@ -328,10 +337,10 @@ export function ContactChatDialog({
                       </div>
                     </motion.div>
                   ))}
-                  
+
                   {/* 按日期分組的對話消息 */}
                   {sortedDates.map((dateKey, dateIndex) => (
-                    <motion.div 
+                    <motion.div
                       key={dateKey}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -346,77 +355,73 @@ export function ContactChatDialog({
                         </div>
                         <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#EADBC8] to-transparent"></div>
                       </div>
-                      
+
                       {/* 該日期的消息 */}
                       {messageGroups[dateKey]
                         .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
                         .map((message, msgIndex) => (
-                        <motion.div
-                          key={message.id}
-                          initial={{ opacity: 0, x: message.sender === 'user' ? 20 : -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: (systemMessages.length + dateIndex + msgIndex) * 0.05 }}
-                          className={`flex ${
-                            message.sender === 'user' 
-                              ? 'justify-end' 
-                              : 'justify-start'
-                          } mb-4`}
-                        >
                           <motion.div
-                            whileHover={{ scale: 1.02 }}
-                            className={`max-w-[75%] rounded-3xl px-5 py-4 relative overflow-hidden ${
-                              message.sender === 'user'
-                                ? 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-lg'
-                                : 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-900 shadow-lg border border-blue-200'
-                            }`}
+                            key={message.id}
+                            initial={{ opacity: 0, x: message.sender === 'user' ? 20 : -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: (systemMessages.length + dateIndex + msgIndex) * 0.05 }}
+                            className={`flex ${message.sender === 'user'
+                                ? 'justify-end'
+                                : 'justify-start'
+                              } mb-4`}
                           >
-                            {/* 背景裝飾 */}
-                            <div className={`absolute top-0 right-0 w-16 h-16 rounded-full opacity-10 ${
-                              message.sender === 'user' 
-                                ? 'bg-white' 
-                                : 'bg-blue-400'
-                            } -translate-y-8 translate-x-8`}></div>
-                            
-                            {message.sender === 'parent' && (
-                              <div className="flex items-center gap-2 mb-2">
-                                <User className="w-4 h-4 text-blue-600" />
-                                <span className="text-xs font-semibold text-blue-700">家長</span>
+                            <motion.div
+                              whileHover={{ scale: 1.02 }}
+                              className={`max-w-[75%] rounded-3xl px-5 py-4 relative overflow-hidden ${message.sender === 'user'
+                                  ? 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-lg'
+                                  : 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-900 shadow-lg border border-blue-200'
+                                }`}
+                            >
+                              {/* 背景裝飾 */}
+                              <div className={`absolute top-0 right-0 w-16 h-16 rounded-full opacity-10 ${message.sender === 'user'
+                                  ? 'bg-white'
+                                  : 'bg-blue-400'
+                                } -translate-y-8 translate-x-8`}></div>
+
+                              {message.sender === 'parent' && (
+                                <div className="flex items-center gap-2 mb-2">
+                                  <User className="w-4 h-4 text-blue-600" />
+                                  <span className="text-xs font-semibold text-blue-700">家長</span>
+                                </div>
+                              )}
+
+                              <div className="whitespace-pre-wrap text-sm font-medium leading-relaxed relative z-10">
+                                {message.content}
                               </div>
-                            )}
-                            
-                            <div className="whitespace-pre-wrap text-sm font-medium leading-relaxed relative z-10">
-                              {message.content}
-                            </div>
-                            
-                            <div className={`flex items-center gap-1 mt-2 text-xs ${
-                              message.sender === 'user' 
-                                ? 'text-[#87704e]' 
-                                : 'text-blue-600'
-                            }`}>
-                              <Clock className="w-3 h-3" />
-                              {message.timestamp.toLocaleTimeString('zh-TW', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </div>
+
+                              <div className={`flex items-center gap-1 mt-2 text-xs ${message.sender === 'user'
+                                  ? 'text-[#87704e]'
+                                  : 'text-blue-600'
+                                }`}>
+                                <Clock className="w-3 h-3" />
+                                {message.timestamp.toLocaleTimeString('zh-TW', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                            </motion.div>
                           </motion.div>
-                        </motion.div>
-                      ))}
+                        ))}
                     </motion.div>
                   ))}
                 </>
               );
             })()}
-            
+
             {isLoadingHistory && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex justify-center mb-6"
               >
                 <div className="bg-white/90 backdrop-blur-sm rounded-3xl px-6 py-4 shadow-lg border border-[#EADBC8]">
                   <div className="flex items-center gap-3">
-                    <motion.div 
+                    <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       className="w-6 h-6 border-2 border-[#FFD59A] border-t-transparent rounded-full"
@@ -426,16 +431,16 @@ export function ContactChatDialog({
                 </div>
               </motion.div>
             )}
-            
+
             {isLoading && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="flex justify-start mb-4"
               >
                 <div className="bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-3xl px-5 py-4 shadow-lg">
                   <div className="flex items-center gap-3">
-                    <motion.div 
+                    <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
@@ -445,12 +450,12 @@ export function ContactChatDialog({
                 </div>
               </motion.div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
 
           {/* 輸入區域 */}
-          <motion.div 
+          <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
@@ -472,11 +477,11 @@ export function ContactChatDialog({
                   disabled={isLoading}
                   whileFocus={{ scale: 1.01 }}
                 />
-                
+
                 {/* 輸入框裝飾 */}
                 <div className="absolute top-2 right-2 w-2 h-2 bg-[#FFD59A]/30 rounded-full"></div>
               </div>
-              
+
               <motion.button
                 onClick={(e) => {
                   e.preventDefault();
@@ -486,20 +491,18 @@ export function ContactChatDialog({
                 disabled={!inputMessage.trim() || isLoading}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 ${
-                  !inputMessage.trim() || isLoading
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 ${!inputMessage.trim() || isLoading
                     ? 'bg-gray-200 cursor-not-allowed'
                     : 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] hover:shadow-xl hover:from-[#FDE6B8] hover:to-[#EBC9A4]'
-                }`}
+                  }`}
               >
-                <Send className={`w-6 h-6 ${
-                  !inputMessage.trim() || isLoading 
-                    ? 'text-gray-400' 
+                <Send className={`w-6 h-6 ${!inputMessage.trim() || isLoading
+                    ? 'text-gray-400'
                     : 'text-[#2B3A3B]'
-                }`} />
+                  }`} />
               </motion.button>
             </div>
-            
+
             {/* 底部裝飾 */}
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FFD59A] via-[#EBC9A4] to-[#FFD59A] opacity-30"></div>
           </motion.div>
@@ -507,4 +510,6 @@ export function ContactChatDialog({
       </div>
     </AnimatePresence>
   );
+
+  return createPortal(dialogContent, document.body);
 }

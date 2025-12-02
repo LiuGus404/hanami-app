@@ -32,6 +32,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MindBlockNode, MindBlockType } from '@/types/mind-block';
 import { getSaasSupabaseClient } from '@/lib/supabase';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
+import { RoleEquipmentPanel } from './RoleEquipmentPanel';
 
 // Initial Demo Data
 const initialBlocks: MindBlockNode[] = [
@@ -181,6 +182,7 @@ export default function MindBlockBuilder() {
     };
 
     const [isLoading, setIsLoading] = useState(false);
+    const [showRoleEquipment, setShowRoleEquipment] = useState(false);
     const compositionId = searchParams.get('compositionId');
 
     // Load composition from URL if present
@@ -843,6 +845,21 @@ export default function MindBlockBuilder() {
                                                             <PlusIcon className="w-5 h-5" />
                                                         </div>
                                                     </div>
+                                                    
+                                                    {/* 快速装备到角色按钮 */}
+                                                    <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity px-3">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setShowRoleEquipment(true);
+                                                            }}
+                                                            className="px-2 py-1 text-xs bg-[#FFD59A] text-[#4B4036] rounded-lg font-bold hover:bg-[#FFC56D] transition-colors flex items-center gap-1"
+                                                            title="装备到角色"
+                                                        >
+                                                            <UserIcon className="w-3 h-3" />
+                                                            装备到角色
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -891,6 +908,16 @@ export default function MindBlockBuilder() {
                     </div>
 
                     <div className="flex items-center gap-4 flex-wrap">
+                        {/* 角色裝備按鈕 */}
+                        <button
+                            onClick={() => setShowRoleEquipment(true)}
+                            className="px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2"
+                            title="管理角色裝備"
+                        >
+                            <UserIcon className="w-5 h-5" />
+                            <span className="hidden md:inline">角色裝備</span>
+                        </button>
+
                         {/* 公開/私人開關 - 當編輯積木時顯示 */}
                         {editingTemplateId && (
                             <div className="flex items-center gap-3 bg-white/60 backdrop-blur-sm rounded-xl px-3 py-2 border border-[#EADBC8]">
@@ -1335,6 +1362,35 @@ export default function MindBlockBuilder() {
                                 {compiledPrompt}
                             </pre>
                         </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* 角色裝備面板 */}
+            <AnimatePresence>
+                {showRoleEquipment && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                        onClick={() => setShowRoleEquipment(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+                        >
+                            <RoleEquipmentPanel
+                                onClose={() => setShowRoleEquipment(false)}
+                                onEquipBlock={(roleId, mindBlockId) => {
+                                    console.log('裝備積木:', { roleId, mindBlockId });
+                                    // 可以在這裡添加額外的回調邏輯
+                                }}
+                            />
+                        </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>

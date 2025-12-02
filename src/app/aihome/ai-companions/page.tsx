@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -22,13 +22,23 @@ import {
   UserIcon,
   Cog6ToothIcon,
   PuzzlePieceIcon,
-  WrenchScrewdriverIcon
+  WrenchScrewdriverIcon,
+  CubeIcon,
+  ClipboardDocumentIcon,
+  GlobeAltIcon,
+  ExclamationCircleIcon,
+  CodeBracketIcon,
+  LightBulbIcon,
+  MagnifyingGlassIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { getSaasSupabaseClient, getSupabaseClient } from '@/lib/supabase';
 import Image from 'next/image';
 import UsageStatsDisplay from '@/components/ai-companion/UsageStatsDisplay';
+import { BlockSelectionModal } from '@/components/ai-companion/BlockSelectionModal';
+import { MindBlock, MindBlockType } from '@/types/mind-block';
 
 interface AIRoom {
   id: string;
@@ -156,6 +166,9 @@ export default function AICompanionsPage() {
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [clickedCompanionId, setClickedCompanionId] = useState<string | null>(null);
   const [companionModels, setCompanionModels] = useState<Record<string, { modelId: string; displayName: string; food: number } | null>>({});
+  const [defaultMindBlocks, setDefaultMindBlocks] = useState<any[]>([]); // 預設思維積木
+  const [loadingMindBlocks, setLoadingMindBlocks] = useState(false);
+  const [showBlockSelectionModal, setShowBlockSelectionModal] = useState(false); // 控制積木選擇 modal
 
   const DEFAULT_MODEL_SENTINEL = '__default__';
   // 估算 100 字問題食量（僅輸入成本；3x 食量，轉為「分」）；最少顯示 1 食量
@@ -385,9 +398,13 @@ export default function AICompanionsPage() {
       } else {
         setDefaultRoleValues(companion);
       }
+
+      // 加載預設思維積木
+      await loadDefaultMindBlocks(companion.id);
     } catch (error) {
       console.error('載入角色資訊異常:', error);
       setDefaultRoleValues(companion);
+      await loadDefaultMindBlocks(companion.id);
     }
   };
 
@@ -426,6 +443,322 @@ export default function AICompanionsPage() {
       'pico': '你是Pico，一個友善的協調者。你擅長團隊合作、專案管理和溝通協調。你的語氣友善而專業，善於促進團隊合作和解決衝突。'
     };
     setRoleGuidance(guidanceMap[roleId] || '你是一個友善的AI助手，樂於幫助用戶解決問題。');
+  };
+
+  // 加載預設思維積木（從 role_mind_blocks）
+  const loadDefaultMindBlocks = async (roleId: string) => {
+    if (!user?.id || !roleId) {
+      setDefaultMindBlocks([]);
+      return;
+    }
+
+    setLoadingMindBlocks(true);
+    try {
+      const supabase = getSaasSupabaseClient();
+      
+      // 先獲取角色 ID
+      const roleSlug = roleId === 'hibi' ? 'hibi-manager' : roleId === 'mori' ? 'mori-researcher' : 'pico-artist';
+      const { data: roleData } = await supabase
+        .from('ai_roles')
+        .select('id')
+        .eq('slug', roleSlug)
+        .maybeSingle();
+
+      if (!roleData) {
+        setDefaultMindBlocks([]);
+        return;
+      }
+
+      // 獲取該角色裝備的預設思維積木
+      const { data: equipmentData, error: equipmentError } = await supabase
+        .from('role_mind_blocks' as any)
+        .select('mind_block_id')
+        .eq('role_id', (roleData as any).id)
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+      if (equipmentError) {
+        console.error('加載預設思維積木失敗:', equipmentError);
+        setDefaultMindBlocks([]);
+        return;
+      }
+
+      if (!equipmentData || equipmentData.length === 0) {
+        setDefaultMindBlocks([]);
+        return;
+      }
+
+      // 獲取思維積木詳情
+      const mindBlockIds = equipmentData.map((item: any) => item.mind_block_id);
+      const { data: blocksData, error: blocksError } = await supabase
+        .from('mind_blocks' as any)
+        .select('*')
+        .in('id', mindBlockIds);
+
+      if (blocksError) {
+        console.error('加載思維積木詳情失敗:', blocksError);
+        setDefaultMindBlocks([]);
+        return;
+      }
+
+      setDefaultMindBlocks((blocksData || []) as any[]);
+    } catch (error) {
+      console.error('加載預設思維積木異常:', error);
+      setDefaultMindBlocks([]);
+    } finally {
+      setLoadingMindBlocks(false);
+    }
+  };
+
+  // 處理選擇積木並裝備為預設值
+  const handleSelectDefaultBlock = async (block: MindBlock) => {
+    if (!user?.id || !selectedCompanion) return;
+
+    try {
+      const supabase = getSaasSupabaseClient();
+      const roleSlug = selectedCompanion.id === 'hibi' ? 'hibi-manager' : selectedCompanion.id === 'mori' ? 'mori-researcher' : 'pico-artist';
+      const { data: roleData } = await supabase
+        .from('ai_roles')
+        .select('id')
+        .eq('slug', roleSlug)
+        .maybeSingle();
+
+      if (!roleData) {
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('找不到對應的角色', {
+          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+          duration: 2000,
+          style: {
+            background: '#fff',
+            color: '#4B4036',
+          }
+        });
+        return;
+      }
+
+      // 檢查是否已經裝備
+      const { data: existing } = await supabase
+        .from('role_mind_blocks' as any)
+        .select('id')
+        .eq('role_id', (roleData as any).id)
+        .eq('mind_block_id', block.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing) {
+        // 如果已存在，激活它
+        const { error } = await supabase
+          .from('role_mind_blocks' as any)
+          .update({ is_active: true })
+          .eq('id', (existing as any).id);
+
+        if (error) throw error;
+      } else {
+        // 如果不存在，創建新記錄
+        const { error } = await supabase
+          .from('role_mind_blocks' as any)
+          .insert({
+            role_id: (roleData as any).id,
+            mind_block_id: block.id,
+            user_id: user.id,
+            is_active: true
+          });
+
+        if (error) throw error;
+      }
+
+      // 重新載入預設思維積木
+      await loadDefaultMindBlocks(selectedCompanion.id);
+
+      const { default: toast } = await import('react-hot-toast');
+      toast.success('已裝備為預設思維積木', {
+        icon: <PuzzlePieceIcon className="w-5 h-5 text-green-600" />,
+        duration: 2000,
+        style: {
+          background: '#fff',
+          color: '#4B4036',
+        }
+      });
+
+      setShowBlockSelectionModal(false);
+    } catch (error) {
+      console.error('裝備預設思維積木失敗:', error);
+      const { default: toast } = await import('react-hot-toast');
+      toast.error('裝備失敗', {
+        icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+        duration: 2000,
+        style: {
+          background: '#fff',
+          color: '#4B4036',
+        }
+      });
+    }
+  };
+
+  // 積木類型配置映射
+  const typeConfigMap: Record<MindBlockType, { label: string; icon: any; color: string }> = {
+    role: { label: '角色', icon: UserIcon, color: 'purple' },
+    style: { label: '風格', icon: PaintBrushIcon, color: 'pink' },
+    task: { label: '任務', icon: ClipboardDocumentIcon, color: 'orange' },
+    context: { label: '上下文', icon: GlobeAltIcon, color: 'blue' },
+    rule: { label: '規則', icon: ExclamationCircleIcon, color: 'red' },
+    variable: { label: '變數', icon: CodeBracketIcon, color: 'indigo' },
+    search: { label: '搜尋', icon: MagnifyingGlassIcon, color: 'teal' },
+    reason: { label: '推理', icon: LightBulbIcon, color: 'yellow' },
+    output: { label: '輸出', icon: ArrowPathIcon, color: 'green' }
+  };
+
+  // 自訂類型的預設配置
+  const getCustomTypeConfig = (type: string): { label: string; icon: any; color: string } => {
+    return {
+      label: type.charAt(0).toUpperCase() + type.slice(1),
+      icon: CubeIcon,
+      color: 'gray'
+    };
+  };
+
+  // 解析積木包含的所有類型
+  const parseBlockTypes = (block: any): Array<{ type: string; isCustom: boolean }> => {
+    try {
+      const types = new Map<string, boolean>();
+      
+      // 方法1: 檢查 block_type 字段
+      if (block.block_type) {
+        const isCustom = !typeConfigMap[block.block_type as MindBlockType];
+        types.set(block.block_type, isCustom);
+      }
+      
+      // 方法2: 解析 content_json
+      const contentJson = block.content_json;
+      if (contentJson && contentJson.blocks && Array.isArray(contentJson.blocks)) {
+        const traverse = (blocks: any[]) => {
+          blocks.forEach((b: any) => {
+            if (b.type) {
+              const isCustom = !typeConfigMap[b.type as MindBlockType];
+              types.set(b.type, isCustom);
+            }
+            if (b.children && Array.isArray(b.children)) {
+              traverse(b.children);
+            }
+          });
+        };
+        traverse(contentJson.blocks);
+      }
+
+      const typeArray = Array.from(types.entries()).map(([type, isCustom]) => ({ type, isCustom }));
+      
+      // 排序
+      const priorityOrder: string[] = ['role', 'style', 'task'];
+      const sortedTypes = typeArray.sort((a, b) => {
+        const aIsCustom = a.isCustom;
+        const bIsCustom = b.isCustom;
+        
+        if (!aIsCustom && bIsCustom) return -1;
+        if (aIsCustom && !bIsCustom) return 1;
+        
+        if (!aIsCustom && !bIsCustom) {
+          const aIndex = priorityOrder.indexOf(a.type);
+          const bIndex = priorityOrder.indexOf(b.type);
+          if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+          if (aIndex !== -1) return -1;
+          if (bIndex !== -1) return 1;
+        }
+        
+        return a.type.localeCompare(b.type);
+      });
+
+      return sortedTypes;
+    } catch (error) {
+      console.error('解析積木類型失敗:', error);
+      return [];
+    }
+  };
+
+  // 獲取顏色樣式類名
+  const getColorClasses = (color: string) => {
+    const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+      purple: { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-600' },
+      pink: { bg: 'bg-pink-50', border: 'border-pink-300', text: 'text-pink-600' },
+      orange: { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-600' },
+      blue: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-600' },
+      red: { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-600' },
+      indigo: { bg: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-600' },
+      teal: { bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-600' },
+      yellow: { bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-600' },
+      green: { bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-600' },
+      gray: { bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-600' }
+    };
+    return colorMap[color] || colorMap.gray;
+  };
+
+  // 積木類型卡片組件
+  const BlockTypeCards = ({ block }: { block: any }) => {
+    const types = parseBlockTypes(block);
+    
+    if (types.length === 0) {
+      return null;
+    }
+
+    const maxVisible = 5;
+    const visibleTypes = types.slice(0, maxVisible);
+    const remainingCount = types.length > maxVisible ? types.length - maxVisible : 0;
+
+    return (
+      <div className="flex items-center mt-2 relative">
+        {visibleTypes.map((typeInfo, index) => {
+          const { type, isCustom } = typeInfo;
+          
+          const config = isCustom 
+            ? getCustomTypeConfig(type)
+            : typeConfigMap[type as MindBlockType];
+          
+          if (!config) return null;
+          
+          const colors = getColorClasses(config.color);
+          const Icon = config.icon;
+
+          return (
+            <React.Fragment key={type}>
+              {index > 0 && (
+                <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative" 
+                     style={{ top: '20px' }}
+                />
+              )}
+              <div className="flex flex-col items-center gap-0.5 opacity-100">
+                <div
+                  className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center shadow-sm transition-all ${colors.bg} ${colors.border}`}
+                >
+                  <Icon className={`w-5 h-5 ${colors.text}`} />
+                </div>
+                <span className={`text-[9px] font-semibold ${colors.text} leading-tight`}>
+                  {config.label}
+                </span>
+              </div>
+            </React.Fragment>
+          );
+        })}
+        
+        {remainingCount > 0 && (
+          <>
+            {visibleTypes.length > 0 && (
+              <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative" 
+                   style={{ top: '20px' }}
+              />
+            )}
+            <div className="flex flex-col items-center gap-0.5 opacity-100">
+              <div className="w-10 h-10 rounded-lg border-2 flex items-center justify-center shadow-sm transition-all bg-gray-50 border-gray-300">
+                <span className="text-[10px] font-bold text-gray-600">
+                  +{remainingCount}
+                </span>
+              </div>
+              <span className="text-[9px] font-semibold text-gray-600 leading-tight">
+                更多
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
   // 檢查是否為預設角色
@@ -638,11 +971,12 @@ export default function AICompanionsPage() {
 
       // 檢查是否所有設定都是預設值（與系統預設一致）
       const isUsingDefaultModel = selectedModel === DEFAULT_MODEL_SENTINEL;
-      const isUsingDefaultGuidance = !roleGuidance || roleGuidance.trim() === '' || roleGuidance.trim() === systemGuidance.trim();
-      const isUsingDefaultTone = !roleTone || roleTone.trim() === '' || roleTone.trim() === systemTone.trim();
+      // 不再檢查 guidance 和 tone，因為已移除這些設定
+      const isUsingDefaultGuidance = true; // 始終視為使用預設
+      const isUsingDefaultTone = true; // 始終視為使用預設
 
       // 如果所有設定都是預設值，刪除 user_role_settings 記錄
-      if (isUsingDefaultModel && isUsingDefaultGuidance && isUsingDefaultTone) {
+      if (isUsingDefaultModel) {
         if (!user?.id) {
           console.error('用戶未登入');
           return;
@@ -692,8 +1026,8 @@ export default function AICompanionsPage() {
           user_id: user.id,
           role_id: roleId,
           model_override: isUsingDefaultModel ? null : resolvedModel,
-          guidance_override: isUsingDefaultGuidance ? null : roleGuidance,
-          tone_override: isUsingDefaultTone ? null : roleTone,
+          guidance_override: null, // 不再保存角色指引
+          tone_override: null, // 不再保存角色語氣
           is_active: true,
           updated_at: new Date().toISOString()
         }, {
@@ -1583,13 +1917,86 @@ export default function AICompanionsPage() {
         // 首先查詢角色實例表，看看是否有對應的角色實例
         const { data: roleInstance, error: roleInstanceError } = await saasSupabase
           .from('role_instances')
-          .select('id')
+          .select('id, settings')
           .eq('ai_role_slug', companion.id)
           .single();
 
         if (roleInstanceError) {
           console.log('⚠️ 未找到角色實例，可能需要先創建:', roleInstanceError);
         } else if (roleInstance) {
+          // 載入預設思維積木（從 role_mind_blocks）
+          const roleSlug = companion.id === 'hibi' ? 'hibi-manager' : companion.id === 'mori' ? 'mori-researcher' : 'pico-artist';
+          const { data: roleData } = await saasSupabase
+            .from('ai_roles')
+            .select('id')
+            .eq('slug', roleSlug)
+            .maybeSingle();
+
+          let defaultEquippedBlocks = {};
+          if (roleData && user?.id) {
+            // 獲取該角色裝備的預設思維積木
+            const { data: equipmentData } = await saasSupabase
+              .from('role_mind_blocks' as any)
+              .select('mind_block_id')
+              .eq('role_id', (roleData as any).id)
+              .eq('user_id', user.id)
+              .eq('is_active', true);
+
+            if (equipmentData && equipmentData.length > 0) {
+              // 獲取思維積木詳情
+              const mindBlockIds = equipmentData.map((item: any) => item.mind_block_id);
+              const { data: blocksData } = await saasSupabase
+                .from('mind_blocks' as any)
+                .select('*')
+                .in('id', mindBlockIds);
+
+              if (blocksData && blocksData.length > 0) {
+                // 將預設思維積木設置到 equipped_blocks
+                // 假設第一個積木作為 role，第二個作為 style，第三個作為 task
+                const blocks = blocksData as any[];
+                if (blocks[0]) defaultEquippedBlocks = { ...defaultEquippedBlocks, role: blocks[0] };
+                if (blocks[1]) defaultEquippedBlocks = { ...defaultEquippedBlocks, style: blocks[1] };
+                if (blocks[2]) defaultEquippedBlocks = { ...defaultEquippedBlocks, task: blocks[2] };
+              }
+            }
+          }
+
+          // 如果 role_instance 還沒有 equipped_blocks，則設置預設值
+          const currentSettings = (roleInstance as any).settings || {};
+          const currentEquipped = currentSettings.equipped_blocks || {};
+          
+          // 只有在當前沒有裝備積木時，才使用預設值
+          const hasEquipped = !!currentEquipped.role || !!currentEquipped.style || !!currentEquipped.task;
+          const finalEquippedBlocks = hasEquipped ? currentEquipped : defaultEquippedBlocks;
+
+          // 如果有預設積木且當前沒有裝備，則更新 role_instance
+          if (Object.keys(defaultEquippedBlocks).length > 0 && !hasEquipped) {
+            // 構建 system prompt
+            let newSystemPrompt = '';
+            const { data: fullRoleData } = await saasSupabase
+              .from('ai_roles')
+              .select('system_prompt')
+              .eq('slug', roleSlug)
+              .maybeSingle();
+            
+            newSystemPrompt = (fullRoleData as any)?.system_prompt || '';
+            if (finalEquippedBlocks.role) newSystemPrompt += `\n\n[Role Definition]\n${(finalEquippedBlocks.role as any).content_json?.blocks?.[0]?.params?.content || ''}`;
+            if (finalEquippedBlocks.style) newSystemPrompt += `\n\n[Style Guide]\n${(finalEquippedBlocks.style as any).content_json?.blocks?.[0]?.params?.content || ''}`;
+            if (finalEquippedBlocks.task) newSystemPrompt += `\n\n[Current Task]\n${(finalEquippedBlocks.task as any).content_json?.blocks?.[0]?.params?.content || ''}`;
+
+            // 更新 role_instance
+            await saasSupabase
+              .from('role_instances')
+              .update({
+                settings: {
+                  ...currentSettings,
+                  equipped_blocks: finalEquippedBlocks
+                },
+                system_prompt_override: newSystemPrompt
+              })
+              .eq('id', (roleInstance as any).id);
+          }
+
           // 插入房間角色關聯
           const { error: roomRoleError } = await (saasSupabase
             .from('room_roles') as any)
@@ -2134,17 +2541,16 @@ export default function AICompanionsPage() {
                     >
                       <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-red-500 rounded-full p-1 shadow-lg">
                         <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                          <Image
-                            src="/3d-character-backgrounds/studio/lulu(front).png"
+                          <img
+                            src="/3d-character-backgrounds/studio/Hibi/lulu(front).png"
                             alt="Hibi"
                             width={72}
                             height={72}
                             className="w-18 h-18 object-cover"
-                            unoptimized={true}
+                            loading="lazy"
                             onError={(e) => {
-                              console.error('❌ [Hibi 圖標] 圖片載入失敗');
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
+                              console.error('❌ [Hibi 圖標] 圖片載入失敗，改用預設貓頭鷹圖示');
+                              (e.target as HTMLImageElement).src = '/owlui.png';
                             }}
                           />
                         </div>
@@ -3221,43 +3627,110 @@ export default function AICompanionsPage() {
                       <div className="px-4 pb-4 border-t border-[#EADBC8] bg-[#FFF9F2]/50">
                         <div className="mt-4 space-y-3">
                           <p className="text-sm text-[#4B4036]/80">
-                            為 {selectedCompanion.name} 裝備特定的思維流程，增強其處理複雜任務的能力。
+                            為 {selectedCompanion.name} 裝備特定的思維流程，增強其處理複雜任務的能力。此設定將作為預設值，在新聊天室中自動載入。
                           </p>
 
-                          {/* Mock Equipped Block */}
-                          <div className="bg-white p-3 rounded-lg border border-[#EADBC8] flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-[#FFD59A]/20 rounded-lg flex items-center justify-center text-lg">
-                                🧩
-                              </div>
-                              <div>
-                                <div className="font-medium text-[#4B4036]">預設積木</div>
-                                <div className="text-xs text-[#4B4036]/60">通用對話模式</div>
-                              </div>
+                          {/* 預設思維積木列表 */}
+                          {loadingMindBlocks ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#FFB6C1]"></div>
+                              <span className="ml-2 text-sm text-[#4B4036]">載入中...</span>
                             </div>
-                            <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">使用中</span>
-                          </div>
+                          ) : defaultMindBlocks.length > 0 ? (
+                            <div className="space-y-2">
+                              {defaultMindBlocks.map((block: any) => (
+                                <div key={block.id} className="bg-white p-3 rounded-lg border border-[#EADBC8] flex items-start justify-between">
+                                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                                    <div className="w-8 h-8 bg-[#FFD59A]/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                      <PuzzlePieceIcon className="w-5 h-5 text-[#4B4036]" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-[#4B4036] text-sm truncate mb-1">{block.title}</div>
+                                      {/* 顯示積木類型卡片而非文字描述 */}
+                                      <BlockTypeCards block={block} />
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={async () => {
+                                      if (!user?.id || !selectedCompanion) return;
+                                      try {
+                                        const supabase = getSaasSupabaseClient();
+                                        const roleSlug = selectedCompanion.id === 'hibi' ? 'hibi-manager' : selectedCompanion.id === 'mori' ? 'mori-researcher' : 'pico-artist';
+                                        const { data: roleData } = await supabase
+                                          .from('ai_roles')
+                                          .select('id')
+                                          .eq('slug', roleSlug)
+                                          .maybeSingle();
+
+                                        if (!roleData) return;
+
+                                        const { error } = await supabase
+                                          .from('role_mind_blocks' as any)
+                                          .update({ is_active: false })
+                                          .eq('role_id', (roleData as any).id)
+                                          .eq('user_id', user.id)
+                                          .eq('mind_block_id', block.id);
+
+                                        if (error) throw error;
+
+                                        // 重新載入
+                                        await loadDefaultMindBlocks(selectedCompanion.id);
+                                        const { default: toast } = await import('react-hot-toast');
+                                        toast.success('已卸載預設思維積木', {
+                                          icon: <PuzzlePieceIcon className="w-5 h-5 text-green-600" />,
+                                          duration: 2000,
+                                          style: {
+                                            background: '#fff',
+                                            color: '#4B4036',
+                                          }
+                                        });
+                                      } catch (error) {
+                                        console.error('卸載預設思維積木失敗:', error);
+                                        const { default: toast } = await import('react-hot-toast');
+                                        toast.error('卸載失敗', {
+                                          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+                                          duration: 2000,
+                                          style: {
+                                            background: '#fff',
+                                            color: '#4B4036',
+                                          }
+                                        });
+                                      }
+                                    }}
+                                    className="ml-2 p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all flex-shrink-0"
+                                  >
+                                    <XMarkIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="bg-white p-3 rounded-lg border border-dashed border-[#EADBC8] text-center">
+                              <div className="text-sm text-[#4B4036]/60">尚未裝備預設思維積木</div>
+                              <div className="text-xs text-[#4B4036]/40 mt-1">點擊下方按鈕選擇積木</div>
+                            </div>
+                          )}
 
                           <div className="flex gap-3 mt-4">
+                            <button
+                              onClick={() => {
+                                if (!selectedCompanion) return;
+                                setShowBlockSelectionModal(true);
+                              }}
+                              className="flex-1 py-2 px-4 bg-[#FFD59A] text-[#4B4036] rounded-lg font-medium text-sm hover:bg-[#FFC57A] transition-colors flex items-center justify-center gap-2"
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                              選擇積木
+                            </button>
                             <button
                               onClick={() => {
                                 setShowSettings(false);
                                 router.push('/aihome/mind-builder');
                               }}
-                              className="flex-1 py-2 px-4 bg-[#FFD59A] text-[#4B4036] rounded-lg font-medium text-sm hover:bg-[#FFC57A] transition-colors flex items-center justify-center gap-2"
+                              className="flex-1 py-2 px-4 bg-white border border-[#EADBC8] text-[#4B4036] rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
                             >
                               <PlusIcon className="w-4 h-4" />
                               創建新積木
-                            </button>
-                            <button
-                              onClick={() => {
-                                setShowSettings(false);
-                                router.push('/aihome/mind-library');
-                              }}
-                              className="flex-1 py-2 px-4 bg-white border border-[#EADBC8] text-[#4B4036] rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
-                            >
-                              <ArrowPathIcon className="w-4 h-4" />
-                              瀏覽積木庫
                             </button>
                           </div>
                         </div>
@@ -3557,60 +4030,6 @@ export default function AICompanionsPage() {
                             ) : (<div className="text-sm text-[#4B4036]">請選擇模型</div>);
                           })()}
                         </div>
-                      </div>
-                    )}
-                  </motion.div>
-
-                  {/* 語氣卡片 */}
-                  <motion.div
-                    whileHover={{ y: -3 }}
-                    className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setOpenPanels((s) => ({ ...s, tone: !s.tone }))}
-                      className="w-full text-left px-4 py-4 flex items-center justify-between"
-                    >
-                      <h3 className="text-lg font-semibold text-[#4B4036]">角色語氣</h3>
-                      <motion.span animate={{ rotate: openPanels.tone ? 180 : 0 }}>
-                        <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
-                      </motion.span>
-                    </button>
-                    {openPanels.tone && (
-                      <div className="px-4 pb-4 border-t border-[#EADBC8]">
-                        <textarea
-                          value={roleTone}
-                          onChange={(e) => setRoleTone(e.target.value)}
-                          placeholder="例如：溫柔親切、專業冷靜、活潑可愛…"
-                          className="mt-4 w-full min-h-[100px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
-                        />
-                      </div>
-                    )}
-                  </motion.div>
-
-                  {/* 指引卡片 */}
-                  <motion.div
-                    whileHover={{ y: -3 }}
-                    className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setOpenPanels((s) => ({ ...s, guidance: !s.guidance }))}
-                      className="w-full text-left px-4 py-4 flex items-center justify-between"
-                    >
-                      <h3 className="text-lg font-semibold text-[#4B4036]">角色指引</h3>
-                      <motion.span animate={{ rotate: openPanels.guidance ? 180 : 0 }}>
-                        <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
-                      </motion.span>
-                    </button>
-                    {openPanels.guidance && (
-                      <div className="px-4 pb-4 border-t border-[#EADBC8]">
-                        <textarea
-                          value={roleGuidance}
-                          onChange={(e) => setRoleGuidance(e.target.value)}
-                          placeholder="在此輸入角色的系統指引（System Prompt）"
-                          className="mt-4 w-full min-h-[140px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
-                        />
                       </div>
                     )}
                   </motion.div>
@@ -3977,6 +4396,16 @@ export default function AICompanionsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 積木選擇 Modal */}
+      {selectedCompanion && (
+        <BlockSelectionModal
+          isOpen={showBlockSelectionModal}
+          onClose={() => setShowBlockSelectionModal(false)}
+          onSelect={handleSelectDefaultBlock}
+          slotType="role" // 預設使用 role，但實際上可以選擇任何類型
+        />
+      )}
     </div>
   );
 }

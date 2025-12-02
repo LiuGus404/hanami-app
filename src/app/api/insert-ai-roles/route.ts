@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
           slug: 'hibi-manager',
           name: 'Hibi',
           description: 'Hanami Echo 系統總管與中央協調者，負責統籌各項任務並協調不同角色間的合作。',
-          avatar_url: '/3d-character-backgrounds/studio/Hibi/Hibi.png',
+          avatar_url: '/3d-character-backgrounds/studio/Hibi/lulu(front).png',
           category: 'management',
           default_model: 'gpt-4o-mini',
           system_prompt: `你是 Hibi，Hanami Echo 的系統總管和中央協調者。你負責：

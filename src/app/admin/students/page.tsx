@@ -399,9 +399,11 @@ export default function StudentManagementPage({
         }
 
         // 使用統一的 calculateRemainingLessonsBatch 函數計算所有常規學生的剩餘堂數
+        // 傳入 organizationId，確保在 TeacherLink 等有機構上下文的情況下，能透過 API（服務角色）繞過 RLS 正確取得堂數
         const remainingMap = await calculateRemainingLessonsBatch(
           regularStudentIds,
-          new Date()
+          new Date(),
+          effectiveOrgId ? { organizationId: effectiveOrgId } : undefined
         );
 
         console.log('計算剩餘堂數結果:', remainingMap);
@@ -935,7 +937,11 @@ export default function StudentManagementPage({
 
         // 計算常規學生的剩餘堂數
         const regularStudentIds = regularStudents.map((student: any) => student.id);
-        const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date());
+        const remainingLessonsMap = await calculateRemainingLessonsBatch(
+          regularStudentIds,
+          new Date(),
+          effectiveOrgId ? { organizationId: effectiveOrgId } : undefined
+        );
 
         // 為常規學生添加剩餘堂數
         const regularStudentsWithRemaining = regularStudents.map((student: any) => ({

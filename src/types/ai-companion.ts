@@ -61,30 +61,30 @@ export interface AIRole {
   description?: string;
   avatar_url?: string;
   category: string;
-  
+
   // AI 配置
   default_model: string;
   system_prompt: string;
   temperature: number;
   max_tokens: number;
-  
+
   // 工具與能力
   tools: string[];
   capabilities: Record<string, any>;
-  
+
   // 定價覆寫
   pricing_override?: Record<string, any>;
-  
+
   // 權限與狀態
   creator_user_id?: string;
   is_public: boolean;
   status: RoleStatus;
   version: number;
-  
+
   // 統計
   usage_count: number;
   rating: number;
-  
+
   created_at: string;
   updated_at: string;
 }
@@ -93,28 +93,28 @@ export interface RoleInstance {
   id: string;
   room_id: string;
   role_id: string;
-  
+
   // 實例化配置
   nickname?: string;
   model_override?: string;
   system_prompt_override?: string;
   temperature_override?: number;
   max_tokens_override?: number;
-  
+
   // 實例設定
   settings: Record<string, any>;
   context_window: number;
-  
+
   // 狀態
   is_active: boolean;
   last_used_at?: string;
-  
+
   // 權限
   created_by?: string;
-  
+
   created_at: string;
   updated_at: string;
-  
+
   // 關聯資料
   role?: AIRole;
 }
@@ -161,38 +161,38 @@ export interface AIMessage {
   id: string;
   room_id: string;
   session_id?: string;
-  
+
   // 發送者資訊
   sender_type: SenderType;
   sender_user_id?: string;
   sender_role_instance_id?: string;
-  
+
   // 訊息內容
   content?: string;
   content_json?: Record<string, any>;
   attachments: MessageAttachment[];
-  
+
   // 回覆關係
   reply_to_id?: string;
   thread_id?: string;
-  
+
   // AI 相關
   model_used?: string;
   tool_calls?: Record<string, any>;
   processing_time_ms?: number;
-  
+
   // 狀態
   status: MessageStatus;
   error_message?: string;
-  
+
   // 互動統計
   reactions: Record<string, any>;
   is_pinned: boolean;
   is_edited: boolean;
-  
+
   created_at: string;
   updated_at: string;
-  
+
   // 關聯資料
   sender_user?: {
     id: string;
@@ -207,18 +207,18 @@ export interface MessageAttachment {
   id: string;
   room_id: string;
   message_id: string;
-  
+
   // 檔案資訊
   storage_path: string;
   file_name: string;
   file_size?: number;
   mime_type?: string;
-  
+
   // 處理狀態
   processing_status: 'pending' | 'processing' | 'completed' | 'failed';
   extracted_text?: string;
   metadata: Record<string, any>;
-  
+
   created_by?: string;
   created_at: string;
 }
@@ -239,7 +239,7 @@ export interface SendMessageRequest {
 
 export interface MemoryItem {
   id: string;
-  
+
   // 記憶範圍
   scope: MemoryScope;
   role_id?: string;
@@ -248,29 +248,29 @@ export interface MemoryItem {
   room_id?: string;
   session_id?: string;
   task_id?: string;
-  
+
   // 記憶內容
   key?: string;
   value: string;
   value_json?: Record<string, any>;
-  
+
   // 記憶類型與屬性
   memory_type: MemoryType;
   importance: number; // 0.0-1.0
   confidence: number; // 0.0-1.0
-  
+
   // 來源追蹤
   source: Record<string, any>;
-  
+
   // 語義搜尋
   embedding?: number[];
-  
+
   // 生命週期
   ttl_days?: number;
   expires_at?: string;
   access_count: number;
   last_accessed_at?: string;
-  
+
   created_at: string;
   updated_at: string;
 }
@@ -331,54 +331,54 @@ export interface ModelPricing {
   output_price_usd: number;
   image_price_usd?: number;
   audio_price_usd?: number;
-  
+
   // 限制與配置
   max_tokens?: number;
   context_window?: number;
   supports_tools: boolean;
   supports_vision: boolean;
   supports_audio: boolean;
-  
+
   metadata: Record<string, any>;
   is_active: boolean;
-  
+
   created_at: string;
   updated_at: string;
 }
 
 export interface AIUsage {
   id: string;
-  
+
   // 關聯資訊
   room_id: string;
   session_id?: string;
   message_id?: string;
   role_instance_id?: string;
   user_id?: string;
-  
+
   // 模型資訊
   provider: string;
   model: string;
-  
+
   // 用量統計
   input_tokens: number;
   output_tokens: number;
   image_count: number;
   audio_seconds: number;
   total_tokens: number;
-  
+
   // 性能指標
   latency_ms?: number;
   first_token_ms?: number;
-  
+
   // 成本計算
   cost_usd?: number;
   pricing_snapshot?: ModelPricing;
-  
+
   // 請求詳情
   request_data?: Record<string, any>;
   response_data?: Record<string, any>;
-  
+
   created_at: string;
 }
 
@@ -406,62 +406,64 @@ export interface UsageStats {
 export interface AITask {
   id: string;
   room_id: string;
-  
+
   // 任務基本資訊
   title: string;
   description?: string;
   task_type: string;
-  
+
   // 任務配置
   workflow: Record<string, any>;
   input_data?: Record<string, any>;
   output_data?: Record<string, any>;
-  
+
   // 狀態管理
   status: TaskStatus;
   progress: number;
-  
+
   // 參與角色
   assigned_roles: string[];
   current_role_id?: string;
-  
+
   // 時間追蹤
   started_at?: string;
   completed_at?: string;
   estimated_duration?: number;
-  
+
   // 錯誤處理
   error_message?: string;
   retry_count: number;
   max_retries: number;
-  
+
   created_by?: string;
   created_at: string;
   updated_at: string;
 }
 
+export type Task = AITask;
+
 export interface TaskStep {
   id: string;
   task_id: string;
-  
+
   // 步驟資訊
   step_name: string;
   step_order: number;
   role_instance_id?: string;
-  
+
   // 步驟配置
   input_data?: Record<string, any>;
   output_data?: Record<string, any>;
   prompt_template?: string;
-  
+
   // 狀態
   status: TaskStatus;
   started_at?: string;
   completed_at?: string;
-  
+
   // 關聯訊息
   message_id?: string;
-  
+
   created_at: string;
 }
 
@@ -614,6 +616,7 @@ export interface UseAIRoomReturn {
   addRole: (request: CreateRoleInstanceRequest) => Promise<void>;
   removeRole: (role_instance_id: string) => Promise<void>;
   updateRoom: (updates: Partial<AIRoom>) => Promise<void>;
+  updateRoleInstance: (instanceId: string, updates: Partial<RoleInstance>) => Promise<void>;
 }
 
 export interface UseAIRolesOptions {

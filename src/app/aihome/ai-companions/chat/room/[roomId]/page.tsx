@@ -21,9 +21,14 @@ import {
   ExclamationTriangleIcon,
   UserIcon,
   Cog6ToothIcon,
-  ArrowDownTrayIcon
+  ArrowDownTrayIcon,
+  AdjustmentsHorizontalIcon,
+  AcademicCapIcon,
+  PaintBrushIcon,
+  UsersIcon,
+  ClipboardDocumentIcon,
+  PuzzlePieceIcon
 } from '@heroicons/react/24/outline';
-import { AcademicCapIcon, PaintBrushIcon, UsersIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { getSaasSupabaseClient } from '@/lib/supabase';
@@ -402,18 +407,6 @@ interface Message {
   processingWorkerId?: string;
 }
 
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  assignedTo: 'hibi' | 'mori' | 'pico';
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  progress: number;
-  createdAt: Date;
-  completedAt?: Date;
-  result?: string;
-}
-
 interface AICompanion {
   id: 'hibi' | 'mori' | 'pico';
   name: string;
@@ -437,152 +430,13 @@ interface Room {
   createdAt: Date;
 }
 
-// TaskPanelContent 組件 - 可重用的任務面板內容
-const TaskPanelContent = ({
-  tasks,
-  activeRoles,
-  room,
-  editingProject,
-  editProjectName,
-  setEditProjectName,
-  editProjectDescription,
-  setEditProjectDescription,
-  handleStartEditProject,
-  handleUpdateProject,
-  setEditingProject
-}: {
-  tasks: any[];
-  activeRoles: ('hibi' | 'mori' | 'pico')[];
-  room: any;
-  editingProject: boolean;
-  editProjectName: string;
-  setEditProjectName: (name: string) => void;
-  editProjectDescription: string;
-  setEditProjectDescription: (desc: string) => void;
-  handleStartEditProject: () => void;
-  handleUpdateProject: () => void;
-  setEditingProject: (editing: boolean) => void;
-}) => (
-  <>
-    {/* 任務統計 */}
-    <div className="grid grid-cols-2 gap-3 mb-6">
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-        <div className="text-lg font-bold text-blue-600">{tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length}</div>
-        <div className="text-xs text-blue-500">進行中</div>
-      </div>
-      <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-        <div className="text-lg font-bold text-green-600">{tasks.filter(t => t.status === 'completed').length}</div>
-        <div className="text-xs text-green-500">已完成</div>
-      </div>
-    </div>
+import { ChatSettingsPanel } from '@/components/ai-companion/ChatSettingsPanel';
+import { BlockSelectionModal } from '@/components/ai-companion/BlockSelectionModal';
+import { RoleInstance, Task } from '@/types/ai-companion';
+import { MindBlock } from '@/types/mind-block';
 
-    {/* 專案資訊編輯區域 */}
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[#4B4036] flex items-center space-x-2">
-          <div className="w-4 h-4 bg-purple-400 rounded-full flex items-center justify-center">
-            <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </div>
-          <span>專案資訊</span>
-        </h3>
 
-        {!editingProject && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleStartEditProject}
-            className="flex items-center space-x-1 px-2 py-1 bg-[#FFD59A] hover:bg-[#EBC9A4] text-[#4B4036] rounded-lg text-xs font-medium transition-all shadow-sm"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            <span>編輯</span>
-          </motion.button>
-        )}
-      </div>
 
-      {editingProject ? (
-        /* 編輯模式 */
-        <div className="space-y-3 p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-          <div>
-            <label className="block text-xs font-medium text-[#4B4036] mb-1">專案名稱</label>
-            <input
-              type="text"
-              value={editProjectName}
-              onChange={(e) => setEditProjectName(e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#FFB6C1] focus:border-transparent transition-all"
-              placeholder="輸入專案名稱..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#4B4036] mb-1">專案指引</label>
-            <textarea
-              value={editProjectDescription}
-              onChange={(e) => setEditProjectDescription(e.target.value)}
-              rows={2}
-              className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#FFB6C1] focus:border-transparent transition-all resize-none"
-              placeholder="輸入專案指引..."
-            />
-          </div>
-
-          <div className="flex space-x-2">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleUpdateProject}
-              className="flex-1 px-3 py-1.5 bg-[#FFB6C1] hover:bg-[#FFB6C1]/80 text-white rounded-md text-xs font-medium transition-all shadow-sm"
-            >
-              保存
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setEditingProject(false)}
-              className="flex-1 px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-[#4B4036] rounded-md text-xs font-medium transition-all"
-            >
-              取消
-            </motion.button>
-          </div>
-        </div>
-      ) : (
-        /* 顯示模式 */
-        <div className="p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-          <div className="mb-2">
-            <div className="text-xs font-medium text-purple-700 mb-0.5">專案名稱</div>
-            <div className="text-sm text-[#4B4036] font-semibold">{room.title}</div>
-          </div>
-          <div>
-            <div className="text-xs font-medium text-purple-700 mb-0.5">專案指引</div>
-            <div className="text-xs text-[#2B3A3B] leading-relaxed">{room.description || '暫無指引'}</div>
-          </div>
-        </div>
-      )}
-    </div>
-
-    {/* 任務列表 */}
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-[#4B4036] mb-3">活躍任務</h3>
-      <AnimatePresence>
-        {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
-        ))}
-      </AnimatePresence>
-
-      {tasks.length === 0 && (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 bg-[#F8F5EC] rounded-full flex items-center justify-center mx-auto mb-3">
-            <CpuChipIcon className="w-8 h-8 text-[#2B3A3B]" />
-          </div>
-          <p className="text-sm text-[#2B3A3B]">還沒有任務</p>
-          <p className="text-xs text-[#2B3A3B]/70">在對話中提及需求，AI 會自動創建任務</p>
-        </div>
-      )}
-    </div>
-  </>
-);
 
 // 安全的 JSON 解析函數
 const safeJsonParse = async (response: Response, context: string = 'API') => {
@@ -665,7 +519,7 @@ export default function RoomChatPage() {
     console.log(`🔄 [選擇性渲染] 觸發原因: ${reason}`);
     setForceRender(prev => prev + 1);
   }, []);
-  const [showTaskPanel, setShowTaskPanel] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [activeRoles, setActiveRoles] = useState<('hibi' | 'mori' | 'pico')[]>(() => {
     console.log('🏁 初始化 activeRoles 為空陣列 (將被 URL 參數或資料庫覆蓋)');
     return []; // 空陣列，稍後會被 URL 參數或資料庫覆蓋
@@ -673,6 +527,148 @@ export default function RoomChatPage() {
   const [selectedCompanion, setSelectedCompanion] = useState<'hibi' | 'mori' | 'pico'>('hibi'); // 預設 hibi 統籌
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+
+  // Loadout Panel State
+  const [roleInstancesMap, setRoleInstancesMap] = useState<Record<string, RoleInstance>>({});
+  const [showLoadout, setShowLoadout] = useState(true);
+  const [loadoutModalState, setLoadoutModalState] = useState<{
+    isOpen: boolean;
+    slotType: 'role' | 'style' | 'task';
+    roleInstanceId: string;
+  }>({
+    isOpen: false,
+    slotType: 'role',
+    roleInstanceId: '',
+  });
+
+  // Listen for open-block-selector event
+  useEffect(() => {
+    const handleOpenBlockSelector = (e: CustomEvent) => {
+      setLoadoutModalState({
+        isOpen: true,
+        slotType: e.detail.type,
+        roleInstanceId: e.detail.roleInstanceId,
+      });
+    };
+
+    window.addEventListener('open-block-selector' as any, handleOpenBlockSelector as any);
+    return () => {
+      window.removeEventListener('open-block-selector' as any, handleOpenBlockSelector as any);
+    };
+  }, []);
+
+  // 監聽模型選擇開啟事件（從 ChatSettingsPanel 觸發）
+  useEffect(() => {
+    const handleOpenModelSelector = (e: CustomEvent) => {
+      const companionId = e.detail?.companionId as 'hibi' | 'mori' | 'pico' | undefined;
+      if (!companionId) return;
+
+      // 切換到對應夥伴
+      setSelectedCompanion(companionId);
+
+      // 展開對應角色的模型選擇區域
+      if (companionId === 'pico') {
+        setPicoModelOptionsExpanded(true);
+        setPicoModelOptionsExpandedForModal(true);
+        setPicoModelSelectOpen(true);
+      } else if (companionId === 'mori') {
+        setMoriModelOptionsExpanded(true);
+        setMoriModelOptionsExpandedForModal(true);
+        setMoriModelSelectOpen(true);
+      } else if (companionId === 'hibi') {
+        setHibiModelOptionsExpanded(true);
+        setHibiModelOptionsExpandedForModal(true);
+        setHibiModelSelectOpen(true);
+      }
+    };
+
+    window.addEventListener('open-model-selector' as any, handleOpenModelSelector as any);
+    return () => {
+      window.removeEventListener('open-model-selector' as any, handleOpenModelSelector as any);
+    };
+  }, []);
+
+  // Update Role Instance Helper
+  const handleUpdateRoleInstance = async (instanceId: string, updates: Partial<RoleInstance>) => {
+    try {
+      const supabase = getSaasSupabaseClient();
+      // 1. Update instance
+      const { data: instanceData, error } = await supabase
+        .from('role_instances')
+        .update(updates)
+        .eq('id', instanceId)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      // 2. Fetch role data separately
+      let fullData = instanceData;
+      if (instanceData && instanceData.role_id) {
+        const { data: roleData } = await supabase
+          .from('ai_roles')
+          .select('*')
+          .eq('id', instanceData.role_id)
+          .single();
+
+        if (roleData) {
+          fullData = { ...instanceData, role: roleData } as any;
+        }
+      }
+
+      // Update local state
+      setRoleInstancesMap(prev => {
+        const newMap = { ...prev };
+        // Find the key for this instance
+        const key = Object.keys(newMap).find(k => newMap[k].id === instanceId);
+        if (key) {
+          newMap[key] = fullData as unknown as RoleInstance;
+        }
+        return newMap;
+      });
+
+      const { default: toast } = await import('react-hot-toast');
+      toast.success('角色設定已更新');
+    } catch (error) {
+      console.error('更新角色失敗:', error);
+      const { default: toast } = await import('react-hot-toast');
+      toast.error('更新角色失敗');
+    }
+  };
+
+  // Handle Block Selection
+  const handleBlockSelect = async (block: MindBlock) => {
+    const { roleInstanceId, slotType } = loadoutModalState;
+    // Find the role instance in the map
+    const roleKey = Object.keys(roleInstancesMap).find(k => roleInstancesMap[k].id === roleInstanceId);
+    const roleInstance = roleKey ? roleInstancesMap[roleKey] : null;
+
+    if (roleInstance) {
+      const currentSettings = roleInstance.settings || {};
+      const currentEquipped = currentSettings.equipped_blocks || {};
+
+      const newEquipped = {
+        ...currentEquipped,
+        [slotType]: block
+      };
+
+      // Construct new system prompt
+      let newSystemPrompt = roleInstance.role?.system_prompt || '';
+
+      if (newEquipped.role) newSystemPrompt += `\n\n[Role Definition]\n${newEquipped.role.content_json?.blocks?.[0]?.params?.content || ''}`;
+      if (newEquipped.style) newSystemPrompt += `\n\n[Style Guide]\n${newEquipped.style.content_json?.blocks?.[0]?.params?.content || ''}`;
+      if (newEquipped.task) newSystemPrompt += `\n\n[Current Task]\n${newEquipped.task.content_json?.blocks?.[0]?.params?.content || ''}`;
+
+      await handleUpdateRoleInstance(roleInstanceId, {
+        settings: {
+          ...currentSettings,
+          equipped_blocks: newEquipped
+        },
+        system_prompt_override: newSystemPrompt
+      });
+      setLoadoutModalState(prev => ({ ...prev, isOpen: false }));
+    }
+  };
 
   // Pico 圖片生成快捷選項
   const [picoImageSize, setPicoImageSize] = useState<string>(() => {
@@ -777,6 +773,9 @@ export default function RoomChatPage() {
   const [loadingPicoModels, setLoadingPicoModels] = useState(false);
   const [loadingMoriModels, setLoadingMoriModels] = useState(false);
   const [loadingHibiModels, setLoadingHibiModels] = useState(false);
+
+  // Feature flag: 是否顯示皮可的「圖片設定選項」區塊
+  const ENABLE_PICO_IMAGE_OPTIONS = false;
 
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(roomId);
   // 兼容的 UUID 生成函數
@@ -1502,43 +1501,93 @@ export default function RoomChatPage() {
           .filter(Boolean);
 
         if (roleInstanceIds.length > 0) {
-          // 第二步：查 role_instances 取得 role_id
-          const { data: roleInstances, error: roleInstancesError } = await supabase
+          // 第二步：查 role_instances 取得完整資訊
+          const { data: roleInstancesData, error: roleInstancesError } = await supabase
             .from('role_instances')
-            .select('id, role_id')
+            .select('*')
             .in('id', roleInstanceIds);
+
+          let roleInstances = roleInstancesData;
+
+          if (!roleInstancesError && roleInstancesData && roleInstancesData.length > 0) {
+            // Fetch roles separately
+            const roleIds = roleInstancesData.map((ri: any) => ri.role_id).filter(Boolean);
+            if (roleIds.length > 0) {
+              const { data: rolesData } = await supabase
+                .from('ai_roles')
+                .select('*')
+                .in('id', roleIds);
+
+              if (rolesData) {
+                // Merge role data
+                roleInstances = roleInstancesData.map((ri: any) => ({
+                  ...ri,
+                  role: rolesData.find((r: any) => r.id === ri.role_id)
+                }));
+
+                // Fetch equipped mind blocks
+                if (user) {
+                  const { data: mindBlocksData } = await supabase
+                    .from('role_mind_blocks' as any)
+                    .select('role_id, mind_block_id, is_active')
+                    .in('role_id', roleIds)
+                    .eq('user_id', user.id)
+                    .eq('is_active', true);
+
+                  if (mindBlocksData && mindBlocksData.length > 0) {
+                    const blockIds = mindBlocksData.map((mb: any) => mb.mind_block_id);
+                    const { data: blocksInfo } = await supabase
+                      .from('mind_blocks' as any)
+                      .select('id, title')
+                      .in('id', blockIds);
+
+                    if (blocksInfo) {
+                      roleInstances = roleInstances.map((ri: any) => {
+                        const equipped = mindBlocksData.filter((mb: any) => mb.role_id === ri.role_id);
+                        const blocks = equipped.map((mb: any) => blocksInfo.find((b: any) => b.id === mb.mind_block_id)).filter(Boolean);
+                        return {
+                          ...ri,
+                          mindBlocks: blocks
+                        };
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          }
 
           if (roleInstancesError) {
             console.log('⚠️ 載入角色實例失敗:', roleInstancesError);
           } else {
+            // Populate roleInstancesMap
+            const newRoleInstancesMap: Record<string, RoleInstance> = {};
+
             const roleIds = (roleInstances || [])
-              .map((ri: any) => ri?.role_id)
+              .map((ri: any) => {
+                const slug = ri.role?.slug;
+                if (slug) {
+                  // Normalize slug to internal name
+                  let internalName = slug;
+                  if (slug.includes('hibi-manager')) internalName = 'hibi';
+                  else if (slug.includes('mori-researcher')) internalName = 'mori';
+                  else if (slug.includes('pico-artist')) internalName = 'pico';
+
+                  newRoleInstancesMap[internalName] = ri as unknown as RoleInstance;
+                  return ri.role_id;
+                }
+                return null;
+              })
               .filter(Boolean);
 
+            setRoleInstancesMap(newRoleInstancesMap);
+
             if (roleIds.length > 0) {
-              // 第三步：查 ai_roles 取得 slug
-              const { data: aiRoles, error: aiRolesError } = await supabase
-                .from('ai_roles')
-                .select('id, slug')
-                .in('id', roleIds);
+              // 第三步：查 ai_roles 取得 slug (其實上面已經有了，但為了保持原有邏輯結構暫時保留，或者直接用上面的 map 結果)
+              // 既然我們已經 join 了 role，其實不需要第三步了，直接構造 roomRoles
 
-              if (aiRolesError) {
-                console.log('⚠️ 載入 AI 角色失敗:', aiRolesError);
-              } else {
-                const rawSlugs = (aiRoles || [])
-                  .map((ar: any) => ar?.slug)
-                  .filter(Boolean);
-
-                // 將資料庫中的 slug 轉換為內部使用的格式
-                roomRoles = rawSlugs.map(slug => {
-                  if (slug.includes('hibi-manager')) return 'hibi';
-                  if (slug.includes('mori-researcher')) return 'mori';
-                  if (slug.includes('pico-artist')) return 'pico';
-                  return slug; // 保持其他格式不變
-                });
-
-                console.log('✅ 從資料庫載入的房間角色:', roomRoles);
-              }
+              roomRoles = Object.values(newRoleInstancesMap).map((instance: any) => instance.role?.slug || instance.role?.name || '').filter(Boolean);
+              console.log('✅ 從資料庫載入的房間角色:', roomRoles);
             }
           }
         } else {
@@ -4531,12 +4580,18 @@ export default function RoomChatPage() {
       // 協作任務交由 hibi 統籌
       const newTask: Task = {
         id: generateUUID(),
+        room_id: roomId as string,
         title: `協作任務：${userMessage.slice(0, 20)}...`,
         description: userMessage,
-        assignedTo: 'hibi',
-        status: 'pending',
+        task_type: 'general',
+        workflow: {},
+        assigned_roles: ['hibi'],
+        status: 'queued',
         progress: 0,
-        createdAt: new Date()
+        retry_count: 0,
+        max_retries: 3,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       setTasks(prev => [...prev, newTask]);
       return {
@@ -4863,14 +4918,14 @@ export default function RoomChatPage() {
                         whileHover={{ backgroundColor: "#FFFBEB" }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => {
-                          setShowTaskPanel(!showTaskPanel);
+                          setShowSettingsPanel(!showSettingsPanel);
                           setShowMobileMenu(false);
                         }}
                         className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors"
                       >
-                        <Cog6ToothIcon className="w-5 h-5 text-[#4B4036]" />
+                        <AdjustmentsHorizontalIcon className="w-5 h-5 text-[#4B4036]" />
                         <span className="text-sm font-medium text-[#4B4036]">
-                          {showTaskPanel ? '關閉任務面板' : '打開任務面板'}
+                          {showSettingsPanel ? '關閉設定面板' : '打開設定面板'}
                         </span>
                       </motion.button>
                     </motion.div>
@@ -4891,8 +4946,8 @@ export default function RoomChatPage() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowSearchBox(!showSearchBox)}
                 className={`p-2 rounded-xl transition-all shadow-md ${showSearchBox
-                    ? 'bg-[#FFD59A] text-white shadow-lg'
-                    : 'hover:bg-[#FFD59A]/20 text-[#4B4036] hover:shadow-lg'
+                  ? 'bg-[#FFD59A] text-white shadow-lg'
+                  : 'hover:bg-[#FFD59A]/20 text-[#4B4036] hover:shadow-lg'
                   }`}
                 title="搜尋對話"
               >
@@ -4924,8 +4979,8 @@ export default function RoomChatPage() {
                   }
                 }}
                 className={`p-2 rounded-xl transition-all shadow-md ${showSettingsModal
-                    ? 'bg-[#FFB6C1] text-white shadow-lg'
-                    : 'hover:bg-[#FFB6C1]/20 text-[#4B4036] hover:shadow-lg'
+                  ? 'bg-[#FFB6C1] text-white shadow-lg'
+                  : 'hover:bg-[#FFB6C1]/20 text-[#4B4036] hover:shadow-lg'
                   }`}
                 title="角色設定"
               >
@@ -4938,8 +4993,8 @@ export default function RoomChatPage() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowBlackboard(!showBlackboard)}
                 className={`p-2 rounded-xl transition-all shadow-md ${showBlackboard
-                    ? 'bg-[#FFD59A] text-[#4B4036] shadow-lg'
-                    : 'hover:bg-[#FFD59A]/30 text-[#4B4036] hover:shadow-lg'
+                  ? 'bg-[#FFD59A] text-[#4B4036] shadow-lg'
+                  : 'hover:bg-[#FFD59A]/30 text-[#4B4036] hover:shadow-lg'
                   }`}
                 title={showBlackboard ? '隱藏黑板' : '顯示黑板'}
               >
@@ -4974,38 +5029,33 @@ export default function RoomChatPage() {
                 </svg>
               </motion.button>
 
-              {/* 任務面板切換 */}
+              {/* Settings Panel Toggle */}
               <motion.button
-                whileHover={{ scale: 1.05, rotate: 180 }}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => setShowSettingsPanel(!showSettingsPanel)}
                 animate={{
-                  rotate: showTaskPanel ? 180 : 0,
-                  backgroundColor: showTaskPanel ? "#FFD59A" : "transparent"
+                  rotate: showSettingsPanel ? 180 : 0,
+                  backgroundColor: showSettingsPanel ? "#FFB6C1" : "transparent"
                 }}
-                transition={{ duration: 0.3 }}
-                onClick={() => {
-                  setShowTaskPanel(!showTaskPanel);
-                  if (showTaskPanel) {
-                    setEditingProject(false); // 關閉編輯模式
-                  }
-                }}
-                className={`p-2 rounded-xl transition-all shadow-md ${showTaskPanel
-                    ? 'bg-[#FFD59A] text-[#4B4036] shadow-lg'
-                    : 'hover:bg-[#FFD59A]/20 text-[#4B4036] hover:shadow-lg'
+                className={`p-2 rounded-xl transition-all shadow-md ${showSettingsPanel
+                  ? "bg-[#FFB6C1] text-white"
+                  : "bg-white/50 hover:bg-white/80 text-[#4B4036]"
                   }`}
-                title="切換任務面板"
+                title={showSettingsPanel ? '關閉設定面板' : '打開設定面板'}
               >
-                <Cog6ToothIcon className="w-6 h-6" />
+                <AdjustmentsHorizontalIcon className="w-6 h-6" />
               </motion.button>
             </div>
           </div>
         </div>
-      </nav>
+      </nav >
 
       {/* 側邊欄 */}
-      <AppSidebar
+      < AppSidebar
         isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={() => setSidebarOpen(false)
+        }
         currentPath="/aihome/ai-companions"
       />
       <div className="flex h-[calc(100vh-64px)]">
@@ -5096,8 +5146,8 @@ export default function RoomChatPage() {
                       onClick={() => loadOlderMessages()}
                       disabled={isLoadingOlderMessages}
                       className={`px-4 py-2 mb-2 rounded-full border border-[#EADBC8] text-sm font-medium transition-all ${isLoadingOlderMessages
-                          ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed'
-                          : 'bg-white/80 text-[#4B4036] hover:bg-[#FFF4E0] shadow-sm'
+                        ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed'
+                        : 'bg-white/80 text-[#4B4036] hover:bg-[#FFF4E0] shadow-sm'
                         }`}
                     >
                       {isLoadingOlderMessages ? '載入中…' : '載入更多訊息'}
@@ -5139,12 +5189,12 @@ export default function RoomChatPage() {
                     {/* AI 頭像 */}
                     <motion.div
                       className={`w-8 h-8 rounded-full bg-gradient-to-br ${processingCompanion === 'pico'
-                          ? 'from-blue-400 to-cyan-500'
-                          : processingCompanion === 'mori'
-                            ? 'from-amber-400 to-orange-500'
-                            : processingCompanion === 'hibi'
-                              ? 'from-orange-400 to-red-500'
-                              : 'from-purple-400 to-pink-500'
+                        ? 'from-blue-400 to-cyan-500'
+                        : processingCompanion === 'mori'
+                          ? 'from-amber-400 to-orange-500'
+                          : processingCompanion === 'hibi'
+                            ? 'from-orange-400 to-red-500'
+                            : 'from-purple-400 to-pink-500'
                         } p-0.5 flex-shrink-0`}
                       animate={{
                         scale: [1, 1.1, 1],
@@ -5217,8 +5267,8 @@ export default function RoomChatPage() {
                           className="mb-2"
                         >
                           <div className={`flex items-center space-x-1.5 text-xs rounded-lg px-2 py-1.5 ${queueCount > 0
-                              ? 'bg-blue-50/50 border border-blue-200/50'
-                              : 'bg-gray-50/50 border border-gray-200/50'
+                            ? 'bg-blue-50/50 border border-blue-200/50'
+                            : 'bg-gray-50/50 border border-gray-200/50'
                             }`}>
                             <ClockIcon className={`w-3.5 h-3.5 flex-shrink-0 ${queueCount > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
                             <span className={`font-medium ${queueCount > 0 ? 'text-blue-700' : 'text-gray-600'}`}>
@@ -5236,36 +5286,36 @@ export default function RoomChatPage() {
                           animate={{ scale: [1, 1.4, 1] }}
                           transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
                           className={`w-2 h-2 rounded-full bg-gradient-to-r ${processingCompanion === 'pico'
-                              ? 'from-blue-400 to-cyan-500'
-                              : processingCompanion === 'mori'
-                                ? 'from-amber-400 to-orange-500'
-                                : processingCompanion === 'hibi'
-                                  ? 'from-orange-400 to-red-500'
-                                  : 'from-purple-400 to-pink-500'
+                            ? 'from-blue-400 to-cyan-500'
+                            : processingCompanion === 'mori'
+                              ? 'from-amber-400 to-orange-500'
+                              : processingCompanion === 'hibi'
+                                ? 'from-orange-400 to-red-500'
+                                : 'from-purple-400 to-pink-500'
                             }`}
                         />
                         <motion.div
                           animate={{ scale: [1, 1.4, 1] }}
                           transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
                           className={`w-2 h-2 rounded-full bg-gradient-to-r ${processingCompanion === 'pico'
-                              ? 'from-blue-400 to-cyan-500'
-                              : processingCompanion === 'mori'
-                                ? 'from-amber-400 to-orange-500'
-                                : processingCompanion === 'hibi'
-                                  ? 'from-orange-400 to-red-500'
-                                  : 'from-purple-400 to-pink-500'
+                            ? 'from-blue-400 to-cyan-500'
+                            : processingCompanion === 'mori'
+                              ? 'from-amber-400 to-orange-500'
+                              : processingCompanion === 'hibi'
+                                ? 'from-orange-400 to-red-500'
+                                : 'from-purple-400 to-pink-500'
                             }`}
                         />
                         <motion.div
                           animate={{ scale: [1, 1.4, 1] }}
                           transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
                           className={`w-2 h-2 rounded-full bg-gradient-to-r ${processingCompanion === 'pico'
-                              ? 'from-blue-400 to-cyan-500'
-                              : processingCompanion === 'mori'
-                                ? 'from-amber-400 to-orange-500'
-                                : processingCompanion === 'hibi'
-                                  ? 'from-orange-400 to-red-500'
-                                  : 'from-purple-400 to-pink-500'
+                            ? 'from-blue-400 to-cyan-500'
+                            : processingCompanion === 'mori'
+                              ? 'from-amber-400 to-orange-500'
+                              : processingCompanion === 'hibi'
+                                ? 'from-orange-400 to-red-500'
+                                : 'from-purple-400 to-pink-500'
                             }`}
                         />
                       </div>
@@ -5284,14 +5334,14 @@ export default function RoomChatPage() {
                       <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
                         <motion.div
                           className={`h-1 rounded-full ${elapsedTime > estimatedTime
-                              ? 'bg-gradient-to-r from-orange-400 to-red-500'
-                              : processingCompanion === 'pico'
-                                ? 'bg-gradient-to-r from-blue-400 to-cyan-500'
-                                : processingCompanion === 'mori'
-                                  ? 'bg-gradient-to-r from-amber-400 to-orange-500'
-                                  : processingCompanion === 'hibi'
-                                    ? 'bg-gradient-to-r from-orange-400 to-red-500'
-                                    : 'bg-gradient-to-r from-purple-400 to-pink-500'
+                            ? 'bg-gradient-to-r from-orange-400 to-red-500'
+                            : processingCompanion === 'pico'
+                              ? 'bg-gradient-to-r from-blue-400 to-cyan-500'
+                              : processingCompanion === 'mori'
+                                ? 'bg-gradient-to-r from-amber-400 to-orange-500'
+                                : processingCompanion === 'hibi'
+                                  ? 'bg-gradient-to-r from-orange-400 to-red-500'
+                                  : 'bg-gradient-to-r from-purple-400 to-pink-500'
                             }`}
                           initial={{ width: 0 }}
                           animate={{
@@ -5413,7 +5463,7 @@ export default function RoomChatPage() {
                 {(() => {
                   // 顯示當前活躍的角色
                   const modes = [
-                    { id: 'hibi', label: 'Hibi', purpose: '統籌', icon: CpuChipIcon, imagePath: '/3d-character-backgrounds/studio/lulu(front).png', color: 'from-[#FF8C42] to-[#FFB366]' },
+                    { id: 'hibi', label: 'Hibi', purpose: '統籌', icon: CpuChipIcon, imagePath: '/3d-character-backgrounds/studio/Hibi/lulu(front).png', color: 'from-[#FF8C42] to-[#FFB366]' },
                     { id: 'mori', label: '墨墨', purpose: '研究', icon: AcademicCapIcon, imagePath: '/3d-character-backgrounds/studio/Mori/Mori.png', color: 'from-[#D4A574] to-[#E6C8A0]' },
                     { id: 'pico', label: '皮可', purpose: '繪圖', icon: PaintBrushIcon, imagePath: '/3d-character-backgrounds/studio/Pico/Pico.png', color: 'from-[#FFB6C1] to-[#FFCDD6]' }
                   ];
@@ -5448,8 +5498,8 @@ export default function RoomChatPage() {
                     }}
                     onClick={() => setSelectedCompanion(mode.id as any)}
                     className={`relative flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-xl text-sm font-medium transition-all ${selectedCompanion === mode.id
-                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg transform scale-105'
-                        : 'text-[#4B4036] hover:bg-[#FFD59A]/20 hover:shadow-md'
+                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg transform scale-105'
+                      : 'text-[#4B4036] hover:bg-[#FFD59A]/20 hover:shadow-md'
                       }`}
                   >
                     {/* 桌面版：顯示圖標 */}
@@ -5508,8 +5558,8 @@ export default function RoomChatPage() {
             animate={{ y: 0, opacity: 1 }}
             className="p-6 pb-24 lg:pb-6 bg-gradient-to-r from-white/80 to-white/70 backdrop-blur-sm border-t border-[#EADBC8]"
           >
-            {/* Pico 圖片選項 - 只在選擇 Pico 時顯示 */}
-            {selectedCompanion === 'pico' && (
+            {/* Pico 圖片選項 - 目前隱藏，如需開啟請將條件改回 selectedCompanion === 'pico' */}
+            {false && selectedCompanion === 'pico' && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -5572,8 +5622,8 @@ export default function RoomChatPage() {
                                   setPicoCustomSize('');
                                 }}
                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${picoImageSize === size && !showCustomSizeInput
-                                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                                    : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                                  : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
                                   }`}
                               >
                                 {size}
@@ -5591,8 +5641,8 @@ export default function RoomChatPage() {
                                 }
                               }}
                               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-1 ${showCustomSizeInput
-                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                                  : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                                : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
                                 }`}
                             >
                               <PlusIcon className="w-4 h-4" />
@@ -5670,8 +5720,8 @@ export default function RoomChatPage() {
                                   setPicoCustomStyle('');
                                 }}
                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${picoImageStyle === style.value && !showCustomStyleInput
-                                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                                    : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                                  : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
                                   }`}
                               >
                                 {style.label}
@@ -5689,8 +5739,8 @@ export default function RoomChatPage() {
                                 }
                               }}
                               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-1 ${showCustomStyleInput
-                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                                  : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
+                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                                : 'bg-white/80 text-[#4B4036] border border-[#EADBC8] hover:border-[#FFB6C1]'
                                 }`}
                             >
                               <PlusIcon className="w-4 h-4" />
@@ -5849,6 +5899,16 @@ export default function RoomChatPage() {
               };
               const modelState = getRoleModelState();
               const dropdownDataAttr = roleId === 'pico' ? 'data-pico-model-dropdown' : roleId === 'mori' ? 'data-mori-model-dropdown' : 'data-hibi-model-dropdown';
+
+              // 取得對應夥伴的角色實例與已裝備的思維積木標題
+              const instanceForCompanion =
+                roleInstancesMap[roleId] || Object.values(roleInstancesMap)[0] || null;
+              const equippedBlocks = (instanceForCompanion?.settings as any)?.equipped_blocks || {};
+              const mindTitle =
+                equippedBlocks.role?.title ||
+                equippedBlocks.style?.title ||
+                equippedBlocks.task?.title ||
+                '未裝備';
 
               return (
                 <motion.div
@@ -6037,18 +6097,31 @@ export default function RoomChatPage() {
                                               if (roleId === 'mori' && modelState.setSelectedModelsMulti) {
                                                 modelState.setSelectedModelsMulti([]);
                                               }
+                                              // 將模型重設為預設並同步保存（會刪除 user_role_settings 覆寫紀錄）
+                                              modelState.saveFunction(DEFAULT_MODEL_SENTINEL);
                                             }}
                                             className={`w-full text-left px-6 py-3 text-sm transition-colors border-b border-[#EADBC8]/30 ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL
-                                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                                : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                              : 'text-[#4B4036] hover:bg-[#FFFBEB]'
                                               }`}
                                           >
                                             <div className="font-medium">預設（建議）</div>
-                                            {modelState.roleDefaultModel && (
-                                              <div className={`text-xs mt-1 ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL ? 'opacity-90' : 'opacity-70'}`}>
-                                                {formatModelDisplay(modelState.roleDefaultModel)}
-                                              </div>
-                                            )}
+                                            {modelState.roleDefaultModel && (() => {
+                                              const defaultModelData = modelState.getFilteredModels().find((m: any) => m.model_id === modelState.roleDefaultModel) || availableModels.find((m: any) => m.model_id === modelState.roleDefaultModel);
+                                              return (
+                                                <>
+                                                  <div className={`text-xs mt-1 ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL ? 'opacity-90' : 'opacity-70'}`}>
+                                                    {formatModelDisplay(modelState.roleDefaultModel)}
+                                                  </div>
+                                                  {defaultModelData && (
+                                                    <div className={`text-[10px] mt-1 flex items-center gap-1 ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL ? 'opacity-80' : 'opacity-60'}`}>
+                                                      <span>100字提問：約 {computeFoodFor100(defaultModelData)} 食量</span>
+                                                      <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
+                                                    </div>
+                                                  )}
+                                                </>
+                                              );
+                                            })()}
                                           </motion.button>
 
                                           {/* 多選模型提示（僅 Mori） */}
@@ -6110,10 +6183,10 @@ export default function RoomChatPage() {
                                                   }
                                                 }}
                                                 className={`w-full text-left px-6 py-3 text-sm transition-colors border-b border-[#EADBC8]/30 ${isSelected
-                                                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                                    : isDisabled
-                                                      ? 'text-gray-400 cursor-not-allowed'
-                                                      : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                                  : isDisabled
+                                                    ? 'text-gray-400 cursor-not-allowed'
+                                                    : 'text-[#4B4036] hover:bg-[#FFFBEB]'
                                                   }`}
                                               >
                                                 <div className="flex items-center justify-between">
@@ -6150,6 +6223,156 @@ export default function RoomChatPage() {
                                     </>
                                   </AnimatePresence>,
                                   document.body
+                                )}
+                              </div>
+
+                              {/* 思維積木設定展開區（每個角色一個） */}
+                              <div className="mt-3 border-t border-[#EADBC8]/40 pt-3">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-[#4B4036] mb-2">
+                                  <PuzzlePieceIcon className="w-4 h-4" />
+                                  <span>思維積木設定</span>
+                                </div>
+                                
+                                {mindTitle !== '未裝備' ? (
+                                  // 已裝備：顯示積木名稱和類型
+                                  <div className="space-y-2">
+                                    <div className="px-3 py-2 rounded-lg border border-[#FFD59A] bg-[#FFF9F2]">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-semibold text-[#4B4036]">{mindTitle}</span>
+                                        <button
+                                          onClick={() => {
+                                            if (!instanceForCompanion) return;
+                                            const event = new CustomEvent('open-block-selector', {
+                                              detail: { type: 'role', roleInstanceId: instanceForCompanion.id }
+                                            });
+                                            window.dispatchEvent(event);
+                                          }}
+                                          className="text-[10px] text-[#4B4036]/60 hover:text-[#4B4036] underline"
+                                        >
+                                          更換
+                                        </button>
+                                      </div>
+                                      {/* 顯示積木類型 */}
+                                      {(() => {
+                                        const equippedBlock = equippedBlocks.role || equippedBlocks.style || equippedBlocks.task;
+                                        if (!equippedBlock) return null;
+                                        
+                                        const types = new Set<string>();
+                                        
+                                        // 方法1: 檢查 block_type 字段（單一類型積木）
+                                        if (equippedBlock.block_type) {
+                                          types.add(equippedBlock.block_type);
+                                        }
+                                        
+                                        // 方法2: 解析 content_json（複合積木）
+                                        if (equippedBlock.content_json) {
+                                          const traverse = (blocks: any[]) => {
+                                            blocks.forEach((b: any) => {
+                                              if (b.type) types.add(b.type);
+                                              if (b.children && Array.isArray(b.children)) {
+                                                traverse(b.children);
+                                              }
+                                            });
+                                          };
+                                          
+                                          if (equippedBlock.content_json.blocks && Array.isArray(equippedBlock.content_json.blocks)) {
+                                            traverse(equippedBlock.content_json.blocks);
+                                          }
+                                        }
+                                        
+                                        if (types.size === 0) return null;
+                                        
+                                        const typeConfigMap: Record<string, { label: string; color: string }> = {
+                                          role: { label: '角色', color: 'purple' },
+                                          style: { label: '風格', color: 'pink' },
+                                          task: { label: '任務', color: 'orange' },
+                                          context: { label: '上下文', color: 'blue' },
+                                          rule: { label: '規則', color: 'red' },
+                                          variable: { label: '變數', color: 'indigo' },
+                                          search: { label: '搜尋', color: 'teal' },
+                                          reason: { label: '推理', color: 'yellow' },
+                                          output: { label: '輸出', color: 'green' }
+                                        };
+                                        
+                                        const getColorClasses = (color: string) => {
+                                          const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+                                            purple: { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-600' },
+                                            pink: { bg: 'bg-pink-50', border: 'border-pink-300', text: 'text-pink-600' },
+                                            orange: { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-600' },
+                                            blue: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-600' },
+                                            red: { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-600' },
+                                            indigo: { bg: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-600' },
+                                            teal: { bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-600' },
+                                            yellow: { bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-600' },
+                                            green: { bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-600' },
+                                            gray: { bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-600' }
+                                          };
+                                          return colorMap[color] || colorMap.gray;
+                                        };
+                                        
+                                        // 按照優先順序排序（角色、風格、任務優先）
+                                        const priorityOrder = ['role', 'style', 'task'];
+                                        const sortedTypes = Array.from(types).sort((a, b) => {
+                                          const aIndex = priorityOrder.indexOf(a);
+                                          const bIndex = priorityOrder.indexOf(b);
+                                          if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                                          if (aIndex !== -1) return -1;
+                                          if (bIndex !== -1) return 1;
+                                          return a.localeCompare(b);
+                                        });
+                                        
+                                        const typeArray = sortedTypes.slice(0, 5);
+                                        const remainingCount = sortedTypes.length > 5 ? sortedTypes.length - 5 : 0;
+                                        
+                                        return (
+                                          <div className="flex items-center gap-1 flex-wrap">
+                                            {typeArray.map((type) => {
+                                              const config = typeConfigMap[type] || { 
+                                                label: type.charAt(0).toUpperCase() + type.slice(1), // 自訂類型首字母大寫
+                                                color: 'gray' 
+                                              };
+                                              const colors = getColorClasses(config.color);
+                                              return (
+                                                <span
+                                                  key={type}
+                                                  className={`px-2 py-0.5 rounded-lg border text-[9px] font-semibold ${colors.bg} ${colors.border} ${colors.text}`}
+                                                >
+                                                  {config.label}
+                                                </span>
+                                              );
+                                            })}
+                                            {remainingCount > 0 && (
+                                              <span className="px-2 py-0.5 rounded-lg border text-[9px] font-semibold bg-gray-50 border-gray-300 text-gray-600">
+                                                +{remainingCount}
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  // 未裝備：顯示選擇按鈕
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        if (!instanceForCompanion) return;
+                                        const event = new CustomEvent('open-block-selector', {
+                                          detail: { type: 'role', roleInstanceId: instanceForCompanion.id }
+                                        });
+                                        window.dispatchEvent(event);
+                                      }}
+                                      className="w-full px-3 py-2 rounded-lg border border-[#EADBC8] bg-white hover:border-[#FFD59A] hover:bg-[#FFF9F2] flex items-center justify-between text-xs text-[#4B4036] transition-all"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <PuzzlePieceIcon className="w-4 h-4 text-[#FFB6C1]" />
+                                        <span className="font-semibold">選擇思維積木</span>
+                                      </span>
+                                    </button>
+                                    <p className="mt-1 text-[11px] text-[#4B4036]/70">
+                                      為 {companion.name} 裝備角色、風格或任務積木，讓回應更符合你的預期。
+                                    </p>
+                                  </>
                                 )}
                               </div>
 
@@ -6194,9 +6417,11 @@ export default function RoomChatPage() {
                               {/* 選中模型詳情 */}
                               <div className="p-3 bg-[#FFF9F2] border border-[#FFB6C1] rounded-lg">
                                 {(() => {
-                                  if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL && (roleId !== 'mori' || !modelState.selectedModelsMulti || modelState.selectedModelsMulti.length === 0)) {
-                                    return <div className="text-sm text-[#4B4036]">將使用角色的預設模型</div>;
-                                  }
+                                  // 即使使用預設模型，也顯示模型詳情和食量
+                                  // if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL && (roleId !== 'mori' || !modelState.selectedModelsMulti || modelState.selectedModelsMulti.length === 0)) {
+                                  //   // 預設模型情況下不再重覆顯示說明
+                                  //   return null;
+                                  // }
 
                                   if (roleId === 'mori' && modelState.selectedModelsMulti && modelState.selectedModelsMulti.length > 0) {
                                     const multiModels = modelState.selectedModelsMulti.map((modelId: string) => {
@@ -6216,9 +6441,9 @@ export default function RoomChatPage() {
                                                 <div className="flex items-center justify-between">
                                                   <span className="text-[#4B4036]">{stripFree(model.display_name || '')}</span>
                                                   <span className={`px-2 py-0.5 rounded-full text-xs ${stripFree(model.price_tier || '') === '免費' || model.price_tier === '免費' ? 'bg-green-100 text-green-800' :
-                                                      stripFree(model.price_tier || '') === '經濟' || model.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
-                                                        stripFree(model.price_tier || '') === '標準' || model.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
-                                                          'bg-purple-100 text-purple-800'
+                                                    stripFree(model.price_tier || '') === '經濟' || model.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
+                                                      stripFree(model.price_tier || '') === '標準' || model.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-purple-100 text-purple-800'
                                                     }`}>
                                                     {stripFree(model.price_tier || '')}
                                                   </span>
@@ -6238,9 +6463,9 @@ export default function RoomChatPage() {
                                       <div className="flex items-center justify-between">
                                         <div className="text-sm font-medium text-[#4B4036]">{stripFree(selectedModelData.display_name || '')}</div>
                                         <div className={`px-2 py-1 rounded-full text-xs font-medium ${stripFree(selectedModelData.price_tier || '') === '免費' || selectedModelData.price_tier === '免費' ? 'bg-green-100 text-green-800' :
-                                            stripFree(selectedModelData.price_tier || '') === '經濟' || selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
-                                              stripFree(selectedModelData.price_tier || '') === '標準' || selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
-                                                'bg-purple-100 text-purple-800'
+                                          stripFree(selectedModelData.price_tier || '') === '經濟' || selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
+                                            stripFree(selectedModelData.price_tier || '') === '標準' || selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-purple-100 text-purple-800'
                                           }`}>
                                           {stripFree(selectedModelData.price_tier || '')}
                                         </div>
@@ -6299,8 +6524,8 @@ export default function RoomChatPage() {
                   onClick={handleSendMessage}
                   disabled={!inputMessage.trim() || isLoading || isTyping || isSending}
                   className={`relative p-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white rounded-xl shadow-lg hover:shadow-xl transition-all ${!inputMessage.trim() || isLoading || isTyping
-                      ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:scale-105'
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:scale-105'
                     }`}
                   title="發送訊息"
                 >
@@ -6330,33 +6555,38 @@ export default function RoomChatPage() {
           </motion.div>
         </div>
 
-        {/* 任務面板 */}
-        <AnimatePresence>
-          {showTaskPanel && (
+        {/* Loadout Panel */}
+        {/* Settings Panel (Unified Loadout & Tasks) */}
+        <AnimatePresence mode="wait">
+          {showSettingsPanel && (
             <>
-              {/* 桌面版：側邊面板 */}
+              {/* Desktop Panel */}
               <motion.div
                 initial={{ x: 300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 300, opacity: 0 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="hidden md:block w-80 bg-white/80 backdrop-blur-sm border-l border-[#EADBC8] p-6 overflow-y-auto"
+                className="hidden md:block w-80 h-full z-20"
               >
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-[#4B4036]">任務面板</h2>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => {
-                      setShowTaskPanel(false);
-                      setEditingProject(false);
-                    }}
-                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <XMarkIcon className="w-5 h-5 text-gray-500" />
-                  </motion.button>
-                </div>
-                <TaskPanelContent
+                <ChatSettingsPanel
+                  roleInstance={
+                    selectedCompanion && roleInstancesMap[selectedCompanion]
+                      ? roleInstancesMap[selectedCompanion]
+                      : Object.values(roleInstancesMap)[0]
+                  }
+                  roleInstances={Object.values(roleInstancesMap)}
+                  onUpdateRole={(updates) => {
+                    const instance = selectedCompanion && roleInstancesMap[selectedCompanion]
+                      ? roleInstancesMap[selectedCompanion]
+                      : Object.values(roleInstancesMap)[0];
+                    if (instance) {
+                      return handleUpdateRoleInstance(instance.id, updates);
+                    }
+                    return Promise.resolve();
+                  }}
+                  onUpdateRoleInstance={handleUpdateRoleInstance}
+                  onClose={() => setShowSettingsPanel(false)}
+                  // Task Panel Props
                   tasks={tasks}
                   activeRoles={activeRoles}
                   room={room}
@@ -6371,373 +6601,288 @@ export default function RoomChatPage() {
                 />
               </motion.div>
 
-              {/* 移動端：全屏覆蓋 */}
+              {/* Mobile Panel Overlay */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                onClick={() => setShowTaskPanel(false)}
+                onClick={() => setShowSettingsPanel(false)}
               >
                 <motion.div
-                  initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                  animate={{ scale: 1, opacity: 1, y: 0 }}
-                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-white rounded-2xl w-full max-w-md h-[80vh] overflow-hidden shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full max-w-md max-h-[80vh] bg-white rounded-2xl shadow-2xl overflow-hidden"
                 >
-                  {/* 移動端標題欄 */}
-                  <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] border-b border-[#EADBC8]">
-                    <h2 className="text-lg font-bold text-[#4B4036]">任務面板</h2>
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => {
-                        setShowTaskPanel(false);
-                        setEditingProject(false);
-                      }}
-                      className="p-2 hover:bg-white/50 rounded-full transition-colors"
-                    >
-                      <XMarkIcon className="w-5 h-5 text-gray-500" />
-                    </motion.button>
-                  </div>
-
-                  {/* 移動端任務面板內容 */}
-                  <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
-                    <TaskPanelContent
-                      tasks={tasks}
-                      activeRoles={activeRoles}
-                      room={room}
-                      editingProject={editingProject}
-                      editProjectName={editProjectName}
-                      setEditProjectName={setEditProjectName}
-                      editProjectDescription={editProjectDescription}
-                      setEditProjectDescription={setEditProjectDescription}
-                      handleStartEditProject={handleStartEditProject}
-                      handleUpdateProject={handleUpdateProject}
-                      setEditingProject={setEditingProject}
-                    />
-                  </div>
+                  <ChatSettingsPanel
+                    roleInstance={
+                      selectedCompanion && roleInstancesMap[selectedCompanion]
+                        ? roleInstancesMap[selectedCompanion]
+                        : Object.values(roleInstancesMap)[0]
+                    }
+                    roleInstances={Object.values(roleInstancesMap)}
+                    onUpdateRole={(updates) => {
+                      const instance = selectedCompanion && roleInstancesMap[selectedCompanion]
+                        ? roleInstancesMap[selectedCompanion]
+                        : Object.values(roleInstancesMap)[0];
+                      if (instance) {
+                        return handleUpdateRoleInstance(instance.id, updates);
+                      }
+                      return Promise.resolve();
+                    }}
+                    onUpdateRoleInstance={handleUpdateRoleInstance}
+                    onClose={() => setShowSettingsPanel(false)}
+                    // Task Panel Props
+                    tasks={tasks}
+                    activeRoles={activeRoles}
+                    room={room}
+                    editingProject={editingProject}
+                    editProjectName={editProjectName}
+                    setEditProjectName={setEditProjectName}
+                    editProjectDescription={editProjectDescription}
+                    setEditProjectDescription={setEditProjectDescription}
+                    handleStartEditProject={handleStartEditProject}
+                    handleUpdateProject={handleUpdateProject}
+                    setEditingProject={setEditingProject}
+                  />
                 </motion.div>
               </motion.div>
             </>
           )}
         </AnimatePresence>
+
         {/* 邀請角色模態框 */}
         <AnimatePresence>
-          {showInviteModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowInviteModal(false)}
-            >
+          {
+            showInviteModal && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="bg-white rounded-2xl p-8 max-w-md w-full"
-                onClick={(e) => e.stopPropagation()}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                onClick={() => setShowInviteModal(false)}
               >
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-[#4B4036]">團隊成員管理</h2>
-                  <motion.button
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setShowInviteModal(false)}
-                    className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                  >
-                    <XMarkIcon className="w-6 h-6 text-[#4B4036]" />
-                  </motion.button>
-                </div>
-
-                {/* 現有團隊成員 */}
-                {activeRoles.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center space-x-2">
-                      <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center">
-                        <CheckCircleIcon className="w-3 h-3 text-white" />
-                      </div>
-                      <span>目前團隊成員</span>
-                    </h3>
-                    <div className="space-y-2">
-                      {activeRoles.map((companionId) => {
-                        const companion = companions.find(c => c.id === companionId);
-                        if (!companion) return null;
-
-                        return (
-                          <div
-                            key={companionId}
-                            className="flex items-center space-x-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200"
-                          >
-                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
-                              <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                {companion.imagePath ? (
-                                  <Image
-                                    src={companion.imagePath}
-                                    alt={companion.name}
-                                    width={32}
-                                    height={32}
-                                    className="w-8 h-8 object-cover"
-                                    unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
-                                    onError={(e) => {
-                                      console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
-                                      const target = e.target as HTMLImageElement;
-                                      target.style.display = 'none';
-                                    }}
-                                  />
-                                ) : (
-                                  <div className="w-8 h-8 flex items-center justify-center">
-                                    {companion.icon && <companion.icon className="w-6 h-6 text-gray-400" />}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-medium text-[#4B4036]">{companion.name}</h4>
-                              <p className="text-xs text-[#2B3A3B]">{companion.specialty}</p>
-                            </div>
-                            <div className="flex items-center space-x-1 text-green-600">
-                              <CheckCircleIcon className="w-4 h-4" />
-                              <span className="text-xs font-medium">已加入</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 可邀請的成員 */}
-                {companions.filter(companion => !activeRoles.includes(companion.id)).length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center space-x-2">
-                      <div className="w-5 h-5 bg-[#FFB6C1] rounded-full flex items-center justify-center">
-                        <PlusIcon className="w-3 h-3 text-white" />
-                      </div>
-                      <span>可邀請成員</span>
-                    </h3>
-                    <div className="space-y-3">
-                      {companions
-                        .filter(companion => !activeRoles.includes(companion.id))
-                        .map((companion) => (
-                          <motion.button
-                            key={companion.id}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => handleInviteRole(companion.id)}
-                            className="w-full flex items-center space-x-4 p-4 bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl hover:from-[#FFD59A]/20 hover:to-[#EBC9A4]/20 transition-all border border-[#EADBC8]"
-                          >
-                            <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
-                              <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                {companion.imagePath ? (
-                                  <Image
-                                    src={companion.imagePath}
-                                    alt={companion.name}
-                                    width={40}
-                                    height={40}
-                                    className="w-10 h-10 object-cover"
-                                    unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
-                                    onError={(e) => {
-                                      console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
-                                      const target = e.target as HTMLImageElement;
-                                      target.style.display = 'none';
-                                    }}
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 flex items-center justify-center">
-                                    {companion.icon && <companion.icon className="w-8 h-8 text-gray-400" />}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex-1 text-left">
-                              <h3 className="font-semibold text-[#4B4036]">{companion.name}</h3>
-                              <p className="text-sm text-[#2B3A3B]">{companion.specialty}</p>
-                            </div>
-                            <PlusIcon className="w-5 h-5 text-[#FFB6C1]" />
-                          </motion.button>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {companions.filter(companion => !activeRoles.includes(companion.id)).length === 0 && activeRoles.length === 3 && (
-                  <div className="text-center py-8 text-[#2B3A3B]">
-                    🎉 所有 AI 成員都已在專案團隊中！
-                  </div>
-                )}
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 角色設定模態框 */}
-        <AnimatePresence>
-          {showSettingsModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-              onClick={() => {
-                setShowSettingsModal(false);
-                setOpenPanels({ roles: false, invite: false }); // 關閉時重置面板狀態
-                setInviteRoleSelectOpen(false);
-                setInviteRoleSearch('');
-              }}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-[80vh] overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center">
-                      <UserIcon className="w-5 h-5 text-white" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-[#4B4036]">角色管理</h2>
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => {
-                      setShowSettingsModal(false);
-                      setEditingProject(false); // 關閉編輯模式
-                      setOpenPanels({ roles: false, invite: false }); // 關閉時重置面板狀態
-                      setInviteRoleSelectOpen(false);
-                      setInviteRoleSearch('');
-                    }}
-                    className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                  >
-                    <XMarkIcon className="w-6 h-6 text-[#4B4036]" />
-                  </motion.button>
-                </div>
-
-                <p className="text-[#2B3A3B] mb-6">管理專案團隊中的 AI 成員，您可以邀請新成員或移除現有成員：</p>
-
-                {/* 分組卡片：當前角色、可邀請角色 */}
-                <div className="space-y-4">
-                  {/* 當前角色卡片 */}
-                  <motion.div
-                    whileHover={{ y: -2 }}
-                    className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setOpenPanels((s) => ({ ...s, roles: !s.roles }))}
-                      className="w-full text-left px-4 py-4 flex items-center justify-between"
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  className="bg-white rounded-2xl p-8 max-w-md w-full"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-[#4B4036]">團隊成員管理</h2>
+                    <motion.button
+                      whileHover={{ scale: 1.1, rotate: 90 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setShowInviteModal(false)}
+                      className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                     >
-                      <div className="flex items-center space-x-3">
+                      <XMarkIcon className="w-6 h-6 text-[#4B4036]" />
+                    </motion.button>
+                  </div>
+
+                  {/* 現有團隊成員 */}
+                  {activeRoles.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center space-x-2">
                         <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center">
                           <CheckCircleIcon className="w-3 h-3 text-white" />
                         </div>
-                        <h3 className="text-lg font-semibold text-[#4B4036]">專案團隊成員</h3>
-                        <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                          {activeRoles.length} 位
-                        </span>
-                      </div>
-                      <motion.span animate={{ rotate: openPanels.roles ? 180 : 0 }}>
-                        <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
-                      </motion.span>
-                    </button>
+                        <span>目前團隊成員</span>
+                      </h3>
+                      <div className="space-y-2">
+                        {activeRoles.map((companionId) => {
+                          const companion = companions.find(c => c.id === companionId);
+                          if (!companion) return null;
 
-                    <AnimatePresence>
-                      {openPanels.roles && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="px-4 pb-4 border-t border-[#EADBC8]">
-                            <div className="mt-4 space-y-3">
-                              {activeRoles.map((roleId) => {
-                                const companion = companions.find(c => c.id === roleId);
-                                if (!companion) return null;
-
-                                return (
-                                  <motion.div
-                                    key={roleId}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border border-green-200"
-                                  >
-                                    <div className="flex items-center space-x-4">
-                                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
-                                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                          <Image
-                                            src={companion.imagePath}
-                                            alt={companion.name}
-                                            width={40}
-                                            height={40}
-                                            className="w-10 h-10 object-cover"
-                                          />
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <h4 className="font-semibold text-[#4B4036]">{companion.name}</h4>
-                                        <p className="text-sm text-green-700">{companion.specialty}</p>
-                                      </div>
+                          return (
+                            <div
+                              key={companionId}
+                              className="flex items-center space-x-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200"
+                            >
+                              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
+                                <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                  {companion.imagePath ? (
+                                    <Image
+                                      src={companion.imagePath}
+                                      alt={companion.name}
+                                      width={32}
+                                      height={32}
+                                      className="w-8 h-8 object-cover"
+                                      unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                                      onError={(e) => {
+                                        console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 flex items-center justify-center">
+                                      {companion.icon && <companion.icon className="w-6 h-6 text-gray-400" />}
                                     </div>
-
-                                    {/* 移除按鈕（只有多於1個角色時顯示） */}
-                                    {activeRoles.length > 1 && (
-                                      <motion.button
-                                        whileHover={{ scale: 1.1, rotate: 90 }}
-                                        whileTap={{ scale: 0.9 }}
-                                        onClick={() => handleRemoveRole(roleId)}
-                                        className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all"
-                                        title={`移除 ${companion.name}`}
-                                      >
-                                        <XMarkIcon className="w-4 h-4" />
-                                      </motion.button>
-                                    )}
-                                  </motion.div>
-                                );
-                              })}
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-[#4B4036]">{companion.name}</h4>
+                                <p className="text-xs text-[#2B3A3B]">{companion.specialty}</p>
+                              </div>
+                              <div className="flex items-center space-x-1 text-green-600">
+                                <CheckCircleIcon className="w-4 h-4" />
+                                <span className="text-xs font-medium">已加入</span>
+                              </div>
                             </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
-                  {/* 可邀請的角色卡片 */}
+                  {/* 可邀請的成員 */}
                   {companions.filter(companion => !activeRoles.includes(companion.id)).length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#4B4036] mb-3 flex items-center space-x-2">
+                        <div className="w-5 h-5 bg-[#FFB6C1] rounded-full flex items-center justify-center">
+                          <PlusIcon className="w-3 h-3 text-white" />
+                        </div>
+                        <span>可邀請成員</span>
+                      </h3>
+                      <div className="space-y-3">
+                        {companions
+                          .filter(companion => !activeRoles.includes(companion.id))
+                          .map((companion) => (
+                            <motion.button
+                              key={companion.id}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => handleInviteRole(companion.id)}
+                              className="w-full flex items-center space-x-4 p-4 bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl hover:from-[#FFD59A]/20 hover:to-[#EBC9A4]/20 transition-all border border-[#EADBC8]"
+                            >
+                              <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
+                                <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                  {companion.imagePath ? (
+                                    <Image
+                                      src={companion.imagePath}
+                                      alt={companion.name}
+                                      width={40}
+                                      height={40}
+                                      className="w-10 h-10 object-cover"
+                                      unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                                      onError={(e) => {
+                                        console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 flex items-center justify-center">
+                                      {companion.icon && <companion.icon className="w-8 h-8 text-gray-400" />}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex-1 text-left">
+                                <h3 className="font-semibold text-[#4B4036]">{companion.name}</h3>
+                                <p className="text-sm text-[#2B3A3B]">{companion.specialty}</p>
+                              </div>
+                              <PlusIcon className="w-5 h-5 text-[#FFB6C1]" />
+                            </motion.button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {companions.filter(companion => !activeRoles.includes(companion.id)).length === 0 && activeRoles.length === 3 && (
+                    <div className="text-center py-8 text-[#2B3A3B]">
+                      🎉 所有 AI 成員都已在專案團隊中！
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )
+          }
+        </AnimatePresence >
+
+        {/* 角色設定模態框 */}
+        <AnimatePresence>
+          {
+            showSettingsModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                onClick={() => {
+                  setShowSettingsModal(false);
+                  setOpenPanels({ roles: false, invite: false }); // 關閉時重置面板狀態
+                  setInviteRoleSelectOpen(false);
+                  setInviteRoleSearch('');
+                }}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-[80vh] overflow-y-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center">
+                        <UserIcon className="w-5 h-5 text-white" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-[#4B4036]">角色管理</h2>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1, rotate: 90 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        setShowSettingsModal(false);
+                        setEditingProject(false); // 關閉編輯模式
+                        setOpenPanels({ roles: false, invite: false }); // 關閉時重置面板狀態
+                        setInviteRoleSelectOpen(false);
+                        setInviteRoleSearch('');
+                      }}
+                      className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                    >
+                      <XMarkIcon className="w-6 h-6 text-[#4B4036]" />
+                    </motion.button>
+                  </div>
+
+                  <p className="text-[#2B3A3B] mb-6">管理專案團隊中的 AI 成員，您可以邀請新成員或移除現有成員：</p>
+
+                  {/* 分組卡片：當前角色、可邀請角色 */}
+                  <div className="space-y-4">
+                    {/* 當前角色卡片 */}
                     <motion.div
                       whileHover={{ y: -2 }}
                       className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
                     >
                       <button
                         type="button"
-                        onClick={() => setOpenPanels((s) => ({ ...s, invite: !s.invite }))}
+                        onClick={() => setOpenPanels((s) => ({ ...s, roles: !s.roles }))}
                         className="w-full text-left px-4 py-4 flex items-center justify-between"
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="w-5 h-5 bg-blue-400 rounded-full flex items-center justify-center">
-                            <PlusIcon className="w-3 h-3 text-white" />
+                          <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center">
+                            <CheckCircleIcon className="w-3 h-3 text-white" />
                           </div>
-                          <h3 className="text-lg font-semibold text-[#4B4036]">可邀請的角色</h3>
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                            {companions.filter(companion => !activeRoles.includes(companion.id)).length} 位
+                          <h3 className="text-lg font-semibold text-[#4B4036]">專案團隊成員</h3>
+                          <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                            {activeRoles.length} 位
                           </span>
                         </div>
-                        <motion.span animate={{ rotate: openPanels.invite ? 180 : 0 }}>
+                        <motion.span animate={{ rotate: openPanels.roles ? 180 : 0 }}>
                           <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
                         </motion.span>
                       </button>
 
                       <AnimatePresence>
-                        {openPanels.invite && (
+                        {openPanels.roles && (
                           <motion.div
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
@@ -6746,158 +6891,255 @@ export default function RoomChatPage() {
                             className="overflow-hidden"
                           >
                             <div className="px-4 pb-4 border-t border-[#EADBC8]">
-                              <div className="relative mt-4 space-y-2">
-                                {/* 下拉選單 */}
-                                <div className="relative" ref={inviteRoleSelectRef}>
-                                  <input
-                                    ref={inviteRoleInputRef}
-                                    type="text"
-                                    value={inviteRoleSearch}
-                                    onChange={(e) => {
-                                      setInviteRoleSearch(e.target.value);
-                                      setInviteRoleSelectOpen(true);
-                                    }}
-                                    onFocus={() => {
-                                      setInviteRoleSelectOpen(true);
-                                      // 更新下拉選單位置
-                                      if (inviteRoleInputRef.current) {
-                                        const rect = inviteRoleInputRef.current.getBoundingClientRect();
-                                        setInviteRoleDropdownPosition({
-                                          top: rect.bottom + 4,
-                                          left: rect.left,
-                                          width: rect.width
-                                        });
-                                      }
-                                    }}
-                                    onBlur={() => setTimeout(() => setInviteRoleSelectOpen(false), 200)}
-                                    placeholder="選擇角色或輸入以搜尋..."
-                                    className="w-full p-3 pr-10 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
-                                  />
-                                  {/* 下拉箭頭 */}
-                                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                    <motion.div
-                                      animate={{ rotate: inviteRoleSelectOpen ? 180 : 0 }}
-                                      transition={{ duration: 0.2 }}
-                                    >
-                                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                      </svg>
-                                    </motion.div>
-                                  </div>
+                              <div className="mt-4 space-y-3">
+                                {activeRoles.map((roleId) => {
+                                  const companion = companions.find(c => c.id === roleId);
+                                  if (!companion) return null;
 
-                                  {/* 下拉選單列表 - 使用 Portal 渲染到 body */}
-                                  {typeof document !== 'undefined' && inviteRoleSelectOpen && inviteRoleDropdownPosition && createPortal(
-                                    <AnimatePresence>
-                                      <motion.div
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -10 }}
-                                        transition={{ duration: 0.2 }}
-                                        style={{
-                                          position: 'fixed',
-                                          top: `${inviteRoleDropdownPosition.top}px`,
-                                          left: `${inviteRoleDropdownPosition.left}px`,
-                                          width: `${inviteRoleDropdownPosition.width}px`,
-                                          zIndex: 9999
-                                        }}
-                                        className="bg-white border border-[#EADBC8] rounded-lg shadow-xl max-h-60 overflow-y-auto"
-                                        data-invite-role-dropdown
-                                      >
-                                        {companions
-                                          .filter(companion => !activeRoles.includes(companion.id))
-                                          .filter(companion => {
-                                            if (!inviteRoleSearch.trim()) return true;
-                                            const q = inviteRoleSearch.toLowerCase();
-                                            return (
-                                              companion.name.toLowerCase().includes(q) ||
-                                              companion.nameEn.toLowerCase().includes(q) ||
-                                              companion.description.toLowerCase().includes(q) ||
-                                              companion.specialty.toLowerCase().includes(q)
-                                            );
-                                          })
-                                          .map((companion) => (
-                                            <motion.button
-                                              key={companion.id}
-                                              whileHover={{ backgroundColor: "#FFFBEB" }}
-                                              whileTap={{ scale: 0.98 }}
-                                              type="button"
-                                              onMouseDown={(e) => {
-                                                e.preventDefault(); // 防止觸發 onBlur
-                                                handleInviteRole(companion.id, true);
-                                                setInviteRoleSearch('');
-                                                setInviteRoleSelectOpen(false);
-                                              }}
-                                              className="w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 hover:bg-[#FFFBEB] text-[#4B4036]"
-                                            >
-                                              <div className="flex items-center space-x-3">
-                                                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${companion.color} p-0.5 flex-shrink-0`}>
-                                                  <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                                    <Image
-                                                      src={companion.imagePath}
-                                                      alt={companion.name}
-                                                      width={28}
-                                                      height={28}
-                                                      className="w-7 h-7 object-cover"
-                                                    />
-                                                  </div>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="font-medium text-[#4B4036]">{companion.name} ({companion.nameEn})</div>
-                                                  <div className="text-xs text-[#2B3A3B] truncate">{companion.specialty}</div>
-                                                </div>
-                                              </div>
-                                            </motion.button>
-                                          ))}
-                                        {companions.filter(companion =>
-                                          !activeRoles.includes(companion.id) &&
-                                          (!inviteRoleSearch.trim() ||
-                                            companion.name.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
-                                            companion.nameEn.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
-                                            companion.description.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
-                                            companion.specialty.toLowerCase().includes(inviteRoleSearch.toLowerCase())
-                                          )
-                                        ).length === 0 && (
-                                            <div className="px-3 py-4 text-center text-sm text-[#2B3A3B]">
-                                              沒有可邀請的角色
-                                            </div>
-                                          )}
-                                      </motion.div>
-                                    </AnimatePresence>,
-                                    document.body
-                                  )}
-                                </div>
+                                  return (
+                                    <motion.div
+                                      key={roleId}
+                                      initial={{ opacity: 0, x: -20 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl border border-green-200"
+                                    >
+                                      <div className="flex items-center space-x-4">
+                                        <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
+                                          <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                            <Image
+                                              src={companion.imagePath}
+                                              alt={companion.name}
+                                              width={40}
+                                              height={40}
+                                              className="w-10 h-10 object-cover"
+                                            />
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <h4 className="font-semibold text-[#4B4036]">{companion.name}</h4>
+                                          <p className="text-sm text-green-700">{companion.specialty}</p>
+                                        </div>
+                                      </div>
+
+                                      {/* 移除按鈕（只有多於1個角色時顯示） */}
+                                      {activeRoles.length > 1 && (
+                                        <motion.button
+                                          whileHover={{ scale: 1.1, rotate: 90 }}
+                                          whileTap={{ scale: 0.9 }}
+                                          onClick={() => handleRemoveRole(roleId)}
+                                          className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all"
+                                          title={`移除 ${companion.name}`}
+                                        >
+                                          <XMarkIcon className="w-4 h-4" />
+                                        </motion.button>
+                                      )}
+                                    </motion.div>
+                                  );
+                                })}
                               </div>
                             </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </motion.div>
-                  )}
-                </div>
 
-                {/* 操作按鈕 */}
-                <div className="flex space-x-3">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      setShowSettingsModal(false);
-                      setEditingProject(false); // 關閉編輯模式
-                      setOpenPanels({ roles: false, invite: false }); // 關閉時重置面板狀態
-                      setInviteRoleSelectOpen(false);
-                      setInviteRoleSearch('');
-                    }}
-                    className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-[#4B4036] rounded-xl font-medium transition-all"
-                  >
-                    關閉
-                  </motion.button>
-                </div>
+                    {/* 可邀請的角色卡片 */}
+                    {companions.filter(companion => !activeRoles.includes(companion.id)).length > 0 && (
+                      <motion.div
+                        whileHover={{ y: -2 }}
+                        className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setOpenPanels((s) => ({ ...s, invite: !s.invite }))}
+                          className="w-full text-left px-4 py-4 flex items-center justify-between"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-5 h-5 bg-blue-400 rounded-full flex items-center justify-center">
+                              <PlusIcon className="w-3 h-3 text-white" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-[#4B4036]">可邀請的角色</h3>
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                              {companions.filter(companion => !activeRoles.includes(companion.id)).length} 位
+                            </span>
+                          </div>
+                          <motion.span animate={{ rotate: openPanels.invite ? 180 : 0 }}>
+                            <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
+                          </motion.span>
+                        </button>
+
+                        <AnimatePresence>
+                          {openPanels.invite && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="px-4 pb-4 border-t border-[#EADBC8]">
+                                <div className="relative mt-4 space-y-2">
+                                  {/* 下拉選單 */}
+                                  <div className="relative" ref={inviteRoleSelectRef}>
+                                    <input
+                                      ref={inviteRoleInputRef}
+                                      type="text"
+                                      value={inviteRoleSearch}
+                                      onChange={(e) => {
+                                        setInviteRoleSearch(e.target.value);
+                                        setInviteRoleSelectOpen(true);
+                                      }}
+                                      onFocus={() => {
+                                        setInviteRoleSelectOpen(true);
+                                        // 更新下拉選單位置
+                                        if (inviteRoleInputRef.current) {
+                                          const rect = inviteRoleInputRef.current.getBoundingClientRect();
+                                          setInviteRoleDropdownPosition({
+                                            top: rect.bottom + 4,
+                                            left: rect.left,
+                                            width: rect.width
+                                          });
+                                        }
+                                      }}
+                                      onBlur={() => setTimeout(() => setInviteRoleSelectOpen(false), 200)}
+                                      placeholder="選擇角色或輸入以搜尋..."
+                                      className="w-full p-3 pr-10 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
+                                    />
+                                    {/* 下拉箭頭 */}
+                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                      <motion.div
+                                        animate={{ rotate: inviteRoleSelectOpen ? 180 : 0 }}
+                                        transition={{ duration: 0.2 }}
+                                      >
+                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                      </motion.div>
+                                    </div>
+
+                                    {/* 下拉選單列表 - 使用 Portal 渲染到 body */}
+                                    {typeof document !== 'undefined' && inviteRoleSelectOpen && inviteRoleDropdownPosition && createPortal(
+                                      <AnimatePresence>
+                                        <motion.div
+                                          initial={{ opacity: 0, y: -10 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          exit={{ opacity: 0, y: -10 }}
+                                          transition={{ duration: 0.2 }}
+                                          style={{
+                                            position: 'fixed',
+                                            top: `${inviteRoleDropdownPosition.top}px`,
+                                            left: `${inviteRoleDropdownPosition.left}px`,
+                                            width: `${inviteRoleDropdownPosition.width}px`,
+                                            zIndex: 9999
+                                          }}
+                                          className="bg-white border border-[#EADBC8] rounded-lg shadow-xl max-h-60 overflow-y-auto"
+                                          data-invite-role-dropdown
+                                        >
+                                          {companions
+                                            .filter(companion => !activeRoles.includes(companion.id))
+                                            .filter(companion => {
+                                              if (!inviteRoleSearch.trim()) return true;
+                                              const q = inviteRoleSearch.toLowerCase();
+                                              return (
+                                                companion.name.toLowerCase().includes(q) ||
+                                                companion.nameEn.toLowerCase().includes(q) ||
+                                                companion.description.toLowerCase().includes(q) ||
+                                                companion.specialty.toLowerCase().includes(q)
+                                              );
+                                            })
+                                            .map((companion) => (
+                                              <motion.button
+                                                key={companion.id}
+                                                whileHover={{ backgroundColor: "#FFFBEB" }}
+                                                whileTap={{ scale: 0.98 }}
+                                                type="button"
+                                                onMouseDown={(e) => {
+                                                  e.preventDefault(); // 防止觸發 onBlur
+                                                  handleInviteRole(companion.id, true);
+                                                  setInviteRoleSearch('');
+                                                  setInviteRoleSelectOpen(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 hover:bg-[#FFFBEB] text-[#4B4036]"
+                                              >
+                                                <div className="flex items-center space-x-3">
+                                                  <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${companion.color} p-0.5 flex-shrink-0`}>
+                                                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                                      <Image
+                                                        src={companion.imagePath}
+                                                        alt={companion.name}
+                                                        width={28}
+                                                        height={28}
+                                                        className="w-7 h-7 object-cover"
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="font-medium text-[#4B4036]">{companion.name} ({companion.nameEn})</div>
+                                                    <div className="text-xs text-[#2B3A3B] truncate">{companion.specialty}</div>
+                                                  </div>
+                                                </div>
+                                              </motion.button>
+                                            ))}
+                                          {companions.filter(companion =>
+                                            !activeRoles.includes(companion.id) &&
+                                            (!inviteRoleSearch.trim() ||
+                                              companion.name.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
+                                              companion.nameEn.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
+                                              companion.description.toLowerCase().includes(inviteRoleSearch.toLowerCase()) ||
+                                              companion.specialty.toLowerCase().includes(inviteRoleSearch.toLowerCase())
+                                            )
+                                          ).length === 0 && (
+                                              <div className="px-3 py-4 text-center text-sm text-[#2B3A3B]">
+                                                沒有可邀請的角色
+                                              </div>
+                                            )}
+                                        </motion.div>
+                                      </AnimatePresence>,
+                                      document.body
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* 操作按鈕 */}
+                  <div className="flex space-x-3">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        setShowSettingsModal(false);
+                        setEditingProject(false); // 關閉編輯模式
+                        setOpenPanels({ roles: false, invite: false }); // 關閉時重置面板狀態
+                        setInviteRoleSelectOpen(false);
+                        setInviteRoleSearch('');
+                      }}
+                      className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-[#4B4036] rounded-xl font-medium transition-all"
+                    >
+                      關閉
+                    </motion.button>
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
+            )
+          }
+        </AnimatePresence >
+      </div >
+
+      {/* Block Selection Modal */}
+      < BlockSelectionModal
+        isOpen={loadoutModalState.isOpen}
+        onClose={() => setLoadoutModalState(prev => ({ ...prev, isOpen: false }))}
+        onSelect={handleBlockSelect}
+        slotType={loadoutModalState.slotType}
+        roleInstanceId={loadoutModalState.roleInstanceId}
+      />
+    </div >
   );
 }
 
@@ -7134,8 +7376,8 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
               type="button"
               onClick={() => setMoriViewMode('stack')}
               className={`px-3 py-1 rounded-full transition-all ${moriViewMode === 'stack'
-                  ? 'bg-white shadow-sm text-[#B33B63]'
-                  : 'text-[#B33B63]/70 hover:text-[#B33B63]'
+                ? 'bg-white shadow-sm text-[#B33B63]'
+                : 'text-[#B33B63]/70 hover:text-[#B33B63]'
                 }`}
             >
               清單
@@ -7144,8 +7386,8 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
               type="button"
               onClick={() => setMoriViewMode('deck')}
               className={`px-3 py-1 rounded-full transition-all ${moriViewMode === 'deck'
-                  ? 'bg-white shadow-sm text-[#B33B63]'
-                  : 'text-[#B33B63]/70 hover:text-[#B33B63]'
+                ? 'bg-white shadow-sm text-[#B33B63]'
+                : 'text-[#B33B63]/70 hover:text-[#B33B63]'
                 }`}
             >
               卡片
@@ -7194,8 +7436,8 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                           type="button"
                           onClick={() => setActiveMoriIndex(idx)}
                           className={`max-w-[160px] truncate px-3 py-1.5 text-xs font-medium rounded-full transition-all border ${idx === currentActiveIndex
-                              ? 'bg-[#FF9CB5] text-white border-[#FF9CB5] shadow'
-                              : 'bg-[#FDF2F7] text-[#B33B63] border-[#F5D3E0] hover:bg-[#FF9CB5]/80 hover:text-white'
+                            ? 'bg-[#FF9CB5] text-white border-[#FF9CB5] shadow'
+                            : 'bg-[#FDF2F7] text-[#B33B63] border-[#F5D3E0] hover:bg-[#FF9CB5]/80 hover:text-white'
                             }`}
                           aria-label={`切換至 ${label}`}
                         >
@@ -7522,96 +7764,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
           </div>
         </div>
       </div>
+
     </motion.div>
   );
-}
-
-// ========================================
-// 任務卡片組件
-// ========================================
-
-interface TaskCardProps {
-  task: Task;
-}
-function TaskCard({ task }: TaskCardProps) {
-  const getStatusColor = (status: Task['status']) => {
-    switch (status) {
-      case 'pending': return 'text-yellow-600 bg-yellow-100 border-yellow-200';
-      case 'in_progress': return 'text-blue-600 bg-blue-100 border-blue-200';
-      case 'completed': return 'text-green-600 bg-green-100 border-green-200';
-      case 'failed': return 'text-red-600 bg-red-100 border-red-200';
-      default: return 'text-gray-600 bg-gray-100 border-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status: Task['status']) => {
-    switch (status) {
-      case 'pending': return ClockIcon;
-      case 'in_progress': return SparklesIcon;
-      case 'completed': return CheckCircleIcon;
-      case 'failed': return ExclamationTriangleIcon;
-      default: return ClockIcon;
-    }
-  };
-
-  const StatusIcon = getStatusIcon(task.status);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      whileHover={{ scale: 1.02 }}
-      className="bg-white/60 backdrop-blur-sm border border-[#EADBC8] rounded-xl p-4 shadow-sm hover:shadow-md transition-all"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <h4 className="font-medium text-[#4B4036] text-sm mb-1">{task.title}</h4>
-          <p className="text-xs text-[#2B3A3B] line-clamp-2">{task.description}</p>
-        </div>
-
-        <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(task.status)}`}>
-          <StatusIcon className="w-3 h-3" />
-          <span>
-            {task.status === 'pending' ? '等待' :
-              task.status === 'in_progress' ? '進行中' :
-                task.status === 'completed' ? '完成' : '失敗'}
-          </span>
-        </div>
-      </div>
-
-      {/* 分配的角色 */}
-      <div className="flex items-center space-x-2 mb-3">
-        <span className="text-xs text-[#2B3A3B]">分配給:</span>
-        <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${task.assignedTo === 'hibi' ? 'from-orange-400 to-red-500' :
-            task.assignedTo === 'mori' ? 'from-amber-400 to-orange-500' :
-              'from-blue-400 to-cyan-500'
-          }`} />
-      </div>
-
-      {/* 進度條 */}
-      {task.status === 'in_progress' && (
-        <div className="mb-3">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-xs text-[#2B3A3B]">進度</span>
-            <span className="text-xs font-medium text-[#4B4036]">{Math.round(task.progress)}%</span>
-          </div>
-          <div className="w-full bg-[#F8F5EC] rounded-full h-1.5">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${task.progress}%` }}
-              transition={{ duration: 0.5 }}
-              className="bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] h-1.5 rounded-full"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* 時間 */}
-      <div className="text-xs text-[#2B3A3B]/70">
-        {task.createdAt.toLocaleString('zh-TW')}
-      </div>
-    </motion.div>
-  );
-
 }

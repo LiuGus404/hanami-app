@@ -281,7 +281,11 @@ function RoleCard({
           <div className="flex-shrink-0">
             {role.avatar_url ? (
               <img
-                src={role.avatar_url}
+                src={
+                  role.avatar_url.includes('Hibi.png')
+                    ? '/3d-character-backgrounds/studio/Hibi/lulu(front).png'
+                    : role.avatar_url
+                }
                 alt={role.name}
                 className="w-12 h-12 rounded-full object-cover"
               />
