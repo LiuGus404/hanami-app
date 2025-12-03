@@ -9,12 +9,13 @@ import StudentBasicInfo from '@/components/ui/StudentBasicInfo';
 import StudentLessonPanel from '@/components/ui/StudentLessonPanel';
 import EnhancedStudentAvatarTab from '@/components/ui/EnhancedStudentAvatarTab';
 import StudentMediaTimeline from '@/components/ui/StudentMediaTimeline';
+import StudentPendingRequestsModal from '@/components/ui/StudentPendingRequestsModal';
 import { BindingStatusIndicator } from '@/components/ui/StudentBindingButton';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useParentId } from '@/hooks/useParentId';
 import { motion } from 'framer-motion';
-import { BookOpen, UserCircle, Sparkles, Camera, Building } from 'lucide-react';
+import { BookOpen, UserCircle, Sparkles, Camera, Building, ArrowLeft } from 'lucide-react';
 import ParentShell from '@/components/ParentShell';
 import { toast } from 'react-hot-toast';
 
@@ -52,6 +53,7 @@ export default function SimpleStudentDetailPage() {
   const [isInactiveStudent, setIsInactiveStudent] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media'>('basic');
   const [isStudentBound, setIsStudentBound] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   const handleTabChange = (tabKey: 'basic' | 'lessons' | 'avatar' | 'media') => {
     // 檢查是否為需要 premium 的功能
@@ -291,165 +293,173 @@ export default function SimpleStudentDetailPage() {
   }
 
   const detailContent = (
-    <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6">
-      <div className="mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-          <motion.button
-            onClick={handleBack}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors text-sm sm:text-base"
-          >
-            <span>←</span>
-            <span className="hidden sm:inline">返回家長連結</span>
-            <span className="sm:hidden">返回</span>
-          </motion.button>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Header Area */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <motion.button
+          onClick={handleBack}
+          whileHover={{ scale: 1.02, x: -4 }}
+          whileTap={{ scale: 0.98 }}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-[#4B4036] rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] hover:border-[#FFD59A] transition-all shadow-sm text-sm font-medium w-fit"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>返回列表</span>
+        </motion.button>
 
-          <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4">
-            <BindingStatusIndicator isBound={isStudentBound} />
-            <div className="flex items-center space-x-2 px-2 py-1.5 sm:px-3 sm:py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8]">
-              <Building className="w-3 h-3 sm:w-4 sm:h-4 text-[#4B4036]" />
-              <span className="text-xs sm:text-sm font-medium text-[#4B4036]">{institution}</span>
-            </div>
+        <div className="flex items-center gap-3">
+          <BindingStatusIndicator isBound={isStudentBound} />
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm rounded-full border border-[#EADBC8] shadow-sm">
+            <Building className="w-3.5 h-3.5 text-[#E6A23C]" />
+            <span className="text-sm font-medium text-[#4B4036]">{institution}</span>
           </div>
         </div>
       </div>
 
       {isInactiveStudent && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                <path clipRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" fillRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">此學生已停用</h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
-                <p>停用原因：{student.inactive_reason}</p>
-              </div>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3"
+        >
+          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-red-800 mb-1">此學生已停用</h3>
+            <div className="text-xs text-red-600 space-y-0.5">
+              <p>停用日期：{new Date(student.inactive_date).toLocaleDateString('zh-HK')}</p>
+              <p>停用原因：{student.inactive_reason}</p>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      <div className="mb-4 sm:mb-6">
-        <div className="flex space-x-1 bg-[#EADBC8]/30 rounded-xl p-1 overflow-x-auto">
-          {[
-            { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理', shortLabel: '基本' },
-            { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄', shortLabel: '課程' },
-            { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度', shortLabel: '狀態' },
-            { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片', shortLabel: '媒體' }
-          ].map(({ key, label, icon: Icon, description, shortLabel }) => {
-            const studentOrgId = student?.org_id ?? null;
-            const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
-            const isDisabled = key === 'media' && !isPremiumOrg;
+      {/* Main Content Card */}
+      <div className="bg-white rounded-[2rem] shadow-sm border border-[#F3EAD9] overflow-hidden min-h-[600px] flex flex-col">
+        {/* Tabs Header */}
+        <div className="border-b border-[#F3EAD9] bg-[#FFFDF8] px-6 py-4">
+          <div className="flex space-x-2 overflow-x-auto scrollbar-hide pb-2 sm:pb-0">
+            {[
+              { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
+              { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
+              { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度' },
+              { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' }
+            ].map(({ key, label, icon: Icon, description }) => {
+              const studentOrgId = student?.org_id ?? null;
+              const isPremiumOrg = studentOrgId === PREMIUM_AI_ORG_ID;
+              const isDisabled = key === 'media' && !isPremiumOrg;
+              const isActive = activeTab === key;
 
-            return (
-              <motion.button
-                key={key}
-                onClick={() => handleTabChange(key as any)}
-                className={`
-                  flex items-center px-2 py-2 sm:px-4 sm:py-3 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0
-                  ${isDisabled
-                    ? 'opacity-50 cursor-pointer text-gray-400'
-                    : activeTab === key
-                      ? 'bg-[#FFD59A] text-[#2B3A3B] shadow-sm'
-                      : 'text-[#2B3A3B]/70 hover:text-[#4B4036] hover:bg-white/50'
-                  }
-                `}
-                whileHover={isDisabled ? {} : { scale: 1.02 }}
-                whileTap={isDisabled ? {} : { scale: 0.98 }}
-                title={description}
-              >
-                <Icon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">{label}</span>
-                <span className="sm:hidden">{shortLabel}</span>
-              </motion.button>
-            );
-          })}
+              return (
+                <button
+                  key={key}
+                  onClick={() => !isDisabled && handleTabChange(key as any)}
+                  disabled={isDisabled}
+                  className={`
+                    relative px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 flex-shrink-0 outline-none
+                    ${isDisabled ? 'opacity-40 cursor-not-allowed grayscale' : 'cursor-pointer'}
+                    ${isActive ? 'text-[#4B4036]' : 'text-[#9CA3AF] hover:text-[#4B4036] hover:bg-[#FFF9F2]'}
+                  `}
+                  title={description}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute inset-0 bg-[#FFD59A] rounded-xl"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
+                  )}
+                  <Icon className={`w-4 h-4 relative z-10 ${isActive ? 'text-[#4B4036]' : 'text-current'}`} />
+                  <span className="relative z-10">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-6 sm:p-8 flex-1 bg-white">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            className="h-full"
+          >
+            {activeTab === 'basic' && (
+              <StudentBasicInfo
+                isInactive={isInactiveStudent}
+                student={student}
+                hideTeacherInfo
+                hideSensitiveInfo
+                hideContactDays
+                readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
+                visibleFields={['full_name', 'nick_name', 'student_age', 'gender', 'course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'duration_months', 'school', 'address', 'health_notes', 'student_remarks']}
+                onUpdate={(newData) => {
+                  setStudent(newData);
+                }}
+              />
+            )}
+
+            {activeTab === 'lessons' && student && (
+              <div className="h-full">
+                {(() => {
+                  const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
+                  return (
+                    <StudentLessonPanel
+                      contactNumber={student.contact_number}
+                      studentId={lessonStudentId}
+                      studentName={student.full_name}
+                      studentType={student.student_type}
+                      studentData={student}
+                      hideActionButtons
+                      hideTeacherColumn
+                      hideCareAlert
+                      disableSelection
+                      orgId={student.org_id ?? null}
+                      organizationName={
+                        (student as any)?.organization_name ??
+                        (student as any)?.organizationName ??
+                        null
+                      }
+                      onPendingClick={() => setShowPendingModal(true)}
+                      isParentView={true}
+                    />
+                  );
+                })()}
+              </div>
+            )}
+
+            {student && (
+              <StudentPendingRequestsModal
+                isOpen={showPendingModal}
+                onClose={() => setShowPendingModal(false)}
+                studentId={isInactiveStudent ? student.original_id || student.id : student.id}
+              />
+            )}
+
+            {activeTab === 'avatar' && student && (
+              <EnhancedStudentAvatarTab
+                student={student}
+                className="h-full"
+              />
+            )}
+
+            {activeTab === 'media' && student && (
+              <StudentMediaTimeline
+                studentId={student.id}
+                studentName={student.full_name}
+                className="h-full"
+              />
+            )}
+          </motion.div>
         </div>
       </div>
 
-      <motion.div
-        key={activeTab}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.3 }}
-      >
-        {activeTab === 'basic' && (
-          <StudentBasicInfo
-            isInactive={isInactiveStudent}
-            student={student}
-            hideTeacherInfo
-            hideSensitiveInfo
-            hideContactDays
-            readonlyFields={['course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'contact_number']}
-            visibleFields={['full_name', 'nick_name', 'student_age', 'gender', 'course_type', 'regular_weekday', 'regular_timeslot', 'started_date', 'duration_months', 'school', 'address', 'health_notes', 'student_remarks']}
-            onUpdate={(newData) => {
-              setStudent(newData);
-            }}
-          />
-        )}
-
-        {activeTab === 'lessons' && student && (
-          <div className="mt-2 sm:mt-4">
-            {(() => {
-              const lessonStudentId = isInactiveStudent ? student.original_id || student.id : student.id;
-              console.log('🎯 準備載入課堂資料:', {
-                lessonStudentId,
-                isInactiveStudent,
-                studentOriginalId: student.original_id,
-                currentStudentId: student.id,
-                studentType: student.student_type,
-              });
-              return (
-                <StudentLessonPanel
-                  contactNumber={student.contact_number}
-                  studentId={lessonStudentId}
-                  studentName={student.full_name}
-                  studentType={student.student_type}
-                  studentData={student}
-                  hideActionButtons
-                  hideTeacherColumn
-                  hideCareAlert
-                  disableSelection
-                  orgId={student.org_id ?? null}
-                  organizationName={
-                    (student as any)?.organization_name ??
-                    (student as any)?.organizationName ??
-                    null
-                  }
-                />
-              );
-            })()}
-          </div>
-        )}
-
-        {activeTab === 'avatar' && student && (
-          <EnhancedStudentAvatarTab
-            student={student}
-            className="mt-2 sm:mt-4"
-          />
-        )}
-
-        {activeTab === 'media' && student && (
-          <>
-            {console.log('🎯 傳遞給 StudentMediaTimeline 的參數:', {
-              studentId: student.id,
-              studentName: student.full_name,
-              studentObject: student
-            })}
-            <StudentMediaTimeline
-              studentId={student.id}
-              studentName={student.full_name}
-              className="mt-2 sm:mt-4"
-            />
-          </>
-        )}
-      </motion.div>
       <LessonEditorModal
         lesson={editingLesson}
         mode={editingLesson ? 'edit' : 'add'}

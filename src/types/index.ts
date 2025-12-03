@@ -51,6 +51,7 @@ export interface Student {
   lesson_date?: string | null;
   actual_timeslot?: string | null;
   remaining_lessons?: number | null;
+  pending_confirmation_count?: number | null;
 }
 
 export interface Lesson {

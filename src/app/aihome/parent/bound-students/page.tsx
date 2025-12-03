@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { 
-  User, 
-  BookOpen, 
-  Calendar, 
-  Heart, 
-  HeartOff, 
-  ArrowLeft, 
-  Users, 
+import {
+  User,
+  BookOpen,
+  Calendar,
+  Heart,
+  HeartOff,
+  ArrowLeft,
+  Users,
   Clock,
   Building,
   X,
@@ -50,7 +50,7 @@ export default function BoundStudentsPage() {
     const loadBoundStudents = async () => {
       try {
         setPageLoading(true);
-        
+
         if (!user?.id) {
           console.error('用戶未登入或缺少用戶 ID');
           return;
@@ -131,9 +131,9 @@ export default function BoundStudentsPage() {
     if (months === null || months === undefined || isNaN(months) || months < 0) {
       return '年齡未設定';
     }
-    
+
     const validMonths = Math.floor(months);
-    
+
     if (validMonths < 12) {
       return `${validMonths} 個月`;
     } else {
@@ -169,108 +169,127 @@ export default function BoundStudentsPage() {
       {/* 學生列表 */}
       {boundStudents.length === 0 ? (
         <div className="text-center py-12">
-          <Users className="w-16 h-16 text-[#EADBC8] mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-[#4B4036] mb-2">還沒有綁定的孩子</h3>
-          <p className="text-[#2B3A3B] mb-6">開始綁定您的孩子，查看他們的學習進度</p>
+          <div className="w-20 h-20 bg-[#FFF9F2] rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-[#EADBC8]">
+            <Users className="w-10 h-10 text-[#FFD59A]" />
+          </div>
+          <h3 className="text-xl font-bold text-[#4B4036] mb-3">還沒有綁定的孩子</h3>
+          <p className="text-[#2B3A3B]/70 mb-8 max-w-md mx-auto">
+            綁定您的孩子後，您將能夠查看他們的學習進度、課程記錄以及 AI 學習夥伴的互動情況。
+          </p>
           <motion.button
             onClick={() => router.push('/aihome/parent/connect')}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-6 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 shadow-lg font-medium"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="px-8 py-3 bg-[#FFD59A] text-[#4B4036] rounded-2xl hover:bg-[#EBC9A4] transition-all duration-200 shadow-sm hover:shadow-md font-semibold flex items-center gap-2 mx-auto"
           >
+            <Plus className="w-5 h-5" />
             綁定孩子
           </motion.button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* 學生卡片 */}
           {boundStudents.map((student) => (
             <motion.div
               key={student.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-lg shadow-lg border border-[#EADBC8] p-4 sm:p-6 hover:shadow-xl transition-all duration-200 relative w-full sm:w-80 lg:w-80"
+              whileHover={{ y: -4 }}
+              className="bg-white rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-[#F3EAD9] relative group overflow-hidden"
             >
+              {/* 裝飾背景 */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FFF9F2] to-transparent rounded-bl-full -mr-8 -mt-8 opacity-50 pointer-events-none" />
+
               {/* 取消綁定按鈕 - 右上角 */}
               <motion.button
-                onClick={() => handleUnbindStudent(student.id, student.student_name)}
-                whileHover={{ scale: 1.1 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUnbindStudent(student.id, student.student_name);
+                }}
+                whileHover={{ scale: 1.1, backgroundColor: '#FEE2E2' }}
                 whileTap={{ scale: 0.9 }}
-                className="absolute top-4 right-4 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                className="absolute top-4 right-4 p-2 text-red-400 hover:text-red-500 rounded-xl transition-colors opacity-0 group-hover:opacity-100 z-10"
                 title="取消綁定"
               >
                 <HeartOff className="w-4 h-4" />
               </motion.button>
 
-              {/* 角色圖片和名字區域 */}
-              <div className="text-center mb-4">
-                <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-3 rounded-full overflow-hidden bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] flex items-center justify-center">
-                  <img 
-                    src="/@girl(front).png" 
-                    alt={student.student_name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                <h3 className="text-lg sm:text-xl font-semibold text-[#4B4036] mb-1">{student.student_name}</h3>
-                <p className="text-xs text-[#2B3A3B] font-mono bg-gray-50 px-2 py-1 rounded border border-gray-200">
-                  學生id：{student.student_id}
-                </p>
-              </div>
-
-              <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-[#2B3A3B] mb-4 sm:mb-6">
-                <div className="flex items-center space-x-2">
-                  <Building className="w-3 h-3 sm:w-4 sm:h-4 text-[#FFD59A]" />
-                  <span className="font-medium">{student.institution}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <User className="w-3 h-3 sm:w-4 sm:h-4 text-[#FFD59A]" />
-                  <span>{convertMonthsToAge(student.student_age_months)}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Heart className="w-3 h-3 sm:w-4 sm:h-4 text-[#FFD59A]" />
-                  <span>我的孩子</span>
-                </div>
-              </div>
-
-              <motion.button
+              <div
+                className="cursor-pointer"
                 onClick={() => router.push(`/aihome/parent/student-simple/${student.student_id}`)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-full px-3 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 font-medium shadow-md hover:shadow-lg text-sm sm:text-base"
               >
-                查看詳情
-              </motion.button>
+                {/* 角色圖片和名字區域 */}
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-[#FFF9F2] border-2 border-[#EADBC8] shadow-sm flex-shrink-0">
+                    <img
+                      src="/@girl(front).png"
+                      alt={student.student_name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-[#4B4036] mb-1">{student.student_name}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium px-2 py-0.5 bg-[#FFF9F2] text-[#E6A23C] rounded-full border border-[#FFE4BA]">
+                        {convertMonthsToAge(student.student_age_months)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] rounded-xl border border-gray-100">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                      <Building className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">所屬機構</div>
+                      <div className="text-sm font-medium text-[#4B4036] truncate">{student.institution}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] rounded-xl border border-gray-100">
+                    <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                      <UserIcon className="w-4 h-4 text-orange-400" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">學生 ID</div>
+                      <div className="text-sm font-medium text-[#4B4036] font-mono">{student.student_id}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-3 bg-[#FFD59A] text-[#4B4036] rounded-xl hover:bg-[#EBC9A4] transition-colors font-semibold shadow-sm text-sm flex items-center justify-center gap-2"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  查看學習檔案
+                </motion.button>
+              </div>
             </motion.div>
           ))}
 
           {/* 新增綁定按鍵 */}
-          <motion.div
+          <motion.button
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full sm:w-80 lg:w-80"
+            whileHover={{ y: -4, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push('/aihome/parent/connect')}
+            className="bg-white rounded-3xl p-8 shadow-sm border border-[#F3EAD9] flex flex-col items-center justify-center text-center group min-h-[320px] relative overflow-hidden"
           >
-            <motion.button
-              onClick={() => router.push('/aihome/parent/connect')}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-full h-full min-h-[300px] sm:min-h-[400px] bg-white rounded-lg shadow-lg border-2 border-dashed border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-xl transition-all duration-200 flex flex-col items-center justify-center p-4 sm:p-6 group"
-            >
-              <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-3 sm:mb-4 rounded-full bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] flex items-center justify-center group-hover:from-[#EBC9A4] group-hover:to-[#FFD59A] transition-all duration-200">
-                <Plus className="w-8 h-8 sm:w-12 sm:h-12 text-[#4B4036]" />
-              </div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FFF9F2] to-transparent rounded-bl-full -mr-8 -mt-8 opacity-50 pointer-events-none" />
 
-              <h3 className="text-lg sm:text-xl font-semibold text-[#4B4036] mb-2">新增綁定</h3>
-              <p className="text-xs sm:text-sm text-[#2B3A3B] text-center mb-3 sm:mb-4">
-                綁定更多孩子<br />
-                查看他們的學習進度
-              </p>
-
-              <div className="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-lg group-hover:from-[#EBC9A4] group-hover:to-[#FFD59A] transition-all duration-200 font-medium shadow-md text-sm sm:text-base">
-                開始綁定
-              </div>
-            </motion.button>
-          </motion.div>
+            <div className="w-20 h-20 bg-[#FFD59A]/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+              <Plus className="w-10 h-10 text-[#4B4036]" />
+            </div>
+            <h3 className="text-2xl font-bold text-[#4B4036] mb-2">新增綁定</h3>
+            <p className="text-[#4B4036]/70">
+              連結更多孩子帳號<br />一同參與學習旅程
+            </p>
+          </motion.button>
         </div>
       )}
     </div>

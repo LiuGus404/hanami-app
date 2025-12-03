@@ -6,10 +6,10 @@ import { useUser } from '@/hooks/useUser';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { createClient } from '@supabase/supabase-js';
-import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  ClockIcon, 
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
   EyeIcon,
   UserIcon,
   PhoneIcon,
@@ -124,12 +124,12 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   const [reviewNotes, setReviewNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('pending');
-  
+
   // 試堂學生相關狀態
   const [showTrialStudents, setShowTrialStudents] = useState(false);
   const [trialStudents, setTrialStudents] = useState<any[]>([]);
   const [loadingTrialStudents, setLoadingTrialStudents] = useState(false);
-  
+
   // 新增狀態
   const [regularStudents, setRegularStudents] = useState<RegularStudent[]>([]);
   const [selectedRegularStudent, setSelectedRegularStudent] = useState<RegularStudent | null>(null);
@@ -186,25 +186,35 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   >([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
 
+
+  // Leave Requests State
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [loadingLeaveRequests, setLoadingLeaveRequests] = useState(false);
+  const [activeTab, setActiveTab] = useState<'students' | 'leave'>('students');
+  const [reviewLeaveNotes, setReviewLeaveNotes] = useState('');
+  const [leaveRejectionReason, setLeaveRejectionReason] = useState('');
+  const [selectedLeaveRequest, setSelectedLeaveRequest] = useState<any>(null);
+  const [showLeaveReviewModal, setShowLeaveReviewModal] = useState(false);
+
   // 載入待審核學生
   const loadPendingStudents = async () => {
     try {
       setLoading(true);
       console.log('🔍 開始載入待審核學生...', { orgId });
-      
-      const url = orgId 
+
+      const url = orgId
         ? `/api/admin/pending-students?orgId=${encodeURIComponent(orgId)}`
         : '/api/admin/pending-students';
-      
+
       const response = await fetch(url);
       const result = await response.json();
-      
+
       console.log('🔍 API 響應:', result);
 
       if (!result.success) {
         throw new Error(result.error?.message || '載入失敗');
       }
-      
+
       setPendingStudents(result.data || []);
       setSelectedStudentIds([]); // 重新載入時清空選中
       console.log('✅ 成功載入待審核學生:', result.count || 0, '個');
@@ -215,25 +225,85 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
     }
   };
 
+  // Load Leave Requests
+  const loadLeaveRequests = async () => {
+    try {
+      setLoadingLeaveRequests(true);
+      const url = orgId
+        ? `/api/admin/leave-requests?orgId=${encodeURIComponent(orgId)}`
+        : '/api/admin/leave-requests';
+
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success) {
+        setLeaveRequests(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading leave requests:', error);
+    } finally {
+      setLoadingLeaveRequests(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'leave') {
+      loadLeaveRequests();
+    }
+  }, [activeTab, orgId]);
+
+  const handleReviewLeave = async (status: 'approved' | 'rejected') => {
+    if (!selectedLeaveRequest) return;
+
+    try {
+      const response = await fetch('/api/admin/leave-requests', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: selectedLeaveRequest.id,
+          status,
+          reviewNotes: reviewLeaveNotes,
+          rejectionReason: leaveRejectionReason,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`申請已${status === 'approved' ? '批准' : '拒絕'}`);
+        setShowLeaveReviewModal(false);
+        setSelectedLeaveRequest(null);
+        setReviewLeaveNotes('');
+        setLeaveRejectionReason('');
+        loadLeaveRequests();
+      } else {
+        alert('操作失敗: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error reviewing leave request:', error);
+      alert('操作失敗');
+    }
+  };
+
   // 載入試堂學生（confirmed_payment = false）
   const loadTrialStudents = async () => {
     try {
       setLoadingTrialStudents(true);
       console.log('🔍 開始載入試堂學生（未確認支付）...', { orgId });
-      
-      const url = orgId 
+
+      const url = orgId
         ? `/api/admin/trial-students?orgId=${encodeURIComponent(orgId)}`
         : '/api/admin/trial-students';
-      
+
       const response = await fetch(url);
       const result = await response.json();
-      
+
       console.log('🔍 試堂學生 API 響應:', result);
 
       if (!result.success) {
         throw new Error(result.error?.message || '載入失敗');
       }
-      
+
       setTrialStudents(result.data || []);
       setSelectedTrialStudentIds([]); // 重新載入時清空選中
       console.log('✅ 成功載入試堂學生:', result.count || 0, '個');
@@ -248,7 +318,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   const updateTrialStudentPayment = async (studentId: string) => {
     try {
       console.log('🔍 更新試堂學生支付確認狀態:', studentId);
-      
+
       const response = await fetch('/api/admin/trial-students/update-payment', {
         method: 'PUT',
         headers: {
@@ -259,19 +329,19 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
           orgId
         })
       });
-      
+
       const result = await response.json();
       console.log('🔍 更新支付確認狀態 API 響應:', result);
 
       if (!result.success) {
         throw new Error(result.error?.message || '更新失敗');
       }
-      
+
       console.log('✅ 成功更新支付確認狀態');
-      
+
       // 重新載入試堂學生列表
       await loadTrialStudents();
-      
+
       alert('支付確認狀態已更新為已確認');
     } catch (error) {
       console.error('❌ 更新支付確認狀態失敗:', error);
@@ -319,12 +389,12 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
       alert('請選擇要新增時間表的正式學生');
       return;
     }
-    
+
     // 如果是新學生，先初始化表單
     if (selectedRegularStudent.id === 'new_student') {
       initializeNewStudentForm(selectedStudent);
     }
-    
+
     setShowConfirmModal(true);
   };
 
@@ -338,11 +408,11 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
     try {
       // 檢查是否為新學生創建
       if (selectedRegularStudent.id === 'new_student') {
-        console.log('🔍 開始創建新學生:', { 
+        console.log('🔍 開始創建新學生:', {
           pendingStudentData: selectedStudent,
           lessonCount: selectedStudent.package_lessons
         });
-        
+
         const response = await fetch('/api/admin/create-new-student', {
           method: 'POST',
           headers: {
@@ -354,7 +424,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
             lessonCount: selectedStudent.package_lessons || 0
           })
         });
-        
+
         const result = await response.json();
         console.log('🔍 創建新學生 API 響應:', result);
 
@@ -365,12 +435,12 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
         alert(result.data.message);
       } else {
         // 現有學生更新堂數
-        console.log('🔍 開始更新正式學生堂數並確認狀態:', { 
-          regularStudentId: selectedRegularStudent.id, 
+        console.log('🔍 開始更新正式學生堂數並確認狀態:', {
+          regularStudentId: selectedRegularStudent.id,
           lessonCount: selectedStudent.package_lessons,
           studentId: selectedStudent.id
         });
-        
+
         const response = await fetch('/api/admin/update-student-lessons', {
           method: 'POST',
           headers: {
@@ -382,7 +452,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
             pendingStudentId: selectedStudent.id
           })
         });
-        
+
         const result = await response.json();
         console.log('🔍 更新堂數 API 響應:', result);
 
@@ -392,7 +462,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
         alert(`成功為 ${selectedRegularStudent.full_name} 新增 ${selectedStudent.package_lessons} 堂課並確認！`);
       }
-      
+
       // 重新載入資料
       await loadPendingStudents();
       setShowModal(false);
@@ -409,7 +479,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   const reviewStudent = async (studentId: string, status: 'approved' | 'rejected' | 'needs_info') => {
     try {
       console.log('🔍 開始審核學生:', { studentId, status });
-      
+
       const response = await fetch('/api/admin/pending-students', {
         method: 'PUT',
         headers: {
@@ -422,7 +492,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
           rejectionReason
         })
       });
-      
+
       const result = await response.json();
       console.log('🔍 審核 API 響應:', result);
 
@@ -481,7 +551,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
   // 切換單個學生的選中狀態
   const toggleStudentSelection = (studentId: string) => {
-    setSelectedStudentIds(prev => 
+    setSelectedStudentIds(prev =>
       prev.includes(studentId)
         ? prev.filter(id => id !== studentId)
         : [...prev, studentId]
@@ -534,7 +604,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
   // 切換單個試堂學生的選中狀態
   const toggleTrialStudentSelection = (studentId: string) => {
-    setSelectedTrialStudentIds(prev => 
+    setSelectedTrialStudentIds(prev =>
       prev.includes(studentId)
         ? prev.filter(id => id !== studentId)
         : [...prev, studentId]
@@ -556,24 +626,24 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
     if (loadingLinks && !forceRefresh) {
       return;
     }
-    
+
     try {
       setLoadingLinks(true);
-      const url = orgId 
+      const url = orgId
         ? `/api/registrations/links?orgId=${encodeURIComponent(orgId)}`
         : '/api/registrations/links';
-      
+
       const response = await fetch(url, {
         credentials: 'include',
         cache: forceRefresh ? 'no-cache' : 'default',
       });
-      
+
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.error || '載入失敗');
       }
-      
+
       setRegistrationLinks(result.data || []);
     } catch (error) {
       console.error('❌ 載入報名連結失敗:', error);
@@ -622,10 +692,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
     try {
       setLoadingCourseTypes(true);
       const targetOrgId = selectedOrgId || linkFormData.organizationId || orgId;
-      const url = targetOrgId 
+      const url = targetOrgId
         ? `/api/course-types?orgId=${encodeURIComponent(targetOrgId)}`
         : '/api/course-types';
-      
+
       const response = await fetch(url);
       const result = await response.json();
       if (result.success && result.data) {
@@ -776,7 +846,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   // 驗證表單
   const validateLinkForm = (): boolean => {
     const errors: Record<string, string> = {};
-    
+
     if (!linkFormData.organizationId) {
       errors.organizationId = '請選擇機構';
     }
@@ -792,7 +862,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
     if (!linkFormData.childGender) {
       errors.childGender = '請選擇性別';
     }
-    
+
     setLinkFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -806,7 +876,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
     try {
       setGeneratingLink(true);
-      
+
       const response = await fetch('/api/registrations/links', {
         method: 'POST',
         headers: {
@@ -821,13 +891,13 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
           notes: `為 ${linkFormData.childFullName || '學生'} 生成的${linkFormData.courseNature === 'trial' ? '試堂' : '常規'}報名連結`
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.error || '生成失敗');
       }
-      
+
       // 重新載入連結列表（強制刷新）
       await loadRegistrationLinks(true);
       setShowLinkFormModal(false);
@@ -845,18 +915,18 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
     if (!confirm('確認要刪除此報名連結嗎？')) {
       return;
     }
-    
+
     try {
       const response = await fetch(`/api/registrations/links?id=${linkId}`, {
         method: 'DELETE',
       });
-      
+
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.error || '刪除失敗');
       }
-      
+
       await loadRegistrationLinks();
       alert('報名連結已刪除');
     } catch (error: any) {
@@ -880,14 +950,14 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   const loadRegularStudents = async () => {
     try {
       setLoadingRegularStudents(true);
-      
+
       const response = await fetch('/api/admin/regular-students');
       const result = await response.json();
 
       if (!result.success) {
         throw new Error(result.error?.message || '載入失敗');
       }
-      
+
       setRegularStudents(result.data || []);
     } catch (error) {
       console.error('❌ 載入正式學生失敗:', error);
@@ -912,7 +982,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
     const lessons = [];
     let startDate;
-    
+
     // 如果有選擇正式學生，使用該學生的最後一堂課日期加一星期
     if (regularStudent && regularStudent.lastLessonDate) {
       const lastLessonDate = new Date(regularStudent.lastLessonDate);
@@ -922,7 +992,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
       // 否則使用待審核學生的開始日期
       startDate = new Date(student.started_date);
     }
-    
+
     const weekday = student.regular_weekday;
     const time = student.regular_timeslot;
     const totalLessons = student.package_lessons;
@@ -940,9 +1010,9 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
       lessons.push({
         id: `lesson_${i + 1}`,
-        date: lessonDate.toLocaleDateString('zh-TW', { 
-          year: 'numeric', 
-          month: '2-digit', 
+        date: lessonDate.toLocaleDateString('zh-TW', {
+          year: 'numeric',
+          month: '2-digit',
           day: '2-digit',
           weekday: 'long'
         }),
@@ -963,22 +1033,22 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
   };
 
   const handleSaveLessonEdit = (lessonId: string, newDate: string, newTime: string) => {
-    const updatedLessons = editedLessons.map(lesson => 
-      lesson.id === lessonId 
-        ? { 
-            ...lesson, 
-            rawDate: newDate, 
-            time: newTime,
-            date: new Date(newDate).toLocaleDateString('zh-TW', { 
-              year: 'numeric', 
-              month: '2-digit', 
-              day: '2-digit',
-              weekday: 'long'
-            })
-          }
+    const updatedLessons = editedLessons.map(lesson =>
+      lesson.id === lessonId
+        ? {
+          ...lesson,
+          rawDate: newDate,
+          time: newTime,
+          date: new Date(newDate).toLocaleDateString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            weekday: 'long'
+          })
+        }
         : lesson
     );
-    
+
     // 如果課程不在編輯列表中，添加它
     if (!editedLessons.find(lesson => lesson.id === lessonId)) {
       const originalLesson = generateLessonSchedule(selectedStudent).find(l => l.id === lessonId);
@@ -987,16 +1057,16 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
           ...originalLesson,
           rawDate: newDate,
           time: newTime,
-          date: new Date(newDate).toLocaleDateString('zh-TW', { 
-            year: 'numeric', 
-            month: '2-digit', 
+          date: new Date(newDate).toLocaleDateString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
             day: '2-digit',
             weekday: 'long'
           })
         });
       }
     }
-    
+
     setEditedLessons(updatedLessons);
     setEditingLesson(null);
   };
@@ -1011,7 +1081,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
       // 使用 hanami-saas-system 的 Supabase 客戶端（Service Role Key）
       const saasSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL;
       const saasSupabaseServiceKey = process.env.SUPABASE_SAAS_SERVICE_ROLE_KEY;
-      
+
       if (!saasSupabaseUrl || !saasSupabaseServiceKey) {
         console.error('SaaS Supabase 環境變數未設定（需要 Service Role Key）');
         return { url: null, error: '環境變數未設定' };
@@ -1023,7 +1093,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
           persistSession: false
         }
       });
-      
+
       // 方法1: 從 payment_records 表查找截圖記錄
       console.log('🔍 方法1: 從 payment_records 表查找截圖記錄');
       const { data: paymentRecords, error: recordsError } = await saasSupabase
@@ -1039,18 +1109,18 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
       } else if (paymentRecords && paymentRecords.length > 0) {
         const record = paymentRecords[0];
         console.log('✅ 找到付款記錄:', record);
-        
+
         // 如果有 screenshot_url，直接使用
         if (record.screenshot_url) {
           return { url: record.screenshot_url, error: null };
         }
-        
+
         // 如果有 file_name，嘗試從 storage 獲取
         if (record.file_name) {
           const { data, error } = await saasSupabase.storage
             .from('hanami-saas-system')
             .createSignedUrl(record.file_name, 3600);
-          
+
           if (!error && data) {
             return { url: data.signedUrl, error: null };
           }
@@ -1059,7 +1129,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
       // 方法2: 直接從 storage 的 payment-screenshots 資料夾查找
       console.log('🔍 方法2: 從 storage 的 payment-screenshots 資料夾查找');
-      
+
       // 獲取所有日期資料夾
       const { data: dateFolders, error: foldersError } = await saasSupabase.storage
         .from('hanami-saas-system')
@@ -1072,11 +1142,11 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
       // 按日期倒序查找（最新的在前）
       const sortedFolders = dateFolders?.sort((a, b) => b.name.localeCompare(a.name)) || [];
-      
+
       for (const folder of sortedFolders) {
         if (folder.name && folder.name.match(/^\d{4}-\d{2}-\d{2}$/)) {
           console.log(`🔍 檢查日期資料夾: ${folder.name}`);
-          
+
           const { data: files, error: filesError } = await saasSupabase.storage
             .from('hanami-saas-system')
             .list(`payment-screenshots/${folder.name}`);
@@ -1089,11 +1159,11 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
           // 尋找可能的截圖檔案（更靈活的匹配）
           const screenshotFile = files?.find(file => {
             if (!file.name) return false;
-            
+
             const fileName = file.name.toLowerCase();
             const studentIdLower = studentId.toLowerCase();
             const studentIdShort = studentId.substring(0, 8).toLowerCase();
-            
+
             // 檢查多種匹配方式
             return (
               fileName.includes(studentIdLower) ||
@@ -1112,7 +1182,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
             const { data, error } = await saasSupabase.storage
               .from('hanami-saas-system')
               .createSignedUrl(`payment-screenshots/${folder.name}/${screenshotFile.name}`, 3600);
-            
+
             if (!error && data) {
               return { url: data.signedUrl, error: null };
             }
@@ -1123,13 +1193,13 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
               const fileName = file.name.toLowerCase();
               return fileName.includes('png') || fileName.includes('jpg') || fileName.includes('jpeg');
             });
-            
+
             if (firstImageFile) {
               console.log(`📸 載入第一個可用的截圖檔案: ${firstImageFile.name}`);
               const { data, error } = await saasSupabase.storage
                 .from('hanami-saas-system')
                 .createSignedUrl(`payment-screenshots/${folder.name}/${firstImageFile.name}`, 3600);
-              
+
               if (!error && data) {
                 return { url: data.signedUrl, error: null };
               }
@@ -1140,16 +1210,16 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
       // 方法3: 嘗試列出所有檔案進行調試
       console.log('🔍 方法3: 列出所有檔案進行調試');
-      
+
       // 列出最近幾天的所有檔案
       const recentDays = 7; // 檢查最近7天
       const today = new Date();
-      
+
       for (let i = 0; i < recentDays; i++) {
         const date = new Date(today);
         date.setDate(today.getDate() - i);
         const dateStr = date.toISOString().slice(0, 10); // YYYY-MM-DD
-        
+
         try {
           const { data: files, error: filesError } = await saasSupabase.storage
             .from('hanami-saas-system')
@@ -1157,15 +1227,15 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
           if (!filesError && files && files.length > 0) {
             console.log(`📁 ${dateStr} 資料夾中的檔案:`, files.map(f => f.name));
-            
+
             // 尋找任何截圖檔案（更靈活的匹配）
             const studentFile = files.find(file => {
               if (!file.name) return false;
-              
+
               const fileName = file.name.toLowerCase();
               const studentIdLower = studentId.toLowerCase();
               const studentIdShort = studentId.substring(0, 8).toLowerCase();
-              
+
               // 檢查多種匹配方式
               return (
                 fileName.includes(studentIdLower) ||
@@ -1178,13 +1248,13 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                 fileName.includes('jpeg')   // 如果是 JPEG 檔案，可能是截圖
               );
             });
-            
+
             if (studentFile) {
               console.log(`✅ 在 ${dateStr} 找到學生檔案: ${studentFile.name}`);
               const { data, error } = await saasSupabase.storage
                 .from('hanami-saas-system')
                 .createSignedUrl(`payment-screenshots/${dateStr}/${studentFile.name}`, 3600);
-              
+
               if (!error && data) {
                 return { url: data.signedUrl, error: null };
               }
@@ -1195,13 +1265,13 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                 const fileName = file.name.toLowerCase();
                 return fileName.includes('png') || fileName.includes('jpg') || fileName.includes('jpeg');
               });
-              
+
               if (firstImageFile) {
                 console.log(`📸 載入第一個可用的截圖檔案: ${firstImageFile.name}`);
                 const { data, error } = await saasSupabase.storage
                   .from('hanami-saas-system')
                   .createSignedUrl(`payment-screenshots/${dateStr}/${firstImageFile.name}`, 3600);
-                
+
                 if (!error && data) {
                   return { url: data.signedUrl, error: null };
                 }
@@ -1262,16 +1332,16 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
         loadPendingStudents(),
         loadRegularStudents()
       ];
-      
+
       // 如果需要顯示試堂學生，也並行加載
       if (showTrialStudents) {
         promises.push(loadTrialStudents());
       }
-      
+
       // 並行執行所有加載操作
       await Promise.all(promises);
     };
-    
+
     loadData();
   }, [orgId, showTrialStudents]);
 
@@ -1357,8 +1427,159 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
           </p>
         </motion.div>
 
+        {/* Tabs */}
+        <div className="flex space-x-4 mb-6 justify-center">
+          <button
+            onClick={() => setActiveTab('students')}
+            className={`px-6 py-2 rounded-full font-medium transition-all ${activeTab === 'students'
+              ? 'bg-[#FFD59A] text-[#4B4036] shadow-md'
+              : 'bg-white/50 text-gray-600 hover:bg-white'
+              }`}
+          >
+            待審核學生
+          </button>
+          <button
+            onClick={() => setActiveTab('leave')}
+            className={`px-6 py-2 rounded-full font-medium transition-all ${activeTab === 'leave'
+              ? 'bg-[#FFD59A] text-[#4B4036] shadow-md'
+              : 'bg-white/50 text-gray-600 hover:bg-white'
+              }`}
+          >
+            請假申請
+            {leaveRequests.length > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                {leaveRequests.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Leave Requests Section */}
+        {activeTab === 'leave' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-[#EADBC8] p-6 mb-8">
+            <h3 className="text-xl font-bold text-[#4B4036] mb-6">待審核病假申請</h3>
+            {loadingLeaveRequests ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFD59A] mx-auto mb-4"></div>
+                <p className="text-gray-500">載入中...</p>
+              </div>
+            ) : leaveRequests.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                <p className="text-gray-500">暫無待審核申請</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {leaveRequests.map((request) => (
+                  <div key={request.id} className="bg-white border border-[#EADBC8] rounded-xl p-4 hover:shadow-md transition-shadow">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-[#4B4036] text-lg">
+                            {request.student?.full_name}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            ({request.student?.nick_name})
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm text-gray-600">
+                            <CalendarIcon className="w-4 h-4 mr-2 text-[#FFD59A]" />
+                            請假日期: {request.lesson_date}
+                          </div>
+                          <div className="flex items-center text-sm text-gray-600">
+                            <ClockIcon className="w-4 h-4 mr-2 text-[#FFD59A]" />
+                            申請時間: {new Date(request.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <a
+                            href={request.proof_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                          >
+                            <DocumentTextIcon className="w-4 h-4 mr-1.5" />
+                            查看醫生證明
+                          </a>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => {
+                            setSelectedLeaveRequest(request);
+                            setShowLeaveReviewModal(true);
+                          }}
+                          className="flex-1 sm:flex-none px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-lg hover:bg-[#EBC9A4] font-medium shadow-sm transition-colors"
+                        >
+                          審核申請
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Leave Review Modal */}
+        {showLeaveReviewModal && selectedLeaveRequest && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl">
+              <h3 className="text-xl font-bold text-[#4B4036] mb-4">審核請假申請</h3>
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-xl">
+                  <p className="text-sm text-gray-600 mb-1">申請學生</p>
+                  <p className="font-medium text-[#4B4036]">{selectedLeaveRequest.student?.full_name}</p>
+                  <p className="text-sm text-gray-600 mt-2 mb-1">請假日期</p>
+                  <p className="font-medium text-[#4B4036]">{selectedLeaveRequest.lesson_date}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">審核備註</label>
+                  <textarea
+                    value={reviewLeaveNotes}
+                    onChange={(e) => setReviewLeaveNotes(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent"
+                    rows={3}
+                    placeholder="可選..."
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    onClick={() => setShowLeaveReviewModal(false)}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={() => {
+                      const reason = prompt('請輸入拒絕原因:');
+                      if (reason) {
+                        setLeaveRejectionReason(reason);
+                        handleReviewLeave('rejected');
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition-colors"
+                  >
+                    拒絕
+                  </button>
+                  <button
+                    onClick={() => handleReviewLeave('approved')}
+                    className="px-4 py-2 bg-[#FFD59A] text-[#4B4036] hover:bg-[#EBC9A4] rounded-lg transition-colors"
+                  >
+                    批准
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 統計卡片 */}
         <motion.div
+          style={{ display: activeTab === 'students' ? 'block' : 'none' }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
@@ -1429,6 +1650,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
         {/* 過濾器 */}
         <motion.div
+          style={{ display: activeTab === 'students' ? 'block' : 'none' }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
@@ -1456,11 +1678,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setFilterStatus('all')}
-                  className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                    filterStatus === 'all' 
-                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg' 
-                      : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
-                  }`}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all ${filterStatus === 'all'
+                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
+                    : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
+                    }`}
                 >
                   全部
                 </motion.button>
@@ -1468,11 +1689,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setFilterStatus('pending')}
-                  className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                    filterStatus === 'pending' 
-                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg' 
-                      : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
-                  }`}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all ${filterStatus === 'pending'
+                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
+                    : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
+                    }`}
                 >
                   未確認
                 </motion.button>
@@ -1480,11 +1700,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setFilterStatus('approved')}
-                  className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                    filterStatus === 'approved' 
-                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg' 
-                      : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
-                  }`}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all ${filterStatus === 'approved'
+                    ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
+                    : 'bg-white/70 border border-[#EADBC8] text-[#4B4036] hover:bg-white shadow-sm'
+                    }`}
                 >
                   已確認
                 </motion.button>
@@ -1518,6 +1737,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
 
         {/* 學生列表 */}
         <motion.div
+          style={{ display: activeTab === 'students' ? 'block' : 'none' }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
@@ -1617,11 +1837,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                               </p>
                             )}
                             {student.trial_status && (
-                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium mt-1 ${
-                                student.trial_status === 'pending' 
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-green-100 text-green-800'
-                              }`}>
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium mt-1 ${student.trial_status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-green-100 text-green-800'
+                                }`}>
                                 {student.trial_status === 'pending' ? '待安排' : '已安排'}
                               </span>
                             )}
@@ -1718,83 +1937,83 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                 </thead>
                 <tbody className="divide-y divide-[#EADBC8]">
                   {filteredStudents.map((student, index) => (
-                  <motion.tr
-                    key={student.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`hover:bg-[#FFF9F2]/50 ${selectedStudentIds.includes(student.id) ? 'bg-[#FFE0E0]/30' : ''}`}
-                  >
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedStudentIds.includes(student.id)}
-                        onChange={() => toggleStudentSelection(student.id)}
-                        className="w-4 h-4 text-[#FFD59A] border-[#EADBC8] rounded focus:ring-[#FFD59A]"
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-[#4B4036]">{student.full_name}</p>
-                        <p className="text-sm text-[#2B3A3B]">ID: {student.student_oid}</p>
-                        {student.nick_name && (
-                          <p className="text-sm text-[#2B3A3B]">暱稱: {student.nick_name}</p>
-                        )}
-                        <p className="text-sm text-[#2B3A3B]">
-                          {student.student_age ? `${Math.floor(student.student_age / 12)}歲${student.student_age % 12}個月` : '年齡未知'}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-[#4B4036]">{student.course_type}</p>
-                        <p className="text-sm text-[#2B3A3B]">{student.selected_plan_name}</p>
-                        {student.regular_weekday !== null && (
+                    <motion.tr
+                      key={student.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`hover:bg-[#FFF9F2]/50 ${selectedStudentIds.includes(student.id) ? 'bg-[#FFE0E0]/30' : ''}`}
+                    >
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudentIds.includes(student.id)}
+                          onChange={() => toggleStudentSelection(student.id)}
+                          className="w-4 h-4 text-[#FFD59A] border-[#EADBC8] rounded focus:ring-[#FFD59A]"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-[#4B4036]">{student.full_name}</p>
+                          <p className="text-sm text-[#2B3A3B]">ID: {student.student_oid}</p>
+                          {student.nick_name && (
+                            <p className="text-sm text-[#2B3A3B]">暱稱: {student.nick_name}</p>
+                          )}
                           <p className="text-sm text-[#2B3A3B]">
-                            星期{getWeekdayName(student.regular_weekday || 0)} {student.regular_timeslot}
+                            {student.student_age ? `${Math.floor(student.student_age / 12)}歲${student.student_age % 12}個月` : '年齡未知'}
                           </p>
-                        )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-[#4B4036]">{student.course_type}</p>
+                          <p className="text-sm text-[#2B3A3B]">{student.selected_plan_name}</p>
+                          {student.regular_weekday !== null && (
+                            <p className="text-sm text-[#2B3A3B]">
+                              星期{getWeekdayName(student.regular_weekday || 0)} {student.regular_timeslot}
+                            </p>
+                          )}
+                          <p className="text-sm text-[#2B3A3B]">
+                            {student.package_lessons} 堂課
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-[#4B4036]">
+                            ${student.payment_amount?.toLocaleString()}
+                          </p>
+                          <p className="text-sm text-[#2B3A3B]">{student.payment_method}</p>
+                          <p className="text-sm text-[#2B3A3B]">{student.contact_number}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(student.review_status)}`}>
+                          {getStatusText(student.review_status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
                         <p className="text-sm text-[#2B3A3B]">
-                          {student.package_lessons} 堂課
+                          {new Date(student.enrollment_date).toLocaleDateString('zh-TW')}
                         </p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-[#4B4036]">
-                          ${student.payment_amount?.toLocaleString()}
-                        </p>
-                        <p className="text-sm text-[#2B3A3B]">{student.payment_method}</p>
-                        <p className="text-sm text-[#2B3A3B]">{student.contact_number}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(student.review_status)}`}>
-                        {getStatusText(student.review_status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-[#2B3A3B]">
-                        {new Date(student.enrollment_date).toLocaleDateString('zh-TW')}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => {
-                          setSelectedStudent(student);
-                          setShowModal(true);
-                        }}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-[#FFD59A] hover:bg-[#EBC9A4] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FFD59A] transition-colors"
-                      >
-                        <EyeIcon className="w-4 h-4 mr-1" />
-                        查看詳情
-                      </button>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setShowModal(true);
+                          }}
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-[#FFD59A] hover:bg-[#EBC9A4] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FFD59A] transition-colors"
+                        >
+                          <EyeIcon className="w-4 h-4 mr-1" />
+                          查看詳情
+                        </button>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </motion.div>
 
@@ -1807,7 +2026,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
               className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-[#EADBC8]"
             >
               <h2 className="text-2xl font-bold text-[#4B4036] mb-6">學生詳情</h2>
-              
+
               {/* 正式學生選擇區域 */}
               <div className="bg-gradient-to-r from-[#EBC9A4] to-[#FFB6C1] rounded-lg p-4 mb-6">
                 <div className="flex items-center justify-between mb-4">
@@ -1823,7 +2042,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                     {loadingRegularStudents ? '載入中...' : '重新載入'}
                   </button>
                 </div>
-                
+
                 <div className="space-y-3">
                   {selectedStudent.review_status === 'pending' ? (
                     <>
@@ -1853,10 +2072,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                         onChange={(value, option) => {
                           if (value === 'new_student') {
                             // 設置為新學生選項
-                            setSelectedRegularStudent({ 
-                              id: 'new_student', 
-                              full_name: '新學生', 
-                              isNew: true 
+                            setSelectedRegularStudent({
+                              id: 'new_student',
+                              full_name: '新學生',
+                              isNew: true
                             } as any);
                             // 初始化新學生表單
                             if (selectedStudent) {
@@ -1899,7 +2118,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                       </div>
                     </>
                   )}
-                  
+
                   {selectedRegularStudent && selectedRegularStudent.id !== 'new_student' && (
                     <div className="bg-white bg-opacity-50 rounded-lg p-3">
                       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1920,7 +2139,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                           <p className="text-lg font-bold text-[#4B4036]">{selectedRegularStudent.net_remaining_lessons} 堂</p>
                         </div>
                       </div>
-                      
+
                       {selectedRegularStudent.packages && selectedRegularStudent.packages.length > 0 && (
                         <div className="mt-3">
                           <p className="font-medium text-[#4B4036] mb-2">課程包詳情：</p>
@@ -1960,7 +2179,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                           </p>
                         </div>
                       </div>
-                      
+
                       {/* 新學生表單 */}
                       {newStudentForm && (
                         <div className="bg-white rounded-lg p-6 border border-[#EADBC8] shadow-sm">
@@ -1970,57 +2189,57 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                               {/* 基本資料 */}
                               <div className="space-y-3">
                                 <h4 className="font-semibold text-[#4B4036] border-b border-[#EADBC8] pb-1">基本資料</h4>
-                                
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">姓名 *</label>
                                   <input
                                     type="text"
                                     value={newStudentForm.full_name}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, full_name: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, full_name: e.target.value })}
                                     className="w-full px-4 py-3 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] focus:outline-none transition-all duration-200 hover:border-[#FFD59A] shadow-sm hover:shadow-md"
                                     placeholder="請輸入學生姓名"
                                   />
                                 </div>
-                                
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">暱稱</label>
                                   <input
                                     type="text"
                                     value={newStudentForm.nick_name}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, nick_name: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, nick_name: e.target.value })}
                                     className="w-full px-4 py-3 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] focus:outline-none transition-all duration-200 hover:border-[#FFD59A] shadow-sm hover:shadow-md"
                                     placeholder="請輸入暱稱"
                                   />
                                 </div>
-                                
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">聯絡電話 *</label>
                                   <input
                                     type="text"
                                     value={newStudentForm.contact_number}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, contact_number: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, contact_number: e.target.value })}
                                     className="w-full px-4 py-3 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] focus:outline-none transition-all duration-200 hover:border-[#FFD59A] shadow-sm hover:shadow-md"
                                     placeholder="請輸入聯絡電話"
                                   />
                                 </div>
-                                
-                                
+
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">家長郵箱</label>
                                   <input
                                     type="email"
                                     value={newStudentForm.parent_email}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, parent_email: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, parent_email: e.target.value })}
                                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent"
                                   />
                                 </div>
-                                
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">性別</label>
                                   <div className="relative">
                                     <select
                                       value={newStudentForm.gender}
-                                      onChange={(e) => setNewStudentForm({...newStudentForm, gender: e.target.value})}
+                                      onChange={(e) => setNewStudentForm({ ...newStudentForm, gender: e.target.value })}
                                       className="w-full px-4 py-3 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] focus:outline-none transition-all duration-200 appearance-none cursor-pointer hover:border-[#FFD59A] shadow-sm hover:shadow-md"
                                     >
                                       <option value="" className="text-[#2B3A3B]">請選擇性別</option>
@@ -2035,28 +2254,28 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               {/* 課程資料 */}
                               <div className="space-y-3">
                                 <h4 className="font-semibold text-[#4B4036] border-b border-[#EADBC8] pb-1">課程資料</h4>
-                                
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">課程類型</label>
                                   <input
                                     type="text"
                                     value={newStudentForm.course_type}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, course_type: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, course_type: e.target.value })}
                                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent"
                                   />
                                 </div>
-                                
-                                
+
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">上課星期</label>
                                   <div className="relative">
                                     <select
                                       value={newStudentForm.regular_weekday || ''}
-                                      onChange={(e) => setNewStudentForm({...newStudentForm, regular_weekday: e.target.value ? parseInt(e.target.value) : null})}
+                                      onChange={(e) => setNewStudentForm({ ...newStudentForm, regular_weekday: e.target.value ? parseInt(e.target.value) : null })}
                                       className="w-full px-4 py-3 bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] focus:outline-none transition-all duration-200 appearance-none cursor-pointer hover:border-[#FFD59A] shadow-sm hover:shadow-md"
                                     >
                                       <option value="" className="text-[#2B3A3B]">請選擇上課星期</option>
@@ -2075,71 +2294,71 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                                     </div>
                                   </div>
                                 </div>
-                                
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">上課時間</label>
                                   <input
                                     type="time"
                                     value={newStudentForm.regular_timeslot}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, regular_timeslot: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, regular_timeslot: e.target.value })}
                                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent"
                                   />
                                 </div>
-                                
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">開始日期</label>
                                   <input
                                     type="date"
                                     value={newStudentForm.started_date}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, started_date: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, started_date: e.target.value })}
                                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent"
                                   />
                                 </div>
-                                
+
                               </div>
                             </div>
-                            
+
                             {/* 其他資料 */}
                             <div className="mt-4 space-y-3">
                               <h4 className="font-semibold text-[#4B4036] border-b border-[#EADBC8] pb-1">其他資料</h4>
-                              
+
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">地址</label>
                                   <input
                                     type="text"
                                     value={newStudentForm.address}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, address: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, address: e.target.value })}
                                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent"
                                   />
                                 </div>
-                                
+
                                 <div>
                                   <label className="block text-[#4B4036] font-medium mb-1">學校</label>
                                   <input
                                     type="text"
                                     value={newStudentForm.school}
-                                    onChange={(e) => setNewStudentForm({...newStudentForm, school: e.target.value})}
+                                    onChange={(e) => setNewStudentForm({ ...newStudentForm, school: e.target.value })}
                                     className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent"
                                   />
                                 </div>
                               </div>
-                              
+
                               <div>
                                 <label className="block text-[#4B4036] font-medium mb-1">健康狀況備註</label>
                                 <textarea
                                   value={newStudentForm.health_notes}
-                                  onChange={(e) => setNewStudentForm({...newStudentForm, health_notes: e.target.value})}
+                                  onChange={(e) => setNewStudentForm({ ...newStudentForm, health_notes: e.target.value })}
                                   rows={2}
                                   className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent"
                                 />
                               </div>
-                              
+
                               <div>
                                 <label className="block text-[#4B4036] font-medium mb-1">學生備註</label>
                                 <textarea
                                   value={newStudentForm.student_remarks}
-                                  onChange={(e) => setNewStudentForm({...newStudentForm, student_remarks: e.target.value})}
+                                  onChange={(e) => setNewStudentForm({ ...newStudentForm, student_remarks: e.target.value })}
                                   rows={2}
                                   className="w-full px-3 py-2 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent"
                                 />
@@ -2152,7 +2371,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                   )}
                 </div>
               </div>
-              
+
               {/* 預覽堂數和時間卡片 */}
               <div className="bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-lg p-4 mb-6">
                 <div className="flex items-center justify-between">
@@ -2163,7 +2382,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                   <div className="text-center">
                     <p className="text-sm text-[#4B4036] font-medium">上課時間</p>
                     <p className="text-lg font-bold text-[#4B4036]">
-                       {selectedStudent.regular_weekday !== null ? `星期${getWeekdayName(selectedStudent.regular_weekday || 0)}` : '未設定'}
+                      {selectedStudent.regular_weekday !== null ? `星期${getWeekdayName(selectedStudent.regular_weekday || 0)}` : '未設定'}
                     </p>
                     <p className="text-sm text-[#4B4036]">
                       {selectedStudent.regular_timeslot || '未設定時間'}
@@ -2174,7 +2393,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                     <p className="text-xl font-bold text-[#4B4036]">${selectedStudent.package_price?.toLocaleString() || 0}</p>
                   </div>
                 </div>
-                
+
                 {/* 開始日期顯示 */}
                 <div className="mt-4 pt-4 border-t border-[#EADBC8]">
                   <div className="flex items-center justify-between">
@@ -2188,10 +2407,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                             const lastLessonDate = new Date((selectedRegularStudent as any).lastLessonDate);
                             const newStartDate = new Date(lastLessonDate);
                             newStartDate.setDate(lastLessonDate.getDate() + 7);
-                            return newStartDate.toLocaleDateString('zh-TW', { 
-                              year: 'numeric', 
-                              month: '2-digit', 
-                              day: '2-digit' 
+                            return newStartDate.toLocaleDateString('zh-TW', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
                             });
                           })()
                         ) : (
@@ -2220,13 +2439,13 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                       <CalendarDaysIcon className="w-5 h-5 text-[#4B4036] mr-2" />
                       <h3 className="text-lg font-semibold text-[#4B4036]">課程時間表安排</h3>
                     </div>
-                     {selectedRegularStudent && (selectedRegularStudent as any).lastLessonDate && (
+                    {selectedRegularStudent && (selectedRegularStudent as any).lastLessonDate && (
                       <div className="text-xs text-[#4B4036] bg-[#E0F2E0] px-2 py-1 rounded">
                         基於 {selectedRegularStudent.full_name} 最後一堂課 ({(selectedRegularStudent as any).lastLessonDate}) 加一星期計算
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {getDisplayLessons().map((lesson, index) => (
                       <div key={lesson.id} className="bg-white bg-opacity-70 rounded-lg p-3 border border-[#EADBC8] relative">
@@ -2247,7 +2466,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                             </button>
                           </div>
                         </div>
-                        
+
                         {editingLesson && editingLesson.id === lesson.id ? (
                           <div className="space-y-2">
                             <div>
@@ -2300,12 +2519,12 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                       </div>
                     ))}
                   </div>
-                  
+
                   <div className="mt-4 p-3 bg-[#E0F2E0] rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm text-[#4B4036]">
                         <span className="font-medium">課程總計：</span>
-                         {selectedStudent.package_lessons} 堂課程，每週 {selectedStudent.regular_weekday !== null ? `星期${getWeekdayName(selectedStudent.regular_weekday || 0)}` : '未設定'} {selectedStudent.regular_timeslot} 上課
+                        {selectedStudent.package_lessons} 堂課程，每週 {selectedStudent.regular_weekday !== null ? `星期${getWeekdayName(selectedStudent.regular_weekday || 0)}` : '未設定'} {selectedStudent.regular_timeslot} 上課
                       </p>
                       {editedLessons.length > 0 && (
                         <span className="text-xs text-orange-600 font-medium">
@@ -2313,7 +2532,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                         </span>
                       )}
                     </div>
-                    
+
                     {editedLessons.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-green-200">
                         <div className="flex items-center justify-between">
@@ -2336,7 +2555,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                   </div>
                 </div>
               )}
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <h3 className="font-medium text-[#4B4036] mb-3">基本資訊</h3>
@@ -2349,26 +2568,26 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                     <p><span className="font-medium">家長電郵:</span> {selectedStudent.parent_email || '無'}</p>
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="font-medium text-[#4B4036] mb-3">課程資訊</h3>
                   <div className="space-y-2">
                     <p><span className="font-medium">課程類型:</span> {selectedStudent.course_type}</p>
                     <p><span className="font-medium">課程計劃:</span> {selectedStudent.selected_plan_name || '無'}</p>
                     <p><span className="font-medium">開始日期:</span> {
-                       selectedRegularStudent && (selectedRegularStudent as any).lastLessonDate ? (
+                      selectedRegularStudent && (selectedRegularStudent as any).lastLessonDate ? (
                         (() => {
                           const lastLessonDate = new Date((selectedRegularStudent as any).lastLessonDate);
                           const newStartDate = new Date(lastLessonDate);
                           newStartDate.setDate(lastLessonDate.getDate() + 7);
-                          return newStartDate.toLocaleDateString('zh-TW', { 
-                            year: 'numeric', 
-                            month: '2-digit', 
-                            day: '2-digit' 
+                          return newStartDate.toLocaleDateString('zh-TW', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
                           });
                         })()
                       ) : (
-                         (selectedStudent as any).started_date || '未設定'
+                        (selectedStudent as any).started_date || '未設定'
                       )
                     }</p>
                     <p><span className="font-medium">課程時長:</span> {(selectedStudent as any).duration_months || 0} 個月</p>
@@ -2384,7 +2603,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                   <p><span className="font-medium">付款金額:</span> ${selectedStudent.payment_amount?.toLocaleString() || 0}</p>
                   <p><span className="font-medium">付款方式:</span> {selectedStudent.payment_method || '未知'}</p>
                 </div>
-                
+
                 {/* 付款截圖顯示 */}
                 {(selectedStudent.payment_method === '截圖' || selectedStudent.payment_method === 'screenshot') && (
                   <div className="mt-4">
@@ -2446,7 +2665,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                         placeholder="輸入審核備註..."
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-[#4B4036] mb-2">拒絕原因（如適用）</label>
                       <textarea
@@ -2468,7 +2687,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                 >
                   關閉
                 </button>
-                
+
                 {selectedStudent && selectedStudent.review_status === 'pending' && (
                   <button
                     onClick={showConfirmationModal}
@@ -2510,12 +2729,12 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
               <div className="flex-1 overflow-y-auto mb-4 sm:mb-6">
                 <div className="text-[#2B3A3B] space-y-3">
                   <p className="text-base sm:text-lg px-2">
-                    {selectedRegularStudent?.id === 'new_student' 
-                      ? '您確定要創建新學生並新增堂數嗎？' 
+                    {selectedRegularStudent?.id === 'new_student'
+                      ? '您確定要創建新學生並新增堂數嗎？'
                       : '您確定要為以下學生新增堂數嗎？'
                     }
                   </p>
-                  
+
                   {selectedRegularStudent && selectedStudent && (
                     <div className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] rounded-xl p-4 border border-[#EADBC8]">
                       {selectedRegularStudent.id === 'new_student' ? (
@@ -2531,7 +2750,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                               並新增 <span className="font-bold text-[#FFB6C1]">{selectedStudent.package_lessons}</span> 堂課
                             </p>
                           </div>
-                          
+
                           {/* 簡潔的確認信息 */}
                           <div className="text-center px-2">
                             <div className="bg-gradient-to-r from-[#E0F2E0] to-[#FFF9F2] rounded-lg sm:rounded-xl p-4 sm:p-6 border border-[#EADBC8]">
@@ -2541,13 +2760,13 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                                 </svg>
                                 <h4 className="text-base sm:text-lg font-semibold text-[#4B4036]">新學生信息摘要</h4>
                               </div>
-                              
+
                               <div className="space-y-2 text-xs sm:text-sm text-[#2B3A3B]">
                                 <p className="break-words"><span className="font-medium">姓名：</span>{newStudentForm?.full_name || '未設定'}</p>
                                 <p className="break-words"><span className="font-medium">聯絡電話：</span>{newStudentForm?.contact_number || '未設定'}</p>
                                 <p className="break-words"><span className="font-medium">課程類型：</span>{newStudentForm?.course_type || '未設定'}</p>
                                 <p className="break-words"><span className="font-medium">上課時間：</span>
-                                  {newStudentForm?.regular_weekday !== null && newStudentForm?.regular_weekday !== undefined 
+                                  {newStudentForm?.regular_weekday !== null && newStudentForm?.regular_weekday !== undefined
                                     ? `星期${['日', '一', '二', '三', '四', '五', '六'][newStudentForm.regular_weekday]} ${newStudentForm.regular_timeslot || ''}`
                                     : '未設定'
                                   }
@@ -2572,13 +2791,13 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                       )}
                     </div>
                   )}
-                  
+
                   <div className="text-xs sm:text-sm text-[#2B3A3B] bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start space-x-2 mx-2">
                     <svg className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
                     <p className="break-words">
-                      {selectedRegularStudent?.id === 'new_student' 
+                      {selectedRegularStudent?.id === 'new_student'
                         ? '此操作將創建新的正式學生記錄並確認待審核學生狀態，無法撤銷。'
                         : '此操作將直接更新正式學生的堂數並確認待審核學生狀態，無法撤銷。'
                       }
@@ -2669,7 +2888,7 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                     const formData = link.form_data || {};
                     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
                     const registrationUrl = `${baseUrl}/aihome/course-activities/register?token=${link.token}`;
-                    
+
                     return (
                       <motion.div
                         key={link.id}
@@ -2680,25 +2899,23 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                link.link_type === 'trial' 
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${link.link_type === 'trial'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-blue-100 text-blue-800'
+                                }`}>
                                 {link.link_type === 'trial' ? '試堂' : '常規'}
                               </span>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                isExpired || link.status === 'expired'
-                                  ? 'bg-red-100 text-red-800'
-                                  : isCompleted
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${isExpired || link.status === 'expired'
+                                ? 'bg-red-100 text-red-800'
+                                : isCompleted
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-green-100 text-green-800'
-                              }`}>
-                                {isExpired || link.status === 'expired' 
+                                }`}>
+                                {isExpired || link.status === 'expired'
                                   ? '已過期'
                                   : isCompleted
-                                  ? '已完成'
-                                  : '有效'}
+                                    ? '已完成'
+                                    : '有效'}
                               </span>
                             </div>
                             <p className="text-sm text-[#4B4036] font-medium mb-1">
@@ -2816,11 +3033,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                         whileHover={orgId && organizations.length === 1 ? {} : { scale: 1.01 }}
                         whileTap={orgId && organizations.length === 1 ? {} : { scale: 0.99 }}
                         transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        className={`w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none shadow-sm hover:shadow-md focus:shadow-lg ${
-                          orgId && organizations.length === 1 
-                            ? 'disabled:bg-[#F5F5F5] disabled:cursor-not-allowed disabled:opacity-50 cursor-not-allowed' 
-                            : 'cursor-pointer'
-                        }`}
+                        className={`w-full px-4 py-3 pr-10 bg-gradient-to-r from-[#FFFDF8] to-[#FFF9F2] border-2 border-[#EADBC8] rounded-2xl text-[#4B4036] text-sm font-medium focus:ring-2 focus:ring-[#FFB6C1] focus:border-[#FFB6C1] transition-all duration-200 appearance-none shadow-sm hover:shadow-md focus:shadow-lg ${orgId && organizations.length === 1
+                          ? 'disabled:bg-[#F5F5F5] disabled:cursor-not-allowed disabled:opacity-50 cursor-not-allowed'
+                          : 'cursor-pointer'
+                          }`}
                       >
                         <option value="">請選擇機構</option>
                         {organizations.map(org => (
@@ -2845,11 +3061,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                       <motion.label
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className={`flex items-center space-x-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
-                          linkFormData.courseNature === 'trial'
-                            ? 'border-[#FFB6C1] bg-[#FFB6C1]/10'
-                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]'
-                        }`}
+                        className={`flex items-center space-x-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${linkFormData.courseNature === 'trial'
+                          ? 'border-[#FFB6C1] bg-[#FFB6C1]/10'
+                          : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]'
+                          }`}
                       >
                         <input
                           type="radio"
@@ -2863,11 +3078,10 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                       <motion.label
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className={`flex items-center space-x-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
-                          linkFormData.courseNature === 'regular'
-                            ? 'border-[#FFB6C1] bg-[#FFB6C1]/10'
-                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]'
-                        }`}
+                        className={`flex items-center space-x-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${linkFormData.courseNature === 'regular'
+                          ? 'border-[#FFB6C1] bg-[#FFB6C1]/10'
+                          : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]'
+                          }`}
                       >
                         <input
                           type="radio"
@@ -3225,8 +3439,8 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                     <div className="relative">
                       <motion.select
                         id="linkExpiryHours"
-                        value={[1, 6, 12, 24, 48, 72, 168].includes(linkFormData.linkExpiryHours) 
-                          ? linkFormData.linkExpiryHours.toString() 
+                        value={[1, 6, 12, 24, 48, 72, 168].includes(linkFormData.linkExpiryHours)
+                          ? linkFormData.linkExpiryHours.toString()
                           : 'custom'}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -3253,8 +3467,8 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                         <option value="72">72 小時</option>
                         <option value="168">7 天（168 小時）</option>
                         <option value="custom">
-                          {[1, 6, 12, 24, 48, 72, 168].includes(linkFormData.linkExpiryHours) 
-                            ? '自訂時限' 
+                          {[1, 6, 12, 24, 48, 72, 168].includes(linkFormData.linkExpiryHours)
+                            ? '自訂時限'
                             : `自訂：${linkFormData.linkExpiryHours} 小時`}
                         </option>
                       </motion.select>
@@ -3303,9 +3517,8 @@ function PendingStudentsPageContent(props: PendingStudentsPageProps = {}) {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       disabled={generatingLink}
-                      className={`flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all ${
-                        generatingLink ? 'opacity-75 cursor-not-allowed' : ''
-                      }`}
+                      className={`flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all ${generatingLink ? 'opacity-75 cursor-not-allowed' : ''
+                        }`}
                     >
                       {generatingLink ? (
                         <div className="flex items-center justify-center space-x-2">

@@ -25,7 +25,7 @@ const generateUUID = () => {
     return crypto.randomUUID();
   }
   // Fallback：使用 Math.random 生成 UUID v4 格式
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -42,6 +42,8 @@ import LessonEditorModal from './LessonEditorModal';
 import { Lesson, CourseType } from '@/types';
 import AIMessageModal from '@/components/ui/AIMessageModal';
 import { buildTeacherDisplayName, TeacherIdentity } from '@/lib/teacherUtils';
+import LeaveApplicationModal from '@/components/ui/LeaveApplicationModal';
+import ParentLessonBookingModal from '@/components/ui/ParentLessonBookingModal';
 
 
 interface StudentLessonPanelProps {
@@ -59,6 +61,8 @@ interface StudentLessonPanelProps {
   disableSelection?: boolean; // 是否禁用勾選功能
   orgId?: string | null; // 所屬機構 ID
   organizationName?: string | null;
+  onPendingClick?: () => void;
+  isParentView?: boolean;
 }
 
 interface LessonData {
@@ -108,8 +112,10 @@ export default function StudentLessonPanel({
   hideTeacherColumn = false,
   hideCareAlert = false,
   disableSelection = false,
+  onPendingClick,
   orgId,
   organizationName,
+  isParentView = false,
 }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
   const resolvedOrgName =
@@ -118,13 +124,13 @@ export default function StudentLessonPanel({
     null;
   const allowAiFeatures = orgId === PREMIUM_AI_ORG_ID;
   const aiFeatureMessage = '暫未開放，企業用戶請聯繫 BuildThinkai@gmail.com';
-  
+
   // 添加動畫樣式到 head
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.textContent = animationStyles;
     document.head.appendChild(styleElement);
-    
+
     return () => {
       document.head.removeChild(styleElement);
     };
@@ -150,25 +156,31 @@ export default function StudentLessonPanel({
   const [teacherLabelMap, setTeacherLabelMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // 排序相關狀態
   const [sortField, setSortField] = useState<string>('lesson_date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  
+
   // 動畫相關狀態
   const [isCountButtonAnimating, setIsCountButtonAnimating] = useState(false);
   const [showSuccessIndicator, setShowSuccessIndicator] = useState(false);
-  
+
   // AI 訊息相關狀態
   const [showAIMessageModal, setShowAIMessageModal] = useState(false);
-  
+
   // 剩餘堂數計算狀態
   const [calculatedRemainingLessons, setCalculatedRemainingLessons] = useState<number | null>(null);
-  
+
   // 新增課堂相關狀態
   const [showLessonEditorModal, setShowLessonEditorModal] = useState(false);
   const [availableLessons, setAvailableLessons] = useState(0);
-  
+
+  // 請假申請相關狀態
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+
+  // 家長預約相關狀態
+  const [showParentBookingModal, setShowParentBookingModal] = useState(false);
+
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
   const currentStudentIdRef = useRef<string | null>(null);
@@ -177,14 +189,14 @@ export default function StudentLessonPanel({
   useEffect(() => {
     // 如果 studentId 沒有變化且已經載入過，不重複載入
     if (currentStudentIdRef.current === studentId && lessonsFetchedRef.current) return;
-    
+
     // 防止重複載入
     if (loadingRef.current) return;
     loadingRef.current = true;
-    
+
     // 更新當前 studentId
     currentStudentIdRef.current = studentId;
-    
+
     fetchLessons();
   }, [studentId]);
 
@@ -229,10 +241,10 @@ export default function StudentLessonPanel({
         </div>
       );
     }
-    return sortDirection === 'asc' ? 
+    return sortDirection === 'asc' ?
       <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
         <path d="M10 3L3 10h14L10 3z" />
-      </svg> : 
+      </svg> :
       <svg className="w-5 h-5 text-orange-400 bg-orange-100 rounded-lg p-0.5 shadow-sm" fill="currentColor" viewBox="0 0 20 20">
         <path d="M10 17L3 10h14L10 17z" />
       </svg>;
@@ -292,9 +304,9 @@ export default function StudentLessonPanel({
       setLoading(true);
       setError(null); // 清除之前的錯誤
       console.log('🔍 開始載入課堂資料，studentId:', studentId, 'studentType:', studentType);
-      
+
       let lessonsData: any[] = [];
-      
+
       // 根據學生類型決定查詢哪個表
       if (studentType === '試堂' || studentType === 'trial') {
         // 試堂學生：查詢 hanami_trial_students 表
@@ -304,13 +316,13 @@ export default function StudentLessonPanel({
           .select('*')
           .eq('id', studentId)
           .not('lesson_date', 'is', null); // 只查詢有課堂日期的記錄
-        
+
         if (error) {
           console.error('❌ 查詢試堂學生課堂資料失敗:', error);
           setError(error.message);
           return;
         }
-        
+
         // 將試堂學生資料轉換為課堂格式
         lessonsData = (data || []).map((trialStudent: any) => ({
           id: trialStudent.id,
@@ -340,7 +352,7 @@ export default function StudentLessonPanel({
           regular_weekday: trialStudent.regular_weekday,
           lesson_activities: null,
         })) as Lesson[];
-        
+
         console.log('✅ 試堂學生課堂資料載入完成，共', lessonsData.length, '筆記錄');
       } else {
         // 常規學生：查詢 hanami_student_lesson 表
@@ -348,8 +360,9 @@ export default function StudentLessonPanel({
         const { data, error } = await supabase
           .from('hanami_student_lesson')
           .select('*')
-          .eq('student_id', studentId);
-        
+          .eq('student_id', studentId)
+          .not('lesson_date', 'is', null);
+
         if (error) {
           console.error('❌ 查詢常規學生課堂資料失敗:', error);
           if (error.code === 'PGRST116' || error.message.includes('401')) {
@@ -359,7 +372,7 @@ export default function StudentLessonPanel({
           }
           return;
         }
-        
+
         // 簡化資料處理
         lessonsData = (data || []).map((item: any) => ({
           id: item.id,
@@ -389,17 +402,17 @@ export default function StudentLessonPanel({
           regular_weekday: item.regular_weekday,
           lesson_activities: item.lesson_activities,
         })) as Lesson[];
-        
+
         console.log('✅ 常規學生課堂資料載入完成，共', lessonsData.length, '筆記錄');
       }
-      
-      console.log('📊 課堂資料載入結果:', { 
-        dataCount: lessonsData.length, 
+
+      console.log('📊 課堂資料載入結果:', {
+        dataCount: lessonsData.length,
         error: '無錯誤',
         studentId,
         studentType,
       });
-      
+
       setLessons(lessonsData);
       lessonsFetchedRef.current = true;
       loadingRef.current = false;
@@ -409,6 +422,41 @@ export default function StudentLessonPanel({
       loadingRef.current = false;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 刷新課堂資料處理函數
+  const handleRefresh = async () => {
+    // 清除緩存狀態，強制重新獲取
+    lessonsFetchedRef.current = false;
+    loadingRef.current = false;
+    
+    try {
+      await fetchLessons();
+      toast.success('課堂資料已刷新', {
+        duration: 2000,
+        style: {
+          background: '#FFF9F2',
+          color: '#4B4036',
+          border: '1px solid #EADBC8',
+          borderRadius: '12px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
+      });
+    } catch (error) {
+      console.error('刷新課堂資料失敗:', error);
+      toast.error('刷新失敗，請稍後再試', {
+        duration: 3000,
+        style: {
+          background: '#FFF9F2',
+          color: '#4B4036',
+          border: '1px solid #EADBC8',
+          borderRadius: '12px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
+      });
     }
   };
 
@@ -443,10 +491,14 @@ export default function StudentLessonPanel({
   const handlePendingLessonsClick = () => {
     console.log('點擊待安排堂數按鈕', studentData?.approved_lesson_nonscheduled);
     if (studentData && (studentData.approved_lesson_nonscheduled || 0) > 0) {
-      const lessons = studentData.approved_lesson_nonscheduled || 0;
-      setAvailableLessons(lessons);
-      setShowLessonEditorModal(true);
-      console.log('開啟新增課堂記錄模態框，初始堂數:', lessons);
+      if (isParentView) {
+        setShowParentBookingModal(true);
+      } else {
+        const lessons = studentData.approved_lesson_nonscheduled || 0;
+        setAvailableLessons(lessons);
+        setShowLessonEditorModal(true);
+        console.log('開啟新增課堂記錄模態框，初始堂數:', lessons);
+      }
     } else {
       console.log('沒有待安排堂數，無法開啟模態框');
     }
@@ -488,7 +540,7 @@ export default function StudentLessonPanel({
   const handleVisibleCountConfirm = () => {
     let parsed: number;
     let successMessage = '';
-    
+
     if (tempVisibleCount === 'all') {
       parsed = lessons.length;
       successMessage = `已設定顯示全部 ${parsed} 筆課堂記錄（按日期舊到新排序）`;
@@ -502,10 +554,10 @@ export default function StudentLessonPanel({
       }
       successMessage = `已設定顯示 ${parsed} 筆課堂記錄`;
     }
-    
+
     setVisibleCount(parsed);
     setVisibleCountSelectOpen(false);
-    
+
     // 添加成功提示動畫
     setIsCountButtonAnimating(true);
     setShowSuccessIndicator(true);
@@ -513,7 +565,7 @@ export default function StudentLessonPanel({
       setIsCountButtonAnimating(false);
       setShowSuccessIndicator(false);
     }, 1000);
-    
+
     // 顯示成功提示
     toast.success(successMessage, {
       duration: 2000,
@@ -536,11 +588,21 @@ export default function StudentLessonPanel({
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   const filteredLessons = sortedLessons.filter((lesson) => {
+    // 如果明確選擇了「請假」過濾器，則顯示請假課堂
+    if (categoryFilter.includes('sick') && lesson.lesson_status === '請假') {
+      return true;
+    }
+
+    // 如果課堂狀態是「請假」，則在其他過濾器中隱藏（除非明確選擇了 sick）
+    if (lesson.lesson_status === '請假') {
+      return false;
+    }
+
     if (categoryFilter.includes('all')) return true;
 
     const lessonDateStr = format(new Date(lesson.lesson_date), 'yyyy-MM-dd');
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    
+
     // 檢查日期和狀態類別
     const dateMatches =
       (categoryFilter.includes('upcoming') && lessonDateStr > todayStr) ||
@@ -548,7 +610,6 @@ export default function StudentLessonPanel({
       (categoryFilter.includes('today') && lessonDateStr === todayStr);
 
     const statusMatches =
-      (categoryFilter.includes('sick') && lesson.lesson_status === '請假') ||
       (categoryFilter.includes('makeup') && lesson.lesson_status === '補課') ||
       (categoryFilter.includes('absent') && lesson.lesson_status === '缺席');
 
@@ -598,14 +659,14 @@ export default function StudentLessonPanel({
   // 新增/更新課堂處理函式
   const handleAddLesson = async (newLesson: Lesson) => {
     // 1. 從 Supabase 取得學生資料
-    let studentData: { org_id: string | null; [key: string]: any; } | null = null;
+    let studentData: { org_id: string | null;[key: string]: any; } | null = null;
     try {
       const { data } = await supabase
         .from('Hanami_Students')
         .select('student_oid, regular_weekday, full_name, org_id')
         .eq('id', newLesson.student_id)
         .single();
-      studentData = data as { org_id: string | null; [key: string]: any; } | null;
+      studentData = data as { org_id: string | null;[key: string]: any; } | null;
     } catch (e) {
       // 可視情況處理錯誤
       studentData = null;
@@ -641,7 +702,7 @@ export default function StudentLessonPanel({
       actual_timeslot: newLesson.actual_timeslot || null,
       lesson_status: newLesson.lesson_status || null,
       status: (newLesson.status && ['attended', 'absent', 'makeup', 'cancelled', 'sick_leave', 'personal_leave'].includes(newLesson.status)
-        ? newLesson.status 
+        ? newLesson.status
         : null) as ('attended' | 'absent' | 'makeup' | 'cancelled' | 'sick_leave' | 'personal_leave' | null),
       course_type: resolvedCourseType,
       lesson_duration: newLesson.lesson_duration || autoLessonDuration,
@@ -728,7 +789,7 @@ export default function StudentLessonPanel({
 
     // 只匯出選中的課堂
     const selectedLessons = filteredLessons.filter(lesson => selected.includes(lesson.id));
-    
+
     const headers = ['日期', '課堂', '上課時間'];
     const csvData = selectedLessons.map(lesson => [
       format(new Date(lesson.lesson_date), 'yyyy/MM/dd'),
@@ -750,7 +811,7 @@ export default function StudentLessonPanel({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     toast.success(`已匯出 ${selectedLessons.length} 筆課堂記錄`);
   };
 
@@ -770,7 +831,7 @@ export default function StudentLessonPanel({
       const date = format(new Date(lesson.lesson_date), 'yyyy/MM/dd');
       const courseType = typeof lesson.course_type === 'string' ? lesson.course_type : '';
       const timeSlot = lesson.actual_timeslot || lesson.regular_timeslot || '';
-      
+
       return `${date} - ${courseType} - ${timeSlot}`;
     }).join('\n');
 
@@ -812,23 +873,23 @@ export default function StudentLessonPanel({
       const date = format(new Date(lesson.lesson_date), 'yyyy/MM/dd');
       const courseType = typeof lesson.course_type === 'string' ? lesson.course_type : '';
       const timeSlot = lesson.actual_timeslot || lesson.regular_timeslot || '';
-      
+
       return `${date} - ${courseType} - ${timeSlot}`;
     }).join('\n');
 
     const message = encodeURIComponent(studentInfo + lessonRecords);
-    
+
     // 處理電話號碼格式（移除所有非數字字符）
     const cleanPhoneNumber = contactNumber.replace(/\D/g, '');
-    
+
     // 如果是香港電話號碼（8位數），加上852區號
     const formattedPhoneNumber = cleanPhoneNumber.length === 8 ? `852${cleanPhoneNumber}` : cleanPhoneNumber;
-    
+
     const whatsappUrl = `https://wa.me/${formattedPhoneNumber}?text=${message}`;
-    
+
     // 在新視窗中開啟WhatsApp
     window.open(whatsappUrl, '_blank');
-    
+
     toast.success(`已開啟WhatsApp，準備發送 ${selectedLessons.length} 筆課堂記錄`);
   };
 
@@ -1030,6 +1091,18 @@ export default function StudentLessonPanel({
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3 sm:gap-0">
           <h2 className="text-lg sm:text-xl font-bold text-[#4B4036]">課堂情況</h2>
           <div className="flex gap-1 sm:gap-2 overflow-x-auto flex-nowrap py-2 px-1 scrollbar-hide">
+            {isParentView && (
+              <button
+                onClick={() => setShowLeaveModal(true)}
+                className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
+                title="請假申請"
+              >
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-[10px] sm:text-[11px] text-[#4B4036]">請假</span>
+              </button>
+            )}
             <button
               onClick={exportToCSV}
               className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
@@ -1053,11 +1126,22 @@ export default function StudentLessonPanel({
               <span className="text-[10px] sm:text-[11px] text-[#4B4036]">複製</span>
             </button>
             <button
-              onClick={fetchLessons}
-              className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
-              title="刷新"
+              onClick={handleRefresh}
+              disabled={loading}
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${
+                loading 
+                  ? 'bg-[#F0ECE1] cursor-wait opacity-70' 
+                  : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
+              }`}
+              title="刷新課堂資料"
             >
-              <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg 
+                className={`w-5 h-5 sm:w-6 sm:h-6 mb-0.5 ${loading ? 'animate-spin' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                viewBox="0 0 24 24"
+              >
                 <path d="M4 4v5h.582M20 20v-5h-.581M5.635 19A9 9 0 1 1 19 5.635" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span className="text-[10px] sm:text-[11px] text-[#4B4036]">刷新</span>
@@ -1096,11 +1180,10 @@ export default function StudentLessonPanel({
             )}
             <button
               onClick={() => setCategorySelectOpen(true)}
-              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${
-                categoryFilter.includes('all') 
-                  ? 'bg-[#F8F5EC] hover:bg-[#FDE6B8]' 
-                  : 'bg-[#FDE6B8] hover:bg-[#FCD58B] border-2 border-[#FCD58B]'
-              }`}
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${categoryFilter.includes('all')
+                ? 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
+                : 'bg-[#FDE6B8] hover:bg-[#FCD58B] border-2 border-[#FCD58B]'
+                }`}
               title={`類別${categoryFilter.includes('all') ? '' : ` (${categoryFilter.length} 項)`}`}
             >
               <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1113,9 +1196,8 @@ export default function StudentLessonPanel({
             </button>
             <button
               onClick={() => setVisibleCountSelectOpen(true)}
-              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition relative ${
-                isCountButtonAnimating ? 'animate-pulse scale-105 bg-[#FDE6B8] border-[#FCD58B] shadow-lg' : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
-              } ${showSuccessIndicator ? 'bg-green-50 border-green-300' : ''}`}
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition relative ${isCountButtonAnimating ? 'animate-pulse scale-105 bg-[#FDE6B8] border-[#FCD58B] shadow-lg' : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
+                } ${showSuccessIndicator ? 'bg-green-50 border-green-300' : ''}`}
               title={`顯示筆數 (${visibleCount >= lessons.length ? '全部' : visibleCount} 筆)`}
             >
               <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1129,7 +1211,7 @@ export default function StudentLessonPanel({
                 <svg className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 animate-bounce absolute -top-1 -right-1 sm:-top-2 sm:-right-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-            )}
+              )}
             </button>
           </div>
         </div>
@@ -1142,7 +1224,7 @@ export default function StudentLessonPanel({
               <div className="text-center">
                 <div className="text-xs font-medium text-[#4B4036]/70 mb-1">星期</div>
                 <div className="text-[#2B3A3B] font-semibold text-sm">
-                  {studentData.regular_weekday !== null && studentData.regular_weekday !== undefined 
+                  {studentData.regular_weekday !== null && studentData.regular_weekday !== undefined
                     ? `星期${['日', '一', '二', '三', '四', '五', '六'][studentData.regular_weekday]}`
                     : '—'
                   }
@@ -1164,20 +1246,50 @@ export default function StudentLessonPanel({
                   {calculatedRemainingLessons !== null ? calculatedRemainingLessons : '—'} 堂
                 </div>
               </div>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-xl font-bold text-[#4B4036]">課堂記錄</h2>
+                </div>
+
+
+                <div className="flex items-center space-x-2">
+                  {!hideActionButtons && (
+                    <>
+
+                      <button
+                        onClick={() => {
+                          setEditingLesson(null);
+                          setIsModalOpen(true);
+                        }}
+                        className="px-3 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-lg hover:bg-[#EBC9A4] transition-colors text-sm font-medium flex items-center"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        新增課堂
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
 
               {/* 待確認堂數 */}
               <div className="text-center">
                 <div className="text-xs font-medium text-[#4B4036]/70 mb-1">待確認堂數</div>
-                {(studentData.non_approved_lesson || 0) > 0 ? (
+                {(studentData.pending_confirmation_count || 0) > 0 ? (
                   <button
                     onClick={() => {
-                      // 跳轉到待審核學生管理頁面
-                      window.location.href = '/admin/pending-students';
+                      if (onPendingClick) {
+                        onPendingClick();
+                      } else {
+                        // 跳轉到待審核學生管理頁面
+                        window.location.href = '/admin/pending-students';
+                      }
                     }}
                     className="bg-gradient-to-r from-[#FFB6C1] to-[#EBC9A4] hover:from-[#FF9BB3] hover:to-[#D4B896] text-[#2B3A3B] px-3 py-1 rounded-full text-xs font-medium shadow-md border border-[#F3EAD9] transition-all duration-200 hover:shadow-lg hover:scale-105 flex items-center gap-1 mx-auto"
                   >
                     <span className="font-semibold text-sm text-[#E65100]">
-                      {studentData.non_approved_lesson || 0}
+                      {studentData.pending_confirmation_count || 0}
                     </span>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1194,11 +1306,10 @@ export default function StudentLessonPanel({
               <div className="text-center">
                 <div className="text-xs font-medium text-[#4B4036]/70 mb-1">待安排堂數</div>
                 <button
-                  className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    (studentData.approved_lesson_nonscheduled || 0) > 0 
-                      ? 'bg-gradient-to-r from-[#E3F2FD] to-[#BBDEFB] text-[#1565C0] hover:from-[#BBDEFB] hover:to-[#90CAF9] hover:shadow-md' 
-                      : 'bg-[#F5F5F5] text-[#999999] cursor-not-allowed'
-                  }`}
+                  className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${(studentData.approved_lesson_nonscheduled || 0) > 0
+                    ? 'bg-gradient-to-r from-[#E3F2FD] to-[#BBDEFB] text-[#1565C0] hover:from-[#BBDEFB] hover:to-[#90CAF9] hover:shadow-md'
+                    : 'bg-[#F5F5F5] text-[#999999] cursor-not-allowed'
+                    }`}
                   onClick={handlePendingLessonsClick}
                   disabled={(studentData.approved_lesson_nonscheduled || 0) === 0}
                   title={(studentData.approved_lesson_nonscheduled || 0) > 0 ? '點擊新增課堂' : '暫無待安排堂數'}
@@ -1212,11 +1323,10 @@ export default function StudentLessonPanel({
                 <div className="text-center">
                   <div className="text-xs font-medium text-[#4B4036]/70 mb-1">特別照顧</div>
                   <div className="flex justify-center">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      studentData.care_alert 
-                        ? 'bg-[#FFE0E0] text-[#C62828]' 
-                        : 'bg-[#F0F0F0] text-[#666666]'
-                    }`}>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${studentData.care_alert
+                      ? 'bg-[#FFE0E0] text-[#C62828]'
+                      : 'bg-[#F0F0F0] text-[#666666]'
+                      }`}>
                       {studentData.care_alert ? '需要特別照顧' : '一般照顧'}
                     </span>
                   </div>
@@ -1224,242 +1334,258 @@ export default function StudentLessonPanel({
               )}
             </div>
           </div>
-        )}
-      
+        )
+        }
+
         {/* 載入狀態 */}
-        {loading && (
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FCD58B] mx-auto" />
-            <p className="mt-2 text-[#2B3A3B] text-sm">載入課堂資料中...</p>
-          </div>
-        </div>
-        )}
-      
+        {
+          loading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FCD58B] mx-auto" />
+                <p className="mt-2 text-[#2B3A3B] text-sm">載入課堂資料中...</p>
+              </div>
+            </div>
+          )
+        }
+
         {/* 錯誤狀態 */}
-        {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                <path clipRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" fillRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">載入課堂資料失敗</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{error}</p>
+        {
+          error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path clipRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" fillRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">載入課堂資料失敗</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{error}</p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-        )}
-      
+          )
+        }
+
         {/* 無資料狀態 */}
-        {!loading && !error && lessons.length === 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                <path clipRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" fillRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">暫無課堂資料</h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <p>此學生目前沒有任何課堂記錄</p>
+        {
+          !loading && !error && lessons.length === 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path clipRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" fillRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">暫無課堂資料</h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>此學生目前沒有任何課堂記錄</p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-        )}
-      
+          )
+        }
+
         {/* 過濾狀態顯示 */}
-        {!loading && !error && lessons.length > 0 && !categoryFilter.includes('all') && (
-          <div className="mb-4 p-3 bg-[#FDE6B8] rounded-lg border border-[#FCD58B]">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-[#4B4036]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
-              </svg>
-              <span className="text-[#4B4036] font-medium">已過濾：</span>
-              <div className="flex flex-wrap gap-2">
-                {categoryFilter.map((category) => (
-                  <span key={category} className="text-sm bg-[#FCD58B] px-2 py-1 rounded-full text-[#4B4036]">
-                    {category}
-                  </span>
-                ))}
+        {
+          !loading && !error && lessons.length > 0 && !categoryFilter.includes('all') && (
+            <div className="mb-4 p-3 bg-[#FDE6B8] rounded-lg border border-[#FCD58B]">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#4B4036]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
+                </svg>
+                <span className="text-[#4B4036] font-medium">已過濾：</span>
+                <div className="flex flex-wrap gap-2">
+                  {categoryFilter.map((category) => (
+                    <span key={category} className="text-sm bg-[#FCD58B] px-2 py-1 rounded-full text-[#4B4036]">
+                      {category}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCategoryFilter(['all'])}
+                  className="text-sm text-[#4B4036] underline hover:text-[#7A6A52] ml-2"
+                >
+                  清除過濾
+                </button>
               </div>
-              <button
-                onClick={() => setCategoryFilter(['all'])}
-                className="text-sm text-[#4B4036] underline hover:text-[#7A6A52] ml-2"
-              >
-                清除過濾
-              </button>
-          </div>
-        </div>
-        )}
-      
+            </div>
+          )
+        }
+
         {/* 課堂資料表格 */}
-        {!loading && !error && lessons.length > 0 && (
-        <div className="overflow-x-auto">
-                          <table className="w-full min-w-max text-[#4B4036] text-xs sm:text-sm">
-            <thead>
-              <tr className="border-b border-[#E9E2D6]">
-                {!disableSelection && (
-                  <th>
-                    <input
-                      className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
-                      type="checkbox"
-                      onChange={(e) => {
-                        if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id));
-                        else setSelected([]);
-                      }}
-                    />
-                  </th>
-                )}
-                <th 
-                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('lesson_date')}
-                >
-                  <div className="flex items-center gap-1">
-                    日期
-                    {getSortIcon('lesson_date')}
-                  </div>
-                </th>
-                <th 
-                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('course_type')}
-                >
-                  <div className="flex items-center gap-1">
-                    課堂
-                    {getSortIcon('course_type')}
-                  </div>
-                </th>
-                <th 
-                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('actual_timeslot')}
-                >
-                  <div className="flex items-center gap-1">
-                    上課時間
-                    {getSortIcon('actual_timeslot')}
-                  </div>
-                </th>
-                {!hideTeacherColumn && (
-                  <th 
-                    className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                    onClick={() => handleSort('lesson_teacher')}
-                  >
-                    <div className="flex items-center gap-1">
-                      負責老師
-                      {getSortIcon('lesson_teacher')}
-                    </div>
-                  </th>
-                )}
-                <th 
-                  className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
-                  onClick={() => handleSort('lesson_status')}
-                >
-                  <div className="flex items-center gap-1">
-                    出席狀況
-                    {getSortIcon('lesson_status')}
-                  </div>
-                </th>
-                <th className="px-2 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLessons.slice(0, visibleCount).map((lesson, index) => (
-                <tr 
-                  key={lesson.id} 
-                  className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6] transition-all duration-300"
-                  style={{
-                    animationDelay: `${index * 50}ms`,
-                    animation: showSuccessIndicator ? 'fadeInUp 0.5s ease-out' : 'none'
-                  }}
-                >
-                  {!disableSelection && (
-                    <td className="px-2 py-2">
-                      <input
-                        checked={selected.includes(lesson.id)}
-                        className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
-                        type="checkbox"
-                        onChange={() => toggleSelect(lesson.id)}
-                      />
-                    </td>
-                  )}
-                  <td className="text-[15px] font-medium px-2 py-2">{format(new Date(lesson.lesson_date), 'yyyy/MM/dd')}</td>
-                  <td className="text-[15px] font-medium px-2 py-2">{typeof lesson.course_type === 'string' ? lesson.course_type : ''}</td>
-                  <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>
-                  {!hideTeacherColumn && (
-                    <td className="text-[15px] font-medium px-2 py-2">{resolveTeacherLabel(lesson.lesson_teacher)}</td>
-                  )}
-                  <td className="text-[15px] font-medium px-2 py-2">
-                    {format(new Date(lesson.lesson_date), 'yyyy-MM-dd') === todayStr ? (
-                      <>
-                        <button
-                          className="underline text-sm"
-                          onClick={() => handleStatusClick(lesson.id, lesson.lesson_status)}
-                        >
-                          {lesson.lesson_status || '-'}
-                        </button>
-                        {statusPopupOpen === lesson.id && !isModalOpen && (
-                          <PopupSelect
-                            mode="multi"
-                            options={[
-                              { label: '出席', value: '出席' },
-                              { label: '缺席', value: '缺席' },
-                              { label: '病假', value: '病假' },
-                              { label: '事假', value: '事假' },
-                            ]}
-                            selected={tempStatus}
-                            title="選擇出席狀況"
-                            onCancel={handleStatusPopupClose}
-                            onChange={handleStatusChange}
-                            onConfirm={async () => {
-                              // hanami_student_lesson table type may not be fully defined
-                              await ((supabase as any)
-                                .from('hanami_student_lesson')
-                                .update({ lesson_status: tempStatus })
-                                .eq('id', lesson.id));
-                              await fetchLessons();
-                              handleStatusPopupClose();
-                            }}
-                          />
-                        )}
-                      </>
-                    ) : format(new Date(lesson.lesson_date), 'yyyy-MM-dd') > todayStr ? (
-                      '-'
-                    ) : (
-                      lesson.lesson_status || '-'
+        {
+          !loading && !error && lessons.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max text-[#4B4036] text-xs sm:text-sm">
+                <thead>
+                  <tr className="border-b border-[#E9E2D6]">
+                    {!disableSelection && (
+                      <th>
+                        <input
+                          className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
+                          type="checkbox"
+                          onChange={(e) => {
+                            if (e.target.checked) setSelected(filteredLessons.slice(0, visibleCount).map(l => l.id));
+                            else setSelected([]);
+                          }}
+                        />
+                      </th>
                     )}
-                  </td>
-                  <td className="px-2 py-2">
-                    {!hideActionButtons && (
-                      <button
-                        className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
-                        onClick={() => handleEdit(lesson)}
+                    <th
+                      className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                      onClick={() => handleSort('lesson_date')}
+                    >
+                      <div className="flex items-center gap-1">
+                        日期
+                        {getSortIcon('lesson_date')}
+                      </div>
+                    </th>
+                    <th
+                      className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                      onClick={() => handleSort('course_type')}
+                    >
+                      <div className="flex items-center gap-1">
+                        課堂
+                        {getSortIcon('course_type')}
+                      </div>
+                    </th>
+                    <th
+                      className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                      onClick={() => handleSort('actual_timeslot')}
+                    >
+                      <div className="flex items-center gap-1">
+                        上課時間
+                        {getSortIcon('actual_timeslot')}
+                      </div>
+                    </th>
+                    {!hideTeacherColumn && (
+                      <th
+                        className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                        onClick={() => handleSort('lesson_teacher')}
                       >
-                        編輯
-                      </button>
+                        <div className="flex items-center gap-1">
+                          負責老師
+                          {getSortIcon('lesson_teacher')}
+                        </div>
+                      </th>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        )}
-        
+                    <th
+                      className="text-xs sm:text-[15px] font-medium px-1 sm:px-2 py-2 text-left cursor-pointer hover:bg-[#FDE6B8] transition-colors"
+                      onClick={() => handleSort('lesson_status')}
+                    >
+                      <div className="flex items-center gap-1">
+                        出席狀況
+                        {getSortIcon('lesson_status')}
+                      </div>
+                    </th>
+                    <th className="px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLessons.slice(0, visibleCount).map((lesson, index) => (
+                    <tr
+                      key={lesson.id}
+                      className="border-b border-[#F3EAD9] hover:bg-[#FFF8E6] transition-all duration-300"
+                      style={{
+                        animationDelay: `${index * 50}ms`,
+                        animationName: showSuccessIndicator ? 'fadeInUp' : 'none',
+                        animationDuration: '0.5s',
+                        animationTimingFunction: 'ease-out',
+                        animationFillMode: 'both'
+                      }}
+                    >
+                      {!disableSelection && (
+                        <td className="px-2 py-2">
+                          <input
+                            checked={selected.includes(lesson.id)}
+                            className="form-checkbox w-4 h-4 text-[#4B4036] accent-[#CBBFA4]"
+                            type="checkbox"
+                            onChange={() => toggleSelect(lesson.id)}
+                          />
+                        </td>
+                      )}
+                      <td className="text-[15px] font-medium px-2 py-2">{format(new Date(lesson.lesson_date), 'yyyy/MM/dd')}</td>
+                      <td className="text-[15px] font-medium px-2 py-2">{typeof lesson.course_type === 'string' ? lesson.course_type : ''}</td>
+                      <td className="text-[15px] font-medium px-2 py-2">{lesson.actual_timeslot || lesson.regular_timeslot}</td>
+                      {!hideTeacherColumn && (
+                        <td className="text-[15px] font-medium px-2 py-2">{resolveTeacherLabel(lesson.lesson_teacher)}</td>
+                      )}
+                      <td className="text-[15px] font-medium px-2 py-2">
+                        {format(new Date(lesson.lesson_date), 'yyyy-MM-dd') === todayStr ? (
+                          <>
+                            <button
+                              className="underline text-sm"
+                              onClick={() => handleStatusClick(lesson.id, lesson.lesson_status)}
+                            >
+                              {lesson.lesson_status || '-'}
+                            </button>
+                            {statusPopupOpen === lesson.id && !isModalOpen && (
+                              <PopupSelect
+                                mode="multi"
+                                options={[
+                                  { label: '出席', value: '出席' },
+                                  { label: '缺席', value: '缺席' },
+                                  { label: '病假', value: '病假' },
+                                  { label: '事假', value: '事假' },
+                                ]}
+                                selected={tempStatus}
+                                title="選擇出席狀況"
+                                onCancel={handleStatusPopupClose}
+                                onChange={handleStatusChange}
+                                onConfirm={async () => {
+                                  // hanami_student_lesson table type may not be fully defined
+                                  await ((supabase as any)
+                                    .from('hanami_student_lesson')
+                                    .update({ lesson_status: tempStatus })
+                                    .eq('id', lesson.id));
+                                  await fetchLessons();
+                                  handleStatusPopupClose();
+                                }}
+                              />
+                            )}
+                          </>
+                        ) : format(new Date(lesson.lesson_date), 'yyyy-MM-dd') > todayStr ? (
+                          '-'
+                        ) : (
+                          lesson.lesson_status || '-'
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        {!hideActionButtons && (
+                          <button
+                            className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
+                            onClick={() => handleEdit(lesson)}
+                          >
+                            編輯
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+
         {/* 記錄數量顯示 */}
-        {!loading && !error && lessons.length > 0 && (
-          <div className="mt-4 text-sm text-[#4B4036] text-center">
-            <span>
-              顯示 {Math.min(visibleCount, filteredLessons.length)} / {filteredLessons.length} 筆記錄
-              {!categoryFilter.includes('all') && ` (已過濾 ${lessons.length - filteredLessons.length} 筆)`}
-            </span>
-          </div>
-        )}
-        
+        {
+          !loading && !error && lessons.length > 0 && (
+            <div className="mt-4 text-sm text-[#4B4036] text-center">
+              <span>
+                顯示 {Math.min(visibleCount, filteredLessons.length)} / {filteredLessons.length} 筆記錄
+                {!categoryFilter.includes('all') && ` (已過濾 ${lessons.length - filteredLessons.length} 筆)`}
+              </span>
+            </div>
+          )
+        }
+
         <div className="flex gap-3 mt-4">
           {!hideActionButtons && (
             <button
@@ -1473,24 +1599,24 @@ export default function StudentLessonPanel({
             </button>
           )}
           {selected.length > 0 && (
-          <>
-            <button
-              className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
-              onClick={() => {
-                setSelected([]);
-                const checkbox = document.querySelector<HTMLInputElement>('th input[type="checkbox"]');
-                if (checkbox) checkbox.checked = false;
-              }}
-            >
-              清除選擇
-            </button>
-            <button
-              className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
-              onClick={() => setIsDeleteConfirmOpen(true)}
-            >
-              刪除
-            </button>
-          </>
+            <>
+              <button
+                className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
+                onClick={() => {
+                  setSelected([]);
+                  const checkbox = document.querySelector<HTMLInputElement>('th input[type="checkbox"]');
+                  if (checkbox) checkbox.checked = false;
+                }}
+              >
+                清除選擇
+              </button>
+              <button
+                className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
+                onClick={() => setIsDeleteConfirmOpen(true)}
+              >
+                刪除
+              </button>
+            </>
           )}
         </div>
         <LessonEditorModal
@@ -1514,125 +1640,166 @@ export default function StudentLessonPanel({
             fetchLessons();
           }}
         />
-        {isDeleteConfirmOpen && (
-        <div
-          className="fixed inset-0 flex items-center justify-center bg-white/80 z-50"
-          onClick={() => setIsDeleteConfirmOpen(false)}
-        >
-          <div
-            className="bg-white rounded-xl p-6 shadow-lg max-w-sm w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-[#4B4036] text-base mb-4">確定要刪除選取的課堂記錄嗎？</p>
-            <div className="flex justify-end gap-3">
-              <button
-                className="px-4 py-2 text-sm rounded-full bg-[#F0ECE1] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]"
-                onClick={() => setIsDeleteConfirmOpen(false)}
+        {
+          isDeleteConfirmOpen && (
+            <div
+              className="fixed inset-0 flex items-center justify-center bg-white/80 z-50"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+            >
+              <div
+                className="bg-white rounded-xl p-6 shadow-lg max-w-sm w-full"
+                onClick={(e) => e.stopPropagation()}
               >
-                取消
-              </button>
-              <button
-                className="px-4 py-2 text-sm rounded-full bg-[#FBEAE5] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]"
-                onClick={async () => {
-                  setIsDeleteConfirmOpen(false);
-                  await confirmDelete();
-                }}
-              >
-                確定刪除
-              </button>
+                <p className="text-[#4B4036] text-base mb-4">確定要刪除選取的課堂記錄嗎？</p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    className="px-4 py-2 text-sm rounded-full bg-[#F0ECE1] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]"
+                    onClick={() => setIsDeleteConfirmOpen(false)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="px-4 py-2 text-sm rounded-full bg-[#FBEAE5] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]"
+                    onClick={async () => {
+                      setIsDeleteConfirmOpen(false);
+                      await confirmDelete();
+                    }}
+                  >
+                    確定刪除
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        )}
-        
+          )
+        }
+
         {/* 類別選擇彈窗 */}
-        {categorySelectOpen && (
-          <PopupSelect
-            title="選擇課堂類別"
-            options={[
-              { label: '全部', value: 'all' },
-              { label: '未上課堂', value: 'upcoming' },
-              { label: '過往課堂', value: 'past' },
-              { label: '今日課堂', value: 'today' },
-              { label: '請假', value: 'sick' },
-              { label: '補課', value: 'makeup' },
-              { label: '缺席', value: 'absent' },
-            ]}
-            selected={tempCategoryFilter}
-            onChange={(value) => setTempCategoryFilter(Array.isArray(value) ? value : [value])}
-            onConfirm={() => {
-              setCategoryFilter(tempCategoryFilter);
-              setCategorySelectOpen(false);
-            }}
-            onCancel={() => {
-              setTempCategoryFilter(categoryFilter);
-              setCategorySelectOpen(false);
-            }}
-            mode="multi"
-          />
-        )}
-        
+        {
+          categorySelectOpen && (
+            <PopupSelect
+              title="選擇課堂類別"
+              options={[
+                { label: '全部', value: 'all' },
+                { label: '未上課堂', value: 'upcoming' },
+                { label: '過往課堂', value: 'past' },
+                { label: '今日課堂', value: 'today' },
+                { label: '請假', value: 'sick' },
+                { label: '補課', value: 'makeup' },
+                { label: '缺席', value: 'absent' },
+              ]}
+              selected={tempCategoryFilter}
+              onChange={(value) => setTempCategoryFilter(Array.isArray(value) ? value : [value])}
+              onConfirm={() => {
+                setCategoryFilter(tempCategoryFilter);
+                setCategorySelectOpen(false);
+              }}
+              onCancel={() => {
+                setTempCategoryFilter(categoryFilter);
+                setCategorySelectOpen(false);
+              }}
+              mode="multi"
+            />
+          )
+        }
+
         {/* 顯示筆數選擇彈窗 */}
-        {visibleCountSelectOpen && (
-          <PopupSelect
-            title="選擇顯示筆數"
-            options={[
-              { label: '5 筆', value: '5' },
-              { label: '10 筆', value: '10' },
-              { label: '20 筆', value: '20' },
-              { label: '50 筆', value: '50' },
-              { label: '全部', value: 'all' },
-            ]}
-            selected={tempVisibleCount}
-            onChange={(value) => setTempVisibleCount(Array.isArray(value) ? value[0] : value)}
-            onConfirm={handleVisibleCountConfirm}
-            onCancel={handleVisibleCountCancel}
-            mode="single"
-          />
-        )}
-        
+        {
+          visibleCountSelectOpen && (
+            <PopupSelect
+              title="選擇顯示筆數"
+              options={[
+                { label: '5 筆', value: '5' },
+                { label: '10 筆', value: '10' },
+                { label: '20 筆', value: '20' },
+                { label: '50 筆', value: '50' },
+                { label: '全部', value: 'all' },
+              ]}
+              selected={tempVisibleCount}
+              onChange={(value) => setTempVisibleCount(Array.isArray(value) ? value[0] : value)}
+              onConfirm={handleVisibleCountConfirm}
+              onCancel={handleVisibleCountCancel}
+              mode="single"
+            />
+          )
+        }
+
         {/* AI 訊息模態框 */}
-        {showAIMessageModal && (
-          <AIMessageModal
-            isOpen={showAIMessageModal}
-            onClose={() => setShowAIMessageModal(false)}
-            students={studentData ? [studentData] : []}
-            selectedLesson={selected.length > 0 ? {
-              lessons: filteredLessons.filter(lesson => selected.includes(lesson.id)) as any,
-              count: selected.length
-            } : null}
-          />
-        )}
+        {
+          showAIMessageModal && (
+            <AIMessageModal
+              isOpen={showAIMessageModal}
+              onClose={() => setShowAIMessageModal(false)}
+              students={studentData ? [studentData] : []}
+              selectedLesson={selected.length > 0 ? {
+                lessons: filteredLessons.filter(lesson => selected.includes(lesson.id)) as any,
+                count: selected.length
+              } : null}
+            />
+          )
+        }
 
         {/* 新增課堂記錄模態框 */}
-        {showLessonEditorModal && (
-          <LessonEditorModal
-            open={showLessonEditorModal}
-            onClose={() => setShowLessonEditorModal(false)}
-            lesson={null}
-            studentId={studentId}
-            mode="add"
-            orgId={orgId}
-            orgName={resolvedOrgName ?? undefined}
-            initialLessonCount={availableLessons}
-            teacherOptions={teacherOptions}
-            teacherLabelMap={teacherLabelMap}
-            defaultRegularTimeslot={studentData?.regular_timeslot ?? null}
-            defaultActualTimeslot={studentData?.regular_timeslot ?? null}
-            defaultRegularWeekday={studentData?.regular_weekday ?? null}
-            onSaved={() => {
-              setShowLessonEditorModal(false);
-              // 重新載入課程記錄
-              fetchLessons();
-              // 如果有課程更新回調，調用它
-              if (onCourseUpdate) {
-                onCourseUpdate();
-              }
-            }}
-          />
-        )}
-        
-      </div>
-    </div>
+        {
+          showLessonEditorModal && (
+            <LessonEditorModal
+              open={showLessonEditorModal}
+              onClose={() => setShowLessonEditorModal(false)}
+              lesson={null}
+              studentId={studentId}
+              mode="add"
+              orgId={orgId}
+              orgName={resolvedOrgName ?? undefined}
+              initialLessonCount={availableLessons}
+              teacherOptions={teacherOptions}
+              teacherLabelMap={teacherLabelMap}
+              defaultRegularTimeslot={studentData?.regular_timeslot ?? null}
+              defaultActualTimeslot={studentData?.regular_timeslot ?? null}
+              defaultRegularWeekday={studentData?.regular_weekday ?? null}
+              onSaved={() => {
+                setShowLessonEditorModal(false);
+                // 重新載入課程記錄
+                fetchLessons();
+                // 如果有課程更新回調，調用它
+                if (onCourseUpdate) {
+                  onCourseUpdate();
+                }
+              }}
+            />
+          )
+        }
+
+      </div >
+      {/* 請假申請模態框 */}
+      < LeaveApplicationModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        studentId={studentId}
+        orgId={orgId ?? null}
+        lessons={lessons}
+        onSuccess={() => {
+          fetchLessons();
+          // 如果有需要更新剩餘堂數或其他狀態，可以在這裡觸發
+        }}
+      />
+      {/* 家長預約模態框 */}
+      <ParentLessonBookingModal
+        isOpen={showParentBookingModal}
+        onClose={() => setShowParentBookingModal(false)}
+        studentId={studentId}
+        studentName={studentData?.full_name || studentName || ''}
+        orgId={orgId ?? null}
+        courseType={
+          typeof studentData?.course_type === 'string'
+            ? studentData.course_type
+            : studentData?.course_type?.name || ''
+        }
+        onSuccess={() => {
+          fetchLessons();
+          if (onCourseUpdate) {
+            onCourseUpdate();
+          }
+        }}
+      />
+    </div >
   );
 }

@@ -14,6 +14,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginWithApple: () => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, nickname: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   resendVerificationEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -539,6 +540,23 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithApple = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: `${window.location.origin}/aihome/auth/login`,
+        },
+      });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      console.error('Apple 登入錯誤:', error);
+      return { success: false, error: error.message || 'Apple 登入失敗' };
+    }
+  };
+
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -667,6 +685,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
     loading,
     login,
     loginWithGoogle,
+    loginWithApple,
     register,
     resetPassword,
     resendVerificationEmail,

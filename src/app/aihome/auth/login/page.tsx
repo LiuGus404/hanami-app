@@ -16,7 +16,7 @@ import { Suspense } from 'react';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, loginWithGoogle, user, loading } = useSaasAuth();
+  const { login, loginWithGoogle, loginWithApple, user, loading } = useSaasAuth();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -232,6 +232,16 @@ function LoginForm() {
                 />
               </svg>
               <span className="text-[#4B4036] font-medium">使用 Google 帳號登入</span>
+            </button>
+
+            <button
+              onClick={() => loginWithApple()}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-[#EADBC8] rounded-xl hover:bg-[#FFF9F2] transition-colors duration-200 bg-white mt-3"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.74 1.18 0 2.45-1.62 4.37-1.62 1.71.12 3.03.84 3.84 2.04-3.18 1.97-2.65 6.19.64 7.61-.54 1.54-1.25 3.06-2.43 4.2zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.16 2.29-2.04 4.15-3.74 4.25z" />
+              </svg>
+              <span className="text-[#4B4036] font-medium">使用 Apple 帳號登入</span>
             </button>
 
             <div className="relative mt-6">

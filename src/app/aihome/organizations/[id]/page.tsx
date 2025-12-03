@@ -132,7 +132,7 @@ export default function OrganizationDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="max-w-5xl mx-auto px-4 py-6 pb-24 lg:pb-6">
         <button
           onClick={() => router.push('/aihome/course-activities')}
           className="mb-4 px-4 py-2 rounded-lg border border-[#EADBC8] text-[#4B4036] bg-white hover:bg-[#FFF9F2] transition"
@@ -162,7 +162,7 @@ export default function OrganizationDetailPage() {
           const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone.substring(1) : (cleanPhone.startsWith('852') ? cleanPhone : `852${cleanPhone}`);
           
           return (
-            <div className="mt-6 flex justify-center">
+            <div className="mt-6 flex justify-center relative z-10">
               <a
                 href={`https://api.whatsapp.com/send/?phone=${formattedPhone}`}
                 target="_blank"

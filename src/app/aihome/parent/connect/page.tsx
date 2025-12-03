@@ -249,43 +249,45 @@ export default function ParentConnectPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={isLoaded ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]"
+            className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#F3EAD9]"
           >
-            <h3 className="text-xl font-semibold text-[#4B4036] mb-6">選擇連接方式</h3>
+            <h3 className="text-xl font-bold text-[#4B4036] mb-8 text-center">選擇連接方式</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <motion.div
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ y: -4, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}
                 whileTap={{ scale: 0.98 }}
-                className="p-6 border-2 border-[#EADBC8] rounded-xl hover:border-[#FFD59A] transition-all duration-200 cursor-pointer"
+                className="bg-white rounded-3xl p-8 shadow-sm border border-[#F3EAD9] cursor-pointer group relative overflow-hidden"
                 onClick={() => {
                   recordAccessLog('qr_scan_start');
                   setShowQRScanner(true);
                 }}
               >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center mx-auto mb-4">
-                    <QrCodeIcon className="w-8 h-8 text-[#4B4036]" />
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FFF9F2] to-transparent rounded-bl-full -mr-8 -mt-8 opacity-50 pointer-events-none" />
+                <div className="text-center relative z-10">
+                  <div className="w-20 h-20 bg-[#FFD59A]/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                    <QrCodeIcon className="w-10 h-10 text-[#4B4036]" />
                   </div>
-                  <h4 className="text-lg font-semibold text-[#4B4036] mb-2">掃描 QR 碼</h4>
-                  <p className="text-sm text-[#2B3A3B]">直接掃描即可綁定對應學生</p>
+                  <h4 className="text-xl font-bold text-[#4B4036] mb-2">掃描 QR 碼</h4>
+                  <p className="text-[#4B4036]/70">直接掃描即可綁定對應學生</p>
                 </div>
               </motion.div>
 
               <motion.div
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ y: -4, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}
                 whileTap={{ scale: 0.98 }}
-                className="p-6 border-2 border-[#EADBC8] rounded-xl hover:border-[#FFD59A] transition-all duration-200 cursor-pointer"
+                className="bg-white rounded-3xl p-8 shadow-sm border border-[#F3EAD9] cursor-pointer group relative overflow-hidden"
                 onClick={() => {
                   recordAccessLog('manual_input_start');
                   setShowQRScanner(false);
                 }}
               >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center mx-auto mb-4">
-                    <MagnifyingGlassIcon className="w-8 h-8 text-[#4B4036]" />
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#FFF9F2] to-transparent rounded-bl-full -mr-8 -mt-8 opacity-50 pointer-events-none" />
+                <div className="text-center relative z-10">
+                  <div className="w-20 h-20 bg-[#EBC9A4]/20 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                    <MagnifyingGlassIcon className="w-10 h-10 text-[#4B4036]" />
                   </div>
-                  <h4 className="text-lg font-semibold text-[#4B4036] mb-2">輸入學生 ID</h4>
-                  <p className="text-sm text-[#2B3A3B]">直接輸入學生 ID 即可綁定</p>
+                  <h4 className="text-xl font-bold text-[#4B4036] mb-2">輸入學生 ID</h4>
+                  <p className="text-[#4B4036]/70">直接輸入學生 ID 即可綁定</p>
                 </div>
               </motion.div>
             </div>
@@ -297,18 +299,18 @@ export default function ParentConnectPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={isLoaded ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.8, delay: 0.6 }}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]"
+              className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#F3EAD9]"
             >
-              <h3 className="text-xl font-semibold text-[#4B4036] mb-4">輸入學生 ID</h3>
-              <div className="space-y-4">
+              <h3 className="text-xl font-bold text-[#4B4036] mb-6">輸入學生 ID</h3>
+              <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-[#4B4036] mb-2">學生 ID</label>
+                  <label className="block text-sm font-medium text-[#4B4036] mb-2 ml-1">學生 ID</label>
                   <input
                     type="text"
                     value={studentId}
                     onChange={(e) => setStudentId(e.target.value)}
                     placeholder="請輸入學生 ID"
-                    className="w-full px-4 py-3 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 py-4 bg-[#F8F9FA] border border-[#EADBC8] rounded-2xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all duration-200 outline-none text-[#4B4036] placeholder-[#9CA3AF]"
                   />
                 </div>
                 <motion.button
@@ -316,7 +318,7 @@ export default function ParentConnectPage() {
                   disabled={isConnecting || !studentId.trim()}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] font-semibold py-3 px-6 rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-[#FFD59A] text-[#4B4036] font-bold py-4 px-6 rounded-2xl hover:bg-[#EBC9A4] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
                   {isConnecting ? '連接中...' : '連接學生'}
                 </motion.button>
@@ -331,15 +333,15 @@ export default function ParentConnectPage() {
               className="space-y-4"
             >
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center space-x-3">
                   <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />
-                  <p className="text-red-700">{error}</p>
+                  <p className="text-red-700 font-medium">{error}</p>
                 </div>
               )}
               {success && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-3">
+                <div className="bg-green-50 border border-green-100 rounded-2xl p-4 flex items-center space-x-3">
                   <CheckCircleIcon className="w-5 h-5 text-green-500" />
-                  <p className="text-green-700">{success}</p>
+                  <p className="text-green-700 font-medium">{success}</p>
                 </div>
               )}
             </motion.div>
@@ -349,13 +351,22 @@ export default function ParentConnectPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={isLoaded ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.8 }}
-            className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]"
+            className="bg-[#FFF9F2]/50 rounded-[2rem] p-8 border border-[#F3EAD9]"
           >
-            <h3 className="text-xl font-semibold text-[#4B4036] mb-4">使用說明</h3>
-            <div className="space-y-2 text-[#2B3A3B]">
-              <p>• 只要有學生 ID 就能完成綁定，機構由系統自動判斷</p>
-              <p>• 若 QR 碼無法掃描，請確認相機已開啟權限</p>
-              <p>• 若遇到狀況，可聯繫客服提供協助</p>
+            <h3 className="text-lg font-bold text-[#4B4036] mb-4">使用說明</h3>
+            <div className="space-y-3 text-[#4B4036]/80 text-sm">
+              <p className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E6A23C]" />
+                只要有學生 ID 就能完成綁定，機構由系統自動判斷
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E6A23C]" />
+                若 QR 碼無法掃描，請確認相機已開啟權限
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E6A23C]" />
+                若遇到狀況，可聯繫客服提供協助
+              </p>
             </div>
           </motion.div>
         </div>

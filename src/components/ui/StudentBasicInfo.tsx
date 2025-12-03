@@ -59,6 +59,7 @@ interface StudentFormData {
   actual_timeslot: string | null;
   weekday: number | null;
   non_approved_lesson: number | null;
+  pending_confirmation_count: number | null;
   approved_lesson_nonscheduled: number | null;
   care_alert: boolean | null;
 }
@@ -109,6 +110,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     duration_months: student?.duration_months || null,
     school: student?.school || null,
     non_approved_lesson: (student as any)?.non_approved_lesson || 0,
+    pending_confirmation_count: (student as any)?.pending_confirmation_count || 0,
     approved_lesson_nonscheduled: (student as any)?.approved_lesson_nonscheduled || 0,
     care_alert: (student as any)?.care_alert || false,
     started_date: student?.started_date || null,
@@ -135,16 +137,17 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
   // 使用批量載入聯繫天數
   const phoneNumbers = student?.contact_number ? [student.contact_number] : [];
   const { results: batchContactResults, loading: loadingContactDays } = useBatchContactDays(phoneNumbers);
-  
+
   const contactDaysData = student?.contact_number ? batchContactResults[student.contact_number] : null;
   const contactDays = contactDaysData?.daysSinceContact ?? null;
   const lastContactTime = contactDaysData?.lastContactTime ?? null;
 
   // 對話框狀態
   const [chatDialogOpen, setChatDialogOpen] = useState(false);
-  
+
   // 添加防抖機制
   const courseOptionsFetchedRef = useRef(false);
+  const lastOrgIdRef = useRef<string | null | undefined>(orgId);
   const teacherOptionsFetchedRef = useRef(false);
 
   // 聯繫天數現在通過 useBatchContactDays Hook 處理
@@ -199,13 +202,23 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         setCalculatedRemainingLessons(null);
       }
     };
-    
+
     calculateRemaining();
   }, [student]);
 
   useEffect(() => {
-    // 如果已經載入過課程選項，直接使用快取
-    if (courseOptionsCache) {
+    // 檢查 orgId 是否改變
+    const orgIdChanged = lastOrgIdRef.current !== orgId;
+    lastOrgIdRef.current = orgId;
+    
+    // 如果 orgId 改變，重置獲取狀態
+    if (orgIdChanged) {
+      courseOptionsFetchedRef.current = false;
+      courseOptionsLoading = false;
+    }
+    
+    // 如果有 orgId，使用機構特定的課程列表，不使用全局快取
+    if (!orgId && courseOptionsCache && !orgIdChanged) {
       setCourseOptions(courseOptionsCache);
       return;
     }
@@ -217,27 +230,39 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
     const fetchCourseOptions = async () => {
       setCourseOptions(null); // 標示正在載入中
-      const { data: dataRaw, error } = await supabase
+      
+      // 如果有 orgId，根據機構過濾課程
+      let query = supabase
         .from('Hanami_CourseTypes')
-        .select('name, status')
+        .select('name, status, org_id')
         .eq('status', true);
       
-      const data = dataRaw as Array<{ name: string | null; status: boolean; [key: string]: any; }> | null;
+      if (orgId) {
+        query = query.eq('org_id', orgId);
+      }
 
-      console.log('📦 課程載入結果：', data, error);
+      const { data: dataRaw, error } = await query;
+
+      const data = dataRaw as Array<{ name: string | null; status: boolean; org_id?: string | null;[key: string]: any; }> | null;
+
+      console.log('📦 課程載入結果（orgId:', orgId, '）：', data, error);
 
       if (!error && data) {
         const options = data.map((c) => c.name).filter((name): name is string => name !== null);
         setCourseOptions(options);
-        courseOptionsCache = options; // 快取結果
+        // 只有沒有 orgId 時才使用全局快取
+        if (!orgId) {
+          courseOptionsCache = options;
+        }
       } else {
         setCourseOptions([]); // 若出錯則設為空陣列避免卡住
       }
       courseOptionsLoading = false;
+      courseOptionsFetchedRef.current = false; // 重置以便下次 orgId 改變時可以重新獲取
     };
 
     fetchCourseOptions();
-  }, []);
+  }, [orgId]);
 
   const isVisible = (field: string) => visibleFields.length === 0 || visibleFields.includes(field);
 
@@ -246,12 +271,12 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     if (isInactive) {
       return false;
     }
-    
+
     // 檢查是否在只讀欄位列表中
     if (readonlyFields.includes(field)) {
       return false;
     }
-    
+
     if (formData.student_type === '試堂') {
       const editableFields = [
         'full_name',
@@ -279,12 +304,12 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         ...prev,
         [field]: value,
       };
-      
+
       // 試堂學生：當 actual_timeslot 改變時，同步到 regular_timeslot
       if (field === 'actual_timeslot' && prev.student_type === '試堂' && value) {
         newData.regular_timeslot = value as string;
       }
-      
+
       // 試堂學生：當 lesson_date 改變時，自動計算並更新星期
       if (field === 'lesson_date' && prev.student_type === '試堂' && value) {
         const date = new Date(value as string);
@@ -293,7 +318,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         // 同時更新 weekday 欄位以保持資料一致性
         newData.weekday = weekday;
       }
-      
+
       return newData;
     });
   };
@@ -329,6 +354,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       actual_timeslot: student.actual_timeslot ?? null,
       weekday: (student as any).weekday ?? null,
       non_approved_lesson: (student as any)?.non_approved_lesson ?? 0,
+      pending_confirmation_count: (student as any)?.pending_confirmation_count ?? 0,
       approved_lesson_nonscheduled: (student as any)?.approved_lesson_nonscheduled ?? 0,
       care_alert: (student as any)?.care_alert ?? false,
     };
@@ -408,6 +434,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       actual_timeslot: '試堂時間',
       weekday: '星期',
       non_approved_lesson: '待確認堂數',
+      pending_confirmation_count: '待確認堂數',
       approved_lesson_nonscheduled: '待安排堂數',
       care_alert: '需要特別照顧',
     };
@@ -433,7 +460,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
       if (formData.actual_timeslot) {
         formData.regular_timeslot = formData.actual_timeslot;
       }
-      
+
       // 試堂學生：根據 lesson_date 計算星期
       if (formData.lesson_date) {
         const date = new Date(formData.lesson_date);
@@ -441,7 +468,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
         formData.regular_weekday = weekday;
         formData.weekday = weekday;
       }
-      
+
       // 只傳 hanami_trial_students 有的欄位
       const trialStudentFields: (keyof StudentFormData)[] = [
         'id', 'student_oid', 'full_name', 'nick_name', 'gender', 'contact_number', 'student_dob', 'student_age',
@@ -459,7 +486,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           trialPayload[key] = formData[key] === null ? null : formData[key];
         }
       });
-      
+
       // 總是使用 API 端點更新（繞過 RLS）
       // 即使沒有 orgId，也使用 API 端點，因為直接更新會觸發 RLS 無限遞迴
       try {
@@ -473,7 +500,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
             orgId: orgId || null,
           }),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           error = { message: errorData.error || '更新失敗' };
@@ -496,7 +523,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           studentPayload[key] = formData[key] ?? null;
         } else if (key === 'regular_weekday') {
           studentPayload[key] = formData[key] ?? null;
-        } else if (key === 'non_approved_lesson' || key === 'approved_lesson_nonscheduled') {
+        } else if (key === 'non_approved_lesson' || key === 'approved_lesson_nonscheduled' || key === 'pending_confirmation_count') {
           studentPayload[key] = formData[key] ?? 0;
         } else if (key === 'care_alert') {
           studentPayload[key] = formData[key] ?? false;
@@ -504,7 +531,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           studentPayload[key] = formData[key] === null ? null : formData[key];
         }
       });
-      
+
       // 總是使用 API 端點更新（繞過 RLS）
       // 即使沒有 orgId，也使用 API 端點，因為直接更新會觸發 RLS 無限遞迴
       try {
@@ -518,7 +545,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
             orgId: orgId || null,
           }),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           error = { message: errorData.error || '更新失敗' };
@@ -564,9 +591,9 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
               >
                 <MessageCircle className="w-3 h-3" />
                 <span>
-                  {contactDays === 0 ? '今天有聯繫' : 
-                   contactDays === 1 ? '1天未聯繫' : 
-                   `${contactDays}天未聯繫`}
+                  {contactDays === 0 ? '今天有聯繫' :
+                    contactDays === 1 ? '1天未聯繫' :
+                      `${contactDays}天未聯繫`}
                 </span>
               </button>
             ) : (
@@ -577,9 +604,9 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
               >
                 <MessageCircle className="w-3 h-3" />
                 <span>
-                  {contactDays === 0 ? '今天有聯繫' : 
-                   contactDays === 1 ? '1天未聯繫' : 
-                   `${contactDays}天未聯繫`}
+                  {contactDays === 0 ? '今天有聯繫' :
+                    contactDays === 1 ? '1天未聯繫' :
+                      `${contactDays}天未聯繫`}
                 </span>
               </button>
             )
@@ -1033,10 +1060,10 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                         onClick={() => {
                           // 處理電話號碼格式（移除所有非數字字符）
                           const cleanPhoneNumber = formData.contact_number.replace(/\D/g, '');
-                          
+
                           // 如果是香港電話號碼（8位數），加上852區號
                           const formattedPhoneNumber = cleanPhoneNumber.length === 8 ? `852${cleanPhoneNumber}` : cleanPhoneNumber;
-                          
+
                           const telUrl = `tel:${formattedPhoneNumber}`;
                           window.open(telUrl, '_blank');
                         }}
@@ -1045,7 +1072,7 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                           <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                         </svg>
                       </button>
-                      
+
                       {/* WhatsApp按鈕 */}
                       <button
                         className="inline-flex items-center justify-center w-6 h-6 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
@@ -1053,10 +1080,10 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                         onClick={() => {
                           // 處理電話號碼格式（移除所有非數字字符）
                           const cleanPhoneNumber = formData.contact_number.replace(/\D/g, '');
-                          
+
                           // 如果是香港電話號碼（8位數），加上852區號
                           const formattedPhoneNumber = cleanPhoneNumber.length === 8 ? `852${cleanPhoneNumber}` : cleanPhoneNumber;
-                          
+
                           const whatsappUrl = `https://wa.me/${formattedPhoneNumber}`;
                           window.open(whatsappUrl, '_blank');
                         }}
@@ -1187,12 +1214,12 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                   className="border border-[#E4D5BC] bg-[#FFFCF5] rounded-lg px-3 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#A68A64]"
                   type="number"
                   min="0"
-                  value={formData.non_approved_lesson || 0}
-                  onChange={(e) => handleChange('non_approved_lesson', parseInt(e.target.value) || 0)}
+                  value={formData.pending_confirmation_count || 0}
+                  onChange={(e) => handleChange('pending_confirmation_count', parseInt(e.target.value) || 0)}
                 />
               ) : (
-                <span className={`font-semibold ${(formData.non_approved_lesson || 0) > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
-                  {formData.non_approved_lesson || 0}
+                <span className={`font-semibold ${(formData.pending_confirmation_count || 0) > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
+                  {formData.pending_confirmation_count || 0}
                 </span>
               )}
             </div>
@@ -1238,11 +1265,10 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                   </label>
                 </div>
               ) : (
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  formData.care_alert 
-                    ? 'bg-red-100 text-red-800' 
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${formData.care_alert
+                    ? 'bg-red-100 text-red-800'
                     : 'bg-gray-100 text-gray-600'
-                }`}>
+                  }`}>
                   {formData.care_alert ? '需要特別照顧' : '一般照顧'}
                 </span>
               )}

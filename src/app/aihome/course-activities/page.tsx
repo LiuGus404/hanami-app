@@ -504,7 +504,7 @@ export default function CourseActivitiesPage() {
           currentPath="/aihome/course-activities"
         />
         <div className="flex-1 flex flex-col">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 lg:pb-8 flex-1">
             {/* 頁面標題 */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
