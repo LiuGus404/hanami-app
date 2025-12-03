@@ -210,13 +210,13 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
     // 檢查 orgId 是否改變
     const orgIdChanged = lastOrgIdRef.current !== orgId;
     lastOrgIdRef.current = orgId;
-    
+
     // 如果 orgId 改變，重置獲取狀態
     if (orgIdChanged) {
       courseOptionsFetchedRef.current = false;
       courseOptionsLoading = false;
     }
-    
+
     // 如果有 orgId，使用機構特定的課程列表，不使用全局快取
     if (!orgId && courseOptionsCache && !orgIdChanged) {
       setCourseOptions(courseOptionsCache);
@@ -230,13 +230,13 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
     const fetchCourseOptions = async () => {
       setCourseOptions(null); // 標示正在載入中
-      
+
       // 如果有 orgId，根據機構過濾課程
       let query = supabase
         .from('Hanami_CourseTypes')
         .select('name, status, org_id')
         .eq('status', true);
-      
+
       if (orgId) {
         query = query.eq('org_id', orgId);
       }
@@ -1266,8 +1266,8 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
                 </div>
               ) : (
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${formData.care_alert
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-600'
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100 text-gray-600'
                   }`}>
                   {formData.care_alert ? '需要特別照顧' : '一般照顧'}
                 </span>

@@ -1,7 +1,7 @@
 // app/aihome/parent/student-simple/[id]/page.tsx
 'use client';
 
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
 
 import LessonEditorModal from '@/components/ui/LessonEditorModal';
@@ -39,7 +39,7 @@ const fetchStudentDetail = async (studentId: string) => {
 };
 
 export default function SimpleStudentDetailPage() {
-  const { id } = useParams();
+  const [id, setId] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const institution = searchParams.get('institution') || 'Hanami Music';
@@ -97,8 +97,18 @@ export default function SimpleStudentDetailPage() {
   };
 
   useEffect(() => {
+    // 從 sessionStorage 獲取 ID
+    const storedId = sessionStorage.getItem('selectedStudentId');
+    if (!storedId) {
+      router.replace('/aihome/parent/bound-students');
+      return;
+    }
+    setId(storedId);
+  }, [router]);
+
+  useEffect(() => {
     // 如果正在載入或沒有用戶，不執行
-    if (loading || !user) return;
+    if (loading || !user || !id) return;
 
     // 如果 ID 沒有變化且已經載入過，不重複載入
     if (currentIdRef.current === id && dataFetchedRef.current) return;
@@ -480,7 +490,7 @@ export default function SimpleStudentDetailPage() {
 
   return (
     <ParentShell
-      currentPath={`/aihome/parent/student-simple/${id}`}
+      currentPath="/aihome/parent/student-simple"
       pageTitle={student.full_name}
       pageSubtitle="查看孩子的完整資料與課程記錄"
       user={user}

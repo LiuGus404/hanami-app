@@ -216,7 +216,10 @@ export default function BoundStudentsPage() {
 
               <div
                 className="cursor-pointer"
-                onClick={() => router.push(`/aihome/parent/student-simple/${student.student_id}`)}
+                onClick={() => {
+                  sessionStorage.setItem('selectedStudentId', student.student_id);
+                  router.push('/aihome/parent/student-simple');
+                }}
               >
                 {/* 角色圖片和名字區域 */}
                 <div className="flex items-center gap-4 mb-6">
