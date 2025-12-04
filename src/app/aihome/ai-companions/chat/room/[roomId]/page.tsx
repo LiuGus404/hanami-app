@@ -5,30 +5,46 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import {
-  Bars3Icon,
   PaperAirplaneIcon,
-  ArrowLeftIcon,
-  MicrophoneIcon,
-  PhotoIcon,
   FaceSmileIcon,
+  PhotoIcon,
+  MicrophoneIcon,
+  XMarkIcon,
+  ArrowPathIcon,
+  SpeakerWaveIcon,
+  StopIcon,
+  ClipboardDocumentIcon,
+  SparklesIcon,
+  ArrowLeftIcon,
+  ClockIcon,
+  UserIcon,
+  PuzzlePieceIcon,
+  Bars3Icon,
   EllipsisHorizontalIcon,
   PlusIcon,
-  XMarkIcon,
   CpuChipIcon,
-  SparklesIcon,
-  ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  UserIcon,
   Cog6ToothIcon,
   ArrowDownTrayIcon,
   AdjustmentsHorizontalIcon,
   AcademicCapIcon,
   PaintBrushIcon,
-  UsersIcon,
-  ClipboardDocumentIcon,
-  PuzzlePieceIcon
+  UsersIcon
 } from '@heroicons/react/24/outline';
+
+// Helper to parse raw multi-model content
+const parseMultiModelContent = (content: string) => {
+  if (!content) return null;
+  const regex = /### \[Model: (.*?)\]([\s\S]*?)(?=### \[Model: |$)/g;
+  const matches = [...content.matchAll(regex)];
+  if (matches.length === 0) return null;
+
+  return matches.map(match => ({
+    model: match[1].trim(),
+    content: match[2].trim().replace(/\*\*/g, '') // Remove bold syntax for cleaner look
+  }));
+};
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { getSaasSupabaseClient } from '@/lib/supabase';
@@ -400,11 +416,12 @@ interface Message {
   sender: 'user' | 'hibi' | 'mori' | 'pico' | 'system';
   timestamp: Date;
   type: 'text' | 'image' | 'task_created' | 'task_completed';
-  status?: 'queued' | 'processing' | 'completed' | 'error' | 'cancelled'; // 新增：訊息狀態
+  status?: 'queued' | 'processing' | 'completed' | 'error' | 'cancelled' | 'sent'; // 新增：訊息狀態
   taskId?: string;
   metadata?: any;
   content_json?: any; // 新增：內容 JSON 資料（包含食量資訊）
   processingWorkerId?: string;
+  model_used?: string;
 }
 
 interface AICompanion {
@@ -880,7 +897,31 @@ export default function RoomChatPage() {
     return rawMessages.map((msg: any) => {
       let sender: Message['sender'] = 'user';
 
-      if (msg.role === 'user') {
+      // Handle ai_messages schema (sender_type)
+      if (msg.sender_type === 'user') {
+        sender = 'user';
+      } else if (msg.sender_type === 'role') {
+        // Try to get role name from content_json
+        const roleName = msg.content_json?.role_name;
+        if (roleName && ['hibi', 'mori', 'pico'].includes(roleName)) {
+          sender = roleName;
+        } else {
+          // Fallback logic if role_name is missing or invalid
+          if (
+            msg.assigned_role_id === 'mori-researcher' ||
+            msg.processing_worker_id === 'mori-processor' ||
+            msg.content_json?.provider === 'multi-model'
+          ) {
+            sender = 'mori';
+          } else if (isPicoMessageRecord(msg)) {
+            sender = 'pico';
+          } else {
+            sender = 'hibi'; // Default to hibi
+          }
+        }
+      }
+      // Backward compatibility for chat_messages schema (role)
+      else if (msg.role === 'user') {
         sender = 'user';
       } else if (msg.role === 'assistant' || msg.role === 'agent') {
         const roleName = msg.content_json?.role_name;
@@ -1880,7 +1921,8 @@ export default function RoomChatPage() {
               timestamp: new Date(newMsg.created_at),
               type: 'text' as const,
               status: newMsg.status,
-              content_json: newMsg.content_json // 新增：保存完整的 content_json
+              content_json: newMsg.content_json, // 新增：保存完整的 content_json
+              model_used: newMsg.model_used // 新增：保存 model_used 用於 fallback
             };
 
             console.log('📨 [Realtime] 添加新訊息:', newMessage);
@@ -2018,7 +2060,8 @@ export default function RoomChatPage() {
                   timestamp: new Date(updatedMsg.created_at),
                   type: 'text' as const,
                   status: updatedMsg.status,
-                  content_json: updatedMsg.content_json
+                  content_json: updatedMsg.content_json,
+                  model_used: updatedMsg.model_used
                 };
 
                 // 更新用戶訊息的狀態為 completed
@@ -2039,7 +2082,8 @@ export default function RoomChatPage() {
                     status: updatedMsg.status,
                     content: updatedMsg.content,
                     content_json: updatedMsg.content_json,
-                    sender: sender // 更新 sender（以防有變化）
+                    sender: sender, // 更新 sender（以防有變化）
+                    model_used: updatedMsg.model_used // 新增：保存 model_used 用於 fallback
                   };
                 }
                 return m;
@@ -2053,7 +2097,8 @@ export default function RoomChatPage() {
                   ...m,
                   status: updatedMsg.status,
                   content: updatedMsg.content,
-                  content_json: updatedMsg.content_json
+                  content_json: updatedMsg.content_json,
+                  model_used: updatedMsg.model_used
                 };
               }
               return m;
@@ -2698,9 +2743,9 @@ export default function RoomChatPage() {
       await ensureRoomMembership(roomId, user.id);
 
       const { data, error } = await saasSupabase
-        .from('chat_messages')
+        .from('ai_messages')
         .select('*')
-        .eq('thread_id', roomId)
+        .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(MESSAGE_FETCH_LIMIT);
 
@@ -2776,9 +2821,9 @@ export default function RoomChatPage() {
 
     try {
       const { data, error } = await saasSupabase
-        .from('chat_messages')
+        .from('ai_messages')
         .select('*')
-        .eq('thread_id', roomId)
+        .eq('room_id', roomId)
         .lt('created_at', oldestMessage.timestamp.toISOString())
         .order('created_at', { ascending: false })
         .limit(MESSAGE_FETCH_LIMIT);
@@ -2879,6 +2924,12 @@ export default function RoomChatPage() {
     // 如果已經有訊息（歷史訊息），就不顯示歡迎訊息
     if (messages.length > 0) {
       console.log('🔍 已有歷史訊息，跳過歡迎訊息生成');
+      return;
+    }
+
+    // ⭐ 檢查房間標題是否已載入
+    if (!room?.title || room.title === '載入中...') {
+      console.log('⏳ 等待房間標題載入完成...');
       return;
     }
 
@@ -3923,10 +3974,10 @@ export default function RoomChatPage() {
   };
 
   // 儲存訊息到 Supabase
-  const saveMessageToSupabase = async (message: Message, targetRoomId?: string) => {
+  const saveMessageToSupabase = async (message: Message, targetRoomId?: string): Promise<string | null> => {
     if (!user?.id) {
       console.warn('⚠️ 無用戶 ID，跳過訊息儲存');
-      return;
+      return null;
     }
 
     // 記錄訊息類型統計
@@ -3959,83 +4010,117 @@ export default function RoomChatPage() {
       const { data, error } = await (saasSupabase
         .from('ai_messages') as any)
         .insert(messageData)
-        .select();
+        .select()
+        .single();
 
       if (error) {
         console.error('❌ 儲存訊息失敗:', error);
         console.error('❌ 錯誤詳情:', JSON.stringify(error, null, 2));
+        return null;
       } else {
         console.log('✅ 訊息已儲存到 Supabase:', data);
+        return data.id;
       }
     } catch (error) {
       console.error('❌ 儲存訊息錯誤:', error);
+      return null;
     }
   };
 
   // 查詢角色 processing 和 queued 狀態訊息數量（輪候人數）
   const getProcessingQueueCount = async (roleId: 'hibi' | 'mori' | 'pico', excludeClientMsgId?: string): Promise<number> => {
     try {
-      // 映射角色 ID 到 assigned_role_id
-      const roleSlugMap: Record<string, string> = {
-        'hibi': 'hibi-manager',
-        'mori': 'mori-researcher',
-        'pico': 'pico-artist'
-      };
+      // 遷移到 ai_messages，暫時只查詢 status = 'processing' 的訊息
+      // 注意：ai_messages 的結構與 chat_messages 不同，可能需要調整查詢條件
 
-      const assignedRoleId = roleSlugMap[roleId];
-      if (!assignedRoleId || !roomId) {
-        console.log('⚠️ [輪候查詢] 缺少必要參數', { assignedRoleId, roomId, roleId });
+      if (!roomId) {
         return 0;
       }
 
-      console.log(`🔍 [輪候查詢] 開始查詢: roleId=${roleId}, assignedRoleId=${assignedRoleId}, threadId=${roomId}, excludeClientMsgId=${excludeClientMsgId || 'none'}`);
+      // 簡單查詢：查詢該房間內所有非用戶且狀態為 processing 的訊息
+      // 這是一個近似值，因為 ai_messages 可能沒有 assigned_role_id
+      const query = saasSupabase
+        .from('ai_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('room_id', roomId)
+        .eq('sender_type', 'role')
+        // .eq('status', 'processing') // 假設 ai_messages 有 status 欄位且會被更新為 processing
+        // 如果 status 欄位不可靠，可能需要其他方式判斷
+        ;
 
-      // 構建查詢：查詢 chat_messages 表中該角色處於 processing 或 queued 狀態的訊息數量
-      // 只查詢當前 thread 的訊息，排除用戶自己的訊息（role = 'user'）
-      let query = saasSupabase
-        .from('chat_messages')
-        .select('id, status, assigned_role_id, role, client_msg_id', { count: 'exact', head: false })
-        .eq('thread_id', roomId)
-        .eq('assigned_role_id', assignedRoleId)
-        .in('status', ['queued', 'processing'])
-        .neq('role', 'user'); // 排除用戶訊息
-
-      // 如果有排除的 client_msg_id，則排除它
-      if (excludeClientMsgId) {
-        query = query.neq('client_msg_id', excludeClientMsgId);
-      }
-
-      const { data, count, error } = await query;
+      const { count, error } = await query;
 
       if (error) {
         console.error('❌ [輪候查詢] 查詢失敗:', error);
-        console.error('❌ [輪候查詢] 錯誤詳情:', JSON.stringify(error, null, 2));
         return 0;
       }
 
-      const result = count || 0;
-
-      // 詳細日誌
-      console.log(`📋 [輪候查詢] 查詢結果:`, {
-        roleId,
-        assignedRoleId,
-        threadId: roomId,
-        count: result,
-        data: data?.slice(0, 3), // 只顯示前3條用於調試
-        totalDataLength: data?.length
-      });
-
-      if (result > 0) {
-        console.log(`📋 [輪候查詢] ✅ ${roleId} (${assignedRoleId}) 在 thread ${roomId} 中有 ${result} 個訊息在排隊/處理中`);
-      } else {
-        console.log(`📋 [輪候查詢] ℹ️ ${roleId} (${assignedRoleId}) 在 thread ${roomId} 中沒有排隊的訊息`);
-      }
-
-      return result;
+      return count || 0;
     } catch (error) {
       console.error('❌ [輪候查詢] 查詢異常:', error);
-      console.error('❌ [輪候查詢] 異常堆疊:', error instanceof Error ? error.stack : '無堆疊資訊');
       return 0;
+    }
+  };
+
+  // 呼叫 Edge Function 處理聊天
+  const callChatProcessor = async (userMessage: string, roomId: string, roleHint: string) => {
+    try {
+      console.log('🚀 呼叫 chat-processor Edge Function...');
+      const { data, error } = await saasSupabase.functions.invoke('chat-processor', {
+        body: {
+          message: userMessage,
+          roomId: roomId,
+          companionId: roleHint,
+          userId: user?.id, // Pass userId for service role calls
+          // modelId: selectedModel, // TODO: 從狀態獲取選擇的模型
+          attachments: [] // TODO: 支援附件
+        }
+      });
+
+      if (error) {
+        console.error('❌ Edge Function 呼叫失敗:', error);
+        throw error;
+      }
+
+      console.log('✅ Edge Function 回應:', data);
+
+      if (data.success && data.content) {
+        // 成功，Edge Function 已經儲存了 assistant 訊息
+        // 我們可以選擇重新載入訊息，或者手動添加到 UI
+        // 這裡我們手動添加到 UI 以獲得更快的響應感
+        // Determine sender based on model usage or role hint
+        const isImageModel = data.model_used?.includes('image') || data.model_used?.includes('dall-e') || data.content_json?.image;
+        const sender = isImageModel ? 'pico' : (roleHint as any);
+
+        const aiMessage: Message = {
+          id: data.messageId || Date.now().toString(),
+          content: data.content,
+          sender: sender,
+          timestamp: new Date(),
+          type: 'text',
+          content_json: data.content_json,
+          model_used: data.model_used || data.content_json?.model || data.content_json?.model_name
+        };
+
+        console.log('✅ [callChatProcessor] 準備添加 AI 訊息到 UI:', aiMessage);
+
+        // 更新全局追蹤，防止 Realtime 重複添加
+        if (aiMessage.id) {
+          processedMessageIds.current.add(aiMessage.id);
+          console.log('✅ [callChatProcessor] 已添加訊息 ID 到全局追蹤:', aiMessage.id);
+        }
+
+        setMessages(prev => {
+          console.log('✅ [callChatProcessor] setMessages 被呼叫，當前訊息數:', prev.length);
+          return [...prev, aiMessage];
+        });
+        return { success: true, messageId: data.messageId };
+      } else {
+        throw new Error(data.error || 'Unknown error from chat-processor');
+      }
+    } catch (error) {
+      console.error('❌ 處理聊天失敗:', error);
+      throw error;
     }
   };
   // 發送訊息處理函數 - 持久化版本
@@ -4062,7 +4147,7 @@ export default function RoomChatPage() {
         if (queueCount > 0) {
           const companionName = companions.find(c => c.id === roleHint)?.name || roleHint;
           const { default: toast } = await import('react-hot-toast');
-          toast(`📋 ${companionName} 前面還有 ${queueCount} 個訊息正在處理中`, {
+          toast(`📋 ${companionName} 正在思考中...`, {
             icon: <ClockIcon className="w-5 h-5 text-blue-600" />,
             duration: 3000,
             style: {
@@ -4158,176 +4243,46 @@ export default function RoomChatPage() {
     }
 
     try {
-      // === 使用 API 路由發送訊息 ===
-      console.log('📦 [API] 開始發送訊息到 API 路由...');
+      // === 使用 Edge Function 發送訊息 ===
+      console.log('📦 [Edge] 開始發送訊息到 Edge Function...');
 
-      // === 載入角色設定資訊 ===
-      console.log('🔍 [角色設定] 開始載入角色設定...');
+      // 1. 儲存用戶訊息到 Supabase (Client Side)
+      const savedMessageId = await saveMessageToSupabase(userMessage, roomId);
 
-      // 載入當前選擇的角色設定
-      const selectedRoleData = await loadRoleSettings(selectedCompanion, user.id);
-      console.log('✅ [角色設定] 選擇的角色設定:', selectedRoleData);
-
-      // 載入專案資訊
-      const projectInfo = {
-        title: room.title,
-        description: room.description,
-        guidance: (room as any).guidance || room.description
-      };
-      console.log('✅ [專案資訊] 專案資訊:', projectInfo);
-
-      // 載入群組角色設定
-      const groupRoles = await loadGroupRoles(activeRoles, user.id);
-      console.log('✅ [群組角色] 群組角色設定:', groupRoles);
-
-      // === 使用 API 路由發送 ===
-      console.log('🚀 [API] 準備發送訊息:', {
-        threadId: roomId,
-        userId: user.id,
-        content: messageContent,
-        roleHint,
-        selectedRole: selectedRoleData,
-        projectInfo: projectInfo,
-        groupRoles: groupRoles
-      });
-
-      console.log('🔍 [API] 用戶資訊檢查:', {
-        user: !!user,
-        userId: user?.id,
-        userEmail: user?.email,
-        roomId: roomId,
-        messageContent: messageContent,
-        messageContentLength: messageContent?.length
-      });
-
-      // 檢查必要參數
-      if (!user?.id) {
-        console.error('❌ [API] 用戶 ID 為空');
-        const { default: toast } = await import('react-hot-toast');
-        toast.error('用戶未登入');
-        return;
+      if (!savedMessageId) {
+        throw new Error('無法儲存用戶訊息');
       }
 
-      if (!roomId) {
-        console.error('❌ [API] 房間 ID 為空');
-        const { default: toast } = await import('react-hot-toast');
-        toast.error('房間 ID 無效');
-        return;
-      }
-
-      if (!messageContent) {
-        console.error('❌ [API] 訊息內容為空');
-        const { default: toast } = await import('react-hot-toast');
-        toast.error('訊息內容不能為空');
-        return;
-      }
-
-      console.log('🚀 [Fetch] 準備發送 fetch 請求...');
-      console.log('📦 [Fetch] 請求參數:', {
-        threadId: roomId,
-        userId: user.id,
-        content: messageContent,
-        roleHint,
-        selectedRole: selectedRoleData,
-        projectInfo: projectInfo,
-        groupRoles: groupRoles
-      });
-
-      // 添加超時控制
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超時
-
-      const response = await fetch('/api/ai-companions/send-message-simple', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          threadId: roomId,
-          userId: user.id,
-          content: messageContent,
-          roleHint,
-          selectedRole: selectedRoleData,  // 新增：選擇的角色設定
-          projectInfo: projectInfo,        // 新增：專案資訊
-          groupRoles: groupRoles           // 新增：群組角色列表
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      console.log('📡 [API] HTTP 響應狀態:', response.status, response.statusText);
-      console.log('📡 [API] 響應頭:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        console.error('❌ [API] HTTP 錯誤:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('❌ [API] 錯誤詳情:', errorText);
-        const { default: toast } = await import('react-hot-toast');
-        toast.error(`發送失敗: ${response.status} ${response.statusText}`);
-        return;
-      }
-
-      console.log('🔍 [API] 準備解析 JSON...');
-      const result = await response.json();
-      console.log('📤 [API] 發送結果:', result);
-      console.log('📤 [API] 結果類型:', typeof result);
-      console.log('📤 [API] 結果內容:', JSON.stringify(result));
-
-      // ⭐ 更新用戶訊息狀態（使用真實的 messageId）
-      console.log('✅ 訊息已持久化:', result.messageId);
-
-      // 更新已顯示的用戶訊息狀態
+      // 更新 UI 中的訊息 ID
       setMessages(prev => {
         return prev.map(msg => {
           if (msg.id === tempMessageId) {
             return {
               ...msg,
-              id: result.messageId, // 使用真實的 ID
-              // ⭐ 保持 processing 狀態，等待 AI 回應完成後才改為 completed
-              status: result.success ? 'processing' : 'error'
+              id: savedMessageId,
+              status: 'sent'
             };
           }
           return msg;
         });
       });
 
-      // ⭐ 更新全局追蹤：移除臨時 ID，添加真實 ID
+      // 更新全局追蹤
       processedMessageIds.current.delete(tempMessageId);
-      processedMessageIds.current.add(result.messageId);
-      console.log('📨 [即時] 已更新全局追蹤：移除臨時 ID，添加真實 ID:', tempMessageId, '->', result.messageId);
+      processedMessageIds.current.add(savedMessageId);
 
-      // ⭐ 不觸發重新渲染，讓 React 自然更新訊息狀態
+      // 2. 呼叫 Edge Function
+      await callChatProcessor(messageContent, roomId, roleHint || 'hibi');
 
-      // ⭐ 如果 n8n 失敗，顯示警告但不阻止 UI 更新
-      if (!result.success) {
-        console.warn('⚠️ n8n 工作流失敗，但用戶訊息已顯示:', result.error);
-        const { default: toast } = await import('react-hot-toast');
-        toast.error('AI 回應可能延遲，但您的訊息已發送');
-      }
-
-      // ⭐ 檢查是否是重複請求錯誤（n8n 返回 success:true 但有 error）
-      if (result.success && result.ingressResponse?.error === '重複請求') {
-        console.warn('⚠️ n8n 檢測到重複請求，這通常意味著訊息已在處理中');
-        const { default: toast } = await import('react-hot-toast');
-        toast('訊息已發送，正在等待 AI 回應...', {
-          icon: <ClockIcon className="w-5 h-5 text-blue-600" />
-        });
-      }
-
-
-      // ⭐ Realtime 會自動檢測並顯示 AI 回應，無需手動觸發檢查
-      console.log('✅ [發送] 訊息已發送，等待 Realtime 推送 AI 回應...');
+      // 3. 完成
+      console.log('✅ [Edge] 訊息處理完成');
 
     } catch (error) {
-      console.error('❌ 發送訊息錯誤:', error);
-      console.error('❌ 錯誤詳情:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
+      console.error('❌ [Edge] 發送失敗:', error);
+      const { default: toast } = await import('react-hot-toast');
+      toast.error('發送失敗，請稍後再試');
 
-      // 更新用戶訊息狀態為錯誤
+      // 更新訊息狀態為錯誤
       setMessages(prev => {
         return prev.map(msg => {
           if (msg.id === tempMessageId) {
@@ -4339,66 +4294,18 @@ export default function RoomChatPage() {
           return msg;
         });
       });
-
-      // ⭐ 更新全局追蹤：移除臨時 ID（錯誤情況下保持臨時 ID）
-      processedMessageIds.current.delete(tempMessageId);
-      console.log('📨 [即時] 錯誤情況下已移除臨時 ID 從全局追蹤:', tempMessageId);
-
-      // ⭐ 不觸發重新渲染，讓 React 自然更新訊息狀態
-
-      const { default: toast } = await import('react-hot-toast');
-      if (error instanceof Error && error.name === 'AbortError') {
-        toast.error('請求超時，請重試');
-      } else {
-        toast.error('發送失敗，請重試');
-      }
     } finally {
-      // ⭐ 不解鎖思考 UI，讓它在 AI 回應完成後自然消失
-      // setIsLoading(false);
-      // setIsTyping(false);
-
-      // ⭐ 注意：輪候人數在 Realtime 收到回應時重置，不在這裡重置
-
-      // ⭐ 解鎖（延遲 1 秒，確保 API 完成）
-      setTimeout(() => {
-        const lockKey = `${roomId}-${messageContent}`;
-        globalSendingLock.delete(lockKey);  // 釋放全局鎖
-        isSendingRef.current = false;
-        setIsSending(false);
-        console.log('🔓 [發送] 已解鎖全局鎖，鎖鍵:', lockKey);
-
-        // ⭐ 清除 Pico 選項（發送後重置，但保留在 localStorage 中供下次使用）
-        // 注意：這裡不清除選項，讓用戶下次使用時可以直接使用相同的設定
-        // 如果需要清除，用戶可以手動點擊清除按鈕
-      }, 1000);
+      // 解鎖
+      globalSendingLock.delete(lockKey);
+      isSendingRef.current = false;
+      setIsSending(false);
+      setIsLoading(false);
+      setIsTyping(false);
+      setProcessingCompanion(null);
     }
   };
 
-  // 模擬 AI 回應
-  const simulateAIResponse = async (userMessage: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
 
-    let responseContent = '';
-    let sender: any = selectedCompanion || activeRoles[0] || 'hibi';
-
-    if (sender === 'hibi') {
-      responseContent = `我了解您的需求。讓我為您統籌安排最適合的團隊成員來處理這個任務。`;
-    } else if (sender === 'mori') {
-      responseContent = `這是一個很有趣的問題！讓我為您研究分析一下...`;
-    } else {
-      responseContent = `我會努力協助您完成這個任務！`;
-    }
-
-    const aiResponse: Message = {
-      id: generateUUID(),
-      content: responseContent,
-      sender: sender,
-      timestamp: new Date(),
-      type: 'text'
-    };
-
-    await addMessage(aiResponse);
-  };
 
   // 刪除單個訊息（使用軟刪除）
   const handleDeleteMessage = async (messageId: string) => {
@@ -4439,7 +4346,7 @@ export default function RoomChatPage() {
 
         // 回退到直接 Supabase 操作
         const { error } = await (saasSupabase as any)
-          .from('chat_messages')
+          .from('ai_messages')
           .update({
             status: 'deleted',
             updated_at: new Date().toISOString()
@@ -4545,9 +4452,9 @@ export default function RoomChatPage() {
 
       // 從資料庫刪除該房間的所有訊息 (使用正確的表名和欄位名)
       const { error } = await saasSupabase
-        .from('chat_messages')
+        .from('ai_messages')
         .delete()
-        .eq('thread_id', roomId);
+        .eq('room_id', roomId);
 
       if (error) {
         console.error('❌ 清除歷史訊息失敗:', error);
@@ -5272,9 +5179,7 @@ export default function RoomChatPage() {
                             }`}>
                             <ClockIcon className={`w-3.5 h-3.5 flex-shrink-0 ${queueCount > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
                             <span className={`font-medium ${queueCount > 0 ? 'text-blue-700' : 'text-gray-600'}`}>
-                              {queueCount > 0
-                                ? `前面還有 ${queueCount} 個訊息正在處理中`
-                                : '正在處理中...'}
+                              正在思考中...
                             </span>
                           </div>
                         </motion.div>
@@ -6232,7 +6137,7 @@ export default function RoomChatPage() {
                                   <PuzzlePieceIcon className="w-4 h-4" />
                                   <span>思維積木設定</span>
                                 </div>
-                                
+
                                 {mindTitle !== '未裝備' ? (
                                   // 已裝備：顯示積木名稱和類型
                                   <div className="space-y-2">
@@ -6256,14 +6161,14 @@ export default function RoomChatPage() {
                                       {(() => {
                                         const equippedBlock = equippedBlocks.role || equippedBlocks.style || equippedBlocks.task;
                                         if (!equippedBlock) return null;
-                                        
+
                                         const types = new Set<string>();
-                                        
+
                                         // 方法1: 檢查 block_type 字段（單一類型積木）
                                         if (equippedBlock.block_type) {
                                           types.add(equippedBlock.block_type);
                                         }
-                                        
+
                                         // 方法2: 解析 content_json（複合積木）
                                         if (equippedBlock.content_json) {
                                           const traverse = (blocks: any[]) => {
@@ -6274,14 +6179,14 @@ export default function RoomChatPage() {
                                               }
                                             });
                                           };
-                                          
+
                                           if (equippedBlock.content_json.blocks && Array.isArray(equippedBlock.content_json.blocks)) {
                                             traverse(equippedBlock.content_json.blocks);
                                           }
                                         }
-                                        
+
                                         if (types.size === 0) return null;
-                                        
+
                                         const typeConfigMap: Record<string, { label: string; color: string }> = {
                                           role: { label: '角色', color: 'purple' },
                                           style: { label: '風格', color: 'pink' },
@@ -6293,7 +6198,7 @@ export default function RoomChatPage() {
                                           reason: { label: '推理', color: 'yellow' },
                                           output: { label: '輸出', color: 'green' }
                                         };
-                                        
+
                                         const getColorClasses = (color: string) => {
                                           const colorMap: Record<string, { bg: string; border: string; text: string }> = {
                                             purple: { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-600' },
@@ -6309,7 +6214,7 @@ export default function RoomChatPage() {
                                           };
                                           return colorMap[color] || colorMap.gray;
                                         };
-                                        
+
                                         // 按照優先順序排序（角色、風格、任務優先）
                                         const priorityOrder = ['role', 'style', 'task'];
                                         const sortedTypes = Array.from(types).sort((a, b) => {
@@ -6320,16 +6225,16 @@ export default function RoomChatPage() {
                                           if (bIndex !== -1) return 1;
                                           return a.localeCompare(b);
                                         });
-                                        
+
                                         const typeArray = sortedTypes.slice(0, 5);
                                         const remainingCount = sortedTypes.length > 5 ? sortedTypes.length - 5 : 0;
-                                        
+
                                         return (
                                           <div className="flex items-center gap-1 flex-wrap">
                                             {typeArray.map((type) => {
-                                              const config = typeConfigMap[type] || { 
+                                              const config = typeConfigMap[type] || {
                                                 label: type.charAt(0).toUpperCase() + type.slice(1), // 自訂類型首字母大寫
-                                                color: 'gray' 
+                                                color: 'gray'
                                               };
                                               const colors = getColorClasses(config.color);
                                               return (
@@ -7154,6 +7059,11 @@ interface MessageBubbleProps {
   isHighlighted?: boolean;
 }
 function MessageBubble({ message, companion, onDelete, isHighlighted = false }: MessageBubbleProps) {
+  // Debug log to verify component render
+  console.log('🔍 [MessageBubble] Rendering message:', message.id, 'Sender:', message.sender, 'Content length:', message.content?.length);
+  console.log('🔍 [MessageBubble] Full content preview:', message.content?.substring(0, 500));
+
+  const [isHovered, setIsHovered] = useState(false);
   const isUser = message.sender === 'user';
   const isSystem = message.sender === 'system';
   const isPico = message.sender === 'pico';
@@ -7162,7 +7072,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
     Boolean(message.content_json?.image || message.content.match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s]*)?/i));
   const [showMobileActions, setShowMobileActions] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  const [moriViewMode, setMoriViewMode] = useState<'stack' | 'deck'>('stack');
+  const [moriViewMode, setMoriViewMode] = useState<'stack' | 'deck'>('deck');
   const [activeMoriIndex, setActiveMoriIndex] = useState(0);
   const picoAvatarSrc = companion?.imagePath || '/3d-character-backgrounds/studio/Pico/Pico.png';
 
@@ -7174,11 +7084,44 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
   const isMoriDeck = isMoriMulti && moriViewMode === 'deck';
 
   const renderPlainText = () => {
-    return message.content.split('\n').map((line, index) => {
+    // Robust splitting for different newline formats
+    const lines = message.content.split(/\r\n|\r|\n/);
+    let hasRenderedImage = false;
+
+    const renderedLines = lines.map((line, index) => {
       // ⭐ 優先檢查是否為圖片 markdown 格式（必須在直接 URL 檢查之前）
       // 改進正則：匹配 ![alt](url) 格式，支援 URL 中包含特殊字符
       const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+
+      // Log every line to see what's happening
+      console.log(`🔍 [MessageBubble] Line ${index}:`, line.substring(0, 50), 'Has markdown start:', line.includes('!['), 'Has markdown end:', line.includes(']('));
+
+      if (line.includes('![') && line.includes('](')) {
+        console.log('🔍 [MessageBubble] Potential markdown image detected:', line);
+        console.log('🔍 [MessageBubble] Match result:', imageMatch);
+
+        // Fallback if regex fails but we suspect an image
+        if (!imageMatch) {
+          console.warn('⚠️ [MessageBubble] Regex failed but markdown detected. Trying fallback parsing.');
+          const start = line.indexOf('](') + 2;
+          const end = line.lastIndexOf(')');
+          if (start > 1 && end > start) {
+            const fallbackUrl = line.substring(start, end).trim();
+            console.log('🔍 [MessageBubble] Fallback URL extracted:', fallbackUrl);
+            if (fallbackUrl.startsWith('http')) {
+              // Construct a fake match object to proceed
+              const publicUrl = convertToPublicUrl(fallbackUrl);
+              return (
+                <div key={index} className="my-2">
+                  <SecureImageDisplay imageUrl={publicUrl} alt="Fallback Image" />
+                </div>
+              );
+            }
+          }
+        }
+      }
       if (imageMatch && imageMatch.index !== undefined) {
+        hasRenderedImage = true;
         let imageUrl = imageMatch[2].trim(); // 捕獲組 2 是 URL，去除首尾空格
 
         // ⭐ 提取 Markdown 圖片前後的文字（完全移除 Markdown 標記）
@@ -7317,6 +7260,23 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
       }
       return null;
     });
+
+    // Global fallback if no image was rendered but one exists in the raw content
+    if (!hasRenderedImage) {
+      const globalImageMatch = message.content.match(/!\[(.*?)\]\((.*?)\)/);
+      if (globalImageMatch) {
+        console.warn('⚠️ [MessageBubble] Global fallback triggered. Image found in raw content but missed by line parser.');
+        const imageUrl = globalImageMatch[2].trim();
+        const publicUrl = convertToPublicUrl(imageUrl);
+        renderedLines.push(
+          <div key="global-fallback-image" className="my-2">
+            <SecureImageDisplay imageUrl={publicUrl} alt="Generated Image" />
+          </div>
+        );
+      }
+    }
+
+    return renderedLines;
   };
 
   useEffect(() => {
@@ -7332,9 +7292,9 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
     }
   }, [moriViewMode, moriModelCount]);
 
-  const renderMoriMulti = () => {
+  const renderMoriMulti = (parsedResponses?: any[]) => {
     const meta = message.content_json || {};
-    const modelResponses: any[] = Array.isArray(meta.model_responses) ? meta.model_responses : [];
+    const modelResponses: any[] = parsedResponses || (Array.isArray(meta.model_responses) ? meta.model_responses : []);
     const modelCount = modelResponses.length;
     const food = meta.food || {};
     const charPerToken = Number(food.CHAR_PER_TOKEN || 4);
@@ -7347,6 +7307,18 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
       const estimatedChars = tokens * charPerToken;
       return Math.max(1, Math.ceil(estimatedChars / charsPerFood));
     };
+
+    // 計算總字數和總食量，用於比例分配
+    const totalContentLength = modelResponses.reduce((acc, resp) => acc + (resp.content?.length || 0), 0);
+    const totalFoodCostFromMeta = (() => {
+      const meta = message.content_json || {};
+      if (meta.food && typeof meta.food.total_food_cost === 'number') {
+        return meta.food.total_food_cost;
+      } else if (typeof meta.total_food_cost === 'number') {
+        return meta.total_food_cost;
+      }
+      return 0;
+    })();
 
     const handlePrevModel = () => {
       setActiveMoriIndex((prev) => {
@@ -7363,21 +7335,25 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
     };
 
     const header = (
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EADBC8] pb-4 mb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FFEEDB] text-[#B56700] text-xs font-semibold">
-            <SparklesIcon className="w-4 h-4" />
-            {`模型 ${modelCount}`}
-          </span>
+          <motion.span
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 3, repeat: Infinity }}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 text-[#4B4036] text-xs font-bold border border-[#FFD59A] shadow-sm"
+          >
+            <SparklesIcon className="w-3.5 h-3.5 text-[#FFB6C1]" />
+            {`AI 模型共演 (${modelCount})`}
+          </motion.span>
         </div>
         {modelCount > 1 && (
-          <div className="flex items-center gap-1 rounded-full bg-[#FFEFF7] border border-[#F7D3E6] p-1 text-xs font-medium text-[#B33B63]">
+          <div className="flex items-center gap-1 bg-[#F8F5EC] p-1 rounded-xl border border-[#EADBC8]">
             <button
               type="button"
               onClick={() => setMoriViewMode('stack')}
-              className={`px-3 py-1 rounded-full transition-all ${moriViewMode === 'stack'
-                ? 'bg-white shadow-sm text-[#B33B63]'
-                : 'text-[#B33B63]/70 hover:text-[#B33B63]'
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${moriViewMode === 'stack'
+                ? 'bg-white text-[#4B4036] shadow-sm border border-[#EADBC8]'
+                : 'text-[#2B3A3B]/60 hover:text-[#4B4036] hover:bg-white/50'
                 }`}
             >
               清單
@@ -7385,9 +7361,9 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
             <button
               type="button"
               onClick={() => setMoriViewMode('deck')}
-              className={`px-3 py-1 rounded-full transition-all ${moriViewMode === 'deck'
-                ? 'bg-white shadow-sm text-[#B33B63]'
-                : 'text-[#B33B63]/70 hover:text-[#B33B63]'
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${moriViewMode === 'deck'
+                ? 'bg-white text-[#4B4036] shadow-sm border border-[#EADBC8]'
+                : 'text-[#2B3A3B]/60 hover:text-[#4B4036] hover:bg-white/50'
                 }`}
             >
               卡片
@@ -7398,98 +7374,135 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
     );
 
     return (
-      <div className="whitespace-normal space-y-4">
+      <div className="whitespace-normal space-y-4 font-sans">
         {isDeckMode ? (
-          <div className="rounded-3xl border border-[#F0E4D2] bg-white shadow-[0_18px_48px_-32px_rgba(0,0,0,0.35)] overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl border border-[#EADBC8] bg-white/80 backdrop-blur-sm shadow-xl shadow-[#EADBC8]/20 overflow-hidden"
+          >
             <div className="p-5 sm:p-6 pb-2">{header}</div>
-            <div className="px-5 sm:px-6 pb-5 space-y-4">
+            <div className="px-5 sm:px-6 pb-6 space-y-5">
               {modelResponses.length > 1 && (
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handlePrevModel}
-                      disabled={currentActiveIndex === 0}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#F3E0E8] bg-white transition-all ${currentActiveIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-x-0.5'
-                        }`}
-                      aria-label="上一個模型"
-                    >
-                      <ArrowLeftIcon className="w-4 h-4 text-[#B33B63]" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNextModel}
-                      disabled={currentActiveIndex === modelResponses.length - 1}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#F3E0E8] bg-white transition-all ${currentActiveIndex === modelResponses.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:translate-x-0.5'
-                        }`}
-                      aria-label="下一個模型"
-                    >
-                      <ArrowLeftIcon className="w-4 h-4 text-[#B33B63] rotate-180" />
-                    </button>
-                  </div>
+                <div className="flex flex-col gap-4">
                   <div className="flex flex-wrap items-center gap-2">
                     {modelResponses.map((resp, idx) => {
                       const label = resp.model || `模型 ${idx + 1}`;
+                      const isActive = idx === currentActiveIndex;
                       return (
                         <button
                           key={`indicator-${idx}`}
                           type="button"
                           onClick={() => setActiveMoriIndex(idx)}
-                          className={`max-w-[160px] truncate px-3 py-1.5 text-xs font-medium rounded-full transition-all border ${idx === currentActiveIndex
-                            ? 'bg-[#FF9CB5] text-white border-[#FF9CB5] shadow'
-                            : 'bg-[#FDF2F7] text-[#B33B63] border-[#F5D3E0] hover:bg-[#FF9CB5]/80 hover:text-white'
+                          className={`relative px-4 py-2 text-xs font-bold rounded-xl transition-all duration-300 border ${isActive
+                            ? 'text-[#4B4036] border-[#FFD59A] shadow-md transform scale-105'
+                            : 'bg-[#F8F5EC] text-[#4B4036]/70 border-[#EADBC8] hover:border-[#FFD59A] hover:bg-[#FFF9F2]'
                             }`}
-                          aria-label={`切換至 ${label}`}
                         >
-                          {label}
+                          <span className="relative z-10">{label}</span>
+                          {isActive && (
+                            <motion.div
+                              layoutId="activeTab"
+                              className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#FFD59A] to-[#FFB6C1] -z-0 opacity-80"
+                              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                            />
+                          )}
                         </button>
                       );
                     })}
                   </div>
+
+                  <div className="flex items-center justify-between text-xs text-[#2B3A3B]/60 px-1">
+                    <span className="flex items-center gap-1">
+                      <motion.div
+                        animate={{ rotate: [0, 10, -10, 0] }}
+                        transition={{ duration: 4, repeat: Infinity }}
+                      >
+                        <CpuChipIcon className="w-3.5 h-3.5 text-[#FFD59A]" />
+                      </motion.div>
+                      {modelResponses[currentActiveIndex]?.model} 的回答
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handlePrevModel}
+                        disabled={currentActiveIndex === 0}
+                        className={`p-1.5 rounded-full hover:bg-[#F8F5EC] text-[#4B4036] transition-colors ${currentActiveIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                      >
+                        <ArrowLeftIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleNextModel}
+                        disabled={currentActiveIndex === modelResponses.length - 1}
+                        className={`p-1.5 rounded-full hover:bg-[#F8F5EC] text-[#4B4036] transition-colors ${currentActiveIndex === modelResponses.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                      >
+                        <ArrowLeftIcon className="w-4 h-4 rotate-180" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
-              <div className="relative overflow-hidden">
+              <div className="relative overflow-hidden min-h-[100px]">
                 <motion.div
                   className="flex w-full"
                   initial={false}
                   animate={{ x: `-${currentActiveIndex * 100}%` }}
-                  transition={{ type: 'spring', stiffness: 140, damping: 20 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 25 }}
                 >
                   {modelResponses.map((resp, idx) => {
                     const respUsage = resp.usage || {};
                     const input = Number(respUsage.input_tokens || 0);
                     const output = Number(respUsage.output_tokens || 0);
                     const total = Number(respUsage.total_tokens || input + output);
-                    const modelLabel = resp.model || `模型 ${idx + 1}`;
-                    const estimatedFood = computePerModelFood(total);
+                    // 使用比例分配計算食量，確保與右上角總食量邏輯一致
+                    let estimatedFood = 0;
+                    if (totalFoodCostFromMeta > 0 && totalContentLength > 0) {
+                      estimatedFood = Math.round(((resp.content?.length || 0) / totalContentLength) * totalFoodCostFromMeta);
+                      // 確保至少為 0 (如果總食量 > 0 但分配後為 0，可能需要調整，但 round 應該足夠)
+                      if (estimatedFood === 0 && (resp.content?.length || 0) > 0) estimatedFood = 1;
+                    } else {
+                      // Fallback: 使用字數計算 (100字 = 1食量)
+                      estimatedFood = Math.ceil((resp.content?.length || 0) / 100);
+                    }
 
                     return (
                       <div
-                        key={`${resp.model || idx}-${idx}`}
-                        className="flex-shrink-0 w-full"
+                        key={`slide-${idx}`}
+                        className="w-full flex-shrink-0 px-1"
                       >
-                        <div className="space-y-4">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="space-y-1">
-                              <div className="text-sm font-semibold text-[#2B3A3B]">
-                                {`#${idx + 1} ${modelLabel}`}
-                              </div>
-                              {resp.provider && (
-                                <div className="text-xs text-[#2B3A3B]/70">
-                                  提供者：{resp.provider}
+                        <div className="prose prose-sm max-w-none text-[#4B4036] leading-relaxed">
+                          <div className="whitespace-pre-wrap">
+                            {resp.content}
+                          </div>
+                        </div>
+
+                        {/* Metadata Footer for Deck View */}
+                        <div className="mt-6 pt-4 border-t border-[#EADBC8]/50 flex flex-wrap items-center gap-3 text-[10px] text-[#2B3A3B]/60 font-medium">
+                          <div className="flex items-center gap-1 bg-[#F8F5EC] px-2 py-0.5 rounded-full border border-[#EADBC8]">
+                            <CpuChipIcon className="w-3 h-3 text-[#FFD59A]" />
+                            <span>{resp.model || resp.model_name || 'Unknown Model'}</span>
+                          </div>
+                          {(resp.mind_name || resp.thinking_process) && (
+                            <div className="flex items-center gap-1 bg-[#F8F5EC] px-2 py-0.5 rounded-full border border-[#EADBC8]">
+                              <SparklesIcon className="w-3 h-3 text-[#FFB6C1]" />
+                              <span>{resp.mind_name || '思考中...'}</span>
+                            </div>
+                          )}
+
+                          {(total > 0 || estimatedFood) && (
+                            <div className="flex items-center gap-3 ml-auto">
+                              {estimatedFood && (
+                                <div className="flex items-center gap-1 text-[#FFB6C1]">
+                                  <img src="/apple-icon.svg" alt="food" className="w-3 h-3 opacity-80" />
+                                  <span className="font-bold">{estimatedFood}</span>
+                                </div>
+                              )}
+                              {estimatedFood && (
+                                <div className="flex items-center gap-1">
+                                  <span className="opacity-70">節省了 {estimatedFood} mins</span>
                                 </div>
                               )}
                             </div>
-                            {estimatedFood && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FFE9F1] text-[#B33B63] text-xs font-semibold">
-                                <img src="/apple-icon.svg" alt="蘋果" className="w-3.5 h-3.5" />
-                                {estimatedFood}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm leading-relaxed text-[#4B4036] whitespace-pre-wrap break-words bg-[#FFF9F2]/60 rounded-xl p-3 border border-[#F3E9D7]">
-                            {resp.content || '（此模型沒有返回內容）'}
-                          </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -7497,60 +7510,126 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                 </motion.div>
               </div>
             </div>
-          </div>
+          </motion.div>
         ) : (
-          <div className="bg-gradient-to-br from-[#FFF9F2] via-white to-[#FFF9F2] border border-[#F3E9D7] rounded-3xl shadow-[0_24px_64px_-32px_rgba(255,181,193,0.65)] p-5 space-y-4">
+          <div className="space-y-6">
             {header}
-            <div className="relative pl-8">
-              <div className="absolute left-3 top-4 bottom-4 w-[3px] bg-gradient-to-b from-[#FFD59A] via-[#FFB6C1] to-transparent rounded-full opacity-80" />
-              <div className="space-y-5">
-                {modelResponses.map((resp, idx) => {
-                  const respUsage = resp.usage || {};
-                  const input = Number(respUsage.input_tokens || 0);
-                  const output = Number(respUsage.output_tokens || 0);
-                  const total = Number(respUsage.total_tokens || input + output);
-                  const modelLabel = resp.model || `模型 ${idx + 1}`;
-                  const estimatedFood = computePerModelFood(total);
+            {modelResponses.map((resp, idx) => {
+              const respUsage = resp.usage || {};
+              const input = Number(respUsage.input_tokens || 0);
+              const output = Number(respUsage.output_tokens || 0);
+              const total = Number(respUsage.total_tokens || input + output);
+              // 使用比例分配計算食量，確保與右上角總食量邏輯一致
+              let estimatedFood = 0;
+              if (totalFoodCostFromMeta > 0 && totalContentLength > 0) {
+                estimatedFood = Math.round(((resp.content?.length || 0) / totalContentLength) * totalFoodCostFromMeta);
+                if (estimatedFood === 0 && (resp.content?.length || 0) > 0) estimatedFood = 1;
+              } else {
+                // Fallback: 使用字數計算 (100字 = 1食量)
+                estimatedFood = Math.ceil((resp.content?.length || 0) / 100);
+              }
 
-                  return (
-                    <motion.div
-                      key={`${resp.model || idx}-${idx}`}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className="relative bg-white border border-[#F0E4D2] rounded-2xl shadow-[0_12px_32px_-24px_rgba(0,0,0,0.25)] p-4 space-y-3"
-                    >
-                      <div className="absolute -left-[37px] top-5 w-3 h-3 rounded-full border-[3px] border-white bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] shadow-[0_0_0_4px_rgba(255,246,234,0.9)]" />
+              return (
+                <motion.div
+                  key={`stack-${idx}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="rounded-3xl border border-[#EADBC8] bg-white p-6 shadow-sm hover:shadow-md transition-all duration-300"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="px-3 py-1 rounded-xl bg-[#F8F5EC] text-[#4B4036] text-xs font-bold border border-[#EADBC8]">
+                      {resp.model || `模型 ${idx + 1}`}
+                    </span>
+                  </div>
+                  <div className="prose prose-sm max-w-none text-[#4B4036] leading-relaxed whitespace-pre-wrap">
+                    {resp.content}
+                  </div>
 
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="text-sm font-semibold text-[#2B3A3B]">
-                            {`#${idx + 1} ${modelLabel}`}
+                  {/* Metadata Footer for Stack View */}
+                  <div className="mt-4 pt-4 border-t border-[#EADBC8]/50 flex flex-wrap items-center gap-3 text-[10px] text-[#2B3A3B]/60 font-medium">
+                    <div className="flex items-center gap-1 bg-[#F8F5EC] px-2 py-0.5 rounded-full border border-[#EADBC8]">
+                      <CpuChipIcon className="w-3 h-3 text-[#FFD59A]" />
+                      <span>{resp.model || resp.model_name || 'Unknown Model'}</span>
+                    </div>
+                    {(resp.mind_name || resp.thinking_process) && (
+                      <div className="flex items-center gap-1 bg-[#F8F5EC] px-2 py-0.5 rounded-full border border-[#EADBC8]">
+                        <SparklesIcon className="w-3 h-3 text-[#FFB6C1]" />
+                        <span>{resp.mind_name || '思考中...'}</span>
+                      </div>
+                    )}
+
+                    {(total > 0 || estimatedFood) && (
+                      <div className="flex items-center gap-3 ml-auto">
+                        {estimatedFood && (
+                          <div className="flex items-center gap-1 text-[#FFB6C1]">
+                            <img src="/apple-icon.svg" alt="food" className="w-3 h-3 opacity-80" />
+                            <span className="font-bold">{estimatedFood}</span>
                           </div>
-                          {resp.provider && (
-                            <div className="text-xs text-[#2B3A3B]/70">
-                              提供者：{resp.provider}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          {estimatedFood && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FFE9F1] text-[#B33B63] font-medium">
-                              <img src="/apple-icon.svg" alt="蘋果" className="w-3.5 h-3.5" />
-                              {estimatedFood}
-                            </span>
-                          )}
-                        </div>
+                        )}
+                        {estimatedFood && (
+                          <div className="flex items-center gap-1">
+                            <span className="opacity-70">節省了 {estimatedFood} mins</span>
+                          </div>
+                        )}
                       </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
-                      <div className="text-sm leading-relaxed text-[#4B4036] whitespace-pre-wrap break-words bg-[#FFF9F2]/60 rounded-xl p-3 border border-[#F3E9D7]">
-                        {resp.content || '（此模型沒有返回內容）'}
-                      </div>
-                    </motion.div>
-                  );
-                })}
+  const renderMetadataFooter = () => {
+    if (isUser || isSystem) return null;
+
+    const meta = message.content_json || {};
+    const model = meta.model || meta.model_name || meta.model_slug || message.model_used;
+    const mind = meta.mind_name || (meta.thinking_process ? '思考中...' : null);
+
+    // 計算食量：優先使用 content_json 中的 food.total_food_cost，否則嘗試從 usage 計算
+    let foodCost = 0;
+    if (meta.food && typeof meta.food.total_food_cost === 'number') {
+      foodCost = meta.food.total_food_cost;
+    } else if (typeof meta.total_food_cost === 'number') {
+      foodCost = meta.total_food_cost;
+    }
+
+    const tokens = meta.usage?.total_tokens || meta.total_tokens || 0;
+
+    if (!model && !mind && !foodCost && !tokens) return null;
+
+    return (
+      <div className="mt-3 pt-2 border-t border-[#EADBC8]/50 flex flex-wrap items-center gap-3 text-[10px] text-[#2B3A3B]/60 font-medium">
+        {model && (
+          <div className="flex items-center gap-1 bg-[#F8F5EC] px-2 py-0.5 rounded-full border border-[#EADBC8]">
+            <CpuChipIcon className="w-3 h-3 text-[#FFD59A]" />
+            <span>{model}</span>
+          </div>
+        )}
+        {mind && (
+          <div className="flex items-center gap-1 bg-[#F8F5EC] px-2 py-0.5 rounded-full border border-[#EADBC8]">
+            <SparklesIcon className="w-3 h-3 text-[#FFB6C1]" />
+            <span>{mind}</span>
+          </div>
+        )}
+        {(foodCost > 0 || tokens > 0) && (
+          <div className="flex items-center gap-3 ml-auto">
+            {foodCost > 0 && (
+              <div className="flex items-center gap-1 text-[#FFB6C1]">
+                <img src="/apple-icon.svg" alt="food" className="w-3 h-3 opacity-80" />
+                <span className="font-bold">{foodCost}</span>
               </div>
-            </div>
+            )}
+            {foodCost > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="opacity-70">節省了 {foodCost} mins</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -7683,28 +7762,49 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
           >
             {isMoriMulti ? (
               renderMoriMulti()
-            ) : (
-              <div className="whitespace-pre-wrap break-words">
-                {renderPlainText()}
-              </div>
-            )}
+            ) : (() => {
+              // Check for raw multi-model content
+              const rawMultiModel = parseMultiModelContent(message.content);
+              if (rawMultiModel) {
+                return renderMoriMulti(rawMultiModel);
+              }
+              return (
+                <div className="whitespace-pre-wrap break-words">
+                  {renderPlainText()}
+                  {renderMetadataFooter()}
+                </div>
+              );
+            })()}
             {/* 操作按鈕 - 響應式顯示 */}
             <div className={`absolute -top-2 -right-2 flex space-x-1 z-10 transition-opacity duration-200
                             ${showMobileActions ? 'opacity-100' : 'opacity-0'} 
                             md:opacity-0 md:group-hover:opacity-100`}>
               {/* 食量顯示 - 僅 AI 回應訊息顯示，靠近時才顯示 */}
-              {!isUser && message.content_json?.food?.total_food_cost && (
-                <motion.button
-                  whileHover={{ scale: 1.2 }}
-                  className="w-12 h-8 md:w-12 md:h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center touch-manipulation"
-                  title={`消耗 ${message.content_json.food.total_food_cost} 食量`}
-                >
-                  <span className="text-xs font-medium flex items-center space-x-1">
-                    <img src="/apple-icon.svg" alt="蘋果" className="w-5 h-5" />
-                    <span>{message.content_json.food.total_food_cost}</span>
-                  </span>
-                </motion.button>
-              )}
+              {/* 食量顯示 - 僅 AI 回應訊息顯示，靠近時才顯示 */}
+              {!isUser && (() => {
+                const meta = message.content_json || {};
+                let foodCost = 0;
+                if (meta.food && typeof meta.food.total_food_cost === 'number') {
+                  foodCost = meta.food.total_food_cost;
+                } else if (typeof meta.total_food_cost === 'number') {
+                  foodCost = meta.total_food_cost;
+                }
+
+                if (!foodCost) return null;
+
+                return (
+                  <motion.button
+                    whileHover={{ scale: 1.2 }}
+                    className="w-12 h-8 md:w-12 md:h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] hover:from-[#FF9BB3] hover:to-[#FFCC7A] text-white rounded-full shadow-lg transition-all flex items-center justify-center touch-manipulation"
+                    title={`消耗 ${foodCost} 食量`}
+                  >
+                    <span className="text-xs font-medium flex items-center space-x-1">
+                      <img src="/apple-icon.svg" alt="蘋果" className="w-5 h-5" />
+                      <span>{foodCost}</span>
+                    </span>
+                  </motion.button>
+                );
+              })()}
 
               {/* 複製按鈕 */}
               <motion.button

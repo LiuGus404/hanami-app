@@ -455,7 +455,7 @@ export default function AICompanionsPage() {
     setLoadingMindBlocks(true);
     try {
       const supabase = getSaasSupabaseClient();
-      
+
       // 先獲取角色 ID
       const roleSlug = roleId === 'hibi' ? 'hibi-manager' : roleId === 'mori' ? 'mori-researcher' : 'pico-artist';
       const { data: roleData } = await supabase
@@ -621,13 +621,13 @@ export default function AICompanionsPage() {
   const parseBlockTypes = (block: any): Array<{ type: string; isCustom: boolean }> => {
     try {
       const types = new Map<string, boolean>();
-      
+
       // 方法1: 檢查 block_type 字段
       if (block.block_type) {
         const isCustom = !typeConfigMap[block.block_type as MindBlockType];
         types.set(block.block_type, isCustom);
       }
-      
+
       // 方法2: 解析 content_json
       const contentJson = block.content_json;
       if (contentJson && contentJson.blocks && Array.isArray(contentJson.blocks)) {
@@ -646,16 +646,16 @@ export default function AICompanionsPage() {
       }
 
       const typeArray = Array.from(types.entries()).map(([type, isCustom]) => ({ type, isCustom }));
-      
+
       // 排序
       const priorityOrder: string[] = ['role', 'style', 'task'];
       const sortedTypes = typeArray.sort((a, b) => {
         const aIsCustom = a.isCustom;
         const bIsCustom = b.isCustom;
-        
+
         if (!aIsCustom && bIsCustom) return -1;
         if (aIsCustom && !bIsCustom) return 1;
-        
+
         if (!aIsCustom && !bIsCustom) {
           const aIndex = priorityOrder.indexOf(a.type);
           const bIndex = priorityOrder.indexOf(b.type);
@@ -663,7 +663,7 @@ export default function AICompanionsPage() {
           if (aIndex !== -1) return -1;
           if (bIndex !== -1) return 1;
         }
-        
+
         return a.type.localeCompare(b.type);
       });
 
@@ -694,7 +694,7 @@ export default function AICompanionsPage() {
   // 積木類型卡片組件
   const BlockTypeCards = ({ block }: { block: any }) => {
     const types = parseBlockTypes(block);
-    
+
     if (types.length === 0) {
       return null;
     }
@@ -707,21 +707,21 @@ export default function AICompanionsPage() {
       <div className="flex items-center mt-2 relative">
         {visibleTypes.map((typeInfo, index) => {
           const { type, isCustom } = typeInfo;
-          
-          const config = isCustom 
+
+          const config = isCustom
             ? getCustomTypeConfig(type)
             : typeConfigMap[type as MindBlockType];
-          
+
           if (!config) return null;
-          
+
           const colors = getColorClasses(config.color);
           const Icon = config.icon;
 
           return (
             <React.Fragment key={type}>
               {index > 0 && (
-                <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative" 
-                     style={{ top: '20px' }}
+                <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative"
+                  style={{ top: '20px' }}
                 />
               )}
               <div className="flex flex-col items-center gap-0.5 opacity-100">
@@ -737,12 +737,12 @@ export default function AICompanionsPage() {
             </React.Fragment>
           );
         })}
-        
+
         {remainingCount > 0 && (
           <>
             {visibleTypes.length > 0 && (
-              <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative" 
-                   style={{ top: '20px' }}
+              <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative"
+                style={{ top: '20px' }}
               />
             )}
             <div className="flex flex-col items-center gap-0.5 opacity-100">
@@ -1377,47 +1377,48 @@ export default function AICompanionsPage() {
                 }
 
                 // 如果 sessionStorage 也沒有，使用標題/描述推斷
+                // 使用 Set 來避免重複角色
+                const uniqueRoles = new Set<string>(activeRoles);
+
+                // 基於房間標題推斷角色（與聊天室頁面保持一致）
+                const roomTitle = room.title?.toLowerCase() || '';
+
+                if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') ||
+                  roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
+                  roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
+                  uniqueRoles.add('皮可');
+                } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') ||
+                  roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') ||
+                  roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
+                  roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
+                  roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
+                  uniqueRoles.add('墨墨');
+                } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') ||
+                  roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
+                  roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
+                  roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
+                  uniqueRoles.add('Hibi');
+                }
+
+                // 檢查標題中的角色名稱
+                if (room.title.includes('Hibi')) uniqueRoles.add('Hibi');
+                if (room.title.includes('墨墨') || room.title.includes('Mori')) uniqueRoles.add('墨墨');
+                if (room.title.includes('皮可') || room.title.includes('Pico')) uniqueRoles.add('皮可');
+
+                // 檢查描述中的角色
+                if (room.description?.includes('Hibi')) uniqueRoles.add('Hibi');
+                if (room.description?.includes('墨墨') || room.description?.includes('Mori')) uniqueRoles.add('墨墨');
+                if (room.description?.includes('皮可') || room.description?.includes('Pico')) uniqueRoles.add('皮可');
+
+                activeRoles = Array.from(uniqueRoles);
+
+                // 最後的預設邏輯：根據房間類型推斷
                 if (activeRoles.length === 0) {
-                  console.log('🔍 使用標題/描述推斷角色');
-
-                  // 基於房間標題推斷角色（與聊天室頁面保持一致）
-                  const roomTitle = room.title?.toLowerCase() || '';
-
-                  if (roomTitle.includes('繪本') || roomTitle.includes('圖') || roomTitle.includes('創作') || roomTitle.includes('設計') ||
-                    roomTitle.includes('畫') || roomTitle.includes('藝術') || roomTitle.includes('美術') || roomTitle.includes('視覺') ||
-                    roomTitle.includes('插畫') || roomTitle.includes('繪畫') || roomTitle.includes('圖像') || roomTitle.includes('視覺化')) {
-                    activeRoles.push('皮可');
-                  } else if (roomTitle.includes('研究') || roomTitle.includes('分析') || roomTitle.includes('調查') ||
-                    roomTitle.includes('資料') || roomTitle.includes('資訊') || roomTitle.includes('知識') ||
-                    roomTitle.includes('學習') || roomTitle.includes('探索') || roomTitle.includes('能力') ||
-                    roomTitle.includes('成長') || roomTitle.includes('發展') || roomTitle.includes('評估') ||
-                    roomTitle.includes('教學') || roomTitle.includes('教育') || roomTitle.includes('課程')) {
-                    activeRoles.push('墨墨');
-                  } else if (roomTitle.includes('統籌') || roomTitle.includes('協作') || roomTitle.includes('管理') ||
-                    roomTitle.includes('專案') || roomTitle.includes('計劃') || roomTitle.includes('規劃') ||
-                    roomTitle.includes('團隊') || roomTitle.includes('合作') || roomTitle.includes('整合') ||
-                    roomTitle.includes('組織') || roomTitle.includes('安排') || roomTitle.includes('協調')) {
-                    activeRoles.push('Hibi');
-                  }
-
-                  // 檢查標題中的角色名稱
-                  if (room.title.includes('Hibi') && !activeRoles.includes('Hibi')) activeRoles.push('Hibi');
-                  if ((room.title.includes('墨墨') || room.title.includes('Mori')) && !activeRoles.includes('墨墨')) activeRoles.push('墨墨');
-                  if ((room.title.includes('皮可') || room.title.includes('Pico')) && !activeRoles.includes('皮可')) activeRoles.push('皮可');
-
-                  // 檢查描述中的角色
-                  if (room.description?.includes('Hibi') && !activeRoles.includes('Hibi')) activeRoles.push('Hibi');
-                  if ((room.description?.includes('墨墨') || room.description?.includes('Mori')) && !activeRoles.includes('墨墨')) activeRoles.push('墨墨');
-                  if ((room.description?.includes('皮可') || room.description?.includes('Pico')) && !activeRoles.includes('皮可')) activeRoles.push('皮可');
-
-                  // 最後的預設邏輯：根據房間類型推斷
-                  if (activeRoles.length === 0) {
-                    const isPersonalChat = room.title.includes('與') && room.title.includes('的對話');
-                    if (isPersonalChat) {
-                      activeRoles = ['墨墨']; // 個人對話預設為墨墨
-                    } else {
-                      activeRoles = ['墨墨']; // 未知房間預設為墨墨（避免顯示全部角色）
-                    }
+                  const isPersonalChat = room.title.includes('與') && room.title.includes('的對話');
+                  if (isPersonalChat) {
+                    activeRoles = ['墨墨']; // 個人對話預設為墨墨
+                  } else {
+                    activeRoles = ['墨墨']; // 未知房間預設為墨墨（避免顯示全部角色）
                   }
                 }
               }
@@ -1446,6 +1447,53 @@ export default function AICompanionsPage() {
       setLoadingRooms(false);
     }
   };
+
+  // 監聽 Realtime 更新以即時更新列表
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('📡 [列表] 開始監聽 ai_messages 更新...');
+    const channel = saasSupabaseClient
+      .channel('room-list-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ai_messages',
+        },
+        (payload) => {
+          const newMessage = payload.new;
+          console.log('📨 [列表] 收到新訊息更新:', newMessage.room_id);
+
+          setRooms((prevRooms) => {
+            return prevRooms.map((room) => {
+              if (room.id === newMessage.room_id) {
+                // 格式化新訊息預覽
+                const preview = formatMessagePreview(newMessage);
+                console.log(`📝 [列表] 更新房間 ${room.title} 的最新訊息: ${preview}`);
+
+                return {
+                  ...room,
+                  lastMessage: preview,
+                  lastActivity: new Date(newMessage.created_at),
+                  messageCount: (room.messageCount || 0) + 1,
+                };
+              }
+              return room;
+            });
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 [列表] 訂閱狀態:', status);
+      });
+
+    return () => {
+      console.log('📡 [列表] 停止監聽更新');
+      saasSupabaseClient.removeChannel(channel);
+    };
+  }, [user?.id]); // 只在用戶 ID 改變時重新訂閱
 
   // 當用戶登入時載入聊天室和 AI 角色
   useEffect(() => {
@@ -1782,18 +1830,18 @@ export default function AICompanionsPage() {
 
     try {
       const latestPromise = saasSupabaseClient
-        .from('chat_messages')
-        .select('id, content, content_json, created_at, status, message_type')
-        .eq('thread_id', roomId)
-        .neq('status', 'deleted')
+        .from('ai_messages')
+        .select('id, content, content_json, created_at, status')
+        .eq('room_id', roomId)
+        .neq('status', 'deleted') // 確保不計算已刪除的訊息
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       const countPromise = saasSupabaseClient
-        .from('chat_messages')
+        .from('ai_messages')
         .select('id', { count: 'exact', head: true })
-        .eq('thread_id', roomId)
+        .eq('room_id', roomId)
         .neq('status', 'deleted');
 
       const [latestResult, countResult] = await Promise.all([latestPromise, countPromise]);
@@ -1806,7 +1854,18 @@ export default function AICompanionsPage() {
         console.warn('⚠️ 無法取得訊息數量:', countResult.error);
       }
 
-      const latestMessage = latestResult.data as { created_at?: string | null } | null;
+      const latestMessage = latestResult.data as { created_at?: string | null, content?: string, id?: string } | null;
+
+      // Debug logging for stale data investigation
+      if (roomId.includes('team') || roomId.includes('project') || (latestMessage && latestMessage.content?.includes('Hibi'))) {
+        console.log(`🔍 [RoomStats] Room ${roomId}:`, {
+          latestId: latestMessage?.id,
+          latestTime: latestMessage?.created_at,
+          latestContent: latestMessage?.content?.substring(0, 20),
+          count: countResult.count
+        });
+      }
+
       const lastMessagePreview = formatMessagePreview(latestMessage);
       const lastActivity = latestMessage?.created_at ? new Date(latestMessage.created_at) : null;
 
@@ -1964,7 +2023,7 @@ export default function AICompanionsPage() {
           // 如果 role_instance 還沒有 equipped_blocks，則設置預設值
           const currentSettings = (roleInstance as any).settings || {};
           const currentEquipped = currentSettings.equipped_blocks || {};
-          
+
           // 只有在當前沒有裝備積木時，才使用預設值
           const hasEquipped = !!currentEquipped.role || !!currentEquipped.style || !!currentEquipped.task;
           const finalEquippedBlocks = hasEquipped ? currentEquipped : defaultEquippedBlocks;
@@ -1978,7 +2037,7 @@ export default function AICompanionsPage() {
               .select('system_prompt')
               .eq('slug', roleSlug)
               .maybeSingle();
-            
+
             newSystemPrompt = (fullRoleData as any)?.system_prompt || '';
             if (finalEquippedBlocks.role) newSystemPrompt += `\n\n[Role Definition]\n${(finalEquippedBlocks.role as any).content_json?.blocks?.[0]?.params?.content || ''}`;
             if (finalEquippedBlocks.style) newSystemPrompt += `\n\n[Style Guide]\n${(finalEquippedBlocks.style as any).content_json?.blocks?.[0]?.params?.content || ''}`;

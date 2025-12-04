@@ -153,8 +153,8 @@ export default function ChatPage() {
   };
 
   // 儲存訊息到 Supabase
-  const saveMessageToSupabase = async (message: Message, roomId?: string) => {
-    if (!user?.id) return;
+  const saveMessageToSupabase = async (message: Message, roomId?: string): Promise<string | null> => {
+    if (!user?.id) return null;
 
     try {
       // 確保有房間 ID
@@ -175,7 +175,7 @@ export default function ChatPage() {
 
         if (roomError) {
           console.error('❌ 創建房間失敗:', roomError);
-          return;
+          return null;
         }
 
         targetRoomId = newRoom.id;
@@ -223,8 +223,11 @@ export default function ChatPage() {
       } else {
         console.log('✅ 訊息已儲存到 Supabase:', message.content.slice(0, 50));
       }
+
+      return targetRoomId;
     } catch (error) {
       console.error('❌ Supabase 操作錯誤:', error);
+      return null;
     }
   };
 
@@ -301,49 +304,60 @@ export default function ChatPage() {
     }
   }, [companionId, companion?.name, user?.id]); // 加入 user.id 依賴
 
-  // 模擬 AI 回覆
-  const simulateAIResponse = async (userMessage: string) => {
+  // 呼叫 Edge Function 處理聊天
+  const callChatProcessor = async (userMessage: string, roomId: string) => {
     setIsTyping(true);
 
-    // 模擬 API 延遲
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+    try {
+      console.log('🚀 呼叫 chat-processor Edge Function...');
+      const { data, error } = await supabase.functions.invoke('chat-processor', {
+        body: {
+          message: userMessage,
+          roomId: roomId,
+          companionId: companion.id,
+          userId: user?.id, // Pass userId for service role calls
+          // modelId: selectedModel, // TODO: 從狀態獲取選擇的模型
+          attachments: [] // TODO: 支援附件
+        }
+      });
 
-    let response = '';
-
-    if (companion.id === 'mori') {
-      // 墨墨的回覆風格 - 學術性
-      if (userMessage.includes('學習') || userMessage.includes('研究')) {
-        response = '這是一個很有趣的學習問題！讓我來幫您分析一下。根據我的知識庫，我建議您可以從以下幾個方面來探討...';
-      } else if (userMessage.includes('問題') || userMessage.includes('解決')) {
-        response = '我理解您遇到的問題。讓我們用系統性的方法來分析和解決這個問題。首先，我們需要了解問題的核心...';
-      } else {
-        response = '作為您的學習伙伴，我很樂意協助您。請告訴我更多詳細資訊，這樣我就能提供更精確的建議和指導。';
+      if (error) {
+        console.error('❌ Edge Function 呼叫失敗:', error);
+        throw error;
       }
-    } else if (companion.id === 'pico') {
-      // 皮可的回覆風格 - 創意性
-      if (userMessage.includes('設計') || userMessage.includes('創作')) {
-        response = '哇！這聽起來是個超棒的創作想法！✨ 讓我們一起發揮創意吧！我建議可以從色彩搭配和視覺構圖開始...';
-      } else if (userMessage.includes('畫') || userMessage.includes('圖')) {
-        response = '繪畫是我最喜歡的事情了！🎨 讓我來幫您構思一下創作方向。我們可以考慮不同的風格和技法...';
+
+      console.log('✅ Edge Function 回應:', data);
+
+      if (data.success && data.content) {
+        const aiMessage: Message = {
+          id: data.messageId || Date.now().toString(),
+          content: data.content,
+          sender: 'companion',
+          timestamp: new Date(),
+          type: 'text'
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+
+        // 注意：Edge Function 已經負責儲存 assistant 訊息到資料庫，
+        // 這裡我們只是更新 UI。如果需要確保一致性，可以重新載入訊息，
+        // 但為了流暢體驗，直接添加到列表通常更好。
       } else {
-        response = '嗨！很高興和您聊天！我充滿創意的大腦已經開始運轉了！有什麼有趣的創作想法想要分享嗎？';
+        throw new Error(data.error || 'Unknown error from chat-processor');
       }
-    }
 
-    const aiMessage: Message = {
-      id: Date.now().toString(),
-      content: response,
-      sender: 'companion',
-      timestamp: new Date(),
-      type: 'text'
-    };
-
-    setIsTyping(false);
-    setMessages(prev => [...prev, aiMessage]);
-
-    // 儲存 AI 回應到 Supabase
-    if (currentRoomId) {
-      await saveMessageToSupabase(aiMessage, currentRoomId);
+    } catch (error) {
+      console.error('❌ 處理聊天失敗:', error);
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        content: '抱歉，我現在無法處理您的請求。請稍後再試。',
+        sender: 'companion',
+        timestamp: new Date(),
+        type: 'text'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false);
     }
   };
 
@@ -364,212 +378,22 @@ export default function ChatPage() {
     setIsLoading(true);
     setIsTyping(true);
 
-    // 儲存用戶訊息到 Supabase
-    await saveMessageToSupabase(userMessage);
+    // 儲存用戶訊息到 Supabase 並獲取 roomId
+    const targetRoomId = await saveMessageToSupabase(userMessage);
 
-    // 如果是 Pico 聊天，發送到 webhook；否則使用模擬回應
-    if (companion.id === 'pico' && user?.id) {
-      console.log('🚀 發送到 Pico webhook:', messageContent);
-      try {
-        const webhookResult = await sendToPicoWebhook(messageContent);
-        console.log('🎨 Pico webhook 處理完成:', webhookResult);
-      } catch (error) {
-        console.error('❌ Pico webhook 失敗，使用備用回應:', error);
-        // 如果 webhook 失敗，使用模擬回應作為備用
-        await simulateAIResponse(userMessage.content);
-      }
+    if (targetRoomId) {
+      await callChatProcessor(messageContent, targetRoomId);
     } else {
-      // 墨墨或其他角色使用模擬回應
-      await simulateAIResponse(userMessage.content);
+      console.error('❌ 無法獲取房間 ID，無法發送訊息');
+      setIsTyping(false);
     }
 
     setIsLoading(false);
-    setIsTyping(false);
   };
 
-  // 背景發送到 Pico webhook（不顯示 UI 狀態）
-  const sendToPicoWebhook = async (text: string) => {
-    if (!user?.id || !text.trim()) return;
+  // 移除舊的 webhook 函數
+  // const sendToPicoWebhook = ... 
 
-    // 智能檢測 style：如果訊息中沒有提到風格相關詞彙，就留空
-    const detectStyle = (message: string): string => {
-      const lowerMsg = message.toLowerCase();
-      const styleKeywords = [
-        'kawaii', '可愛', '萌', 'cute', 'adorable', 'sweet',
-        'realistic', '寫實', '真實', 'photorealistic',
-        'cartoon', '卡通', '動畫', 'anime', '二次元',
-        'artistic', '藝術', 'art', 'painting', '繪畫',
-        'minimalist', '簡約', 'simple', '極簡',
-        'vintage', '復古', 'retro', '懷舊',
-        'modern', '現代', 'contemporary', '當代',
-        'style', '風格', '樣式'
-      ];
-
-      // 如果訊息包含風格關鍵字，使用 kawaii 作為預設
-      if (styleKeywords.some(keyword => lowerMsg.includes(keyword))) {
-        return 'kawaii';
-      }
-
-      // 否則留空，讓 AI 自行決定
-      return '';
-    };
-
-    const detectedStyle = detectStyle(text);
-    console.log('🎨 檢測到的風格:', detectedStyle || '無指定（留空）');
-
-    // 準備完整的 webhook 資料
-    const webhookData = {
-      user_id: user.id,
-      final_prompt: text,
-      style: detectedStyle || 'kawaii',
-      size: '1024x1024',
-      model: 'flux-dev',
-      timestamp: new Date().toISOString(),
-      session_id: `pico_chat_${Date.now()}`,
-      companion_id: 'pico',
-      user_info: {
-        name: user.full_name || '用戶',
-        email: user.email || '',
-        id: user.id
-      },
-      context: {
-        previous_messages: messages.slice(-3).map(msg => ({
-          content: msg.content,
-          sender: msg.sender,
-          timestamp: msg.timestamp.toISOString()
-        })),
-        conversation_id: `conv_pico_${user.id}_${Date.now()}`,
-        platform: 'hanami-web',
-        chat_type: 'individual_companion_chat'
-      },
-      memory_context: {
-        scope: 'user',
-        role_id: 'pico-artist',
-        should_store_memory: true,
-        memory_importance: 0.7
-      },
-      response_preferences: {
-        include_image: true,
-        include_text_response: true,
-        max_response_length: 200
-      }
-    };
-
-    console.log('📦 準備發送的完整 webhook 資料:', webhookData);
-
-    try {
-      const res = await fetch('/aihome/api/aipico', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(webhookData)
-      });
-
-      const out = await res.json();
-      console.log('✅ 自動 webhook 回應:', { status: res.status, data: out });
-
-      // 處理 n8n 的回應並顯示給用戶
-      if (res.ok) {
-        let responseContent = '';
-        let messageType: 'text' | 'image' = 'text';
-        let imageUrl = '';
-
-        console.log('🔍 分析 webhook 回應結構:', out);
-
-        // 根據你的 n8n workflow，檢查不同的回應格式
-        if (out.data) {
-          let rawResponse = '';
-
-          if (typeof out.data === 'string') {
-            rawResponse = out.data;
-          } else if (out.data.raw) {
-            rawResponse = out.data.raw;
-          }
-
-          // 提取圖片 URL（從 iframe 或直接 URL）
-          if (rawResponse) {
-            console.log('🔍 原始回應內容:', rawResponse);
-
-            // 檢查是否包含 iframe
-            if (rawResponse.includes('<iframe') && rawResponse.includes('https://')) {
-              // 從 iframe srcdoc 中提取圖片 URL
-              const urlMatch = rawResponse.match(/https:\/\/[^\s"<>]+\.(?:png|jpg|jpeg|webp|gif)/i);
-              if (urlMatch) {
-                imageUrl = urlMatch[0];
-                responseContent = `🎨 我為您創作了一隻會飛的貓！太可愛了！`;
-                messageType = 'image';
-                console.log('✅ 從 iframe 提取圖片 URL:', imageUrl);
-              } else {
-                responseContent = '🎨 創作完成！但圖片連結解析失敗。';
-                console.error('❌ 無法從 iframe 提取圖片 URL');
-              }
-            } else if (rawResponse.includes('http') && (rawResponse.includes('.png') || rawResponse.includes('.jpg') || rawResponse.includes('.webp'))) {
-              // 直接是圖片 URL
-              imageUrl = rawResponse.trim();
-              responseContent = `🎨 我為您創作了一隻會飛的貓！太可愛了！`;
-              messageType = 'image';
-              console.log('✅ 直接圖片 URL:', imageUrl);
-            } else {
-              responseContent = rawResponse;
-              console.log('📝 文字回應:', rawResponse);
-            }
-          } else if (out.data.image_url) {
-            imageUrl = out.data.image_url;
-            responseContent = out.data.message || `🎨 創作完成！`;
-            messageType = 'image';
-          } else if (out.data.message) {
-            responseContent = out.data.message;
-          } else if (out.data.response) {
-            responseContent = out.data.response;
-          }
-        }
-
-        // 如果沒有找到明確的回應，使用預設訊息
-        if (!responseContent) {
-          responseContent = '🎨 我收到您的請求了！正在發揮創意為您創作...';
-        }
-
-        // 如果有圖片，添加圖片 URL 到內容
-        if (imageUrl) {
-          responseContent += `\n\n![創作作品](${imageUrl})`;
-        }
-
-        // 創建 AI 回應訊息
-        const aiResponse: Message = {
-          id: (Date.now() + Math.random()).toString(),
-          content: responseContent,
-          sender: 'companion',
-          timestamp: new Date(),
-          type: messageType
-        };
-
-        // 添加到訊息列表
-        setMessages(prev => [...prev, aiResponse]);
-        console.log('🎨 已添加 Pico 的回應到對話中:', aiResponse);
-
-        // 儲存 AI 回應到 Supabase
-        if (currentRoomId) {
-          await saveMessageToSupabase(aiResponse, currentRoomId);
-        }
-      } else {
-        // 處理錯誤回應
-        const errorMessage: Message = {
-          id: (Date.now() + Math.random()).toString(),
-          content: '抱歉，我現在無法處理您的請求。請稍後再試。',
-          sender: 'companion',
-          timestamp: new Date(),
-          type: 'text'
-        };
-
-        setMessages(prev => [...prev, errorMessage]);
-        console.log('❌ Webhook 回應錯誤，顯示錯誤訊息');
-      }
-
-      return { success: res.ok, data: out };
-    } catch (error) {
-      console.error('❌ 自動 webhook 錯誤:', error);
-      throw error;
-    }
-  };
 
   // 發送到 Pico 影像/任務 Webhook（固定格式）- 手動按鈕
   const handleSendToPico = async () => {

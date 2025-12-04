@@ -2,14 +2,14 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { 
-  ClockIcon, 
-  CheckCircleIcon, 
+import {
+  ClockIcon,
+  CheckCircleIcon,
   ExclamationTriangleIcon,
   CpuChipIcon
 } from '@heroicons/react/24/outline';
 
-export type MessageStatus = 'queued' | 'processing' | 'completed' | 'error' | 'cancelled';
+export type MessageStatus = 'queued' | 'processing' | 'completed' | 'error' | 'cancelled' | 'sent';
 
 interface MessageStatusIndicatorProps {
   status: MessageStatus;
@@ -17,10 +17,10 @@ interface MessageStatusIndicatorProps {
   className?: string;
 }
 
-export function MessageStatusIndicator({ 
-  status, 
-  compact = false, 
-  className = '' 
+export function MessageStatusIndicator({
+  status,
+  compact = false,
+  className = ''
 }: MessageStatusIndicatorProps) {
   const getStatusConfig = () => {
     switch (status) {
@@ -46,6 +46,14 @@ export function MessageStatusIndicator({
           text: '已完成',
           color: 'text-green-500',
           bgColor: 'bg-green-50',
+          animate: false
+        };
+      case 'sent':
+        return {
+          icon: CheckCircleIcon,
+          text: '已發送',
+          color: 'text-gray-400',
+          bgColor: 'bg-gray-50',
           animate: false
         };
       case 'error':
@@ -83,10 +91,10 @@ export function MessageStatusIndicator({
       <motion.div
         className={`inline-flex items-center ${config.color} ${className}`}
         animate={config.animate ? { rotate: 360 } : {}}
-        transition={config.animate ? { 
-          duration: 2, 
-          repeat: Infinity, 
-          ease: "linear" 
+        transition={config.animate ? {
+          duration: 2,
+          repeat: Infinity,
+          ease: "linear"
         } : {}}
         title={config.text}
       >
@@ -103,10 +111,10 @@ export function MessageStatusIndicator({
     >
       <motion.div
         animate={config.animate ? { rotate: 360 } : {}}
-        transition={config.animate ? { 
-          duration: 2, 
-          repeat: Infinity, 
-          ease: "linear" 
+        transition={config.animate ? {
+          duration: 2,
+          repeat: Infinity,
+          ease: "linear"
         } : {}}
       >
         <Icon className="w-4 h-4" />
@@ -117,10 +125,10 @@ export function MessageStatusIndicator({
 }
 
 // 簡化版：只顯示圖標的組件
-export function MessageStatusIcon({ 
-  status, 
-  className = '' 
-}: { 
+export function MessageStatusIcon({
+  status,
+  className = ''
+}: {
   status: MessageStatus;
   className?: string;
 }) {

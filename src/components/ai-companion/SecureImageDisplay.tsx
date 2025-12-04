@@ -82,21 +82,21 @@ export function SecureImageDisplay({
           if (!urlPromise) {
             urlPromise = getSignedImageUrl(imageUrl, 3600);
             signedUrlCache.set(imageUrl, urlPromise);
-            
+
             // 5 分鐘後清除緩存
             setTimeout(() => {
               signedUrlCache.delete(imageUrl);
               console.log('🗑️ [SecureImage] 清除緩存:', imageUrl.substring(0, 100) + '...');
             }, 5 * 60 * 1000);
           }
-          
+
           const url = await urlPromise;
-          
+
           // ⭐ 驗證轉換後的 URL 是公開格式
           if (!url.includes('/storage/v1/object/public/ai-images') && url.includes('ai-images')) {
             console.warn('⚠️ [SecureImage] URL 轉換後仍不是公開格式:', url.substring(0, 100));
           }
-          
+
           if (isMountedRef.current && !abortControllerRef.current?.signal.aborted) {
             setSignedUrl(url);
             setIsLoading(false);
@@ -130,13 +130,13 @@ export function SecureImageDisplay({
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     console.error('❌ [SecureImage] 圖片載入失敗');
-    
+
     // ⭐ 如果當前 URL 是公開 URL 但載入失敗，嘗試使用代理 API
     if (signedUrl.includes('/storage/v1/object/public/ai-images')) {
       const storagePath = signedUrl.match(/\/storage\/v1\/object\/public\/ai-images\/(.+?)(?:\?|$)/)?.[1];
       if (storagePath) {
         const proxyUrl = `/api/storage/proxy-image?path=${encodeURIComponent(storagePath)}`;
-        
+
         // 只在第一次失敗時嘗試代理，避免無限循環
         if (!signedUrl.includes('/api/storage/proxy-image')) {
           setSignedUrl(proxyUrl);
@@ -146,7 +146,7 @@ export function SecureImageDisplay({
         }
       }
     }
-    
+
     // ⭐ 如果所有嘗試都失敗，標記錯誤
     setHasError(true);
     setIsLoading(false);
@@ -184,13 +184,16 @@ export function SecureImageDisplay({
 
   return (
     <>
-      <div className="relative overflow-hidden">
+      <div
+        className="relative overflow-hidden"
+        style={{ minHeight: isLoading ? (thumbnail ? '150px' : '200px') : undefined }}
+      >
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/50 rounded-lg z-10">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFB6C1]"></div>
           </div>
         )}
-        
+
         <div className="relative inline-block">
           <img
             ref={imageRef}
@@ -200,7 +203,7 @@ export function SecureImageDisplay({
             onClick={handleImageClick}
             onLoad={handleLoad}
             onError={handleError}
-            style={{ 
+            style={{
               display: hasError ? 'none' : 'block',
               maxWidth: thumbnail ? `${thumbnailSize}px` : undefined,
               maxHeight: thumbnail ? `${thumbnailSize}px` : undefined,
@@ -209,10 +212,10 @@ export function SecureImageDisplay({
               objectFit: thumbnail ? 'contain' : undefined
             }}
           />
-          
+
           {/* 水印 - 根據圖片尺寸定位在右下角 */}
           {!hasError && !isLoading && imageSize && (
-            <div 
+            <div
               className="absolute pointer-events-none z-20"
               style={{
                 bottom: '4px',
@@ -224,11 +227,11 @@ export function SecureImageDisplay({
                 maxHeight: `${Math.min(imageSize.height * 0.15, 40)}px`
               }}
             >
-              <img 
-                src="/@hanami.png" 
-                alt="Hanami 水印" 
+              <img
+                src="/@hanami.png"
+                alt="Hanami 水印"
                 className="opacity-70 hover:opacity-90 transition-opacity w-full h-full"
-                style={{ 
+                style={{
                   filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))',
                   objectFit: 'contain'
                 }}
@@ -236,7 +239,7 @@ export function SecureImageDisplay({
             </div>
           )}
         </div>
-        
+
         {hasError && !isLoading && (
           <div className="flex flex-col items-center justify-center p-4 bg-red-50 rounded-lg text-red-600 text-sm space-y-2">
             <div className="flex items-center">
@@ -250,7 +253,7 @@ export function SecureImageDisplay({
             </div>
           </div>
         )}
-        
+
         {thumbnail && !hasError && !isLoading && (
           <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md shadow-lg pointer-events-none flex items-center space-x-1 z-10">
             <MagnifyingGlassIcon className="w-3 h-3" />
@@ -325,7 +328,7 @@ export function SecureImageDisplay({
                   />
                   {/* 水印 - 放大視圖右下角，根據圖片尺寸定位 */}
                   {imageSize && (
-                    <div 
+                    <div
                       className="absolute pointer-events-none z-20"
                       style={{
                         bottom: '8px',
@@ -337,11 +340,11 @@ export function SecureImageDisplay({
                         maxHeight: `${Math.min(imageSize.height * 0.1, 48)}px`
                       }}
                     >
-                      <img 
-                        src="/@hanami.png" 
-                        alt="Hanami 水印" 
+                      <img
+                        src="/@hanami.png"
+                        alt="Hanami 水印"
                         className="opacity-70 hover:opacity-90 transition-opacity w-full h-full"
-                        style={{ 
+                        style={{
                           filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))',
                           objectFit: 'contain'
                         }}

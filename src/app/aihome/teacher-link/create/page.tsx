@@ -632,7 +632,7 @@ function CreatePageContent() {
                       className={`relative ${isRestricted
                           ? 'bg-gray-200 border-2 border-gray-300 opacity-60 cursor-not-allowed'
                           : 'bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md border-2 border-[#EADBC8] hover:border-[#FFD59A] shadow-lg hover:shadow-2xl'
-                        } p-4 rounded-2xl text-left transition-all duration-500 w-full flex flex-row items-center gap-4 overflow-hidden group`}
+                        } p-4 rounded-2xl text-left transition-colors transition-shadow duration-500 w-full flex flex-row items-center gap-4 overflow-hidden group`}
                       onClick={() => {
                         if (isRestricted) {
                           toast.error('權限不足，未能進入', {
@@ -668,7 +668,7 @@ function CreatePageContent() {
                       </div>
                       {/* 懸停光暈效果 */}
                       {!isRestricted && (
-                        <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-lg" />
+                        <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-lg pointer-events-none" />
                       )}
                     </motion.button>
                   );
@@ -714,7 +714,7 @@ function CreatePageContent() {
                     className={`relative ${isRestricted
                         ? 'bg-gray-200 border-2 border-gray-300 opacity-60 cursor-not-allowed'
                         : 'bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md border-2 border-[#EADBC8] hover:border-[#FFD59A] shadow-lg hover:shadow-2xl'
-                      } p-4 rounded-3xl text-center transition-all duration-500 h-full w-full flex flex-col items-center justify-center overflow-hidden group`}
+                      } p-4 rounded-3xl text-center transition-colors transition-shadow duration-500 h-full w-full flex flex-col items-center justify-center overflow-hidden group`}
                     onClick={() => {
                       if (isRestricted) {
                         toast.error('權限不足，未能進入', {
@@ -759,7 +759,7 @@ function CreatePageContent() {
                     {/* 懸停光暈效果 */}
                     {!isRestricted && (
                       <motion.div
-                        className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                        className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
                         style={{
                           boxShadow: '0 0 30px rgba(255, 182, 193, 0.3)'
                         }}
