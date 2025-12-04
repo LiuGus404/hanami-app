@@ -63,7 +63,7 @@ export async function callLLM(config: ModelConfig, messages: Message[]): Promise
     return response;
 }
 
-export async function generateImage(prompt: string, modelId: string = "openai/dall-e-3"): Promise<string> {
+export async function generateImage(prompt: string, modelId: string = "openai/dall-e-3", systemPrompt?: string): Promise<string> {
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     const openRouterKey = Deno.env.get('OPENROUTER_API_KEY');
 
@@ -92,14 +92,18 @@ export async function generateImage(prompt: string, modelId: string = "openai/da
 
         console.log(`Generating image via chat/completions for prompt: ${prompt.substring(0, 50)}... using model ${modelId}`);
 
+        const messages: any[] = [];
+        if (systemPrompt) {
+            messages.push({ role: 'system', content: systemPrompt });
+        }
+        messages.push({ role: 'user', content: prompt });
+
         const res = await fetch(url, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify({
                 model: modelId,
-                messages: [
-                    { role: 'user', content: prompt }
-                ],
+                messages: messages,
                 // OpenRouter specific for some models like Gemini to force image output
                 modalities: ["image"],
             })
@@ -155,7 +159,7 @@ export async function generateImage(prompt: string, modelId: string = "openai/da
         headers: headers,
         body: JSON.stringify({
             model: modelId,
-            prompt: prompt,
+            prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt,
             n: 1,
             size: "1024x1024",
         })

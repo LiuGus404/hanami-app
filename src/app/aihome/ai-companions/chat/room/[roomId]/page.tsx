@@ -38,7 +38,7 @@ const parseMultiModelContent = (content: string) => {
   if (!content) return null;
   const regex = /### \[Model: (.*?)\]([\s\S]*?)(?=### \[Model: |$)/g;
   const matches = [...content.matchAll(regex)];
-  if (matches.length === 0) return null;
+  if (matches.length <= 1) return null;
 
   return matches.map(match => ({
     model: match[1].trim(),
@@ -7079,7 +7079,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
   const isMoriMulti =
     !isUser &&
     Array.isArray(message.content_json?.model_responses) &&
-    message.content_json.model_responses.length > 0;
+    message.content_json.model_responses.length > 1;
   const moriModelCount = isMoriMulti ? message.content_json?.model_responses?.length ?? 0 : 0;
   const isMoriDeck = isMoriMulti && moriViewMode === 'deck';
 
@@ -7294,7 +7294,23 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
 
   const renderMoriMulti = (parsedResponses?: any[]) => {
     const meta = message.content_json || {};
-    const modelResponses: any[] = parsedResponses || (Array.isArray(meta.model_responses) ? meta.model_responses : []);
+    const rawModelResponses: any[] = parsedResponses || (Array.isArray(meta.model_responses) ? meta.model_responses : []);
+
+    // Deep copy to avoid mutating props/state directly if it's from state
+    const modelResponses = JSON.parse(JSON.stringify(rawModelResponses));
+
+    // PATCH: Inject image from message.content if missing in modelResponses (Fixes existing messages)
+    const globalImageMatch = message.content.match(/!\[(.*?)\]\((.*?)\)/);
+    if (globalImageMatch) {
+      const imageUrl = globalImageMatch[2];
+      // Check if any model response already has this image
+      const hasImage = modelResponses.some((r: any) => r.content?.includes(imageUrl));
+      if (!hasImage && modelResponses.length > 0) {
+        console.log('🔧 [MessageBubble] Patching missing image into model response');
+        modelResponses[0].content += `\n\n![Generated Image](${imageUrl})`;
+      }
+    }
+
     const modelCount = modelResponses.length;
     const food = meta.food || {};
     const charPerToken = Number(food.CHAR_PER_TOKEN || 4);
@@ -7309,7 +7325,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
     };
 
     // 計算總字數和總食量，用於比例分配
-    const totalContentLength = modelResponses.reduce((acc, resp) => acc + (resp.content?.length || 0), 0);
+    const totalContentLength = modelResponses.reduce((acc: number, resp: any) => acc + (resp.content?.length || 0), 0);
     const totalFoodCostFromMeta = (() => {
       const meta = message.content_json || {};
       if (meta.food && typeof meta.food.total_food_cost === 'number') {
@@ -7386,7 +7402,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
               {modelResponses.length > 1 && (
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    {modelResponses.map((resp, idx) => {
+                    {modelResponses.map((resp: any, idx: number) => {
                       const label = resp.model || `模型 ${idx + 1}`;
                       const isActive = idx === currentActiveIndex;
                       return (
@@ -7448,7 +7464,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                   animate={{ x: `-${currentActiveIndex * 100}%` }}
                   transition={{ type: 'spring', stiffness: 200, damping: 25 }}
                 >
-                  {modelResponses.map((resp, idx) => {
+                  {modelResponses.map((resp: any, idx: number) => {
                     const respUsage = resp.usage || {};
                     const input = Number(respUsage.input_tokens || 0);
                     const output = Number(respUsage.output_tokens || 0);
@@ -7471,7 +7487,51 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                       >
                         <div className="prose prose-sm max-w-none text-[#4B4036] leading-relaxed">
                           <div className="whitespace-pre-wrap">
-                            {resp.content}
+                            {resp.content?.split(/\r\n|\r|\n/).map((line: string, i: number) => {
+                              // Image detection logic (same as renderPlainText)
+                              const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+                              const urlMatch = line.match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s]*)?/i);
+
+                              if (imageMatch) {
+                                const imageUrl = imageMatch[2].trim();
+                                const publicUrl = convertToPublicUrl(imageUrl);
+                                const textBefore = line.substring(0, imageMatch.index!);
+                                const textAfter = line.substring(imageMatch.index! + imageMatch[0].length);
+                                return (
+                                  <div key={i} className="my-2">
+                                    {textBefore && <p className="mb-2">{textBefore}</p>}
+                                    <SecureImageDisplay
+                                      imageUrl={publicUrl}
+                                      alt="Generated Image"
+                                      className="rounded-lg shadow-lg border-2 border-[#FFB6C1]/30"
+                                      onDownload={() => downloadImage(imageUrl)}
+                                    />
+                                    {textAfter && <p className="mt-2">{textAfter}</p>}
+                                  </div>
+                                );
+                              }
+
+                              if (urlMatch) {
+                                const imageUrl = urlMatch[0];
+                                const publicUrl = convertToPublicUrl(imageUrl);
+                                const textBefore = line.substring(0, urlMatch.index!);
+                                const textAfter = line.substring(urlMatch.index! + imageUrl.length);
+                                return (
+                                  <div key={i} className="my-2">
+                                    {textBefore && <p className="mb-2">{textBefore}</p>}
+                                    <SecureImageDisplay
+                                      imageUrl={publicUrl}
+                                      alt="Generated Image"
+                                      className="rounded-lg shadow-lg border-2 border-[#FFB6C1]/30"
+                                      onDownload={() => downloadImage(imageUrl)}
+                                    />
+                                    {textAfter && <p className="mt-2">{textAfter}</p>}
+                                  </div>
+                                );
+                              }
+
+                              return <div key={i}>{line}</div>;
+                            })}
                           </div>
                         </div>
 
@@ -7514,7 +7574,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
         ) : (
           <div className="space-y-6">
             {header}
-            {modelResponses.map((resp, idx) => {
+            {modelResponses.map((resp: any, idx: number) => {
               const respUsage = resp.usage || {};
               const input = Number(respUsage.input_tokens || 0);
               const output = Number(respUsage.output_tokens || 0);

@@ -845,7 +845,7 @@ export default function MindBlockBuilder() {
                                                             <PlusIcon className="w-5 h-5" />
                                                         </div>
                                                     </div>
-                                                    
+
                                                     {/* 快速装备到角色按钮 */}
                                                     <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity px-3">
                                                         <button
@@ -1362,6 +1362,97 @@ export default function MindBlockBuilder() {
                                 {compiledPrompt}
                             </pre>
                         </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Save Composition Modal */}
+            <AnimatePresence>
+                {isSavingComposition && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                        onClick={() => setIsSavingComposition(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+                        >
+                            <div className="p-4 border-b border-[#EADBC8] bg-[#FFF9F2]/50 flex items-center justify-between">
+                                <h3 className="font-bold text-[#4B4036]">
+                                    {editingTemplateId ? '更新思維積木組合' : '儲存思維積木組合'}
+                                </h3>
+                                <button
+                                    onClick={() => setIsSavingComposition(false)}
+                                    className="p-2 hover:bg-[#EADBC8]/20 rounded-full transition-colors"
+                                >
+                                    <XMarkIcon className="w-5 h-5 text-[#4B4036]" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-[#4B4036]">標題</label>
+                                    <input
+                                        type="text"
+                                        value={compositionMetadata.title}
+                                        onChange={(e) => setCompositionMetadata({ ...compositionMetadata, title: e.target.value })}
+                                        className="w-full px-4 py-2 bg-[#FFF9F2] border border-[#EADBC8] rounded-xl focus:border-[#FFD59A] focus:ring-0 text-[#4B4036]"
+                                        placeholder="為這個組合取個名字..."
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-[#4B4036]">描述 (選填)</label>
+                                    <textarea
+                                        value={compositionMetadata.description}
+                                        onChange={(e) => setCompositionMetadata({ ...compositionMetadata, description: e.target.value })}
+                                        className="w-full px-4 py-2 bg-[#FFF9F2] border border-[#EADBC8] rounded-xl focus:border-[#FFD59A] focus:ring-0 text-[#4B4036] min-h-[80px] resize-none"
+                                        placeholder="描述這個組合的用途..."
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-[#4B4036]">隱私設定</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setCompositionMetadata({ ...compositionMetadata, isPublic: false })}
+                                            className={`flex-1 py-2 px-3 rounded-xl border-2 flex items-center justify-center gap-2 text-sm font-bold transition-all ${!compositionMetadata.isPublic ? 'bg-white border-[#FFD59A] text-[#4B4036] shadow-sm' : 'border-transparent bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                        >
+                                            <LockClosedIcon className="w-4 h-4" />
+                                            私人
+                                        </button>
+                                        <button
+                                            onClick={() => setCompositionMetadata({ ...compositionMetadata, isPublic: true })}
+                                            className={`flex-1 py-2 px-3 rounded-xl border-2 flex items-center justify-center gap-2 text-sm font-bold transition-all ${compositionMetadata.isPublic ? 'bg-white border-blue-300 text-blue-600 shadow-sm' : 'border-transparent bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                        >
+                                            <GlobeAltIcon className="w-4 h-4" />
+                                            公開
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 border-t border-[#EADBC8] bg-[#FFF9F2]/30 flex gap-3">
+                                <button
+                                    onClick={() => setIsSavingComposition(false)}
+                                    className="flex-1 py-2 bg-white border border-[#EADBC8] text-[#4B4036] rounded-xl font-bold hover:bg-slate-50 transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={confirmSaveComposition}
+                                    className="flex-1 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+                                >
+                                    {editingTemplateId ? '確認更新' : '確認儲存'}
+                                </button>
+                            </div>
+                        </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>

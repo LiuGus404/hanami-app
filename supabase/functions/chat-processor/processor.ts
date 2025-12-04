@@ -189,7 +189,7 @@ export async function processChat(
     if (isImageRequest) {
         try {
             console.log(`Detected image generation intent for Pico. Using model: ${imageModelId}`);
-            generatedImageUrl = await generateImage(message, imageModelId);
+            generatedImageUrl = await generateImage(message, imageModelId, systemPrompt);
 
             // Handle Base64 Images (Upload to Supabase Storage)
             if (generatedImageUrl && generatedImageUrl.startsWith('data:image')) {
@@ -310,12 +310,19 @@ export async function processChat(
                     CHARS_PER_FOOD
                 },
                 mind_name: mindBlocks.map(mb => mb.title).join(', '),
-                model_responses: responses.map(({ config, res, error }) => ({
-                    model: config.display_name || config.model_name,
-                    content: error ? `Error: ${(error as any).message}` : res?.content,
-                    usage: res?.usage,
-                    mind_name: mindBlocks.map(mb => mb.title).join(', ')
-                }))
+                model_responses: responses.map(({ config, res, error }, index) => {
+                    let content = error ? `Error: ${(error as any).message}` : res?.content;
+                    // Append image to the first model's response if available
+                    if (index === 0 && generatedImageUrl) {
+                        content += `\n\n![Generated Image](${generatedImageUrl})`;
+                    }
+                    return {
+                        model: config.display_name || config.model_name,
+                        content: content,
+                        usage: res?.usage,
+                        mind_name: mindBlocks.map(mb => mb.title).join(', ')
+                    };
+                })
             }
         })
         .select()
