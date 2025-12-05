@@ -17,9 +17,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   // 格式化時間
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString('zh-TW', {
+    return date.toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: false
     });
   };
 
@@ -75,13 +79,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div className={`flex max-w-[80%] ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start space-x-2`}>
         {/* 頭像 */}
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-          isUser 
-            ? 'bg-[#FFD59A] text-[#4B4036]' 
-            : isAssistant 
-            ? 'bg-[#EBC9A4] text-[#4B4036]'
-            : 'bg-gray-200 text-gray-600'
-        }`}>
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${isUser
+            ? 'bg-[#FFD59A] text-[#4B4036]'
+            : isAssistant
+              ? 'bg-[#EBC9A4] text-[#4B4036]'
+              : 'bg-gray-200 text-gray-600'
+          }`}>
           {getRoleAvatar()}
         </div>
 
@@ -101,16 +104,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </div>
 
           {/* 訊息氣泡 */}
-          <div className={`relative px-4 py-2 rounded-2xl shadow-sm ${
-            isUser
+          <div className={`relative px-4 py-2 rounded-2xl shadow-sm ${isUser
               ? 'bg-[#FFD59A] text-[#4B4036] rounded-br-md'
               : isAssistant
-              ? 'bg-white text-[#4B4036] border border-[#EADBC8] rounded-bl-md'
-              : isSystem
-              ? 'bg-gray-100 text-gray-700 border border-gray-200'
-              : 'bg-white text-[#4B4036] border border-[#EADBC8]'
-          } ${isError ? 'border-red-300 bg-red-50' : ''}`}>
-            
+                ? 'bg-white text-[#4B4036] border border-[#EADBC8] rounded-bl-md'
+                : isSystem
+                  ? 'bg-gray-100 text-gray-700 border border-gray-200'
+                  : 'bg-white text-[#4B4036] border border-[#EADBC8]'
+            } ${isError ? 'border-red-300 bg-red-50' : ''}`}>
+
             {/* 訊息內容 */}
             <div className="whitespace-pre-wrap break-words">
               {message.content}
@@ -138,9 +140,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
           {/* 訊息類型標籤 */}
           {message.message_type && message.message_type !== 'user_request' && (
-            <div className={`text-xs px-2 py-1 rounded-full mt-1 ${
-              isUser ? 'bg-[#FFD59A] text-[#4B4036]' : 'bg-gray-100 text-gray-600'
-            }`}>
+            <div className={`text-xs px-2 py-1 rounded-full mt-1 ${isUser ? 'bg-[#FFD59A] text-[#4B4036]' : 'bg-gray-100 text-gray-600'
+              }`}>
               {message.message_type}
             </div>
           )}

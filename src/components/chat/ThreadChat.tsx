@@ -7,6 +7,7 @@ import { MessageBubble } from './MessageBubble';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiInput } from '@/components/ui/HanamiInput';
 import { toast } from 'react-hot-toast';
+import { useHanamiEcho } from '@/hooks/useHanamiEcho';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -73,7 +74,6 @@ interface ThreadChatProps {
 export function ThreadChat({ threadId, userId }: ThreadChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [thread, setThread] = useState<ChatThread | null>(null);
-  const [foodBalance, setFoodBalance] = useState<UserFoodBalance | null>(null);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
@@ -101,21 +101,7 @@ export function ThreadChat({ threadId, userId }: ThreadChatProps) {
     }
   };
 
-  // 載入用戶食量餘額
-  const loadFoodBalance = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_food_balance')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      setFoodBalance(data);
-    } catch (error) {
-      console.error('載入食量餘額錯誤:', error);
-    }
-  };
+  const { foodBalance, loadFoodBalance } = useHanamiEcho(userId);
 
   // 載入聊天訊息
   const loadMessages = async () => {
@@ -201,19 +187,19 @@ export function ThreadChat({ threadId, userId }: ThreadChatProps) {
         },
         (payload) => {
           console.log('收到實時更新:', payload);
-          
+
           if (payload.eventType === 'INSERT') {
             const newMessage = payload.new as ChatMessage;
             setMessages(prev => [...prev, newMessage]);
           } else if (payload.eventType === 'UPDATE') {
             const updatedMessage = payload.new as ChatMessage;
-            setMessages(prev => 
-              prev.map(msg => 
+            setMessages(prev =>
+              prev.map(msg =>
                 msg.id === updatedMessage.id ? updatedMessage : msg
               )
             );
           }
-          
+
           // 更新當前發言者
           if (payload.new && (payload.new as any).role === 'assistant') {
             setCurrentSpeaker((payload.new as any).agent_id || 'AI');
@@ -227,34 +213,11 @@ export function ThreadChat({ threadId, userId }: ThreadChatProps) {
     };
   }, [threadId]);
 
-  // 訂閱食量餘額更新
-  useEffect(() => {
-    const channel = supabase
-      .channel(`food_balance:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_food_balance',
-          filter: `user_id=eq.${userId}`
-        },
-        (payload) => {
-          console.log('食量餘額更新:', payload);
-          setFoodBalance(payload.new as UserFoodBalance);
-        }
-      )
-      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId]);
 
   // 初始載入
   useEffect(() => {
     loadThread();
-    loadFoodBalance();
     loadMessages();
   }, [threadId, userId]);
 
@@ -340,7 +303,7 @@ export function ThreadChat({ threadId, userId }: ThreadChatProps) {
             {isLoading ? '發送中...' : '發送'}
           </HanamiButton>
         </div>
-        
+
         {/* 食量消耗提示 */}
         <div className="mt-2 text-xs text-[#2B3A3B] text-center">
           每條訊息約消耗 10 食量 🍎

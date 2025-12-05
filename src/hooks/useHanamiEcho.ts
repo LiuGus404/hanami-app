@@ -1,12 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createSaasClient } from '@/lib/supabase-saas';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createSaasClient();
 
 // 用戶食量餘額介面
 interface UserFoodBalance {
@@ -78,7 +75,7 @@ export function useHanamiEcho(userId: string) {
           daily_usage: 0,
           weekly_usage: 0,
           monthly_usage: 0
-        })
+        } as any)
         .select()
         .single();
 
@@ -93,7 +90,7 @@ export function useHanamiEcho(userId: string) {
           amount: 1000,
           balance_after: 1000,
           description: '新用戶初始食量'
-        });
+        } as any);
 
       if (txError) {
         console.error('建立初始交易記錄失敗:', txError);
@@ -110,6 +107,7 @@ export function useHanamiEcho(userId: string) {
 
   // 載入用戶食量餘額
   const loadFoodBalance = async () => {
+    console.log('loadFoodBalance 開始, userId:', userId);
     try {
       const { data, error } = await supabase
         .from('user_food_balance')
@@ -118,6 +116,9 @@ export function useHanamiEcho(userId: string) {
         .single();
 
       if (error) {
+        console.log('loadFoodBalance 查詢錯誤:', error);
+        console.log('錯誤代碼:', error.code);
+
         if (error.code === 'PGRST116') {
           // 找不到記錄，進行初始化
           console.log('用戶無食量記錄，進行初始化...');
@@ -127,9 +128,10 @@ export function useHanamiEcho(userId: string) {
         throw error;
       }
 
+      console.log('loadFoodBalance 成功:', data);
       setFoodBalance(data);
     } catch (err) {
-      console.error('載入食量餘額錯誤:', err);
+      console.error('載入食量餘額錯誤 (catch):', err);
       setError(err instanceof Error ? err.message : '載入食量餘額失敗');
     }
   };
@@ -242,15 +244,16 @@ export function useHanamiEcho(userId: string) {
       if (error) throw error;
 
       // 計算統計數據
-      const totalCost = data?.reduce((sum, cost) => sum + cost.food_amount, 0) || 0;
-      const totalMessages = data?.length || 0;
+      const typedData = (data as any[]) || [];
+      const totalCost = typedData.reduce((sum, cost: any) => sum + (cost.food_amount || 0), 0);
+      const totalMessages = typedData.length;
       const averageCost = totalMessages > 0 ? totalCost / totalMessages : 0;
 
       return {
         totalCost,
         totalMessages,
         averageCost,
-        costs: data || []
+        costs: typedData
       };
     } catch (err) {
       console.error('獲取成本統計錯誤:', err);
