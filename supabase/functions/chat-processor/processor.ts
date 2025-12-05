@@ -294,7 +294,7 @@ export async function processChat(
         // Multi-model aggregation
         finalContent = responses.map(({ config, res, error }) => {
             if (error) {
-                return `### [Model: ${config.display_name || config.model_name}] (Failed)\nError: ${error.message}`;
+                return `### [Model: ${config.display_name || config.model_name}] (Failed)\nError: ${(error as any).message}`;
             }
             totalInputTokens += res!.usage?.prompt_tokens || 0;
             totalOutputTokens += res!.usage?.completion_tokens || 0;
@@ -456,6 +456,12 @@ export async function processChat(
                     CHARS_PER_FOOD
                 },
                 mind_name: mindBlocks.map(mb => mb.title).join(', '),
+                debug: {
+                    roleId: roleConfig.id,
+                    userId: userId,
+                    mindBlocksCount: mindBlocks.length,
+                    mindBlocksTitles: mindBlocks.map(mb => mb.title)
+                },
                 model_responses: responses.map(({ config, res, error }, index) => {
                     let content = error ? `Error: ${(error as any).message}` : res?.content;
                     // Append image to the first model's response if available

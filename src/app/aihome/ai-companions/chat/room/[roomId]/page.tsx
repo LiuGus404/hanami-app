@@ -605,10 +605,106 @@ export default function RoomChatPage() {
     };
   }, []);
 
+  // Sync Mind Blocks to DB Helper
+  const syncMindBlocksToDb = async (roleId: string, equippedBlocks: Record<string, any>) => {
+    if (!user?.id) return;
+
+    try {
+      // 1. Fetch currently active blocks from DB
+      const { data: dbActive } = await (saasSupabase as any)
+        .from('role_mind_blocks')
+        .select('mind_block_id')
+        .eq('user_id', user.id)
+        .eq('role_id', roleId)
+        .eq('is_active', true);
+
+      const dbActiveIds = (dbActive || []).map((r: any) => r.mind_block_id);
+      const equippedIds = Object.values(equippedBlocks).map((b: any) => b.id);
+
+      // 2. Identify changes
+      const toDeactivate = dbActiveIds.filter((id: string) => !equippedIds.includes(id));
+      const toActivate = equippedIds.filter((id: string) => !dbActiveIds.includes(id));
+
+      // 3. Deactivate removed blocks
+      if (toDeactivate.length > 0) {
+        console.log('🔄 [Sync] Deactivating mind blocks:', toDeactivate);
+        await (saasSupabase as any)
+          .from('role_mind_blocks')
+          .update({ is_active: false })
+          .in('mind_block_id', toDeactivate)
+          .eq('role_id', roleId)
+          .eq('user_id', user.id);
+      }
+
+      // 4. Activate added blocks
+      if (toActivate.length > 0) {
+        console.log('🔄 [Sync] Activating mind blocks:', toActivate);
+        for (const blockId of toActivate) {
+          const { data: existing } = await (saasSupabase as any)
+            .from('role_mind_blocks')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('role_id', roleId)
+            .eq('mind_block_id', blockId)
+            .maybeSingle();
+
+          if (existing) {
+            await (saasSupabase as any)
+              .from('role_mind_blocks')
+              .update({ is_active: true })
+              .eq('id', existing.id);
+          } else {
+            await (saasSupabase as any).from('role_mind_blocks').insert({
+              user_id: user.id,
+              role_id: roleId,
+              mind_block_id: blockId,
+              is_active: true
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error syncing mind blocks:', error);
+    }
+  };
+
+  // Sync on Load Effect
+  const hasInitialSyncedRef = useRef(false);
+  useEffect(() => {
+    if (hasInitialSyncedRef.current || !user?.id || Object.keys(roleInstancesMap).length === 0) return;
+
+    const syncAllRoles = async () => {
+      console.log('🔄 [Sync] Starting initial mind block sync...');
+      for (const key in roleInstancesMap) {
+        const instance = roleInstancesMap[key];
+        if (instance.role_id && instance.settings?.equipped_blocks) {
+          await syncMindBlocksToDb(instance.role_id, instance.settings.equipped_blocks);
+        }
+      }
+      console.log('✅ [Sync] Initial mind block sync completed');
+      hasInitialSyncedRef.current = true;
+    };
+
+    syncAllRoles();
+  }, [roleInstancesMap, user?.id]);
+
   // Update Role Instance Helper
   const handleUpdateRoleInstance = async (instanceId: string, updates: Partial<RoleInstance>) => {
     try {
       const supabase = getSaasSupabaseClient();
+
+      // Sync mind blocks to role_mind_blocks table if equipped_blocks is updated
+      if (updates.settings && (updates.settings as any).equipped_blocks) {
+        const newEquipped = (updates.settings as any).equipped_blocks || {};
+
+        // Get current instance to get role_id
+        const currentInstance = Object.values(roleInstancesMap).find(instance => instance.id === instanceId);
+
+        if (currentInstance && currentInstance.role_id) {
+          await syncMindBlocksToDb(currentInstance.role_id, newEquipped);
+        }
+      }
+
       // 1. Update instance
       const { data: instanceData, error } = await supabase
         .from('role_instances')
@@ -951,7 +1047,8 @@ export default function RoomChatPage() {
         status: msg.status || 'completed',
         metadata: msg.content_json,
         content_json: msg.content_json,
-        processingWorkerId: msg.processing_worker_id || undefined
+        processingWorkerId: msg.processing_worker_id || undefined,
+        model_used: msg.model_used
       };
     });
   }, [isPicoMessageRecord]);

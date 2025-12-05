@@ -33,6 +33,7 @@ export interface ChatMessage {
   food_cost: number;
   created_at: string;
   updated_at: string;
+  model_used?: string;
 }
 
 // 聊天線程介面

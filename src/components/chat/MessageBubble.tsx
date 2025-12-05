@@ -80,10 +80,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <div className={`flex max-w-[80%] ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start space-x-2`}>
         {/* 頭像 */}
         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${isUser
-            ? 'bg-[#FFD59A] text-[#4B4036]'
-            : isAssistant
-              ? 'bg-[#EBC9A4] text-[#4B4036]'
-              : 'bg-gray-200 text-gray-600'
+          ? 'bg-[#FFD59A] text-[#4B4036]'
+          : isAssistant
+            ? 'bg-[#EBC9A4] text-[#4B4036]'
+            : 'bg-gray-200 text-gray-600'
           }`}>
           {getRoleAvatar()}
         </div>
@@ -105,12 +105,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
           {/* 訊息氣泡 */}
           <div className={`relative px-4 py-2 rounded-2xl shadow-sm ${isUser
-              ? 'bg-[#FFD59A] text-[#4B4036] rounded-br-md'
-              : isAssistant
-                ? 'bg-white text-[#4B4036] border border-[#EADBC8] rounded-bl-md'
-                : isSystem
-                  ? 'bg-gray-100 text-gray-700 border border-gray-200'
-                  : 'bg-white text-[#4B4036] border border-[#EADBC8]'
+            ? 'bg-[#FFD59A] text-[#4B4036] rounded-br-md'
+            : isAssistant
+              ? 'bg-white text-[#4B4036] border border-[#EADBC8] rounded-bl-md'
+              : isSystem
+                ? 'bg-gray-100 text-gray-700 border border-gray-200'
+                : 'bg-white text-[#4B4036] border border-[#EADBC8]'
             } ${isError ? 'border-red-300 bg-red-50' : ''}`}>
 
             {/* 訊息內容 */}
@@ -129,6 +129,25 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             {message.processing_time_ms && (
               <div className="text-xs text-gray-500 mt-1">
                 處理時間: {message.processing_time_ms}ms
+              </div>
+            )}
+
+            {/* 思維積木與模型資訊 */}
+            {isAssistant && message.content_json && (
+              <div className="mt-2 pt-2 border-t border-[#EADBC8]/50 text-xs text-[#8C7B6C] flex flex-wrap gap-3">
+                {/* Debug log */}
+
+
+                {(message.content_json.mind_name || message.content_json.model_responses?.[0]?.mind_name) && (
+                  <span className="flex items-center gap-1" title="思維積木">
+                    🧠 {message.content_json.mind_name || message.content_json.model_responses?.[0]?.mind_name}
+                  </span>
+                )}
+                {(message.content_json.model_responses?.[0]?.model || message.model_used) && (
+                  <span className="flex items-center gap-1" title="使用模型">
+                    🤖 {message.content_json.model_responses?.[0]?.model || message.model_used}
+                  </span>
+                )}
               </div>
             )}
           </div>
