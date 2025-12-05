@@ -63,6 +63,51 @@ export function useHanamiEcho(userId: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 初始化用戶食量餘額
+  const initializeFoodBalance = async () => {
+    try {
+      // 1. 建立初始餘額記錄
+      const { data: newBalance, error: balanceError } = await supabase
+        .from('user_food_balance')
+        .insert({
+          user_id: userId,
+          current_balance: 1000, // 初始贈送 1000
+          monthly_allowance: 1000,
+          total_earned: 1000,
+          total_spent: 0,
+          daily_usage: 0,
+          weekly_usage: 0,
+          monthly_usage: 0
+        })
+        .select()
+        .single();
+
+      if (balanceError) throw balanceError;
+
+      // 2. 建立初始交易記錄
+      const { error: txError } = await supabase
+        .from('food_transactions')
+        .insert({
+          user_id: userId,
+          transaction_type: 'initial_grant',
+          amount: 1000,
+          balance_after: 1000,
+          description: '新用戶初始食量'
+        });
+
+      if (txError) {
+        console.error('建立初始交易記錄失敗:', txError);
+        // 不阻擋流程，因為餘額已經建立
+      }
+
+      setFoodBalance(newBalance);
+      return newBalance;
+    } catch (err) {
+      console.error('初始化食量餘額失敗:', err);
+      throw err;
+    }
+  };
+
   // 載入用戶食量餘額
   const loadFoodBalance = async () => {
     try {
@@ -72,7 +117,13 @@ export function useHanamiEcho(userId: string) {
         .eq('user_id', userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // 找不到記錄，進行初始化
+          console.log('用戶無食量記錄，進行初始化...');
+          await initializeFoodBalance();
+          return;
+        }
         throw error;
       }
 
@@ -212,7 +263,7 @@ export function useHanamiEcho(userId: string) {
     if (userId) {
       setIsLoading(true);
       setError(null);
-      
+
       Promise.all([
         loadFoodBalance(),
         loadRecentTransactions()
