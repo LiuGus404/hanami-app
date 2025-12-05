@@ -247,8 +247,8 @@ export function AIRoomChat({ roomId, className = '' }: AIRoomChatProps) {
                 <button
                   onClick={() => setSelectedRole('')}
                   className={`px-3 py-1 rounded-full text-sm transition-all ${selectedRole === ''
-                      ? 'bg-hanami-primary text-white'
-                      : 'bg-hanami-surface text-hanami-text-secondary hover:bg-hanami-secondary'
+                    ? 'bg-hanami-primary text-white'
+                    : 'bg-hanami-surface text-hanami-text-secondary hover:bg-hanami-secondary'
                     }`}
                 >
                   所有角色
@@ -258,8 +258,8 @@ export function AIRoomChat({ roomId, className = '' }: AIRoomChatProps) {
                     key={role.id}
                     onClick={() => setSelectedRole(role.id)}
                     className={`px-3 py-1 rounded-full text-sm transition-all ${selectedRole === role.id
-                        ? 'bg-hanami-primary text-white'
-                        : 'bg-hanami-surface text-hanami-text-secondary hover:bg-hanami-secondary'
+                      ? 'bg-hanami-primary text-white'
+                      : 'bg-hanami-surface text-hanami-text-secondary hover:bg-hanami-secondary'
                       }`}
                   >
                     {role.nickname || role.role?.name}
@@ -325,7 +325,12 @@ export function AIRoomChat({ roomId, className = '' }: AIRoomChatProps) {
           </AnimatePresence>
           <AnimatePresence>
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+              <MessageBubble
+                key={message.id}
+                message={message}
+                onDelete={useChatSession(roomId).deleteMessage}
+                isOwner={true} // 暫時允許所有用戶刪除（後端會驗證）
+              />
             ))}
           </AnimatePresence>
 
@@ -471,9 +476,11 @@ export function AIRoomChat({ roomId, className = '' }: AIRoomChatProps) {
 
 interface MessageBubbleProps {
   message: AIMessage;
+  onDelete?: (id: string) => void;
+  isOwner?: boolean;
 }
 
-function MessageBubble({ message }: MessageBubbleProps) {
+function MessageBubble({ message, onDelete, isOwner }: MessageBubbleProps) {
   const isUser = message.sender_type === 'user';
   const isSystem = message.sender_type === 'system';
 
@@ -516,7 +523,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'} group`}
     >
       <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3 max-w-[80%]`}>
         {/* 頭像 */}
@@ -542,17 +549,34 @@ function MessageBubble({ message }: MessageBubbleProps) {
         {/* 訊息內容 */}
         <div className={`${isUser ? 'mr-3' : 'ml-3'}`}>
           {/* 發送者名稱 */}
-          <div className={`text-xs text-hanami-text-secondary mb-1 ${isUser ? 'text-right' : 'text-left'}`}>
+          <div className={`text-xs text-hanami-text-secondary mb-1 ${isUser ? 'text-right' : 'text-left'} flex items-center gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
             {senderName}
+
+            {/* 刪除按鈕 (僅在 hover 時顯示，且僅限用戶自己的訊息或擁有者) */}
+            {(isUser || isOwner) && onDelete && (
+              <button
+                onClick={() => {
+                  if (confirm('確定要刪除這條訊息嗎？如果包含圖片，圖片也會被刪除。')) {
+                    onDelete(message.id);
+                  }
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500"
+                title="刪除訊息"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* 訊息氣泡 */}
           <div
             className={`px-4 py-3 rounded-2xl ${isUser
-                ? 'bg-hanami-primary text-white rounded-br-md'
-                : isSystem
-                  ? 'bg-gray-100 text-gray-800 rounded-bl-md'
-                  : 'bg-white border border-hanami-border text-hanami-text rounded-bl-md shadow-sm'
+              ? 'bg-hanami-primary text-white rounded-br-md'
+              : isSystem
+                ? 'bg-gray-100 text-gray-800 rounded-bl-md'
+                : 'bg-white border border-hanami-border text-hanami-text rounded-bl-md shadow-sm'
               }`}
           >
             {message.content && (

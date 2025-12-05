@@ -87,6 +87,18 @@ interface ModelConfigSnapshot {
   pricingDetails: Record<string, any>;
   metadata: Record<string, any>;
   foodRatio: string;
+  foodTokens: FoodTokenConfig;
+}
+
+interface FoodTokenConfig {
+  text_input: string;
+  text_output: string;
+  image_input: string;
+  image_output: string;
+  audio_input: string;
+  audio_output: string;
+  video_input: string;
+  video_output: string;
 }
 
 interface EditableModelConfig extends ModelConfigSnapshot {
@@ -123,7 +135,7 @@ export default function AdminControlCenterPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'ai-models' | 'role-config' | 'role-permissions' | 'audit-logs' | 'ai-project-logs'>('ai-models');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+
   // AI 專案對話紀錄相關狀態
   type LogTabKey = 'rooms' | 'users' | 'messages' | 'errors';
   const [logActiveTab, setLogActiveTab] = useState<LogTabKey>('rooms');
@@ -134,7 +146,7 @@ export default function AdminControlCenterPage() {
   const [showLogDialog, setShowLogDialog] = useState(false);
   const [logDialogTitle, setLogDialogTitle] = useState('');
   const [logDialogItems, setLogDialogItems] = useState<any[]>([]);
-  
+
   const formatHK = (iso?: string | null) => {
     if (!iso) return '-';
     try {
@@ -143,9 +155,9 @@ export default function AdminControlCenterPage() {
       return iso;
     }
   };
-  
+
   const tabLabel = (t: LogTabKey) => (t === 'rooms' ? '專案' : t === 'users' ? '用戶' : t === 'messages' ? '對話' : '錯誤');
-  
+
   const openRoomConversation = async (roomId: string) => {
     try {
       setShowLogDialog(true);
@@ -243,6 +255,21 @@ export default function AdminControlCenterPage() {
     return Number.isFinite(numeric) && numeric > 0 ? String(numeric) : '';
   };
 
+  const extractFoodTokens = (metadata: Record<string, any>): FoodTokenConfig => {
+    const ft = metadata?.food_tokens || {};
+    const toString = (val: any) => (val !== undefined && val !== null ? String(val) : '');
+    return {
+      text_input: toString(ft.text_input),
+      text_output: toString(ft.text_output),
+      image_input: toString(ft.image_input),
+      image_output: toString(ft.image_output),
+      audio_input: toString(ft.audio_input),
+      audio_output: toString(ft.audio_output),
+      video_input: toString(ft.video_input),
+      video_output: toString(ft.video_output),
+    };
+  };
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -304,6 +331,7 @@ export default function AdminControlCenterPage() {
           pricingDetails,
           metadata,
           foodRatio: ratio,
+          foodTokens: extractFoodTokens(metadata),
           isSaving: false,
         };
 
@@ -349,7 +377,7 @@ export default function AdminControlCenterPage() {
       });
 
       const snapshotRecord: Record<string, RoleConfigSnapshot> = {};
-  mappedRoles.forEach(({ isSaving: _isSaving, ...snapshot }) => {
+      mappedRoles.forEach(({ isSaving: _isSaving, ...snapshot }) => {
         snapshotRecord[snapshot.id] = snapshot;
       });
 
@@ -406,7 +434,7 @@ export default function AdminControlCenterPage() {
 
       try {
         let query = supabase.from('saas_users').select('user_role');
-        
+
         if (userId) {
           query = query.eq('id', userId);
         } else if (userEmail) {
@@ -559,9 +587,9 @@ export default function AdminControlCenterPage() {
       prev.map((role) =>
         role.id === roleId
           ? {
-              ...snapshot,
-              isSaving: false,
-            }
+            ...snapshot,
+            isSaving: false,
+          }
           : role
       )
     );
@@ -781,6 +809,16 @@ export default function AdminControlCenterPage() {
     updateModelConfigs(modelId, (config) => ({ ...config, [field]: value }));
   };
 
+  const handleFoodTokenChange = (modelId: string, key: keyof FoodTokenConfig, value: string) => {
+    updateModelConfigs(modelId, (config) => ({
+      ...config,
+      foodTokens: {
+        ...config.foodTokens,
+        [key]: value,
+      },
+    }));
+  };
+
   const handleToggleModality = (modelId: string, key: ModalityKey) => {
     updateModelConfigs(modelId, (config) => ({
       ...config,
@@ -867,6 +905,26 @@ export default function AdminControlCenterPage() {
         delete updatedMetadata.food_ratio;
       }
 
+      // Process Food Tokens
+      const foodTokensPayload: Record<string, number> = {};
+      let hasFoodTokens = false;
+      (Object.keys(model.foodTokens) as Array<keyof FoodTokenConfig>).forEach((key) => {
+        const val = model.foodTokens[key];
+        if (val && val.trim() !== '') {
+          const num = Number(val);
+          if (Number.isFinite(num)) {
+            foodTokensPayload[key] = num;
+            hasFoodTokens = true;
+          }
+        }
+      });
+
+      if (hasFoodTokens) {
+        updatedMetadata.food_tokens = foodTokensPayload;
+      } else {
+        delete updatedMetadata.food_tokens;
+      }
+
       const updates: Record<string, any> = {
         display_name: model.display_name,
         provider: model.provider,
@@ -922,6 +980,7 @@ export default function AdminControlCenterPage() {
         pricingDetails: { ...updatedPricingDetails },
         metadata: { ...updatedMetadata },
         foodRatio: normalizedFoodRatio,
+        foodTokens: { ...model.foodTokens },
       };
 
       setOriginalModelConfigs((prev) => ({
@@ -1020,9 +1079,8 @@ export default function AdminControlCenterPage() {
                 whileTap={{ scale: 0.97 }}
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[#EADBC8] text-xs sm:text-sm font-medium transition-all ${
-                  isRefreshing ? 'bg-[#F8F5EC] text-[#B8ABA0]' : 'bg-white text-[#4B4036] hover:bg-[#FFF4E0] shadow-sm'
-                }`}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[#EADBC8] text-xs sm:text-sm font-medium transition-all ${isRefreshing ? 'bg-[#F8F5EC] text-[#B8ABA0]' : 'bg-white text-[#4B4036] hover:bg-[#FFF4E0] shadow-sm'
+                  }`}
               >
                 <ArrowPathIcon className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 {isRefreshing ? '重新整理中...' : '重新整理資料'}
@@ -1110,17 +1168,15 @@ export default function AdminControlCenterPage() {
                           whileHover={item.disabled ? {} : { scale: 1.01 }}
                           whileTap={item.disabled ? {} : { scale: 0.98 }}
                           onClick={() => !item.disabled && setActiveSection(item.id as typeof activeSection)}
-                          className={`w-full text-left px-4 py-3 rounded-2xl border transition-all ${
-                            isActive
-                              ? 'border-transparent bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
-                              : 'border-[#EADBC8] bg-white text-[#4B4036] hover:border-[#FFD59A]/60'
-                          } ${item.disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          className={`w-full text-left px-4 py-3 rounded-2xl border transition-all ${isActive
+                            ? 'border-transparent bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
+                            : 'border-[#EADBC8] bg-white text-[#4B4036] hover:border-[#FFD59A]/60'
+                            } ${item.disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex items-center gap-3">
                             <div
-                              className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
-                                isActive ? 'bg-white/20 text-white' : 'bg-[#FFF4E0] text-[#4B4036]'
-                              }`}
+                              className={`w-9 h-9 rounded-2xl flex items-center justify-center ${isActive ? 'bg-white/20 text-white' : 'bg-[#FFF4E0] text-[#4B4036]'
+                                }`}
                             >
                               <item.icon className="w-4.5 h-4.5" />
                             </div>
@@ -1208,11 +1264,10 @@ export default function AdminControlCenterPage() {
                                       key={option.value}
                                       type="button"
                                       onClick={() => setModelFilter(option.value as typeof modelFilter)}
-                                      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${
-                                        isActive
-                                          ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-transparent shadow'
-                                          : 'border-[#EADBC8] text-[#4B4036] bg-white hover:border-[#FFD59A]'
-                                      }`}
+                                      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${isActive
+                                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-transparent shadow'
+                                        : 'border-[#EADBC8] text-[#4B4036] bg-white hover:border-[#FFD59A]'
+                                        }`}
                                     >
                                       {option.label}
                                     </button>
@@ -1255,11 +1310,10 @@ export default function AdminControlCenterPage() {
                                         type="button"
                                         onClick={() => removeSelectedModels()}
                                         disabled={selectedModelRows.size === 0 || isDeletingModels}
-                                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                                          selectedModelRows.size === 0 || isDeletingModels
-                                            ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed border border-[#EADBC8]'
-                                            : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow hover:shadow-lg'
-                                        }`}
+                                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition ${selectedModelRows.size === 0 || isDeletingModels
+                                          ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed border border-[#EADBC8]'
+                                          : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow hover:shadow-lg'
+                                          }`}
                                       >
                                         {isDeletingModels ? (
                                           <span className="flex items-center justify-center gap-2">
@@ -1321,264 +1375,301 @@ export default function AdminControlCenterPage() {
                           return model.modalities[modelFilter];
                         })
                         .map((model) => {
-                        const enabledModalitiesSummary = MODALITY_OPTIONS.filter((option) => model.modalities[option.key])
-                          .map((option) => option.label)
-                          .join('、');
+                          const enabledModalitiesSummary = MODALITY_OPTIONS.filter((option) => model.modalities[option.key])
+                            .map((option) => option.label)
+                            .join('、');
 
-                        return (
-                        <motion.div
-                          key={model.id || model.model_id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -20 }}
-                          className={`bg-white/90 backdrop-blur-sm border ${
-                            selectedModelRows.has(model.id) ? 'border-[#FFB6C1]' : 'border-[#EADBC8]'
-                          } rounded-3xl shadow-md transition`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExpandedModelIds((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(model.id)) {
-                                  next.delete(model.id);
-                                } else {
-                                  next.add(model.id);
-                                }
-                                return next;
-                              });
-                            }}
-                            className="w-full flex items-center justify-between px-6 py-4 text-left"
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
-                              <div className="flex items-center gap-3">
-                                {isSelectionMode && (
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedModelRows.has(model.id)}
-                                    onClick={(event) => event.stopPropagation()}
-                                    onChange={() => toggleModelSelection(model.id)}
-                                    className="h-4 w-4 rounded border-[#EADBC8] text-[#FFB6C1] focus:ring-[#FFB6C1]"
-                                  />
-                                )}
-                                <Cog6ToothIcon className="w-5 h-5 text-[#FFB6C1]" />
-                                <h3 className="text-lg font-semibold text-[#4B4036]">{model.display_name || '未命名模型'}</h3>
-                              </div>
-                              <p className="text-xs text-[#2B3A3B]/60 mt-1 sm:mt-0">
-                                模型 ID：{model.model_id || '未設定'}
-                              </p>
-                            </div>
+                          return (
                             <motion.div
-                              initial={false}
-                              animate={{ rotate: expandedModelIds.has(model.id) ? 180 : 0 }}
-                              transition={{ duration: 0.25 }}
-                              className="w-8 h-8 bg-[#FFF4E0] rounded-full flex items-center justify-center"
+                              key={model.id || model.model_id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -20 }}
+                              className={`bg-white/90 backdrop-blur-sm border ${selectedModelRows.has(model.id) ? 'border-[#FFB6C1]' : 'border-[#EADBC8]'
+                                } rounded-3xl shadow-md transition`}
                             >
-                              <svg className="w-4 h-4 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </motion.div>
-                          </button>
-
-                          <AnimatePresence initial={false}>
-                            {expandedModelIds.has(model.id) && (
-                              <motion.div
-                                key={`${model.id}-details`}
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.25, ease: 'easeInOut' }}
-                                className="px-6 pb-6"
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExpandedModelIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(model.id)) {
+                                      next.delete(model.id);
+                                    } else {
+                                      next.add(model.id);
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                className="w-full flex items-center justify-between px-6 py-4 text-left"
                               >
-                                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 pb-4 border-b border-[#EADBC8]/60 mb-6">
-                                  <div className="flex flex-col gap-1 text-xs text-[#2B3A3B]/70">
-                                    <span>模型特質：{model.model_type || '未設定'}</span>
-                                    {enabledModalitiesSummary && (
-                                      <span>支援模態：{enabledModalitiesSummary}</span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+                                  <div className="flex items-center gap-3">
                                     {isSelectionMode && (
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleModelSelection(model.id)}
-                                        className={`px-3 py-2 rounded-xl border text-xs font-medium transition ${
-                                          selectedModelRows.has(model.id)
-                                            ? 'border-[#FFB6C1] bg-[#FFB6C1]/20 text-[#4B4036]'
-                                            : 'border-[#EADBC8] bg-white text-[#4B4036] hover:border-[#FFD59A]'
-                                        }`}
-                                      >
-                                        {selectedModelRows.has(model.id) ? '取消選擇' : '加入選擇'}
-                                      </button>
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedModelRows.has(model.id)}
+                                        onClick={(event) => event.stopPropagation()}
+                                        onChange={() => toggleModelSelection(model.id)}
+                                        className="h-4 w-4 rounded border-[#EADBC8] text-[#FFB6C1] focus:ring-[#FFB6C1]"
+                                      />
                                     )}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleResetModel(model.id)}
-                                      className="px-3 py-2 rounded-xl border border-[#EADBC8] text-xs font-medium text-[#4B4036] hover:bg-[#FFF4E0] transition"
-                                    >
-                                      還原
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSaveModel(model.id)}
-                                      disabled={model.isSaving}
-                                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 ${
-                                        model.isSaving
-                                          ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed'
-                                          : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md hover:shadow-lg'
-                                      }`}
-                                    >
-                                      {model.isSaving ? (
-                                        <>
-                                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                                          儲存中...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <CheckCircleIcon className="w-4 h-4" />
-                                          儲存模型
-                                        </>
-                                      )}
-                                    </button>
+                                    <Cog6ToothIcon className="w-5 h-5 text-[#FFB6C1]" />
+                                    <h3 className="text-lg font-semibold text-[#4B4036]">{model.display_name || '未命名模型'}</h3>
                                   </div>
+                                  <p className="text-xs text-[#2B3A3B]/60 mt-1 sm:mt-0">
+                                    模型 ID：{model.model_id || '未設定'}
+                                  </p>
                                 </div>
+                                <motion.div
+                                  initial={false}
+                                  animate={{ rotate: expandedModelIds.has(model.id) ? 180 : 0 }}
+                                  transition={{ duration: 0.25 }}
+                                  className="w-8 h-8 bg-[#FFF4E0] rounded-full flex items-center justify-center"
+                                >
+                                  <svg className="w-4 h-4 text-[#4B4036]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </motion.div>
+                              </button>
 
-                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                                  <div className="space-y-4">
-                                    <label className="block text-sm font-medium text-[#4B4036]">
-                                      顯示名稱
-                                      <input
-                                        type="text"
-                                        value={model.display_name}
-                                        onChange={(event) => handleModelValueChange(model.id, 'display_name', event.target.value)}
-                                        className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
-                                      />
-                                    </label>
-
-                                    <label className="block text-sm font-medium text-[#4B4036]">
-                                      模型 ID
-                                      <input
-                                        type="text"
-                                        value={model.model_id}
-                                        onChange={(event) => handleModelValueChange(model.id, 'model_id', event.target.value)}
-                                        className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
-                                      />
-                                    </label>
-
-                              <label className="block text-sm font-medium text-[#4B4036]">
-                                模型特質
-                                <input
-                                  type="text"
-                                  value={model.model_type || ''}
-                                  onChange={(event) => handleModelValueChange(model.id, 'model_type', event.target.value)}
-                                  className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
-                                />
-                              </label>
-
-                                    <label className="block text-sm font-medium text-[#4B4036]">
-                                      模型描述
-                                      <textarea
-                                        value={model.description}
-                                        onChange={(event) => handleModelValueChange(model.id, 'description', event.target.value)}
-                                        rows={4}
-                                        className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
-                                      />
-                                    </label>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                      <label className="block text-sm font-medium text-[#4B4036]">
-                                        輸入成本（USD / 1M tokens）
-                                        <input
-                                          type="number"
-                                          step="0.0001"
-                                          value={model.input_cost_usd}
-                                          onChange={(event) => handleModelValueChange(model.id, 'input_cost_usd', event.target.value)}
-                                          className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
-                                        />
-                                      </label>
-                                      <label className="block text-sm font-medium text-[#4B4036]">
-                                        輸出成本（USD / 1M tokens）
-                                        <input
-                                          type="number"
-                                          step="0.0001"
-                                          value={model.output_cost_usd}
-                                          onChange={(event) => handleModelValueChange(model.id, 'output_cost_usd', event.target.value)}
-                                          className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
-                                        />
-                                      </label>
-                                    </div>
-
-                                    <label className="block text-sm font-medium text-[#4B4036]">
-                                      食量換算比例（每 USD 對應的食量點數）
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={model.foodRatio}
-                                        onChange={(event) => handleModelValueChange(model.id, 'foodRatio', event.target.value)}
-                                        placeholder="例如：300"
-                                        className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
-                                      />
-                                      <span className="mt-1 block text-xs text-[#2B3A3B]/60">
-                                        留空則使用系統預設比例 300
-                                      </span>
-                                    </label>
-                                  </div>
-
-                                  <div className="space-y-4">
-                                    <div>
-                                      <h4 className="text-sm font-semibold text-[#4B4036] mb-2">支援模態</h4>
-                                      <p className="text-xs text-[#2B3A3B]/70 mb-3">勾選模型可支援的輸入與輸出形式</p>
-                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                        {MODALITY_OPTIONS.map((option) => (
-                                          <label
-                                            key={option.key}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
-                                              model.modalities[option.key]
-                                                ? 'border-[#FFB6C1] bg-[#FFB6C1]/15'
-                                                : 'border-[#EADBC8] bg-[#FFFDF8]'
-                                            } text-sm text-[#4B4036]`}
+                              <AnimatePresence initial={false}>
+                                {expandedModelIds.has(model.id) && (
+                                  <motion.div
+                                    key={`${model.id}-details`}
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                    className="px-6 pb-6"
+                                  >
+                                    <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 pb-4 border-b border-[#EADBC8]/60 mb-6">
+                                      <div className="flex flex-col gap-1 text-xs text-[#2B3A3B]/70">
+                                        <span>模型特質：{model.model_type || '未設定'}</span>
+                                        {enabledModalitiesSummary && (
+                                          <span>支援模態：{enabledModalitiesSummary}</span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {isSelectionMode && (
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleModelSelection(model.id)}
+                                            className={`px-3 py-2 rounded-xl border text-xs font-medium transition ${selectedModelRows.has(model.id)
+                                              ? 'border-[#FFB6C1] bg-[#FFB6C1]/20 text-[#4B4036]'
+                                              : 'border-[#EADBC8] bg-white text-[#4B4036] hover:border-[#FFD59A]'
+                                              }`}
                                           >
-                                            <input
-                                              type="checkbox"
-                                              checked={model.modalities[option.key]}
-                                              onChange={() => handleToggleModality(model.id, option.key)}
-                                              className="h-4 w-4 rounded border-[#EADBC8] text-[#FFB6C1] focus:ring-[#FFB6C1]"
-                                            />
-                                            {option.label}
-                                          </label>
-                                        ))}
+                                            {selectedModelRows.has(model.id) ? '取消選擇' : '加入選擇'}
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleResetModel(model.id)}
+                                          className="px-3 py-2 rounded-xl border border-[#EADBC8] text-xs font-medium text-[#4B4036] hover:bg-[#FFF4E0] transition"
+                                        >
+                                          還原
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSaveModel(model.id)}
+                                          disabled={model.isSaving}
+                                          className={`px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 ${model.isSaving
+                                            ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md hover:shadow-lg'
+                                            }`}
+                                        >
+                                          {model.isSaving ? (
+                                            <>
+                                              <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                              儲存中...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <CheckCircleIcon className="w-4 h-4" />
+                                              儲存模型
+                                            </>
+                                          )}
+                                        </button>
                                       </div>
                                     </div>
 
-                                    <div className="flex items-center gap-3 px-3 py-2 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
-                                      <input
-                                        type="checkbox"
-                                        checked={model.supportsSearch}
-                                        onChange={() => handleToggleSearchCapability(model.id)}
-                                        className="h-4 w-4 rounded border-[#EADBC8] text-[#FFB6C1] focus:ring-[#FFB6C1]"
-                                      />
-                                      <span className="text-sm text-[#4B4036]">支援搜尋 / Research 工作流程</span>
-                                    </div>
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                      <div className="space-y-4">
+                                        <label className="block text-sm font-medium text-[#4B4036]">
+                                          顯示名稱
+                                          <input
+                                            type="text"
+                                            value={model.display_name}
+                                            onChange={(event) => handleModelValueChange(model.id, 'display_name', event.target.value)}
+                                            className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                          />
+                                        </label>
 
-                                    <div className="bg-white/70 border border-dashed border-[#EADBC8] rounded-xl p-3 text-xs text-[#2B3A3B]/60 space-y-1">
-                                      <p>
-                                        保留的其他能力：
-                                        {model.otherCapabilities.length > 0 ? model.otherCapabilities.join('、') : '無'}
-                                      </p>
-                                      <p>
-                                        保留的其他模態：
-                                        {model.otherModalities.length > 0 ? model.otherModalities.join('、') : '無'}
-                                      </p>
+                                        <label className="block text-sm font-medium text-[#4B4036]">
+                                          模型 ID
+                                          <input
+                                            type="text"
+                                            value={model.model_id}
+                                            onChange={(event) => handleModelValueChange(model.id, 'model_id', event.target.value)}
+                                            className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                          />
+                                        </label>
+
+                                        <label className="block text-sm font-medium text-[#4B4036]">
+                                          模型特質
+                                          <input
+                                            type="text"
+                                            value={model.model_type || ''}
+                                            onChange={(event) => handleModelValueChange(model.id, 'model_type', event.target.value)}
+                                            className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                          />
+                                        </label>
+
+                                        <label className="block text-sm font-medium text-[#4B4036]">
+                                          模型描述
+                                          <textarea
+                                            value={model.description}
+                                            onChange={(event) => handleModelValueChange(model.id, 'description', event.target.value)}
+                                            rows={4}
+                                            className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                          />
+                                        </label>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                          <label className="block text-sm font-medium text-[#4B4036]">
+                                            輸入成本（USD / 1M tokens）
+                                            <input
+                                              type="number"
+                                              step="0.0001"
+                                              value={model.input_cost_usd}
+                                              onChange={(event) => handleModelValueChange(model.id, 'input_cost_usd', event.target.value)}
+                                              className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                            />
+                                          </label>
+                                          <label className="block text-sm font-medium text-[#4B4036]">
+                                            輸出成本（USD / 1M tokens）
+                                            <input
+                                              type="number"
+                                              step="0.0001"
+                                              value={model.output_cost_usd}
+                                              onChange={(event) => handleModelValueChange(model.id, 'output_cost_usd', event.target.value)}
+                                              className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                            />
+                                          </label>
+                                        </div>
+
+                                        <label className="block text-sm font-medium text-[#4B4036]">
+                                          食量換算比例 (Food Ratio)
+                                          <input
+                                            type="number"
+                                            value={model.foodRatio}
+                                            onChange={(event) => handleModelValueChange(model.id, 'foodRatio', event.target.value)}
+                                            placeholder="預設: 300"
+                                            className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                          />
+                                          <p className="mt-1 text-xs text-[#2B3A3B]/60">
+                                            每 $0.01 USD 對應的 Food 數量 (若設定此值，將覆蓋預設的 300)
+                                          </p>
+                                        </label>
+                                      </div>
+
+                                      <div className="border-t border-[#EADBC8]/60 pt-4 mt-2">
+                                        <h4 className="text-sm font-semibold text-[#8F7A65] mb-3 uppercase tracking-wide">
+                                          Food Token Settings (Granular)
+                                        </h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#FFFDF8] p-4 rounded-xl border border-[#EADBC8]/50">
+                                          {[
+                                            { key: 'text', label: '文字 (Text)' },
+                                            { key: 'image', label: '圖像 (Image)' },
+                                            { key: 'audio', label: '語音 (Audio)' },
+                                            { key: 'video', label: '影片 (Video)' },
+                                          ].map((type) => (
+                                            <div key={type.key} className="space-y-3">
+                                              <p className="text-xs font-bold text-[#4B4036]">{type.label}</p>
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <label className="block text-xs text-[#2B3A3B]/70">
+                                                  Input
+                                                  <input
+                                                    type="number"
+                                                    value={model.foodTokens[`${type.key}_input` as keyof FoodTokenConfig] || ''}
+                                                    onChange={(e) => handleFoodTokenChange(model.id, `${type.key}_input` as keyof FoodTokenConfig, e.target.value)}
+                                                    placeholder="Auto"
+                                                    className="mt-1 w-full px-2 py-1.5 rounded border border-[#EADBC8] text-xs focus:ring-1 focus:ring-[#FFB6C1]"
+                                                  />
+                                                </label>
+                                                <label className="block text-xs text-[#2B3A3B]/70">
+                                                  Output
+                                                  <input
+                                                    type="number"
+                                                    value={model.foodTokens[`${type.key}_output` as keyof FoodTokenConfig] || ''}
+                                                    onChange={(e) => handleFoodTokenChange(model.id, `${type.key}_output` as keyof FoodTokenConfig, e.target.value)}
+                                                    placeholder="Auto"
+                                                    className="mt-1 w-full px-2 py-1.5 rounded border border-[#EADBC8] text-xs focus:ring-1 focus:ring-[#FFB6C1]"
+                                                  />
+                                                </label>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <p className="mt-2 text-[10px] text-[#2B3A3B]/50">
+                                          * 設定具體的 Food Token 數值。若留空則使用預設計算方式 (USD Cost * Ratio)。
+                                        </p>
+                                      </div>
+
+                                      <div className="space-y-4">
+                                        <div>
+                                          <h4 className="text-sm font-semibold text-[#4B4036] mb-2">支援模態</h4>
+                                          <p className="text-xs text-[#2B3A3B]/70 mb-3">勾選模型可支援的輸入與輸出形式</p>
+                                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {MODALITY_OPTIONS.map((option) => (
+                                              <label
+                                                key={option.key}
+                                                className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${model.modalities[option.key]
+                                                  ? 'border-[#FFB6C1] bg-[#FFB6C1]/15'
+                                                  : 'border-[#EADBC8] bg-[#FFFDF8]'
+                                                  } text-sm text-[#4B4036]`}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={model.modalities[option.key]}
+                                                  onChange={() => handleToggleModality(model.id, option.key)}
+                                                  className="h-4 w-4 rounded border-[#EADBC8] text-[#FFB6C1] focus:ring-[#FFB6C1]"
+                                                />
+                                                {option.label}
+                                              </label>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 px-3 py-2 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
+                                          <input
+                                            type="checkbox"
+                                            checked={model.supportsSearch}
+                                            onChange={() => handleToggleSearchCapability(model.id)}
+                                            className="h-4 w-4 rounded border-[#EADBC8] text-[#FFB6C1] focus:ring-[#FFB6C1]"
+                                          />
+                                          <span className="text-sm text-[#4B4036]">支援搜尋 / Research 工作流程</span>
+                                        </div>
+
+                                        <div className="bg-white/70 border border-dashed border-[#EADBC8] rounded-xl p-3 text-xs text-[#2B3A3B]/60 space-y-1">
+                                          <p>
+                                            保留的其他能力：
+                                            {model.otherCapabilities.length > 0 ? model.otherCapabilities.join('、') : '無'}
+                                          </p>
+                                          <p>
+                                            保留的其他模態：
+                                            {model.otherModalities.length > 0 ? model.otherModalities.join('、') : '無'}
+                                          </p>
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </motion.div>
-                      );
-                    })}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </motion.div>
+                          );
+                        })}
                     </AnimatePresence>
 
                     {modelConfigs.length === 0 && (
@@ -1665,11 +1756,10 @@ export default function AdminControlCenterPage() {
                                   type="button"
                                   onClick={() => removeSelectedRoles()}
                                   disabled={selectedRoleRows.size === 0 || isDeletingRoles}
-                                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                                    selectedRoleRows.size === 0 || isDeletingRoles
-                                      ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed border border-[#EADBC8]'
-                                      : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow hover:shadow-lg'
-                                  }`}
+                                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition ${selectedRoleRows.size === 0 || isDeletingRoles
+                                    ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed border border-[#EADBC8]'
+                                    : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow hover:shadow-lg'
+                                    }`}
                                 >
                                   {isDeletingRoles ? (
                                     <span className="flex items-center justify-center gap-2">
@@ -1720,9 +1810,8 @@ export default function AdminControlCenterPage() {
                           .filter((model) => {
                             const keyword = filterState.search.trim().toLowerCase();
                             if (!keyword) return true;
-                            const haystack = `${model.display_name || ''} ${model.model_id || ''} ${model.description || ''} ${
-                              model.provider || ''
-                            }`.toLowerCase();
+                            const haystack = `${model.display_name || ''} ${model.model_id || ''} ${model.description || ''} ${model.provider || ''
+                              }`.toLowerCase();
                             return haystack.includes(keyword);
                           })
                           .filter((model) => {
@@ -1738,9 +1827,8 @@ export default function AdminControlCenterPage() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
-                            className={`bg-white/85 backdrop-blur-sm rounded-3xl shadow-md p-6 space-y-6 transition border ${
-                              selectedRoleRows.has(role.id) ? 'border-[#FFB6C1]' : 'border-[#EADBC8]'
-                            }`}
+                            className={`bg-white/85 backdrop-blur-sm rounded-3xl shadow-md p-6 space-y-6 transition border ${selectedRoleRows.has(role.id) ? 'border-[#FFB6C1]' : 'border-[#EADBC8]'
+                              }`}
                           >
                             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                               <div className="flex flex-col gap-1">
@@ -1795,11 +1883,10 @@ export default function AdminControlCenterPage() {
                                   type="button"
                                   onClick={() => handleSaveRole(role.id)}
                                   disabled={role.isSaving || roleSelectionMode}
-                                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 ${
-                                    role.isSaving || roleSelectionMode
-                                      ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed'
-                                      : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md hover:shadow-lg'
-                                   }`}
+                                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 ${role.isSaving || roleSelectionMode
+                                    ? 'bg-[#F8F5EC] text-[#B8ABA0] cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md hover:shadow-lg'
+                                    }`}
                                 >
                                   {role.isSaving ? (
                                     <>
@@ -1867,11 +1954,10 @@ export default function AdminControlCenterPage() {
                                           role.allowed_models.map((modelId) => (
                                             <span
                                               key={modelId}
-                                              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${
-                                                role.default_model === modelId
-                                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-transparent shadow'
-                                                  : 'bg-[#FFD59A]/30 border-[#FFD59A] text-[#4B4036]'
-                                              }`}
+                                              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs ${role.default_model === modelId
+                                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-transparent shadow'
+                                                : 'bg-[#FFD59A]/30 border-[#FFD59A] text-[#4B4036]'
+                                                }`}
                                             >
                                               {resolveModelLabel(modelId)}
                                               <button
@@ -1968,11 +2054,10 @@ export default function AdminControlCenterPage() {
                                                               filter: option.value as 'all' | ModalityKey | 'supportsSearch',
                                                             })
                                                           }
-                                                          className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${
-                                                            isActive
-                                                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-transparent shadow'
-                                                              : 'border-[#EADBC8] text-[#4B4036] bg-white hover:border-[#FFD59A]'
-                                                          }`}
+                                                          className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${isActive
+                                                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white border-transparent shadow'
+                                                            : 'border-[#EADBC8] text-[#4B4036] bg-white hover:border-[#FFD59A]'
+                                                            }`}
                                                         >
                                                           {option.label}
                                                         </button>
@@ -2001,9 +2086,8 @@ export default function AdminControlCenterPage() {
                                                   return (
                                                     <div
                                                       key={`${role.id}-${model.id}`}
-                                                      className={`rounded-2xl border px-4 py-3 bg-white transition ${
-                                                        isChecked ? 'border-[#FFB6C1] shadow-md' : 'border-[#EADBC8]'
-                                                      }`}
+                                                      className={`rounded-2xl border px-4 py-3 bg-white transition ${isChecked ? 'border-[#FFB6C1] shadow-md' : 'border-[#EADBC8]'
+                                                        }`}
                                                     >
                                                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                                         <div>
@@ -2034,11 +2118,10 @@ export default function AdminControlCenterPage() {
                                                           <button
                                                             type="button"
                                                             onClick={() => handleSetDefaultModel(role.id, model.model_id)}
-                                                            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
-                                                              isDefault
-                                                                ? 'border-[#FFB6C1] bg-[#FFB6C1]/20 text-[#4B4036]'
-                                                                : 'border-[#EADBC8] bg-white text-[#4B4036] hover:border-[#FFD59A]'
-                                                            }`}
+                                                            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition ${isDefault
+                                                              ? 'border-[#FFB6C1] bg-[#FFB6C1]/20 text-[#4B4036]'
+                                                              : 'border-[#EADBC8] bg-white text-[#4B4036] hover:border-[#FFD59A]'
+                                                              }`}
                                                           >
                                                             設為預設
                                                           </button>
@@ -2110,15 +2193,14 @@ export default function AdminControlCenterPage() {
 
                     {/* 子標籤頁 */}
                     <div className="flex gap-2 mb-4">
-                      {(['rooms','users','messages','errors'] as LogTabKey[]).map((t) => (
+                      {(['rooms', 'users', 'messages', 'errors'] as LogTabKey[]).map((t) => (
                         <button
                           key={t}
                           onClick={() => setLogActiveTab(t)}
-                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                            logActiveTab === t 
-                              ? 'bg-[#FFEAD1] text-[#4B4036] font-medium' 
-                              : 'bg-white border border-[#EADBC8] text-gray-700 hover:bg-[#FFF9F2]'
-                          }`}
+                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${logActiveTab === t
+                            ? 'bg-[#FFEAD1] text-[#4B4036] font-medium'
+                            : 'bg-white border border-[#EADBC8] text-gray-700 hover:bg-[#FFF9F2]'
+                            }`}
                         >
                           {tabLabel(t)}
                         </button>
@@ -2137,12 +2219,12 @@ export default function AdminControlCenterPage() {
                             {logRooms.length === 0 ? (
                               <div className="text-center py-8 text-gray-500">目前沒有專案記錄</div>
                             ) : (
-                              logRooms.map((r:any)=> (
+                              logRooms.map((r: any) => (
                                 <div key={r.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
                                   <div className="flex items-center justify-between">
                                     <div>
                                       <p className="font-semibold text-[#4B4036]">
-                                        {r.title || '(未命名專案)'} 
+                                        {r.title || '(未命名專案)'}
                                         <span className="text-xs text-gray-500 ml-1">{formatHK(r.created_at)}</span>
                                       </p>
                                       <p className="text-xs text-gray-600">room_id: {r.id}</p>
@@ -2160,7 +2242,7 @@ export default function AdminControlCenterPage() {
                             {logUsers.length === 0 ? (
                               <div className="text-center py-8 text-gray-500">目前沒有用戶記錄</div>
                             ) : (
-                              logUsers.map((u:any)=> (
+                              logUsers.map((u: any) => (
                                 <div key={u.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
                                   <p className="font-semibold text-[#4B4036]">{u.full_name || u.email}</p>
                                   <p className="text-xs text-gray-600">{u.email} · {formatHK(u.created_at)}</p>
@@ -2175,11 +2257,11 @@ export default function AdminControlCenterPage() {
                             {logMessages.length === 0 ? (
                               <div className="text-center py-8 text-gray-500">目前沒有對話記錄</div>
                             ) : (
-                              logMessages.map((m:any)=> (
+                              logMessages.map((m: any) => (
                                 <div key={m.id} className="p-3 rounded-xl border border-[#EADBC8] hover:bg-[#FFF9F2] transition-colors">
                                   <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {formatHK(m.created_at)}</p>
                                   <p className="font-medium text-[#2B3A3B]">
-                                    [{m.sender_type}] {m.content?.slice(0,200) || m.content_json?.text || '(空白)'}
+                                    [{m.sender_type}] {m.content?.slice(0, 200) || m.content_json?.text || '(空白)'}
                                   </p>
                                   {(((m.status && m.status !== 'sent') ? true : false) || (m.error_message && m.error_message.trim() !== '')) && (
                                     <p className="text-xs text-rose-600 mt-1">狀態: {m.status || 'error'}</p>
@@ -2192,29 +2274,29 @@ export default function AdminControlCenterPage() {
 
                         {logActiveTab === 'errors' && (
                           <div className="space-y-2">
-                            {logMessages.filter((m:any)=> 
-                              m.status==='error' || 
-                              (m.error_message && m.error_message.trim()!=='') || 
+                            {logMessages.filter((m: any) =>
+                              m.status === 'error' ||
+                              (m.error_message && m.error_message.trim() !== '') ||
                               (m.content && /遇到點小困難|重新輸入|稍後再試/.test(m.content))
                             ).length === 0 ? (
                               <div className="text-center py-8 text-gray-500">目前沒有錯誤記錄</div>
                             ) : (
-                              logMessages.filter((m:any)=> 
-                                m.status==='error' || 
-                                (m.error_message && m.error_message.trim()!=='') || 
+                              logMessages.filter((m: any) =>
+                                m.status === 'error' ||
+                                (m.error_message && m.error_message.trim() !== '') ||
                                 (m.content && /遇到點小困難|重新輸入|稍後再試/.test(m.content))
-                              ).map((m:any)=> (
-                                <div 
-                                  key={m.id} 
-                                  className="p-3 rounded-xl border border-rose-200 bg-rose-50 cursor-pointer hover:bg-rose-100 transition-colors" 
-                                  onClick={()=>openRoomConversation(m.room_id)}
+                              ).map((m: any) => (
+                                <div
+                                  key={m.id}
+                                  className="p-3 rounded-xl border border-rose-200 bg-rose-50 cursor-pointer hover:bg-rose-100 transition-colors"
+                                  onClick={() => openRoomConversation(m.room_id)}
                                 >
                                   <p className="text-xs text-gray-600 mb-1">room: {m.room_id} · {formatHK(m.created_at)}</p>
                                   <p className="font-medium text-[#B00020]">
                                     {m.error_message || '系統提示：遇到點小困難，請重新輸入或稍後再試'}
                                   </p>
                                   <p className="text-xs text-[#2B3A3B] mt-1">
-                                    內容: {m.content?.slice(0,180) || m.content_json?.text || '(空白)'}
+                                    內容: {m.content?.slice(0, 180) || m.content_json?.text || '(空白)'}
                                   </p>
                                 </div>
                               ))
@@ -2257,19 +2339,19 @@ export default function AdminControlCenterPage() {
 
       {/* 對話詳情視窗 */}
       {showLogDialog && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30" 
-          onClick={()=>setShowLogDialog(false)}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
+          onClick={() => setShowLogDialog(false)}
         >
-          <div 
-            className="w-full max-w-3xl bg-white rounded-2xl p-4 ring-1 ring-[#EADBC8] max-h-[80vh] flex flex-col" 
-            onClick={(e)=>e.stopPropagation()}
+          <div
+            className="w-full max-w-3xl bg-white rounded-2xl p-4 ring-1 ring-[#EADBC8] max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3 flex-shrink-0">
               <h3 className="text-lg font-bold text-[#2B3A3B]">{logDialogTitle}</h3>
-              <button 
-                className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#2B3A3B] transition-colors" 
-                onClick={()=>setShowLogDialog(false)}
+              <button
+                className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#2B3A3B] transition-colors"
+                onClick={() => setShowLogDialog(false)}
               >
                 關閉
               </button>
@@ -2278,11 +2360,11 @@ export default function AdminControlCenterPage() {
               {logDialogItems.length === 0 ? (
                 <div className="text-center text-[#2B3A3B] py-6">沒有對話內容</div>
               ) : (
-                logDialogItems.map((it:any)=>(
+                logDialogItems.map((it: any) => (
                   <div key={it.id} className="p-3 rounded-xl border border-[#EADBC8]">
                     <p className="text-xs text-gray-600 mb-1">{formatHK(it.created_at)} · {it.sender_type}</p>
                     <p className="text-[#2B3A3B] whitespace-pre-wrap">{it.content || it.content_json?.text || '(空白)'}</p>
-                    {(((it.status && it.status!=='sent') ? true : false) || (it.error_message && it.error_message.trim()!=='')) && (
+                    {(((it.status && it.status !== 'sent') ? true : false) || (it.error_message && it.error_message.trim() !== '')) && (
                       <p className="text-xs text-rose-600 mt-1">狀態: {it.status || 'error'} · {it.error_message}</p>
                     )}
                   </div>

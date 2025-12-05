@@ -63,7 +63,7 @@ export async function callLLM(config: ModelConfig, messages: Message[]): Promise
     return response;
 }
 
-export async function generateImage(prompt: string, modelId: string = "openai/dall-e-3", systemPrompt?: string): Promise<string> {
+export async function generateImage(prompt: string, modelId: string = "openai/dall-e-3", systemPrompt?: string): Promise<{ url: string, usage?: any }> {
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     const openRouterKey = Deno.env.get('OPENROUTER_API_KEY');
 
@@ -119,20 +119,24 @@ export async function generateImage(prompt: string, modelId: string = "openai/da
         // Try to extract image URL from various possible locations in OpenRouter response
         // 1. Standard OpenRouter/Gemini image format in message
         if (data.choices?.[0]?.message?.images?.[0]?.image_url?.url) {
-            return data.choices[0].message.images[0].image_url.url;
+            return { url: data.choices[0].message.images[0].image_url.url, usage: data.usage };
         }
         // 2. Markdown image in content
         if (data.choices?.[0]?.message?.content) {
             const content = data.choices[0].message.content;
             const match = content.match(/\!\[.*?\]\((.*?)\)/);
             if (match && match[1]) {
-                return match[1];
+                return { url: match[1], usage: data.usage };
             }
             // If content is just a URL
             if (content.startsWith('http')) {
-                return content;
+                return { url: content, usage: data.usage };
             }
         }
+
+        // 3. Try to find any URL in the response (fallback)
+        // Log the full response for debugging
+        console.log('OpenRouter Response Data:', JSON.stringify(data, null, 2));
 
         throw new Error('Could not parse image URL from OpenRouter response');
     }
@@ -171,7 +175,9 @@ export async function generateImage(prompt: string, modelId: string = "openai/da
     }
 
     const data = await res.json();
-    return data.data[0].url;
+    const imageUrl = data.data[0].url;
+
+    return { url: imageUrl };
 }
 
 async function callOpenAICompatible(config: ModelConfig, messages: Message[]): Promise<LLMResponse> {

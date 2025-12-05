@@ -613,6 +613,7 @@ export interface UseAIRoomReturn {
   is_loading: boolean;
   error: string | null;
   sendMessage: (request: SendMessageRequest) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
   addRole: (request: CreateRoleInstanceRequest) => Promise<void>;
   removeRole: (role_instance_id: string) => Promise<void>;
   updateRoom: (updates: Partial<AIRoom>) => Promise<void>;

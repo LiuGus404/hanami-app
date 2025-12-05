@@ -51,6 +51,9 @@ export interface ModelConfig {
     display_name?: string;
     api_key_env?: string; // Env var name for the API key
     base_url?: string;
+    input_cost_usd?: number;
+    output_cost_usd?: number;
+    metadata?: any;
 }
 
 export interface MindBlock {

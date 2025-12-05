@@ -63,7 +63,7 @@ export const roomAPI = {
       if (!userId) {
         return [];
       }
-      
+
       const { data, error } = await supabase
         .from('ai_rooms')
         .select(`
@@ -118,7 +118,7 @@ export const roomAPI = {
       if (roomError) handleSupabaseError(roomError);
       if (!room) throw new AICompanionError('房間創建失敗');
 
-      const typedRoom = room as { id: string; [key: string]: any };
+      const typedRoom = room as { id: string;[key: string]: any };
 
       // 將創建者添加為房間擁有者
       const { error: memberError } = await supabase
@@ -379,7 +379,7 @@ export const roleAPI = {
       if (instanceError) handleSupabaseError(instanceError);
       if (!instance) throw new AICompanionError('創建角色實例失敗');
 
-      const typedInstance = instance as { id: string; [key: string]: any };
+      const typedInstance = instance as { id: string;[key: string]: any };
 
       // 添加到房間角色列表
       const { error: roomRoleError } = await supabase
@@ -443,8 +443,8 @@ export const roleAPI = {
 export const messageAPI = {
   // 獲取房間訊息
   async getRoomMessages(
-    roomId: string, 
-    limit: number = 50, 
+    roomId: string,
+    limit: number = 50,
     before?: string
   ): Promise<AIMessage[]> {
     try {
@@ -461,7 +461,7 @@ export const messageAPI = {
 
       const { data, error } = await query;
       if (error) handleSupabaseError(error);
-      
+
       return (data || []).reverse(); // 反轉為時間順序
     } catch (error) {
       console.error('獲取房間訊息失敗:', error);
@@ -482,7 +482,7 @@ export const messageAPI = {
           return crypto.randomUUID();
         }
         // Fallback：使用 Math.random 生成 UUID v4 格式
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
           const r = Math.random() * 16 | 0;
           const v = c === 'x' ? r : (r & 0x3 | 0x8);
           return v.toString(16);
@@ -510,7 +510,7 @@ export const messageAPI = {
 
       if (error) handleSupabaseError(error);
 
-      const typedData = data as { id?: string; [key: string]: any } | null;
+      const typedData = data as { id?: string;[key: string]: any } | null;
 
       // 如果有指定目標角色，創建一個處理中的 AI 回應
       if (request.target_role_instance_id) {
@@ -561,6 +561,60 @@ export const messageAPI = {
   // 刪除訊息
   async deleteMessage(messageId: string): Promise<void> {
     try {
+      // 1. 獲取訊息內容以檢查是否有圖片
+      const { data: message, error: fetchError } = await supabase
+        .from('ai_messages')
+        .select('content')
+        .eq('id', messageId)
+        .single();
+
+      if (fetchError) {
+        console.warn('刪除訊息時獲取內容失敗:', fetchError);
+        // 繼續刪除訊息，但可能無法刪除圖片
+      } else if (message) {
+        const messageContent = (message as { content?: string }).content;
+        if (messageContent) {
+          // 2. 檢查並提取圖片路徑
+          // 匹配 markdown 圖片語法: ![...](url)
+          const imageRegex = /!\[.*?\]\((.*?)\)/g;
+          let match;
+          const pathsToDelete: string[] = [];
+
+          while ((match = imageRegex.exec(messageContent)) !== null) {
+            const imageUrl = match[1];
+            // 使用 extractStoragePath 提取路徑
+            // 我們需要動態導入或假設它可用。由於這是 API 文件，我們最好在這裡實現簡單的提取邏輯或導入
+            // 簡單提取邏輯：
+            try {
+              if (imageUrl.includes('ai-images')) {
+                // 嘗試提取路徑：user_id/companion_id/timestamp.ext
+                // URL 格式可能是 .../public/ai-images/PATH 或 .../sign/ai-images/PATH
+                const pathMatch = imageUrl.match(/ai-images\/(.+?)(\?|$)/);
+                if (pathMatch && pathMatch[1]) {
+                  pathsToDelete.push(decodeURIComponent(pathMatch[1]));
+                }
+              }
+            } catch (e) {
+              console.warn('解析圖片路徑失敗:', imageUrl, e);
+            }
+          }
+
+          // 3. 刪除 Storage 中的圖片
+          if (pathsToDelete.length > 0) {
+            console.log('刪除關聯圖片:', pathsToDelete);
+            const { error: storageError } = await supabase.storage
+              .from('ai-images')
+              .remove(pathsToDelete);
+
+            if (storageError) {
+              console.error('刪除 Storage 圖片失敗:', storageError);
+              // 不阻擋訊息刪除
+            }
+          }
+        }
+      }
+
+      // 4. 刪除訊息記錄
       const { error } = await supabase
         .from('ai_messages')
         .delete()
@@ -656,8 +710,8 @@ export const memoryAPI = {
 
   // 獲取記憶列表
   async getMemories(
-    scope?: string, 
-    roomId?: string, 
+    scope?: string,
+    roomId?: string,
     userId?: string,
     limit: number = 50
   ): Promise<MemoryItem[]> {
@@ -737,7 +791,7 @@ export const usageAPI = {
       if (error) handleSupabaseError(error);
 
       // 處理統計資料
-      const usage = ((data || []) as Array<{ total_tokens?: number; cost_usd?: number; latency_ms?: number; provider?: string; model?: string; [key: string]: any }>);
+      const usage = ((data || []) as Array<{ total_tokens?: number; cost_usd?: number; latency_ms?: number; provider?: string; model?: string;[key: string]: any }>);
       const totalRequests = usage.length;
       const totalTokens = usage.reduce((sum, u) => sum + (u.total_tokens || 0), 0);
       const totalCost = usage.reduce((sum, u) => sum + (u.cost_usd || 0), 0);
@@ -799,7 +853,7 @@ export const usageAPI = {
       if (error) handleSupabaseError(error);
 
       // 處理統計資料（類似 getRoomUsage 的邏輯）
-      const usage = ((data || []) as Array<{ total_tokens?: number; cost_usd?: number; latency_ms?: number; [key: string]: any }>);
+      const usage = ((data || []) as Array<{ total_tokens?: number; cost_usd?: number; latency_ms?: number;[key: string]: any }>);
       const totalRequests = usage.length;
       const totalTokens = usage.reduce((sum, u) => sum + (u.total_tokens || 0), 0);
       const totalCost = usage.reduce((sum, u) => sum + (u.cost_usd || 0), 0);

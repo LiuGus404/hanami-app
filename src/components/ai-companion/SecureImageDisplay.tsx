@@ -8,8 +8,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { XMarkIcon, ArrowDownTrayIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { getSignedImageUrl, needsSignedUrl } from '@/lib/getSignedImageUrl';
+import { XMarkIcon, ArrowDownTrayIcon, MagnifyingGlassIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { getSignedImageUrl, needsSignedUrl, extractStoragePath } from '@/lib/getSignedImageUrl';
 
 interface SecureImageDisplayProps {
   imageUrl: string;
@@ -133,12 +133,16 @@ export function SecureImageDisplay({
 
     // ⭐ 如果當前 URL 是公開 URL 但載入失敗，嘗試使用代理 API
     if (signedUrl.includes('/storage/v1/object/public/ai-images')) {
-      const storagePath = signedUrl.match(/\/storage\/v1\/object\/public\/ai-images\/(.+?)(?:\?|$)/)?.[1];
+      // 使用 extractStoragePath 正確提取並解碼路徑
+      const storagePath = extractStoragePath(signedUrl);
+
       if (storagePath) {
+        // 再次編碼以確保 URL 參數正確（只編碼一次）
         const proxyUrl = `/api/storage/proxy-image?path=${encodeURIComponent(storagePath)}`;
 
         // 只在第一次失敗時嘗試代理，避免無限循環
         if (!signedUrl.includes('/api/storage/proxy-image')) {
+          console.log('🔄 [SecureImage] 嘗試使用代理載入:', proxyUrl);
           setSignedUrl(proxyUrl);
           setIsLoading(true);
           setHasError(false);
@@ -246,11 +250,17 @@ export function SecureImageDisplay({
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              圖片載入失敗
+              無法載入圖片
             </div>
-            <div className="text-xs text-red-400 break-all max-w-full">
-              嘗試載入：{signedUrl.substring(0, 100)}...
-            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(signedUrl, '_blank');
+              }}
+              className="text-xs underline hover:opacity-80"
+            >
+              點擊下載圖片
+            </button>
           </div>
         )}
 
@@ -276,35 +286,58 @@ export function SecureImageDisplay({
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              className="relative max-w-[85vw] max-h-[85vh] bg-white rounded-xl shadow-2xl overflow-auto flex flex-col"
+              className="relative group max-w-[85vw] max-h-[85vh] bg-white rounded-xl shadow-2xl overflow-auto flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* 工具欄 */}
-              <div className="absolute top-4 right-4 z-10 flex items-center space-x-2">
-                {/* 下載按鈕 */}
-                {onDownload && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDownload();
-                    }}
-                    className="p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-colors"
-                    aria-label="下載圖片"
-                    title="下載圖片"
-                  >
-                    <ArrowDownTrayIcon className="w-6 h-6 text-gray-800" />
-                  </button>
-                )}
-                {/* 關閉按鈕 */}
-                <button
-                  onClick={handleCloseZoom}
-                  className="p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-colors"
-                  aria-label="關閉"
-                >
-                  <XMarkIcon className="w-6 h-6 text-gray-800" />
-                </button>
-              </div>
+              {/* 錯誤狀態 */}
+              {hasError && ( // Changed 'error' to 'hasError' to match existing state
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-500 text-xs p-2 text-center">
+                  <ExclamationTriangleIcon className="w-6 h-6 mb-1 text-gray-400" />
+                  <span>{/* Assuming 'error' state variable exists or using a derived message */}
+                    {/* For simplicity, using a generic message here. If specific error message is needed,
+                a state variable like `errorMessage` should be introduced. */}
+                    {signedUrl.includes('404') || signedUrl.includes('not found') ? '圖片已過期' : '無法載入圖片'}
+                  </span>
 
+                  {/* 顯示詳細錯誤資訊的切換按鈕 */}
+                  {/* Assuming showErrorDetails state and setShowErrorDetails function exist */}
+                  {/* <button 
+            onClick={() => setShowErrorDetails(!showErrorDetails)}
+            className="mt-2 text-[10px] text-blue-500 hover:underline flex items-center"
+          >
+            {showErrorDetails ? '隱藏詳情' : '顯示詳情'}
+          </button> */}
+
+                  {/* 詳細錯誤資訊 (僅在展開時顯示) */}
+                  {/* {showErrorDetails && (
+             <div className="mt-1 w-full max-w-[200px] overflow-hidden">
+               <p className="truncate" title={error}>{error}</p>
+               <p className="truncate text-[9px] mt-0.5 text-gray-400" title={imageUrl}>URL: {imageUrl}</p>
+             </div>
+          )} */}
+
+                  {/* 下載按鈕 (即使出錯也嘗試提供，可能只是顯示問題) */}
+                  {imageUrl && !imageUrl.startsWith('blob:') && (
+                    <a
+                      href={imageUrl}
+                      download={`image-${Date.now()}.png`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 px-2 py-1 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-1"
+                    >
+                      <ArrowDownTrayIcon className="w-3 h-3" />
+                      <span>下載原圖</span>
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* 48小時過期警告 (僅在圖片成功載入且未出錯時顯示) */}
+              {!isLoading && !hasError && ( // Changed 'error' to 'hasError'
+                <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] py-1 px-2 text-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  ⚠️ 圖片將於 48 小時後移除，請及時保存
+                </div>
+              )}
               {/* 放大後的圖片 */}
               <div className="relative flex items-center justify-center p-4 min-h-0">
                 <div className="relative inline-block">
@@ -326,32 +359,32 @@ export function SecureImageDisplay({
                       maxHeight: '80vh'
                     }}
                   />
-                  {/* 水印 - 放大視圖右下角，根據圖片尺寸定位 */}
-                  {imageSize && (
-                    <div
-                      className="absolute pointer-events-none z-20"
-                      style={{
-                        bottom: '8px',
-                        right: '8px',
-                        width: '48px',
-                        height: '48px',
-                        // 確保水印不會超出圖片邊界
-                        maxWidth: `${Math.min(imageSize.width * 0.1, 48)}px`,
-                        maxHeight: `${Math.min(imageSize.height * 0.1, 48)}px`
-                      }}
-                    >
-                      <img
-                        src="/@hanami.png"
-                        alt="Hanami 水印"
-                        className="opacity-70 hover:opacity-90 transition-opacity w-full h-full"
-                        style={{
-                          filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))',
-                          objectFit: 'contain'
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
+                {/* 水印 - 放大視圖右下角，根據圖片尺寸定位 */}
+                {imageSize && (
+                  <div
+                    className="absolute pointer-events-none z-20"
+                    style={{
+                      bottom: '8px',
+                      right: '8px',
+                      width: '48px',
+                      height: '48px',
+                      // 確保水印不會超出圖片邊界
+                      maxWidth: `${Math.min(imageSize.width * 0.1, 48)}px`,
+                      maxHeight: `${Math.min(imageSize.height * 0.1, 48)}px`
+                    }}
+                  >
+                    <img
+                      src="/@hanami.png"
+                      alt="Hanami 水印"
+                      className="opacity-70 hover:opacity-90 transition-opacity w-full h-full"
+                      style={{
+                        filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))',
+                        objectFit: 'contain'
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -360,4 +393,3 @@ export function SecureImageDisplay({
     </>
   );
 }
-

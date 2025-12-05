@@ -152,6 +152,17 @@ export function useAIRoom(options: UseAIRoomOptions): UseAIRoomReturn {
     is_loading: isLoading,
     error,
     sendMessage,
+    deleteMessage: async (messageId: string) => {
+      try {
+        await aiAPI.message.deleteMessage(messageId);
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+        toast.success('訊息已刪除');
+      } catch (err: any) {
+        setError(err.message || '刪除訊息失敗');
+        toast.error('刪除訊息失敗');
+        throw err;
+      }
+    },
     addRole,
     removeRole,
     updateRoom,
@@ -518,6 +529,7 @@ export function useChatSession(roomId: string) {
     typingUsers,
     error,
     sendMessage: sendChatMessage,
+    deleteMessage: (messageId: string) => useAIRoom({ room_id: roomId, auto_load: false }).deleteMessage(messageId),
     updateRoleInstance: (instanceId: string, updates: Partial<RoleInstance>) =>
       useAIRoom({ room_id: roomId, auto_load: false }).updateRoleInstance(instanceId, updates),
     startNewSession,

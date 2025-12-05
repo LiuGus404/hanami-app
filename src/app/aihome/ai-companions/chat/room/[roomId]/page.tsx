@@ -7459,7 +7459,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
               )}
               <div className="relative overflow-hidden min-h-[100px]">
                 <motion.div
-                  className="flex w-full"
+                  className="flex w-full max-w-full"
                   initial={false}
                   animate={{ x: `-${currentActiveIndex * 100}%` }}
                   transition={{ type: 'spring', stiffness: 200, damping: 25 }}
@@ -7485,7 +7485,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                         key={`slide-${idx}`}
                         className="w-full flex-shrink-0 px-1"
                       >
-                        <div className="prose prose-sm max-w-none text-[#4B4036] leading-relaxed">
+                        <div className="prose prose-sm max-w-none text-[#4B4036] leading-relaxed break-words">
                           <div className="whitespace-pre-wrap">
                             {resp.content?.split(/\r\n|\r|\n/).map((line: string, i: number) => {
                               // Image detection logic (same as renderPlainText)
@@ -7595,7 +7595,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.1 }}
-                  className="rounded-3xl border border-[#EADBC8] bg-white p-6 shadow-sm hover:shadow-md transition-all duration-300"
+                  className="rounded-3xl border border-[#EADBC8] bg-white p-6 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <span className="px-3 py-1 rounded-xl bg-[#F8F5EC] text-[#4B4036] text-xs font-bold border border-[#EADBC8]">
@@ -7829,7 +7829,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                 return renderMoriMulti(rawMultiModel);
               }
               return (
-                <div className="whitespace-pre-wrap break-words">
+                <div className="whitespace-pre-wrap break-words overflow-x-auto max-w-full">
                   {renderPlainText()}
                   {renderMetadataFooter()}
                 </div>
