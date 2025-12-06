@@ -474,6 +474,7 @@ const safeJsonParse = async (response: Response, context: string = 'API') => {
 };
 export default function RoomChatPage() {
   const { user } = useSaasAuth();
+  const userId = user?.id;
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -2246,7 +2247,7 @@ export default function RoomChatPage() {
         cleanup();
       }
     };
-  }, [roomId, user]);
+  }, [roomId, userId]);
 
   // 最終 fallback：確保至少有一個角色顯示
   useEffect(() => {
@@ -2842,12 +2843,12 @@ export default function RoomChatPage() {
   // console.log('🎯 當前房間狀態:', { roomId, initialRoleParam, companionParam, activeRoles, selectedCompanion });
 
   const loadInitialMessages = useCallback(async () => {
-    if (!roomId || !user) return;
+    if (!roomId || !userId) return;
 
     try {
       console.log('🔍 載入聊天室歷史訊息:', roomId);
 
-      await ensureRoomMembership(roomId, user.id);
+      await ensureRoomMembership(roomId, userId);
 
       const { data, error } = await saasSupabase
         .from('ai_messages')
@@ -2917,10 +2918,10 @@ export default function RoomChatPage() {
       setHasLoadedHistory(true);
       setHasMoreMessages(false);
     }
-  }, [roomId, user, ensureRoomMembership, saasSupabase, transformSupabaseMessages, triggerSelectiveRender]);
+  }, [roomId, userId, ensureRoomMembership, saasSupabase, transformSupabaseMessages, triggerSelectiveRender]);
 
   const loadOlderMessages = useCallback(async (forceLoad = false) => {
-    if (!roomId || !user || isLoadingOlderMessages) return;
+    if (!roomId || !userId || isLoadingOlderMessages) return;
     if (!hasMoreMessages && !forceLoad) return;
 
     const oldestMessage = messages[0];
@@ -2999,7 +3000,7 @@ export default function RoomChatPage() {
     } finally {
       setIsLoadingOlderMessages(false);
     }
-  }, [roomId, user, isLoadingOlderMessages, hasMoreMessages, messages, saasSupabase, transformSupabaseMessages]);
+  }, [roomId, userId, isLoadingOlderMessages, hasMoreMessages, messages, saasSupabase, transformSupabaseMessages]);
 
   const handleMessagesScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const target = event.currentTarget;
@@ -3027,10 +3028,10 @@ export default function RoomChatPage() {
     setHasLoadedHistory(false);
     setHasMoreMessages(true);
 
-    if (!roomId || !user) return;
+    if (!roomId || !userId) return;
 
     loadInitialMessages();
-  }, [roomId, user, loadInitialMessages]);
+  }, [roomId, userId, loadInitialMessages]);
 
   // 初始化歡迎訊息（只在沒有歷史訊息時顯示）
   useEffect(() => {
