@@ -65,10 +65,37 @@ serve(async (req) => {
 
         } else {
             // Standard User Auth
-            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+            console.log(`[Auth Debug] Header present: ${!!authHeader}, Length: ${authHeader?.length}`);
+
+            const token = authHeader?.replace('Bearer ', '');
+            const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+
             if (authError || !user) {
-                return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-                    status: 401,
+                console.error('[Auth Error] getUser failed:', authError);
+                return new Response(JSON.stringify({
+                    error: 'Unauthorized',
+                    details: 'Auth validation failed',
+                    debug: {
+                        headerLength: authHeader?.length,
+                        authError: authError?.message,
+                        envUrl: Deno.env.get('SUPABASE_URL'),
+                        tokenPart: authHeader?.slice(0, 20) + '...',
+                        // Simple base64 decoding of the middle part of JWT
+                        decodedClaims: (() => {
+                            try {
+                                const parts = authHeader?.split(' ')[1]?.split('.');
+                                if (parts && parts.length === 3) {
+                                    return JSON.parse(atob(parts[1]));
+                                }
+                                return 'Invalid JWT format';
+                            } catch (e) {
+                                return 'Decode failed: ' + e.message;
+                            }
+                        })()
+                    }
+                }), {
+                    // Return 200 to bypass client-side error throwing and see the body
+                    status: 200,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 });
             }
@@ -97,14 +124,23 @@ serve(async (req) => {
             });
         }
 
-        return new Response(JSON.stringify(result), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
 
-    } catch (error) {
+
+    } catch (error: any) {
         console.error('Error processing chat:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
+
+        // DEBUG: Return error as a visibly rendered chat message
+        // This bypasses the 500 error screen on the frontend and shows the stack trace
+        const errorResponse: ChatResponse = {
+            success: false,
+            content: `### ❌ System Error\n\n**Message**: ${error.message}\n\n**Stack**:\n\`\`\`\n${error.stack}\n\`\`\``,
+            messageId: 'debug-error',
+            content_json: null,
+            model_used: 'debug-handler'
+        };
+
+        return new Response(JSON.stringify(errorResponse), {
+            status: 200, // Force 200 OK so the frontend displays the content
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }

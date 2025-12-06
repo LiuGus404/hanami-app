@@ -17,7 +17,7 @@ import {
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useTeacherAccess } from '@/hooks/saas/useTeacherAccess';
 import { useDirectTeacherAccess } from '@/hooks/saas/useDirectTeacherAccess';
-import { getSaasSupabaseClient } from '@/lib/supabase';
+import { createSaasClient } from '@/lib/supabase-saas';
 import toast from 'react-hot-toast';
 
 interface SidebarItem {
@@ -39,13 +39,13 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
   const [isMounted, setIsMounted] = useState(false);
   const { user } = useSaasAuth();
   const { hasTeacherAccess, checkTeacherAccess, teacherAccess, forceRefreshState, loading } = useTeacherAccess();
-  const { 
-    hasTeacherAccess: directHasTeacherAccess, 
+  const {
+    hasTeacherAccess: directHasTeacherAccess,
     checkTeacherAccess: directCheckTeacherAccess,
     teacherAccess: directTeacherAccess,
     loading: directLoading
   } = useDirectTeacherAccess();
-  const saasSupabase = useMemo(() => getSaasSupabaseClient(), []);
+  const saasSupabase = useMemo(() => createSaasClient(), []);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
 
@@ -111,7 +111,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
 
       try {
         let query = saasSupabase.from('saas_users').select('user_role');
-        
+
         if (userId) {
           query = query.eq('id', userId);
         } else if (userEmail) {
@@ -149,23 +149,23 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
 
   const sidebarMenuItems: SidebarItem[] = useMemo(() => {
     const baseItems: SidebarItem[] = [
-      { 
-        icon: HomeIcon, 
-        label: '首頁', 
-        href: '/aihome', 
-        description: '返回主頁' 
+      {
+        icon: HomeIcon,
+        label: '首頁',
+        href: '/aihome',
+        description: '返回主頁'
       },
-      { 
-        icon: CalendarDaysIcon, 
-        label: '課程活動', 
-        href: '/aihome/course-activities', 
-        description: '查看所有報讀的機構和課程活動' 
+      {
+        icon: CalendarDaysIcon,
+        label: '課程活動',
+        href: '/aihome/course-activities',
+        description: '查看所有報讀的機構和課程活動'
       },
-      { 
-        icon: UsersIcon, 
-        label: '家長連結', 
-        href: '/aihome/parent/bound-students', 
-        description: '查看孩子的學習' 
+      {
+        icon: UsersIcon,
+        label: '家長連結',
+        href: '/aihome/parent/bound-students',
+        description: '查看孩子的學習'
       },
       {
         icon: BriefcaseIcon,
@@ -173,11 +173,11 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         href: '/aihome/teacher-link',
         description: '建立與管理您的課程機構',
       },
-      { 
-        icon: SparklesIcon, 
-        label: 'AI伙伴', 
-        href: '/aihome/ai-companions', 
-        description: '您的工作和學習伙伴' 
+      {
+        icon: SparklesIcon,
+        label: 'AI伙伴',
+        href: '/aihome/ai-companions',
+        description: '您的工作和學習伙伴'
       },
     ];
 
@@ -193,10 +193,10 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
 
     // 添加設定選項
     baseItems.push({
-      icon: UserIcon, 
-      label: '設定', 
-      href: '/aihome/profile', 
-      description: '管理您的個人信息和系統設定' 
+      icon: UserIcon,
+      label: '設定',
+      href: '/aihome/profile',
+      description: '管理您的個人信息和系統設定'
     });
 
     return baseItems;
@@ -250,9 +250,9 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 relative">
-                    <img 
-                      src="/@hanami.png" 
-                      alt="HanamiEcho Logo" 
+                    <img
+                      src="/@hanami.png"
+                      alt="HanamiEcho Logo"
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -276,8 +276,8 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
             <nav className="flex-1 overflow-y-auto p-4 space-y-2">
               {sidebarMenuItems.map((item, index) => {
                 const isActive = currentPath === item.href;
-                
-                
+
+
                 return (
                   <motion.button
                     key={item.href}
@@ -285,20 +285,17 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                     onClick={() => handleItemClick(item.href)}
-                    className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200 ${
-                      isActive 
-                        ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md' 
+                    className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200 ${isActive
+                        ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md'
                         : 'text-[#2B3A3B] hover:bg-[#FFD59A]/20'
-                    }`}
+                      }`}
                   >
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      isActive 
-                        ? 'bg-white/80' 
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isActive
+                        ? 'bg-white/80'
                         : 'bg-[#FFD59A]/20'
-                    }`}>
-                      <item.icon className={`w-5 h-5 ${
-                        isActive ? 'text-[#4B4036]' : 'text-[#4B4036]'
-                      }`} />
+                      }`}>
+                      <item.icon className={`w-5 h-5 ${isActive ? 'text-[#4B4036]' : 'text-[#4B4036]'
+                        }`} />
                     </div>
                     <div className="flex-1 text-left">
                       <div className="font-medium text-[#4B4036]">{item.label}</div>
@@ -316,7 +313,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
           </motion.div>
         )}
       </AnimatePresence>
-      
+
     </>
   );
 }

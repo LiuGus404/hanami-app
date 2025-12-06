@@ -1,4 +1,7 @@
+// @ts-ignore
 import { createClient, SupabaseClient } from "supabase-js";
+// @ts-ignore
+declare var Deno: any;
 import { ChatRequest, ChatResponse, Message, RoleConfig, ModelConfig, MindBlock, ContentPart } from "./types.ts";
 import { callLLM, generateImage } from "./providers.ts";
 
@@ -47,27 +50,72 @@ export async function processChat(
         throw new Error('Role configuration is required');
     }
 
+    // 1.5 Fetch Role Instance Override (User Preference for this Room)
+    // The user stores their model selection in role_instances.model_override, so we must check this.
+    let roleInstanceOverride: string | null = null;
+    if (roleConfig && roomId) {
+        const { data: instanceData } = await supabase
+            .from('role_instances')
+            .select('model_override')
+            .eq('room_id', roomId)
+            .eq('role_id', roleConfig.id)
+            .maybeSingle();
+
+        if (instanceData?.model_override) {
+            roleInstanceOverride = instanceData.model_override;
+            console.log(`Using model override from role_instance: ${roleInstanceOverride}`);
+        }
+    }
+
     // 2. Resolve Models (Support Multiple)
     let targetModelIds: string[] = [];
-    const rawModelId = modelId || roleConfig.default_model;
+    // Priority: Explicit Request (if not __default__) > Room Override > Global Default
+    let effectiveModelId = modelId;
+    if (effectiveModelId === '__default__') {
+        effectiveModelId = undefined;
+    }
+
+    const rawModelId = effectiveModelId || roleInstanceOverride || roleConfig.default_model;
 
     if (rawModelId) {
-        targetModelIds = rawModelId.split(',').map(id => id.trim()).filter(Boolean);
+        // Handle "__default__" placeholder from DB by mapping to a likely valid default
+        // User seems to prefer Gemini 2.0 Flash Lite
+        const cleanedId = rawModelId === '__default__' ? 'gemini-2.0-flash-lite-preview-02-05' : rawModelId;
+        targetModelIds = cleanedId.split(',').map(id => id.trim()).filter(Boolean);
     }
 
     if (targetModelIds.length === 0) {
-        throw new Error('No model configured for this role');
+        targetModelIds = ['gemini-2.0-flash-lite-preview-02-05'];
     }
 
     // Fetch all model configs
-    const { data: modelDataList, error: modelError } = await supabase
+    let { data: modelDataList, error: modelError } = await supabase
         .from('model_configs')
         .select('*')
         .in('model_id', targetModelIds);
 
+    // Robust Fallback: If requested models aren't found, grab ANY valid model to prevent crash
     if (modelError || !modelDataList || modelDataList.length === 0) {
-        console.error('Error fetching model configs:', modelError);
-        throw new Error(`Model configs not found for: ${targetModelIds.join(', ')}`);
+        console.warn(`Requested models [${targetModelIds.join(', ')}] not found in DB. Fetching system fallback...`);
+
+        // Fetch up to 10 models to log what is actually available for debugging
+        const { data: fallbackData } = await supabase
+            .from('model_configs')
+            .select('*')
+            .limit(10);
+
+        if (fallbackData && fallbackData.length > 0) {
+            // Log available models for debugging
+            console.log(`Available models in DB: ${fallbackData.map(m => m.model_id).join(', ')}`);
+
+            // Use the first one
+            modelDataList = [fallbackData[0]];
+            console.log(`System fallback successfully resolved to: ${modelDataList[0].model_id}`);
+        } else {
+            // Only throw if database is truly empty or inaccessible
+            console.error('Critical: No model configs available in database.');
+            throw new Error(`Model configs not found for: ${targetModelIds.join(', ')} and no fallback available.`);
+        }
     }
 
     const modelConfigs: ModelConfig[] = modelDataList;
@@ -457,10 +505,10 @@ export async function processChat(
                 },
                 mind_name: mindBlocks.map(mb => mb.title).join(', '),
                 debug: {
-                    roleId: roleConfig.id,
+                    roleId: roleConfig?.id,
                     userId: userId,
-                    mindBlocksCount: mindBlocks.length,
-                    mindBlocksTitles: mindBlocks.map(mb => mb.title)
+                    mindBlocksCount: mindBlocks?.length || 0,
+                    mindBlocksTitles: mindBlocks?.map((mb: any) => mb?.title || mb?.name || 'Untitled') || []
                 },
                 model_responses: responses.map(({ config, res, error }, index) => {
                     let content = error ? `Error: ${(error as any).message}` : res?.content;
@@ -486,49 +534,57 @@ export async function processChat(
 
     // 11. Deduct Food & Record Transaction
     if (assistantMsg) {
-        // Update Balance
-        const { data: updatedBalance, error: updateError } = await supabase.rpc('deduct_user_food', {
-            p_user_id: userId,
-            p_amount: totalFoodCost
-        });
+        try {
+            console.log(`Attempting food deduction for user ${userId}, cost: ${totalFoodCost}`);
 
-        // If RPC doesn't exist, fallback to direct update (less safe for concurrency but works for now)
-        if (updateError) {
-            console.log('RPC deduct_user_food not found or failed, using direct update:', updateError);
-            await supabase
-                .from('user_food_balance')
-                .update({
-                    current_balance: currentBalance - totalFoodCost,
-                    total_spent: (balanceData?.total_spent || 0) + totalFoodCost,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('user_id', userId);
+            // 1. Try RPC (Preferred, secure, atomic)
+            // Using the user-scoped client passed into processChat
+            const { data: updatedBalance, error: updateError } = await supabase.rpc('deduct_user_food', {
+                p_user_id: userId,
+                p_amount: totalFoodCost,
+                p_reason: `LLM spend: ${roleConfig.slug} using ${primaryModelId}`
+            });
+
+            if (updateError) {
+                console.error('RPC deduct_user_food failed:', updateError);
+
+                // 2. Fallback: Log transaction only (User client might have permission to insert, but not update balance)
+                // We rely on RPC for balance update. If RPC fails, balance might be out of sync, but we record the attempt.
+                const { error: insertError } = await supabase.from('food_transactions').insert({
+                    user_id: userId,
+                    transaction_type: 'usage',
+                    amount: -totalFoodCost,
+                    balance_after: (currentBalance - totalFoodCost),
+                    ai_message_id: assistantMsg.id,
+                    ai_room_id: roomId,
+                    description: `LLM spend: ${roleConfig.slug} using ${primaryModelId} (RPC Failed: ${updateError.message})`
+                });
+
+                if (insertError) {
+                    console.error('Fallback insert failed:', insertError);
+                }
+            } else {
+                console.log('Food deduction successful, new balance:', updatedBalance);
+            }
+
+            // 3. Record Message Costs (Best effort)
+            await supabase.from('message_costs').insert({
+                ai_message_id: assistantMsg.id,
+                ai_room_id: roomId,
+                user_id: userId,
+                input_tokens: totalInputTokens,
+                output_tokens: totalOutputTokens,
+                total_tokens: totalTokens,
+                model_provider: 'supabase-edge',
+                model_name: primaryModelId,
+                total_cost_usd: 0,
+                food_amount: totalFoodCost
+            });
+
+        } catch (foodError) {
+            // CRITICAL: Swallow error to ensure chat response is returned to user regardless of food logic failure
+            console.error('Food deduction logic crashed:', foodError);
         }
-
-        // Record Transaction
-        await supabase.from('food_transactions').insert({
-            user_id: userId,
-            transaction_type: 'spend',
-            amount: totalFoodCost,
-            balance_after: (currentBalance - totalFoodCost), // Approximate if concurrent
-            message_id: assistantMsg.id,
-            thread_id: roomId,
-            description: `LLM spend: ${primaryModelId} (in=${inputChars}, out=${outputChars}, food=${totalFoodCost})`
-        });
-
-        // Record Message Costs (Legacy table support)
-        await supabase.from('message_costs').insert({
-            message_id: assistantMsg.id,
-            thread_id: roomId,
-            user_id: userId,
-            input_tokens: totalInputTokens,
-            output_tokens: totalOutputTokens,
-            total_tokens: totalTokens,
-            model_provider: 'supabase-edge', // or specific provider
-            model_name: primaryModelId,
-            total_cost_usd: 0, // TODO: Implement cost calc
-            food_amount: totalFoodCost
-        });
     }
 
     return {

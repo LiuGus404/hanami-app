@@ -13,7 +13,7 @@ import {
     SparklesIcon,
     ArrowPathIcon,
 } from '@heroicons/react/24/outline';
-import { getSaasSupabaseClient } from '@/lib/supabase';
+import { createSaasClient } from '@/lib/supabase-saas';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import type { AIRole } from '@/types/ai-companion';
 import type { MindBlock } from '@/types/mind-block';
@@ -30,7 +30,7 @@ interface EquippedBlock extends MindBlock {
 }
 
 export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanelProps) {
-    const supabase = getSaasSupabaseClient();
+    const supabase = createSaasClient();
     const { user: currentUser } = useSaasAuth();
 
     const [roles, setRoles] = useState<AIRole[]>([]);
@@ -105,8 +105,8 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                             .order('created_at', { ascending: false })
                     ]);
 
-                    const publicRoles = publicRolesResult.data || [];
-                    const userRoles = userRolesResult.data || [];
+                    const publicRoles = (publicRolesResult.data as any[]) || [];
+                    const userRoles = (userRolesResult.data as any[]) || [];
 
                     console.log('🔍 [角色装备] 公开角色数量:', publicRoles.length);
                     console.log('🔍 [角色装备] 用户角色数量:', userRoles.length);
@@ -120,20 +120,20 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
 
                     // 合并并去重（基于 id）
                     const allRolesMap = new Map<string, AIRole>();
-                    [...publicRoles, ...userRoles].forEach(role => {
+                    [...publicRoles, ...userRoles].forEach((role: any) => {
                         allRolesMap.set(role.id, role as any);
                     });
 
-                    const allRoles = Array.from(allRolesMap.values());
+                    const allRoles = Array.from(allRolesMap.values()) as any[];
                     console.log('✅ [角色装备] 合并后角色数量:', allRoles.length);
                     setRoles(allRoles);
                 } else {
                     // 成功获取所有角色
-                    const allRoles = allRolesData || [];
+                    const allRoles = (allRolesData as any[]) || [];
                     console.log('✅ [角色装备] 成功加载所有角色，数量:', allRoles.length);
 
                     // 过滤：只显示公开角色或用户自己创建的角色
-                    const filteredRoles = allRoles.filter(role =>
+                    const filteredRoles = allRoles.filter((role: any) =>
                         role.is_public === true || role.creator_user_id === currentUser.id
                     );
 
@@ -158,8 +158,8 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
         setIsLoadingBlocks(true);
         try {
             // 先获取装备记录
-            const { data: equipmentData, error: equipmentError } = await supabase
-                .from('role_mind_blocks' as any)
+            const { data: equipmentData, error: equipmentError } = await (supabase as any)
+                .from('role_mind_blocks')
                 .select('id, is_active, mind_block_id')
                 .eq('role_id', roleId)
                 .eq('user_id', currentUser.id)
@@ -230,8 +230,8 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
 
         try {
             // 检查是否已经装备
-            const { data: existing } = await supabase
-                .from('role_mind_blocks' as any)
+            const { data: existing } = await (supabase as any)
+                .from('role_mind_blocks')
                 .select('id')
                 .eq('role_id', selectedRole.id)
                 .eq('mind_block_id', mindBlockId)
@@ -240,8 +240,8 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
 
             if (existing) {
                 // 如果已存在，激活它
-                const { error } = await supabase
-                    .from('role_mind_blocks' as any)
+                const { error } = await (supabase as any)
+                    .from('role_mind_blocks')
                     .update({ is_active: true })
                     .eq('id', (existing as any).id);
 
@@ -249,8 +249,8 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                 toast.success('思维积木已激活');
             } else {
                 // 创建新的装备记录
-                const { error } = await supabase
-                    .from('role_mind_blocks' as any)
+                const { error } = await (supabase as any)
+                    .from('role_mind_blocks')
                     .insert({
                         role_id: selectedRole.id,
                         mind_block_id: mindBlockId,
@@ -279,8 +279,8 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
         if (!confirm('确定要卸载这个思维积木吗？')) return;
 
         try {
-            const { error } = await supabase
-                .from('role_mind_blocks' as any)
+            const { error } = await (supabase as any)
+                .from('role_mind_blocks')
                 .update({ is_active: false })
                 .eq('id', equipmentId);
 
@@ -382,8 +382,8 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                                             {role.name && role.name.length > 20 ? role.name.substring(0, 20) + '...' : role.name}
                                         </div>
                                         <div className="text-xs text-[#4B4036]/60 truncate" title={role.description || '无描述'}>
-                                            {role.description && role.description.length > 30 
-                                                ? role.description.substring(0, 30) + '...' 
+                                            {role.description && role.description.length > 30
+                                                ? role.description.substring(0, 30) + '...'
                                                 : (role.description || '无描述')}
                                         </div>
                                     </div>
@@ -414,8 +414,8 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                             <div className="flex items-center justify-between gap-2">
                                 <span className="text-[#4B4036]/60 flex-shrink-0">默认模型:</span>
                                 <span className="font-medium text-[#4B4036] truncate text-right" title={selectedRole.default_model}>
-                                    {selectedRole.default_model && selectedRole.default_model.length > 30 
-                                        ? selectedRole.default_model.substring(0, 30) + '...' 
+                                    {selectedRole.default_model && selectedRole.default_model.length > 30
+                                        ? selectedRole.default_model.substring(0, 30) + '...'
                                         : selectedRole.default_model}
                                 </span>
                             </div>

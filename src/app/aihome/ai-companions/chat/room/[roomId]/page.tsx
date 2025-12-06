@@ -47,7 +47,7 @@ const parseMultiModelContent = (content: string) => {
 };
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
-import { getSaasSupabaseClient } from '@/lib/supabase';
+import { createSaasClient } from '@/lib/supabase-saas';
 import Image from 'next/image';
 import { MessageStatusIndicator } from '@/components/ai-companion/MessageStatusIndicator';
 import { FoodBalanceDisplay } from '@/components/ai-companion/FoodBalanceDisplay';
@@ -480,7 +480,7 @@ export default function RoomChatPage() {
   const roomId = params.roomId as string;
 
   // 使用 SaaS 系統的 Supabase 客戶端
-  const saasSupabase = getSaasSupabaseClient();
+  const saasSupabase = createSaasClient();
   // 使用更可靠的方法獲取 URL 參數 - 使用 Next.js 的 useSearchParams
   const [urlParams, setUrlParams] = useState<{ initialRole?: string, companion?: string }>({});
 
@@ -691,7 +691,7 @@ export default function RoomChatPage() {
   // Update Role Instance Helper
   const handleUpdateRoleInstance = async (instanceId: string, updates: Partial<RoleInstance>) => {
     try {
-      const supabase = getSaasSupabaseClient();
+      const supabase = createSaasClient();
 
       // Sync mind blocks to role_mind_blocks table if equipped_blocks is updated
       if (updates.settings && (updates.settings as any).equipped_blocks) {
@@ -706,7 +706,7 @@ export default function RoomChatPage() {
       }
 
       // 1. Update instance
-      const { data: instanceData, error } = await supabase
+      const { data: instanceData, error } = await (supabase as any)
         .from('role_instances')
         .update(updates)
         .eq('id', instanceId)
@@ -1145,7 +1145,7 @@ export default function RoomChatPage() {
       else if (roleId === 'mori') setLoadingMoriModels(true);
       else setLoadingHibiModels(true);
 
-      const supabase = getSaasSupabaseClient();
+      const supabase = createSaasClient();
 
       // 映射 companion.id 到實際的 slug
       const getRoleSlug = (companionId: string) => {
@@ -1224,8 +1224,12 @@ export default function RoomChatPage() {
       } else {
         // 使用系統預設
         if (roleId === 'pico') {
-          setPicoSelectedModel(DEFAULT_MODEL_SENTINEL);
+          setPicoSelectedModel(systemDefault);
           setPicoModelSearch('');
+          if (availableModels.length > 0) {
+            const modelData = availableModels.find((m: any) => m.model_id === systemDefault);
+            setPicoModelSearch(modelData?.display_name || systemDefault);
+          }
         } else if (roleId === 'mori') {
           // Mori 預設是多選模型
           if (systemDefault.includes(',')) {
@@ -1233,13 +1237,19 @@ export default function RoomChatPage() {
             setMoriSelectedModelsMulti(modelIds);
             setMoriSelectedModel(DEFAULT_MODEL_SENTINEL);
           } else {
-            setMoriSelectedModel(DEFAULT_MODEL_SENTINEL);
+            setMoriSelectedModel(systemDefault);
             setMoriSelectedModelsMulti([]);
-            setMoriModelSearch('');
+            if (availableModels.length > 0) {
+              const modelData = availableModels.find((m: any) => m.model_id === systemDefault);
+              setMoriModelSearch(modelData?.display_name || systemDefault);
+            }
           }
         } else { // hibi
-          setHibiSelectedModel(DEFAULT_MODEL_SENTINEL);
-          setHibiModelSearch('');
+          setHibiSelectedModel(systemDefault);
+          if (availableModels.length > 0) {
+            const modelData = availableModels.find((m: any) => m.model_id === systemDefault);
+            setHibiModelSearch(modelData?.display_name || systemDefault);
+          }
         }
       }
     } catch (error) {
@@ -1299,7 +1309,7 @@ export default function RoomChatPage() {
     if (!user?.id) return;
 
     try {
-      const supabase = getSaasSupabaseClient();
+      const supabase = createSaasClient();
 
       // 映射 companion.id 到實際的 slug
       const getRoleSlug = (companionId: string) => {
@@ -1610,7 +1620,7 @@ export default function RoomChatPage() {
     try {
       console.log('🔍 載入房間資訊:', roomId);
 
-      const supabase = getSaasSupabaseClient();
+      const supabase = createSaasClient();
 
       // 載入房間基本資訊
       const { data: roomData, error: roomError } = await supabase
@@ -1645,7 +1655,7 @@ export default function RoomChatPage() {
             .select('*')
             .in('id', roleInstanceIds);
 
-          let roleInstances = roleInstancesData;
+          let roleInstances: any[] = (roleInstancesData as any[]) || [];
 
           if (!roleInstancesError && roleInstancesData && roleInstancesData.length > 0) {
             // Fetch roles separately
@@ -1784,7 +1794,7 @@ export default function RoomChatPage() {
   // 載入角色設定的輔助函數
   const loadRoleSettings = async (roleId: string, userId: string) => {
     try {
-      const supabase = getSaasSupabaseClient();
+      const supabase = createSaasClient();
 
       // 映射 companion.id 到實際的 slug
       const getRoleSlug = (companionId: string) => {
@@ -2883,6 +2893,18 @@ export default function RoomChatPage() {
         console.log('🔄 [載入] 檢測到最後一條用戶訊息狀態為 processing，顯示思考 UI');
         setIsLoading(true);
         setIsTyping(true);
+
+        // ⭐ 安全機制：8秒後強制解除載入狀態，防止 UI 永久卡死
+        setTimeout(() => {
+          setIsLoading(current => {
+            if (current) {
+              console.warn('⚠️ [UI Safety] 8秒超時，強制解除載入狀態');
+              return false;
+            }
+            return current;
+          });
+          setIsTyping(false);
+        }, 8000);
       }
 
       triggerSelectiveRender('進入/刷新聊天室');
@@ -4169,7 +4191,11 @@ export default function RoomChatPage() {
           roomId: roomId,
           companionId: roleHint,
           userId: user?.id, // Pass userId for service role calls
-          // modelId: selectedModel, // TODO: 從狀態獲取選擇的模型
+          modelId: roleHint === 'mori'
+            ? moriSelectedModelsMulti.join(',')
+            : roleHint === 'hibi' ? hibiSelectedModel
+              : roleHint === 'pico' ? picoSelectedModel
+                : undefined,
           attachments: [] // TODO: 支援附件
         }
       });
@@ -4179,7 +4205,7 @@ export default function RoomChatPage() {
         throw error;
       }
 
-      console.log('✅ Edge Function 回應:', data);
+      console.log('✅ Edge Function 回應:', JSON.stringify(data, null, 2));
 
       if (data.success && data.content) {
         // 成功，Edge Function 已經儲存了 assistant 訊息
@@ -4331,6 +4357,7 @@ export default function RoomChatPage() {
     // ⭐ 在發送前再次查詢輪候人數（排除即將發送的訊息）
     if (roleHint && ['hibi', 'mori', 'pico'].includes(roleHint)) {
       try {
+        console.log(`📋 [發送前] 準備查詢輪候人數 (${roleHint})...`);
         const queueCount = await getProcessingQueueCount(roleHint as 'hibi' | 'mori' | 'pico', tempClientMsgId);
         setQueueCount(queueCount);
         console.log(`📋 [發送前] ${roleHint} 前面還有 ${queueCount} 個訊息正在排隊/處理中`);
@@ -4368,6 +4395,21 @@ export default function RoomChatPage() {
       processedMessageIds.current.delete(tempMessageId);
       processedMessageIds.current.add(savedMessageId);
 
+      // Check Session Before Invoke
+      const { data: sessionData } = await saasSupabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      console.log(`🔑 [Edge] Invoke Token Check: ${token ? 'Present (' + token.substring(0, 10) + '...)' : 'MISSING'}`);
+
+      if (!token) {
+        console.error('❌ [Edge] No Auth Token available! Aborting invoke.');
+        // Try to refresh session?
+        const { data: refreshData, error: refreshError } = await saasSupabase.auth.refreshSession();
+        if (refreshError || !refreshData.session) {
+          throw new Error('User not authenticated (No Session)');
+        }
+        console.log('🔄 [Edge] Session refreshed successfully.');
+      }
+
       // 2. 呼叫 Edge Function
       await callChatProcessor(messageContent, roomId, roleHint || 'hibi');
 
@@ -4376,6 +4418,11 @@ export default function RoomChatPage() {
 
     } catch (error) {
       console.error('❌ [Edge] 發送失敗:', error);
+      // Log the full error object structure
+      if (typeof error === 'object' && error !== null) {
+        console.error('❌ [Edge] Error Details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      }
+
       const { default: toast } = await import('react-hot-toast');
       toast.error('發送失敗，請稍後再試');
 
@@ -7157,8 +7204,8 @@ interface MessageBubbleProps {
 }
 function MessageBubble({ message, companion, onDelete, isHighlighted = false }: MessageBubbleProps) {
   // Debug log to verify component render
-  console.log('🔍 [MessageBubble] Rendering message:', message.id, 'Sender:', message.sender, 'Content length:', message.content?.length);
-  console.log('🔍 [MessageBubble] Full content preview:', message.content?.substring(0, 500));
+  // console.log('🔍 [MessageBubble] Rendering message:', message.id, 'Sender:', message.sender, 'Content length:', message.content?.length);
+  // console.log('🔍 [MessageBubble] Full content preview:', message.content?.substring(0, 500));
 
   const [isHovered, setIsHovered] = useState(false);
   const isUser = message.sender === 'user';
@@ -7191,11 +7238,11 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
       const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
 
       // Log every line to see what's happening
-      console.log(`🔍 [MessageBubble] Line ${index}:`, line.substring(0, 50), 'Has markdown start:', line.includes('!['), 'Has markdown end:', line.includes(']('));
+      // console.log(`🔍 [MessageBubble] Line ${index}:`, line.substring(0, 50), 'Has markdown start:', line.includes('!['), 'Has markdown end:', line.includes(']('));
 
       if (line.includes('![') && line.includes('](')) {
-        console.log('🔍 [MessageBubble] Potential markdown image detected:', line);
-        console.log('🔍 [MessageBubble] Match result:', imageMatch);
+        // console.log('🔍 [MessageBubble] Potential markdown image detected:', line);
+        // console.log('🔍 [MessageBubble] Match result:', imageMatch);
 
         // Fallback if regex fails but we suspect an image
         if (!imageMatch) {
