@@ -187,6 +187,43 @@ export default function HanamiMusicRegisterPage() {
     return courseTypesByOrg[formData.organizationId] || [];
   }, [courseTypesByOrg, formData.organizationId]);
 
+  // 計算機構的試堂價格
+  const organizationTrialPrice = useMemo(() => {
+    // 如果沒有選擇機構，返回默認價格
+    if (!formData.organizationId || displayedCourseTypes.length === 0) {
+      return 168; // 默認試堂價格
+    }
+
+    // 從機構設置中獲取試堂價格（如果有的話）
+    const orgSettings = selectedOrganization?.settings as any;
+    if (orgSettings?.trialPrice && typeof orgSettings.trialPrice === 'number') {
+      return orgSettings.trialPrice;
+    }
+
+    // 從該機構下的課程類型中獲取試堂價格
+    for (const course of displayedCourseTypes) {
+      // 檢查課程類型是否有 discount_configs
+      const courseData = course as any;
+      if (courseData.discount_configs && typeof courseData.discount_configs === 'object') {
+        const discountConfigs = courseData.discount_configs;
+        const trialBundles = Array.isArray(discountConfigs.trialBundles) ? discountConfigs.trialBundles : [];
+        const firstActiveTrial = trialBundles.find((b: any) => b?.is_active !== false) || trialBundles[0];
+        
+        if (firstActiveTrial?.price != null) {
+          return Number(firstActiveTrial.price);
+        }
+      }
+      
+      // 如果沒有試堂套票，使用課程的單堂價格
+      if (courseData.price_per_lesson && typeof courseData.price_per_lesson === 'number' && courseData.price_per_lesson > 0) {
+        return courseData.price_per_lesson;
+      }
+    }
+
+    // 如果都沒有找到，返回默認價格
+    return 168;
+  }, [formData.organizationId, displayedCourseTypes, selectedOrganization]);
+
   useEffect(() => {
     if (!formData.organizationId || displayedCourseTypes.length === 0) return;
     setFormData(prev => {
@@ -2065,7 +2102,7 @@ export default function HanamiMusicRegisterPage() {
                           <SparklesIcon className="w-12 h-12 sm:w-16 sm:h-16 text-[#4B4036] mx-auto mb-4" />
                           <h3 className="text-xl sm:text-2xl font-bold text-[#4B4036] mb-2">試堂</h3>
                           <p className="text-sm sm:text-base text-[#2B3A3B] mb-2">以"最優惠"價格體驗課堂</p>
-                          <p className="text-lg sm:text-xl font-bold text-green-600">試堂$168</p>
+                          <p className="text-lg sm:text-xl font-bold text-green-600">試堂${organizationTrialPrice}</p>
                         </motion.button>
 
                         <motion.button
@@ -3208,7 +3245,7 @@ export default function HanamiMusicRegisterPage() {
                       <PaymentMethodSelector
                         selectedMethod={formData.paymentMethod}
                         onMethodChange={(methodId) => setFormData(prev => ({ ...prev, paymentMethod: methodId, screenshotUploaded: false }))}
-                        amount={formData.courseNature === 'trial' ? 168 : (() => {
+                        amount={formData.courseNature === 'trial' ? organizationTrialPrice : (() => {
                           if (priceCalculation) {
                             return priceCalculation.final_price;
                           }

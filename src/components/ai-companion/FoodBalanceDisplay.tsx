@@ -4,6 +4,14 @@ import React, { useState, useEffect, Fragment } from 'react';
 import { motion } from 'framer-motion';
 import { Popover, Transition } from '@headlessui/react';
 import { useHanamiEcho } from '@/hooks/useHanamiEcho';
+import {
+  SparklesIcon,
+  AcademicCapIcon,
+  PaintBrushIcon,
+  CurrencyDollarIcon,
+  CpuChipIcon,
+  ShoppingBagIcon
+} from '@heroicons/react/24/outline';
 
 interface FoodBalanceDisplayProps {
   userId: string;
@@ -41,14 +49,14 @@ export function FoodBalanceDisplay({ userId, className = '' }: FoodBalanceDispla
             as={motion.button}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.05, backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
             whileTap={{ scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className={`relative flex items-center space-x-2 bg-white rounded-2xl px-3 py-2 shadow-sm hover:shadow-md transition-all border border-gray-100 outline-none focus:ring-2 focus:ring-[#8BC34A] focus:ring-opacity-50 ${className}`}
+            className={`relative flex items-center space-x-2 bg-white/60 backdrop-blur-md rounded-2xl px-3 py-2 shadow-sm hover:shadow-md transition-all border border-stone-200/50 outline-none focus:ring-2 focus:ring-[#8BC34A] focus:ring-opacity-50 group ${className}`}
             title="查看食量記錄"
           >
             {/* 蘋果圖標 */}
-            <div className="w-5 h-5 flex-shrink-0">
+            <div className="w-5 h-5 flex-shrink-0 drop-shadow-sm group-hover:drop-shadow-md transition-all">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-full h-full">
                 {/* 葉子 */}
                 <ellipse cx="55" cy="15" rx="12" ry="8" fill="#8BC34A" transform="rotate(-20 55 15)" />
@@ -76,7 +84,7 @@ export function FoodBalanceDisplay({ userId, className = '' }: FoodBalanceDispla
             </div>
 
             {/* 餘額數字 */}
-            <div className="text-sm font-semibold text-gray-700">
+            <div className="text-sm font-semibold text-stone-600 group-hover:text-stone-800 transition-colors">
               {isLoading ? (
                 <span className="animate-pulse">...</span>
               ) : (
@@ -95,23 +103,38 @@ export function FoodBalanceDisplay({ userId, className = '' }: FoodBalanceDispla
           <Transition
             as={Fragment}
             enter="transition ease-out duration-200"
-            enterFrom="opacity-0 translate-y-1"
-            enterTo="opacity-100 translate-y-0"
+            enterFrom="opacity-0 translate-y-2 scale-95"
+            enterTo="opacity-100 translate-y-0 scale-100"
             leave="transition ease-in duration-150"
-            leaveFrom="opacity-100 translate-y-0"
-            leaveTo="opacity-0 translate-y-1"
+            leaveFrom="opacity-100 translate-y-0 scale-100"
+            leaveTo="opacity-0 translate-y-2 scale-95"
           >
-            <Popover.Panel className="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-xl bg-white p-4 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-              <div className="flex flex-col space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                  <span className="text-sm font-medium text-gray-500">當前食量</span>
-                  <span className="text-lg font-bold text-[#FF7043]">{balance}</span>
+            <Popover.Panel className="absolute right-0 z-50 mt-3 w-80 origin-top-right rounded-2xl bg-white/90 backdrop-blur-xl p-5 shadow-xl ring-1 ring-black/5 focus:outline-none border border-white/50">
+              <div className="flex flex-col space-y-4">
+                <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                  <span className="text-sm font-medium text-stone-500">當前食量</span>
+                  <div className="flex items-baseline space-x-1">
+                    <span className="text-2xl font-bold text-[#FF7043] bg-clip-text text-transparent bg-gradient-to-br from-[#FF7043] to-[#EF5350]">{balance}</span>
+                    <span className="text-xs text-stone-400">pts</span>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">最近記錄</div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider">最近記錄</div>
+                    <button
+                      onClick={() => { useHanamiEcho(userId).loadRecentTransactions() }}
+                      className="text-[10px] text-stone-400 hover:text-[#8BC34A] transition-colors flex items-center gap-1"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
+                        <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0v2.433l-.31-.31a7 7 0 00-11.712 3.138.75.75 0 001.449.39 5.5 5.5 0 019.201-2.466l.312.312h-2.433a.75.75 0 000 1.5h4.242z" clipRule="evenodd" />
+                      </svg>
+                      刷新
+                    </button>
+                  </div>
+
                   {recentTransactions && recentTransactions.length > 0 ? (
-                    <div className="flex flex-col space-y-2">
+                    <div className="flex flex-col space-y-2 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
                       {recentTransactions.slice(0, 5).map((tx) => {
                         const isExpense = tx.amount < 0 || (tx.description && tx.description.toLowerCase().includes('spend')) || (tx.transaction_type === 'usage');
                         const displayAmount = isExpense ? -Math.abs(tx.amount) : Math.abs(tx.amount);
@@ -125,17 +148,51 @@ export function FoodBalanceDisplay({ userId, className = '' }: FoodBalanceDispla
                         else if (displayDesc.includes('purchase')) displayDesc = '購買食量';
                         else if (displayDesc.includes('LLM spend')) displayDesc = 'AI 思考消耗';
 
+
+                        // Decide Icon
+                        let Icon = SparklesIcon;
+                        let iconColor = 'text-stone-400';
+                        let bgColor = 'bg-stone-50';
+                        let borderColor = 'border-stone-100';
+
+                        if (displayDesc.includes('Mori')) {
+                          Icon = AcademicCapIcon;
+                          iconColor = 'text-amber-500';
+                          bgColor = 'bg-amber-50';
+                          borderColor = 'border-amber-100';
+                        } else if (displayDesc.includes('Hibi')) {
+                          Icon = CpuChipIcon;
+                          iconColor = 'text-orange-500';
+                          bgColor = 'bg-orange-50';
+                          borderColor = 'border-orange-100';
+                        } else if (displayDesc.includes('Pico')) {
+                          Icon = PaintBrushIcon;
+                          iconColor = 'text-blue-500';
+                          bgColor = 'bg-blue-50';
+                          borderColor = 'border-blue-100';
+                        } else if (displayDesc.includes('購買')) {
+                          Icon = ShoppingBagIcon;
+                          iconColor = 'text-green-500';
+                          bgColor = 'bg-green-50';
+                          borderColor = 'border-green-100';
+                        }
+
                         return (
-                          <div key={tx.id} className="flex justify-between items-start text-xs group hover:bg-gray-50 p-1.5 rounded-lg transition-colors">
-                            <div className="flex flex-col space-y-0.5">
-                              <span className="text-gray-700 font-medium truncate max-w-[140px]" title={tx.description || '交易'}>
-                                {displayDesc}
-                              </span>
-                              <span className="text-gray-400 text-[10px]">
-                                {new Date(tx.created_at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </span>
+                          <div key={tx.id} className="flex justify-between items-center text-xs group hover:bg-stone-50 p-2 rounded-xl transition-all border border-transparent hover:border-stone-100">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full ${bgColor} ${borderColor} border flex items-center justify-center shadow-sm`}>
+                                <Icon className={`w-4 h-4 ${iconColor}`} />
+                              </div>
+                              <div className="flex flex-col space-y-0.5">
+                                <span className="text-stone-700 font-medium truncate max-w-[120px]" title={tx.description || '交易'}>
+                                  {displayDesc}
+                                </span>
+                                <span className="text-stone-400 text-[10px]">
+                                  {new Date(tx.created_at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
                             </div>
-                            <span className={`font-mono font-medium ${displayAmount > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                            <span className={`font-mono font-medium ${displayAmount > 0 ? 'text-green-600 bg-green-50 px-2 py-0.5 rounded-md' : 'text-red-500 bg-red-50 px-2 py-0.5 rounded-md'}`}>
                               {displayAmount > 0 ? '+' : ''}{displayAmount}
                             </span>
                           </div>
@@ -143,7 +200,7 @@ export function FoodBalanceDisplay({ userId, className = '' }: FoodBalanceDispla
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-4 text-xs text-gray-400 bg-gray-50 rounded-lg">
+                    <div className="text-center py-6 text-xs text-stone-400 bg-stone-50/50 rounded-xl border border-stone-100 border-dashed">
                       尚無交易記錄
                     </div>
                   )}

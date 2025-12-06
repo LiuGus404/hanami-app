@@ -4,7 +4,7 @@ DROP CONSTRAINT IF EXISTS food_transactions_transaction_type_check;
 
 ALTER TABLE public.food_transactions 
 ADD CONSTRAINT food_transactions_transaction_type_check 
-CHECK (transaction_type IN ('deposit', 'withdrawal', 'usage', 'initial_grant', 'purchase', 'other', 'refund', 'adjustment'));
+CHECK (transaction_type IN ('deposit', 'withdrawal', 'usage', 'initial_grant', 'purchase', 'other', 'refund', 'adjustment')) NOT VALID;
 
 -- 2. Re-create the function to ensure it exists and matches the signature expected by processor.ts
 -- processor.ts calls with: { p_user_id, p_amount, p_reason }

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
-    XMarkIcon, 
-    MagnifyingGlassIcon, 
-    CubeIcon, 
-    ArrowTopRightOnSquareIcon, 
-    UserIcon, 
-    PaintBrushIcon, 
+import {
+    XMarkIcon,
+    MagnifyingGlassIcon,
+    CubeIcon,
+    ArrowTopRightOnSquareIcon,
+    UserIcon,
+    PaintBrushIcon,
     ClipboardDocumentIcon,
     GlobeAltIcon,
     ExclamationCircleIcon,
@@ -125,14 +125,14 @@ export function BlockSelectionModal({
         try {
             const types = new Map<string, boolean>(); // Map<type, isCustom>
             const foundTypes: string[] = [];
-            
+
             // 方法1: 檢查 block_type 字段（單一類型積木）
             if (block.block_type) {
                 const isCustom = !typeConfigMap[block.block_type as MindBlockType];
                 types.set(block.block_type, isCustom);
                 foundTypes.push(`block_type: ${block.block_type}`);
             }
-            
+
             // 方法2: 解析 content_json（複合積木）
             const contentJson = block.content_json;
             if (contentJson && contentJson.blocks && Array.isArray(contentJson.blocks)) {
@@ -155,17 +155,17 @@ export function BlockSelectionModal({
 
             // 轉換為數組並排序
             const typeArray = Array.from(types.entries()).map(([type, isCustom]) => ({ type, isCustom }));
-            
+
             // 按照優先順序排序（標準類型優先，然後是自訂類型）
             const priorityOrder: string[] = ['role', 'style', 'task'];
             const sortedTypes = typeArray.sort((a, b) => {
                 const aIsCustom = a.isCustom;
                 const bIsCustom = b.isCustom;
-                
+
                 // 標準類型優先於自訂類型
                 if (!aIsCustom && bIsCustom) return -1;
                 if (aIsCustom && !bIsCustom) return 1;
-                
+
                 // 都是標準類型，按優先順序排序
                 if (!aIsCustom && !bIsCustom) {
                     const aIndex = priorityOrder.indexOf(a.type);
@@ -174,7 +174,7 @@ export function BlockSelectionModal({
                     if (aIndex !== -1) return -1;
                     if (bIndex !== -1) return 1;
                 }
-                
+
                 // 都按字母順序排序
                 return a.type.localeCompare(b.type);
             });
@@ -208,7 +208,7 @@ export function BlockSelectionModal({
     // 積木類型卡片組件
     const BlockTypeCards = ({ block }: { block: MindBlock }) => {
         const types = parseBlockTypes(block);
-        
+
         // 如果沒有任何類型，不顯示
         if (types.length === 0) {
             return null;
@@ -223,26 +223,26 @@ export function BlockSelectionModal({
             <div className="flex items-center mt-2 relative">
                 {visibleTypes.map((typeInfo, index) => {
                     const { type, isCustom } = typeInfo;
-                    
+
                     // 獲取配置：標準類型從 typeConfigMap，自訂類型使用 getCustomTypeConfig
-                    const config = isCustom 
+                    const config = isCustom
                         ? getCustomTypeConfig(type, block)
                         : typeConfigMap[type as MindBlockType];
-                    
+
                     // 防禦性檢查：如果配置不存在，跳過
                     if (!config) {
                         console.warn('⚠️ [BlockSelectionModal] 類型配置不存在:', type, '積木:', block.title);
                         return null;
                     }
-                    
+
                     const colors = getColorClasses(config.color);
                     const Icon = config.icon;
 
                     return (
                         <React.Fragment key={type}>
                             {index > 0 && (
-                                <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative" 
-                                     style={{ top: '20px' }}
+                                <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative"
+                                    style={{ top: '20px' }}
                                 />
                             )}
                             <div className="flex flex-col items-center gap-0.5 opacity-100">
@@ -258,13 +258,13 @@ export function BlockSelectionModal({
                         </React.Fragment>
                     );
                 })}
-                
+
                 {/* 如果有多餘的類型，顯示數字卡片 */}
                 {remainingCount > 0 && (
                     <>
                         {visibleTypes.length > 0 && (
-                            <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative" 
-                                 style={{ top: '20px' }}
+                            <div className="w-1 h-1 rounded-full bg-gray-300 mx-0.5 relative"
+                                style={{ top: '20px' }}
                             />
                         )}
                         <div className="flex flex-col items-center gap-0.5 opacity-100">
@@ -286,7 +286,7 @@ export function BlockSelectionModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
