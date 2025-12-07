@@ -6983,7 +6983,12 @@ function InviteModal({ isOpen, onClose, companions, activeRoles, onInvite, onRem
                                           </div>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                          <div className="font-medium text-[#4B4036]">{companion.name} ({companion.nameEn})</div>
+                                          <div className="font-medium text-[#4B4036]">
+                {companion.id === 'hibi' ? '（綜合）希希' :
+                 companion.id === 'mori' ? '（多模型研究）墨墨' :
+                 companion.id === 'pico' ? '（繪圖）皮可' :
+                 companion.name} ({companion.nameEn})
+              </div>
                                           <div className="text-xs text-[#2B3A3B] truncate">{companion.specialty}</div>
                                         </div>
                                       </div>
@@ -7092,7 +7097,12 @@ function RoleSelectorModal({ isOpen, onClose, companions, activeRoles, selectedC
                   />
                 </div>
               </div>
-              <div className="font-medium">{companion.name}</div>
+              <div className="font-medium">
+                {companion.id === 'hibi' ? '（綜合）希希' :
+                 companion.id === 'mori' ? '（多模型研究）墨墨' :
+                 companion.id === 'pico' ? '（繪圖）皮可' :
+                 companion.name}
+              </div>
               {selectedCompanion === companion.id && (
                 <CheckCircleIcon className="w-5 h-5 text-[#FFB6C1] ml-auto" />
               )}

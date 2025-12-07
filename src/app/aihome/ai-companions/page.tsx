@@ -172,7 +172,7 @@ export default function AICompanionsPage() {
         .from('food_transactions')
         .select(`
           *,
-          ai_messages!fk_food_transactions_ai_message (
+          ai_messages (
             role_id,
             role_instances!ai_messages_sender_role_instance_id_fkey (role_id)
           )
@@ -4501,7 +4501,12 @@ export default function AICompanionsPage() {
                                 </div>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium text-[#4B4036]">{companion.name}</p>
+                                <p className="font-medium text-[#4B4036]">
+                                  {companion.id === 'hibi' ? '（綜合）希希' :
+                                   companion.id === 'mori' ? '（多模型研究）墨墨' :
+                                   companion.id === 'pico' ? '（繪圖）皮可' :
+                                   companion.name}
+                                </p>
                                 <p className="text-sm text-[#2B3A3B] truncate">{companion.specialty}</p>
                               </div>
                             </div>
@@ -4700,7 +4705,12 @@ function RoleSelectionGrid({
                 )}
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-[#4B4036]">{companion.name}</h3>
+                <h3 className="font-semibold text-[#4B4036]">
+                  {companion.id === 'hibi' ? '（綜合）希希' :
+                   companion.id === 'mori' ? '（多模型研究）墨墨' :
+                   companion.id === 'pico' ? '（繪圖）皮可' :
+                   companion.name}
+                </h3>
                 <p className="text-sm text-[#2B3A3B]">{companion.specialty}</p>
               </div>
             </div>
