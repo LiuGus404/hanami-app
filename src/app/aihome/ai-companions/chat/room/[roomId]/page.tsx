@@ -30,7 +30,9 @@ import {
   AdjustmentsHorizontalIcon,
   AcademicCapIcon,
   PaintBrushIcon,
-  UsersIcon
+  UsersIcon,
+  ChartBarIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 
 // Helper to parse raw multi-model content
@@ -548,6 +550,7 @@ export default function RoomChatPage() {
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [showMobileDropdown, setShowMobileDropdown] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -1786,9 +1789,9 @@ export default function RoomChatPage() {
           activeCompanions: roomRoles.length > 0 ? roomRoles as ('hibi' | 'mori' | 'pico')[] : activeRoles
         });
       } else if (roomData) {
-        console.log('✅ 房間資訊載入成功:', roomData.title);
+        console.log('✅ 房間資訊載入成功:', roomData.title || (roomData as any).project_name);
         setRoom({
-          title: roomData.title || '未命名專案',
+          title: roomData.title || (roomData as any).project_name || '未命名專案',
           description: roomData.description || '',
           activeCompanions: roomRoles.length > 0 ? roomRoles as ('hibi' | 'mori' | 'pico')[] : activeRoles
         });
@@ -4904,14 +4907,112 @@ export default function RoomChatPage() {
                   <span>團隊 ({activeRoles.length})</span>
                 </motion.button>
 
+              </div>
+
+              {/* 統一的下拉菜單 (桌面 + 移動端) */}
+              <div className="flex items-center space-x-2 relative">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowSettingsPanel(true)}
-                  className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                  onClick={() => setShowMobileDropdown(!showMobileDropdown)}
+                  className="relative flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
                 >
-                  <Cog6ToothIcon className="w-6 h-6 text-[#4B4036]" />
+                  <motion.div
+                    animate={{
+                      rotate: showMobileDropdown ? 180 : 0
+                    }}
+                    transition={{
+                      duration: 0.3,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <Cog6ToothIcon className="w-5 h-5" />
+                  </motion.div>
+                  <span className="text-sm font-medium">選單</span>
                 </motion.button>
+
+                <AnimatePresence>
+                  {showMobileDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                      className="absolute top-12 right-0 bg-white rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[200px] z-50"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* 頭部標題 */}
+                      <div className="px-3 py-2 border-b border-[#EADBC8]/30 mb-1">
+                        <div className="font-bold text-[#4B4036] text-sm">HanamiEcho</div>
+                        <div className="text-[10px] text-[#8C7A6B]">您的AI工作和學習夥伴</div>
+                      </div>
+
+                      {/* 導航連結 */}
+                      {[
+                        { id: 'chat', label: '聊天室列表', icon: ChatBubbleLeftRightIcon },
+                        { id: 'roles', label: '角色', icon: CpuChipIcon },
+                        { id: 'mind', label: '思維積木', icon: PuzzlePieceIcon },
+                        { id: 'memory', label: '記憶', icon: SparklesIcon },
+                        { id: 'stats', label: '統計', icon: ChartBarIcon }
+                      ].map((tab) => (
+                        <motion.button
+                          key={tab.id}
+                          whileHover={{ backgroundColor: "#FFFBEB" }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            router.push(`/aihome/ai-companions?view=${tab.id}`);
+                            setShowMobileDropdown(false);
+                          }}
+                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
+                        >
+                          <tab.icon className="w-5 h-5 text-[#8C7A6B]" />
+                          <span className="text-sm font-medium">{tab.label}</span>
+                        </motion.button>
+                      ))}
+
+                      <div className="border-t border-[#EADBC8]/30 my-2"></div>
+
+                      {/* 房間專屬操作 - 團隊成員 (僅在移動端顯示，因為桌面端已有獨立按鈕) */}
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FFFBEB" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setShowInviteModal(true);
+                          setShowMobileDropdown(false);
+                        }}
+                        className="w-full flex md:hidden items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
+                      >
+                        <UsersIcon className="w-5 h-5 text-[#8C7A6B]" />
+                        <span className="text-sm font-medium">團隊成員 ({activeRoles.length})</span>
+                      </motion.button>
+
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FFFBEB" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setShowSettingsPanel(true);
+                          setShowMobileDropdown(false);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
+                      >
+                        <Cog6ToothIcon className="w-5 h-5 text-[#8C7A6B]" />
+                        <span className="text-sm font-medium">房間設定</span>
+                      </motion.button>
+
+                      <div className="border-t border-[#EADBC8]/30 my-2"></div>
+
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FFFBEB" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => router.push('/aihome/ai-companions')}
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-red-500"
+                      >
+                        <ArrowLeftIcon className="w-5 h-5" />
+                        <span className="text-sm font-medium">離開房間</span>
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </div>
@@ -4959,7 +5060,7 @@ export default function RoomChatPage() {
             return (
               <div className="w-full max-w-4xl mx-auto">
                 {mounted && createPortal(
-                  <div className="fixed bottom-0 lg:bottom-6 left-0 right-0 z-[60] flex flex-col items-start lg:items-center gap-0 bg-gradient-to-t from-[#FFFDF8] via-[#FFFDF8] to-transparent px-2 sm:px-4 pb-2 pt-4 pointer-events-none">
+                  <div className="fixed bottom-20 lg:bottom-6 left-0 right-0 z-[60] flex flex-col items-start lg:items-center gap-0 bg-gradient-to-t from-[#FFFDF8] via-[#FFFDF8] to-transparent px-2 sm:px-4 pb-2 pt-4 pointer-events-none">
                     <div className="w-full max-w-4xl mx-auto flex flex-col gap-0">
                       {/* 1. Chips Row */}
                       <div className="w-full px-2 pb-2 flex items-center gap-2 overflow-x-auto no-scrollbar pointer-events-auto">
@@ -5090,84 +5191,89 @@ export default function RoomChatPage() {
                   document.body as HTMLElement
                 )}
 
-                {/* Model Selection Modal (Portal) */}
                 {typeof document !== 'undefined' && modelState.modelSelectOpen && createPortal(
-                  <AnimatePresence>
-                    <motion.div
-                      key="model-backdrop"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[9998]"
+                  <div
+                    className="fixed inset-0 z-[100] lg:z-50 lg:absolute lg:inset-auto pointer-events-none"
+                    style={{
+                      top: typeof window !== 'undefined' && window.innerWidth >= 1024 ? modelState.dropdownPosition?.top || 0 : 0,
+                      left: typeof window !== 'undefined' && window.innerWidth >= 1024 ? modelState.dropdownPosition?.left || 0 : 0,
+                    }}
+                  >
+                    {/* Backdrop for mobile */}
+                    <div
+                      className="fixed inset-0 bg-black/20 backdrop-blur-sm lg:hidden pointer-events-auto"
                       onClick={() => modelState.setModelSelectOpen(false)}
                     />
-                    <motion.div
-                      key="model-content"
-                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                      transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                      className="fixed inset-x-4 bottom-4 top-auto md:top-1/2 md:bottom-auto md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[600px] md:h-auto max-h-[80vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col z-[9999]"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* Header */}
-                      <div className="flex items-center justify-between px-5 py-4 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFB6C1]/10 to-[#FFD59A]/10">
-                        <div className="flex items-center gap-3">
-                          <CpuChipIcon className={`w-6 h-6 ${roleId === 'pico' ? 'text-[#FFB6C1]' : roleId === 'mori' ? 'text-amber-500' : 'text-orange-500'}`} />
-                          <h3 className="text-lg font-semibold text-[#4B4036]">選擇 {companion.name} 的大腦</h3>
+
+                    {/* Modal Container */}
+                    <div className="fixed inset-0 flex items-center justify-center lg:block lg:static pointer-events-none">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                        className="bg-white rounded-xl shadow-xl border border-orange-100 flex flex-col pointer-events-auto w-[90vw] max-w-[320px] max-h-[80vh] lg:w-[320px] lg:max-h-[400px]"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFB6C1]/10 to-[#FFD59A]/10">
+                          <div className="flex items-center gap-3">
+                            <CpuChipIcon className={`w-6 h-6 ${roleId === 'pico' ? 'text-[#FFB6C1]' : roleId === 'mori' ? 'text-amber-500' : 'text-orange-500'}`} />
+                            <h3 className="text-lg font-semibold text-[#4B4036]">選擇 {companion.name} 的大腦</h3>
+                          </div>
+                          <button onClick={() => modelState.setModelSelectOpen(false)} className="p-2 hover:bg-black/5 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
                         </div>
-                        <button onClick={() => modelState.setModelSelectOpen(false)} className="p-2 hover:bg-black/5 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
-                      </div>
-                      {/* Search */}
-                      <div className="px-5 py-3 border-b border-[#EADBC8]">
-                        <input
-                          type="text"
-                          value={modelState.modelSearch}
-                          onChange={(e) => modelState.setModelSearch(e.target.value)}
-                          placeholder="搜尋模型..."
-                          className="w-full p-2.5 bg-[#F8F5EC] border-transparent focus:bg-white border focus:border-[#FFB6C1] rounded-xl focus:ring-0 text-[#4B4036]"
-                        />
-                      </div>
-                      {/* Model List */}
-                      <div className="overflow-y-auto flex-1 p-2 space-y-1">
-                        <button
-                          onClick={() => {
-                            modelState.setSelectedModel(DEFAULT_MODEL_SENTINEL);
-                            modelState.setModelSelectOpen(false);
-                            modelState.saveFunction(DEFAULT_MODEL_SENTINEL);
-                          }}
-                          className={`w-full text-left px-4 py-3 rounded-xl transition-all ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL
-                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                            : 'text-[#4B4036] hover:bg-[#F8F5EC]'
-                            }`}
-                        >
-                          <div className="font-bold text-sm">✨ 系統推薦 (預設)</div>
-                        </button>
-                        {modelState.getFilteredModels?.().filter((m: any) => {
-                          if (!modelState.modelSearch.trim()) return true;
-                          return (m.display_name?.toLowerCase().includes(modelState.modelSearch.toLowerCase()));
-                        }).map((model: any) => {
-                          const isSelected = modelState.selectedModel === model.model_id;
-                          return (
-                            <button
-                              key={model.model_id}
-                              onClick={() => {
-                                modelState.setSelectedModel(model.model_id);
-                                modelState.setModelSelectOpen(false);
-                                modelState.saveFunction(model.model_id);
-                              }}
-                              className={`w-full text-left px-4 py-3 rounded-xl transition-all ${isSelected ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' : 'hover:bg-[#F8F5EC]'}`}
-                            >
-                              <div className="font-bold text-sm">{model.display_name || model.model_id}</div>
-                              <div className={`text-xs ${isSelected ? 'text-white/80' : 'text-[#4B4036]/60'}`}>
-                                {model.provider} {model.price_tier ? `• ${model.price_tier}` : ''}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>,
+                        {/* Search */}
+                        <div className="px-5 py-3 border-b border-[#EADBC8]">
+                          <input
+                            type="text"
+                            value={modelState.modelSearch}
+                            onChange={(e) => modelState.setModelSearch(e.target.value)}
+                            placeholder="搜尋模型..."
+                            className="w-full p-2.5 bg-[#F8F5EC] border-transparent focus:bg-white border focus:border-[#FFB6C1] rounded-xl focus:ring-0 text-[#4B4036]"
+                          />
+                        </div>
+                        {/* Model List */}
+                        <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                          <button
+                            onClick={() => {
+                              modelState.setSelectedModel(DEFAULT_MODEL_SENTINEL);
+                              modelState.setModelSelectOpen(false);
+                              modelState.saveFunction(DEFAULT_MODEL_SENTINEL);
+                            }}
+                            className={`w-full text-left px-4 py-3 rounded-xl transition-all ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL
+                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                              : 'text-[#4B4036] hover:bg-[#F8F5EC]'
+                              }`}
+                          >
+                            <div className="font-bold text-sm">✨ 系統推薦 (預設)</div>
+                          </button>
+                          {modelState.getFilteredModels?.().filter((m: any) => {
+                            if (!modelState.modelSearch.trim()) return true;
+                            return (m.display_name?.toLowerCase().includes(modelState.modelSearch.toLowerCase()));
+                          }).map((model: any) => {
+                            const isSelected = modelState.selectedModel === model.model_id;
+                            return (
+                              <button
+                                key={model.model_id}
+                                onClick={() => {
+                                  modelState.setSelectedModel(model.model_id);
+                                  modelState.setModelSelectOpen(false);
+                                  modelState.saveFunction(model.model_id);
+                                }}
+                                className={`w-full text-left px-4 py-3 rounded-xl transition-all ${isSelected ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' : 'hover:bg-[#F8F5EC]'}`}
+                              >
+                                <div className="font-bold text-sm">{model.display_name || model.model_id}</div>
+                                <div className={`text-xs ${isSelected ? 'text-white/80' : 'text-[#4B4036]/60'}`}>
+                                  {model.provider} {model.price_tier ? `• ${model.price_tier}` : ''}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    </div>
+                  </div>,
                   document.body
                 )}
               </div>
@@ -5249,9 +5355,9 @@ export default function RoomChatPage() {
             selectedCompanion={selectedCompanion}
             onSelect={setSelectedCompanion}
           />
-        </div>
-      </div>
-    </div>
+        </div >
+      </div >
+    </div >
   );
 }
 
