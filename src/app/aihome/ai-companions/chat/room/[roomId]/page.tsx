@@ -33,7 +33,8 @@ import {
   UsersIcon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
-  CheckIcon
+  CheckIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 
 // Helper to parse raw multi-model content
@@ -586,6 +587,57 @@ export default function RoomChatPage() {
     };
   }, []);
 
+  // 食量顯示與歷史記錄邏輯
+  const [foodBalance, setFoodBalance] = useState<number>(0);
+  const [foodHistory, setFoodHistory] = useState<any[]>([]);
+  const [showFoodHistory, setShowFoodHistory] = useState(false);
+
+  const fetchFoodInfo = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const supabase = createSaasClient();
+
+      // 1. 獲取餘額 (從 user_food_balance 表)
+      const { data: balanceData, error: balanceError } = await supabase
+        .from('user_food_balance')
+        .select('current_balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!balanceError && balanceData) {
+        setFoodBalance((balanceData as any).current_balance || 0);
+      }
+
+      // 2. 獲取最近 5 筆交易記錄
+      const { data: historyData, error: historyError } = await supabase
+        .from('food_transactions')
+        .select(`
+          *,
+          ai_messages (
+            sender_role_instance_id,
+            role_instances (
+              role_id
+            )
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!historyError && historyData) {
+        setFoodHistory(historyData);
+      }
+    } catch (error) {
+      console.error('❌ 獲取食量資訊失敗:', error);
+    }
+  }, [user?.id]);
+
+  // 初始加載和定時更新（可選）
+  useEffect(() => {
+    fetchFoodInfo();
+  }, [fetchFoodInfo]);
+
+
   // 監聽模型選擇開啟事件（從 ChatSettingsPanel 觸發）
   useEffect(() => {
     const handleOpenModelSelector = (e: CustomEvent) => {
@@ -974,7 +1026,17 @@ export default function RoomChatPage() {
     return generateUUID();
   });
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createSaasClient();
+      await supabase.auth.signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
   const [openPanels, setOpenPanels] = useState<{ roles: boolean; invite: boolean }>({ roles: false, invite: false });
   const [inviteRoleSelectOpen, setInviteRoleSelectOpen] = useState(false);
   const [inviteRoleSearch, setInviteRoleSearch] = useState('');
@@ -2698,7 +2760,7 @@ export default function RoomChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomId: roomId,
-          roleName: roleId === 'hibi' ? 'Hibi' : roleId === 'mori' ? '墨墨' : '皮可'
+          roleName: roleId === 'hibi' ? '希希' : roleId === 'mori' ? '墨墨' : '皮可'
         })
       });
       const result = await safeJsonParse(response, '移除角色 API');
@@ -2810,7 +2872,7 @@ export default function RoomChatPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             roomId: roomId,
-            roleName: roleId === 'hibi' ? 'Hibi' : roleId === 'mori' ? '墨墨' : '皮可',
+            roleName: roleId === 'hibi' ? '希希' : roleId === 'mori' ? '墨墨' : '皮可',
             action: 'add' // 添加角色而不是替換
           })
         });
@@ -2830,9 +2892,20 @@ export default function RoomChatPage() {
       // 添加邀請訊息
       const invitedCompanion = companions.find(c => c.id === roleId);
       if (invitedCompanion) {
+        let inviteContent = '';
+        if (roleId === 'hibi') {
+          inviteContent = `（綜合）希希 已加入專案！大家好，我是（綜合）希希，${invitedCompanion.description}。很高興加入這個專案！`;
+        } else if (roleId === 'mori') {
+          inviteContent = `（多模型研究）墨墨 已加入專案！大家好，我是（多模型研究）墨墨，${invitedCompanion.description}。很高興加入這個專案！`;
+        } else if (roleId === 'pico') {
+          inviteContent = `（繪圖）皮可 已加入專案！大家好，我是（繪圖）皮可，${invitedCompanion.description}。很高興加入這個專案！`;
+        } else {
+          inviteContent = `${invitedCompanion.name} 已加入專案！大家好，我是 ${invitedCompanion.name}，${invitedCompanion.description}。很高興加入這個專案！`;
+        }
+
         const inviteMessage: Message = {
           id: `invite-${roleId}-${Date.now()}`,
-          content: `${invitedCompanion.name} 已加入專案！大家好，我是 ${invitedCompanion.name}，${invitedCompanion.description}。很高興加入這個專案！`,
+          content: inviteContent,
           sender: roleId,
           timestamp: new Date(),
           type: 'text'
@@ -2853,10 +2926,10 @@ export default function RoomChatPage() {
   const companions: AICompanion[] = [
     {
       id: 'hibi',
-      name: 'Hibi',
+      name: '希希',
       nameEn: 'Hibi',
-      description: '系統總管狐狸，智慧的協調者和統籌中樞，負責任務分配和團隊協作',
-      specialty: '系統總管',
+      description: '系統總管狐狸，智慧的協調者和統籌中樞，負責解答您的問題',
+      specialty: '綜合',
       icon: CpuChipIcon,
       imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
       personality: '智慧、領導力、協調能力、友善',
@@ -2869,8 +2942,8 @@ export default function RoomChatPage() {
       id: 'mori',
       name: '墨墨',
       nameEn: 'Mori',
-      description: '一隻充滿智慧的貓頭鷹，專精於研究和學習',
-      specialty: '研究專用',
+      description: '智慧的貓頭鷹研究員，專精以多模型於學術研究、資料分析和知識整理。',
+      specialty: '多模型研究',
       icon: AcademicCapIcon,
       imagePath: '/3d-character-backgrounds/studio/Mori/Mori.png',
       personality: '智慧、沉穩、博學',
@@ -2882,8 +2955,8 @@ export default function RoomChatPage() {
       id: 'pico',
       name: '皮可',
       nameEn: 'Pico',
-      description: '一隻熱愛繪畫創作的水瀨，專精於藝術創作',
-      specialty: '繪圖專用',
+      description: '創意無限的水瀨藝術家，專精於視覺創作、設計和藝術指導。',
+      specialty: '繪圖',
       icon: PaintBrushIcon,
       imagePath: '/3d-character-backgrounds/studio/Pico/Pico.png',
       personality: '創意、活潑、藝術',
@@ -2894,61 +2967,105 @@ export default function RoomChatPage() {
   ];
 
 
-  // 確保用戶是房間成員
-  const ensureRoomMembership = useCallback(async (roomId: string, userId: string) => {
-    console.log('🛡️ [Membership] 開始檢查成員身份:', roomId, userId);
-    try {
-      // 檢查用戶是否已經是房間成員
-      // 添加 5 秒超時機制
-      const checkPromise = saasSupabase
-        .from('room_members')
-        .select('*')
-        .eq('room_id', roomId)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Membership check timeout')), 5000));
-
-      console.log('🛡️ [Membership] 發送 Supabase 查詢...');
-      const result: any = await Promise.race([checkPromise, timeoutPromise]);
-      const { data: existingMember, error: checkError } = result;
-
-      console.log('🛡️ [Membership] 查詢結果返回:', { existingMember: !!existingMember, error: checkError });
-
-      if (checkError) {
-        console.error('❌ 檢查房間成員失敗:', checkError);
-        return;
+  // 監聽訊息變化並確保渲染
+  useEffect(() => {
+    if (messages.length > 0) {
+      console.log(`👀 [Render Check] Messages length changed to: ${messages.length}`);
+      // 如果有訊息但還沒滾動到底部，嘗試滾動
+      if (hasLoadedHistory) {
+        requestAnimationFrame(() => scrollToBottom());
       }
+    }
+  }, [messages.length, hasLoadedHistory, scrollToBottom]);
 
-      // 如果用戶不是房間成員，自動添加
-      if (!existingMember) {
-        console.log('👤 [Membership] 用戶不是房間成員，正在添加...');
-        const { error: insertError } = await (saasSupabase
-          .from('room_members') as any)
-          .insert({
-            room_id: roomId,
-            user_id: userId,
-            role: 'member',
-            user_type: 'hanami_user'
-          });
+  // 確保用戶是房間成員
+  const membershipCheckedRef = useRef<string | null>(null);
 
-        if (insertError) {
-          // 如果是重複鍵錯誤，表示用戶已經存在，這是正常的
-          if (insertError.code === '23505') {
-            console.log('✅ [Membership] 用戶已是房間成員（重複鍵錯誤）');
+  const ensureRoomMembership = useCallback(async (roomId: string, userId: string) => {
+    // 檢查緩存，如果已經檢查過該房間，則直接返回
+    if (membershipCheckedRef.current === roomId) {
+      console.log('🛡️ [Membership] 已在本次會話檢查過成員身份，跳過');
+      return;
+    }
+
+    console.log('🛡️ [Membership] 開始檢查成員身份:', roomId, userId);
+
+    // 重試機制
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        attempt++;
+        const supabase = createSaasClient();
+
+        // 檢查用戶是否已經是房間成員
+        // 設置 5s 超時，超時則重試
+        const checkPromise = supabase
+          .from('room_members')
+          .select('user_id')
+          .eq('room_id', roomId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Membership check timeout')), 5000)
+        );
+
+        console.log(`🛡️ [Membership] 第 ${attempt} 次查詢嘗試...`);
+        const result: any = await Promise.race([checkPromise, timeoutPromise]);
+        const { data: existingMember, error: checkError } = result;
+
+        if (checkError) {
+          console.warn(`⚠️ [Membership] 第 ${attempt} 次檢查失敗:`, checkError);
+          if (attempt === maxRetries) throw checkError;
+          await new Promise(r => setTimeout(r, 1000)); // 等待 1s
+          continue;
+        }
+
+        // 如果用戶不是房間成員，自動添加
+        if (!existingMember) {
+          console.log('👤 [Membership] 用戶不是房間成員，正在添加...');
+          const { error: insertError } = await (supabase
+            .from('room_members') as any)
+            .insert({
+              room_id: roomId,
+              user_id: userId,
+              role: 'member',
+              user_type: 'hanami_user'
+            });
+
+          if (insertError) {
+            if (insertError.code === '23505') {
+              console.log('✅ [Membership] 用戶已是房間成員（重複鍵錯誤）');
+            } else {
+              console.error('❌ [Membership] 添加房間成員失敗:', insertError);
+              // 添加失敗也當作本輪失敗，重試
+              if (attempt === maxRetries) throw insertError;
+              await new Promise(r => setTimeout(r, 1000));
+              continue;
+            }
           } else {
-            console.error('❌ [Membership] 添加房間成員失敗:', insertError);
+            console.log('✅ [Membership] 用戶已添加為房間成員');
           }
         } else {
-          console.log('✅ [Membership] 用戶已添加為房間成員');
+          console.log('✅ [Membership] 用戶已是房間成員');
         }
-      } else {
-        console.log('✅ [Membership] 用戶已是房間成員');
+
+        // 成功，標記並退出
+        membershipCheckedRef.current = roomId;
+        return;
+
+      } catch (error) {
+        console.warn(`⚠️ [Membership] 第 ${attempt} 次嘗試發生錯誤:`, error);
+        if (attempt === maxRetries) {
+          console.error('❌ 確保房間成員身份多次嘗試後失敗');
+        } else {
+          await new Promise(r => setTimeout(r, 1000));
+        }
       }
-    } catch (error) {
-      console.error('❌ 確保房間成員身份時發生錯誤:', error);
     }
-  }, [saasSupabase]);
+  }, []);
 
   // 調試日誌（已移除以減少控制台輸出）
   // console.log('🎯 當前房間狀態:', { roomId, initialRoleParam, companionParam, activeRoles, selectedCompanion });
@@ -3000,7 +3117,13 @@ export default function RoomChatPage() {
       setMessages(convertedMessages);
       setHasLoadedHistory(true);
       setHasMoreMessages(hasMore);
-      console.log(`✅ 載入了 ${convertedMessages.length} 條歷史訊息`);
+      console.log(`✅ 載入了 ${convertedMessages.length} 條歷史訊息，準備渲染`);
+
+      // 強制確保狀態更新被 React 捕捉
+      requestAnimationFrame(() => {
+        triggerSelectiveRender('進入/刷新聊天室 - 數據載入完成');
+        setTimeout(scrollToBottom, 100);
+      });
 
       const lastUserMessage = convertedMessages.filter(m => m.sender === 'user').pop();
       if (lastUserMessage && lastUserMessage.status === 'processing') {
@@ -3023,9 +3146,13 @@ export default function RoomChatPage() {
 
       triggerSelectiveRender('進入/刷新聊天室');
 
-      setTimeout(() => {
-        scrollToBottom();
-      }, 200);
+      // 使用 requestAnimationFrame 確保在渲染後滾動
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          scrollToBottom();
+          console.log('📜 [Scroll] 嘗試滾動到底部');
+        }, 200);
+      });
     } catch (error) {
       console.error('❌ 載入訊息錯誤:', error);
       setHasLoadedHistory(true);
@@ -3185,10 +3312,21 @@ export default function RoomChatPage() {
         const roleId = activeRoles[0];
         const selectedCompanionData = companions.find(c => c.id === roleId);
         if (selectedCompanionData) {
+          let content = '';
+          if (roleId === 'hibi') {
+            content = `你好！我是（綜合）希希，${selectedCompanionData.description}。歡迎來到我們的專案協作空間！有什麼任務需要我協助的嗎？`;
+          } else if (roleId === 'mori') {
+            content = `你好！我是（多模型研究）墨墨，${selectedCompanionData.description}。歡迎來到我們的專案協作空間！有什麼任務需要我協助的嗎？`;
+          } else if (roleId === 'pico') {
+            content = `你好！我是（繪圖）皮可，${selectedCompanionData.description}。歡迎來到我們的專案協作空間！有什麼任務需要我協助的嗎？`;
+          } else {
+            content = `你好！我是 ${selectedCompanionData.name}，${selectedCompanionData.description}。歡迎來到我們的專案協作空間！有什麼任務需要我協助的嗎？`;
+          }
+
           welcomeMessages = [
             {
               id: 'welcome-single-member',
-              content: `你好！我是 ${selectedCompanionData.name}，${selectedCompanionData.description}。歡迎來到我們的專案協作空間！有什麼任務需要我協助的嗎？`,
+              content: content,
               sender: roleId,
               timestamp: new Date(),
               type: 'text'
@@ -3204,13 +3342,14 @@ export default function RoomChatPage() {
         welcomeMessages = validRoles
           .filter(roleId => companions.find(c => c.id === roleId))
           .map((roleId, index) => {
+            const companion = companions.find(c => c.id === roleId);
             let content = '';
             if (roleId === 'hibi') {
-              content = `歡迎來到 ${room.title}！我是 Hibi，系統總管，很高興為您統籌和協調各項任務。`;
+              content = `歡迎來到 ${room.title}！我是（綜合）希希，${companion?.description}。`;
             } else if (roleId === 'mori') {
-              content = `我是墨墨，專精於研究和學習分析。有任何學術或研究需求都可以找我！`;
+              content = `我是（多模型研究）墨墨，${companion?.description}。`;
             } else if (roleId === 'pico') {
-              content = `嗨！我是皮可，負責創意和視覺設計。讓我們一起創造美好的作品吧！`;
+              content = `嗨！我是（繪圖）皮可，${companion?.description}。`;
             }
 
             return {
@@ -4157,9 +4296,9 @@ export default function RoomChatPage() {
   // 生成角色特色的錯誤訊息
   const getCompanionErrorMessage = (companionId: 'hibi' | 'mori' | 'pico'): string => {
     const errorMessages = {
-      hibi: '🦊 Hibi 遇到點小困難，可以重新輸入或稍後再試。',
-      mori: '🦉 墨墨遇到點小困難，可以重新輸入或稍後再試。',
-      pico: '🎨 皮可遇到點小困難，可以重新輸入或稍後再試。'
+      hibi: '🦊 （綜合）希希 遇到點小困難，可以重新輸入或稍後再試。',
+      mori: '🦉 （多模型研究）墨墨 遇到點小困難，可以重新輸入或稍後再試。',
+      pico: '🎨 （繪圖）皮可 遇到點小困難，可以重新輸入或稍後再試。'
     };
     return errorMessages[companionId];
   };
@@ -4216,9 +4355,9 @@ export default function RoomChatPage() {
     // 記錄訊息類型統計
     const messageTypeMap = {
       'user': '👤 用戶訊息',
-      'hibi': '🦊 Hibi 訊息',
-      'mori': '🦉 墨墨訊息',
-      'pico': '🦦 皮可訊息',
+      'hibi': '🦊 （綜合）希希 訊息',
+      'mori': '🦉 （多模型研究）墨墨 訊息',
+      'pico': '🦦 （繪圖）皮可 訊息',
       'system': '⚙️ 系統訊息'
     };
     console.log(`💾 保存 ${messageTypeMap[message.sender as keyof typeof messageTypeMap] || message.sender}:`, message.content.substring(0, 30) + '...');
@@ -4951,70 +5090,132 @@ export default function RoomChatPage() {
                 <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
               </motion.button>
 
-              {/* 標題與角色狀態 */}
-              <div className="flex items-center space-x-3">
-                <h1 className="text-xl font-bold bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] bg-clip-text text-transparent">
-                  {room?.title || '新專案'}
-                </h1>
-
-                {/* 活躍角色頭像堆疊 */}
-                <div className="flex -space-x-2">
-                  {activeRoles.map((companionId) => {
-                    const companion = companions.find(c => c.id === companionId);
-                    return (
-                      <motion.div
-                        key={companionId}
-                        whileHover={{ y: -2, zIndex: 10 }}
-                        className="relative"
-                      >
-                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${companion?.color} p-0.5 ring-2 ring-white`}>
-                          <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                            {companion?.imagePath ? (
-                              <Image
-                                src={companion.imagePath}
-                                alt={companion.name}
-                                width={28}
-                                height={28}
-                                className="w-7 h-7 object-cover"
-                                unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
-                              />
-                            ) : (
-                              <div className="w-7 h-7 flex items-center justify-center">
-                                {companion?.icon && <companion.icon className="w-4 h-4 text-gray-400" />}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
+              {/* Logo */}
+              <div className="w-8 h-8 sm:w-10 sm:h-10 relative flex-shrink-0">
+                <Image
+                  src="/@hanami.png"
+                  alt="HanamiEcho Logo"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-contain"
+                />
               </div>
+
+              {/* 活躍角色頭像堆疊 - 點擊打開團隊選單 */}
+              <motion.div
+                onClick={() => setShowInviteModal(true)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex -space-x-2 cursor-pointer relative group"
+                title="點擊管理團隊成員"
+              >
+                {activeRoles.map((companionId) => {
+                  const companion = companions.find(c => c.id === companionId);
+                  return (
+                    <motion.div
+                      key={companionId}
+                      whileHover={{ y: -2, zIndex: 10 }}
+                      className="relative"
+                    >
+                      <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${companion?.color} p-0.5 ring-2 ring-white transition-all group-hover:ring-[#FFD59A]`}>
+                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                          {companion?.imagePath ? (
+                            <Image
+                              src={companion.imagePath}
+                              alt={companion.name}
+                              width={28}
+                              height={28}
+                              className="w-7 h-7 object-cover"
+                              unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                            />
+                          ) : (
+                            <div className="w-7 h-7 flex items-center justify-center">
+                              {companion?.icon && <companion.icon className="w-4 h-4 text-gray-400" />}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
             </div>
+
+
 
             {/* 右側操作區 */}
             <div className="flex items-center space-x-2">
-              {/* 桌面端按鈕 */}
-              <div className="hidden md:flex items-center space-x-2">
+              {/* 食量顯示與歷史記錄 (Popver) */}
+              <div className="relative">
                 <motion.button
+                  onClick={() => {
+                    setShowFoodHistory(!showFoodHistory);
+                    if (!showFoodHistory) fetchFoodInfo(); // 點擊時刷新
+                  }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowInviteModal(true)}
-                  className="px-3 py-1.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-full text-sm font-medium shadow-md flex items-center space-x-1"
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
                 >
-                  <UsersIcon className="w-4 h-4" />
-                  <span>團隊 ({activeRoles.length})</span>
+                  <Image
+                    src="/apple-icon.svg"
+                    alt="Food"
+                    width={20}
+                    height={20}
+                    className="w-5 h-5 object-contain"
+                  />
+                  <span className="text-sm font-bold text-[#4B4036]">{foodBalance}</span>
                 </motion.button>
 
-              </div>
+                <AnimatePresence>
+                  {showFoodHistory && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                      className="absolute top-12 right-0 w-64 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden"
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#8C7A6B] mb-2 px-1">
+                        <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
+                        <span>最近 5 次食量記錄</span>
+                      </div>
+                      <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                        {foodHistory.length === 0 ? (
+                          <div className="text-center text-xs text-gray-400 py-2">尚無記錄</div>
+                        ) : (
+                          foodHistory.map((record) => {
+                            // 解析角色名稱
+                            let characterName = '消耗';
+                            const roleId = record.ai_messages?.role_instances?.role_id;
+                            if (roleId) {
+                              const companion = companions.find(c => c.id === roleId);
+                              if (companion) characterName = companion.name;
+                            }
 
+                            return (
+                              <div key={record.id} className="flex justify-between items-center text-xs p-2 bg-[#F8F5EC] rounded-lg">
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-[#4B4036] flex items-center gap-1.5">
+                                    <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
+                                    <span>{record.amount > 0 ? '+' : ''}{record.amount} {characterName}</span>
+                                  </span>
+                                  <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               {/* 統一的下拉菜單 (桌面 + 移動端) */}
               <div className="flex items-center space-x-2 relative">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowMobileDropdown(!showMobileDropdown)}
-                  className="relative flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                  className="relative flex items-center justify-center p-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
                 >
                   <motion.div
                     animate={{
@@ -5027,7 +5228,7 @@ export default function RoomChatPage() {
                   >
                     <Cog6ToothIcon className="w-5 h-5" />
                   </motion.div>
-                  <span className="text-sm font-medium">選單</span>
+
                 </motion.button>
 
                 <AnimatePresence>
@@ -5071,7 +5272,7 @@ export default function RoomChatPage() {
 
                       <div className="border-t border-[#EADBC8]/30 my-2"></div>
 
-                      {/* 房間專屬操作 - 團隊成員 (僅在移動端顯示，因為桌面端已有獨立按鈕) */}
+                      {/* 房間專屬操作 - 團隊成員 (顯示在選單中) */}
                       <motion.button
                         whileHover={{ backgroundColor: "#FFFBEB" }}
                         whileTap={{ scale: 0.98 }}
@@ -5079,10 +5280,10 @@ export default function RoomChatPage() {
                           setShowInviteModal(true);
                           setShowMobileDropdown(false);
                         }}
-                        className="w-full flex md:hidden items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
                       >
                         <UsersIcon className="w-5 h-5 text-[#8C7A6B]" />
-                        <span className="text-sm font-medium">團隊成員 ({activeRoles.length})</span>
+                        <span className="text-sm font-medium">團隊 ({activeRoles.length})</span>
                       </motion.button>
 
                       <motion.button
@@ -5109,6 +5310,22 @@ export default function RoomChatPage() {
                         <ArrowLeftIcon className="w-5 h-5" />
                         <span className="text-sm font-medium">離開房間</span>
                       </motion.button>
+
+
+                      <div className="border-t border-[#EADBC8]/30 my-2"></div>
+
+                      <motion.button
+                        whileHover={{ backgroundColor: "#FFFBEB" }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          handleLogout();
+                          setShowMobileDropdown(false);
+                        }}
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-red-500"
+                      >
+                        <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                        <span className="text-sm font-medium">登出系統</span>
+                      </motion.button>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -5116,10 +5333,10 @@ export default function RoomChatPage() {
             </div>
           </div>
         </div>
-      </nav>
+      </nav >
 
       {/* 側邊欄與主內容 */}
-      <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+      < div className="flex h-[calc(100vh-64px)] overflow-hidden" >
 
         <AppSidebar
           isOpen={sidebarOpen}

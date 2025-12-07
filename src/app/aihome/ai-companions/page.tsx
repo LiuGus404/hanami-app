@@ -30,7 +30,8 @@ import {
   CodeBracketIcon,
   LightBulbIcon,
   MagnifyingGlassIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
@@ -145,6 +146,83 @@ export default function AICompanionsPage() {
   const [showMobileDropdown, setShowMobileDropdown] = useState(false);
   const [selectedCompanionForProject, setSelectedCompanionForProject] = useState<AICompanion | null>(null);
   const [showRoleSelectionModal, setShowRoleSelectionModal] = useState(false);
+
+  // 食量相關狀態
+  const [foodBalance, setFoodBalance] = useState<number>(0);
+  const [foodHistory, setFoodHistory] = useState<any[]>([]);
+  const [showFoodHistory, setShowFoodHistory] = useState(false);
+
+  // 獲取食量資訊
+  const fetchFoodInfo = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      // 1. 獲取餘額
+      const { data: userData, error: userError } = await saasSupabaseClient
+        .from('user_food_balance')
+        .select('current_balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!userError && userData) {
+        setFoodBalance((userData as any).current_balance || 0);
+      }
+
+      // 2. 獲取最近 5 筆交易記錄
+      const { data: historyData, error: historyError } = await saasSupabaseClient
+        .from('food_transactions')
+        .select(`
+          *,
+          ai_messages!fk_food_transactions_ai_message (
+            role_id,
+            role_instances!ai_messages_sender_role_instance_id_fkey (role_id)
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!historyError && historyData) {
+        setFoodHistory(historyData);
+      }
+    } catch (error) {
+      console.error('❌ 獲取食量資訊失敗:', error);
+    }
+  }, [user?.id, saasSupabaseClient]);
+
+  // 監聽食量變更
+  useEffect(() => {
+    fetchFoodInfo();
+
+    // 訂閱變更
+    const channel = saasSupabaseClient
+      .channel('food-balance-changes-' + user?.id)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_food_balance',
+          filter: `user_id=eq.${user?.id}`
+        },
+        () => {
+          fetchFoodInfo();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      saasSupabaseClient.removeChannel(channel);
+    };
+  }, [user?.id, saasSupabaseClient, fetchFoodInfo]);
+
+  const handleLogout = async () => {
+    try {
+      await saasSupabaseClient.auth.signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   // 角色設定相關狀態
   const [showSettings, setShowSettings] = useState(false);
@@ -1684,10 +1762,10 @@ export default function AICompanionsPage() {
   const companions: AICompanion[] = [
     {
       id: 'hibi',
-      name: 'Hibi',
+      name: '希希',
       nameEn: 'Hibi',
-      description: '系統總管狐狸，智慧的協調者和統籌中樞，負責任務分配和團隊協作',
-      specialty: '系統總管',
+      description: '系統總管狐狸，智慧的協調者和統籌中樞，負責解答您的問題',
+      specialty: '綜合',
       icon: CpuChipIcon,
       imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
       personality: '智慧、領導力、協調能力、友善',
@@ -1700,8 +1778,8 @@ export default function AICompanionsPage() {
       id: 'mori',
       name: '墨墨',
       nameEn: 'Mori',
-      description: '一隻充滿智慧的貓頭鷹，專精於研究和學習',
-      specialty: '研究專用',
+      description: '智慧的貓頭鷹研究員，專精以多模型於學術研究、資料分析和知識整理。',
+      specialty: '多模型研究',
       icon: AcademicCapIcon,
       imagePath: '/3d-character-backgrounds/studio/Mori/Mori.png',
       personality: '智慧、沉穩、博學',
@@ -1713,8 +1791,8 @@ export default function AICompanionsPage() {
       id: 'pico',
       name: '皮可',
       nameEn: 'Pico',
-      description: '一隻熱愛繪畫創作的水瀨，專精於藝術創作',
-      specialty: '繪圖專用',
+      description: '創意無限的水瀨藝術家，專精於視覺創作、設計和藝術指導。',
+      specialty: '繪圖',
       icon: PaintBrushIcon,
       imagePath: '/3d-character-backgrounds/studio/Pico/Pico.png',
       personality: '創意、活潑、藝術',
@@ -2169,7 +2247,8 @@ export default function AICompanionsPage() {
       for (const roleName of selectedRoles) {
         // 將角色名稱映射到對應的 slug
         const roleNameToSlug: { [key: string]: string } = {
-          'Hibi': 'hibi-manager',
+          '希希': 'hibi-manager',
+          'Hibi': 'hibi-manager', // 兼容舊代碼
           '墨墨': 'mori-researcher',
           '皮可': 'pico-artist'
         };
@@ -2371,24 +2450,70 @@ export default function AICompanionsPage() {
                   className="w-full h-full object-contain"
                 />
               </div>
-
-              <div className="min-w-0 flex-1">
-                {/* 桌面版：顯示完整標題 */}
-                <div className="hidden sm:block">
-                  <h1 className="text-xl font-bold text-[#4B4036]">HanamiEcho</h1>
-                  <p className="text-sm text-[#2B3A3B]">您的AI工作和學習夥伴</p>
-                </div>
-
-                {/* 移動端：只顯示 "AI 伙伴" */}
-                <div className="block sm:hidden">
-                  <h1 className="text-lg font-bold text-[#4B4036]">
-                    AI 伙伴
-                  </h1>
-                </div>
-              </div>
             </div>
 
             <div className="flex items-center space-x-4">
+              {/* 食量顯示 (moved here) */}
+              <div className="relative mx-2">
+                <motion.button
+                  onClick={() => {
+                    setShowFoodHistory(!showFoodHistory);
+                    if (!showFoodHistory) fetchFoodInfo(); // 點擊時刷新
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
+                >
+                  {/* 使用與聊天室一致的圖示 */}
+                  <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
+                  <span className="text-sm font-bold text-[#4B4036]">{foodBalance}</span>
+                </motion.button>
+
+                <AnimatePresence>
+                  {showFoodHistory && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                      className="absolute top-12 right-0 w-64 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden"
+                    >
+                      <div className="text-xs font-bold text-[#8C7A6B] mb-2 px-1">最近 5 次食量記錄</div>
+                      <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                        {foodHistory.length === 0 ? (
+                          <div className="text-center text-xs text-gray-400 py-2">尚無記錄</div>
+                        ) : (
+                          foodHistory.map((record) => {
+                            // 獲取角色資料 (這裡簡化處理，如果不匹配則顯示 ID)
+                            let characterName = '';
+                            const roleId = record.ai_messages?.role_instances?.role_id || record.ai_messages?.role_id;
+
+                            if (roleId) {
+                              const roleNameMap: Record<string, string> = {
+                                'hibi': 'Hibi',
+                                'mori': 'Mori',
+                                'pico': 'Pico'
+                              };
+                              characterName = roleNameMap[roleId] || roleId;
+                            }
+
+                            return (
+                              <div key={record.id} className="flex justify-between items-center text-xs p-2 bg-[#F8F5EC] rounded-lg">
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-[#4B4036] flex items-center gap-1.5">
+                                    <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
+                                    <span>{record.amount > 0 ? '+' : ''}{record.amount} {characterName}</span>
+                                  </span>
+                                  <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               {/* 桌面版：顯示完整的視圖切換和創建按鈕 */}
               <div className="hidden md:flex items-center space-x-4">
                 {/* 視圖切換 */}
@@ -2420,14 +2545,7 @@ export default function AICompanionsPage() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    const quickRoom = {
-                      title: `AI 協作 ${new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`,
-                      description: '與 Hibi、墨墨和皮可的全能協作空間',
-                      selectedRoles: ['Hibi', '墨墨', '皮可']
-                    };
-                    handleCreateProjectRoom(quickRoom);
-                  }}
+                  onClick={handleQuickCollaborate}
                   className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
                   title="快速開始 AI 協作"
                 >
@@ -2442,7 +2560,8 @@ export default function AICompanionsPage() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowMobileDropdown(!showMobileDropdown)}
-                  className="relative flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                  className="relative flex items-center justify-center p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                  title="選單"
                 >
                   {/* 圖案 */}
                   <motion.div
@@ -2454,11 +2573,10 @@ export default function AICompanionsPage() {
                       ease: "easeInOut"
                     }}
                   >
-                    <Cog6ToothIcon className="w-5 h-5" />
+                    <Cog6ToothIcon className="w-6 h-6 text-[#4B4036]" />
                   </motion.div>
 
-                  {/* 兩個字的中文名稱 */}
-                  <span className="text-sm font-medium">選單</span>
+
                 </motion.button>
 
                 {/* 下拉菜單 */}
@@ -2499,25 +2617,23 @@ export default function AICompanionsPage() {
                       ))}
 
                       {/* 分隔線 */}
+
+
+
+
                       <div className="border-t border-[#EADBC8]/30 my-2"></div>
 
-                      {/* 快速創建選項 */}
                       <motion.button
                         whileHover={{ backgroundColor: "#FFFBEB" }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => {
-                          const quickRoom = {
-                            title: `AI 協作 ${new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`,
-                            description: '與 Hibi、墨墨和皮可的全能協作空間',
-                            selectedRoles: ['Hibi', '墨墨', '皮可']
-                          };
-                          handleCreateProjectRoom(quickRoom);
+                          handleLogout();
                           setShowMobileDropdown(false);
                         }}
-                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
+                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-red-500"
                       >
-                        <PlusIcon className="w-5 h-5 text-[#4B4036]" />
-                        <span className="text-sm font-medium">開始協作</span>
+                        <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                        <span className="text-sm font-medium">登出系統</span>
                       </motion.button>
                     </motion.div>
                   )}
@@ -2592,7 +2708,7 @@ export default function AICompanionsPage() {
                   className="text-center py-12"
                 >
                   <div className="flex justify-center space-x-3 mb-6">
-                    {/* Hibi - 系統總管 */}
+                    {/* 希希 - 系統總管 */}
                     <motion.div
                       animate={{ y: [0, -10, 0] }}
                       transition={{ duration: 2, repeat: Infinity, delay: 0 }}
@@ -2602,13 +2718,13 @@ export default function AICompanionsPage() {
                         <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
                           <img
                             src="/3d-character-backgrounds/studio/Hibi/lulu(front).png"
-                            alt="Hibi"
+                            alt="希希"
                             width={72}
                             height={72}
                             className="w-18 h-18 object-cover"
                             loading="lazy"
                             onError={(e) => {
-                              console.error('❌ [Hibi 圖標] 圖片載入失敗，改用預設貓頭鷹圖示');
+                              console.error('❌ [希希 圖標] 圖片載入失敗，改用預設貓頭鷹圖示');
                               (e.target as HTMLImageElement).src = '/owlui.png';
                             }}
                           />
@@ -2660,7 +2776,7 @@ export default function AICompanionsPage() {
 
                   <h3 className="text-2xl font-semibold text-[#4B4036] mb-3">歡迎來到 AI 伙伴系統！</h3>
                   <p className="text-[#2B3A3B] mb-6 max-w-md mx-auto">
-                    Hibi 系統總管和專業助手墨墨、皮可正在等待與您協作。創建專案開始智能對話，讓 AI 團隊幫您完成各種任務。
+                    希希 系統總管和專業助手墨墨、皮可正在等待與您協作。創建專案開始智能對話，讓 AI 團隊幫您完成各種任務。
                   </p>
 
                   {/* 快速開始按鈕 */}
@@ -2742,7 +2858,7 @@ export default function AICompanionsPage() {
                             if (isPersonalChat) {
                               // 從標題中識別角色
                               let companionId = '';
-                              if (room.title.includes('Hibi')) companionId = 'hibi';
+                              if (room.title.includes('Hibi') || room.title.includes('希希')) companionId = 'hibi';
                               else if (room.title.includes('墨墨')) companionId = 'mori';
                               else if (room.title.includes('皮可')) companionId = 'pico';
 
@@ -3887,131 +4003,131 @@ export default function AICompanionsPage() {
                                     width: `${dropdownPosition.width}px`,
                                     zIndex: 9999
                                   }}
-                                 className="bg-white border border-[#EADBC8] rounded-lg shadow-xl flex flex-col max-h-[400px]"
-                                 data-model-dropdown
-                               >
-                                 <div className="overflow-y-auto flex-1">
-                                   {/* 預設選項 */}
-                                   <motion.button
-                                     whileHover={{ backgroundColor: "#FFFBEB" }}
-                                     whileTap={{ scale: 0.98 }}
-                                     type="button"
-                                     onMouseDown={(e) => {
-                                       e.preventDefault(); // 防止觸發 onBlur
-                                       setSelectedModel(DEFAULT_MODEL_SENTINEL);
-                                       setModelSearch('');
-                                       setModelSelectOpen(false);
-                                     }}
-                                     className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedModel === DEFAULT_MODEL_SENTINEL
-                                       ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                       : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                       }`}
-                                   >
-                                     預設（建議）
-                                   </motion.button>
+                                  className="bg-white border border-[#EADBC8] rounded-lg shadow-xl flex flex-col max-h-[400px]"
+                                  data-model-dropdown
+                                >
+                                  <div className="overflow-y-auto flex-1">
+                                    {/* 預設選項 */}
+                                    <motion.button
+                                      whileHover={{ backgroundColor: "#FFFBEB" }}
+                                      whileTap={{ scale: 0.98 }}
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault(); // 防止觸發 onBlur
+                                        setSelectedModel(DEFAULT_MODEL_SENTINEL);
+                                        setModelSearch('');
+                                        setModelSelectOpen(false);
+                                      }}
+                                      className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedModel === DEFAULT_MODEL_SENTINEL
+                                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                        : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                        }`}
+                                    >
+                                      預設（建議）
+                                    </motion.button>
 
-                                   {/* 模型選項 */}
-                                   {getFilteredModels().filter(m => {
-                                     if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
-                                     if (!modelSearch.trim()) return true;
-                                     const q = modelSearch.toLowerCase();
-                                     return (
-                                       (m.display_name || '').toLowerCase().includes(q) ||
-                                       (m.description || '').toLowerCase().includes(q) ||
-                                       (m.provider || '').toLowerCase().includes(q) ||
-                                       (m.model_id || '').toLowerCase().includes(q)
-                                     );
-                                   }).map((model) => {
-                                     // 對於 Mori，檢查是否在多選列表中
-                                     const isMultiSelected = selectedCompanion?.id === 'mori' && selectedModelsMulti.includes(model.model_id);
-                                     const isSingleSelected = selectedCompanion?.id !== 'mori' && selectedModel === model.model_id;
-                                     const isSelected = isMultiSelected || isSingleSelected;
-                                     const isDisabled = selectedCompanion?.id === 'mori' && !isMultiSelected && selectedModelsMulti.length >= 4;
+                                    {/* 模型選項 */}
+                                    {getFilteredModels().filter(m => {
+                                      if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
+                                      if (!modelSearch.trim()) return true;
+                                      const q = modelSearch.toLowerCase();
+                                      return (
+                                        (m.display_name || '').toLowerCase().includes(q) ||
+                                        (m.description || '').toLowerCase().includes(q) ||
+                                        (m.provider || '').toLowerCase().includes(q) ||
+                                        (m.model_id || '').toLowerCase().includes(q)
+                                      );
+                                    }).map((model) => {
+                                      // 對於 Mori，檢查是否在多選列表中
+                                      const isMultiSelected = selectedCompanion?.id === 'mori' && selectedModelsMulti.includes(model.model_id);
+                                      const isSingleSelected = selectedCompanion?.id !== 'mori' && selectedModel === model.model_id;
+                                      const isSelected = isMultiSelected || isSingleSelected;
+                                      const isDisabled = selectedCompanion?.id === 'mori' && !isMultiSelected && selectedModelsMulti.length >= 4;
 
-                                     return (
-                                       <motion.button
-                                         key={model.model_id}
-                                         whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
-                                         whileTap={{ scale: 0.98 }}
-                                         type="button"
-                                         disabled={isDisabled}
-                                         onMouseDown={(e) => {
-                                           e.preventDefault(); // 防止觸發 onBlur
+                                      return (
+                                        <motion.button
+                                          key={model.model_id}
+                                          whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
+                                          whileTap={{ scale: 0.98 }}
+                                          type="button"
+                                          disabled={isDisabled}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault(); // 防止觸發 onBlur
 
-                                           if (selectedCompanion?.id === 'mori') {
-                                             // 多選模式
-                                             if (isMultiSelected) {
-                                               // 取消選擇
-                                               setSelectedModelsMulti(prev => prev.filter(id => id !== model.model_id));
-                                             } else if (selectedModelsMulti.length < 4) {
-                                               // 添加選擇
-                                               setSelectedModelsMulti(prev => [...prev, model.model_id]);
-                                             }
-                                             // 多選模式下不關閉下拉選單
-                                           } else {
-                                             // 單選模式
-                                             setSelectedModel(model.model_id);
-                                             setModelSearch(stripFree(model.display_name || model.model_id));
-                                             setModelSelectOpen(false);
-                                           }
-                                         }}
-                                         className={`w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 ${isSelected
-                                           ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                           : isDisabled
-                                             ? 'text-gray-400 cursor-not-allowed'
-                                             : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                           }`}
-                                       >
-                                         <div className="flex items-center justify-between">
-                                           <div className="flex-1">
-                                             <div className="font-medium">{stripFree(model.display_name || '')}</div>
-                                             <div className={`text-xs ${isSelected ? 'opacity-90' : 'opacity-80'}`}>
-                                               {stripFree(model.description || '')} ({stripFree(model.price_tier || '')})
-                                             </div>
-                                           </div>
-                                           {selectedCompanion?.id === 'mori' && (
-                                             <div className="ml-2 flex-shrink-0">
-                                               {isMultiSelected ? (
-                                                 <motion.div
-                                                   initial={{ scale: 0 }}
-                                                   animate={{ scale: 1 }}
-                                                   className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"
-                                                 >
-                                                   <svg className="w-3 h-3 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                   </svg>
-                                                 </motion.div>
-                                               ) : (
-                                                 <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-white/80' : 'border-[#EADBC8]'
-                                                   }`} />
-                                               )}
-                                             </div>
-                                           )}
-                                         </div>
-                                       </motion.button>
-                                     );
-                                   })}
-                                 </div>
+                                            if (selectedCompanion?.id === 'mori') {
+                                              // 多選模式
+                                              if (isMultiSelected) {
+                                                // 取消選擇
+                                                setSelectedModelsMulti(prev => prev.filter(id => id !== model.model_id));
+                                              } else if (selectedModelsMulti.length < 4) {
+                                                // 添加選擇
+                                                setSelectedModelsMulti(prev => [...prev, model.model_id]);
+                                              }
+                                              // 多選模式下不關閉下拉選單
+                                            } else {
+                                              // 單選模式
+                                              setSelectedModel(model.model_id);
+                                              setModelSearch(stripFree(model.display_name || model.model_id));
+                                              setModelSelectOpen(false);
+                                            }
+                                          }}
+                                          className={`w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 ${isSelected
+                                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                            : isDisabled
+                                              ? 'text-gray-400 cursor-not-allowed'
+                                              : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                            }`}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex-1">
+                                              <div className="font-medium">{stripFree(model.display_name || '')}</div>
+                                              <div className={`text-xs ${isSelected ? 'opacity-90' : 'opacity-80'}`}>
+                                                {stripFree(model.description || '')} ({stripFree(model.price_tier || '')})
+                                              </div>
+                                            </div>
+                                            {selectedCompanion?.id === 'mori' && (
+                                              <div className="ml-2 flex-shrink-0">
+                                                {isMultiSelected ? (
+                                                  <motion.div
+                                                    initial={{ scale: 0 }}
+                                                    animate={{ scale: 1 }}
+                                                    className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"
+                                                  >
+                                                    <svg className="w-3 h-3 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                  </motion.div>
+                                                ) : (
+                                                  <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-white/80' : 'border-[#EADBC8]'
+                                                    }`} />
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </motion.button>
+                                      );
+                                    })}
+                                  </div>
 
-                                 {/* 底部確認按鈕（僅 Mori 多選模式） */}
-                                 {selectedCompanion?.id === 'mori' && (
-                                   <div className="p-3 bg-gray-50 border-t border-[#EADBC8] flex justify-between items-center shrink-0">
-                                       <div className="text-xs text-[#4B4036]">
-                                           已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
-                                       </div>
-                                       <button
-                                           type="button"
-                                           onMouseDown={(e) => {
-                                               e.preventDefault();
-                                               setModelSelectOpen(false);
-                                           }}
-                                           className="px-4 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-md text-sm font-medium hover:bg-[#EBC9A4] transition-colors shadow-sm"
-                                       >
-                                           確認選擇
-                                       </button>
-                                   </div>
-                                 )}
-                               </motion.div>
+                                  {/* 底部確認按鈕（僅 Mori 多選模式） */}
+                                  {selectedCompanion?.id === 'mori' && (
+                                    <div className="p-3 bg-gray-50 border-t border-[#EADBC8] flex justify-between items-center shrink-0">
+                                      <div className="text-xs text-[#4B4036]">
+                                        已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          setModelSelectOpen(false);
+                                        }}
+                                        className="px-4 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-md text-sm font-medium hover:bg-[#EBC9A4] transition-colors shadow-sm"
+                                      >
+                                        確認選擇
+                                      </button>
+                                    </div>
+                                  )}
+                                </motion.div>
                               </AnimatePresence>,
                               document.body
                             )}
