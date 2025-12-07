@@ -2896,14 +2896,24 @@ export default function RoomChatPage() {
 
   // 確保用戶是房間成員
   const ensureRoomMembership = useCallback(async (roomId: string, userId: string) => {
+    console.log('🛡️ [Membership] 開始檢查成員身份:', roomId, userId);
     try {
       // 檢查用戶是否已經是房間成員
-      const { data: existingMember, error: checkError } = await saasSupabase
+      // 添加 5 秒超時機制
+      const checkPromise = saasSupabase
         .from('room_members')
         .select('*')
         .eq('room_id', roomId)
         .eq('user_id', userId)
         .maybeSingle();
+
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Membership check timeout')), 5000));
+
+      console.log('🛡️ [Membership] 發送 Supabase 查詢...');
+      const result: any = await Promise.race([checkPromise, timeoutPromise]);
+      const { data: existingMember, error: checkError } = result;
+
+      console.log('🛡️ [Membership] 查詢結果返回:', { existingMember: !!existingMember, error: checkError });
 
       if (checkError) {
         console.error('❌ 檢查房間成員失敗:', checkError);
@@ -2912,7 +2922,7 @@ export default function RoomChatPage() {
 
       // 如果用戶不是房間成員，自動添加
       if (!existingMember) {
-        console.log('👤 用戶不是房間成員，正在添加...');
+        console.log('👤 [Membership] 用戶不是房間成員，正在添加...');
         const { error: insertError } = await (saasSupabase
           .from('room_members') as any)
           .insert({
@@ -2925,15 +2935,15 @@ export default function RoomChatPage() {
         if (insertError) {
           // 如果是重複鍵錯誤，表示用戶已經存在，這是正常的
           if (insertError.code === '23505') {
-            console.log('✅ 用戶已是房間成員（重複鍵錯誤）');
+            console.log('✅ [Membership] 用戶已是房間成員（重複鍵錯誤）');
           } else {
-            console.error('❌ 添加房間成員失敗:', insertError);
+            console.error('❌ [Membership] 添加房間成員失敗:', insertError);
           }
         } else {
-          console.log('✅ 用戶已添加為房間成員');
+          console.log('✅ [Membership] 用戶已添加為房間成員');
         }
       } else {
-        console.log('✅ 用戶已是房間成員');
+        console.log('✅ [Membership] 用戶已是房間成員');
       }
     } catch (error) {
       console.error('❌ 確保房間成員身份時發生錯誤:', error);
@@ -2949,7 +2959,9 @@ export default function RoomChatPage() {
     try {
       console.log('🔍 載入聊天室歷史訊息:', roomId);
 
+      console.log('🛡️ 呼叫 ensureRoomMembership...');
       await ensureRoomMembership(roomId, userId);
+      console.log('🛡️ ensureRoomMembership 完成');
 
       const { data, error } = await saasSupabase
         .from('ai_messages')
@@ -5425,7 +5437,7 @@ export default function RoomChatPage() {
                               disabled={isLimitReached}
                               onMouseDown={async (e) => {
                                 // console.log('[ModelSelector] MouseDown triggered for:', model.model_id);
-                                
+
                                 // Prevent any default behavior that might close the modal
                                 e.preventDefault();
                                 e.stopPropagation();

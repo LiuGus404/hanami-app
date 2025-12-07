@@ -1,5 +1,6 @@
 // Jest 測試設置文件
 import '@testing-library/jest-dom';
+import React from 'react';
 
 // Mock Next.js router
 jest.mock('next/router', () => ({
@@ -66,14 +67,17 @@ jest.mock('@/lib/supabase', () => ({
 }));
 
 // Mock Framer Motion
-jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...props }) => <div {...props}>{children}</div>,
-    button: ({ children, ...props }) => <button {...props}>{children}</button>,
-    span: ({ children, ...props }) => <span {...props}>{children}</span>,
-  },
-  AnimatePresence: ({ children }) => children,
-}));
+jest.mock('framer-motion', () => {
+  const React = require('react');
+  return {
+    motion: {
+      div: ({ children, ...props }) => React.createElement('div', props, children),
+      button: ({ children, ...props }) => React.createElement('button', props, children),
+      span: ({ children, ...props }) => React.createElement('span', props, children),
+    },
+    AnimatePresence: ({ children }) => children,
+  };
+});
 
 // 全局測試設置
 global.ResizeObserver = jest.fn().mockImplementation(() => ({
