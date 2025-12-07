@@ -3887,119 +3887,131 @@ export default function AICompanionsPage() {
                                     width: `${dropdownPosition.width}px`,
                                     zIndex: 9999
                                   }}
-                                  className="bg-white border border-[#EADBC8] rounded-lg shadow-xl max-h-60 overflow-y-auto"
-                                  data-model-dropdown
-                                >
-                                  {/* 預設選項 */}
-                                  <motion.button
-                                    whileHover={{ backgroundColor: "#FFFBEB" }}
-                                    whileTap={{ scale: 0.98 }}
-                                    type="button"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault(); // 防止觸發 onBlur
-                                      setSelectedModel(DEFAULT_MODEL_SENTINEL);
-                                      setModelSearch('');
-                                      setModelSelectOpen(false);
-                                    }}
-                                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedModel === DEFAULT_MODEL_SENTINEL
-                                      ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                      : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                      }`}
-                                  >
-                                    預設（建議）
-                                  </motion.button>
+                                 className="bg-white border border-[#EADBC8] rounded-lg shadow-xl flex flex-col max-h-[400px]"
+                                 data-model-dropdown
+                               >
+                                 <div className="overflow-y-auto flex-1">
+                                   {/* 預設選項 */}
+                                   <motion.button
+                                     whileHover={{ backgroundColor: "#FFFBEB" }}
+                                     whileTap={{ scale: 0.98 }}
+                                     type="button"
+                                     onMouseDown={(e) => {
+                                       e.preventDefault(); // 防止觸發 onBlur
+                                       setSelectedModel(DEFAULT_MODEL_SENTINEL);
+                                       setModelSearch('');
+                                       setModelSelectOpen(false);
+                                     }}
+                                     className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedModel === DEFAULT_MODEL_SENTINEL
+                                       ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                       : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                       }`}
+                                   >
+                                     預設（建議）
+                                   </motion.button>
 
-                                  {/* 多選模型提示（僅 Mori） */}
-                                  {selectedCompanion?.id === 'mori' && (
-                                    <div className="px-3 py-2 bg-[#FFF9F2] border-b border-[#EADBC8]/30">
-                                      <div className="text-xs font-medium text-[#4B4036]">
-                                        已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
-                                      </div>
-                                    </div>
-                                  )}
+                                   {/* 模型選項 */}
+                                   {getFilteredModels().filter(m => {
+                                     if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
+                                     if (!modelSearch.trim()) return true;
+                                     const q = modelSearch.toLowerCase();
+                                     return (
+                                       (m.display_name || '').toLowerCase().includes(q) ||
+                                       (m.description || '').toLowerCase().includes(q) ||
+                                       (m.provider || '').toLowerCase().includes(q) ||
+                                       (m.model_id || '').toLowerCase().includes(q)
+                                     );
+                                   }).map((model) => {
+                                     // 對於 Mori，檢查是否在多選列表中
+                                     const isMultiSelected = selectedCompanion?.id === 'mori' && selectedModelsMulti.includes(model.model_id);
+                                     const isSingleSelected = selectedCompanion?.id !== 'mori' && selectedModel === model.model_id;
+                                     const isSelected = isMultiSelected || isSingleSelected;
+                                     const isDisabled = selectedCompanion?.id === 'mori' && !isMultiSelected && selectedModelsMulti.length >= 4;
 
-                                  {/* 模型選項 */}
-                                  {getFilteredModels().filter(m => {
-                                    if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
-                                    if (!modelSearch.trim()) return true;
-                                    const q = modelSearch.toLowerCase();
-                                    return (
-                                      (m.display_name || '').toLowerCase().includes(q) ||
-                                      (m.description || '').toLowerCase().includes(q) ||
-                                      (m.provider || '').toLowerCase().includes(q) ||
-                                      (m.model_id || '').toLowerCase().includes(q)
-                                    );
-                                  }).map((model) => {
-                                    // 對於 Mori，檢查是否在多選列表中
-                                    const isMultiSelected = selectedCompanion?.id === 'mori' && selectedModelsMulti.includes(model.model_id);
-                                    const isSingleSelected = selectedCompanion?.id !== 'mori' && selectedModel === model.model_id;
-                                    const isSelected = isMultiSelected || isSingleSelected;
-                                    const isDisabled = selectedCompanion?.id === 'mori' && !isMultiSelected && selectedModelsMulti.length >= 4;
+                                     return (
+                                       <motion.button
+                                         key={model.model_id}
+                                         whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
+                                         whileTap={{ scale: 0.98 }}
+                                         type="button"
+                                         disabled={isDisabled}
+                                         onMouseDown={(e) => {
+                                           e.preventDefault(); // 防止觸發 onBlur
 
-                                    return (
-                                      <motion.button
-                                        key={model.model_id}
-                                        whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        type="button"
-                                        disabled={isDisabled}
-                                        onMouseDown={(e) => {
-                                          e.preventDefault(); // 防止觸發 onBlur
+                                           if (selectedCompanion?.id === 'mori') {
+                                             // 多選模式
+                                             if (isMultiSelected) {
+                                               // 取消選擇
+                                               setSelectedModelsMulti(prev => prev.filter(id => id !== model.model_id));
+                                             } else if (selectedModelsMulti.length < 4) {
+                                               // 添加選擇
+                                               setSelectedModelsMulti(prev => [...prev, model.model_id]);
+                                             }
+                                             // 多選模式下不關閉下拉選單
+                                           } else {
+                                             // 單選模式
+                                             setSelectedModel(model.model_id);
+                                             setModelSearch(stripFree(model.display_name || model.model_id));
+                                             setModelSelectOpen(false);
+                                           }
+                                         }}
+                                         className={`w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 ${isSelected
+                                           ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                           : isDisabled
+                                             ? 'text-gray-400 cursor-not-allowed'
+                                             : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                           }`}
+                                       >
+                                         <div className="flex items-center justify-between">
+                                           <div className="flex-1">
+                                             <div className="font-medium">{stripFree(model.display_name || '')}</div>
+                                             <div className={`text-xs ${isSelected ? 'opacity-90' : 'opacity-80'}`}>
+                                               {stripFree(model.description || '')} ({stripFree(model.price_tier || '')})
+                                             </div>
+                                           </div>
+                                           {selectedCompanion?.id === 'mori' && (
+                                             <div className="ml-2 flex-shrink-0">
+                                               {isMultiSelected ? (
+                                                 <motion.div
+                                                   initial={{ scale: 0 }}
+                                                   animate={{ scale: 1 }}
+                                                   className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"
+                                                 >
+                                                   <svg className="w-3 h-3 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                   </svg>
+                                                 </motion.div>
+                                               ) : (
+                                                 <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-white/80' : 'border-[#EADBC8]'
+                                                   }`} />
+                                               )}
+                                             </div>
+                                           )}
+                                         </div>
+                                       </motion.button>
+                                     );
+                                   })}
+                                 </div>
 
-                                          if (selectedCompanion?.id === 'mori') {
-                                            // 多選模式
-                                            if (isMultiSelected) {
-                                              // 取消選擇
-                                              setSelectedModelsMulti(prev => prev.filter(id => id !== model.model_id));
-                                            } else if (selectedModelsMulti.length < 4) {
-                                              // 添加選擇
-                                              setSelectedModelsMulti(prev => [...prev, model.model_id]);
-                                            }
-                                            // 多選模式下不關閉下拉選單
-                                          } else {
-                                            // 單選模式
-                                            setSelectedModel(model.model_id);
-                                            setModelSearch(stripFree(model.display_name || model.model_id));
-                                            setModelSelectOpen(false);
-                                          }
-                                        }}
-                                        className={`w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 ${isSelected
-                                          ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                          : isDisabled
-                                            ? 'text-gray-400 cursor-not-allowed'
-                                            : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                          }`}
-                                      >
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex-1">
-                                            <div className="font-medium">{stripFree(model.display_name || '')}</div>
-                                            <div className={`text-xs ${isSelected ? 'opacity-90' : 'opacity-80'}`}>
-                                              {stripFree(model.description || '')} ({stripFree(model.price_tier || '')})
-                                            </div>
-                                          </div>
-                                          {selectedCompanion?.id === 'mori' && (
-                                            <div className="ml-2 flex-shrink-0">
-                                              {isMultiSelected ? (
-                                                <motion.div
-                                                  initial={{ scale: 0 }}
-                                                  animate={{ scale: 1 }}
-                                                  className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"
-                                                >
-                                                  <svg className="w-3 h-3 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                  </svg>
-                                                </motion.div>
-                                              ) : (
-                                                <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-white/80' : 'border-[#EADBC8]'
-                                                  }`} />
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </motion.button>
-                                    );
-                                  })}
-                                </motion.div>
+                                 {/* 底部確認按鈕（僅 Mori 多選模式） */}
+                                 {selectedCompanion?.id === 'mori' && (
+                                   <div className="p-3 bg-gray-50 border-t border-[#EADBC8] flex justify-between items-center shrink-0">
+                                       <div className="text-xs text-[#4B4036]">
+                                           已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
+                                       </div>
+                                       <button
+                                           type="button"
+                                           onMouseDown={(e) => {
+                                               e.preventDefault();
+                                               setModelSelectOpen(false);
+                                           }}
+                                           className="px-4 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-md text-sm font-medium hover:bg-[#EBC9A4] transition-colors shadow-sm"
+                                       >
+                                           確認選擇
+                                       </button>
+                                   </div>
+                                 )}
+                               </motion.div>
                               </AnimatePresence>,
                               document.body
                             )}

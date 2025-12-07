@@ -32,7 +32,8 @@ import {
   PaintBrushIcon,
   UsersIcon,
   ChartBarIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
+  CheckIcon
 } from '@heroicons/react/24/outline';
 
 // Helper to parse raw multi-model content
@@ -765,32 +766,82 @@ export default function RoomChatPage() {
     const { roleInstanceId, slotType } = loadoutModalState;
     // Find the role instance in the map
     const roleKey = Object.keys(roleInstancesMap).find(k => roleInstancesMap[k].id === roleInstanceId);
-    const roleInstance = roleKey ? roleInstancesMap[roleKey] : null;
 
-    if (roleInstance) {
-      const currentSettings = roleInstance.settings || {};
-      const currentEquipped = currentSettings.equipped_blocks || {};
+    // roleKey is internalName (hibi, mori, pico)
+    if (roleKey && roomId) {
+      const supabase = createSaasClient();
+      console.log(`💾 [Save] 保存積木設定: room=${roomId}, role=${roleKey}, slot=${slotType}, block=${block.title}`);
 
-      const newEquipped = {
-        ...currentEquipped,
-        [slotType]: block
-      };
+      try {
+        // 1. 獲取當前房間設定
+        const { data: roomData, error: fetchError } = await supabase
+          .from('ai_rooms')
+          .select('settings')
+          .eq('id', roomId)
+          .single();
 
-      // Construct new system prompt
-      let newSystemPrompt = roleInstance.role?.system_prompt || '';
+        if (fetchError) {
+          console.error('❌ [Save] 獲取房間設定失敗:', fetchError);
+          return;
+        }
 
-      if (newEquipped.role) newSystemPrompt += `\n\n[Role Definition]\n${newEquipped.role.content_json?.blocks?.[0]?.params?.content || ''}`;
-      if (newEquipped.style) newSystemPrompt += `\n\n[Style Guide]\n${newEquipped.style.content_json?.blocks?.[0]?.params?.content || ''}`;
-      if (newEquipped.task) newSystemPrompt += `\n\n[Current Task]\n${newEquipped.task.content_json?.blocks?.[0]?.params?.content || ''}`;
+        const currentSettings = ((roomData as any)?.settings) || {};
+        const mindBlockOverrides = currentSettings.mind_block_overrides || {};
 
-      await handleUpdateRoleInstance(roleInstanceId, {
-        settings: {
+        // 初始化該角色的 override 物件
+        if (!mindBlockOverrides[roleKey]) {
+          mindBlockOverrides[roleKey] = {};
+        }
+
+        // 更新對應 slot 的積木 (儲存完整 block 物件以避免額外查詢)
+        mindBlockOverrides[roleKey][slotType] = block;
+
+        // 2. 更新 ai_rooms
+        const newSettings = {
           ...currentSettings,
-          equipped_blocks: newEquipped
-        },
-        system_prompt_override: newSystemPrompt
-      });
-      setLoadoutModalState(prev => ({ ...prev, isOpen: false }));
+          mind_block_overrides: mindBlockOverrides
+        };
+
+        const { error: updateError } = await supabase
+          .from('ai_rooms')
+          // @ts-ignore
+          .update({ settings: newSettings } as any)
+          .eq('id', roomId);
+
+        if (updateError) {
+          console.error('❌ [Save] 更新房間積木設定失敗:', updateError);
+          const { default: toast } = await import('react-hot-toast');
+          toast.error('保存積木設定失敗');
+        } else {
+          console.log('✅ [Save] 積木設定已更新到房間:', newSettings);
+
+          // 3. 更新本地狀態 (Override local instance map directly for immediate UI update)
+          setRoleInstancesMap(prev => {
+            const newMap = { ...prev };
+            if (newMap[roleKey]) {
+              newMap[roleKey] = {
+                ...newMap[roleKey],
+                settings: {
+                  ...newMap[roleKey].settings,
+                  equipped_blocks: {
+                    ...(newMap[roleKey].settings?.equipped_blocks || {}),
+                    [slotType]: block
+                  }
+                }
+              };
+            }
+            return newMap;
+          });
+
+          setLoadoutModalState(prev => ({ ...prev, isOpen: false }));
+
+          const { default: toast } = await import('react-hot-toast');
+          toast.success('已更新此房間的思維積木');
+        }
+
+      } catch (error) {
+        console.error('保存積木設定異常:', error);
+      }
     }
   };
 
@@ -1150,7 +1201,7 @@ export default function RoomChatPage() {
 
   // 載入角色模型設定的通用函數
   const loadRoleModelSettings = async (roleId: 'hibi' | 'mori' | 'pico') => {
-    if (!user?.id) return;
+    if (!user?.id || !roomId) return;
 
     try {
       // 設置載入狀態
@@ -1169,6 +1220,50 @@ export default function RoomChatPage() {
         };
         return slugMap[companionId] || companionId;
       };
+
+      // 0. 嘗試從房間設定中讀取 (優先級最高)
+      const { data: roomData } = await supabase
+        .from('ai_rooms')
+        .select('settings')
+        .eq('id', roomId)
+        .single();
+
+      const currentSettings = ((roomData as any)?.settings as any) || {};
+      const modelOverrides = currentSettings.model_overrides || {};
+      const roomOverrideModel = modelOverrides[roleId];
+
+      if (roomOverrideModel) {
+        console.log(`🏠 [Load] 使用房間特定模型: ${roleId} -> ${roomOverrideModel}`);
+        if (roleId === 'pico') {
+          setPicoSelectedModel(roomOverrideModel);
+          if (availableModels.length > 0) {
+            const modelData = availableModels.find((m: any) => m.model_id === roomOverrideModel);
+            setPicoModelSearch(modelData?.display_name || roomOverrideModel);
+          }
+        } else if (roleId === 'mori') {
+          // Mori 支援多選模型
+          if (roomOverrideModel.includes(',')) {
+            const modelIds = roomOverrideModel.split(',').map((id: string) => id.trim()).filter(Boolean);
+            setMoriSelectedModelsMulti(modelIds);
+            setMoriSelectedModel(DEFAULT_MODEL_SENTINEL);
+          } else {
+            setMoriSelectedModel(roomOverrideModel);
+            setMoriSelectedModelsMulti([]);
+            if (availableModels.length > 0) {
+              const modelData = availableModels.find((m: any) => m.model_id === roomOverrideModel);
+              setMoriModelSearch(modelData?.display_name || roomOverrideModel);
+            }
+          }
+        } else { // hibi
+          setHibiSelectedModel(roomOverrideModel);
+          if (availableModels.length > 0) {
+            const modelData = availableModels.find((m: any) => m.model_id === roomOverrideModel);
+            setHibiModelSearch(modelData?.display_name || roomOverrideModel);
+          }
+        }
+        // 如果有房間設定，直接返回，不讀取用戶全局設定
+        return;
+      }
 
       const roleSlug = getRoleSlug(roleId);
 
@@ -1317,78 +1412,67 @@ export default function RoomChatPage() {
       }
     }
   }, [availableModels, picoSelectedModel, moriSelectedModel, hibiSelectedModel]);
-  // 保存角色模型設定的通用函數（使用 user_role_settings 表）
+  // 保存角色模型設定的通用函數（使用 ai_rooms.settings，範圍僅限當前房間）
   const saveRoleModelSettings = async (roleId: 'hibi' | 'mori' | 'pico', modelId: string | string[]) => {
-    if (!user?.id) return;
+    if (!user?.id || !roomId) return;
 
     try {
       const supabase = createSaasClient();
 
-      // 映射 companion.id 到實際的 slug
-      const getRoleSlug = (companionId: string) => {
-        const slugMap: Record<string, string> = {
-          'hibi': 'hibi-manager',
-          'mori': 'mori-researcher',
-          'pico': 'pico-artist'
-        };
-        return slugMap[companionId] || companionId;
-      };
+      console.log(`💾 [Save] 開始保存模型設定: room=${roomId}, role=${roleId}, model=${modelId}`);
 
-      const roleSlug = getRoleSlug(roleId);
+      // 1. 先獲取當前房間的 settings
+      const { data: roomData, error: fetchError } = await supabase
+        .from('ai_rooms')
+        .select('settings')
+        .eq('id', roomId)
+        .single();
 
-      // 1. 先獲取角色 ID
-      const { data: roleData, error: roleError } = await supabase
-        .from('ai_roles')
-        .select('id, system_prompt, tone')
-        .eq('slug', roleSlug)
-        .maybeSingle();
-
-      if (roleError || !roleData) {
-        console.error(`找不到角色: ${roleSlug}`, roleError);
+      if (fetchError) {
+        console.error('❌ [Save] 獲取房間設定失敗:', fetchError);
         const { default: toast } = await import('react-hot-toast');
-        toast.error('找不到角色設定', {
-          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
-          duration: 2000,
-          style: {
-            background: '#fff',
-            color: '#4B4036',
-          }
-        });
+        toast.error('保存設定失敗：無法獲取房間資訊');
         return;
       }
 
-      const roleId_db = (roleData as any).id;
-
-      // 2. 獲取系統預設的指引和語氣以便比較
-      const systemGuidance = (roleData as any)?.system_prompt || '';
-      const systemTone = (roleData as any)?.tone || '';
+      const currentSettings = ((roomData as any)?.settings as any) || {};
+      const modelOverrides = currentSettings.model_overrides || {};
 
       // 處理模型 ID（支援多選）
       const resolvedModel = Array.isArray(modelId) ? modelId.join(',') : modelId;
 
-      // 如果選擇預設，刪除用戶覆寫記錄
+      // 如果選擇預設，從 overrides 中移除
       if (resolvedModel === DEFAULT_MODEL_SENTINEL || (Array.isArray(modelId) && modelId.length === 0)) {
-        const { error } = await supabase
-          .from('user_role_settings')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('role_id', roleId_db);
+        delete modelOverrides[roleId];
+      } else {
+        // 否則更新 overrides
+        modelOverrides[roleId] = resolvedModel;
+      }
 
-        if (error) {
-          console.error('刪除用戶覆寫記錄錯誤:', error);
-          const { default: toast } = await import('react-hot-toast');
-          toast.error('恢復預設模型失敗', {
-            icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
-            duration: 2000,
-            style: {
-              background: '#fff',
-              color: '#4B4036',
-            }
-          });
-          return;
-        }
+      // 2. 更新 ai_rooms
+      const newSettings = {
+        ...currentSettings,
+        model_overrides: modelOverrides
+      };
 
-        // 更新本地狀態
+      const { error: updateError } = await supabase
+        .from('ai_rooms')
+        // @ts-ignore
+        .update({ settings: newSettings } as any)
+        .eq('id', roomId);
+
+      if (updateError) {
+        console.error('❌ [Save] 更新房間設定失敗:', updateError);
+        const { default: toast } = await import('react-hot-toast');
+        toast.error('保存設定失敗');
+        return;
+      }
+
+      console.log('✅ [Save] 模型設定已更新到房間:', newSettings);
+
+      // 3. 更新本地狀態 & 顯示 Toast
+      if (resolvedModel === DEFAULT_MODEL_SENTINEL || (Array.isArray(modelId) && modelId.length === 0)) {
+        // 恢復預設邏輯
         if (roleId === 'pico') {
           setPicoSelectedModel(DEFAULT_MODEL_SENTINEL);
           setPicoModelSearch('');
@@ -1402,80 +1486,40 @@ export default function RoomChatPage() {
         }
 
         const { default: toast } = await import('react-hot-toast');
-        toast.success('已恢復預設模型', {
+        toast.success('已恢復為房間預設模型', {
           icon: <CpuChipIcon className="w-5 h-5 text-green-600" />,
           duration: 2000,
-          style: {
-            background: '#fff',
-            color: '#4B4036',
-          }
+          style: { background: '#fff', color: '#4B4036' }
         });
-        return;
-      }
-
-      // 儲存或更新 user_role_settings（只儲存非預設的設定）
-      const { data, error } = await (supabase as any)
-        .from('user_role_settings')
-        .upsert({
-          user_id: user.id,
-          role_id: roleId_db,
-          model_override: resolvedModel,
-          guidance_override: null, // 不改變指引
-          tone_override: null, // 不改變語氣
-          is_active: true,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,role_id'
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error(`保存${roleId}模型設定錯誤:`, error);
-        const { default: toast } = await import('react-hot-toast');
-        toast.error(`保存設定失敗: ${error.message || '未知錯誤'}`, {
-          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
-          duration: 3000,
-          style: {
-            background: '#fff',
-            color: '#4B4036',
-          }
-        });
-        return;
-      }
-
-      // 更新本地狀態
-      if (roleId === 'pico') {
-        setPicoSelectedModel(resolvedModel);
-        const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
-        setPicoModelSearch(modelData?.display_name || resolvedModel);
-      } else if (roleId === 'mori') {
-        if (Array.isArray(modelId)) {
-          setMoriSelectedModelsMulti(modelId);
-          setMoriSelectedModel(DEFAULT_MODEL_SENTINEL);
-        } else {
-          setMoriSelectedModel(resolvedModel);
-          setMoriSelectedModelsMulti([]);
-          const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
-          setMoriModelSearch(modelData?.display_name || resolvedModel);
-        }
       } else {
-        setHibiSelectedModel(resolvedModel);
-        const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
-        setHibiModelSearch(modelData?.display_name || resolvedModel);
-      }
-
-      const { default: toast } = await import('react-hot-toast');
-      toast.success('模型設定已更新', {
-        icon: <CpuChipIcon className="w-5 h-5 text-green-600" />,
-        duration: 2000,
-        style: {
-          background: '#fff',
-          color: '#4B4036',
+        // 設置新模型邏輯
+        if (roleId === 'pico') {
+          setPicoSelectedModel(resolvedModel);
+          const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
+          setPicoModelSearch(modelData?.display_name || resolvedModel);
+        } else if (roleId === 'mori') {
+          if (Array.isArray(modelId)) {
+            setMoriSelectedModelsMulti(modelId);
+            setMoriSelectedModel(DEFAULT_MODEL_SENTINEL);
+          } else {
+            setMoriSelectedModel(resolvedModel);
+            setMoriSelectedModelsMulti([]);
+            const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
+            setMoriModelSearch(modelData?.display_name || resolvedModel);
+          }
+        } else {
+          setHibiSelectedModel(resolvedModel);
+          const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
+          setHibiModelSearch(modelData?.display_name || resolvedModel);
         }
-      });
 
-      console.log(`✅ ${roleId}模型設定已保存:`, data);
+        const { default: toast } = await import('react-hot-toast');
+        toast.success('已更新此房間的模型設定', {
+          icon: <CpuChipIcon className="w-5 h-5 text-blue-600" />,
+          duration: 2000,
+          style: { background: '#fff', color: '#4B4036' }
+        });
+      }
     } catch (error) {
       console.error(`保存${roleId}模型設定異常:`, error);
       const { default: toast } = await import('react-hot-toast');
@@ -1516,15 +1560,40 @@ export default function RoomChatPage() {
     });
   };
 
-  // 根據角色過濾模型（墨墨需要 search 能力）
+  // 根據角色過濾模型（墨墨需要 search 能力，但也包含預設模型）
   const getFilteredMoriModels = () => {
+    // Debug log
+    // console.log('🔍 [Mori Filter] Checking models. Total:', availableModels.length);
     if (showAllMoriModels) return availableModels;
 
-    return availableModels.filter((m) => {
+    const defaults = moriRoleDefaultModel ? moriRoleDefaultModel.split(',').map(s => s.trim()) : [];
+
+    const filtered = availableModels.filter((m) => {
+      // 1. Always include defaults
+      if (defaults.includes(m.model_id)) return true;
+
+      // 2. Check capabilities
       const caps: string[] = Array.isArray(m.capabilities) ? m.capabilities : [];
       const hasSearch = caps.includes('web_search') || /perplexity|sonar|search/.test((m.provider || '') + ' ' + (m.model_name || '') + ' ' + (m.model_id || ''));
+
+      // 3. Temporarily allow 'chat' models too if the list is too small, or simply rely on defaults + search?
+      // Since the user wants to use generic models, let's allow strong chat models too or just rely on the user adding them via Show All.
+      // But "System Recommended" models MUST be visible.
       return hasSearch;
     });
+
+    // Debug result
+    if (filtered.length === 0 && availableModels.length > 0) {
+      console.warn('⚠️ [Mori Filter] Result is empty! Relaxing filter to include chat models fallback.');
+      // Fallback: Return all if strict filter fails? Or just return availableModels?
+      // Let's return defaults + search + chat to be safe.
+      return availableModels.filter(m => {
+        if (defaults.includes(m.model_id)) return true;
+        const caps = Array.isArray(m.capabilities) ? m.capabilities : [];
+        return caps.includes('web_search') || caps.includes('chat') || m.model_type === 'chat';
+      });
+    }
+    return filtered;
   };
 
   // 根據角色過濾模型（Hibi 需要 code 能力）
@@ -1640,9 +1709,9 @@ export default function RoomChatPage() {
       // 載入房間基本資訊
       const { data: roomData, error: roomError } = await supabase
         .from('ai_rooms')
-        .select('id, title, description, room_type, created_at')
+        .select('id, title, description, room_type, created_at, settings')
         .eq('id', roomId)
-        .single() as { data: { id: string; title: string; description?: string; room_type?: string; created_at: string } | null; error: any };
+        .single() as { data: { id: string; title: string; description?: string; room_type?: string; created_at: string; settings?: any } | null; error: any };
 
       // 載入房間角色（兩段式查詢避免 400/406 並確保完整資料）
       let roomRoles: string[] = [];
@@ -1726,6 +1795,9 @@ export default function RoomChatPage() {
             // Populate roleInstancesMap
             const newRoleInstancesMap: Record<string, RoleInstance> = {};
 
+            const roomSettings = roomData?.settings || {};
+            const mindBlockOverrides = roomSettings.mind_block_overrides || {};
+
             const roleIds = (roleInstances || [])
               .map((ri: any) => {
                 const slug = ri.role?.slug;
@@ -1735,6 +1807,21 @@ export default function RoomChatPage() {
                   if (slug.includes('hibi-manager')) internalName = 'hibi';
                   else if (slug.includes('mori-researcher')) internalName = 'mori';
                   else if (slug.includes('pico-artist')) internalName = 'pico';
+
+                  // Check for overrides
+                  if (mindBlockOverrides[internalName]) {
+                    console.log(`🏠 [Load] 應用房間積木設定: ${internalName}`, mindBlockOverrides[internalName]);
+
+                    // Ensure settings and equipped_blocks exist
+                    if (!ri.settings) ri.settings = {};
+                    if (!ri.settings.equipped_blocks) ri.settings.equipped_blocks = {};
+
+                    // Apply overrides
+                    ri.settings.equipped_blocks = {
+                      ...ri.settings.equipped_blocks,
+                      ...mindBlockOverrides[internalName]
+                    };
+                  }
 
                   newRoleInstancesMap[internalName] = ri as unknown as RoleInstance;
                   return ri.role_id;
@@ -5044,6 +5131,41 @@ export default function RoomChatPage() {
                 onDelete={handleDeleteMessage}
               />
             ))}
+
+            {/* ⭐ Ghost Message (Typing Indicator) - 解決 "Thinking..." UI 缺失問題 */}
+            {(isLoading || isTyping) && (() => {
+              const targetId = processingCompanion || selectedCompanion || activeRoles[0];
+              const info = getCompanionInfo(targetId as any);
+              if (!info) return null;
+
+              return (
+                <div className="flex justify-start animate-pulse pt-2">
+                  <div className="flex flex-row items-end space-x-3 max-w-[95%] sm:max-w-[90%] md:max-w-[82%] xl:max-w-[70%]">
+                    <div className="flex-shrink-0">
+                      <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${info.color} p-0.5`}>
+                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                          <Image
+                            src={info.imagePath}
+                            alt={info.name}
+                            width={28}
+                            height={28}
+                            className="w-7 h-7 object-cover"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="ml-3">
+                      <div className="text-xs text-[#2B3A3B] mb-1">
+                        {info.name}
+                      </div>
+                      <div className="px-4 py-3 rounded-2xl shadow-sm bg-white border border-[#EADBC8] text-[#4B4036] rounded-bl-md flex items-center space-x-2">
+                        <MessageStatusIndicator status="processing" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             <div ref={messagesEndRef} />
           </div>
 
@@ -5094,7 +5216,15 @@ export default function RoomChatPage() {
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#EADBC8] bg-white/50 hover:bg-[#FFF9F2] backdrop-blur-sm transition-all active:scale-95 flex-shrink-0"
                         >
                           <CpuChipIcon className="w-3.5 h-3.5 text-orange-400" />
-                          <span className="text-xs font-medium text-[#4B4036] max-w-[100px] truncate">{modelName}</span>
+                          <span className="text-xs font-medium text-[#4B4036] max-w-[100px] truncate">
+                            {roleId === 'mori' && modelState.selectedModelsMulti ? (
+                              modelState.selectedModelsMulti.length > 0
+                                ? `已選 ${modelState.selectedModelsMulti.length} 個模型`
+                                : '預設模型組合'
+                            ) : (
+                              modelName
+                            )}
+                          </span>
                         </button>
 
                         {/* Mind Blocks Chip */}
@@ -5153,7 +5283,7 @@ export default function RoomChatPage() {
                               ? `與 ${companion.name} 對話...`
                               : '輸入訊息...'
                           }
-                          className="flex-1 max-h-32 min-h-[44px] py-2.5 px-2 bg-transparent border-none focus:ring-0 text-[#4B4036] placeholder-[#2B3A3B]/40 resize-none text-base leading-relaxed"
+                          className="flex-1 max-h-32 min-h-[44px] py-2.5 px-2 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-transparent text-[#4B4036] placeholder-[#2B3A3B]/40 resize-none text-base leading-relaxed"
                           rows={1}
                           style={{ height: 'auto', minHeight: '44px' }}
                           onInput={(e) => {
@@ -5164,27 +5294,29 @@ export default function RoomChatPage() {
                         />
 
                         {/* Send Button */}
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={handleSendMessage}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            // Backup click handler
+                            handleSendMessage();
+                          }}
+                          onMouseDown={(e) => {
+                            // Primary handler for immediate response
+                            e.preventDefault(); // Prevent focus loss
+                            handleSendMessage();
+                          }}
                           disabled={!inputMessage.trim() || isLoading || isTyping || isSending}
-                          className={`p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${inputMessage.trim() && !isLoading && !isSending
-                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-[#FFB6C1]/30'
-                            : 'bg-[#F0EAE0] text-[#4B4036]/30 shadow-none'
+                          className={`relative z-50 p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${inputMessage.trim() && !isLoading && !isSending
+                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-[#FFB6C1]/30 cursor-pointer pointer-events-auto'
+                            : 'bg-[#F0EAE0] text-[#4B4036]/30 shadow-none cursor-not-allowed'
                             }`}
                         >
                           {isLoading || isTyping ? (
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            >
-                              <ClockIcon className="w-5 h-5" />
-                            </motion.div>
+                            <ClockIcon className="w-5 h-5 animate-spin" />
                           ) : (
                             <PaperAirplaneIcon className="w-5 h-5 translate-x-0.5 -translate-y-0.5" />
                           )}
-                        </motion.button>
+                        </button>
                       </div>
                     </div>
                   </div>,
@@ -5192,86 +5324,194 @@ export default function RoomChatPage() {
                 )}
 
                 {typeof document !== 'undefined' && modelState.modelSelectOpen && createPortal(
-                  <div
-                    className="fixed inset-0 z-[100] lg:z-50 lg:absolute lg:inset-auto pointer-events-none"
-                    style={{
-                      top: typeof window !== 'undefined' && window.innerWidth >= 1024 ? modelState.dropdownPosition?.top || 0 : 0,
-                      left: typeof window !== 'undefined' && window.innerWidth >= 1024 ? modelState.dropdownPosition?.left || 0 : 0,
-                    }}
-                  >
-                    {/* Backdrop for mobile */}
+                  <div className="fixed inset-0 z-[100] flex items-center justify-center">
+                    {/* Backdrop */}
                     <div
-                      className="fixed inset-0 bg-black/20 backdrop-blur-sm lg:hidden pointer-events-auto"
+                      className="absolute inset-0 bg-black/20 backdrop-blur-sm z-[10]"
                       onClick={() => modelState.setModelSelectOpen(false)}
                     />
 
                     {/* Modal Container */}
-                    <div className="fixed inset-0 flex items-center justify-center lg:block lg:static pointer-events-none">
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className="bg-white rounded-xl shadow-xl border border-orange-100 flex flex-col pointer-events-auto w-[90vw] max-w-[320px] max-h-[80vh] lg:w-[320px] lg:max-h-[400px]"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFB6C1]/10 to-[#FFD59A]/10">
-                          <div className="flex items-center gap-3">
-                            <CpuChipIcon className={`w-6 h-6 ${roleId === 'pico' ? 'text-[#FFB6C1]' : roleId === 'mori' ? 'text-amber-500' : 'text-orange-500'}`} />
-                            <h3 className="text-lg font-semibold text-[#4B4036]">選擇 {companion.name} 的大腦</h3>
-                          </div>
-                          <button onClick={() => modelState.setModelSelectOpen(false)} className="p-2 hover:bg-black/5 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
+                    <div
+                      className="relative z-[20] bg-white rounded-xl shadow-xl border border-orange-100 flex flex-col w-[90vw] max-w-[320px] max-h-[80vh] lg:w-[320px] lg:max-h-[400px]"
+                      style={{ pointerEvents: 'auto' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFB6C1]/10 to-[#FFD59A]/10">
+                        <div className="flex items-center gap-3">
+                          <CpuChipIcon className={`w-6 h-6 ${roleId === 'pico' ? 'text-[#FFB6C1]' : roleId === 'mori' ? 'text-amber-500' : 'text-orange-500'}`} />
+                          <h3 className="text-lg font-semibold text-[#4B4036]">
+                            {roleId === 'mori' ? `選擇 ${companion.name} 的模型組合` : `選擇 ${companion.name} 的大腦`}
+                          </h3>
                         </div>
-                        {/* Search */}
-                        <div className="px-5 py-3 border-b border-[#EADBC8]">
-                          <input
-                            type="text"
-                            value={modelState.modelSearch}
-                            onChange={(e) => modelState.setModelSearch(e.target.value)}
-                            placeholder="搜尋模型..."
-                            className="w-full p-2.5 bg-[#F8F5EC] border-transparent focus:bg-white border focus:border-[#FFB6C1] rounded-xl focus:ring-0 text-[#4B4036]"
-                          />
-                        </div>
-                        {/* Model List */}
-                        <div className="overflow-y-auto flex-1 p-2 space-y-1">
-                          <button
-                            onClick={() => {
+                        <button onClick={() => modelState.setModelSelectOpen(false)} className="p-2 hover:bg-black/5 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
+                      </div>
+                      {/* Search */}
+                      <div className="px-5 py-3 border-b border-[#EADBC8]">
+                        <input
+                          type="text"
+                          value={modelState.modelSearch}
+                          onChange={(e) => modelState.setModelSearch(e.target.value)}
+                          placeholder="搜尋模型..."
+                          className="w-full p-2.5 bg-[#F8F5EC] border-transparent focus:bg-white border focus:border-[#FFB6C1] rounded-xl focus:ring-0 text-[#4B4036] pointer-events-auto select-text"
+                          onClick={() => console.log('Input clicked')}
+                        />
+                      </div>
+                      {/* Model List */}
+                      <div className="overflow-y-auto flex-1 p-2 space-y-1 relative z-30" style={{ pointerEvents: 'auto' }}>
+                        {/* System Default Option */}
+                        <button
+                          onMouseDown={() => {
+                            if (roleId === 'mori' && modelState.setSelectedModelsMulti) {
+                              // Multi-select for Mori: Revert to default
+                              // Just mark as default mode, don't close.
+                              // DB saves [] to indicate default.
+                              modelState.setSelectedModelsMulti([]);
                               modelState.setSelectedModel(DEFAULT_MODEL_SENTINEL);
-                              modelState.setModelSelectOpen(false);
+                              modelState.saveFunction([]);
+                            } else {
+                              modelState.setSelectedModel(DEFAULT_MODEL_SENTINEL);
                               modelState.saveFunction(DEFAULT_MODEL_SENTINEL);
-                            }}
-                            className={`w-full text-left px-4 py-3 rounded-xl transition-all ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL
-                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                              : 'text-[#4B4036] hover:bg-[#F8F5EC]'
-                              }`}
-                          >
-                            <div className="font-bold text-sm">✨ 系統推薦 (預設)</div>
-                          </button>
-                          {modelState.getFilteredModels?.().filter((m: any) => {
-                            if (!modelState.modelSearch.trim()) return true;
-                            return (m.display_name?.toLowerCase().includes(modelState.modelSearch.toLowerCase()));
-                          }).map((model: any) => {
-                            const isSelected = modelState.selectedModel === model.model_id;
-                            return (
-                              <button
-                                key={model.model_id}
-                                onClick={() => {
-                                  modelState.setSelectedModel(model.model_id);
-                                  modelState.setModelSelectOpen(false);
-                                  modelState.saveFunction(model.model_id);
-                                }}
-                                className={`w-full text-left px-4 py-3 rounded-xl transition-all ${isSelected ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white' : 'hover:bg-[#F8F5EC]'}`}
-                              >
-                                <div className="font-bold text-sm">{model.display_name || model.model_id}</div>
-                                <div className={`text-xs ${isSelected ? 'text-white/80' : 'text-[#4B4036]/60'}`}>
-                                  {model.provider} {model.price_tier ? `• ${model.price_tier}` : ''}
+                              modelState.setModelSelectOpen(false); // Single select still closes
+                            }
+                          }}
+                          className={`w-full text-left px-4 py-3 rounded-xl transition-all ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL
+                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
+                            : 'text-[#4B4036] hover:bg-[#F8F5EC]'
+                            }`}
+                        >
+                          <div className="font-bold text-sm flex items-center justify-between">
+                            <span>✨ 系統推薦 (預設)</span>
+                            {modelState.selectedModel === DEFAULT_MODEL_SENTINEL && (
+                              <CheckIcon className="w-5 h-5 text-white" />
+                            )}
+                          </div>
+                        </button>
+
+                        {modelState.getFilteredModels?.().filter((m: any) => {
+                          if (!modelState.modelSearch.trim()) return true;
+                          return (m.display_name?.toLowerCase().includes(modelState.modelSearch.toLowerCase()));
+                        }).map((model: any) => {
+                          const isMori = roleId === 'mori';
+
+                          // Parse defaults for logic
+                          const defaults = (isMori && modelState.roleDefaultModel)
+                            ? modelState.roleDefaultModel.split(',').map((s: string) => s.trim()).filter(Boolean)
+                            : [];
+
+                          // Check selection state
+                          let isSelected = false;
+                          if (isMori) {
+                            if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL) {
+                              isSelected = defaults.includes(model.model_id);
+                            } else {
+                              isSelected = modelState.selectedModelsMulti?.includes(model.model_id) || false;
+                            }
+                          } else {
+                            isSelected = modelState.selectedModel === model.model_id;
+                          }
+
+                          // Check selection limit (4)
+                          const isLimitReached = isMori && !isSelected && (modelState.selectedModelsMulti?.length || 0) >= 4;
+
+                          return (
+                            <button
+                              key={model.model_id}
+                              style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                              id={`model-btn-${model.model_id}`}
+                              disabled={isLimitReached}
+                              onMouseDown={async (e) => {
+                                // console.log('[ModelSelector] MouseDown triggered for:', model.model_id);
+                                
+                                // Prevent any default behavior that might close the modal
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                const { default: toast } = await import('react-hot-toast');
+                                try {
+                                  if (isMori && modelState.setSelectedModelsMulti) {
+                                    // Handle Multi-Select - UPDATE LOCAL STATE ONLY
+                                    // Logic for transitioning from Default -> Custom
+                                    let currentSelection: string[] = [];
+                                    if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL) {
+                                      currentSelection = [...defaults];
+                                      modelState.setSelectedModel('');
+                                    } else {
+                                      currentSelection = modelState.selectedModelsMulti || [];
+                                    }
+
+                                    const newSelection = currentSelection.includes(model.model_id)
+                                      ? currentSelection.filter((id: string) => id !== model.model_id)
+                                      : [...currentSelection, model.model_id];
+
+                                    modelState.setSelectedModelsMulti(newSelection);
+                                    // DO NOT close modal here for Mori multi-select
+                                  } else {
+                                    // Handle Single Select
+                                    modelState.setSelectedModel(model.model_id);
+                                    modelState.setModelSelectOpen(false); // Close for single select
+                                    toast.success('已選擇 ' + (model.display_name || model.model_id));
+                                    await modelState.saveFunction(model.model_id);
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                  toast.error('選擇失敗');
+                                }
+                              }}
+                              className={`relative z-[51] w-full text-left px-4 py-3 rounded-xl transition-all ${isSelected
+                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                : isLimitReached
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  : 'hover:bg-[#F8F5EC] text-[#4B4036]'
+                                }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-bold text-sm">{model.display_name || model.model_id}</div>
+                                  <div className={`text-xs ${isSelected ? 'text-white/80' : 'text-[#4B4036]/60'}`}>
+                                    {model.provider} {model.price_tier ? `• ${model.price_tier}` : ''}
+                                  </div>
                                 </div>
-                              </button>
-                            );
-                          })}
+                                {isSelected && <CheckIcon className="w-5 h-5 text-white" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {/* Footer for Multi-select */}
+                      {roleId === 'mori' && (
+                        <div className="p-4 border-t border-[#EADBC8] bg-[#F8F5EC] flex items-center justify-between">
+                          <div className="text-xs text-[#4B4036] font-medium">
+                            已選 {modelState.selectedModelsMulti?.length || 0} / 4 (至少 2 個)
+                          </div>
+                          <button
+                            onMouseDown={async (e) => {
+                              e.preventDefault();
+                              const { default: toast } = await import('react-hot-toast');
+                              // Save only on confirm
+                              try {
+                                const selection = modelState.selectedModelsMulti || [];
+                                if (selection.length < 2) {
+                                  toast.error('請至少選擇 2 個模型');
+                                  return;
+                                }
+                                await modelState.saveFunction(selection as any); // Cast to any to avoid TS error, implementation handles string[]
+                                modelState.setModelSelectOpen(false);
+                                toast.success('模型設定已更新');
+                              } catch (err) {
+                                console.error(err);
+                                toast.error('儲存失敗');
+                              }
+                            }}
+                            className="px-4 py-2 bg-[#FFD59A] hover:bg-[#FFC570] text-[#4B4036] font-bold rounded-lg transition-colors shadow-sm"
+                          >
+                            確認選擇
+                          </button>
                         </div>
-                      </motion.div>
+                      )}
                     </div>
                   </div>,
                   document.body
