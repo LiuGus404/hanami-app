@@ -70,6 +70,7 @@ export function useFoodDisplay(userId?: string) {
         saasSupabaseClient.removeChannel(channel);
       };
     }
+    return undefined;
   }, [userId, saasSupabaseClient, fetchFoodInfo]);
 
   const toggleFoodHistory = () => {
