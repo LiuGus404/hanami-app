@@ -1124,6 +1124,9 @@ export default function RoomChatPage() {
     notes: ''
   });
 
+  // 追蹤用戶是否接近底部 (用於防止閱讀歷史訊息時被強制滾動)
+  const isNearBottomRef = useRef(true);
+
   // 滾動到訊息底部的函數
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -3001,11 +3004,16 @@ export default function RoomChatPage() {
 
 
   // 監聽訊息變化並確保渲染
+  // 監聽訊息變化並確保渲染 (更智能的滾動邏輯)
   useEffect(() => {
     if (messages.length > 0) {
-      console.log(`👀 [Render Check] Messages length changed to: ${messages.length}`);
-      // 如果有訊息但還沒滾動到底部，嘗試滾動
-      if (hasLoadedHistory) {
+      // 判斷是否應該滾動
+      const shouldScroll = isNearBottomRef.current;
+      const lastMessage = messages[messages.length - 1];
+      const isUserMessage = lastMessage?.sender === 'user'; // 如果是用戶發的，強制滾動
+
+      if (hasLoadedHistory && (shouldScroll || isUserMessage)) {
+        // 使用 RAF 確保 DOM 更新後執行
         requestAnimationFrame(() => scrollToBottom());
       }
     }
@@ -3284,6 +3292,9 @@ export default function RoomChatPage() {
     const scrollHeight = target.scrollHeight;
     const clientHeight = target.clientHeight;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+    // 更新接近底部狀態 (閾值設為 100px)
+    isNearBottomRef.current = distanceFromBottom < 100;
 
     // 當距離底部超過 200px 時顯示「返回最新」按鈕
     setShowScrollToBottomButton(distanceFromBottom > 200);
@@ -5104,15 +5115,6 @@ export default function RoomChatPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              {/* 返回按鈕 */}
-              <motion.button
-                onClick={() => router.back()}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-              >
-                <ArrowLeftIcon className="w-6 h-6 text-[#4B4036]" />
-              </motion.button>
 
               {/* 選單按鈕 */}
               <motion.button
@@ -5301,7 +5303,7 @@ export default function RoomChatPage() {
               if (!info) return null;
 
               return (
-                <div className="flex justify-start animate-pulse pt-2">
+                <div className="flex justify-start pt-2">
                   <div className="flex flex-row items-end space-x-3 max-w-[95%] sm:max-w-[90%] md:max-w-[82%] xl:max-w-[70%]">
                     <div className="flex-shrink-0">
                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${info.color} p-0.5`}>
@@ -5311,17 +5313,83 @@ export default function RoomChatPage() {
                             alt={info.name}
                             width={28}
                             height={28}
-                            className="w-7 h-7 object-cover"
+                            className="w-7 h-7 object-cover opacity-80"
                           />
                         </div>
                       </div>
                     </div>
                     <div className="ml-3">
-                      <div className="text-xs text-[#2B3A3B] mb-1">
-                        {info.name}
-                      </div>
-                      <div className="px-4 py-3 rounded-2xl shadow-sm bg-white border border-[#EADBC8] text-[#4B4036] rounded-bl-md flex items-center space-x-2">
-                        <MessageStatusIndicator status="processing" />
+                      <div className="px-5 py-3 rounded-2xl shadow-sm bg-white/80 backdrop-blur-sm border border-[#EADBC8] text-[#4B4036] rounded-bl-md flex items-center space-x-3">
+                        {/* Custom Animated SVG Cloud - Dynamic & Hanami Style */}
+                        <div className="relative w-12 h-10 flex items-center justify-center -ml-1">
+                          {/* Main Cloud */}
+                          <motion.svg
+                            width="100%" height="100%" viewBox="0 0 100 100"
+                            animate={{ y: [-3, 3, -3] }}
+                            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                            className="overflow-visible"
+                          >
+                            <defs>
+                              <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#FFD59A" /> {/* Hanami Warm Orange */}
+                                <stop offset="100%" stopColor="#FFB6C1" /> {/* Hanami Soft Pink */}
+                              </linearGradient>
+                              {/* Soft Shadow Filter */}
+                              <filter id="cloudShadow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#FFB6C1" floodOpacity="0.4" />
+                              </filter>
+                            </defs>
+
+                            {/* Cloud Shape Group */}
+                            <g filter="url(#cloudShadow)">
+                              {/* Central Mass - Breathing */}
+                              <motion.circle cx="50" cy="50" r="28" fill="url(#cloudGrad)" animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2.5, repeat: Infinity }} />
+
+                              {/* Surrounding Puffs - Random floating */}
+                              <motion.circle cx="25" cy="55" r="18" fill="url(#cloudGrad)" animate={{ x: [-1, 1, -1] }} transition={{ duration: 2, repeat: Infinity }} />
+                              <motion.circle cx="75" cy="55" r="18" fill="url(#cloudGrad)" animate={{ x: [1, -1, 1] }} transition={{ duration: 2.2, repeat: Infinity }} />
+                              <motion.circle cx="35" cy="35" r="20" fill="url(#cloudGrad)" animate={{ y: [-1, 1, -1] }} transition={{ duration: 1.8, repeat: Infinity }} />
+                              <motion.circle cx="65" cy="35" r="20" fill="url(#cloudGrad)" animate={{ y: [1, -1, 1] }} transition={{ duration: 2.1, repeat: Infinity }} />
+                            </g>
+
+                            {/* Cute Face */}
+                            <g transform="translate(0, 5)">
+                              {/* Eyes */}
+                              <circle cx="40" cy="52" r="2.5" fill="#4B4036" />
+                              <circle cx="60" cy="52" r="2.5" fill="#4B4036" />
+                              {/* Smile */}
+                              <path d="M 46 58 Q 50 62 54 58" stroke="#4B4036" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8" />
+                              {/* Cheeks - White for contrast on warm cloud */}
+                              <circle cx="34" cy="56" r="3" fill="#FFFFFF" opacity="0.6" />
+                              <circle cx="66" cy="56" r="3" fill="#FFFFFF" opacity="0.6" />
+                            </g>
+                          </motion.svg>
+
+                          {/* Mini particles */}
+                          <motion.div
+                            className="absolute top-0 right-0 w-1.5 h-1.5 bg-[#FFD59A] rounded-full"
+                            animate={{ y: [-10, -20], opacity: [0, 1, 0] }}
+                            transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 }}
+                          />
+                          <motion.div
+                            className="absolute bottom-1 -left-1 w-1 h-1 bg-[#FFB6C1] rounded-full"
+                            animate={{ scale: [0, 1.5, 0] }}
+                            transition={{ duration: 2, repeat: Infinity, delay: 1.2 }}
+                          />
+                        </div>
+
+                        {/* Thinking Text with Character Name */}
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-[#FF9BB3] mb-0.5">{info.name}</span>
+                          <span className="text-xs text-[#2B3A3B]/70 tracking-wider">正在思考中...</span>
+                        </div>
+
+                        {/* Subtle Loading Dots */}
+                        <div className="flex space-x-1 items-center mt-1">
+                          <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0 }} className="w-1 h-1 bg-[#FFB6C1] rounded-full" />
+                          <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }} className="w-1 h-1 bg-[#FFB6C1] rounded-full" />
+                          <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }} className="w-1 h-1 bg-[#FFB6C1] rounded-full" />
+                        </div>
                       </div>
                     </div>
                   </div>

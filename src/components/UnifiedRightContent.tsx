@@ -52,6 +52,10 @@ export default function UnifiedRightContent({ user, onLogout, onNavigate }: Unif
         if (item.action) {
             if (onNavigate) {
                 onNavigate(item.action);
+            } else if (item.action.startsWith('view:')) {
+                // 如果沒有提供 onNavigate (例如在聊天室中)，則跳轉到 Dashboard 並帶上 view 參數
+                const view = item.action.split(':')[1];
+                router.push(`/aihome/ai-companions?view=${view}`);
             }
         } else if (item.href) {
             router.push(item.href);
