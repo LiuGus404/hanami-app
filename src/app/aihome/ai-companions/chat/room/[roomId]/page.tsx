@@ -56,6 +56,7 @@ import Image from 'next/image';
 import { MessageStatusIndicator } from '@/components/ai-companion/MessageStatusIndicator';
 import { FoodBalanceDisplay } from '@/components/ai-companion/FoodBalanceDisplay';
 import { SecureImageDisplay } from '@/components/ai-companion/SecureImageDisplay';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
 import { convertToPublicUrl, convertToShortUrl, getShortDisplayUrl, extractStoragePath } from '@/lib/getSignedImageUrl';
 
 // ⭐ 全局發送鎖（跨組件實例共享，防止 React Strict Mode 雙重掛載）
@@ -552,7 +553,7 @@ export default function RoomChatPage() {
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mounted, setMounted] = useState(false);
-  const [showMobileDropdown, setShowMobileDropdown] = useState(false);
+
 
   useEffect(() => {
     setMounted(true);
@@ -3000,21 +3001,21 @@ export default function RoomChatPage() {
         const supabase = createSaasClient();
 
         // 檢查用戶是否已經是房間成員
-        // 設置 5s 超時，超時則重試
+        // 優化：使用 head: true 只獲取數量，不獲取資料，減少傳輸
+        // 增加超時時間到 15s 以應對網絡波動
         const checkPromise = supabase
           .from('room_members')
-          .select('user_id')
+          .select('*', { count: 'exact', head: true })
           .eq('room_id', roomId)
-          .eq('user_id', userId)
-          .maybeSingle();
+          .eq('user_id', userId);
 
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Membership check timeout')), 5000)
+          setTimeout(() => reject(new Error('Membership check timeout')), 15000)
         );
 
         console.log(`🛡️ [Membership] 第 ${attempt} 次查詢嘗試...`);
         const result: any = await Promise.race([checkPromise, timeoutPromise]);
-        const { data: existingMember, error: checkError } = result;
+        const { count, error: checkError } = result;
 
         if (checkError) {
           console.warn(`⚠️ [Membership] 第 ${attempt} 次檢查失敗:`, checkError);
@@ -3023,8 +3024,8 @@ export default function RoomChatPage() {
           continue;
         }
 
-        // 如果用戶不是房間成員，自動添加
-        if (!existingMember) {
+        // 如果用戶不是房間成員 (count === 0)，自動添加
+        if (count === 0) {
           console.log('👤 [Membership] 用戶不是房間成員，正在添加...');
           const { error: insertError } = await (supabase
             .from('room_members') as any)
@@ -3060,6 +3061,7 @@ export default function RoomChatPage() {
         console.warn(`⚠️ [Membership] 第 ${attempt} 次嘗試發生錯誤:`, error);
         if (attempt === maxRetries) {
           console.error('❌ 確保房間成員身份多次嘗試後失敗');
+          throw error; // 拋出錯誤讓調用者知道失敗
         } else {
           await new Promise(r => setTimeout(r, 1000));
         }
@@ -5211,124 +5213,7 @@ export default function RoomChatPage() {
               </div>
               {/* 統一的下拉菜單 (桌面 + 移動端) */}
               <div className="flex items-center space-x-2 relative">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowMobileDropdown(!showMobileDropdown)}
-                  className="relative flex items-center justify-center p-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
-                >
-                  <motion.div
-                    animate={{
-                      rotate: showMobileDropdown ? 180 : 0
-                    }}
-                    transition={{
-                      duration: 0.3,
-                      ease: "easeInOut"
-                    }}
-                  >
-                    <Cog6ToothIcon className="w-5 h-5" />
-                  </motion.div>
-
-                </motion.button>
-
-                <AnimatePresence>
-                  {showMobileDropdown && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                      transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                      className="absolute top-12 right-0 bg-white rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[200px] z-50"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* 頭部標題 */}
-                      <div className="px-3 py-2 border-b border-[#EADBC8]/30 mb-1">
-                        <div className="font-bold text-[#4B4036] text-sm">HanamiEcho</div>
-                        <div className="text-[10px] text-[#8C7A6B]">您的AI工作和學習夥伴</div>
-                      </div>
-
-                      {/* 導航連結 */}
-                      {[
-                        { id: 'chat', label: '聊天室列表', icon: ChatBubbleLeftRightIcon },
-                        { id: 'roles', label: '角色', icon: CpuChipIcon },
-                        { id: 'mind', label: '思維積木', icon: PuzzlePieceIcon },
-                        { id: 'memory', label: '記憶', icon: SparklesIcon },
-                        { id: 'stats', label: '統計', icon: ChartBarIcon }
-                      ].map((tab) => (
-                        <motion.button
-                          key={tab.id}
-                          whileHover={{ backgroundColor: "#FFFBEB" }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => {
-                            router.push(`/aihome/ai-companions?view=${tab.id}`);
-                            setShowMobileDropdown(false);
-                          }}
-                          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
-                        >
-                          <tab.icon className="w-5 h-5 text-[#8C7A6B]" />
-                          <span className="text-sm font-medium">{tab.label}</span>
-                        </motion.button>
-                      ))}
-
-                      <div className="border-t border-[#EADBC8]/30 my-2"></div>
-
-                      {/* 房間專屬操作 - 團隊成員 (顯示在選單中) */}
-                      <motion.button
-                        whileHover={{ backgroundColor: "#FFFBEB" }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          setShowInviteModal(true);
-                          setShowMobileDropdown(false);
-                        }}
-                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
-                      >
-                        <UsersIcon className="w-5 h-5 text-[#8C7A6B]" />
-                        <span className="text-sm font-medium">團隊 ({activeRoles.length})</span>
-                      </motion.button>
-
-                      <motion.button
-                        whileHover={{ backgroundColor: "#FFFBEB" }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          setShowSettingsPanel(true);
-                          setShowMobileDropdown(false);
-                        }}
-                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-[#4B4036]"
-                      >
-                        <Cog6ToothIcon className="w-5 h-5 text-[#8C7A6B]" />
-                        <span className="text-sm font-medium">房間設定</span>
-                      </motion.button>
-
-                      <div className="border-t border-[#EADBC8]/30 my-2"></div>
-
-                      <motion.button
-                        whileHover={{ backgroundColor: "#FFFBEB" }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => router.push('/aihome/ai-companions')}
-                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-red-500"
-                      >
-                        <ArrowLeftIcon className="w-5 h-5" />
-                        <span className="text-sm font-medium">離開房間</span>
-                      </motion.button>
-
-
-                      <div className="border-t border-[#EADBC8]/30 my-2"></div>
-
-                      <motion.button
-                        whileHover={{ backgroundColor: "#FFFBEB" }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          handleLogout();
-                          setShowMobileDropdown(false);
-                        }}
-                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-red-500"
-                      >
-                        <ArrowRightOnRectangleIcon className="w-5 h-5" />
-                        <span className="text-sm font-medium">登出系統</span>
-                      </motion.button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <UnifiedRightContent user={user} onLogout={handleLogout} />
               </div>
             </div>
           </div>
@@ -5349,7 +5234,7 @@ export default function RoomChatPage() {
           {/* 訊息列表 */}
           <div
             ref={messagesContainerRef}
-            className="flex-1 overflow-y-auto p-4 space-y-4 pb-32 no-scrollbar"
+            className="flex-1 overflow-y-auto p-4 space-y-4 pb-64 lg:pb-40 no-scrollbar"
             onScroll={handleMessagesScroll}
           >
             {messages.map((message, index) => (
@@ -6984,11 +6869,11 @@ function InviteModal({ isOpen, onClose, companions, activeRoles, onInvite, onRem
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <div className="font-medium text-[#4B4036]">
-                {companion.id === 'hibi' ? '（綜合）希希' :
-                 companion.id === 'mori' ? '（多模型研究）墨墨' :
-                 companion.id === 'pico' ? '（繪圖）皮可' :
-                 companion.name} ({companion.nameEn})
-              </div>
+                                            {companion.id === 'hibi' ? '（綜合）希希' :
+                                              companion.id === 'mori' ? '（多模型研究）墨墨' :
+                                                companion.id === 'pico' ? '（繪圖）皮可' :
+                                                  companion.name} ({companion.nameEn})
+                                          </div>
                                           <div className="text-xs text-[#2B3A3B] truncate">{companion.specialty}</div>
                                         </div>
                                       </div>
@@ -7099,9 +6984,9 @@ function RoleSelectorModal({ isOpen, onClose, companions, activeRoles, selectedC
               </div>
               <div className="font-medium">
                 {companion.id === 'hibi' ? '（綜合）希希' :
-                 companion.id === 'mori' ? '（多模型研究）墨墨' :
-                 companion.id === 'pico' ? '（繪圖）皮可' :
-                 companion.name}
+                  companion.id === 'mori' ? '（多模型研究）墨墨' :
+                    companion.id === 'pico' ? '（繪圖）皮可' :
+                      companion.name}
               </div>
               {selectedCompanion === companion.id && (
                 <CheckCircleIcon className="w-5 h-5 text-[#FFB6C1] ml-auto" />

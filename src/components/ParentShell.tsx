@@ -1,7 +1,9 @@
 'use client';
 
 import { ReactNode, useState } from 'react';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import {
+  Bars3Icon,
+} from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import UnifiedNavbar from '@/components/UnifiedNavbar';
 import AppSidebar from '@/components/AppSidebar';
@@ -28,6 +30,11 @@ export interface ParentShellProps {
   onRegister: () => void;
 }
 
+
+import { motion } from 'framer-motion';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
+import { useRouter } from 'next/navigation';
+
 export default function ParentShell({
   children,
   currentPath,
@@ -39,6 +46,7 @@ export default function ParentShell({
   onLogin,
   onRegister,
 }: ParentShellProps) {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -49,6 +57,7 @@ export default function ParentShell({
         onLogout={onLogout}
         onLogin={onLogin}
         onRegister={onRegister}
+        customRightContent={<UnifiedRightContent user={user} onLogout={onLogout} />}
       />
 
       <div className="flex">
@@ -71,11 +80,10 @@ export default function ParentShell({
                 {action && (
                   <button
                     onClick={action.onClick}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-colors shadow-sm ${
-                      action.variant === 'ghost'
-                        ? 'bg-white border border-[#EADBC8] text-[#4B4036]'
-                        : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
-                    }`}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-colors shadow-sm ${action.variant === 'ghost'
+                      ? 'bg-white border border-[#EADBC8] text-[#4B4036]'
+                      : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
+                      }`}
                   >
                     {action.icon}
                     {action.label}

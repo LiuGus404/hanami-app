@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
-  BookOpenIcon, 
-  SparklesIcon, 
-  HeartIcon, 
+import {
+  BookOpenIcon,
+  SparklesIcon,
+  HeartIcon,
   ChatBubbleLeftRightIcon,
   MusicalNoteIcon,
   PaintBrushIcon,
-  PuzzlePieceIcon,
+
   StarIcon,
   UserGroupIcon,
   AcademicCapIcon,
@@ -24,10 +24,10 @@ import {
   ArrowRightOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
-  Cog6ToothIcon,
-  CalendarDaysIcon,
-  UsersIcon
+  FunnelIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import LuLuCharacterWithBubble from '@/components/3d/LuLuCharacterWithBubble';
 import AppSidebar from '@/components/AppSidebar';
@@ -39,6 +39,11 @@ export default function DashboardPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+
+  const activeView = 'dashboard';
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('week');
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   // 更新時間
   useEffect(() => {
@@ -127,21 +132,22 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
       <div className="flex">
         {/* 側邊欄選單 */}
-        <AppSidebar 
-          isOpen={sidebarOpen} 
+        <AppSidebar
+          isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           currentPath="/aihome"
         />
 
         {/* 主內容區域 */}
         <div className="flex-1 flex flex-col">
-        <UnifiedNavbar
-          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-          user={user}
-          onLogout={handleLogout}
-          onLogin={() => router.push('/aihome/auth/login')}
-          onRegister={() => router.push('/aihome/auth/register')}
-        />
+          <UnifiedNavbar
+            onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+            user={user}
+            onLogout={handleLogout}
+            onLogin={() => router.push('/aihome/auth/login')}
+            onRegister={() => router.push('/aihome/auth/register')}
+            customRightContent={<UnifiedRightContent user={user} onLogout={handleLogout} />}
+          />
 
           {/* 主內容區域 */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 min-h-full">
@@ -155,19 +161,19 @@ export default function DashboardPage() {
               <h1 className="text-4xl font-bold text-[#4B4036] mb-6">
                 歡迎來到 HanamiEcho
               </h1>
-              
+
               <div className="mb-8">
                 <div className="w-96 h-96 mx-auto flex items-center justify-center relative">
-                  <LuLuCharacterWithBubble 
-                    size="xxl" 
+                  <LuLuCharacterWithBubble
+                    size="xxl"
                     enableInteractions={true}
                     className="drop-shadow-lg"
                   />
                 </div>
               </div>
-              
+
               {/* AI 對話框 - 暫時隱藏，之後開通 */}
-          {/* 
+              {/* 
           <div className="mb-8 max-w-2xl mx-auto">
             <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#EADBC8]">
               <div className="flex items-center space-x-3 mb-4">
@@ -209,107 +215,107 @@ export default function DashboardPage() {
             </div>
           </div>
           */}
-          
-          <p className="text-xl text-[#2B3A3B] max-w-3xl mx-auto mb-6">
-            提供多種AI角色，為你解決問題。無論是學習成長還是工作，都是你最貼心的智能伙伴！
-          </p>
-          <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
-            您的智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持
-          </p>
-        </motion.div>
 
-        {/* 快速導航 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="mb-12"
-        >
-          <div className="flex justify-center space-x-2 sm:space-x-4">
-            {quickNav.map((item, index) => (
-              <motion.button
-                key={item.label}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={isLoaded ? { opacity: 1, scale: 1 } : {}}
-                transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => router.push(item.href)}
-                className="flex items-center space-x-2 px-2 sm:px-4 py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8] hover:bg-white/80 transition-all duration-200"
-              >
-                <item.icon className="w-5 h-5 text-[#4B4036]" />
-                <span className="hidden sm:inline text-[#4B4036] font-medium">{item.label}</span>
-              </motion.button>
-            ))}
-          </div>
-        </motion.div>
+              <p className="text-xl text-[#2B3A3B] max-w-3xl mx-auto mb-6">
+                提供多種AI角色，為你解決問題。無論是學習成長還是工作，都是你最貼心的智能伙伴！
+              </p>
+              <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
+                您的智能AI助手，為兒童和成人提供個性化的協作體驗和情感支持
+              </p>
+            </motion.div>
 
-
-        {/* 核心 AI 功能 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.35 }}
-          className="mb-16"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {coreAIFeatures.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.6, delay: 0.55 + index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <div 
-                  className="bg-white rounded-xl p-6 h-full text-center cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 border border-[#EADBC8]"
-                  onClick={() => router.push(feature.href)}
-                >
-                  <div
-                    className={`w-16 h-16 mx-auto mb-4 ${feature.color} rounded-full flex items-center justify-center`}
-                  >
-                    <feature.icon className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-[#4B4036] mb-2">
-                    {feature.title}
-                  </h3>
-                  <p className="text-[#2B3A3B] text-sm">
-                    {feature.description}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* 行動呼籲 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="mb-16"
-        >
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-[#4B4036] mb-4">
-              準備開始 HanamiEcho 智能伙伴之旅？
-            </h2>
-            <p className="text-lg text-[#2B3A3B] mb-8">
-              立即開始使用，體驗AI智能伙伴的魅力
-            </p>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => router.push('/aihome/ai-companions')}
-              className="inline-flex items-center px-8 py-4 bg-orange-500 text-white rounded-xl font-semibold text-lg shadow-lg hover:bg-orange-600 transition-all duration-200"
+            {/* 快速導航 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={isLoaded ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mb-12"
             >
-              開始使用
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </motion.button>
-          </div>
-        </motion.div>
+              <div className="flex justify-center space-x-2 sm:space-x-4">
+                {quickNav.map((item, index) => (
+                  <motion.button
+                    key={item.label}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={isLoaded ? { opacity: 1, scale: 1 } : {}}
+                    transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => router.push(item.href)}
+                    className="flex items-center space-x-2 px-2 sm:px-4 py-2 bg-white/60 backdrop-blur-sm rounded-lg border border-[#EADBC8] hover:bg-white/80 transition-all duration-200"
+                  >
+                    <item.icon className="w-5 h-5 text-[#4B4036]" />
+                    <span className="hidden sm:inline text-[#4B4036] font-medium">{item.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+
+
+            {/* 核心 AI 功能 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={isLoaded ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8, delay: 0.35 }}
+              className="mb-16"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                {coreAIFeatures.map((feature, index) => (
+                  <motion.div
+                    key={feature.title}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={isLoaded ? { opacity: 1, y: 0 } : {}}
+                    transition={{ duration: 0.6, delay: 0.55 + index * 0.1 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <div
+                      className="bg-white rounded-xl p-6 h-full text-center cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 border border-[#EADBC8]"
+                      onClick={() => router.push(feature.href)}
+                    >
+                      <div
+                        className={`w-16 h-16 mx-auto mb-4 ${feature.color} rounded-full flex items-center justify-center`}
+                      >
+                        <feature.icon className="w-8 h-8 text-white" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-[#4B4036] mb-2">
+                        {feature.title}
+                      </h3>
+                      <p className="text-[#2B3A3B] text-sm">
+                        {feature.description}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* 行動呼籲 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={isLoaded ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8, delay: 0.6 }}
+              className="mb-16"
+            >
+              <div className="text-center">
+                <h2 className="text-3xl font-bold text-[#4B4036] mb-4">
+                  準備開始 HanamiEcho 智能伙伴之旅？
+                </h2>
+                <p className="text-lg text-[#2B3A3B] mb-8">
+                  立即開始使用，體驗AI智能伙伴的魅力
+                </p>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => router.push('/aihome/ai-companions')}
+                  className="inline-flex items-center px-8 py-4 bg-orange-500 text-white rounded-xl font-semibold text-lg shadow-lg hover:bg-orange-600 transition-all duration-200"
+                >
+                  開始使用
+                  <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </motion.button>
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>

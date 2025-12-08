@@ -69,11 +69,37 @@ jest.mock('@/lib/supabase', () => ({
 // Mock Framer Motion
 jest.mock('framer-motion', () => {
   const React = require('react');
+
+  // 濾除 framer-motion 的專用屬性，避免 React 控制台錯誤
+  const filterMotionProps = (props) => {
+    const {
+      initial,
+      animate,
+      exit,
+      transition,
+      variants,
+      whileHover,
+      whileTap,
+      whileFocus,
+      whileDrag,
+      whileInView,
+      viewport,
+      layout,
+      layoutId,
+      ...validProps
+    } = props;
+    return validProps;
+  };
+
   return {
     motion: {
-      div: ({ children, ...props }) => React.createElement('div', props, children),
-      button: ({ children, ...props }) => React.createElement('button', props, children),
-      span: ({ children, ...props }) => React.createElement('span', props, children),
+      div: ({ children, ...props }) => React.createElement('div', filterMotionProps(props), children),
+      button: ({ children, ...props }) => React.createElement('button', filterMotionProps(props), children),
+      span: ({ children, ...props }) => React.createElement('span', filterMotionProps(props), children),
+      li: ({ children, ...props }) => React.createElement('li', filterMotionProps(props), children),
+      ul: ({ children, ...props }) => React.createElement('ul', filterMotionProps(props), children),
+      nav: ({ children, ...props }) => React.createElement('nav', filterMotionProps(props), children),
+      a: ({ children, ...props }) => React.createElement('a', filterMotionProps(props), children),
     },
     AnimatePresence: ({ children }) => children,
   };

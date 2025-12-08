@@ -26,8 +26,10 @@ import {
   ArrowRightOnRectangleIcon,
   ExclamationTriangleIcon,
   VideoCameraIcon,
-  PhotoIcon
+  PhotoIcon,
+  FunnelIcon,
 } from '@heroicons/react/24/outline';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
 
 import { HanamiCard, HanamiButton, LessonPlanModal, GrowthTreeDetailModal, StudentActivitiesPanel, StudentMediaModal } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
@@ -166,6 +168,8 @@ export default function TeacherZonePage() {
 
   // 側邊欄狀態
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedGrade, setSelectedGrade] = useState<string>('all'); // Placeholder for consistent menu
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // 食量顯示
@@ -2160,9 +2164,9 @@ export default function TeacherZonePage() {
 
                                   if (roleId) {
                                     const roleNameMap: Record<string, string> = {
-                                      'hibi': 'Hibi',
-                                      'mori': 'Mori',
-                                      'pico': 'Pico'
+                                      'hibi': '希希',
+                                      'mori': '墨墨',
+                                      'pico': '皮可'
                                     };
                                     characterName = roleNameMap[roleId] || roleId;
                                   }
@@ -2193,21 +2197,9 @@ export default function TeacherZonePage() {
                       minute: '2-digit'
                     })}
                   </div>
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                    <span className="text-xs sm:text-sm font-medium text-[#4B4036]">
-                      {user?.full_name?.charAt(0).toUpperCase() || 'U'}
-                    </span>
+                  <div className="flex items-center">
+                    <UnifiedRightContent user={user} onLogout={handleLogout} />
                   </div>
-                  <motion.button
-                    onClick={handleLogout}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
-                    title="登出"
-                  >
-                    <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                    <span className="hidden sm:inline">登出</span>
-                  </motion.button>
                 </div>
               </div>
 

@@ -3,14 +3,16 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   SparklesIcon,
   UserGroupIcon,
   AcademicCapIcon,
   HeartIcon,
   ArrowRightIcon,
   PlayIcon,
+  FunnelIcon
 } from '@heroicons/react/24/outline';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiCard } from '@/components/ui/HanamiCard';
@@ -23,6 +25,9 @@ export default function AIHomePage() {
   const router = useRouter();
   const [isLoaded, setIsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'news' | 'activities'>('news');
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchCurrentX, setTouchCurrentX] = useState<number | null>(null);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -31,7 +36,7 @@ export default function AIHomePage() {
   // 處理登入按鈕點擊
   const handleLoginClick = () => {
     console.log('登入按鈕被點擊，當前用戶狀態:', { user: !!saasUser, loading });
-    
+
     if (saasUser) {
       // 用戶已登入，直接跳轉到儀表板
       console.log('🎯 用戶已登入，直接跳轉到儀表板');
@@ -60,18 +65,19 @@ export default function AIHomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
-      <AppSidebar 
-        isOpen={sidebarOpen} 
+      <AppSidebar
+        isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         currentPath="/aihome"
       />
-      
+
       <UnifiedNavbar
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
         user={saasUser}
         onLogout={handleLogout}
         onLogin={handleLoginClick}
         onRegister={() => router.push('/aihome/auth/register')}
+        customRightContent={<UnifiedRightContent user={saasUser} onLogout={handleLogout} />}
       />
 
       {/* 主要內容 */}
@@ -94,7 +100,7 @@ export default function AIHomePage() {
                 <p className="text-xl text-[#2B3A3B] mb-8 max-w-2xl">
                   您的智能 AI 助手，您和孩子專屬的學習和工作夥伴
                 </p>
-                
+
                 <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                   {saasUser ? (
                     <HanamiButton
@@ -127,7 +133,7 @@ export default function AIHomePage() {
                   )}
                 </div>
               </motion.div>
-              
+
               {/* 右側：LuLu 增強版角色 */}
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
@@ -135,8 +141,8 @@ export default function AIHomePage() {
                 transition={{ duration: 0.8, delay: 0.2 }}
                 className="relative h-96 lg:h-[500px] flex items-center justify-center"
               >
-                <LuLuCharacterWithBubble 
-                  size="xxl" 
+                <LuLuCharacterWithBubble
+                  size="xxl"
                   enableInteractions={true}
                 />
               </motion.div>
@@ -221,7 +227,7 @@ export default function AIHomePage() {
               <p className="text-lg text-[#2B3A3B] mb-8">
                 立即開始使用，體驗AI智能伙伴的魅力
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <HanamiButton
                   onClick={() => router.push('/aihome/dashboard')}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   ChartBarIcon,
   CpuChipIcon,
   ClockIcon,
@@ -250,9 +250,9 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         .select('content_json')
         .eq('id', messageId)
         .single();
-      
+
       if (error || !data) return null;
-      
+
       // 從 content_json 中提取 role_hint
       const contentJson = (data as any).content_json;
       if (contentJson && contentJson.role_hint) {
@@ -261,7 +261,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         if (roleHint === 'pico' || roleHint.includes('pico')) return 'pico-artist';
         if (roleHint === 'hibi' || roleHint.includes('hibi')) return 'hibi-manager';
       }
-      
+
       return 'hibi-manager'; // 默認
     } catch (error) {
       return null;
@@ -277,7 +277,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
       const baseRoles = [
         {
           slug: 'hibi-manager',
-          name: 'Hibi',
+          name: '希希',
           imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
           icon: CpuChipIcon,
           color: 'from-orange-400 to-red-500',
@@ -297,7 +297,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
           color: 'from-blue-400 to-cyan-500',
         },
       ];
-      
+
       // 首先獲取房間中的活躍角色
       const rolesMap = new Map<string, { name: string; imagePath: string; icon: any; color: string }>();
       baseRoles.forEach((role) => {
@@ -310,7 +310,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
       });
 
       const usageRecords: UsageStats[] = [];
-      
+
       const threadIds = new Set<string>();
 
       if (roomId) {
@@ -345,7 +345,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
               let icon = CpuChipIcon;
               let color = 'from-orange-400 to-red-500';
               let imagePath = '/3d-character-backgrounds/studio/lulu(front).png';
-              
+
               if (aiRole.slug?.includes('mori')) {
                 icon = AcademicCapIcon;
                 color = 'from-amber-400 to-orange-500';
@@ -355,7 +355,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                 color = 'from-blue-400 to-cyan-500';
                 imagePath = '/3d-character-backgrounds/studio/Pico/Pico.png';
               }
-              
+
               rolesMap.set(aiRole.slug, {
                 name: aiRole.name,
                 imagePath,
@@ -387,16 +387,18 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (resolvedThreadIds.length === 1) {
-        costQuery = costQuery.eq('thread_id', resolvedThreadIds[0]);
-      } else if (resolvedThreadIds.length > 1) {
+      if (roomId) {
+        costQuery = costQuery.eq('thread_id', roomId);
+      } else if (userId) {
+        costQuery = costQuery.eq('user_id', userId);
+      } else if (resolvedThreadIds.length > 0) {
         costQuery = costQuery.in('thread_id', resolvedThreadIds);
       }
 
       // 根據時間期間篩選
       const now = new Date();
       let startDate: Date;
-      
+
       switch (selectedPeriod) {
         case 'today':
           startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -459,10 +461,10 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
       const messageMap = new Map<string, any>();
       messageRecords.forEach((msg) => {
         if (msg?.id) {
-        messageMap.set(msg.id, msg);
+          messageMap.set(msg.id, msg);
         }
       });
-      
+
       // 轉換 message_costs 為 usage 格式
       const convertedUsage = costRecords.map((record) => {
         const messageId = record.message_id ?? undefined;
@@ -493,7 +495,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
       usageRecords.push(...convertedUsage);
 
       setUsageData(usageRecords);
-      
+
       // 統計每個角色的食用情況
       const roleStats = new Map<string, RoleUsage>();
 
@@ -525,14 +527,14 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
         for (const record of costRecords) {
           // 直接使用 food_amount 欄位（已經從 message_costs 表獲取）
           const food = record.food_amount || 0;
- 
+
           const messageKey = record.message_id ?? undefined;
           const message = messageKey ? messageMap.get(messageKey) : undefined;
           const roleSlug = resolveRoleSlug(record, message);
           if (record.message_id) {
             countedMessageIds.add(record.message_id);
           }
- 
+
           const entry = ensureRoleEntry(roleSlug);
 
           entry.requests += 1;
@@ -541,7 +543,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
 
           if (food > 0) {
             entry.totalFood += food;
-          totalFoodConsumed += food;
+            totalFoodConsumed += food;
           }
         }
       }
@@ -568,17 +570,25 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
       try {
         let foodQuery = saasSupabase
           .from('food_transactions')
-          .select('id, user_id, transaction_type, amount, balance_after, message_id, thread_id, description, created_at')
-          .eq('transaction_type', 'spend')
+          .select(`
+            id, user_id, transaction_type, amount, balance_after, message_id, thread_id, description, created_at,
+            ai_messages (
+              sender_role_instance_id,
+              role_instances (
+                role_id
+              )
+            )
+          `)
+          .in('transaction_type', ['spend', 'usage'])
           .order('created_at', { ascending: false })
           .limit(500);
 
-        if (resolvedThreadIds.length === 1) {
-          foodQuery = foodQuery.eq('thread_id', resolvedThreadIds[0]);
-        } else if (resolvedThreadIds.length > 1) {
-          foodQuery = foodQuery.in('thread_id', resolvedThreadIds);
+        if (roomId) {
+          foodQuery = foodQuery.eq('thread_id', roomId);
         } else if (userId) {
           foodQuery = foodQuery.eq('user_id', userId);
+        } else if (resolvedThreadIds.length > 0) {
+          foodQuery = foodQuery.in('thread_id', resolvedThreadIds);
         }
 
         if (selectedPeriod !== 'all') {
@@ -639,6 +649,19 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
             };
 
             let roleSlug = resolveRoleSlug(pseudoRecord, message);
+
+            // 優先使用從 ai_messages join 出來的角色資料
+            const aiMessage = (tx as any).ai_messages;
+            const roleId = aiMessage?.role_instances?.role_id;
+            if (roleId) {
+              const map: Record<string, string> = {
+                'hibi': 'hibi-manager',
+                'mori': 'mori-researcher',
+                'pico': 'pico-artist'
+              };
+              roleSlug = map[roleId] || roleId;
+            }
+
             if (!roleSlug && tx.description) {
               const descClue = detectRoleClue(tx.description);
               if (descClue) roleSlug = descClue;
@@ -691,12 +714,12 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
             .order('created_at', { ascending: false })
             .limit(500);
 
-          if (resolvedThreadIds.length === 1) {
-            usageQuery = usageQuery.eq('room_id', resolvedThreadIds[0]);
-          } else if (resolvedThreadIds.length > 1) {
-            usageQuery = usageQuery.in('room_id', resolvedThreadIds);
+          if (roomId) {
+            usageQuery = usageQuery.eq('room_id', roomId);
           } else if (userId) {
             usageQuery = usageQuery.eq('user_id', userId);
+          } else if (resolvedThreadIds.length > 0) {
+            usageQuery = usageQuery.in('room_id', resolvedThreadIds);
           }
 
           if (selectedPeriod !== 'all') {
@@ -773,11 +796,11 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
           console.error('⚠️ ai_usage 後備載入失敗:', fallbackError);
         }
       }
- 
+
       baseRoles.forEach((role) => ensureRoleEntry(role.slug));
 
       console.log('🍔 統計結果:', { totalFood: totalFoodConsumed, roleCount: roleStats.size });
-      
+
       const sortedRoles = Array.from(roleStats.values())
         .sort((a, b) => b.totalFood - a.totalFood || a.roleName.localeCompare(b.roleName, 'zh-Hant'));
       setRoleUsage(sortedRoles);
@@ -819,7 +842,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             {/* 時間期間選擇器 */}
             <div className="flex bg-[#F8F5EC] rounded-xl p-1">
@@ -834,17 +857,16 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setSelectedPeriod(period.key as any)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                    selectedPeriod === period.key
-                      ? 'bg-[#FFD59A] text-[#4B4036] shadow-sm'
-                      : 'text-[#2B3A3B] hover:bg-[#FFD59A]/20'
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${selectedPeriod === period.key
+                    ? 'bg-[#FFD59A] text-[#4B4036] shadow-sm'
+                    : 'text-[#2B3A3B] hover:bg-[#FFD59A]/20'
+                    }`}
                 >
                   {period.label}
                 </motion.button>
               ))}
             </div>
-            
+
             {/* 刷新按鈕 */}
             <motion.button
               whileHover={{ scale: 1.1, rotate: 180 }}
@@ -887,11 +909,11 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                 <ChartBarIcon className="w-5 h-5 text-[#FFB6C1]" />
                 <span>各角色食用情況</span>
               </h4>
-              
+
               {roleUsage.map((role, index) => {
                 const RoleIcon = role.icon;
                 const percentage = totalFood > 0 ? (role.totalFood / totalFood) * 100 : 0;
-                
+
                 return (
                   <motion.div
                     key={role.roleId}
@@ -923,7 +945,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="text-right">
                         <div className="flex items-center space-x-2">
                           <img src="/apple-icon.svg" alt="食量" className="w-8 h-8" />
@@ -936,7 +958,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* 進度條 */}
                     <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                       <motion.div
@@ -994,7 +1016,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                 <ClockIcon className="w-4 h-4 text-[#FFB6C1]" />
                 <span>詳細使用記錄</span>
               </h4>
-              
+
               {usageData.length > 0 ? (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {usageData.map((usage, index) => {
@@ -1033,7 +1055,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="text-right">
                             <div className="flex items-center space-x-1">
                               <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
@@ -1042,7 +1064,7 @@ export default function UsageStatsDisplay({ userId, roomId, className = '' }: Us
                             <div className="text-xs text-[#2B3A3B]">食物點數</div>
                           </div>
                         </div>
-                        
+
                         <div className="grid grid-cols-3 gap-3 text-xs">
                           <div className="bg-blue-50 rounded-lg p-2 text-center">
                             <div className="font-medium text-blue-700">

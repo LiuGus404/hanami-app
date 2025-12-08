@@ -15,6 +15,7 @@ export interface UnifiedNavbarProps {
   onLogout: () => void;
   onLogin: () => void;
   onRegister: () => void;
+  customRightContent?: React.ReactNode;
 }
 
 export default function UnifiedNavbar({
@@ -23,6 +24,7 @@ export default function UnifiedNavbar({
   onLogout,
   onLogin,
   onRegister,
+  customRightContent
 }: UnifiedNavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
@@ -126,87 +128,91 @@ export default function UnifiedNavbar({
               </div>
             )}
 
-            <div className="relative">
-              <motion.button
-                onClick={handleGearClick}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                title="帳戶設定"
-              >
-                <Cog6ToothIcon className="w-6 h-6 text-[#4B4036]" />
-              </motion.button>
-              {menuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={closeMenu} />
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute right-0 mt-2 w-44 bg-white border border-[#EADBC8] rounded-xl shadow-lg z-50"
-                  >
-                    {user ? (
-                      <div className="px-4 py-3 text-[#4B4036] text-sm">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                            <span className="text-sm font-medium">{displayInitial}</span>
+            {customRightContent ? (
+              customRightContent
+            ) : (
+              <div className="relative">
+                <motion.button
+                  onClick={handleGearClick}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
+                  title="帳戶設定"
+                >
+                  <Cog6ToothIcon className="w-6 h-6 text-[#4B4036]" />
+                </motion.button>
+                {menuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={closeMenu} />
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute right-0 mt-2 w-44 bg-white border border-[#EADBC8] rounded-xl shadow-lg z-50"
+                    >
+                      {user ? (
+                        <div className="px-4 py-3 text-[#4B4036] text-sm">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                              <span className="text-sm font-medium">{displayInitial}</span>
+                            </div>
+                            <div className="leading-tight">
+                              <p className="font-semibold text-sm">
+                                {displayName || '使用者'}
+                              </p>
+                              {user.email && (
+                                <p className="text-xs text-[#8A7C70]">{user.email}</p>
+                              )}
+                            </div>
                           </div>
-                          <div className="leading-tight">
-                            <p className="font-semibold text-sm">
-                              {displayName || '使用者'}
-                            </p>
-                            {user.email && (
-                              <p className="text-xs text-[#8A7C70]">{user.email}</p>
-                            )}
-                          </div>
+                          <button
+                            onClick={() => {
+                              router.push('/aihome/profile');
+                              closeMenu();
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-[#FFF4DF] transition-colors text-[#4B4036] font-medium text-xs border border-[#EADBC8] mb-2"
+                          >
+                            設定
+                          </button>
+                          <button
+                            onClick={() => {
+                              onLogout();
+                              closeMenu();
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#FFF9F2] hover:bg-[#FFF4DF] transition-colors text-[#4B4036] font-medium text-xs"
+                          >
+                            <ArrowRightOnRectangleIcon className="w-4 h-4" />
+                            登出
+                          </button>
                         </div>
-                        <button
-                          onClick={() => {
-                            router.push('/aihome/profile');
-                            closeMenu();
-                          }}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-[#FFF4DF] transition-colors text-[#4B4036] font-medium text-xs border border-[#EADBC8] mb-2"
-                        >
-                          設定
-                        </button>
-                        <button
-                          onClick={() => {
-                            onLogout();
-                            closeMenu();
-                          }}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#FFF9F2] hover:bg-[#FFF4DF] transition-colors text-[#4B4036] font-medium text-xs"
-                        >
-                          <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                          登出
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col text-[#4B4036] text-sm">
-                        <button
-                          onClick={() => {
-                            onLogin();
-                            closeMenu();
-                          }}
-                          className="px-3 py-2 hover:bg-[#FFF9F2] text-left"
-                        >
-                          登入
-                        </button>
-                        <button
-                          onClick={() => {
-                            onRegister();
-                            closeMenu();
-                          }}
-                          className="px-3 py-2 hover:bg-[#FFF9F2] text-left"
-                        >
-                          註冊
-                        </button>
-                      </div>
-                    )}
-                  </motion.div>
-                </>
-              )}
-            </div>
+                      ) : (
+                        <div className="flex flex-col text-[#4B4036] text-sm">
+                          <button
+                            onClick={() => {
+                              onLogin();
+                              closeMenu();
+                            }}
+                            className="px-3 py-2 hover:bg-[#FFF9F2] text-left"
+                          >
+                            登入
+                          </button>
+                          <button
+                            onClick={() => {
+                              onRegister();
+                              closeMenu();
+                            }}
+                            className="px-3 py-2 hover:bg-[#FFF9F2] text-left"
+                          >
+                            註冊
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

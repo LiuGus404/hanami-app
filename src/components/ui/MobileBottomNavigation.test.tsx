@@ -11,14 +11,7 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/aihome/dashboard',
 }));
 
-// Mock framer-motion
-jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-    button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  },
-  AnimatePresence: ({ children }: any) => <>{children}</>,
-}));
+
 
 // Mock useSaasAuth hook
 jest.mock('@/hooks/saas/useSaasAuthSimple', () => ({
@@ -55,7 +48,7 @@ describe('MobileBottomNavigation', () => {
       configurable: true,
       value: 768,
     });
-    
+
     // Mock localStorage
     Object.defineProperty(window, 'localStorage', {
       value: {
@@ -66,7 +59,7 @@ describe('MobileBottomNavigation', () => {
       },
       writable: true,
     });
-    
+
     // Mock sessionStorage
     Object.defineProperty(window, 'sessionStorage', {
       value: {
@@ -91,7 +84,7 @@ describe('MobileBottomNavigation', () => {
     expect(() => {
       render(<MobileBottomNavigation />);
     }).not.toThrow();
-    
+
     // Component behavior is acceptable whether it renders content or returns null
     // based on screen size, as long as it doesn't throw errors
     expect(true).toBe(true);

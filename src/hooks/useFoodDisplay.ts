@@ -27,9 +27,11 @@ export function useFoodDisplay(userId?: string) {
         .from('food_transactions')
         .select(`
           *,
-          ai_messages!fk_food_transactions_ai_message (
-            role_id,
-            role_instances!ai_messages_sender_role_instance_id_fkey (role_id)
+          ai_messages (
+            sender_role_instance_id,
+              role_instances (
+                role_id
+              )
           )
         `)
         .eq('user_id', userId)

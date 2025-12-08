@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   CalendarDaysIcon,
   ClockIcon,
   MapPinIcon,
@@ -16,13 +16,19 @@ import {
   MusicalNoteIcon,
   HeartIcon,
   ChatBubbleLeftRightIcon,
-  FunnelIcon
+  FunnelIcon,
+  CpuChipIcon,
+  PuzzlePieceIcon,
+  ChartBarIcon,
+  Cog6ToothIcon,
+  ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import AppSidebar from '@/components/AppSidebar';
 import CourseMiniCard from '@/components/ui/CourseMiniCard';
 import OrganizationMiniCard from '@/components/ui/OrganizationMiniCard';
 import UnifiedNavbar from '@/components/UnifiedNavbar';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
 import { supabase } from '@/lib/supabase';
 import { getUserSession } from '@/lib/authUtils';
 import { CATEGORY_GROUPS } from '@/app/aihome/teacher-link/create/CreateOrganizationPanel';
@@ -45,6 +51,7 @@ export default function CourseActivitiesPage() {
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchCurrentX, setTouchCurrentX] = useState<number | null>(null);
 
+
   // 新增：多選機構類別篩選
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -54,7 +61,7 @@ export default function CourseActivitiesPage() {
   // 年齡篩選
   const [selectedAgeRanges, setSelectedAgeRanges] = useState<string[]>([]);
   const [ageFilterOpen, setAgeFilterOpen] = useState(false);
-  
+
   // 排序
   const [sortBy, setSortBy] = useState<'likes' | 'created_at' | 'reviews' | 'none'>('none');
   const [sortOpen, setSortOpen] = useState(false);
@@ -150,9 +157,9 @@ export default function CourseActivitiesPage() {
       try {
         setLoadingCourses(true);
         const institutions: Institution[] = [];
-        
+
         console.log('📥 開始載入機構和課程數據...');
-        
+
         // 使用 API 端點獲取機構列表（繞過 RLS）
         // 先獲取所有機構（包括 inactive），因為課程可能屬於 inactive 機構
         // 但在顯示時會過濾掉 inactive 的機構
@@ -161,21 +168,21 @@ export default function CourseActivitiesPage() {
         });
         let orgList: any[] = [];
         let allOrgList: any[] = []; // 保存所有機構（用於課程分配）
-        
+
         if (orgResponse.ok) {
           const orgData = await orgResponse.json();
           console.log('✅ 機構 API 響應:', { success: orgData.success, count: orgData.count, hasData: !!orgData.data });
           allOrgList = orgData.data || [];
-          
+
           // 調試：顯示每個機構的狀態
-          console.log('🔍 機構狀態檢查:', allOrgList.map((org: any) => ({ 
-            id: org.id, 
-            name: org.org_name, 
+          console.log('🔍 機構狀態檢查:', allOrgList.map((org: any) => ({
+            id: org.id,
+            name: org.org_name,
             status: org.status,
             statusType: typeof org.status,
             statusValue: JSON.stringify(org.status)
           })));
-          
+
           // 過濾掉 inactive 的機構，只保留 active 和 suspended 的機構用於顯示
           orgList = allOrgList.filter((org: any) => {
             // 確保 status 存在且不為 'inactive'
@@ -183,7 +190,7 @@ export default function CourseActivitiesPage() {
             // 轉換為字符串並轉小寫進行比較，處理可能的類型問題
             const statusStr = String(status || '').toLowerCase().trim();
             const isActive = statusStr !== 'inactive' && statusStr !== '' && status !== null && status !== undefined;
-            
+
             if (!isActive) {
               console.log(`🚫 過濾掉機構: ${org.org_name} (status: ${JSON.stringify(status)}, statusStr: ${statusStr})`);
             } else {
@@ -197,7 +204,7 @@ export default function CourseActivitiesPage() {
             const statusStr = String(org.status || '').toLowerCase().trim();
             return statusStr === 'inactive' || org.status === null || org.status === undefined;
           }).map((org: any) => ({ name: org.org_name, status: org.status })));
-          
+
           // 創建機構 ID 到機構對象的映射（使用所有機構，確保課程能正確分配）
           const orgMap = new Map(allOrgList.map((org: any) => [org.id, org]));
           console.log('🗺️ 機構映射表:', Array.from(orgMap.keys()));
@@ -211,7 +218,7 @@ export default function CourseActivitiesPage() {
           credentials: 'include',
         });
         let courseTypes: any[] = [];
-        
+
         if (coursesResponse.ok) {
           const coursesData = await coursesResponse.json();
           console.log('✅ 課程 API 響應:', { success: coursesData.success, count: coursesData.count, hasData: !!coursesData.data });
@@ -224,11 +231,11 @@ export default function CourseActivitiesPage() {
 
         // 創建機構 ID 到機構對象的映射（使用所有機構，包括 inactive，確保課程能正確分配）
         const orgMap = new Map((allOrgList.length > 0 ? allOrgList : orgList).map((org: any) => [org.id, org]));
-        
+
         const orgIdToCourses: Record<string, Course[]> = {};
         const buildCourse = (ct: any, orgSettings: any): Course => {
-                const images = Array.isArray(ct.images) ? ct.images : [];
-                const firstImage = images.length > 0 ? images[0] : '/HanamiMusic/musicclass.png';
+          const images = Array.isArray(ct.images) ? ct.images : [];
+          const firstImage = images.length > 0 ? images[0] : '/HanamiMusic/musicclass.png';
           const discountConfigs = (ct.discount_configs && typeof ct.discount_configs === 'object')
             ? ct.discount_configs
             : { packages: [], trialBundles: [] };
@@ -237,25 +244,25 @@ export default function CourseActivitiesPage() {
           const displayPrice = (firstActiveTrial?.price != null)
             ? Number(firstActiveTrial.price)
             : (ct.price_per_lesson || 0);
-                
-                return {
-                  id: ct.id,
-                  name: ct.name || '未命名課程',
-                  description: ct.description || '',
-                  duration: ct.duration_minutes ? `${ct.duration_minutes} 分鐘` : '靈活安排',
-                  level: ct.difficulty_level === 'beginner' ? '初級' : 
-                         ct.difficulty_level === 'intermediate' ? '中級' :
-                         ct.difficulty_level === 'advanced' ? '進階' : '專家',
-                  instructor: '專業教師團隊',
-                  schedule: '靈活安排',
+
+          return {
+            id: ct.id,
+            name: ct.name || '未命名課程',
+            description: ct.description || '',
+            duration: ct.duration_minutes ? `${ct.duration_minutes} 分鐘` : '靈活安排',
+            level: ct.difficulty_level === 'beginner' ? '初級' :
+              ct.difficulty_level === 'intermediate' ? '中級' :
+                ct.difficulty_level === 'advanced' ? '進階' : '專家',
+            instructor: '專業教師團隊',
+            schedule: '靈活安排',
             location: orgSettings?.location || '香港九龍旺角威達商業大廈504-505室',
-                  maxStudents: ct.max_students || 8,
-                  currentStudents: 0,
+            maxStudents: ct.max_students || 8,
+            currentStudents: 0,
             price: displayPrice,
-                  rating: 5.0,
-                  image: firstImage,
-                  status: '招生中',
-                  progress: 0,
+            rating: 5.0,
+            image: firstImage,
+            status: '招生中',
+            progress: 0,
             nextClass: '立即報名開始學習',
             discountConfigs,
             images,
@@ -271,7 +278,7 @@ export default function CourseActivitiesPage() {
             if (orgId && orgMap.has(orgId)) {
               const org = orgMap.get(orgId);
               const orgStatus = org?.status;
-              
+
               // 只將課程分配給 active 或 suspended 的機構（不分配給 inactive 機構）
               if (orgStatus && orgStatus !== 'inactive') {
                 if (!orgIdToCourses[orgId]) {
@@ -288,7 +295,7 @@ export default function CourseActivitiesPage() {
               console.warn(`⚠️ 課程 "${ct.name}" (${ct.id}) 沒有有效的 org_id 或機構不存在:`, orgId);
             }
           });
-          
+
           console.log('📊 課程分配統計（只包含 active/suspended 機構）:', Object.keys(orgIdToCourses).map(orgId => {
             const org = orgMap.get(orgId);
             return `${org?.org_name || orgId} (${org?.status}): ${orgIdToCourses[orgId].length} 個課程`;
@@ -298,19 +305,19 @@ export default function CourseActivitiesPage() {
         if (orgList && orgList.length > 0) {
           // 批量獲取所有機構的 like count 和 review count（使用 API 端點）
           const orgIds = orgList.map((org: any) => org.id);
-          
+
           const statsResponse = await fetch(
             `/api/organizations/stats?orgIds=${orgIds.join(',')}`,
             { credentials: 'include' }
           );
-          
+
           const likeCountMap: Record<string, number> = {};
           const reviewCountMap: Record<string, number> = {};
-          
+
           if (statsResponse.ok) {
             const statsData = await statsResponse.json();
             const stats = statsData.data || {};
-            
+
             orgIds.forEach((orgId: string) => {
               likeCountMap[orgId] = stats[orgId]?.likeCount || 0;
               reviewCountMap[orgId] = stats[orgId]?.reviewCount || 0;
@@ -318,12 +325,12 @@ export default function CourseActivitiesPage() {
           } else {
             console.error('獲取機構統計失敗:', await statsResponse.json().catch(() => ({})));
           }
-          
+
           // 顯示所有 active/suspended 的機構，即使沒有課程
           for (const org of orgList as any[]) {
             const settings = (org.settings as any) || {};
             const coursesForOrg: Course[] = orgIdToCourses[org.id] || [];
-            
+
             console.log(`📝 處理機構: ${org.org_name} (status: ${org.status}), 課程數: ${coursesForOrg.length}`);
 
             // 顯示所有機構，即使沒有課程
@@ -358,11 +365,11 @@ export default function CourseActivitiesPage() {
 
         console.log('📋 最終機構列表:', institutions.map(i => ({ id: i.id, name: i.name, hasOrgData: !!i.orgData, coursesCount: i.courses.length })));
         console.log(`✅ 總共載入 ${institutions.length} 個機構，${institutions.reduce((sum, inst) => sum + inst.courses.length, 0)} 個課程`);
-        
+
         if (institutions.length === 0) {
           console.warn('⚠️ 沒有載入到任何機構，可能的原因：1) 資料庫中沒有機構 2) API 端點錯誤 3) RLS 策略問題');
         }
-        
+
         setCourseActivities(institutions);
       } catch (error) {
         console.error('載入課程活動失敗:', error);
@@ -462,11 +469,11 @@ export default function CourseActivitiesPage() {
   const orgMatchesFilter = (inst: Institution) => {
     return orgMatchesCategory(inst) && orgMatchesAge(inst);
   };
-  
+
   // 排序函數
   const sortInstitutions = (institutions: Institution[]): Institution[] => {
     if (sortBy === 'none') return institutions;
-    
+
     const sorted = [...institutions];
     switch (sortBy) {
       case 'likes':
@@ -494,6 +501,10 @@ export default function CourseActivitiesPage() {
         onLogout={handleLogout}
         onLogin={() => router.push('/aihome/auth/login')}
         onRegister={() => router.push('/aihome/auth/register')}
+        customRightContent={
+          /* 統一的下拉菜單 (桌面 + 移動端) */
+          <UnifiedRightContent user={user} onLogout={handleLogout} />
+        }
       />
 
       {/* 主內容區域 */}
@@ -506,457 +517,455 @@ export default function CourseActivitiesPage() {
         <div className="flex-1 flex flex-col">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 lg:pb-8 flex-1">
             {/* 頁面標題 */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-12"
-        >
-          <h1 className="text-4xl font-bold text-[#4B4036] mb-4">
-            課程活動
-          </h1>
-          <p className="text-xl text-[#2B3A3B] max-w-3xl mx-auto">
-            探索更多機構和優惠課程活動，掌握更多優質教育資源
-          </p>
-        </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={isLoaded ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-12"
+            >
+              <h1 className="text-4xl font-bold text-[#4B4036] mb-4">
+                課程活動
+              </h1>
+              <p className="text-xl text-[#2B3A3B] max-w-3xl mx-auto">
+                探索更多機構和優惠課程活動，掌握更多優質教育資源
+              </p>
+            </motion.div>
 
-        {/* 搜尋與篩選 */}
-        <div className="mb-8">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜尋機構或課程"
-                className="flex-1 rounded-xl border border-[#EADBC8] bg-white px-4 py-2 text-[#2B3A3B] focus:outline-none focus:ring-2 focus:ring-[#FFD59A]"
-              />
+            {/* 搜尋與篩選 */}
+            <div className="mb-8">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="搜尋機構或課程"
+                    className="flex-1 rounded-xl border border-[#EADBC8] bg-white px-4 py-2 text-[#2B3A3B] focus:outline-none focus:ring-2 focus:ring-[#FFD59A]"
+                  />
 
-              {/* 多選機構類別下拉選單 */}
-              
-            </div>
-          </div>
-        </div>
+                  {/* 多選機構類別下拉選單 */}
 
-        {/* 分段切換 + 機構類別與年齡篩選（顯示在機構之上，同一行） */}
-        <div className="mb-6 px-2">
-          <div className="flex flex-wrap items-center gap-3 justify-between">
-            {/* 分段切換：機構 / 課程 */}
-            <div className="relative inline-flex items-center bg-white border border-[#EADBC8] rounded-full p-1 shadow-sm">
-              <button
-                onClick={() => setActiveTab('orgs')}
-                className={`relative z-10 px-4 py-1.5 text-sm rounded-full transition-colors ${
-                  activeTab === 'orgs' ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]' : 'text-[#4B4036]/70'
-                }`}
-                type="button"
-              >
-                機構
-              </button>
-              <button
-                onClick={() => setActiveTab('courses')}
-                className={`relative z-10 px-4 py-1.5 text-sm rounded-full transition-colors ${
-                  activeTab === 'courses' ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]' : 'text-[#4B4036]/70'
-                }`}
-                type="button"
-              >
-                課程
-              </button>
+                </div>
+              </div>
             </div>
 
-            {/* 篩選群組：類別 + 年齧齡 + 清除 */}
-            <div className="flex flex-wrap items-center gap-3">
-              {/* 類別下拉 */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setFilterOpen(prev => { const next = !prev; if (next) setAgeFilterOpen(false); return next; })}
-                  className="px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] text-sm flex items-center gap-2 shadow-sm hover:bg-[#FFF9F2]"
-                >
-                  機構類別 <span className="text-[#8A7C70]">▾</span>
-                </button>
-                {filterOpen && (
-                  <div className="absolute z-20 mt-2 w-80 max-w-[90vw] bg-white border border-[#EADBC8] rounded-xl shadow-lg p-3">
-                    <div className="max-h-80 overflow-auto pr-1">
-                      {CATEGORY_GROUPS.map(group => (
-                        <div key={group.title} className="mb-2 border border-[#F5E7D6] rounded-md">
+            {/* 分段切換 + 機構類別與年齡篩選（顯示在機構之上，同一行） */}
+            <div className="mb-6 px-2">
+              <div className="flex flex-wrap items-center gap-3 justify-between">
+                {/* 分段切換：機構 / 課程 */}
+                <div className="relative inline-flex items-center bg-white border border-[#EADBC8] rounded-full p-1 shadow-sm">
+                  <button
+                    onClick={() => setActiveTab('orgs')}
+                    className={`relative z-10 px-4 py-1.5 text-sm rounded-full transition-colors ${activeTab === 'orgs' ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]' : 'text-[#4B4036]/70'
+                      }`}
+                    type="button"
+                  >
+                    機構
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('courses')}
+                    className={`relative z-10 px-4 py-1.5 text-sm rounded-full transition-colors ${activeTab === 'courses' ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]' : 'text-[#4B4036]/70'
+                      }`}
+                    type="button"
+                  >
+                    課程
+                  </button>
+                </div>
+
+                {/* 篩選群組：類別 + 年齧齡 + 清除 */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* 類別下拉 */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setFilterOpen(prev => { const next = !prev; if (next) setAgeFilterOpen(false); return next; })}
+                      className="px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] text-sm flex items-center gap-2 shadow-sm hover:bg-[#FFF9F2]"
+                    >
+                      機構類別 <span className="text-[#8A7C70]">▾</span>
+                    </button>
+                    {filterOpen && (
+                      <div className="absolute z-20 mt-2 w-80 max-w-[90vw] bg-white border border-[#EADBC8] rounded-xl shadow-lg p-3">
+                        <div className="max-h-80 overflow-auto pr-1">
+                          {CATEGORY_GROUPS.map(group => (
+                            <div key={group.title} className="mb-2 border border-[#F5E7D6] rounded-md">
+                              <button
+                                type="button"
+                                onClick={() => setOpenGroups(prev => ({ ...prev, [group.title]: !prev[group.title] }))}
+                                className="w-full flex justify-between items-center px-2 py-1 text-sm text-left text-[#4B4036] hover:bg-[#FFEFD9] rounded-md"
+                              >
+                                <span>{group.title}</span>
+                                <span className={`transition-transform ${openGroups[group.title] ? 'rotate-180' : ''}`}>▾</span>
+                              </button>
+                              {openGroups[group.title] && (
+                                <div className="px-2 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                  {group.options.map(opt => {
+                                    const checked = selectedCategories.includes(opt.value);
+                                    return (
+                                      <label key={opt.value} className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => {
+                                            setSelectedCategories(prev => {
+                                              if (prev.includes(opt.value)) return prev.filter(v => v !== opt.value);
+                                              return [...prev, opt.value];
+                                            });
+                                          }}
+                                        />
+                                        <span>{opt.label}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {selectedCategories.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {selectedCategories.map(c => (
+                              <span key={c} className="text-xs px-2 py-0.5 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#4B4036]">
+                                {c}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-3 flex justify-end">
                           <button
                             type="button"
-                            onClick={() => setOpenGroups(prev => ({...prev, [group.title]: !prev[group.title]}))}
-                            className="w-full flex justify-between items-center px-2 py-1 text-sm text-left text-[#4B4036] hover:bg-[#FFEFD9] rounded-md"
+                            onClick={() => { setSelectedCategories([]); setFilterOpen(false); }}
+                            className="text-xs px-3 py-1.5 rounded-full border border-[#EADBC8] text-[#4B4036] hover:bg-[#FFF4DF]"
                           >
-                            <span>{group.title}</span>
-                            <span className={`transition-transform ${openGroups[group.title] ? 'rotate-180' : ''}`}>▾</span>
+                            清除類別
                           </button>
-                          {openGroups[group.title] && (
-                            <div className="px-2 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                              {group.options.map(opt => {
-                                const checked = selectedCategories.includes(opt.value);
-                                return (
-                                  <label key={opt.value} className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={() => {
-                                        setSelectedCategories(prev => {
-                                          if (prev.includes(opt.value)) return prev.filter(v => v !== opt.value);
-                                          return [...prev, opt.value];
-                                        });
-                                      }}
-                                    />
-                                    <span>{opt.label}</span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          )}
                         </div>
-                      ))}
-                    </div>
-                    {selectedCategories.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {selectedCategories.map(c => (
-                          <span key={c} className="text-xs px-2 py-0.5 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#4B4036]">
-                            {c}
-                          </span>
-                        ))}
                       </div>
                     )}
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedCategories([]); setFilterOpen(false); }}
-                        className="text-xs px-3 py-1.5 rounded-full border border-[#EADBC8] text-[#4B4036] hover:bg-[#FFF4DF]"
-                      >
-                        清除類別
-                      </button>
-                    </div>
                   </div>
-                )}
-              </div>
 
-              {/* 年齡下拉 */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setAgeFilterOpen(prev => { const next = !prev; if (next) setFilterOpen(false); return next; })}
-                  className="px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] text-sm flex items-center gap-2 shadow-sm hover:bg-[#FFF9F2]"
-                >
-                  適合年齡 <span className="text-[#8A7C70]">▾</span>
-                </button>
-                {ageFilterOpen && (
-                  <div className="absolute z-20 mt-2 w-56 max-w-[90vw] bg-white border border-[#EADBC8] rounded-xl shadow-lg p-3">
-                    <div className="space-y-1">
-                      {AGE_RANGES.map(r => {
-                        const checked = selectedAgeRanges.includes(r.key);
-                        return (
-                          <label key={r.key} className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer">
+                  {/* 年齡下拉 */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setAgeFilterOpen(prev => { const next = !prev; if (next) setFilterOpen(false); return next; })}
+                      className="px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] text-sm flex items-center gap-2 shadow-sm hover:bg-[#FFF9F2]"
+                    >
+                      適合年齡 <span className="text-[#8A7C70]">▾</span>
+                    </button>
+                    {ageFilterOpen && (
+                      <div className="absolute z-20 mt-2 w-56 max-w-[90vw] bg-white border border-[#EADBC8] rounded-xl shadow-lg p-3">
+                        <div className="space-y-1">
+                          {AGE_RANGES.map(r => {
+                            const checked = selectedAgeRanges.includes(r.key);
+                            return (
+                              <label key={r.key} className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setSelectedAgeRanges(prev => {
+                                      if (prev.includes(r.key)) return prev.filter(v => v !== r.key);
+                                      return [...prev, r.key];
+                                    });
+                                  }}
+                                />
+                                <span>{r.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {selectedAgeRanges.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {selectedAgeRanges.map(k => {
+                              const r = AGE_RANGES.find(x => x.key === k);
+                              return (
+                                <span key={k} className="text-xs px-2 py-0.5 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#4B4036]">
+                                  {r?.label || k}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setSelectedAgeRanges([]); setAgeFilterOpen(false); }}
+                            className="text-xs px-3 py-1.5 rounded-full border border-[#EADBC8] text-[#4B4036] hover:bg-[#FFF4DF]"
+                          >
+                            清除年齡
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 排序下拉 */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setSortOpen(prev => { const next = !prev; if (next) { setFilterOpen(false); setAgeFilterOpen(false); } return next; })}
+                      className="px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] text-sm flex items-center gap-2 shadow-sm hover:bg-[#FFF9F2]"
+                    >
+                      <FunnelIcon className="w-4 h-4" />
+                      <span>排序</span>
+                      <span className="text-[#8A7C70]">▾</span>
+                    </button>
+                    {sortOpen && (
+                      <div className="absolute z-20 mt-2 w-48 max-w-[90vw] bg-white border border-[#EADBC8] rounded-xl shadow-lg p-3">
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer hover:bg-[#FFF9F2] rounded px-2 py-1 transition-colors">
                             <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => {
-                                setSelectedAgeRanges(prev => {
-                                  if (prev.includes(r.key)) return prev.filter(v => v !== r.key);
-                                  return [...prev, r.key];
-                                });
-                              }}
+                              type="radio"
+                              name="sort"
+                              checked={sortBy === 'none'}
+                              onChange={() => { setSortBy('none'); setSortOpen(false); }}
+                              className="text-[#FFD59A]"
                             />
-                            <span>{r.label}</span>
+                            <span>預設排序</span>
                           </label>
+                          <label className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer hover:bg-[#FFF9F2] rounded px-2 py-1 transition-colors">
+                            <input
+                              type="radio"
+                              name="sort"
+                              checked={sortBy === 'likes'}
+                              onChange={() => { setSortBy('likes'); setSortOpen(false); }}
+                              className="text-[#FFD59A]"
+                            />
+                            <HeartIcon className="w-4 h-4 text-red-500" />
+                            <span>心心數</span>
+                          </label>
+                          <label className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer hover:bg-[#FFF9F2] rounded px-2 py-1 transition-colors">
+                            <input
+                              type="radio"
+                              name="sort"
+                              checked={sortBy === 'created_at'}
+                              onChange={() => { setSortBy('created_at'); setSortOpen(false); }}
+                              className="text-[#FFD59A]"
+                            />
+                            <CalendarDaysIcon className="w-4 h-4 text-blue-500" />
+                            <span>加入時間</span>
+                          </label>
+                          <label className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer hover:bg-[#FFF9F2] rounded px-2 py-1 transition-colors">
+                            <input
+                              type="radio"
+                              name="sort"
+                              checked={sortBy === 'reviews'}
+                              onChange={() => { setSortBy('reviews'); setSortOpen(false); }}
+                              className="text-[#FFD59A]"
+                            />
+                            <ChatBubbleLeftRightIcon className="w-4 h-4 text-yellow-500" />
+                            <span>評論數</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 清除全部 */}
+                  {(selectedCategories.length > 0 || selectedAgeRanges.length > 0 || sortBy !== 'none') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategories([]);
+                        setSelectedAgeRanges([]);
+                        setSortBy('none');
+                        setFilterOpen(false);
+                        setAgeFilterOpen(false);
+                        setSortOpen(false);
+                      }}
+                      className="px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] text-sm shadow-sm hover:bg-[#FFE0B2]"
+                    >
+                      清除全部
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 內容區域：加入左右滑動手勢（類 iPhone） */}
+            <div
+              onTouchStart={(e) => {
+                setTouchStartX(e.changedTouches[0].clientX);
+                setTouchCurrentX(e.changedTouches[0].clientX);
+              }}
+              onTouchMove={(e) => {
+                setTouchCurrentX(e.changedTouches[0].clientX);
+              }}
+              onTouchEnd={() => {
+                if (touchStartX != null && touchCurrentX != null) {
+                  const delta = touchCurrentX - touchStartX;
+                  // 右滑 delta>50：顯示機構；左滑 delta<-50：顯示課程
+                  if (delta > 50) setActiveTab('orgs');
+                  if (delta < -50) setActiveTab('courses');
+                }
+                setTouchStartX(null);
+                setTouchCurrentX(null);
+              }}
+            >
+              {/* 機構 Carousell（左） */}
+              {activeTab === 'orgs' && (
+                <div className="mb-10">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xl font-bold text-[#4B4036]">機構</h2>
+                  </div>
+                  <div className="grid w-full gap-5 grid-cols-2">
+                    {sortInstitutions(
+                      courseActivities.filter((inst) => {
+                        const q = searchQuery.trim().toLowerCase();
+                        if (q && !(
+                          inst.name.toLowerCase().includes(q) ||
+                          inst.description.toLowerCase().includes(q)
+                        )) return false;
+                        // 按機構類別與年齡過濾
+                        return orgMatchesFilter(inst);
+                      })
+                    )
+                      .map((inst) => {
+                        // 檢查是否為花見音樂機構（優先使用 org_slug，這是從 Supabase 載入的）
+                        const isHanamiMusic =
+                          inst.orgData?.orgSlug === 'hanami-music' ||
+                          inst.id === 'f8d269ec-b682-45d1-a796-3b74c2bf3eec' ||
+                          inst.name?.toLowerCase() === 'hanami music' ||
+                          inst.name?.toLowerCase().includes('hanami music') ||
+                          inst.name?.includes('花見音樂') ||
+                          inst.orgData?.orgName?.toLowerCase() === 'hanami music' ||
+                          inst.orgData?.orgName?.toLowerCase().includes('hanami music') ||
+                          inst.orgData?.orgName?.includes('花見音樂');
+
+                        // 如果是花見音樂，導向專屬頁面；否則導向一般機構詳情頁
+                        const orgRoute = isHanamiMusic
+                          ? '/aihome/hanami-music'
+                          : `/aihome/organizations/${inst.id}`;
+
+                        // 對於 Hanami Music，使用專屬的封面圖片和描述
+                        // 優先使用 Supabase 中的數據，如果為空或只有 "yeah" 則使用更好的默認值
+                        let finalCoverImage: string;
+                        let finalDescription: string;
+
+                        if (isHanamiMusic) {
+                          // 封面圖片：優先使用 Supabase 的 coverImageUrl，否則使用 Hanami Music 專屬圖片
+                          finalCoverImage = inst.orgData?.coverImageUrl || '/HanamiMusic/IndexLogo.png';
+
+                          // 描述：如果 Supabase 中的描述為空或只是 "yeah"，使用更好的默認描述
+                          const supabaseDesc = inst.orgData?.description || inst.description;
+                          if (!supabaseDesc || supabaseDesc.trim() === 'yeah' || supabaseDesc.trim() === '') {
+                            finalDescription = '專業音樂教育機構，提供創新的音樂教學方法。2022-2024連續獲得優秀教育機構及導師獎。以最有趣活潑又科學的音樂教學助孩子成長發展。';
+                          } else {
+                            finalDescription = supabaseDesc;
+                          }
+                        } else {
+                          finalCoverImage = inst.orgData?.coverImageUrl || inst.institutionLogo;
+                          finalDescription = inst.description;
+                        }
+
+                        return (
+                          <OrganizationMiniCard
+                            key={inst.id}
+                            orgId={inst.id}
+                            name={inst.name}
+                            coverImageUrl={finalCoverImage}
+                            description={finalDescription}
+                            categories={inst.orgData?.categories || null}
+                            onClick={() => router.push(orgRoute)}
+                          />
                         );
                       })}
-                    </div>
-                    {selectedAgeRanges.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {selectedAgeRanges.map(k => {
-                          const r = AGE_RANGES.find(x => x.key === k);
-                          return (
-                            <span key={k} className="text-xs px-2 py-0.5 rounded-full bg-[#FFF9F2] border border-[#EADBC8] text-[#4B4036]">
-                              {r?.label || k}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                    <div className="mt-3 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedAgeRanges([]); setAgeFilterOpen(false); }}
-                        className="text-xs px-3 py-1.5 rounded-full border border-[#EADBC8] text-[#4B4036] hover:bg-[#FFF4DF]"
-                      >
-                        清除年齡
-                      </button>
-                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* 排序下拉 */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setSortOpen(prev => { const next = !prev; if (next) { setFilterOpen(false); setAgeFilterOpen(false); } return next; })}
-                  className="px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] text-sm flex items-center gap-2 shadow-sm hover:bg-[#FFF9F2]"
-                >
-                  <FunnelIcon className="w-4 h-4" />
-                  <span>排序</span>
-                  <span className="text-[#8A7C70]">▾</span>
-                </button>
-                {sortOpen && (
-                  <div className="absolute z-20 mt-2 w-48 max-w-[90vw] bg-white border border-[#EADBC8] rounded-xl shadow-lg p-3">
-                    <div className="space-y-1">
-                      <label className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer hover:bg-[#FFF9F2] rounded px-2 py-1 transition-colors">
-                        <input
-                          type="radio"
-                          name="sort"
-                          checked={sortBy === 'none'}
-                          onChange={() => { setSortBy('none'); setSortOpen(false); }}
-                          className="text-[#FFD59A]"
-                        />
-                        <span>預設排序</span>
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer hover:bg-[#FFF9F2] rounded px-2 py-1 transition-colors">
-                        <input
-                          type="radio"
-                          name="sort"
-                          checked={sortBy === 'likes'}
-                          onChange={() => { setSortBy('likes'); setSortOpen(false); }}
-                          className="text-[#FFD59A]"
-                        />
-                        <HeartIcon className="w-4 h-4 text-red-500" />
-                        <span>心心數</span>
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer hover:bg-[#FFF9F2] rounded px-2 py-1 transition-colors">
-                        <input
-                          type="radio"
-                          name="sort"
-                          checked={sortBy === 'created_at'}
-                          onChange={() => { setSortBy('created_at'); setSortOpen(false); }}
-                          className="text-[#FFD59A]"
-                        />
-                        <CalendarDaysIcon className="w-4 h-4 text-blue-500" />
-                        <span>加入時間</span>
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-[#2B3A3B] cursor-pointer hover:bg-[#FFF9F2] rounded px-2 py-1 transition-colors">
-                        <input
-                          type="radio"
-                          name="sort"
-                          checked={sortBy === 'reviews'}
-                          onChange={() => { setSortBy('reviews'); setSortOpen(false); }}
-                          className="text-[#FFD59A]"
-                        />
-                        <ChatBubbleLeftRightIcon className="w-4 h-4 text-yellow-500" />
-                        <span>評論數</span>
-                      </label>
-                    </div>
+              {/* 課程 Carousell（右，預設） */}
+              {activeTab === 'courses' && (
+                <div className="mb-12">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xl font-bold text-[#4B4036]">課程</h2>
                   </div>
-                )}
-              </div>
+                  <div className="grid w-full gap-6 grid-cols-2">
+                    {courseActivities
+                      .flatMap((inst) =>
+                        inst.courses.map((c) => ({ ...c, _inst: inst }))
+                      )
+                      .filter((c) => {
+                        const q = searchQuery.trim().toLowerCase();
+                        const passSearch =
+                          !q ||
+                          c.name.toLowerCase().includes(q) ||
+                          (c.description || '').toLowerCase().includes(q) ||
+                          c._inst!.name.toLowerCase().includes(q);
+                        const passCategory = orgMatchesCategory(c._inst!);
+                        const passAge = courseMatchesAge(c);
+                        return passSearch && passCategory && passAge;
+                      })
+                      .map((c) => {
+                        // 檢查是否為花見音樂的課程
+                        const isHanamiMusic =
+                          c._inst!.name?.toLowerCase().includes('hanami music') ||
+                          c._inst!.name?.includes('花見音樂') ||
+                          c._inst!.orgData?.orgSlug === 'hanami-music' ||
+                          c._inst!.orgData?.orgName?.toLowerCase().includes('hanami music') ||
+                          c._inst!.orgData?.orgName?.includes('花見音樂');
 
-              {/* 清除全部 */}
-              {(selectedCategories.length > 0 || selectedAgeRanges.length > 0 || sortBy !== 'none') && (
-                <button
-                  type="button"
-                  onClick={() => { 
-                    setSelectedCategories([]); 
-                    setSelectedAgeRanges([]); 
-                    setSortBy('none');
-                    setFilterOpen(false); 
-                    setAgeFilterOpen(false);
-                    setSortOpen(false);
-                  }}
-                  className="px-3 py-2 border border-[#EADBC8] rounded-lg bg-white text-[#4B4036] text-sm shadow-sm hover:bg-[#FFE0B2]"
-                >
-                  清除全部
-                </button>
+                        // 檢查課程名稱
+                        const courseName = c.name || '';
+                        const isPianoClass = courseName.includes('鋼琴') || courseName.toLowerCase().includes('piano');
+                        const isMusicFocusClass = courseName.includes('音樂專注力') || courseName.includes('專注力') || courseName.toLowerCase().includes('music focus') || courseName.toLowerCase().includes('focus');
+
+                        // 決定路由
+                        let courseRoute = `/aihome/courses/${c.id}`; // 預設路由
+                        if (isHanamiMusic) {
+                          if (isPianoClass) {
+                            courseRoute = '/aihome/hanami-music/piano-class';
+                          } else if (isMusicFocusClass) {
+                            courseRoute = '/aihome/hanami-music/music-focus-class';
+                          }
+                        }
+
+                        return (
+                          <CourseMiniCard
+                            key={c.id}
+                            id={c.id}
+                            name={c.name}
+                            image={c.image}
+                            images={c.images}
+                            description={c.description}
+                            price={c.price}
+                            orgName={c._inst!.name}
+                            orgLogo={c._inst!.orgData?.coverImageUrl || c._inst!.institutionLogo}
+                            categories={c._inst!.orgData?.categories || null}
+                            discountConfigs={c.discountConfigs}
+                            minAge={c.minAge}
+                            maxAge={c.maxAge}
+                            onClick={() => router.push(courseRoute)}
+                          />
+                        );
+                      })}
+                  </div>
+                </div>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* 內容區域：加入左右滑動手勢（類 iPhone） */}
-        <div
-          onTouchStart={(e) => {
-            setTouchStartX(e.changedTouches[0].clientX);
-            setTouchCurrentX(e.changedTouches[0].clientX);
-          }}
-          onTouchMove={(e) => {
-            setTouchCurrentX(e.changedTouches[0].clientX);
-          }}
-          onTouchEnd={() => {
-            if (touchStartX != null && touchCurrentX != null) {
-              const delta = touchCurrentX - touchStartX;
-              // 右滑 delta>50：顯示機構；左滑 delta<-50：顯示課程
-              if (delta > 50) setActiveTab('orgs');
-              if (delta < -50) setActiveTab('courses');
-            }
-            setTouchStartX(null);
-            setTouchCurrentX(null);
-          }}
-        >
-          {/* 機構 Carousell（左） */}
-          {activeTab === 'orgs' && (
-            <div className="mb-10">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-bold text-[#4B4036]">機構</h2>
-              </div>
-              <div className="grid w-full gap-5 grid-cols-2">
-                {sortInstitutions(
-                  courseActivities.filter((inst) => {
-                    const q = searchQuery.trim().toLowerCase();
-                    if (q && !(
-                      inst.name.toLowerCase().includes(q) ||
-                      inst.description.toLowerCase().includes(q)
-                    )) return false;
-                    // 按機構類別與年齡過濾
-                    return orgMatchesFilter(inst);
-                  })
-                )
-                  .map((inst) => {
-                    // 檢查是否為花見音樂機構（優先使用 org_slug，這是從 Supabase 載入的）
-                    const isHanamiMusic = 
-                      inst.orgData?.orgSlug === 'hanami-music' ||
-                      inst.id === 'f8d269ec-b682-45d1-a796-3b74c2bf3eec' ||
-                      inst.name?.toLowerCase() === 'hanami music' ||
-                      inst.name?.toLowerCase().includes('hanami music') ||
-                      inst.name?.includes('花見音樂') ||
-                      inst.orgData?.orgName?.toLowerCase() === 'hanami music' ||
-                      inst.orgData?.orgName?.toLowerCase().includes('hanami music') ||
-                      inst.orgData?.orgName?.includes('花見音樂');
-                    
-                    // 如果是花見音樂，導向專屬頁面；否則導向一般機構詳情頁
-                    const orgRoute = isHanamiMusic 
-                      ? '/aihome/hanami-music'
-                      : `/aihome/organizations/${inst.id}`;
-                    
-                    // 對於 Hanami Music，使用專屬的封面圖片和描述
-                    // 優先使用 Supabase 中的數據，如果為空或只有 "yeah" 則使用更好的默認值
-                    let finalCoverImage: string;
-                    let finalDescription: string;
-                    
-                    if (isHanamiMusic) {
-                      // 封面圖片：優先使用 Supabase 的 coverImageUrl，否則使用 Hanami Music 專屬圖片
-                      finalCoverImage = inst.orgData?.coverImageUrl || '/HanamiMusic/IndexLogo.png';
-                      
-                      // 描述：如果 Supabase 中的描述為空或只是 "yeah"，使用更好的默認描述
-                      const supabaseDesc = inst.orgData?.description || inst.description;
-                      if (!supabaseDesc || supabaseDesc.trim() === 'yeah' || supabaseDesc.trim() === '') {
-                        finalDescription = '專業音樂教育機構，提供創新的音樂教學方法。2022-2024連續獲得優秀教育機構及導師獎。以最有趣活潑又科學的音樂教學助孩子成長發展。';
-                      } else {
-                        finalDescription = supabaseDesc;
-                      }
-                    } else {
-                      finalCoverImage = inst.orgData?.coverImageUrl || inst.institutionLogo;
-                      finalDescription = inst.description;
-                    }
-                    
-                    return (
-                      <OrganizationMiniCard
-                        key={inst.id}
-                        orgId={inst.id}
-                        name={inst.name}
-                        coverImageUrl={finalCoverImage}
-                        description={finalDescription}
-                        categories={inst.orgData?.categories || null}
-                        onClick={() => router.push(orgRoute)}
-                      />
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-
-          {/* 課程 Carousell（右，預設） */}
-          {activeTab === 'courses' && (
-            <div className="mb-12">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-bold text-[#4B4036]">課程</h2>
-              </div>
-              <div className="grid w-full gap-6 grid-cols-2">
-                {courseActivities
-                  .flatMap((inst) =>
-                    inst.courses.map((c) => ({ ...c, _inst: inst }))
-                  )
-                  .filter((c) => {
-                    const q = searchQuery.trim().toLowerCase();
-                    const passSearch =
-                      !q ||
-                      c.name.toLowerCase().includes(q) ||
-                      (c.description || '').toLowerCase().includes(q) ||
-                      c._inst!.name.toLowerCase().includes(q);
-                    const passCategory = orgMatchesCategory(c._inst!);
-                    const passAge = courseMatchesAge(c);
-                    return passSearch && passCategory && passAge;
-                  })
-                  .map((c) => {
-                    // 檢查是否為花見音樂的課程
-                    const isHanamiMusic = 
-                      c._inst!.name?.toLowerCase().includes('hanami music') ||
-                      c._inst!.name?.includes('花見音樂') ||
-                      c._inst!.orgData?.orgSlug === 'hanami-music' ||
-                      c._inst!.orgData?.orgName?.toLowerCase().includes('hanami music') ||
-                      c._inst!.orgData?.orgName?.includes('花見音樂');
-                    
-                    // 檢查課程名稱
-                    const courseName = c.name || '';
-                    const isPianoClass = courseName.includes('鋼琴') || courseName.toLowerCase().includes('piano');
-                    const isMusicFocusClass = courseName.includes('音樂專注力') || courseName.includes('專注力') || courseName.toLowerCase().includes('music focus') || courseName.toLowerCase().includes('focus');
-                    
-                    // 決定路由
-                    let courseRoute = `/aihome/courses/${c.id}`; // 預設路由
-                    if (isHanamiMusic) {
-                      if (isPianoClass) {
-                        courseRoute = '/aihome/hanami-music/piano-class';
-                      } else if (isMusicFocusClass) {
-                        courseRoute = '/aihome/hanami-music/music-focus-class';
-                      }
-                    }
-                    
-                    return (
-                      <CourseMiniCard
-                        key={c.id}
-                        id={c.id}
-                        name={c.name}
-                        image={c.image}
-                        images={c.images}
-                        description={c.description}
-                        price={c.price}
-                        orgName={c._inst!.name}
-                        orgLogo={c._inst!.orgData?.coverImageUrl || c._inst!.institutionLogo}
-                        categories={c._inst!.orgData?.categories || null}
-                        discountConfigs={c.discountConfigs}
-                        minAge={c.minAge}
-                        maxAge={c.maxAge}
-                        onClick={() => router.push(courseRoute)}
-                      />
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-        </div>
 
             {/* 空狀態 */}
             {courseActivities.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-center py-16"
-          >
-            <div className="w-24 h-24 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center mx-auto mb-6">
-              <AcademicCapIcon className="w-12 h-12 text-[#4B4036]" />
-            </div>
-            <h3 className="text-2xl font-bold text-[#4B4036] mb-4">還沒有報讀任何課程</h3>
-            <p className="text-lg text-[#2B3A3B] mb-8">開始您的學習之旅，探索豐富的課程活動</p>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => router.push('/aihome')}
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              探索課程
-              <ChevronRightIcon className="w-5 h-5 ml-2" />
-            </motion.button>
-          </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={isLoaded ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.8, delay: 0.4 }}
+                className="text-center py-16"
+              >
+                <div className="w-24 h-24 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center mx-auto mb-6">
+                  <AcademicCapIcon className="w-12 h-12 text-[#4B4036]" />
+                </div>
+                <h3 className="text-2xl font-bold text-[#4B4036] mb-4">還沒有報讀任何課程</h3>
+                <p className="text-lg text-[#2B3A3B] mb-8">開始您的學習之旅，探索豐富的課程活動</p>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => router.push('/aihome')}
+                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  探索課程
+                  <ChevronRightIcon className="w-5 h-5 ml-2" />
+                </motion.button>
+              </motion.div>
             )}
           </div>
         </div>

@@ -8,9 +8,12 @@ import React, {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bars3Icon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import {
+  Bars3Icon,
+} from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
 
 import AppSidebar from '@/components/AppSidebar';
 import UnifiedNavbar from '@/components/UnifiedNavbar';
@@ -158,7 +161,7 @@ export function TeacherLinkShell({
     const isCreatePage = currentPath === '/aihome/teacher-link/create' || currentPath === '/aihome/teacher-link/create/';
     const isSelectPage = currentPath?.includes('/select-organization');
     const isJoinPage = currentPath?.includes('/join-organization');
-    
+
     // 檢查 localStorage 中是否有有效的機構（在開始解析之前）
     let hasValidLocalStorageOrgEarly = false;
     if (typeof window !== 'undefined' && isCreatePage) {
@@ -175,12 +178,12 @@ export function TeacherLinkShell({
         console.error('TeacherLinkShell: 提前讀取 localStorage 失敗', error);
       }
     }
-    
+
     // 如果路徑變化且不是主創建頁面，重置跳轉標記（允許用戶之後回到主創建頁面時可以跳轉）
     if (lastResolvedPathRef.current && lastResolvedPathRef.current !== currentPath && !isCreatePage) {
       redirectingToSelectRef.current = false;
     }
-    
+
     // 如果已經完成機構解析，且當前路徑與上次解析的路徑相同，且不是主創建頁面，則不重新執行
     // 這樣可以避免在子頁面中點擊按鈕時觸發重新解析
     // 如果是主創建頁面，但 localStorage 中有有效的機構，也跳過重新執行（避免不必要的跳轉）
@@ -188,7 +191,7 @@ export function TeacherLinkShell({
       console.log('TeacherLinkShell: 已在子頁面完成機構解析，跳過重新執行');
       return;
     }
-    
+
     // 如果是主創建頁面，且已經完成過解析，且 localStorage 中有有效的機構，跳過重新執行
     if (orgResolvedRef.current && isCreatePage && hasValidLocalStorageOrgEarly && !isSelectPage && !isJoinPage) {
       console.log('TeacherLinkShell: 在主創建頁面，已解析過且 localStorage 中有有效機構，跳過重新執行');
@@ -231,7 +234,7 @@ export function TeacherLinkShell({
           userEmail: saasUser.email,
           allowOrgData,
         });
-        
+
         // 使用 API 端點查詢機構列表，繞過 RLS 問題
         let allOrgs: UserOrganizationIdentity[] = [];
         try {
@@ -252,7 +255,7 @@ export function TeacherLinkShell({
           // 如果 API 失敗，回退到直接查詢（可能會有 RLS 問題）
           allOrgs = await getUserOrganizations(supabase, saasUser.id, saasUser.email);
         }
-        
+
         console.log('TeacherLinkShell: 獲取的機構身份數量:', allOrgs.length, allOrgs);
         setUserOrganizations(allOrgs);
 
@@ -262,20 +265,20 @@ export function TeacherLinkShell({
             currentPath,
             allOrgsCount: allOrgs.length,
           });
-          
+
           // 檢查當前路徑是否已經是選擇機構頁面或加入機構頁面
           const isSelectPage = currentPath?.includes('/select-organization');
           const isJoinPage = currentPath?.includes('/join-organization');
           // 嚴格檢查是否在主創建頁面（不包括子頁面）
           const isCreatePage = currentPath === '/aihome/teacher-link/create' || currentPath === '/aihome/teacher-link/create/';
-          
+
           // 不再從 URL 參數讀取機構 ID，改為只從 localStorage 讀取
           // 同時清除 URL 中可能存在的機構參數
           const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
           const urlOrgId = urlParams?.get('orgId');
           const urlOrgName = urlParams?.get('orgName');
           const urlOrgSlug = urlParams?.get('orgSlug');
-          
+
           // 如果 URL 中有機構參數，清除它們（但先保存到 localStorage）
           if (urlOrgId && typeof window !== 'undefined') {
             const urlOrg = allOrgs.find(org => org.orgId === urlOrgId);
@@ -296,13 +299,13 @@ export function TeacherLinkShell({
               newParams.delete('orgName');
               newParams.delete('orgSlug');
               const newQueryString = newParams.toString();
-              const newUrl = newQueryString 
+              const newUrl = newQueryString
                 ? `${window.location.pathname}?${newQueryString}`
                 : window.location.pathname;
               window.history.replaceState({}, '', newUrl);
             }
           }
-          
+
           // 從 localStorage 讀取機構 ID
           let localStorageOrgId: string | null = null;
           let hasValidLocalStorageOrg = false;
@@ -320,7 +323,7 @@ export function TeacherLinkShell({
               console.error('TeacherLinkShell: read stored org failed', error);
             }
           }
-          
+
           console.log('TeacherLinkShell: 路徑檢查', {
             isSelectPage,
             isJoinPage,
@@ -330,7 +333,7 @@ export function TeacherLinkShell({
             hasValidLocalStorageOrg,
             redirectingToSelectRef: redirectingToSelectRef.current,
           });
-          
+
           // 從 localStorage 恢復機構信息（優先級最高）
           if (hasValidLocalStorageOrg && localStorageOrgId) {
             const preferredOrg = allOrgs.find(org => org.orgId === localStorageOrgId);
@@ -368,11 +371,11 @@ export function TeacherLinkShell({
               localStorageOrgId = null;
             }
           }
-          
+
           // 檢查當前是否有有效的機構 ID（優先使用 localStorage 的值，因為狀態可能還沒更新）
           const effectiveOrgId = localStorageOrgId || organization?.id || null;
           const hasCurrentValidOrgId = Boolean(effectiveOrgId) && effectiveOrgId !== UNASSIGNED_ORG.id && effectiveOrgId !== 'default-org';
-          
+
           // 只有在主創建頁面時才跳轉到選擇機構頁面
           // 子頁面（如 /student-progress）不應該觸發跳轉
           // 如果 localStorage 中有有效的機構，也不跳轉（即使當前狀態還沒更新）
@@ -390,7 +393,7 @@ export function TeacherLinkShell({
             router.replace('/aihome/teacher-link/create/select-organization');
             return; // 提前返回，不設置其他狀態
           }
-          
+
           // 如果有 localStorage 中的機構但當前狀態還沒更新，確保不顯示選擇面板
           if (hasValidLocalStorageOrg && !hasCurrentValidOrgId) {
             console.log('TeacherLinkShell: localStorage 中有有效機構，等待狀態更新，不顯示選擇面板');
@@ -398,7 +401,7 @@ export function TeacherLinkShell({
             setShowOnboardingPage(false);
             setShowCreatePanel(false);
           }
-          
+
           // 如果在選擇機構頁面，設置選擇面板狀態
           if (isSelectPage) {
             console.log('TeacherLinkShell: 在選擇機構頁面，設置選擇面板狀態');
@@ -622,6 +625,7 @@ export function TeacherLinkShell({
               onLogout={handleLogout}
               onLogin={() => router.push('/aihome/auth/login')}
               onRegister={() => router.push('/aihome/auth/register')}
+              customRightContent={<UnifiedRightContent user={saasUser} onLogout={handleLogout} />}
             />
             <div className="bg-white/80 border-b border-[#EADBC8]">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -656,39 +660,39 @@ export function TeacherLinkShell({
                 return null;
               })()}
               {(() => {
-            // 優先級：選擇面板 > 介紹頁面 > 創建面板 > 主內容
-            // 但如果當前路徑是 join-organization 或 select-organization，則不顯示選擇面板或介紹頁面，直接渲染 children
-            const isJoinPage = currentPath?.includes('/join-organization');
-            const isSelectPage = currentPath?.includes('/select-organization');
-            
-            // 如果在選擇機構頁面或加入機構頁面，直接渲染 children
-            if (isSelectPage || isJoinPage) {
-              console.log('TeacherLinkShell: 在選擇/加入機構頁面，直接渲染 children');
-              return children;
-            }
-            
-            if (showOrganizationSelector && !isJoinPage) {
-              console.log('TeacherLinkShell: 渲染選擇面板');
-              return (
-                <OrganizationSelectorPanel
-                  organizations={userOrganizations}
-                  onSelect={handleOrganizationSelect}
-                  onCreateNew={handleCreateNew}
-                  onJoinExisting={handleJoinExisting}
-                  currentOrgId={hasValidOrgId ? orgId : null}
-                />
-              );
-            }
-            if (showOnboardingPage && !isJoinPage) {
-              console.log('TeacherLinkShell: 渲染介紹頁面');
-              return (
-                <OrganizationOnboardingPage
-                  onCreateOrganization={handleCreateNew}
-                  onJoinOrganization={handleJoinExisting}
-                />
-              );
-            }
-            if (showCreatePanel && !isJoinPage) {
+                // 優先級：選擇面板 > 介紹頁面 > 創建面板 > 主內容
+                // 但如果當前路徑是 join-organization 或 select-organization，則不顯示選擇面板或介紹頁面，直接渲染 children
+                const isJoinPage = currentPath?.includes('/join-organization');
+                const isSelectPage = currentPath?.includes('/select-organization');
+
+                // 如果在選擇機構頁面或加入機構頁面，直接渲染 children
+                if (isSelectPage || isJoinPage) {
+                  console.log('TeacherLinkShell: 在選擇/加入機構頁面，直接渲染 children');
+                  return children;
+                }
+
+                if (showOrganizationSelector && !isJoinPage) {
+                  console.log('TeacherLinkShell: 渲染選擇面板');
+                  return (
+                    <OrganizationSelectorPanel
+                      organizations={userOrganizations}
+                      onSelect={handleOrganizationSelect}
+                      onCreateNew={handleCreateNew}
+                      onJoinExisting={handleJoinExisting}
+                      currentOrgId={hasValidOrgId ? orgId : null}
+                    />
+                  );
+                }
+                if (showOnboardingPage && !isJoinPage) {
+                  console.log('TeacherLinkShell: 渲染介紹頁面');
+                  return (
+                    <OrganizationOnboardingPage
+                      onCreateOrganization={handleCreateNew}
+                      onJoinOrganization={handleJoinExisting}
+                    />
+                  );
+                }
+                if (showCreatePanel && !isJoinPage) {
                   console.log('TeacherLinkShell: 渲染創建面板');
                   return (
                     <CreateOrganizationPanel

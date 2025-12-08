@@ -20,7 +20,6 @@ import {
   HeartIcon,
   ArrowPathIcon,
   UserIcon,
-  Cog6ToothIcon,
   PuzzlePieceIcon,
   WrenchScrewdriverIcon,
   CubeIcon,
@@ -31,8 +30,9 @@ import {
   LightBulbIcon,
   MagnifyingGlassIcon,
   DocumentTextIcon,
-  ArrowRightOnRectangleIcon
+  FunnelIcon,
 } from '@heroicons/react/24/outline';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
 import AppSidebar from '@/components/AppSidebar';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { getSaasSupabaseClient, getSupabaseClient } from '@/lib/supabase';
@@ -40,6 +40,7 @@ import Image from 'next/image';
 import UsageStatsDisplay from '@/components/ai-companion/UsageStatsDisplay';
 import { BlockSelectionModal } from '@/components/ai-companion/BlockSelectionModal';
 import { MindBlock, MindBlockType } from '@/types/mind-block';
+import { useFoodDisplay } from '@/hooks/useFoodDisplay';
 
 interface AIRoom {
   id: string;
@@ -143,77 +144,15 @@ export default function AICompanionsPage() {
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [creatingChat, setCreatingChat] = useState<string | null>(null); // 正在創建聊天室的 companion ID
   const [showProjectModal, setShowProjectModal] = useState(false);
-  const [showMobileDropdown, setShowMobileDropdown] = useState(false);
   const [selectedCompanionForProject, setSelectedCompanionForProject] = useState<AICompanion | null>(null);
   const [showRoleSelectionModal, setShowRoleSelectionModal] = useState(false);
 
-  // 食量相關狀態
-  const [foodBalance, setFoodBalance] = useState<number>(0);
-  const [foodHistory, setFoodHistory] = useState<any[]>([]);
-  const [showFoodHistory, setShowFoodHistory] = useState(false);
+  // 食量相關狀態 - 使用 Hook
+  const { foodBalance, foodHistory, showFoodHistory, toggleFoodHistory, fetchFoodInfo } = useFoodDisplay(user?.id);
 
-  // 獲取食量資訊
-  const fetchFoodInfo = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      // 1. 獲取餘額
-      const { data: userData, error: userError } = await saasSupabaseClient
-        .from('user_food_balance')
-        .select('current_balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!userError && userData) {
-        setFoodBalance((userData as any).current_balance || 0);
-      }
-
-      // 2. 獲取最近 5 筆交易記錄
-      const { data: historyData, error: historyError } = await saasSupabaseClient
-        .from('food_transactions')
-        .select(`
-          *,
-          ai_messages (
-            role_id,
-            role_instances!ai_messages_sender_role_instance_id_fkey (role_id)
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (!historyError && historyData) {
-        setFoodHistory(historyData);
-      }
-    } catch (error) {
-      console.error('❌ 獲取食量資訊失敗:', error);
-    }
-  }, [user?.id, saasSupabaseClient]);
-
-  // 監聽食量變更
-  useEffect(() => {
-    fetchFoodInfo();
-
-    // 訂閱變更
-    const channel = saasSupabaseClient
-      .channel('food-balance-changes-' + user?.id)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_food_balance',
-          filter: `user_id=eq.${user?.id}`
-        },
-        () => {
-          fetchFoodInfo();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      saasSupabaseClient.removeChannel(channel);
-    };
-  }, [user?.id, saasSupabaseClient, fetchFoodInfo]);
+  // 移除重複的 handleLogout (若需要可保留，但建議統一)
+  // const handleLogout ... (上面已經有 import define，這裡可能有重複定義?)
+  // 我們保留原本的 handleLogout，但移除 inline food logic。
 
   const handleLogout = async () => {
     try {
@@ -245,7 +184,6 @@ export default function AICompanionsPage() {
   const [clickedCompanionId, setClickedCompanionId] = useState<string | null>(null);
   const [companionModels, setCompanionModels] = useState<Record<string, { modelId: string; displayName: string; food: number } | null>>({});
   const [defaultMindBlocks, setDefaultMindBlocks] = useState<any[]>([]); // 預設思維積木
-  const [loadingMindBlocks, setLoadingMindBlocks] = useState(false);
   const [showBlockSelectionModal, setShowBlockSelectionModal] = useState(false); // 控制積木選擇 modal
 
   const DEFAULT_MODEL_SENTINEL = '__default__';
@@ -530,7 +468,7 @@ export default function AICompanionsPage() {
       return;
     }
 
-    setLoadingMindBlocks(true);
+    setLoadingModels(true);
     try {
       const supabase = getSaasSupabaseClient();
 
@@ -584,7 +522,7 @@ export default function AICompanionsPage() {
       console.error('加載預設思維積木異常:', error);
       setDefaultMindBlocks([]);
     } finally {
-      setLoadingMindBlocks(false);
+      setLoadingModels(false);
     }
   };
 
@@ -1427,9 +1365,9 @@ export default function AICompanionsPage() {
                 console.log('⚠️ 查詢角色資料時發生錯誤:', error);
               }
 
-              // 如果資料庫中沒有角色資料，使用備用邏輯
+              // 如果資料庫中沒有角色資料，僅記錄訊息而不顯示警告
               if (activeRoles.length === 0) {
-                console.log('⚠️ 資料庫中沒有角色資料，嘗試從 sessionStorage 獲取');
+                console.log('ℹ️ 此聊天室目前無角色資料或無法從資料庫讀取，嘗試從 sessionStorage 獲取備份');
 
                 // 先嘗試從 sessionStorage 獲取
                 if (typeof window !== 'undefined') {
@@ -1441,7 +1379,7 @@ export default function AICompanionsPage() {
                       if (Array.isArray(parsedRoles) && parsedRoles.length > 0) {
                         // 將 sessionStorage 中的角色 ID 轉換為顯示名稱
                         activeRoles = parsedRoles.map(roleId => {
-                          if (roleId === 'hibi') return 'Hibi';
+                          if (roleId === 'hibi') return '希希';
                           if (roleId === 'mori') return '墨墨';
                           if (roleId === 'pico') return '皮可';
                           return roleId;
@@ -1608,25 +1546,6 @@ export default function AICompanionsPage() {
     }
   }, [availableModels, clickedCompanionId]);
 
-  // 點擊外部關閉移動端下拉菜單
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showMobileDropdown) {
-        setShowMobileDropdown(false);
-      }
-    };
-
-    if (showMobileDropdown && typeof document !== 'undefined') {
-      document.addEventListener('click', handleClickOutside);
-    }
-
-    return () => {
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('click', handleClickOutside);
-      }
-    };
-  }, [showMobileDropdown]);
-
   // 計算下拉選單位置
   useEffect(() => {
     const updateDropdownPosition = () => {
@@ -1753,7 +1672,6 @@ export default function AICompanionsPage() {
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('storage', handleStorageChange);
-        window.removeEventListener('focus', handleFocus);
       }
       clearInterval(intervalId);
     };
@@ -1764,7 +1682,7 @@ export default function AICompanionsPage() {
       id: 'hibi',
       name: '希希',
       nameEn: 'Hibi',
-      description: '系統總管狐狸，智慧的協調者和統籌中樞，負責解答您的問題',
+      description: '預設主助理狐狸，處理日常問題、教學、行政和簡單決策',
       specialty: '綜合',
       icon: CpuChipIcon,
       imagePath: '/3d-character-backgrounds/studio/lulu(front).png',
@@ -2456,10 +2374,7 @@ export default function AICompanionsPage() {
               {/* 食量顯示 (moved here) */}
               <div className="relative mx-2">
                 <motion.button
-                  onClick={() => {
-                    setShowFoodHistory(!showFoodHistory);
-                    if (!showFoodHistory) fetchFoodInfo(); // 點擊時刷新
-                  }}
+                  onClick={toggleFoodHistory}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
@@ -2489,9 +2404,9 @@ export default function AICompanionsPage() {
 
                             if (roleId) {
                               const roleNameMap: Record<string, string> = {
-                                'hibi': 'Hibi',
-                                'mori': 'Mori',
-                                'pico': 'Pico'
+                                'hibi': '希希',
+                                'mori': '墨墨',
+                                'pico': '皮可'
                               };
                               characterName = roleNameMap[roleId] || roleId;
                             }
@@ -2514,145 +2429,22 @@ export default function AICompanionsPage() {
                   )}
                 </AnimatePresence>
               </div>
-              {/* 桌面版：顯示完整的視圖切換和創建按鈕 */}
-              <div className="hidden md:flex items-center space-x-4">
-                {/* 視圖切換 */}
-                <div className="flex items-center space-x-2 bg-white/60 backdrop-blur-sm rounded-xl p-1">
-                  {[
-                    { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
-                    { id: 'roles', label: '角色', icon: CpuChipIcon },
-                    { id: 'mind', label: '思維積木', icon: PuzzlePieceIcon },
-                    { id: 'memory', label: '記憶', icon: SparklesIcon },
-                    { id: 'stats', label: '統計', icon: ChartBarIcon }
-                  ].map((tab) => (
-                    <motion.button
-                      key={tab.id}
-                      onClick={() => setActiveView(tab.id as any)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all ${activeView === tab.id
-                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
-                        : 'text-[#4B4036] hover:bg-[#FFD59A]/20'
-                        }`}
-                    >
-                      <tab.icon className="w-4 h-4" />
-                      <span>{tab.label}</span>
-                    </motion.button>
-                  ))}
-                </div>
-
-                {/* 快速創建專案按鈕 */}
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleQuickCollaborate}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
-                  title="快速開始 AI 協作"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                  <span>開始協作</span>
-                </motion.button>
-              </div>
-
-              {/* 移動端/平板：合併按鈕 + 下拉菜單 */}
-              <div className="flex md:hidden items-center space-x-2 relative">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowMobileDropdown(!showMobileDropdown)}
-                  className="relative flex items-center justify-center p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                  title="選單"
-                >
-                  {/* 圖案 */}
-                  <motion.div
-                    animate={{
-                      rotate: showMobileDropdown ? 180 : 0
-                    }}
-                    transition={{
-                      duration: 0.3,
-                      ease: "easeInOut"
-                    }}
-                  >
-                    <Cog6ToothIcon className="w-6 h-6 text-[#4B4036]" />
-                  </motion.div>
-
-
-                </motion.button>
-
-                {/* 下拉菜單 */}
-                <AnimatePresence>
-                  {showMobileDropdown && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                      transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                      className="absolute top-12 right-0 bg-white rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[180px] z-50"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* 視圖切換選項 */}
-                      {[
-                        { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
-                        { id: 'roles', label: '角色', icon: CpuChipIcon },
-                        { id: 'mind', label: '思維積木', icon: PuzzlePieceIcon },
-                        { id: 'memory', label: '記憶', icon: SparklesIcon },
-                        { id: 'stats', label: '統計', icon: ChartBarIcon }
-                      ].map((tab) => (
-                        <motion.button
-                          key={tab.id}
-                          whileHover={{ backgroundColor: "#FFFBEB" }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => {
-                            setActiveView(tab.id as any);
-                            setShowMobileDropdown(false);
-                          }}
-                          className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${activeView === tab.id
-                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                            : 'text-[#4B4036]'
-                            }`}
-                        >
-                          <tab.icon className="w-5 h-5" />
-                          <span className="text-sm font-medium">{tab.label}</span>
-                        </motion.button>
-                      ))}
-
-                      {/* 分隔線 */}
-
-
-
-
-                      <div className="border-t border-[#EADBC8]/30 my-2"></div>
-
-                      <motion.button
-                        whileHover={{ backgroundColor: "#FFFBEB" }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          handleLogout();
-                          setShowMobileDropdown(false);
-                        }}
-                        className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-red-500"
-                      >
-                        <ArrowRightOnRectangleIcon className="w-5 h-5" />
-                        <span className="text-sm font-medium">登出系統</span>
-                      </motion.button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              <UnifiedRightContent user={user} onLogout={handleLogout} />
             </div>
           </div>
         </div>
-      </nav>
+      </nav >
 
       {/* 側邊欄 */}
-      <AppSidebar
+      < AppSidebar
         isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={() => setSidebarOpen(false)
+        }
         currentPath="/aihome/ai-companions"
       />
 
       {/* 主要內容 */}
-      <main className="px-4 py-8">
+      < main className="px-4 py-8" >
         <div className="max-w-7xl mx-auto">
           <AnimatePresence mode="wait">
             {/* 聊天室視圖 */}
@@ -3667,938 +3459,948 @@ export default function AICompanionsPage() {
             )}
           </AnimatePresence>
         </div>
-      </main>
+      </main >
 
       {/* 角色設定模態框 */}
       <AnimatePresence>
-        {selectedCompanion && showSettings && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => {
-              setSelectedCompanion(null);
-              setShowSettings(false);
-            }}
-          >
-
+        {
+          selectedCompanion && showSettings && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20, rotate: -2 }}
-              animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20, rotate: 2 }}
-              transition={{ type: "spring", damping: 22, stiffness: 280 }}
-              className="relative bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => {
+                setSelectedCompanion(null);
+                setShowSettings(false);
+              }}
             >
-              {/* 移除裝飾邊框光暈，避免中間出現細線 */}
 
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <motion.div
-                    initial={{ scale: 0.9, rotate: -8 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: 'linear-gradient(135deg, #FFD59A 0%, #FFB6C1 100%)',
-                      boxShadow: '0 6px 20px rgba(255,182,193,0.35)'
-                    }}
-                  >
-                    <SparklesIcon className="w-6 h-6 text-white" />
-                  </motion.div>
-                  <h2 className="text-2xl font-bold text-[#4B4036]">
-                    {selectedCompanion.name} 角色設定
-                  </h2>
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.06, rotate: 90 }}
-                  whileTap={{ scale: 0.92 }}
-                  onClick={() => {
-                    setSelectedCompanion(null);
-                    setShowSettings(false);
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <XMarkIcon className="w-6 h-6" />
-                </motion.button>
-              </div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20, rotate: -2 }}
+                animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20, rotate: 2 }}
+                transition={{ type: "spring", damping: 22, stiffness: 280 }}
+                className="relative bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* 移除裝飾邊框光暈，避免中間出現細線 */}
 
-              <div className="space-y-6">
-                {/* 頂部提示條 */}
-                {!isDefaultRole(selectedCompanion!) && (
-                  <motion.div
-                    initial={{ y: -8, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    className="rounded-xl p-3 border border-[#EADBC8] bg-[#FFFDF8] flex items-center gap-2"
-                  >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
                     <motion.div
-                      animate={{ rotate: [0, 10, -10, 0] }}
-                      transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-                      className="w-2 h-2 rounded-full bg-[#FFB6C1]"
-                    />
-                    <span className="text-sm text-[#2B3A3B]">可開啟「顯示全部模型」切換查看更多選項</span>
-                  </motion.div>
-                )}
-
-                {/* 角色頭像與描述卡片增強效果 */}
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.05 }}
-                  className="text-center"
-                >
-                  <motion.div
-                    whileHover={{ rotate: [0, -5, 5, 0] }}
-                    transition={{ duration: 0.6 }}
-                    className="inline-block p-3 rounded-2xl"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(255,213,154,0.15) 0%, rgba(255,182,193,0.15) 100%)'
-                    }}
-                  >
-                    <Image src={selectedCompanion.imagePath} alt={selectedCompanion.name} width={144} height={144} className="rounded-2xl" />
-                  </motion.div>
-                  <p className="mt-4 text-[#2B3A3B] text-lg max-w-2xl mx-auto leading-relaxed">{selectedCompanion.description}</p>
-                  {/* 100字問題食量顯示（僅顯示食量與圖示） */}
-                  {(() => {
-                    const resolvedId = selectedModel === DEFAULT_MODEL_SENTINEL ? roleDefaultModel : selectedModel;
-                    const m = availableModels.find((x: any) => x.model_id === resolvedId);
-                    const food = computeFoodFor100(m);
-                    return (
-                      <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2">
-                        <span className="text-sm text-[#4B4036]">100字提問食量：約 {food} 食量</span>
-                        <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
-                      </div>
-                    );
-                  })()}
-                </motion.div>
-
-                {/* 分組卡片：模型、語氣、指引 */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="grid grid-cols-1 gap-6"
-                >
-                  {/* MindBlock 卡片 */}
-                  <motion.div
-                    whileHover={{ y: -3 }}
-                    className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setOpenPanels((s) => ({ ...s, mind: !s.mind }))}
-                      className="w-full text-left px-4 py-4 flex items-center justify-between"
+                      initial={{ scale: 0.9, rotate: -8 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{
+                        background: 'linear-gradient(135deg, #FFD59A 0%, #FFB6C1 100%)',
+                        boxShadow: '0 6px 20px rgba(255,182,193,0.35)'
+                      }}
                     >
-                      <div className="flex items-center gap-2">
-                        <PuzzlePieceIcon className="w-5 h-5 text-[#4B4036]" />
-                        <h3 className="text-lg font-semibold text-[#4B4036]">思維積木 (MindBlock)</h3>
-                      </div>
-                      <motion.span animate={{ rotate: openPanels.mind ? 180 : 0 }}>
-                        <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
-                      </motion.span>
-                    </button>
-
-                    {openPanels.mind && (
-                      <div className="px-4 pb-4 border-t border-[#EADBC8] bg-[#FFF9F2]/50">
-                        <div className="mt-4 space-y-3">
-                          <p className="text-sm text-[#4B4036]/80">
-                            為 {selectedCompanion.name} 裝備特定的思維流程，增強其處理複雜任務的能力。此設定將作為預設值，在新聊天室中自動載入。
-                          </p>
-
-                          {/* 預設思維積木列表 */}
-                          {loadingMindBlocks ? (
-                            <div className="flex items-center justify-center py-4">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#FFB6C1]"></div>
-                              <span className="ml-2 text-sm text-[#4B4036]">載入中...</span>
-                            </div>
-                          ) : defaultMindBlocks.length > 0 ? (
-                            <div className="space-y-2">
-                              {defaultMindBlocks.map((block: any) => (
-                                <div key={block.id} className="bg-white p-3 rounded-lg border border-[#EADBC8] flex items-start justify-between">
-                                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                                    <div className="w-8 h-8 bg-[#FFD59A]/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                      <PuzzlePieceIcon className="w-5 h-5 text-[#4B4036]" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-[#4B4036] text-sm truncate mb-1">{block.title}</div>
-                                      {/* 顯示積木類型卡片而非文字描述 */}
-                                      <BlockTypeCards block={block} />
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={async () => {
-                                      if (!user?.id || !selectedCompanion) return;
-                                      try {
-                                        const supabase = getSaasSupabaseClient();
-                                        const roleSlug = selectedCompanion.id === 'hibi' ? 'hibi-manager' : selectedCompanion.id === 'mori' ? 'mori-researcher' : 'pico-artist';
-                                        const { data: roleData } = await supabase
-                                          .from('ai_roles')
-                                          .select('id')
-                                          .eq('slug', roleSlug)
-                                          .maybeSingle();
-
-                                        if (!roleData) return;
-
-                                        const { error } = await supabase
-                                          .from('role_mind_blocks' as any)
-                                          .update({ is_active: false })
-                                          .eq('role_id', (roleData as any).id)
-                                          .eq('user_id', user.id)
-                                          .eq('mind_block_id', block.id);
-
-                                        if (error) throw error;
-
-                                        // 重新載入
-                                        await loadDefaultMindBlocks(selectedCompanion.id);
-                                        const { default: toast } = await import('react-hot-toast');
-                                        toast.success('已卸載預設思維積木', {
-                                          icon: <PuzzlePieceIcon className="w-5 h-5 text-green-600" />,
-                                          duration: 2000,
-                                          style: {
-                                            background: '#fff',
-                                            color: '#4B4036',
-                                          }
-                                        });
-                                      } catch (error) {
-                                        console.error('卸載預設思維積木失敗:', error);
-                                        const { default: toast } = await import('react-hot-toast');
-                                        toast.error('卸載失敗', {
-                                          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
-                                          duration: 2000,
-                                          style: {
-                                            background: '#fff',
-                                            color: '#4B4036',
-                                          }
-                                        });
-                                      }
-                                    }}
-                                    className="ml-2 p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all flex-shrink-0"
-                                  >
-                                    <XMarkIcon className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="bg-white p-3 rounded-lg border border-dashed border-[#EADBC8] text-center">
-                              <div className="text-sm text-[#4B4036]/60">尚未裝備預設思維積木</div>
-                              <div className="text-xs text-[#4B4036]/40 mt-1">點擊下方按鈕選擇積木</div>
-                            </div>
-                          )}
-
-                          <div className="flex gap-3 mt-4">
-                            <button
-                              onClick={() => {
-                                if (!selectedCompanion) return;
-                                setShowBlockSelectionModal(true);
-                              }}
-                              className="flex-1 py-2 px-4 bg-[#FFD59A] text-[#4B4036] rounded-lg font-medium text-sm hover:bg-[#FFC57A] transition-colors flex items-center justify-center gap-2"
-                            >
-                              <PlusIcon className="w-4 h-4" />
-                              選擇積木
-                            </button>
-                            <button
-                              onClick={() => {
-                                setShowSettings(false);
-                                router.push('/aihome/mind-builder');
-                              }}
-                              className="flex-1 py-2 px-4 bg-white border border-[#EADBC8] text-[#4B4036] rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
-                            >
-                              <PlusIcon className="w-4 h-4" />
-                              創建新積木
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-
-                  {/* 模型卡片 */}
-                  <motion.div
-                    whileHover={{ y: -3 }}
-                    className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setOpenPanels((s) => ({ ...s, model: !s.model }))}
-                      className="w-full text-left px-4 py-4 flex items-center justify-between"
-                    >
-                      <h3 className="text-lg font-semibold text-[#4B4036]">選擇 AI 模型</h3>
-                      <motion.span animate={{ rotate: openPanels.model ? 180 : 0 }}>
-                        <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
-                      </motion.span>
-                    </button>
-
-                    {openPanels.model && (
-                      <div className="px-4 pb-4 border-t border-[#EADBC8]">
-                        <div className="relative mt-4 space-y-2">
-                          {/* 自訂下拉選單 */}
-                          <div className="relative" ref={modelSelectRef}>
-                            <input
-                              ref={modelInputRef}
-                              type="text"
-                              value={modelSearch}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setModelSearch(v);
-                                setModelSelectOpen(true);
-
-                                if (v === DEFAULT_MODEL_SENTINEL) {
-                                  setSelectedModel(v);
-                                  setModelSearch(''); // 清空以顯示 placeholder
-                                  if (selectedCompanion?.id === 'mori') {
-                                    setSelectedModelsMulti([]); // 清除多選
-                                  }
-                                  return;
-                                }
-                                // 只在非 Mori 模式下自動選擇
-                                if (selectedCompanion?.id !== 'mori') {
-                                  const exists = getFilteredModels().some(m => m.model_id === v) || availableModels.some(m => m.model_id === v);
-                                  if (exists) setSelectedModel(v);
-                                }
-                              }}
-                              onFocus={() => setModelSelectOpen(true)}
-                              onBlur={() => setTimeout(() => setModelSelectOpen(false), 200)}
-                              placeholder={(() => {
-                                // Mori 多選模式
-                                if (selectedCompanion?.id === 'mori') {
-                                  if (selectedModelsMulti.length === 0) {
-                                    return "選擇至少 2 個模型（最多 4 個）";
-                                  }
-                                  return "繼續選擇模型或輸入以搜尋...";
-                                }
-                                // 單選模式：顯示預設模型
-                                if (selectedModel === DEFAULT_MODEL_SENTINEL && roleDefaultModel) {
-                                  const defaultDisplay = formatModelDisplay(roleDefaultModel);
-                                  return defaultDisplay ? `預設（建議）：${defaultDisplay}` : "預設（建議）或輸入以搜尋模型";
-                                }
-                                return "預設（建議）或輸入以搜尋模型";
-                              })()}
-                              className="w-full p-3 pr-10 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
-                            />
-                            {/* 下拉箭頭 */}
-                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                              <motion.div
-                                animate={{ rotate: modelSelectOpen ? 180 : 0 }}
-                                transition={{ duration: 0.2 }}
-                              >
-                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </motion.div>
-                            </div>
-
-                            {/* 自訂下拉選單列表 - 使用 Portal 渲染到 body */}
-                            {typeof document !== 'undefined' && modelSelectOpen && dropdownPosition && createPortal(
-                              <AnimatePresence>
-                                <motion.div
-                                  initial={{ opacity: 0, y: -10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -10 }}
-                                  transition={{ duration: 0.2 }}
-                                  style={{
-                                    position: 'fixed',
-                                    top: `${dropdownPosition.top}px`,
-                                    left: `${dropdownPosition.left}px`,
-                                    width: `${dropdownPosition.width}px`,
-                                    zIndex: 9999
-                                  }}
-                                  className="bg-white border border-[#EADBC8] rounded-lg shadow-xl flex flex-col max-h-[400px]"
-                                  data-model-dropdown
-                                >
-                                  <div className="overflow-y-auto flex-1">
-                                    {/* 預設選項 */}
-                                    <motion.button
-                                      whileHover={{ backgroundColor: "#FFFBEB" }}
-                                      whileTap={{ scale: 0.98 }}
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault(); // 防止觸發 onBlur
-                                        setSelectedModel(DEFAULT_MODEL_SENTINEL);
-                                        setModelSearch('');
-                                        setModelSelectOpen(false);
-                                      }}
-                                      className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedModel === DEFAULT_MODEL_SENTINEL
-                                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                        : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                        }`}
-                                    >
-                                      預設（建議）
-                                    </motion.button>
-
-                                    {/* 模型選項 */}
-                                    {getFilteredModels().filter(m => {
-                                      if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
-                                      if (!modelSearch.trim()) return true;
-                                      const q = modelSearch.toLowerCase();
-                                      return (
-                                        (m.display_name || '').toLowerCase().includes(q) ||
-                                        (m.description || '').toLowerCase().includes(q) ||
-                                        (m.provider || '').toLowerCase().includes(q) ||
-                                        (m.model_id || '').toLowerCase().includes(q)
-                                      );
-                                    }).map((model) => {
-                                      // 對於 Mori，檢查是否在多選列表中
-                                      const isMultiSelected = selectedCompanion?.id === 'mori' && selectedModelsMulti.includes(model.model_id);
-                                      const isSingleSelected = selectedCompanion?.id !== 'mori' && selectedModel === model.model_id;
-                                      const isSelected = isMultiSelected || isSingleSelected;
-                                      const isDisabled = selectedCompanion?.id === 'mori' && !isMultiSelected && selectedModelsMulti.length >= 4;
-
-                                      return (
-                                        <motion.button
-                                          key={model.model_id}
-                                          whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
-                                          whileTap={{ scale: 0.98 }}
-                                          type="button"
-                                          disabled={isDisabled}
-                                          onMouseDown={(e) => {
-                                            e.preventDefault(); // 防止觸發 onBlur
-
-                                            if (selectedCompanion?.id === 'mori') {
-                                              // 多選模式
-                                              if (isMultiSelected) {
-                                                // 取消選擇
-                                                setSelectedModelsMulti(prev => prev.filter(id => id !== model.model_id));
-                                              } else if (selectedModelsMulti.length < 4) {
-                                                // 添加選擇
-                                                setSelectedModelsMulti(prev => [...prev, model.model_id]);
-                                              }
-                                              // 多選模式下不關閉下拉選單
-                                            } else {
-                                              // 單選模式
-                                              setSelectedModel(model.model_id);
-                                              setModelSearch(stripFree(model.display_name || model.model_id));
-                                              setModelSelectOpen(false);
-                                            }
-                                          }}
-                                          className={`w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 ${isSelected
-                                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                            : isDisabled
-                                              ? 'text-gray-400 cursor-not-allowed'
-                                              : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                            }`}
-                                        >
-                                          <div className="flex items-center justify-between">
-                                            <div className="flex-1">
-                                              <div className="font-medium">{stripFree(model.display_name || '')}</div>
-                                              <div className={`text-xs ${isSelected ? 'opacity-90' : 'opacity-80'}`}>
-                                                {stripFree(model.description || '')} ({stripFree(model.price_tier || '')})
-                                              </div>
-                                            </div>
-                                            {selectedCompanion?.id === 'mori' && (
-                                              <div className="ml-2 flex-shrink-0">
-                                                {isMultiSelected ? (
-                                                  <motion.div
-                                                    initial={{ scale: 0 }}
-                                                    animate={{ scale: 1 }}
-                                                    className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"
-                                                  >
-                                                    <svg className="w-3 h-3 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                  </motion.div>
-                                                ) : (
-                                                  <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-white/80' : 'border-[#EADBC8]'
-                                                    }`} />
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </motion.button>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {/* 底部確認按鈕（僅 Mori 多選模式） */}
-                                  {selectedCompanion?.id === 'mori' && (
-                                    <div className="p-3 bg-gray-50 border-t border-[#EADBC8] flex justify-between items-center shrink-0">
-                                      <div className="text-xs text-[#4B4036]">
-                                        已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onMouseDown={(e) => {
-                                          e.preventDefault();
-                                          setModelSelectOpen(false);
-                                        }}
-                                        className="px-4 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-md text-sm font-medium hover:bg-[#EBC9A4] transition-colors shadow-sm"
-                                      >
-                                        確認選擇
-                                      </button>
-                                    </div>
-                                  )}
-                                </motion.div>
-                              </AnimatePresence>,
-                              document.body
-                            )}
-                          </div>
-
-                          {/* 多選模型僅對 Mori 啟用 - 已整合到上方 Portal 下拉選單中 */}
-                          {selectedCompanion?.id === 'mori' && selectedModelsMulti.length > 0 && (
-                            <div className="mt-2">
-                              <div className="flex flex-wrap gap-2">
-                                {selectedModelsMulti.map(id => {
-                                  const m = availableModels.find(x => x.model_id === id) || getFilteredModels().find(x => x.model_id === id);
-                                  return (
-                                    <motion.span
-                                      key={id}
-                                      initial={{ scale: 0, opacity: 0 }}
-                                      animate={{ scale: 1, opacity: 1 }}
-                                      exit={{ scale: 0, opacity: 0 }}
-                                      className="inline-flex items-center gap-1 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white text-xs px-3 py-1.5 rounded-full shadow-sm"
-                                    >
-                                      {stripFree(m?.display_name || id)}
-                                      <motion.button
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
-                                        type="button"
-                                        onClick={() => setSelectedModelsMulti(prev => prev.filter(x => x !== id))}
-                                        className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
-                                      >
-                                        <XMarkIcon className="w-3 h-3" />
-                                      </motion.button>
-                                    </motion.span>
-                                  );
-                                })}
-                              </div>
-                              <div className="mt-2 text-xs text-[#4B4036]">
-                                已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* 模式切換：自動/全部（預設角色不顯示） */}
-                        {!isDefaultRole(selectedCompanion!) && (
-                          <div className="mt-3 flex items-center gap-3 text-sm">
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={showAllModels}
-                                onChange={(e) => setShowAllModels(e.target.checked)}
-                              />
-                              顯示全部模型（預設自動篩選）
-                            </label>
-                            {!showAllModels && (
-                              <span className="text-[#2B3A3B]">已依角色自動篩選</span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* 選中模型詳情/預設提示 */}
-                        <div className="mt-3 p-3 bg-[#FFF9F2] border border-[#FFB6C1] rounded-lg">
-                          {(() => {
-                            if (selectedModel === DEFAULT_MODEL_SENTINEL) {
-                              return <div className="text-sm text-[#4B4036]">將使用角色的預設模型</div>;
-                            }
-                            const source = getFilteredModels();
-                            const effectiveModelId = selectedModel === DEFAULT_MODEL_SENTINEL ? roleDefaultModel : selectedModel;
-                            const selectedModelData = source.find(m => m.model_id === effectiveModelId) || availableModels.find(m => m.model_id === effectiveModelId);
-                            return selectedModelData ? (
-                              <>
-                                <div className="flex items-center justify-between">
-                                  <div className="text-sm font-medium text-[#4B4036]">{stripFree(selectedModelData.display_name || '')}</div>
-                                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${stripFree(selectedModelData.price_tier || '') === '免費' || selectedModelData.price_tier === '免費' ? 'bg-green-100 text-green-800' :
-                                    stripFree(selectedModelData.price_tier || '') === '經濟' || selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
-                                      stripFree(selectedModelData.price_tier || '') === '標準' || selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-purple-100 text-purple-800'
-                                    }`}>
-                                    {stripFree(selectedModelData.price_tier || '')}
-                                  </div>
-                                </div>
-                                <div className="text-xs text-[#2B3A3B] mt-1">{stripFree(selectedModelData.description || '')}</div>
-                                {/* 僅顯示食量與圖示，不顯示金額 */}
-                                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2">
-
-                                  <span className="text-sm text-[#4B4036]">100字提問：約 {computeFoodFor100(selectedModelData)} 食量</span>
-                                  <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
-                                </div>
-                              </>
-                            ) : (<div className="text-sm text-[#4B4036]">請選擇模型</div>);
-                          })()}
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                </motion.div>
-
-                {/* 底部按鈕區：增加動態反饋 */}
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex space-x-3 pt-2"
-                >
+                      <SparklesIcon className="w-6 h-6 text-white" />
+                    </motion.div>
+                    <h2 className="text-2xl font-bold text-[#4B4036]">
+                      {selectedCompanion.name} 角色設定
+                    </h2>
+                  </div>
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleSaveSettings}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white rounded-xl font-medium transition-all shadow-lg"
-                  >
-                    保存設定
-                  </motion.button>
-                  {isDefaultRole(selectedCompanion!) && (
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleResetToDefaults}
-                      className="px-6 py-3 bg-white border border-[#EADBC8] text-[#4B4036] rounded-xl font-medium"
-                    >
-                      還原預設
-                    </motion.button>
-                  )}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.06, rotate: 90 }}
+                    whileTap={{ scale: 0.92 }}
                     onClick={() => {
                       setSelectedCompanion(null);
                       setShowSettings(false);
                     }}
-                    className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    取消
+                    <XMarkIcon className="w-6 h-6" />
                   </motion.button>
-                </motion.div>
-              </div>
+                </div>
+
+                <div className="space-y-6">
+                  {/* 頂部提示條 */}
+                  {!isDefaultRole(selectedCompanion!) && (
+                    <motion.div
+                      initial={{ y: -8, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      className="rounded-xl p-3 border border-[#EADBC8] bg-[#FFFDF8] flex items-center gap-2"
+                    >
+                      <motion.div
+                        animate={{ rotate: [0, 10, -10, 0] }}
+                        transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+                        className="w-2 h-2 rounded-full bg-[#FFB6C1]"
+                      />
+                      <span className="text-sm text-[#2B3A3B]">可開啟「顯示全部模型」切換查看更多選項</span>
+                    </motion.div>
+                  )}
+
+                  {/* 角色頭像與描述卡片增強效果 */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 }}
+                    className="text-center"
+                  >
+                    <motion.div
+                      whileHover={{ rotate: [0, -5, 5, 0] }}
+                      transition={{ duration: 0.6 }}
+                      className="inline-block p-3 rounded-2xl"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(255,213,154,0.15) 0%, rgba(255,182,193,0.15) 100%)'
+                      }}
+                    >
+                      <Image src={selectedCompanion.imagePath} alt={selectedCompanion.name} width={144} height={144} className="rounded-2xl" />
+                    </motion.div>
+                    <p className="mt-4 text-[#2B3A3B] text-lg max-w-2xl mx-auto leading-relaxed">{selectedCompanion.description}</p>
+                    {/* 100字問題食量顯示（僅顯示食量與圖示） */}
+                    {(() => {
+                      const resolvedId = selectedModel === DEFAULT_MODEL_SENTINEL ? roleDefaultModel : selectedModel;
+                      const m = availableModels.find((x: any) => x.model_id === resolvedId);
+                      const food = computeFoodFor100(m);
+                      return (
+                        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2">
+                          <span className="text-sm text-[#4B4036]">100字提問食量：約 {food} 食量</span>
+                          <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
+                        </div>
+                      );
+                    })()}
+                  </motion.div>
+
+                  {/* 分組卡片：模型、語氣、指引 */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="grid grid-cols-1 gap-6"
+                  >
+                    {/* MindBlock 卡片 */}
+                    <motion.div
+                      whileHover={{ y: -3 }}
+                      className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenPanels((s) => ({ ...s, mind: !s.mind }))}
+                        className="w-full text-left px-4 py-4 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          <PuzzlePieceIcon className="w-5 h-5 text-[#4B4036]" />
+                          <h3 className="text-lg font-semibold text-[#4B4036]">思維積木 (MindBlock)</h3>
+                        </div>
+                        <motion.span animate={{ rotate: openPanels.mind ? 180 : 0 }}>
+                          <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
+                        </motion.span>
+                      </button>
+
+                      {openPanels.mind && (
+                        <div className="px-4 pb-4 border-t border-[#EADBC8] bg-[#FFF9F2]/50">
+                          <div className="mt-4 space-y-3">
+                            <p className="text-sm text-[#4B4036]/80">
+                              為 {selectedCompanion.name} 裝備特定的思維流程，增強其處理複雜任務的能力。此設定將作為預設值，在新聊天室中自動載入。
+                            </p>
+
+                            {/* 預設思維積木列表 */}
+                            {loadingModels ? (
+                              <div className="flex items-center justify-center py-4">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#FFB6C1]"></div>
+                                <span className="ml-2 text-sm text-[#4B4036]">載入中...</span>
+                              </div>
+                            ) : defaultMindBlocks.length > 0 ? (
+                              <div className="space-y-2">
+                                {defaultMindBlocks.map((block: any) => (
+                                  <div key={block.id} className="bg-white p-3 rounded-lg border border-[#EADBC8] flex items-start justify-between">
+                                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                                      <div className="w-8 h-8 bg-[#FFD59A]/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <PuzzlePieceIcon className="w-5 h-5 text-[#4B4036]" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-[#4B4036] text-sm truncate mb-1">{block.title}</div>
+                                        {/* 顯示積木類型卡片而非文字描述 */}
+                                        <BlockTypeCards block={block} />
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={async () => {
+                                        if (!user?.id || !selectedCompanion) return;
+                                        try {
+                                          const supabase = getSaasSupabaseClient();
+                                          const roleSlug = selectedCompanion.id === 'hibi' ? 'hibi-manager' : selectedCompanion.id === 'mori' ? 'mori-researcher' : 'pico-artist';
+                                          const { data: roleData } = await supabase
+                                            .from('ai_roles')
+                                            .select('id')
+                                            .eq('slug', roleSlug)
+                                            .maybeSingle();
+
+                                          if (!roleData) return;
+
+                                          const { error } = await supabase
+                                            .from('role_mind_blocks' as any)
+                                            .update({ is_active: false })
+                                            .eq('role_id', (roleData as any).id)
+                                            .eq('user_id', user.id)
+                                            .eq('mind_block_id', block.id);
+
+                                          if (error) throw error;
+
+                                          // 重新載入
+                                          await loadDefaultMindBlocks(selectedCompanion.id);
+                                          const { default: toast } = await import('react-hot-toast');
+                                          toast.success('已卸載預設思維積木', {
+                                            icon: <PuzzlePieceIcon className="w-5 h-5 text-green-600" />,
+                                            duration: 2000,
+                                            style: {
+                                              background: '#fff',
+                                              color: '#4B4036',
+                                            }
+                                          });
+                                        } catch (error) {
+                                          console.error('卸載預設思維積木失敗:', error);
+                                          const { default: toast } = await import('react-hot-toast');
+                                          toast.error('卸載失敗', {
+                                            icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
+                                            duration: 2000,
+                                            style: {
+                                              background: '#fff',
+                                              color: '#4B4036',
+                                            }
+                                          });
+                                        }
+                                      }}
+                                      className="ml-2 p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all flex-shrink-0"
+                                    >
+                                      <XMarkIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="bg-white p-3 rounded-lg border border-dashed border-[#EADBC8] text-center">
+                                <div className="text-sm text-[#4B4036]/60">尚未裝備預設思維積木</div>
+                                <div className="text-xs text-[#4B4036]/40 mt-1">點擊下方按鈕選擇積木</div>
+                              </div>
+                            )}
+
+                            <div className="flex gap-3 mt-4">
+                              <button
+                                onClick={() => {
+                                  if (!selectedCompanion) return;
+                                  setShowBlockSelectionModal(true);
+                                }}
+                                className="flex-1 py-2 px-4 bg-[#FFD59A] text-[#4B4036] rounded-lg font-medium text-sm hover:bg-[#FFC57A] transition-colors flex items-center justify-center gap-2"
+                              >
+                                <PlusIcon className="w-4 h-4" />
+                                選擇積木
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowSettings(false);
+                                  router.push('/aihome/mind-builder');
+                                }}
+                                className="flex-1 py-2 px-4 bg-white border border-[#EADBC8] text-[#4B4036] rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <PlusIcon className="w-4 h-4" />
+                                創建新積木
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+
+                    {/* 模型卡片 */}
+                    <motion.div
+                      whileHover={{ y: -3 }}
+                      className="rounded-xl border border-[#EADBC8] bg-white p-0 shadow-sm overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenPanels((s) => ({ ...s, model: !s.model }))}
+                        className="w-full text-left px-4 py-4 flex items-center justify-between"
+                      >
+                        <h3 className="text-lg font-semibold text-[#4B4036]">選擇 AI 模型</h3>
+                        <motion.span animate={{ rotate: openPanels.model ? 180 : 0 }}>
+                          <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
+                        </motion.span>
+                      </button>
+
+                      {openPanels.model && (
+                        <div className="px-4 pb-4 border-t border-[#EADBC8]">
+                          <div className="relative mt-4 space-y-2">
+                            {/* 自訂下拉選單 */}
+                            <div className="relative" ref={modelSelectRef}>
+                              <input
+                                ref={modelInputRef}
+                                type="text"
+                                value={modelSearch}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setModelSearch(v);
+                                  setModelSelectOpen(true);
+
+                                  if (v === DEFAULT_MODEL_SENTINEL) {
+                                    setSelectedModel(v);
+                                    setModelSearch(''); // 清空以顯示 placeholder
+                                    if (selectedCompanion?.id === 'mori') {
+                                      setSelectedModelsMulti([]); // 清除多選
+                                    }
+                                    return;
+                                  }
+                                  // 只在非 Mori 模式下自動選擇
+                                  if (selectedCompanion?.id !== 'mori') {
+                                    const exists = getFilteredModels().some(m => m.model_id === v) || availableModels.some(m => m.model_id === v);
+                                    if (exists) setSelectedModel(v);
+                                  }
+                                }}
+                                onFocus={() => setModelSelectOpen(true)}
+                                onBlur={() => setTimeout(() => setModelSelectOpen(false), 200)}
+                                placeholder={(() => {
+                                  // Mori 多選模式
+                                  if (selectedCompanion?.id === 'mori') {
+                                    if (selectedModelsMulti.length === 0) {
+                                      return "選擇至少 2 個模型（最多 4 個）";
+                                    }
+                                    return "繼續選擇模型或輸入以搜尋...";
+                                  }
+                                  // 單選模式：顯示預設模型
+                                  if (selectedModel === DEFAULT_MODEL_SENTINEL && roleDefaultModel) {
+                                    const defaultDisplay = formatModelDisplay(roleDefaultModel);
+                                    return defaultDisplay ? `預設（建議）：${defaultDisplay}` : "預設（建議）或輸入以搜尋模型";
+                                  }
+                                  return "預設（建議）或輸入以搜尋模型";
+                                })()}
+                                className="w-full p-3 pr-10 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
+                              />
+                              {/* 下拉箭頭 */}
+                              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <motion.div
+                                  animate={{ rotate: modelSelectOpen ? 180 : 0 }}
+                                  transition={{ duration: 0.2 }}
+                                >
+                                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </motion.div>
+                              </div>
+
+                              {/* 自訂下拉選單列表 - 使用 Portal 渲染到 body */}
+                              {typeof document !== 'undefined' && modelSelectOpen && dropdownPosition && createPortal(
+                                <AnimatePresence>
+                                  <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.2 }}
+                                    style={{
+                                      position: 'fixed',
+                                      top: `${dropdownPosition.top}px`,
+                                      left: `${dropdownPosition.left}px`,
+                                      width: `${dropdownPosition.width}px`,
+                                      zIndex: 9999
+                                    }}
+                                    className="bg-white border border-[#EADBC8] rounded-lg shadow-xl flex flex-col max-h-[400px]"
+                                    data-model-dropdown
+                                  >
+                                    <div className="overflow-y-auto flex-1">
+                                      {/* 預設選項 */}
+                                      <motion.button
+                                        whileHover={{ backgroundColor: "#FFFBEB" }}
+                                        whileTap={{ scale: 0.98 }}
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault(); // 防止觸發 onBlur
+                                          setSelectedModel(DEFAULT_MODEL_SENTINEL);
+                                          setModelSearch('');
+                                          setModelSelectOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedModel === DEFAULT_MODEL_SENTINEL
+                                          ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                          : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                          }`}
+                                      >
+                                        預設（建議）
+                                      </motion.button>
+
+                                      {/* 模型選項 */}
+                                      {getFilteredModels().filter(m => {
+                                        if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
+                                        if (!modelSearch.trim()) return true;
+                                        const q = modelSearch.toLowerCase();
+                                        return (
+                                          (m.display_name || '').toLowerCase().includes(q) ||
+                                          (m.description || '').toLowerCase().includes(q) ||
+                                          (m.provider || '').toLowerCase().includes(q) ||
+                                          (m.model_id || '').toLowerCase().includes(q)
+                                        );
+                                      }).map((model) => {
+                                        // 對於 Mori，檢查是否在多選列表中
+                                        const isMultiSelected = selectedCompanion?.id === 'mori' && selectedModelsMulti.includes(model.model_id);
+                                        const isSingleSelected = selectedCompanion?.id !== 'mori' && selectedModel === model.model_id;
+                                        const isSelected = isMultiSelected || isSingleSelected;
+                                        const isDisabled = selectedCompanion?.id === 'mori' && !isMultiSelected && selectedModelsMulti.length >= 4;
+
+                                        return (
+                                          <motion.button
+                                            key={model.model_id}
+                                            whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
+                                            whileTap={{ scale: 0.98 }}
+                                            type="button"
+                                            disabled={isDisabled}
+                                            onMouseDown={(e) => {
+                                              e.preventDefault(); // 防止觸發 onBlur
+
+                                              if (selectedCompanion?.id === 'mori') {
+                                                // 多選模式
+                                                if (isMultiSelected) {
+                                                  // 取消選擇
+                                                  setSelectedModelsMulti(prev => prev.filter(id => id !== model.model_id));
+                                                } else if (selectedModelsMulti.length < 4) {
+                                                  // 添加選擇
+                                                  setSelectedModelsMulti(prev => [...prev, model.model_id]);
+                                                }
+                                                // 多選模式下不關閉下拉選單
+                                              } else {
+                                                // 單選模式
+                                                setSelectedModel(model.model_id);
+                                                setModelSearch(stripFree(model.display_name || model.model_id));
+                                                setModelSelectOpen(false);
+                                              }
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 ${isSelected
+                                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                              : isDisabled
+                                                ? 'text-gray-400 cursor-not-allowed'
+                                                : 'text-[#4B4036] hover:bg-[#FFFBEB]'
+                                              }`}
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex-1">
+                                                <div className="font-medium">{stripFree(model.display_name || '')}</div>
+                                                <div className={`text-xs ${isSelected ? 'opacity-90' : 'opacity-80'}`}>
+                                                  {stripFree(model.description || '')} ({stripFree(model.price_tier || '')})
+                                                </div>
+                                              </div>
+                                              {selectedCompanion?.id === 'mori' && (
+                                                <div className="ml-2 flex-shrink-0">
+                                                  {isMultiSelected ? (
+                                                    <motion.div
+                                                      initial={{ scale: 0 }}
+                                                      animate={{ scale: 1 }}
+                                                      className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"
+                                                    >
+                                                      <svg className="w-3 h-3 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                      </svg>
+                                                    </motion.div>
+                                                  ) : (
+                                                    <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-white/80' : 'border-[#EADBC8]'
+                                                      }`} />
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </motion.button>
+                                        );
+                                      })}
+                                    </div>
+
+                                    {/* 底部確認按鈕（僅 Mori 多選模式） */}
+                                    {selectedCompanion?.id === 'mori' && (
+                                      <div className="p-3 bg-gray-50 border-t border-[#EADBC8] flex justify-between items-center shrink-0">
+                                        <div className="text-xs text-[#4B4036]">
+                                          已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            setModelSelectOpen(false);
+                                          }}
+                                          className="px-4 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-md text-sm font-medium hover:bg-[#EBC9A4] transition-colors shadow-sm"
+                                        >
+                                          確認選擇
+                                        </button>
+                                      </div>
+                                    )}
+                                  </motion.div>
+                                </AnimatePresence>,
+                                document.body
+                              )}
+                            </div>
+
+                            {/* 多選模型僅對 Mori 啟用 - 已整合到上方 Portal 下拉選單中 */}
+                            {selectedCompanion?.id === 'mori' && selectedModelsMulti.length > 0 && (
+                              <div className="mt-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedModelsMulti.map(id => {
+                                    const m = availableModels.find(x => x.model_id === id) || getFilteredModels().find(x => x.model_id === id);
+                                    return (
+                                      <motion.span
+                                        key={id}
+                                        initial={{ scale: 0, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0, opacity: 0 }}
+                                        className="inline-flex items-center gap-1 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white text-xs px-3 py-1.5 rounded-full shadow-sm"
+                                      >
+                                        {stripFree(m?.display_name || id)}
+                                        <motion.button
+                                          whileHover={{ scale: 1.1 }}
+                                          whileTap={{ scale: 0.9 }}
+                                          type="button"
+                                          onClick={() => setSelectedModelsMulti(prev => prev.filter(x => x !== id))}
+                                          className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                                        >
+                                          <XMarkIcon className="w-3 h-3" />
+                                        </motion.button>
+                                      </motion.span>
+                                    );
+                                  })}
+                                </div>
+                                <div className="mt-2 text-xs text-[#4B4036]">
+                                  已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 模式切換：自動/全部（預設角色不顯示） */}
+                          {!isDefaultRole(selectedCompanion!) && (
+                            <div className="mt-3 flex items-center gap-3 text-sm">
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={showAllModels}
+                                  onChange={(e) => setShowAllModels(e.target.checked)}
+                                />
+                                顯示全部模型（預設自動篩選）
+                              </label>
+                              {!showAllModels && (
+                                <span className="text-[#2B3A3B]">已依角色自動篩選</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* 選中模型詳情/預設提示 */}
+                          <div className="mt-3 p-3 bg-[#FFF9F2] border border-[#FFB6C1] rounded-lg">
+                            {(() => {
+                              if (selectedModel === DEFAULT_MODEL_SENTINEL) {
+                                return <div className="text-sm text-[#4B4036]">將使用角色的預設模型</div>;
+                              }
+                              const source = getFilteredModels();
+                              const effectiveModelId = selectedModel === DEFAULT_MODEL_SENTINEL ? roleDefaultModel : selectedModel;
+                              const selectedModelData = source.find(m => m.model_id === effectiveModelId) || availableModels.find(m => m.model_id === effectiveModelId);
+                              return selectedModelData ? (
+                                <>
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-sm font-medium text-[#4B4036]">{stripFree(selectedModelData.display_name || '')}</div>
+                                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${stripFree(selectedModelData.price_tier || '') === '免費' || selectedModelData.price_tier === '免費' ? 'bg-green-100 text-green-800' :
+                                      stripFree(selectedModelData.price_tier || '') === '經濟' || selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
+                                        stripFree(selectedModelData.price_tier || '') === '標準' || selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
+                                          'bg-purple-100 text-purple-800'
+                                      }`}>
+                                      {stripFree(selectedModelData.price_tier || '')}
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-[#2B3A3B] mt-1">{stripFree(selectedModelData.description || '')}</div>
+                                  {/* 僅顯示食量與圖示，不顯示金額 */}
+                                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2">
+
+                                    <span className="text-sm text-[#4B4036]">100字提問：約 {computeFoodFor100(selectedModelData)} 食量</span>
+                                    <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
+                                  </div>
+                                </>
+                              ) : (<div className="text-sm text-[#4B4036]">請選擇模型</div>);
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  </motion.div>
+
+                  {/* 底部按鈕區：增加動態反饋 */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex space-x-3 pt-2"
+                  >
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleSaveSettings}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white rounded-xl font-medium transition-all shadow-lg"
+                    >
+                      保存設定
+                    </motion.button>
+                    {isDefaultRole(selectedCompanion!) && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleResetToDefaults}
+                        className="px-6 py-3 bg-white border border-[#EADBC8] text-[#4B4036] rounded-xl font-medium"
+                      >
+                        還原預設
+                      </motion.button>
+                    )}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        setSelectedCompanion(null);
+                        setShowSettings(false);
+                      }}
+                      className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
+                    >
+                      取消
+                    </motion.button>
+                  </motion.div>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )
+        }
+      </AnimatePresence >
 
       {/* 創建專案模態框 */}
       <AnimatePresence>
         {/* 專案資訊填寫模態框 */}
-        {showProjectModal && selectedCompanionForProject && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => {
-              setShowProjectModal(false);
-              setSelectedCompanionForProject(null);
-            }}
-          >
+        {
+          showProjectModal && selectedCompanionForProject && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white rounded-2xl p-8 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => {
+                setShowProjectModal(false);
+                setSelectedCompanionForProject(null);
+              }}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-[#4B4036]">開始新專案</h2>
-                <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    setShowProjectModal(false);
-                    setSelectedCompanionForProject(null);
-                  }}
-                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                >
-                  <XMarkIcon className="w-6 h-6 text-[#4B4036]" />
-                </motion.button>
-              </div>
-
-              <div className="mb-6">
-                <div className="flex items-center space-x-4 p-4 bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl">
-                  <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${selectedCompanionForProject.color} p-0.5`}>
-                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                      <Image
-                        src={selectedCompanionForProject.imagePath}
-                        alt={selectedCompanionForProject.name}
-                        width={56}
-                        height={56}
-                        className="w-14 h-14 object-cover"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-[#4B4036]">
-                      與 {selectedCompanionForProject.name} 協作
-                    </h3>
-                    <p className="text-sm text-[#2B3A3B]">
-                      {selectedCompanionForProject.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const projectData = {
-                  title: formData.get('title') as string,
-                  description: formData.get('description') as string
-                };
-                handleCreateChatWithProject(projectData);
-              }}>
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <label htmlFor="title" className="block text-sm font-medium text-[#4B4036] mb-2">
-                      本次專案 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="title"
-                      name="title"
-                      required
-                      placeholder="請輸入專案名稱，例如：網站設計專案"
-                      className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-[#4B4036] mb-2">
-                      專案內容 <span className="text-gray-400">(選填)</span>
-                    </label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      rows={3}
-                      placeholder="請描述專案的具體內容和目標..."
-                      className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all resize-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex space-x-3">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="bg-white rounded-2xl p-8 max-w-md w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-[#4B4036]">開始新專案</h2>
                   <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={() => {
                       setShowProjectModal(false);
                       setSelectedCompanionForProject(null);
                     }}
-                    className="flex-1 px-6 py-3 border border-[#EADBC8] text-[#4B4036] rounded-xl font-medium hover:bg-[#F8F5EC] transition-all"
+                    className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                   >
-                    取消
-                  </motion.button>
-                  <motion.button
-                    type="submit"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    disabled={creatingChat === selectedCompanionForProject.id}
-                    className={`flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all ${creatingChat === selectedCompanionForProject.id ? 'opacity-75 cursor-not-allowed' : ''
-                      }`}
-                  >
-                    {creatingChat === selectedCompanionForProject.id ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>創建中...</span>
-                      </div>
-                    ) : (
-                      '開始協作'
-                    )}
+                    <XMarkIcon className="w-6 h-6 text-[#4B4036]" />
                   </motion.button>
                 </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
 
-        {showCreateRoom && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowCreateRoom(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-[#4B4036]">創建新專案</h2>
-                <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setShowCreateRoom(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <XMarkIcon className="w-6 h-6" />
-                </motion.button>
-              </div>
-
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const selectedRoles = Array.from(formData.getAll('roles')) as string[];
-                handleCreateProjectRoom({
-                  title: formData.get('title') as string,
-                  description: formData.get('description') as string,
-                  selectedRoles
-                });
-              }}>
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-[#4B4036] mb-2">本次專案</label>
-                    <input
-                      type="text"
-                      name="title"
-                      required
-                      className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all bg-white text-[#4B4036]"
-                      placeholder="例：網站重新設計專案"
-                    />
+                <div className="mb-6">
+                  <div className="flex items-center space-x-4 p-4 bg-gradient-to-r from-[#FFF9F2] to-[#F8F5EC] rounded-xl">
+                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${selectedCompanionForProject.color} p-0.5`}>
+                      <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                        <Image
+                          src={selectedCompanionForProject.imagePath}
+                          alt={selectedCompanionForProject.name}
+                          width={56}
+                          height={56}
+                          className="w-14 h-14 object-cover"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-[#4B4036]">
+                        與 {selectedCompanionForProject.name} 協作
+                      </h3>
+                      <p className="text-sm text-[#2B3A3B]">
+                        {selectedCompanionForProject.description}
+                      </p>
+                    </div>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-[#4B4036] mb-2">專案內容</label>
-                    <textarea
-                      name="description"
-                      rows={3}
-                      className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all bg-white text-[#4B4036]"
-                      placeholder="簡短描述這個專案的內容和目標..."
-                    />
-                  </div>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const projectData = {
+                    title: formData.get('title') as string,
+                    description: formData.get('description') as string
+                  };
+                  handleCreateChatWithProject(projectData);
+                }}>
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label htmlFor="title" className="block text-sm font-medium text-[#4B4036] mb-2">
+                        本次專案 <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        required
+                        placeholder="請輸入專案名稱，例如：網站設計專案"
+                        className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-[#4B4036] mb-4">選擇 AI 角色成員</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {companions.map((companion) => (
-                        <motion.label
-                          key={companion.id}
-                          whileHover={{ scale: 1.02 }}
-                          className="relative cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            name="roles"
-                            value={companion.name}
-                            defaultChecked
-                            className="sr-only peer"
-                          />
-                          <div className="bg-white border-2 border-[#EADBC8] rounded-xl p-4 hover:border-[#FFD59A] transition-colors peer-checked:border-[#FFB6C1] peer-checked:bg-[#FFB6C1]/10">
-                            <div className="flex items-center space-x-3">
-                              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
-                                <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                  {companion.imagePath ? (
-                                    <Image
-                                      src={companion.imagePath}
-                                      alt={companion.name}
-                                      width={32}
-                                      height={32}
-                                      className="w-8 h-8 object-cover"
-                                      unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
-                                      onError={(e) => {
-                                        console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
-                                        const target = e.target as HTMLImageElement;
-                                        target.style.display = 'none';
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="w-8 h-8 flex items-center justify-center">
-                                      {companion.icon && <companion.icon className="w-6 h-6 text-gray-400" />}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-[#4B4036]">
-                                  {companion.id === 'hibi' ? '（綜合）希希' :
-                                   companion.id === 'mori' ? '（多模型研究）墨墨' :
-                                   companion.id === 'pico' ? '（繪圖）皮可' :
-                                   companion.name}
-                                </p>
-                                <p className="text-sm text-[#2B3A3B] truncate">{companion.specialty}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.label>
-                      ))}
+                    <div>
+                      <label htmlFor="description" className="block text-sm font-medium text-[#4B4036] mb-2">
+                        專案內容 <span className="text-gray-400">(選填)</span>
+                      </label>
+                      <textarea
+                        id="description"
+                        name="description"
+                        rows={3}
+                        placeholder="請描述專案的具體內容和目標..."
+                        className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent transition-all resize-none"
+                      />
                     </div>
                   </div>
 
-                  <div className="flex space-x-3 pt-4">
-                    <motion.button
-                      type="submit"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
-                    >
-                      創建專案
-                    </motion.button>
+                  <div className="flex space-x-3">
                     <motion.button
                       type="button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setShowCreateRoom(false)}
-                      className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium transition-colors"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        setShowProjectModal(false);
+                        setSelectedCompanionForProject(null);
+                      }}
+                      className="flex-1 px-6 py-3 border border-[#EADBC8] text-[#4B4036] rounded-xl font-medium hover:bg-[#F8F5EC] transition-all"
                     >
                       取消
                     </motion.button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={creatingChat === selectedCompanionForProject.id}
+                      className={`flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all ${creatingChat === selectedCompanionForProject.id ? 'opacity-75 cursor-not-allowed' : ''
+                        }`}
+                    >
+                      {creatingChat === selectedCompanionForProject.id ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>創建中...</span>
+                        </div>
+                      ) : (
+                        '開始協作'
+                      )}
+                    </motion.button>
                   </div>
-                </div>
-              </form>
+                </form>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )
+        }
+
+        {
+          showCreateRoom && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowCreateRoom(false)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-[#4B4036]">創建新專案</h2>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowCreateRoom(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </motion.button>
+                </div>
+
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const selectedRoles = Array.from(formData.getAll('roles')) as string[];
+                  handleCreateProjectRoom({
+                    title: formData.get('title') as string,
+                    description: formData.get('description') as string,
+                    selectedRoles
+                  });
+                }}>
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-[#4B4036] mb-2">本次專案</label>
+                      <input
+                        type="text"
+                        name="title"
+                        required
+                        className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all bg-white text-[#4B4036]"
+                        placeholder="例：網站重新設計專案"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#4B4036] mb-2">專案內容</label>
+                      <textarea
+                        name="description"
+                        rows={3}
+                        className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all bg-white text-[#4B4036]"
+                        placeholder="簡短描述這個專案的內容和目標..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#4B4036] mb-4">選擇 AI 角色成員</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {companions.map((companion) => (
+                          <motion.label
+                            key={companion.id}
+                            whileHover={{ scale: 1.02 }}
+                            className="relative cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              name="roles"
+                              value={companion.name}
+                              defaultChecked
+                              className="sr-only peer"
+                            />
+                            <div className="bg-white border-2 border-[#EADBC8] rounded-xl p-4 hover:border-[#FFD59A] transition-colors peer-checked:border-[#FFB6C1] peer-checked:bg-[#FFB6C1]/10">
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${companion.color} p-0.5`}>
+                                  <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                                    {companion.imagePath ? (
+                                      <Image
+                                        src={companion.imagePath}
+                                        alt={companion.name}
+                                        width={32}
+                                        height={32}
+                                        className="w-8 h-8 object-cover"
+                                        unoptimized={companion.imagePath.includes('(') || companion.imagePath.includes(')')}
+                                        onError={(e) => {
+                                          console.error('❌ [角色圖標] 圖片載入失敗:', companion.imagePath);
+                                          const target = e.target as HTMLImageElement;
+                                          target.style.display = 'none';
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 flex items-center justify-center">
+                                        {companion.icon && <companion.icon className="w-6 h-6 text-gray-400" />}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-[#4B4036]">
+                                    {companion.id === 'hibi' ? '（綜合）希希' :
+                                      companion.id === 'mori' ? '（多模型研究）墨墨' :
+                                        companion.id === 'pico' ? '（繪圖）皮可' :
+                                          companion.name}
+                                  </p>
+                                  <p className="text-sm text-[#2B3A3B] truncate">{companion.specialty}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-3 pt-4">
+                      <motion.button
+                        type="submit"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                      >
+                        創建專案
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowCreateRoom(false)}
+                        className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium transition-colors"
+                      >
+                        取消
+                      </motion.button>
+                    </div>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )
+        }
+      </AnimatePresence >
 
       {/* 角色選擇視窗 */}
       <AnimatePresence>
-        {showRoleSelectionModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[radial-gradient(ellipse_at_top,rgba(255,214,165,0.25),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(255,182,193,0.25),transparent_60%)] backdrop-blur-sm sm:backdrop-blur-md"
-            onClick={() => setShowRoleSelectionModal(false)}
-          >
+        {
+          showRoleSelectionModal && (
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 8 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-              className="relative bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-[0_10px_40px_rgba(255,182,193,0.35)] ring-1 ring-[#EADBC8]"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-[radial-gradient(ellipse_at_top,rgba(255,214,165,0.25),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(255,182,193,0.25),transparent_60%)] backdrop-blur-sm sm:backdrop-blur-md"
+              onClick={() => setShowRoleSelectionModal(false)}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A]">選擇 AI 角色</h2>
-                <button
-                  onClick={() => setShowRoleSelectionModal(false)}
-                  className="p-2 hover:bg-[#FFF9F2] rounded-full transition-colors"
-                >
-                  <XMarkIcon className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 8 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.96, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+                className="relative bg-white/90 backdrop-blur-xl rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-[0_10px_40px_rgba(255,182,193,0.35)] ring-1 ring-[#EADBC8]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A]">選擇 AI 角色</h2>
+                  <button
+                    onClick={() => setShowRoleSelectionModal(false)}
+                    className="p-2 hover:bg-[#FFF9F2] rounded-full transition-colors"
+                  >
+                    <XMarkIcon className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
 
-              <p className="text-[#2B3A3B] mb-6">
-                請選擇要加入協作聊天室的 AI 角色：
-              </p>
+                <p className="text-[#2B3A3B] mb-6">
+                  請選擇要加入協作聊天室的 AI 角色：
+                </p>
 
-              <RoleSelectionGrid
-                companions={companions}
-                onConfirm={(selectedRoles) => {
-                  if (selectedRoles.length > 0) {
-                    createTeamCollaborationProject(selectedRoles);
-                  }
-                }}
-                onCancel={() => setShowRoleSelectionModal(false)}
-              />
+                <RoleSelectionGrid
+                  companions={companions}
+                  onConfirm={(selectedRoles) => {
+                    if (selectedRoles.length > 0) {
+                      createTeamCollaborationProject(selectedRoles);
+                    }
+                  }}
+                  onCancel={() => setShowRoleSelectionModal(false)}
+                />
 
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )
+        }
+      </AnimatePresence >
 
       {/* 積木選擇 Modal */}
-      {selectedCompanion && (
-        <BlockSelectionModal
-          isOpen={showBlockSelectionModal}
-          onClose={() => setShowBlockSelectionModal(false)}
-          onSelect={handleSelectDefaultBlock}
-          slotType="role" // 預設使用 role，但實際上可以選擇任何類型
-        />
-      )}
-    </div>
+      {
+        selectedCompanion && (
+          <BlockSelectionModal
+            isOpen={showBlockSelectionModal}
+            onClose={() => setShowBlockSelectionModal(false)}
+            onSelect={handleSelectDefaultBlock}
+            slotType="role" // 預設使用 role，但實際上可以選擇任何類型
+          />
+        )
+      }
+    </div >
   );
 }
 
@@ -4614,7 +4416,6 @@ function RoleSelectionGrid({
 }) {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
-  // 動畫變體：容器與子項目進場漸進
   const listVariants = {
     hidden: { opacity: 0, y: 8 },
     show: {
@@ -4707,9 +4508,9 @@ function RoleSelectionGrid({
               <div className="flex-1">
                 <h3 className="font-semibold text-[#4B4036]">
                   {companion.id === 'hibi' ? '（綜合）希希' :
-                   companion.id === 'mori' ? '（多模型研究）墨墨' :
-                   companion.id === 'pico' ? '（繪圖）皮可' :
-                   companion.name}
+                    companion.id === 'mori' ? '（多模型研究）墨墨' :
+                      companion.id === 'pico' ? '（繪圖）皮可' :
+                        companion.name}
                 </h3>
                 <p className="text-sm text-[#2B3A3B]">{companion.specialty}</p>
               </div>

@@ -26,8 +26,11 @@ import {
     ChevronUpIcon,
     ArrowPathIcon,
     HeartIcon,
-    UserGroupIcon
+    UserGroupIcon,
+    ArrowRightOnRectangleIcon,
+    FunnelIcon,
 } from '@heroicons/react/24/outline';
+import UnifiedRightContent from '@/components/UnifiedRightContent';
 import AppSidebar from '@/components/AppSidebar';
 import { MindBlock, MindBlockType } from '@/types/mind-block';
 import { getSaasSupabaseClient } from '@/lib/supabase';
@@ -41,12 +44,23 @@ export default function MindLibraryPage() {
     const supabase = getSaasSupabaseClient();
     const { user } = useSaasAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [showMobileDropdown, setShowMobileDropdown] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [favorites, setFavorites] = useState<Set<string>>(new Set());
     const [searchQuery, setSearchQuery] = useState('');
     const activeView = 'mind'; // Force active view for styling
 
     // 食量顯示
     const { foodBalance, foodHistory, showFoodHistory, toggleFoodHistory } = useFoodDisplay(user?.id);
+
+    const handleLogout = async () => {
+        try {
+            await supabase.auth.signOut();
+            router.push('/auth/login');
+        } catch (error) {
+            console.error('Logout failed:', error);
+            router.push('/auth/login');
+        }
+    };
 
     // Library State
     const [activeTab, setActiveTab] = useState<'composition' | 'block'>('composition');
@@ -237,7 +251,6 @@ export default function MindLibraryPage() {
                         </div>
 
                         <div className="flex items-center space-x-4">
-                            {/* 食量顯示 */}
                             {user?.id && (
                                 <div className="relative mx-2">
                                     <motion.button
@@ -272,9 +285,9 @@ export default function MindLibraryPage() {
 
                                                             if (roleId) {
                                                                 const roleNameMap: Record<string, string> = {
-                                                                    'hibi': 'Hibi',
-                                                                    'mori': 'Mori',
-                                                                    'pico': 'Pico'
+                                                                    'hibi': '希希',
+                                                                    'mori': '墨墨',
+                                                                    'pico': '皮可'
                                                                 };
                                                                 characterName = roleNameMap[roleId] || roleId;
                                                             }
@@ -298,98 +311,13 @@ export default function MindLibraryPage() {
                                     </AnimatePresence>
                                 </div>
                             )}
-
-                            {/* 桌面版：顯示完整的視圖切換 */}
-                            <div className="hidden md:flex items-center space-x-4">
-                                <div className="flex items-center space-x-2 bg-white/60 backdrop-blur-sm rounded-xl p-1">
-                                    {[
-                                        { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
-                                        { id: 'roles', label: '角色', icon: CpuChipIcon },
-                                        { id: 'mind', label: '思維積木', icon: PuzzlePieceIcon },
-                                        { id: 'memory', label: '記憶', icon: SparklesIcon },
-                                        { id: 'stats', label: '統計', icon: ChartBarIcon }
-                                    ].map((tab) => (
-                                        <motion.button
-                                            key={tab.id}
-                                            onClick={() => handleTabClick(tab.id)}
-                                            whileHover={{ scale: 1.05 }}
-                                            whileTap={{ scale: 0.95 }}
-                                            className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all ${activeView === tab.id
-                                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-lg'
-                                                : 'text-[#4B4036] hover:bg-[#FFD59A]/20'
-                                                }`}
-                                        >
-                                            <tab.icon className="w-4 h-4" />
-                                            <span>{tab.label}</span>
-                                        </motion.button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* 移動端/平板：合併按鈕 + 下拉菜單 */}
-                            <div className="flex md:hidden items-center space-x-2 relative">
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => setShowMobileDropdown(!showMobileDropdown)}
-                                    className="relative flex items-center justify-center p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors"
-                                    title="選單"
-                                >
-                                    <motion.div
-                                        animate={{
-                                            rotate: showMobileDropdown ? 180 : 0
-                                        }}
-                                        transition={{
-                                            duration: 0.3,
-                                            ease: "easeInOut"
-                                        }}
-                                    >
-                                        <Cog6ToothIcon className="w-6 h-6 text-[#4B4036]" />
-                                    </motion.div>
-                                </motion.button>
-
-                                <AnimatePresence>
-                                    {showMobileDropdown && (
-                                        <motion.div
-                                            initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                                            exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                                            className="absolute top-12 right-0 bg-white rounded-xl shadow-xl border border-[#EADBC8]/20 p-2 min-w-[180px] z-50"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            {[
-                                                { id: 'chat', label: '聊天室', icon: ChatBubbleLeftRightIcon },
-                                                { id: 'roles', label: '角色', icon: CpuChipIcon },
-                                                { id: 'mind', label: '思維積木', icon: PuzzlePieceIcon },
-                                                { id: 'memory', label: '記憶', icon: SparklesIcon },
-                                                { id: 'stats', label: '統計', icon: ChartBarIcon }
-                                            ].map((tab) => (
-                                                <motion.button
-                                                    key={tab.id}
-                                                    whileHover={{ backgroundColor: "#FFFBEB" }}
-                                                    whileTap={{ scale: 0.98 }}
-                                                    onClick={() => {
-                                                        handleTabClick(tab.id);
-                                                        setShowMobileDropdown(false);
-                                                    }}
-                                                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${activeView === tab.id
-                                                        ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                                        : 'text-[#4B4036]'
-                                                        }`}
-                                                >
-                                                    <tab.icon className="w-5 h-5" />
-                                                    <span className="text-sm font-medium">{tab.label}</span>
-                                                </motion.button>
-                                            ))}
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
+                            <UnifiedRightContent user={user} onLogout={handleLogout} />
                         </div>
                     </div>
                 </div>
             </nav>
+
+
 
             <main className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Back Button */}
@@ -691,6 +619,6 @@ export default function MindLibraryPage() {
                 block={selectedBlock}
                 onLoadBlock={handleLoad}
             />
-        </div>
+        </div >
     );
 }
