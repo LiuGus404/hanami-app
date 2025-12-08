@@ -1128,9 +1128,9 @@ export default function RoomChatPage() {
   const isNearBottomRef = useRef(true);
 
   // 滾動到訊息底部的函數
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   const isPicoMessageRecord = useCallback((msg: any): boolean => {
     const content = msg?.content || '';
@@ -4547,10 +4547,21 @@ export default function RoomChatPage() {
   // 發送訊息處理函數 - 持久化版本
   const handleSendMessage = async () => {
     console.log('🚀 [持久化版] handleSendMessage 被呼叫');
+    console.log('🔍 [發送前檢查] 狀態:', {
+      inputTrimmed: inputMessage.trim().length > 0,
+      isLoading,
+      hasUserId: !!user?.id,
+      userId: user?.id,
+      inputLength: inputMessage.length
+    });
 
     // ⭐ 驗證輸入（先驗證，避免無效內容也加鎖）
     if (!inputMessage.trim() || isLoading || !user?.id) {
-      console.warn('⚠️ [發送] 輸入無效，忽略請求');
+      console.warn('⚠️ [發送] 輸入無效，忽略請求', {
+        noInput: !inputMessage.trim(),
+        loading: isLoading,
+        noUser: !user?.id
+      });
       return;
     }
 
@@ -5527,16 +5538,15 @@ export default function RoomChatPage() {
                         <button
                           type="button"
                           onClick={(e) => {
-                            // Backup click handler
+                            console.log('👆 [SendButton] Click triggered');
                             handleSendMessage();
                           }}
                           onMouseDown={(e) => {
-                            // Primary handler for immediate response
-                            e.preventDefault(); // Prevent focus loss
-                            handleSendMessage();
+                            // Prevent focus loss only
+                            e.preventDefault();
                           }}
-                          disabled={!inputMessage.trim() || isLoading || isTyping || isSending}
-                          className={`relative z-50 p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${inputMessage.trim() && !isLoading && !isSending
+                          disabled={!inputMessage.trim() || isLoading || isTyping || isSending || !user}
+                          className={`relative z-50 p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${inputMessage.trim() && !isLoading && !isSending && user
                             ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-[#FFB6C1]/30 cursor-pointer pointer-events-auto'
                             : 'bg-[#F0EAE0] text-[#4B4036]/30 shadow-none cursor-not-allowed'
                             }`}
@@ -6553,7 +6563,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
       animate={{
         opacity: isHighlighted ? [1, 0.7, 1] : 1,
         scale: isHighlighted ? [1, 1.02, 1] : 1,
-        backgroundColor: isHighlighted ? ['rgba(255, 213, 154, 0)', 'rgba(255, 213, 154, 0.3)', 'rgba(255, 213, 154, 0)'] : 'transparent'
+        backgroundColor: isHighlighted ? ['rgba(255, 213, 154, 0)', 'rgba(255, 213, 154, 0.3)', 'rgba(255, 213, 154, 0)'] : 'rgba(0, 0, 0, 0)'
       }}
       transition={{ duration: 0.3, repeat: isHighlighted ? 2 : 0 }}
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${isHighlighted ? 'rounded-xl' : ''}`}
