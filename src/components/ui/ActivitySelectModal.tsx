@@ -41,7 +41,7 @@ export const ActivitySelectModal: React.FC<ActivitySelectModalProps> = ({
 
     // 按成長樹篩選
     if (selectedTreeFilter !== 'all') {
-      filtered = filtered.filter(activity => 
+      filtered = filtered.filter(activity =>
         (activity as any).hanami_growth_trees?.tree_name === selectedTreeFilter
       );
     }
@@ -55,10 +55,10 @@ export const ActivitySelectModal: React.FC<ActivitySelectModalProps> = ({
           : (activity as any).custom_activity_name || '';
         const treeName = (activity as any).hanami_growth_trees?.tree_name || '';
         const description = (activity as any).activity_description || (activity as any).custom_activity_description || '';
-        
+
         return activityName.toLowerCase().includes(query) ||
-               treeName.toLowerCase().includes(query) ||
-               description.toLowerCase().includes(query);
+          treeName.toLowerCase().includes(query) ||
+          description.toLowerCase().includes(query);
       });
     }
 
@@ -72,7 +72,7 @@ export const ActivitySelectModal: React.FC<ActivitySelectModalProps> = ({
   const toggleOption = (activityId: string) => {
     const value = `tree_${activityId}`;
     const current = selected;
-    
+
     if (current.includes(value)) {
       // 如果已選中，則移除
       onChange(current.filter(v => v !== value));
@@ -143,11 +143,11 @@ export const ActivitySelectModal: React.FC<ActivitySelectModalProps> = ({
                 const activityId = value.replace('tree_', '');
                 const activity = treeActivities.find(a => a.id === activityId);
                 if (!activity) return null;
-                
+
                 const activityName = (activity as any).activity_source === 'teaching' && (activity as any).hanami_teaching_activities
                   ? (activity as any).hanami_teaching_activities.activity_name
                   : (activity as any).custom_activity_name || '未命名活動';
-                
+
                 return (
                   <span key={value} className="text-xs bg-[#E8E3D5] px-2 py-1 rounded">
                     {activityName}
@@ -172,17 +172,15 @@ export const ActivitySelectModal: React.FC<ActivitySelectModalProps> = ({
               return (
                 <div
                   key={activity.id}
-                  className={`flex items-start justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${
-                    isSelectedActivity 
-                      ? 'bg-green-50 border-2 border-green-200 shadow-md scale-[1.02]' 
+                  className={`flex items-start justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${isSelectedActivity
+                      ? 'bg-green-50 border-2 border-green-200 shadow-md scale-[1.02]'
                       : 'bg-white hover:bg-[#F3F0E5] hover:shadow-sm border-2 border-transparent'
-                  }`}
+                    }`}
                   onClick={() => toggleOption(activity.id)}
                 >
                   <div className="flex-1">
-                    <div className={`font-medium transition-colors duration-200 ${
-                      isSelectedActivity ? 'text-green-700 font-semibold' : 'text-[#4B4B4B]'
-                    }`}>
+                    <div className={`font-medium transition-colors duration-200 ${isSelectedActivity ? 'text-green-700 font-semibold' : 'text-[#4B4B4B]'
+                      }`}>
                       {activityName}
                     </div>
                     <div className="text-xs text-[#2B3A3B] opacity-70 mt-1">

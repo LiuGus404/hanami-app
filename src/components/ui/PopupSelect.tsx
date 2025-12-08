@@ -44,7 +44,7 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
     if (actualMode === 'multi') {
       const current = Array.isArray(selected) ? selected : [];
       let updated: string[];
-      
+
       if (current.includes(value)) {
         // 如果已選中，則移除
         updated = current.filter((v) => v !== value);
@@ -52,7 +52,7 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
         // 如果未選中，則添加
         updated = [...current, value];
       }
-      
+
       onChange(updated);
     } else {
       // 單選模式
@@ -86,7 +86,7 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
         {errorMsg && (
           <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">{errorMsg}</div>
         )}
-        
+
         {/* 顯示已選擇的項目 */}
         {actualMode === 'multi' && Array.isArray(selected) && selected.length > 0 && (
           <div className="mb-4 p-3 bg-[#F3F0E5] rounded-lg">
@@ -103,21 +103,19 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
             </div>
           </div>
         )}
-        
+
         <div className="space-y-3 overflow-y-auto flex-1 pr-2">
           {options.map(({ label, value }, index) => (
             <div
               key={`${value}-${index}`}
-              className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${
-                isSelected(value) ? 'bg-green-50 border-2 border-green-200 shadow-md scale-[1.02]' : 'bg-white hover:bg-[#F3F0E5] hover:shadow-sm border-2 border-transparent'
-              }`}
+              className={`flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${isSelected(value) ? 'bg-green-50 border-2 border-green-200 shadow-md scale-[1.02]' : 'bg-white hover:bg-[#F3F0E5] hover:shadow-sm border-2 border-transparent'
+                }`}
               onClick={() => toggleOption(value)}
             >
               <div className="flex items-center gap-3">
                 <Sprout className={`w-5 h-5 transition-all duration-200 ${isSelected(value) ? 'text-green-600 scale-110' : 'text-[#D8CDBF]'}`} />
-                <span className={`text-base font-medium transition-colors duration-200 ${
-                  isSelected(value) ? 'text-green-700 font-semibold' : 'text-[#4B4B4B]'
-                }`}>{label}</span>
+                <span className={`text-base font-medium transition-colors duration-200 ${isSelected(value) ? 'text-green-700 font-semibold' : 'text-[#4B4B4B]'
+                  }`}>{label}</span>
               </div>
               {isSelected(value) && (
                 <div className="w-5 h-5 bg-green-600 rounded-full flex items-center justify-center animate-bounce">
@@ -127,7 +125,7 @@ export const PopupSelect: React.FC<PopupSelectProps> = ({
             </div>
           ))}
         </div>
-        
+
         <div className="flex justify-around mt-6 pt-4 border-t border-[#D8CDBF]">
           <button
             className="px-4 py-2 border border-[#D8CDBF] rounded-xl hover:bg-[#F3F0E5] transition-all duration-200 hover:scale-105"

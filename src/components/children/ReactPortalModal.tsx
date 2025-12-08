@@ -13,18 +13,18 @@ interface ReactPortalModalProps {
   submitButtonText?: string;
 }
 
-export default function ReactPortalModal({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children, 
+export default function ReactPortalModal({
+  isOpen,
+  onClose,
+  title,
+  children,
   onSubmit,
   submitButtonText = '確認'
 }: ReactPortalModalProps) {
   if (!isOpen) return null;
 
   const modalContent = (
-    <div 
+    <div
       style={{
         position: 'fixed',
         top: 0,
@@ -44,7 +44,7 @@ export default function ReactPortalModal({
         }
       }}
     >
-      <div 
+      <div
         style={{
           backgroundColor: 'rgba(255, 255, 255, 0.8)',
           backdropFilter: 'blur(12px)',

@@ -34,24 +34,24 @@ interface FormField {
 // 統一取得範本欄位的函數
 function getTemplateFields(template: any) {
   console.log('getTemplateFields - 輸入範本:', template);
-  
+
   if (!template) {
     console.log('getTemplateFields - 範本為空，返回空陣列');
     return [];
   }
-  
+
   // 如果 template_schema 是物件且有 fields 屬性
   if (template.template_schema && typeof template.template_schema === 'object' && template.template_schema.fields) {
     console.log('getTemplateFields - 從 template_schema.fields 獲取欄位:', template.template_schema.fields);
     return template.template_schema.fields;
   }
-  
+
   // 如果 template_schema 是陣列
   if (Array.isArray(template.template_schema)) {
     console.log('getTemplateFields - 從 template_schema 陣列獲取欄位:', template.template_schema);
     return template.template_schema;
   }
-  
+
   // 如果 template_schema 是物件但沒有 fields 屬性，嘗試其他可能的屬性
   if (template.template_schema && typeof template.template_schema === 'object') {
     console.log('getTemplateFields - template_schema 物件:', template.template_schema);
@@ -63,13 +63,13 @@ function getTemplateFields(template: any) {
       }
     }
   }
-  
+
   // 如果範本直接有 fields 屬性
   if (template.fields && Array.isArray(template.fields)) {
     console.log('getTemplateFields - 從 template.fields 獲取欄位:', template.fields);
     return template.fields;
   }
-  
+
   console.log('getTemplateFields - 未找到欄位定義，返回空陣列');
   return [];
 }
@@ -80,22 +80,22 @@ function getFieldDefaultValue(field: any) {
   if (field.default_value !== undefined && field.default_value !== null) {
     return field.default_value;
   }
-  
+
   // 檢查欄位是否有預設內容
   if (field.default_content !== undefined && field.default_content !== null) {
     return field.default_content;
   }
-  
+
   // 檢查欄位是否有預設文字
   if (field.default_text !== undefined && field.default_text !== null) {
     return field.default_text;
   }
-  
+
   // 檢查欄位是否有預設選項
   if (field.default_option !== undefined && field.default_option !== null) {
     return field.default_option;
   }
-  
+
   // 如果沒有預設值，返回空字串
   return '';
 }
@@ -106,22 +106,22 @@ function getFieldDefaultPlaceholder(field: any) {
   if (field.default_content !== undefined && field.default_content !== null) {
     return field.default_content;
   }
-  
+
   // 檢查欄位是否有預設文字
   if (field.default_text !== undefined && field.default_text !== null) {
     return field.default_text;
   }
-  
+
   // 檢查欄位是否有預設值
   if (field.default_value !== undefined && field.default_value !== null) {
     return field.default_value;
   }
-  
+
   // 檢查欄位是否有預設選項
   if (field.default_option !== undefined && field.default_option !== null) {
     return field.default_option;
   }
-  
+
   // 如果沒有預設內容，返回標準 placeholder
   return '';
 }
@@ -133,7 +133,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     activityId: activity?.id,
     activityName: activity?.activity_name
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -141,7 +141,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [templateFieldsLoaded, setTemplateFieldsLoaded] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+
   // 彈出選擇相關狀態
   const [showPopup, setShowPopup] = useState<{ field: string, open: boolean }>({ field: '', open: false });
   const [popupSelected, setPopupSelected] = useState<string | string[]>([]);
@@ -188,22 +188,22 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     // 如果有現有活動資料，正確處理陣列欄位
     if (activity) {
       console.log('初始化編輯模式的 formData，activity:', activity);
-      
+
       // 處理陣列欄位，確保它們是陣列格式
       // 注意：資料庫使用單數形式，表單使用複數形式
       const processedActivity = {
         ...activity,
         // 從單數欄位轉換為複數陣列
-        activity_types: activity.activity_type ? [activity.activity_type] : 
+        activity_types: activity.activity_type ? [activity.activity_type] :
           (Array.isArray(activity.activity_types) ? activity.activity_types : []),
-        categories: activity.category ? [activity.category] : 
+        categories: activity.category ? [activity.category] :
           (Array.isArray(activity.categories) ? activity.categories : []),
-        statuses: activity.status ? [activity.status] : 
+        statuses: activity.status ? [activity.status] :
           (Array.isArray(activity.statuses) ? activity.statuses : []),
         tags: Array.isArray(activity.tags) ? activity.tags : [],
         materials_needed: Array.isArray(activity.materials_needed) ? activity.materials_needed : [],
       };
-      
+
       // 處理 custom_fields 中的範本欄位資料
       if (activity.custom_fields && typeof activity.custom_fields === 'object') {
         console.log('載入 custom_fields:', activity.custom_fields);
@@ -214,17 +214,17 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
               processedActivity[key] = value ? [value] : [];
               console.log(`轉換 dropdown 欄位 ${key}:`, value, '->', processedActivity[key]);
             } else {
-            processedActivity[key] = value;
-            console.log(`載入範本欄位 ${key}:`, value);
+              processedActivity[key] = value;
+              console.log(`載入範本欄位 ${key}:`, value);
             }
           }
         });
       }
-      
+
       console.log('處理後的 formData:', processedActivity);
       return { ...initialData, ...processedActivity };
     }
-    
+
     return initialData;
   });
 
@@ -238,7 +238,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         const templatesData = await response.json();
         setTemplates(templatesData);
         console.log('載入的範本:', templatesData);
-        
+
         // 如果是編輯模式且有 template_id，自動選擇範本
         if (mode === 'edit' && formData.template_id) {
           const selectedTemplateData = templatesData.find((t: any) => t.id === formData.template_id);
@@ -255,13 +255,13 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         .from('hanami_resource_categories')
         .select('*')
         .eq('is_active', true);
-      
+
       if (orgId) {
         categoriesQuery = categoriesQuery.eq('org_id', orgId);
       }
-      
+
       const { data: categoriesData } = await categoriesQuery;
-      
+
       // 預設分類選項（如果資料庫中沒有分類，則使用這些預設選項）
       const defaultCategories = [
         { id: 'default-1', category_name: '基礎訓練', category_description: '基礎音樂技能訓練活動，包含節奏、音感、視譜等基礎能力培養', sort_order: 1, is_active: true, is_default: true },
@@ -272,7 +272,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         { id: 'default-6', category_name: '團體合奏', category_description: '團體合奏和協作活動，培養團隊合作精神', sort_order: 6, is_active: true, is_default: true },
         { id: 'default-7', category_name: '個別指導', category_description: '適合個別指導的活動，針對個人需求進行教學', sort_order: 7, is_active: true, is_default: true },
       ];
-      
+
       // 如果資料庫中有分類，使用資料庫的分類；否則使用預設分類
       if (categoriesData && categoriesData.length > 0) {
         // 合併預設分類和資料庫分類，確保預設分類始終存在
@@ -289,13 +289,13 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         .from('hanami_resource_tags')
         .select('*')
         .eq('is_active', true);
-      
+
       if (orgId) {
         tagsQuery = tagsQuery.eq('org_id', orgId);
       }
-      
+
       const { data: tagsData } = await tagsQuery;
-      
+
       if (tagsData) {
         setTags(tagsData);
       }
@@ -318,14 +318,14 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         .eq('option_type', 'activity_type')
         .eq('is_active', true)
         .order('sort_order');
-      
+
       if (orgId) {
         activityTypesQuery = activityTypesQuery.eq('org_id', orgId);
       } else {
         // 如果沒有 orgId，不載入任何自訂選項
         activityTypesQuery = activityTypesQuery.eq('org_id', '00000000-0000-0000-0000-000000000000'); // 不存在的 ID，確保返回空結果
       }
-      
+
       const { data: activityTypesData } = await activityTypesQuery;
 
       // 總是包含預設選項
@@ -336,9 +336,9 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         { id: 'storybook', name: '繪本活動', is_default: true },
         { id: 'performance', name: '表演活動', is_default: true },
       ];
-      
+
       // 只添加屬於當前機構的自訂選項
-      const typedActivityTypesData = (activityTypesData || []) as Array<{ org_id?: string; option_value?: string; option_name?: string; [key: string]: any }>;
+      const typedActivityTypesData = (activityTypesData || []) as Array<{ org_id?: string; option_value?: string; option_name?: string;[key: string]: any }>;
       const customTypes = typedActivityTypesData.filter(item => {
         // 確保只顯示屬於當前 orgId 的選項
         if (orgId) {
@@ -350,7 +350,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         name: item.option_name,
         is_default: false,
       }));
-      
+
       setCustomOptions(prev => ({
         ...prev,
         activity_types: [...defaultTypes, ...customTypes],
@@ -364,14 +364,14 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         .eq('option_type', 'status')
         .eq('is_active', true)
         .order('sort_order');
-      
+
       if (orgId) {
         statusesQuery = statusesQuery.eq('org_id', orgId);
       } else {
         // 如果沒有 orgId，不載入任何自訂選項
         statusesQuery = statusesQuery.eq('org_id', '00000000-0000-0000-0000-000000000000'); // 不存在的 ID，確保返回空結果
       }
-      
+
       const { data: statusesData } = await statusesQuery;
 
       // 總是包含預設選項
@@ -380,9 +380,9 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         { id: 'published', name: '已發布', is_default: true },
         { id: 'archived', name: '已封存', is_default: true },
       ];
-      
+
       // 只添加屬於當前機構的自訂選項
-      const typedStatusesData = (statusesData || []) as Array<{ org_id?: string; option_value?: string; option_name?: string; [key: string]: any }>;
+      const typedStatusesData = (statusesData || []) as Array<{ org_id?: string; option_value?: string; option_name?: string;[key: string]: any }>;
       const customStatuses = typedStatusesData.filter(item => {
         // 確保只顯示屬於當前 orgId 的選項
         if (orgId) {
@@ -394,7 +394,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         name: item.option_name,
         is_default: false,
       }));
-      
+
       setCustomOptions(prev => ({
         ...prev,
         statuses: [...defaultStatuses, ...customStatuses],
@@ -416,11 +416,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         sort_order: categories.length,
         is_active: true,
       };
-      
+
       if (orgId) {
         insertData.org_id = orgId;
       }
-      
+
       const { error } = await supabase
         .from('hanami_resource_categories')
         .insert(insertData);
@@ -499,16 +499,16 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
   const handleInputChange = (field: string, value: any) => {
     console.log(`handleInputChange - 欄位: ${field}, 值:`, value);
-    
+
     setFormData((prev: any) => {
       const newData = {
-      ...prev,
-      [field]: value,
+        ...prev,
+        [field]: value,
       };
       console.log(`更新 formData - ${field}:`, newData[field]);
       return newData;
     });
-    
+
     // 清除錯誤
     if (errors[field]) {
       setErrors(prev => ({
@@ -521,13 +521,13 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   const handleTemplateChange = (templateId: string) => {
     console.log('選擇範本 ID:', templateId);
     handleInputChange('template_id', templateId);
-    
+
     if (templateId) {
       const template = templates.find(t => t.id === templateId);
       console.log('找到的範本:', template);
       setSelectedTemplate(template);
       setTemplateFieldsLoaded(false);
-      
+
       // 清除之前的範本欄位資料並設置預設值
       const templateFields = getTemplateFields(template);
       const clearedData = { ...formData, template_id: templateId };
@@ -535,7 +535,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         const fieldName = field.title || field.name || field.id;
         // 檢查是否有預設內容
         const fieldDefaultValue = getFieldDefaultValue(field);
-        
+
         // 根據欄位類型設置正確的預設值
         switch (field.type) {
           case 'array':
@@ -580,25 +580,25 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   const loadTemplateFields = () => {
     console.log('載入範本欄位');
     setTemplateFieldsLoaded(true);
-    
+
     // 初始化範本欄位的預設值
     const templateFields = getTemplateFields(selectedTemplate);
     const updatedData = { ...formData };
-    
+
     templateFields.forEach((field: any) => {
       const fieldName = field.title || field.name || field.id;
       console.log(`處理欄位: ${fieldName}, 類型: ${field.type}, 當前值:`, updatedData[fieldName]);
-      
+
       if (!updatedData[fieldName]) {
         // 檢查是否有預設內容
         const fieldDefaultValue = getFieldDefaultValue(field);
-        
+
         switch (field.type) {
           case 'array':
-          updatedData[fieldName] = [];
+            updatedData[fieldName] = [];
             break;
           case 'checkbox':
-          updatedData[fieldName] = false;
+            updatedData[fieldName] = false;
             break;
           case 'checkboxes':
           case 'dropdown':
@@ -630,14 +630,14 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         console.log(`初始化欄位 ${fieldName} 為:`, updatedData[fieldName]);
       }
     });
-    
+
     console.log('更新後的 formData:', updatedData);
     setFormData(updatedData);
   };
 
   const handleArrayChange = (field: string, value: string) => {
     if (!value.trim()) return;
-    
+
     setFormData((prev: any) => ({
       ...prev,
       [field]: [...(prev[field] || []), value.trim()],
@@ -657,24 +657,24 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     console.log('activity_types 類型:', typeof formData.activity_types, '值:', formData.activity_types);
     console.log('categories 類型:', typeof formData.categories, '值:', formData.categories);
     console.log('statuses 類型:', typeof formData.statuses, '值:', formData.statuses);
-    
+
     const newErrors: Record<string, string> = {};
     const missingFields: string[] = [];
-    
+
     // 基本欄位驗證
     if (!formData.activity_name?.trim()) {
       newErrors.activity_name = '請輸入活動名稱';
       missingFields.push('活動名稱');
       console.log('活動名稱驗證失敗');
     }
-    
+
     // 確保陣列欄位是陣列格式
     const activityTypes = Array.isArray(formData.activity_types) ? formData.activity_types : [];
     const categories = Array.isArray(formData.categories) ? formData.categories : [];
     const statuses = Array.isArray(formData.statuses) ? formData.statuses : [];
-    
+
     console.log('處理後的陣列:', { activityTypes, categories, statuses });
-    
+
     if (activityTypes.length === 0) {
       newErrors.activity_types = '請選擇至少一個活動類型';
       missingFields.push('活動類型');
@@ -692,18 +692,18 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       missingFields.push('狀態');
       console.log('狀態驗證失敗');
     }
-    
+
     // 範本欄位驗證
     if (selectedTemplate && templateFieldsLoaded) {
       const templateFields = getTemplateFields(selectedTemplate);
       templateFields.forEach((field: any) => {
         const fieldName = field.title || field.name || field.id;
         const fieldRequired = field.required || false;
-        
+
         if (fieldRequired) {
           const value = formData[fieldName];
           const fieldType = field.type || 'text';
-          
+
           if (['checkboxes', 'dropdown', 'file_upload'].includes(fieldType)) {
             if (!Array.isArray(value) || value.length === 0) {
               newErrors[fieldName] = `請填寫${fieldName}`;
@@ -721,17 +721,17 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         }
       });
     }
-    
+
     console.log('驗證結果 - 錯誤數量:', Object.keys(newErrors).length);
     console.log('驗證錯誤:', newErrors);
     setErrors(newErrors);
     const isValid = Object.keys(newErrors).length === 0;
-    
+
     // 如果驗證失敗，顯示具體的錯誤訊息
     if (!isValid && missingFields.length > 0) {
       toast.error(`請填寫以下必填欄位：${missingFields.join('、')}`);
     }
-    
+
     console.log('=== validateForm 結束，結果:', isValid, '===');
     return isValid;
   };
@@ -754,7 +754,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
   const handleSubmit = async () => {
     console.log('handleSubmit 被呼叫，mode:', mode);
-    
+
     if (!validateForm()) {
       return;
     }
@@ -764,19 +764,19 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       const customFields: Record<string, any> = {};
       if (selectedTemplate && templateFieldsLoaded) {
         const templateFields = getTemplateFields(selectedTemplate);
-        
+
         templateFields.forEach((field: any) => {
           // 嘗試多種可能的欄位名稱
           const fieldNames = [field.name, field.title, field.id, field.label];
           let fieldValue = null;
-          
+
           for (const fieldName of fieldNames) {
             if (fieldName && formData[fieldName] !== undefined) {
               fieldValue = formData[fieldName];
               break;
             }
           }
-          
+
           if (fieldValue !== null && fieldValue !== undefined) {
             // 使用第一個找到的欄位名稱作為 key
             const fieldKey = fieldNames.find(name => name) || field.id;
@@ -784,7 +784,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
           }
         });
       }
-      
+
       // 過濾掉自定義欄位，只保留標準欄位
       const standardFields = [
         'activity_name', 'activity_description', 'activity_type', 'difficulty_level',
@@ -793,14 +793,14 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         'status', 'version', 'created_by', 'updated_by', 'estimated_duration',
         'instructions', 'notes', 'activity_types', 'categories', 'statuses', 'duration'
       ];
-      
+
       const filteredFormData: any = {};
       standardFields.forEach(field => {
         if (formData[field] !== undefined) {
           filteredFormData[field] = formData[field];
         }
       });
-      
+
       const submitData = {
         ...filteredFormData,
         custom_fields: customFields,
@@ -812,12 +812,12 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         ...submitData,
         estimated_duration: submitData.estimated_duration || submitData.duration || 0,
       };
-    
+
       // 修正 template_id 空字串問題
       if (cleanedData.template_id === '' || cleanedData.template_id === undefined) {
         cleanedData.template_id = null;
       }
-    
+
       // 將陣列欄位轉為單一值（用於資料庫儲存）
       if (Array.isArray(cleanedData.activity_types) && cleanedData.activity_types.length > 0) {
         cleanedData.activity_type = cleanedData.activity_types[0];
@@ -828,7 +828,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       if (Array.isArray(cleanedData.statuses) && cleanedData.statuses.length > 0) {
         cleanedData.status = cleanedData.statuses[0];
       }
-    
+
       // 確保單數欄位有值（如果陣列為空，使用預設值）
       if (!cleanedData.activity_type) {
         cleanedData.activity_type = 'game'; // 預設值
@@ -839,7 +839,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
       if (!cleanedData.status) {
         cleanedData.status = 'draft'; // 預設值
       }
-    
+
       // 移除多餘欄位
       delete cleanedData.activity_types;
       delete cleanedData.categories;
@@ -875,7 +875,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
   const handlePopupConfirm = () => {
     console.log('handlePopupConfirm - showPopup.field:', showPopup.field, 'popupSelected:', popupSelected);
-    
+
     if (['activity_types', 'categories', 'statuses', 'tags'].includes(showPopup.field)) {
       // 多選欄位
       handleInputChange(showPopup.field, Array.isArray(popupSelected) ? popupSelected : []);
@@ -923,7 +923,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     if (!newOptionName.trim()) return;
 
     const field = showCustomManager.field;
-    
+
     if (field === 'tag') {
       // 新增標籤
       try {
@@ -933,11 +933,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
           tag_color: '#10B981', // 預設綠色
           is_active: true,
         };
-        
+
         if (orgId) {
           insertData.org_id = orgId;
         }
-        
+
         const { error } = await supabase
           .from('hanami_resource_tags')
           .insert(insertData);
@@ -974,11 +974,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
           sort_order: customOptions[field === 'activity_type' ? 'activity_types' : 'statuses'].length,
           is_active: true,
         };
-        
+
         if (orgId) {
           insertData.org_id = orgId;
         }
-        
+
         const { error } = await supabase
           .from('hanami_custom_options')
           .insert(insertData);
@@ -1010,7 +1010,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     if (!editingOption || !newOptionName.trim()) return;
 
     const field = showCustomManager.field;
-    
+
     // 檢查是否為預設選項，如果是則不允許編輯
     if (field === 'activity_type' || field === 'status') {
       if (editingOption.is_default) {
@@ -1020,7 +1020,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         return;
       }
     }
-    
+
     if (field === 'tag') {
       // 編輯標籤
       try {
@@ -1081,7 +1081,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
 
   const handleDeleteCustomOption = async (optionId: string) => {
     const field = showCustomManager.field;
-    
+
     // 檢查是否為預設選項，如果是則不允許刪除
     if (field === 'activity_type' || field === 'status') {
       const options = field === 'activity_type' ? customOptions.activity_types : customOptions.statuses;
@@ -1091,7 +1091,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         return;
       }
     }
-    
+
     if (field === 'tag') {
       // 刪除標籤
       try {
@@ -1174,7 +1174,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
         notes: '適合 3-6 歲兒童，注意音量控制',
       },
     };
-    
+
     setFormData(testData);
     toast.success('已自動填入測試資料！');
   };
@@ -1334,12 +1334,12 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
               type="button"
               onClick={() => handlePopupOpen('template_id')}
             >
-              {formData.template_id ? 
+              {formData.template_id ?
                 templates.find(t => t.id === formData.template_id)?.template_name || '未知範本'
                 : '不使用範本'}
             </button>
           </div>
-          
+
           {selectedTemplate && !templateFieldsLoaded && (
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 border border-gray-200 rounded-lg">
               <div className="flex-1">
@@ -1363,7 +1363,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
               </HanamiButton>
             </div>
           )}
-          
+
           {selectedTemplate && templateFieldsLoaded && (
             <div className="flex items-center gap-2 p-3 border border-green-200 rounded-lg">
               <div className="w-2 h-2 bg-green-500 rounded-full" />
@@ -1383,7 +1383,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
     if (!templateFields.length || !templateFieldsLoaded) {
       return null;
     }
-    
+
     return (
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-6">
@@ -1400,13 +1400,13 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
             const fieldDefaultPlaceholder = getFieldDefaultPlaceholder(field);
             const fieldPlaceholder = field.placeholder || `請輸入${fieldName}`;
             const fieldOptions = field.options || [];
-            
+
             // 對於特定欄位類型，如果沒有值但有預設內容，自動填充預設內容
             // 使用 formData 中的實際值
-            const fieldValue = formData[fieldName] !== undefined && formData[fieldName] !== null 
-              ? formData[fieldName] 
+            const fieldValue = formData[fieldName] !== undefined && formData[fieldName] !== null
+              ? formData[fieldName]
               : '';
-            
+
             return (
               <div key={fieldName}>
                 {fieldType === 'text' && (
@@ -1421,10 +1421,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     </div>
                     <input
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                    placeholder={fieldPlaceholder}
+                      placeholder={fieldPlaceholder}
                       value={fieldValue}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                         <span>⚠️</span>
@@ -1433,7 +1433,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {fieldType === 'select' && (
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-2 mb-3">
@@ -1447,7 +1447,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     <select
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
                       value={fieldValue}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
                     >
                       <option value="">{`選擇${fieldName}`}</option>
                       {fieldOptions.map((opt: string) => (
@@ -1462,7 +1462,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {fieldType === 'textarea' && (
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-2 mb-3">
@@ -1470,8 +1470,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         <span className="text-[#4B4036] text-xs">📝</span>
                       </div>
                       <label className="text-base font-semibold text-[#4B4036]">
-                      {fieldName}{fieldRequired ? ' *' : ''}
-                    </label>
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
                     </div>
                     <textarea
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200 resize-none"
@@ -1488,7 +1488,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {fieldType === 'number' && (
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-2 mb-3">
@@ -1501,11 +1501,11 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     </div>
                     <input
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                    placeholder={fieldPlaceholder}
-                    type="number"
+                      placeholder={fieldPlaceholder}
+                      type="number"
                       value={fieldValue || ''}
-                    onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value) || 0)}
-                  />
+                      onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value) || 0)}
+                    />
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                         <span>⚠️</span>
@@ -1514,17 +1514,17 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {fieldType === 'checkbox' && (
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                      <input
+                        <input
                           checked={fieldValue || false}
                           className="w-5 h-5 text-[#FFD59A] bg-white border-2 border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-0 transition-all duration-200"
-                        type="checkbox"
-                        onChange={(e) => handleInputChange(fieldName, e.target.checked)}
-                      />
+                          type="checkbox"
+                          onChange={(e) => handleInputChange(fieldName, e.target.checked)}
+                        />
                         {fieldValue && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-[#4B4036] text-xs font-bold">✓</span>
@@ -1543,7 +1543,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {fieldType === 'array' && (
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-2 mb-4">
@@ -1551,8 +1551,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         <span className="text-[#4B4036] text-xs">📋</span>
                       </div>
                       <label className="text-base font-semibold text-[#4B4036]">
-                      {fieldName}{fieldRequired ? ' *' : ''}
-                    </label>
+                        {fieldName}{fieldRequired ? ' *' : ''}
+                      </label>
                     </div>
                     <div className="space-y-3">
                       {fieldValue?.map((item: string, index: number) => (
@@ -1602,7 +1602,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {/* 處理 multiple_choice 欄位類型 */}
                 {fieldType === 'multiple_choice' && (
                   <div>
@@ -1638,8 +1638,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                       type="button"
                       onClick={() => handlePopupOpen(`dropdown_${fieldName}`)}
                     >
-                      {Array.isArray(fieldValue) && fieldValue.length > 0 ? 
-                        fieldValue.join(', ') : 
+                      {Array.isArray(fieldValue) && fieldValue.length > 0 ?
+                        fieldValue.join(', ') :
                         '請選擇選項'}
                     </button>
                     {/* 調試信息 */}
@@ -1653,7 +1653,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {/* 處理 title 欄位類型 */}
                 {fieldType === 'title' && (
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
@@ -1667,10 +1667,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     </div>
                     <input
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                    placeholder={fieldPlaceholder}
+                      placeholder={fieldPlaceholder}
                       value={fieldValue}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                         <span>⚠️</span>
@@ -1679,7 +1679,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {/* 處理 short_answer 欄位類型 */}
                 {fieldType === 'short_answer' && (
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
@@ -1693,10 +1693,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     </div>
                     <input
                       className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                    placeholder={fieldPlaceholder}
+                      placeholder={fieldPlaceholder}
                       value={fieldValue}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
                         <span>⚠️</span>
@@ -1732,7 +1732,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {/* 處理 checkboxes 欄位類型 */}
                 {fieldType === 'checkboxes' && (
                   <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
@@ -1806,7 +1806,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                                 value={scaleValue}
                                 onChange={(e) => handleInputChange(fieldName, parseInt(e.target.value))}
                               />
-                                                             {fieldValue === scaleValue && (
+                              {fieldValue === scaleValue && (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                   <div className="w-3 h-3 bg-[#FFD59A] rounded-full"></div>
                                 </div>
@@ -1843,11 +1843,10 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
                             key={star}
-                            className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 ${
-                              fieldValue >= star 
-                                ? 'text-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FDE6C2] shadow-md' 
+                            className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 ${fieldValue >= star
+                                ? 'text-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FDE6C2] shadow-md'
                                 : 'text-[#EADBC8] hover:text-[#FFD59A] hover:bg-[#FFF9F2]'
-                            }`}
+                              }`}
                             type="button"
                             onClick={() => handleInputChange(fieldName, star)}
                           >
@@ -1858,13 +1857,13 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         ))}
                       </div>
                     </div>
-                                         {fieldValue && (
-                       <div className="mt-3 text-center">
-                         <span className="text-sm font-medium text-[#A68A64]">
-                           已選擇 {fieldValue} 顆星
-                         </span>
-                       </div>
-                     )}
+                    {fieldValue && (
+                      <div className="mt-3 text-center">
+                        <span className="text-sm font-medium text-[#A68A64]">
+                          已選擇 {fieldValue} 顆星
+                        </span>
+                      </div>
+                    )}
                     {errors[fieldName] && (
                       <p className="text-red-500 text-sm mt-3 flex items-center gap-1">
                         <span>⚠️</span>
@@ -1892,7 +1891,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         multiple={field.multiple_files || false}
                         type="file"
                         disabled
-                        onChange={() => {}}
+                        onChange={() => { }}
                       />
                       <div className="p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-100 text-center cursor-not-allowed">
                         <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -1904,7 +1903,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                         </p>
                       </div>
                     </div>
-                                         {fieldValue && fieldValue.length > 0 && (
+                    {fieldValue && fieldValue.length > 0 && (
                       <div className="mt-3 p-3 bg-[#FFF9F2] rounded-lg border border-[#EADBC8]">
                         <p className="text-sm font-medium text-[#4B4036] mb-2">已選擇檔案：</p>
                         <div className="space-y-1">
@@ -1938,8 +1937,8 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                       type="button"
                       onClick={() => setShowDatePicker({ field: fieldName, open: true })}
                     >
-                      {fieldValue ? 
-                        new Date(fieldValue).toLocaleDateString('zh-TW') : 
+                      {fieldValue ?
+                        new Date(fieldValue).toLocaleDateString('zh-TW') :
                         '請選擇日期'}
                     </button>
                     {errors[fieldName] && (
@@ -2166,19 +2165,19 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                                         const currentValue = fieldValue || {};
                                         const currentRowValues = currentValue[row] || [];
                                         if (e.target.checked) {
-                                          handleInputChange(fieldName, { 
-                                            ...currentValue, 
-                                            [row]: [...currentRowValues, column] 
+                                          handleInputChange(fieldName, {
+                                            ...currentValue,
+                                            [row]: [...currentRowValues, column]
                                           });
                                         } else {
-                                          handleInputChange(fieldName, { 
-                                            ...currentValue, 
-                                            [row]: currentRowValues.filter((v: string) => v !== column) 
+                                          handleInputChange(fieldName, {
+                                            ...currentValue,
+                                            [row]: currentRowValues.filter((v: string) => v !== column)
                                           });
                                         }
                                       }}
                                     />
-                                                                          {fieldValue?.[row]?.includes(column) && (
+                                    {fieldValue?.[row]?.includes(column) && (
                                       <div className="absolute inset-0 flex items-center justify-center">
                                         <span className="text-[#4B4036] text-xs font-bold">✓</span>
                                       </div>
@@ -2199,31 +2198,31 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     )}
                   </div>
                 )}
-                
+
                 {/* 預設文字輸入，處理未知的欄位類型 */}
-                  {!['text', 'select', 'textarea', 'number', 'checkbox', 'array', 'title', 'short_answer', 'multiple_choice', 'dropdown', 'checkboxes', 'linear_scale', 'rating', 'file_upload', 'date', 'time', 'url', 'email', 'phone', 'multiple_choice_grid', 'tick_box_grid', 'paragraph'].includes(fieldType) && (
-                    <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                          <span className="text-[#4B4036] text-xs">❓</span>
-                        </div>
-                        <label className="text-base font-semibold text-[#4B4036]">
-                          {fieldName} ({fieldType}){fieldRequired ? ' *' : ''}
-                        </label>
+                {!['text', 'select', 'textarea', 'number', 'checkbox', 'array', 'title', 'short_answer', 'multiple_choice', 'dropdown', 'checkboxes', 'linear_scale', 'rating', 'file_upload', 'date', 'time', 'url', 'email', 'phone', 'multiple_choice_grid', 'tick_box_grid', 'paragraph'].includes(fieldType) && (
+                  <div className="bg-gradient-to-br from-[#FFFDF8] to-[#FFF9F2] p-6 rounded-2xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-[#4B4036] text-xs">❓</span>
                       </div>
-                      <input
-                        className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
-                    placeholder={fieldPlaceholder}
-                        value={fieldValue}
-                    onChange={(e) => handleInputChange(fieldName, e.target.value)}
-                  />
-                      {errors[fieldName] && (
-                        <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
-                          <span>⚠️</span>
-                          {errors[fieldName]}
-                        </p>
-                      )}
+                      <label className="text-base font-semibold text-[#4B4036]">
+                        {fieldName} ({fieldType}){fieldRequired ? ' *' : ''}
+                      </label>
                     </div>
+                    <input
+                      className="w-full p-4 border-2 border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-[#FFD59A] bg-white shadow-sm transition-all duration-200"
+                      placeholder={fieldPlaceholder}
+                      value={fieldValue}
+                      onChange={(e) => handleInputChange(fieldName, e.target.value)}
+                    />
+                    {errors[fieldName] && (
+                      <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                        <span>⚠️</span>
+                        {errors[fieldName]}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -2325,7 +2324,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
   const modalContent = (
     <>
       {console.log('ActivityForm render, showCustomManager:', showCustomManager)}
-      
+
       {/* 彈出選擇組件 */}
       {showPopup.open && (
         <PopupSelect
@@ -2347,24 +2346,24 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                       { value: '', label: '不使用範本' },
                       ...templates.map(t => ({ value: t.id, label: t.template_name })),
                     ] :
-                    showPopup.field.startsWith('dropdown_') ? 
-                      // 處理 dropdown 欄位的選項
-                      (() => {
-                        const actualFieldName = showPopup.field.replace('dropdown_', '');
-                        const templateFields = getTemplateFields(selectedTemplate);
-                        console.log('dropdown 選項處理 - actualFieldName:', actualFieldName);
-                        console.log('dropdown 選項處理 - selectedTemplate:', selectedTemplate);
-                        console.log('dropdown 選項處理 - templateFields:', templateFields);
-                        
-                        const field = templateFields.find((f: any) => 
-                          (f.title || f.name || f.id) === actualFieldName
-                        );
-                        console.log('dropdown 選項處理 - 找到的欄位:', field);
-                        
-                        const options = field?.options?.map((opt: string) => ({ value: opt, label: opt })) || [];
-                        console.log('dropdown 選項處理 - 最終選項:', options);
-                        return options;
-                      })() : []
+                      showPopup.field.startsWith('dropdown_') ?
+                        // 處理 dropdown 欄位的選項
+                        (() => {
+                          const actualFieldName = showPopup.field.replace('dropdown_', '');
+                          const templateFields = getTemplateFields(selectedTemplate);
+                          console.log('dropdown 選項處理 - actualFieldName:', actualFieldName);
+                          console.log('dropdown 選項處理 - selectedTemplate:', selectedTemplate);
+                          console.log('dropdown 選項處理 - templateFields:', templateFields);
+
+                          const field = templateFields.find((f: any) =>
+                            (f.title || f.name || f.id) === actualFieldName
+                          );
+                          console.log('dropdown 選項處理 - 找到的欄位:', field);
+
+                          const options = field?.options?.map((opt: string) => ({ value: opt, label: opt })) || [];
+                          console.log('dropdown 選項處理 - 最終選項:', options);
+                          return options;
+                        })() : []
           }
           selected={popupSelected}
           title={
@@ -2373,16 +2372,16 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                 showPopup.field === 'statuses' ? '選擇狀態' :
                   showPopup.field === 'tags' ? '選擇標籤' :
                     showPopup.field === 'template_id' ? '選擇範本' :
-                    showPopup.field.startsWith('dropdown_') ? 
-                      (() => {
-                        const actualFieldName = showPopup.field.replace('dropdown_', '');
-                        const templateFields = getTemplateFields(selectedTemplate);
-                        const field = templateFields.find((f: any) => 
-                          (f.title || f.name || f.id) === actualFieldName
-                        );
-                        return `選擇${field?.title || actualFieldName}`;
-                      })() :
-                      '選擇選項'
+                      showPopup.field.startsWith('dropdown_') ?
+                        (() => {
+                          const actualFieldName = showPopup.field.replace('dropdown_', '');
+                          const templateFields = getTemplateFields(selectedTemplate);
+                          const field = templateFields.find((f: any) =>
+                            (f.title || f.name || f.id) === actualFieldName
+                          );
+                          return `選擇${field?.title || actualFieldName}`;
+                        })() :
+                        '選擇選項'
           }
           onCancel={handlePopupCancel}
           onChange={(value: string | string[]) => setPopupSelected(value)}
@@ -2428,13 +2427,13 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                     value={newOptionName}
                     onChange={(value) => setNewOptionName(value)}
                   />
-                  
+
                   <div className="flex gap-2">
                     <HanamiButton
                       className="bg-hanami-primary hover:bg-hanami-accent"
                       disabled={!newOptionName.trim()}
                       onClick={
-                        showCustomManager.field === 'category' ? 
+                        showCustomManager.field === 'category' ?
                           (editingOption ? handleEditCategory : handleAddCategory) :
                           (editingOption ? handleEditCustomOption : handleAddCustomOption)
                       }
@@ -2468,7 +2467,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{option.name || option.category_name || option.tag_name}</span>
                               {option.is_default && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">預設</span>
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">預設</span>
                               )}
                             </div>
                             <div className="flex gap-2 items-center">
@@ -2506,7 +2505,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                               )}
                             </div>
                           </div>
-                  ))}
+                        ))}
                 </div>
               </div>
             </div>
@@ -2536,15 +2535,15 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
           <div className="absolute bottom-20 left-8 opacity-15">
             <Image src="/star-icon.png" alt="" width={50} height={50} className="animate-pulse" style={{ animationDelay: '1s' }} />
           </div>
-          
+
           <div className="p-4 md:p-6 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] relative z-10">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <Image 
-                  src="/star-icon.png" 
-                  alt="教學活動" 
-                  width={40} 
-                  height={40} 
+                <Image
+                  src="/star-icon.png"
+                  alt="教學活動"
+                  width={40}
+                  height={40}
                   className="drop-shadow-lg"
                 />
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-full animate-ping opacity-75"></div>
@@ -2575,7 +2574,7 @@ export default function ActivityForm({ activity, template, onSubmit, onCancel, m
                 </div>
               </div>
             )}
-            
+
             {/* 範本選擇 */}
             {renderTemplateSelection()}
 

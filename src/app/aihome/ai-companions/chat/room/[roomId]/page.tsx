@@ -59,6 +59,9 @@ import { SecureImageDisplay } from '@/components/ai-companion/SecureImageDisplay
 import UnifiedRightContent from '@/components/UnifiedRightContent';
 import ConnectionHint from '@/components/ai-companion/ConnectionHint';
 import { convertToPublicUrl, convertToShortUrl, getShortDisplayUrl, extractStoragePath } from '@/lib/getSignedImageUrl';
+import { ReferenceImagePicker } from '@/components/chat/ReferenceImagePicker';
+import { ReferenceImageAnalysis } from '@/components/chat/ReferenceImageAnalysis';
+import { ReferenceCameraModal } from '@/components/chat/ReferenceCameraModal';
 
 const AI_SERVER_URL = process.env.NEXT_PUBLIC_AI_SERVER_URL || 'https://hanami-ai-server.onrender.com';
 
@@ -428,6 +431,7 @@ interface Message {
   taskId?: string;
   metadata?: any;
   content_json?: any; // 新增：內容 JSON 資料（包含食量資訊）
+  attachments?: any[]; // 新增：附件資料
   processingWorkerId?: string;
   model_used?: string;
 }
@@ -555,6 +559,13 @@ export default function RoomChatPage() {
     console.log(`🔄 [選擇性渲染] 觸發原因: ${reason}`);
     setForceRender(prev => prev + 1);
   }, []);
+
+  // Image Upload & Analysis States
+  const [showImagePicker, setShowImagePicker] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false); // New state
+  const [analyzingImages, setAnalyzingImages] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
   const [activeRoles, setActiveRoles] = useState<('hibi' | 'mori' | 'pico')[]>(() => {
@@ -4418,7 +4429,17 @@ export default function RoomChatPage() {
         sender_user_id: message.sender === 'user' ? user.id : null,
         sender_role_instance_id: null, // 暫時設為 null，因為我們沒有真正的角色實例 ID
         content: message.content,
-        content_json: message.metadata ? { ...message.metadata, role_name: message.sender } : { role_name: message.sender },
+        content_json: message.metadata
+          ? {
+            ...message.metadata,
+            role_name: message.sender,
+            images: message.attachments // Save attachments in content_json as fallback
+          }
+          : {
+            role_name: message.sender,
+            images: message.attachments // Save attachments in content_json as fallback
+          },
+        attachments: message.attachments, // Keep trying to save to attachments column too
         status: 'sent'
       };
 
@@ -4480,7 +4501,7 @@ export default function RoomChatPage() {
   };
 
   // 呼叫 Edge Function 處理聊天
-  const callChatProcessor = async (userMessage: string, roomId: string, roleHint: string) => {
+  const callChatProcessor = async (userMessage: string, roomId: string, roleHint: string, messageData?: any) => {
     try {
       console.log('🚀 呼叫 chat-processor Edge Function...');
       const { data, error } = await saasSupabase.functions.invoke('chat-processor', {
@@ -4494,7 +4515,7 @@ export default function RoomChatPage() {
             : roleHint === 'hibi' ? hibiSelectedModel
               : roleHint === 'pico' ? picoSelectedModel
                 : undefined,
-          attachments: [] // TODO: 支援附件
+          attachments: (messageData as any).attachments // Pass attachments to Edge Function
         }
       });
 
@@ -4544,6 +4565,138 @@ export default function RoomChatPage() {
       throw error;
     }
   };
+  const checkModelImageSupport = () => {
+    try {
+      const state = getRoleModelState();
+      if (!state) return true;
+
+      // Default model handling
+      let modelIdToCheck = state.selectedModel;
+      if (modelIdToCheck === DEFAULT_MODEL_SENTINEL && state.roleDefaultModel) {
+        modelIdToCheck = state.roleDefaultModel.split(',')[0];
+      }
+
+      // Get models
+      const models = state.getFilteredModels?.() || [];
+      const modelConfig = models.find((m: any) => m.model_id === modelIdToCheck);
+
+      if (modelConfig) {
+        const id = modelConfig.model_id.toLowerCase();
+        const type = modelConfig.model_type?.toLowerCase() || '';
+
+        // Known vision capable patterns
+        if (type.includes('image') || type.includes('vision') || type.includes('multimodal')) return true;
+        if (id.includes('gpt-4o') || id.includes('vision') || id.includes('claude-3') || id.includes('gemini')) return true;
+
+        return false;
+      }
+      return true; // Default allow
+    } catch (e) {
+      console.error('Error checking model support:', e);
+      return true;
+    }
+  };
+
+  // Image Handling Functions
+  const handleFilesAdded = (files: File[]) => {
+    if (files.length > 0) {
+      if (selectedImages.length + files.length > 5) {
+        const { default: toast } = require('react-hot-toast');
+        toast.error(`最多只能上傳 5 張圖片。你已經選擇了 ${selectedImages.length} 張。`);
+        return;
+      }
+      setSelectedImages(prev => [...prev, ...files]);
+      setShowImagePicker(false);
+    }
+  };
+
+  const handleImageSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.onchange = (e) => {
+      const files = Array.from((e.target as HTMLInputElement).files || []);
+      handleFilesAdded(files);
+    };
+    input.click();
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCameraCapture = () => {
+    // Open Custom Camera Modal
+    setShowImagePicker(false);
+    setShowCameraModal(true);
+  };
+
+  const uploadFilesToStorage = async (files: File[], roomId: string): Promise<any[]> => {
+    if (!user?.id) return [];
+
+    const uploadedAttachments: any[] = [];
+    const supabase = createSaasClient();
+
+    for (const file of files) {
+      console.log('📤 [Storage] Starting upload for file:', file.name);
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `chat_uploads/${roomId}/${fileName}`;
+        console.log('📤 [Storage] Generated path:', filePath);
+
+        const { data, error } = await supabase.storage
+          .from('hanami-content')
+          .upload(filePath, file);
+
+        if (error) {
+          console.error('❌ [Storage] Upload failed for:', file.name, error);
+          if ((error as any).statusCode === '403') console.error('🔐 [Storage] Permission denied. Check bucket policies for "hanami-content".');
+          if ((error as any).error === 'Bucket not found') console.error('🪣 [Storage] Bucket "hanami-content" not found.');
+          continue;
+        }
+        console.log('✅ [Storage] Upload success for:', file.name);
+
+        // Get public URL or signed URL
+        // Assuming we want a signed URL for privacy or public if the bucket is public
+        // For now, let's assume we can get a path and let the backend handle signing or public access
+        // The backend expects attachments to have { type, url, name, size }
+
+        // Use getPublicUrl for simplicity if bucket is public, otherwise createSignedUrl
+        // But for chat uploads, usually we want some security.
+        // Let's store the full path and let the UI/Backend handle convertToSignedUrl
+        // or actually, call `getPublicUrl` if it's public.
+        // Let's assume standard behavior.
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('hanami-content')
+          .getPublicUrl(filePath);
+
+        uploadedAttachments.push({
+          type: 'image',
+          url: publicUrl, // Send proper URL to Edge Function
+          path: filePath,
+          name: file.name,
+          size: file.size,
+          mimeType: file.type
+        });
+
+      } catch (err) {
+        console.error('File upload exception:', err);
+      }
+    }
+    return uploadedAttachments;
+  };
+
+  const handleAnalysisComplete = () => {
+    setAnalyzingImages(false);
+    // Proceed to send message with images
+    // We call handleSendMessage but we need to make sure handleSendMessage knows about the images
+    // Since selectedImages is in state, handleSendMessage can access it.
+    handleSendMessage();
+  };
+
   // 發送訊息處理函數 - 持久化版本
   const handleSendMessage = async () => {
     console.log('🚀 [持久化版] handleSendMessage 被呼叫');
@@ -4552,13 +4705,15 @@ export default function RoomChatPage() {
       isLoading,
       hasUserId: !!user?.id,
       userId: user?.id,
-      inputLength: inputMessage.length
+      inputLength: inputMessage.length,
+      hasImages: selectedImages.length > 0
     });
 
     // ⭐ 驗證輸入（先驗證，避免無效內容也加鎖）
-    if (!inputMessage.trim() || isLoading || !user?.id) {
+    // 允許有圖片但無文字
+    if ((!inputMessage.trim() && selectedImages.length === 0) || isLoading || !user?.id) {
       console.warn('⚠️ [發送] 輸入無效，忽略請求', {
-        noInput: !inputMessage.trim(),
+        noInput: !inputMessage.trim() && selectedImages.length === 0,
         loading: isLoading,
         noUser: !user?.id
       });
@@ -4566,6 +4721,12 @@ export default function RoomChatPage() {
     }
 
     let messageContent = inputMessage.trim();
+    // Allow empty text if images are present
+    if (!messageContent && selectedImages.length === 0) {
+      // This case is already handled by validation above, but safe to keep check or fallback
+      // Actually validation returns, so we are good.
+    }
+
     const roleHint = selectedCompanion || (activeRoles[0] ?? 'auto');
 
     // ⭐ 預先查詢該角色的 processing/queued 訊息數量並設置輪候人數（用於顯示初始狀態）
@@ -4611,7 +4772,7 @@ export default function RoomChatPage() {
       }
     }
 
-    const lockKey = `${roomId}-${messageContent}`;  // 使用房間ID + 內容作為鎖鍵
+    const lockKey = `${roomId}-${messageContent}-${Date.now()}`;  // 使用 Unique Key 避免衝突
 
     // ⭐ 第一步：檢查全局鎖（防止 React Strict Mode 雙重掛載）
     if (globalSendingLock.get(lockKey)) {
@@ -4626,23 +4787,30 @@ export default function RoomChatPage() {
     console.log('🔒 [發送] 已加全局鎖，鎖鍵:', lockKey);
 
     // ⭐ 立即顯示用戶訊息（不等待 API 響應）
-    const tempMessageId = generateUUID();
+    const tempMessageId = generateUUID(); // Assuming generateUUID is available or define it
     const tempClientMsgId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // OPTIMISTIC ATTACHMENTS FOR UI
+    const optimisticAttachments = selectedImages.map(file => ({
+      type: 'image',
+      url: URL.createObjectURL(file), // Local preview
+      name: file.name
+    }));
+
     const userMessage: Message = {
       id: tempMessageId,
       content: messageContent,
       sender: 'user',
       timestamp: new Date(),
       type: 'text' as const,
-      status: 'processing'
+      status: 'processing',
+      attachments: optimisticAttachments.length > 0 ? optimisticAttachments : undefined
     };
 
     // 立即添加到 UI
     setMessages(prev => {
       const newMessages = [...prev, userMessage];
       console.log('📨 [即時] 立即添加用戶訊息到 UI:', userMessage);
-      console.log('📨 [即時] 更新後的訊息列表:', newMessages.length, '條訊息');
-      console.log('📨 [即時] 完整新訊息列表:', newMessages);
       return newMessages;
     });
 
@@ -4650,10 +4818,10 @@ export default function RoomChatPage() {
     processedMessageIds.current.add(tempMessageId);
     console.log('📨 [即時] 已添加臨時訊息 ID 到全局追蹤:', tempMessageId);
 
-    // ⭐ 不觸發重新渲染，讓 React 自然更新訊息列表
-
-    // 清空輸入框
+    // 清空輸入框和圖片
     setInputMessage('');
+    setSelectedImages([]); // Clear images
+    // Note: showImagePicker should be closed already
     setIsLoading(true);
     setIsTyping(true);
 
@@ -4676,6 +4844,25 @@ export default function RoomChatPage() {
     }
 
     try {
+      // === UPLOAD IMAGES IF ANY ===
+      let realAttachments: any[] = [];
+      if (selectedImages.length > 0) {
+        console.log('📦 [Upload] Selected images count:', selectedImages.length);
+        console.log('📦 [Upload] Files:', selectedImages.map(f => ({ name: f.name, size: f.size, type: f.type })));
+
+        realAttachments = await uploadFilesToStorage(selectedImages, roomId);
+        console.log('✅ [Upload] Images uploaded result:', JSON.stringify(realAttachments, null, 2));
+
+        if (realAttachments.length === 0) {
+          console.warn('⚠️ [Upload] Upload returned empty array despite selectedImages > 0. Check uploadFilesToStorage.');
+        }
+
+        // Update userMessage with real attachments (optional, but good for consistency)
+        userMessage.attachments = realAttachments;
+      } else {
+        console.log('ℹ️ [Upload] No images selected.');
+      }
+
       // === 使用 Edge Function 發送訊息 ===
       console.log('📦 [Edge] 開始發送訊息到 Edge Function...');
 
@@ -4686,14 +4873,41 @@ export default function RoomChatPage() {
         throw new Error('無法儲存用戶訊息');
       }
 
+      // ⭐ CRITICAL: Add saved ID to tracking to prevent Realtime from re-adding it
+      processedMessageIds.current.add(savedMessageId);
+      console.log('📨 [Dedupe] Added savedMessageId to tracking:', savedMessageId);
+
       // 更新 UI 中的訊息 ID
       setMessages(prev => {
+        // Check if the saved message ID somehow already crept in via Realtime
+        const alreadyExists = prev.some(m => m.id === savedMessageId);
+
+        if (alreadyExists) {
+          console.log('🔄 [UI Update] Message already exists (via Realtime?). Removing temp message to avoid duplicate.');
+          // Filter out the temp message, keeping the Realtime one.
+          // BUT, we must ensure the Realtime one has the attachments if they were local-only initially.
+          // It's safer to Keep the Local one (updated) and Remove the Realtime one if it's a duplicate? 
+          // Or merge them?
+          // Simplest: Remove temp, assuming Realtime state is "truth".
+          // Risk: Realtime state lacks 'attachments' blob url.
+          // Strategy: Update the EXISTING Realtime message with realAttachments if needed, and remove temp.
+          return prev.map(msg => {
+            if (msg.id === savedMessageId && realAttachments.length > 0) {
+              return { ...msg, attachments: realAttachments };
+            }
+            return msg;
+          }).filter(msg => msg.id !== tempMessageId);
+        }
+
         return prev.map(msg => {
           if (msg.id === tempMessageId) {
+            console.log('🔄 [UI Update] Updating message with saved ID and attachments:', { savedMessageId, realAttachments });
             return {
               ...msg,
               id: savedMessageId,
-              status: 'sent'
+              status: 'sent',
+              // Force use of realAttachments if available, falling back to existing only if realAttachments is empty
+              attachments: realAttachments.length > 0 ? realAttachments : msg.attachments
             };
           }
           return msg;
@@ -4720,7 +4934,7 @@ export default function RoomChatPage() {
       }
 
       // 2. 呼叫 Edge Function
-      await callChatProcessor(messageContent, roomId, roleHint || 'hibi');
+      await callChatProcessor(messageContent, roomId, roleHint || 'hibi', userMessage);
 
       // 3. 完成
       console.log('✅ [Edge] 訊息處理完成');
@@ -5489,6 +5703,8 @@ export default function RoomChatPage() {
 
                       {/* Input Area */}
                       <div className="w-full relative flex items-end gap-2 bg-white/80 backdrop-blur-md border border-[#EADBC8] p-1.5 rounded-[24px] shadow-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-[#FFB6C1]/50 focus-within:border-[#FFB6C1] focus-within:shadow-md pointer-events-auto">
+
+
                         {/* Attach Button */}
                         <motion.button
                           whileHover={{ scale: 1.1 }}
@@ -5496,8 +5712,12 @@ export default function RoomChatPage() {
                           className="p-2.5 text-[#4B4036]/60 hover:text-[#4B4036] hover:bg-[#F8F5EC] rounded-full transition-colors hidden sm:block"
                           title="添加圖片"
                           onClick={() => {
-                            const { default: toast } = require('react-hot-toast');
-                            toast('圖片上傳功能即將推出', { icon: '📷' });
+                            if (checkModelImageSupport()) {
+                              setShowImagePicker(true);
+                            } else {
+                              const { default: toast } = require('react-hot-toast');
+                              toast.error('當前模型不支援圖片輸入');
+                            }
                           }}
                         >
                           <PhotoIcon className="w-6 h-6" />
@@ -5507,12 +5727,40 @@ export default function RoomChatPage() {
                           whileTap={{ scale: 0.9 }}
                           className="p-2 text-[#4B4036]/60 hover:text-[#4B4036] rounded-full sm:hidden"
                           onClick={() => {
-                            const { default: toast } = require('react-hot-toast');
-                            toast('圖片上傳功能即將推出', { icon: '📷' });
+                            if (checkModelImageSupport()) {
+                              setShowImagePicker(true);
+                            } else {
+                              const { default: toast } = require('react-hot-toast');
+                              toast.error('當前模型不支援圖片輸入');
+                            }
                           }}
                         >
                           <PlusIcon className="w-6 h-6" />
                         </motion.button>
+
+                        {/* Selected Images Preview */}
+                        {selectedImages.length > 0 && (
+                          <div className="flex gap-2 p-2 overflow-x-auto my-2">
+                            {selectedImages.map((file, index) => (
+                              <div key={index} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-[#EADBC8] group">
+                                <img
+                                  src={URL.createObjectURL(file)}
+                                  alt={`preview-${index}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveImage(index);
+                                  }}
+                                  className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full p-0.5 hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100"
+                                >
+                                  <XMarkIcon className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                         {/* Text Input */}
                         <textarea
@@ -5545,8 +5793,8 @@ export default function RoomChatPage() {
                             // Prevent focus loss only
                             e.preventDefault();
                           }}
-                          disabled={!inputMessage.trim() || isLoading || isTyping || isSending || !user}
-                          className={`relative z-50 p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${inputMessage.trim() && !isLoading && !isSending && user
+                          disabled={(!inputMessage.trim() && selectedImages.length === 0) || isLoading || isTyping || isSending || !user}
+                          className={`relative z-50 p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${(inputMessage.trim() || selectedImages.length > 0) && !isLoading && !isSending && user
                             ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-[#FFB6C1]/30 cursor-pointer pointer-events-auto'
                             : 'bg-[#F0EAE0] text-[#4B4036]/30 shadow-none cursor-not-allowed'
                             }`}
@@ -5760,6 +6008,39 @@ export default function RoomChatPage() {
             );
           })()}
 
+          {/* Camera Modal Portal */}
+          <AnimatePresence>
+            {showCameraModal && (
+              <ReferenceCameraModal
+                onClose={() => setShowCameraModal(false)}
+                onCapture={(file) => {
+                  if (selectedImages.length >= 5) {
+                    const { default: toast } = require('react-hot-toast');
+                    toast.error('最多只能上傳 5 張圖片');
+                    return;
+                  }
+                  setSelectedImages(prev => [...prev, file]);
+                  setShowCameraModal(false);
+                  // Removed setAnalyzingImages(true)
+                }}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Image Picker Portal */}
+          <AnimatePresence>
+            {showImagePicker && (
+              <ReferenceImagePicker
+                onClose={() => setShowImagePicker(false)}
+                onSelectUpload={handleImageSelect}
+                onSelectCamera={handleCameraCapture}
+                onFilesSelected={handleFilesAdded}
+              />
+            )}
+          </AnimatePresence>
+
+
+
           {/* Modals & Panels */}
           <AnimatePresence mode="wait">
             {showSettingsPanel && (
@@ -5838,7 +6119,7 @@ export default function RoomChatPage() {
         </div >
       </div >
 
-    </div>
+    </div >
   );
 }
 
@@ -5877,10 +6158,43 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
   const moriModelCount = isMoriMulti ? message.content_json?.model_responses?.length ?? 0 : 0;
   const isMoriDeck = isMoriMulti && moriViewMode === 'deck';
 
+  // 🟢 Fix: Extract attachments from message (handling both array and string formats)
+  let safeAttachments: any[] = [];
+  try {
+    const rawAttachments = (message as any).attachments || (message.content_json as any)?.images;
+    if (Array.isArray(rawAttachments)) {
+      safeAttachments = rawAttachments;
+    } else if (typeof rawAttachments === 'string') {
+      try {
+        safeAttachments = JSON.parse(rawAttachments);
+      } catch (e) {
+        // If string but not JSON, maybe single URL?
+        if (rawAttachments.startsWith('http')) safeAttachments = [{ url: rawAttachments }];
+      }
+    }
+  } catch (e) {
+    console.error('Error parsing attachments in inline MessageBubble:', e);
+  }
+
   const renderPlainText = () => {
     // Robust splitting for different newline formats
     const lines = message.content.split(/\r\n|\r|\n/);
     let hasRenderedImage = false;
+
+    // 🟣 Inline Debug Box removed
+
+    const attachmentImages = safeAttachments.length > 0 ? (
+      <div className="flex flex-wrap gap-2 my-2">
+        {safeAttachments.map((att, idx) => (
+          <div key={`att-${idx}`} className="relative w-48 h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+            <SecureImageDisplay
+              imageUrl={att.url || att.path}
+              alt="Attachment"
+            />
+          </div>
+        ))}
+      </div>
+    ) : null;
 
     const renderedLines = lines.map((line, index) => {
       // ⭐ 優先檢查是否為圖片 markdown 格式（必須在直接 URL 檢查之前）
@@ -6070,7 +6384,13 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
       }
     }
 
-    return renderedLines;
+    // Inject Attachments (only)
+    const finalOutput = [
+      ...(attachmentImages ? [attachmentImages] : []),
+      ...renderedLines
+    ];
+
+    return finalOutput;
   };
 
   useEffect(() => {

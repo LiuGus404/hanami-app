@@ -408,7 +408,7 @@ function ExpensesManagementContent() {
               </ul>
             </div>
           </div>
-          
+
           <div className="max-h-[80vh] overflow-y-auto px-6 py-6">
             <div className="space-y-5">
               <section className="rounded-3xl border border-[#F1E4D3] bg-white/90 p-5 shadow-sm">
@@ -422,7 +422,7 @@ function ExpensesManagementContent() {
                     <input
                       type="date"
                       value={newExpense.expense_date}
-                      onChange={(e) => setNewExpense({...newExpense, expense_date: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, expense_date: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
                     />
                   </div>
@@ -430,7 +430,7 @@ function ExpensesManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">支出分類 *</label>
                     <select
                       value={newExpense.expense_category}
-                      onChange={(e) => setNewExpense({...newExpense, expense_category: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, expense_category: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23D48347%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-right-4 bg-[length:16px_16px] pr-10"
                     >
                       <option value="">請選擇分類</option>
@@ -440,12 +440,12 @@ function ExpensesManagementContent() {
                           // 提取分類標題（移除分隔線）
                           const title = category.replace(/──────────/g, '').trim();
                           return (
-                            <option 
-                              key={category} 
+                            <option
+                              key={category}
                               value=""
                               disabled
-                              style={{ 
-                                fontWeight: 'bold', 
+                              style={{
+                                fontWeight: 'bold',
                                 backgroundColor: '#FFF9F2',
                                 color: '#D48347',
                                 fontSize: '0.8rem',
@@ -459,8 +459,8 @@ function ExpensesManagementContent() {
                           );
                         }
                         return (
-                          <option 
-                            key={category} 
+                          <option
+                            key={category}
                             value={category}
                             style={{
                               paddingLeft: '20px',
@@ -487,7 +487,7 @@ function ExpensesManagementContent() {
                     <input
                       type="text"
                       value={newExpense.expense_description}
-                      onChange={(e) => setNewExpense({...newExpense, expense_description: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, expense_description: e.target.value })}
                       placeholder="例如：購買教學器材"
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
                     />
@@ -497,7 +497,7 @@ function ExpensesManagementContent() {
                     <input
                       type="number"
                       value={newExpense.amount}
-                      onChange={(e) => setNewExpense({...newExpense, amount: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setNewExpense({ ...newExpense, amount: parseFloat(e.target.value) || 0 })}
                       placeholder="0.00"
                       step="0.01"
                       min="0"
@@ -517,7 +517,7 @@ function ExpensesManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">付款方式</label>
                     <select
                       value={newExpense.payment_method}
-                      onChange={(e) => setNewExpense({...newExpense, payment_method: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, payment_method: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23D48347%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-right-4 bg-[length:16px_16px] pr-10"
                     >
                       <option value="">請選擇付款方式</option>
@@ -530,7 +530,7 @@ function ExpensesManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">備註</label>
                     <textarea
                       value={newExpense.notes}
-                      onChange={(e) => setNewExpense({...newExpense, notes: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, notes: e.target.value })}
                       placeholder="可選的備註資訊"
                       rows={3}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
@@ -609,7 +609,7 @@ function ExpensesManagementContent() {
               </ul>
             </div>
           </div>
-          
+
           <div className="max-h-[80vh] overflow-y-auto px-6 py-6">
             <div className="space-y-5">
               <section className="rounded-3xl border border-[#F1E4D3] bg-white/90 p-5 shadow-sm">
@@ -623,7 +623,7 @@ function ExpensesManagementContent() {
                     <input
                       type="date"
                       value={newExpense.expense_date}
-                      onChange={(e) => setNewExpense({...newExpense, expense_date: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, expense_date: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
                     />
                   </div>
@@ -631,7 +631,7 @@ function ExpensesManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">支出分類 *</label>
                     <select
                       value={newExpense.expense_category}
-                      onChange={(e) => setNewExpense({...newExpense, expense_category: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, expense_category: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23D48347%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-right-4 bg-[length:16px_16px] pr-10"
                     >
                       <option value="">請選擇分類</option>
@@ -641,12 +641,12 @@ function ExpensesManagementContent() {
                           // 提取分類標題（移除分隔線）
                           const title = category.replace(/──────────/g, '').trim();
                           return (
-                            <option 
-                              key={category} 
+                            <option
+                              key={category}
                               value=""
                               disabled
-                              style={{ 
-                                fontWeight: 'bold', 
+                              style={{
+                                fontWeight: 'bold',
                                 backgroundColor: '#FFF9F2',
                                 color: '#D48347',
                                 fontSize: '0.8rem',
@@ -660,8 +660,8 @@ function ExpensesManagementContent() {
                           );
                         }
                         return (
-                          <option 
-                            key={category} 
+                          <option
+                            key={category}
                             value={category}
                             style={{
                               paddingLeft: '20px',
@@ -688,7 +688,7 @@ function ExpensesManagementContent() {
                     <input
                       type="text"
                       value={newExpense.expense_description}
-                      onChange={(e) => setNewExpense({...newExpense, expense_description: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, expense_description: e.target.value })}
                       placeholder="例如：購買教學器材"
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"
                     />
@@ -698,7 +698,7 @@ function ExpensesManagementContent() {
                     <input
                       type="number"
                       value={newExpense.amount}
-                      onChange={(e) => setNewExpense({...newExpense, amount: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setNewExpense({ ...newExpense, amount: parseFloat(e.target.value) || 0 })}
                       placeholder="0.00"
                       step="0.01"
                       min="0"
@@ -718,7 +718,7 @@ function ExpensesManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">付款方式</label>
                     <select
                       value={newExpense.payment_method}
-                      onChange={(e) => setNewExpense({...newExpense, payment_method: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, payment_method: e.target.value })}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm font-medium text-[#4B4036] shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23D48347%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E')] bg-no-repeat bg-right-4 bg-[length:16px_16px] pr-10"
                     >
                       <option value="">請選擇付款方式</option>
@@ -731,7 +731,7 @@ function ExpensesManagementContent() {
                     <label className="mb-1 block text-xs font-semibold text-[#8A7C70]">備註</label>
                     <textarea
                       value={newExpense.notes}
-                      onChange={(e) => setNewExpense({...newExpense, notes: e.target.value})}
+                      onChange={(e) => setNewExpense({ ...newExpense, notes: e.target.value })}
                       placeholder="可選的備註資訊"
                       rows={3}
                       className="w-full rounded-2xl border border-[#F1E4D3] bg-gradient-to-r from-[#FFF5EC] via-[#FFF0F6] to-[#FFF8E8] px-4 py-3 text-sm text-[#4B4036] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F59BB5]/40 focus:border-[#F59BB5]/60"

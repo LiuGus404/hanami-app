@@ -136,24 +136,24 @@ export default function SimpleAbilityAssessmentModal({
   defaultTeacher
 }: SimpleAbilityAssessmentModalProps) {
   const { currentOrganization } = useOrganization();
-  
+
   const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
   const PLACEHOLDER_ORG_IDS = new Set(['default-org', 'unassigned-org-placeholder']);
-  
+
   const validOrgId = useMemo(() => {
     if (!currentOrganization?.id) return null;
     return UUID_REGEX.test(currentOrganization.id) && !PLACEHOLDER_ORG_IDS.has(currentOrganization.id)
       ? currentOrganization.id
       : null;
   }, [currentOrganization?.id]);
-  
+
   const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
-  
+
   const canUsePortal = useMemo(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       return false;
@@ -165,7 +165,7 @@ export default function SimpleAbilityAssessmentModal({
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [goals, setGoals] = useState<GrowthGoal[]>([]);
   const [abilities, setAbilities] = useState<DevelopmentAbility[]>([]);
-  
+
   // 表單狀態
   const [selectedStudentId, setSelectedStudentId] = useState(
     initialData?.student_id || defaultStudent?.id || ''
@@ -181,35 +181,35 @@ export default function SimpleAbilityAssessmentModal({
   const [overallRating, setOverallRating] = useState(initialData?.overall_performance_rating || 3);
   const [generalNotes, setGeneralNotes] = useState(initialData?.general_notes || '');
   const [nextFocus, setNextFocus] = useState(initialData?.next_lesson_focus || '');
-  
+
   // 學生選擇相關狀態
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
-  
+
   // 成長樹選擇相關狀態
   const [showTreeDropdown, setShowTreeDropdown] = useState(false);
   const [treeSearch, setTreeSearch] = useState('');
   const [studentTrees, setStudentTrees] = useState<GrowthTree[]>([]); // 學生的所有成長樹
-  
+
   // 評估記錄選擇相關狀態
   const [showAssessmentDropdown, setShowAssessmentDropdown] = useState(false);
-  
+
   // 教師選擇相關狀態
   const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
   const [teacherSearch, setTeacherSearch] = useState('');
-  
+
   // 能力評估狀態
-  const [abilityAssessments, setAbilityAssessments] = useState<{[key: string]: any}>(initialData?.ability_assessments || {});
-  const [goalAssessments, setGoalAssessments] = useState<{[key: string]: any}>({});
+  const [abilityAssessments, setAbilityAssessments] = useState<{ [key: string]: any }>(initialData?.ability_assessments || {});
+  const [goalAssessments, setGoalAssessments] = useState<{ [key: string]: any }>({});
   const [selectedGoals, setSelectedGoals] = useState<any[]>(initialData?.selected_goals || []);
-  
+
   // 評估記錄歷史狀態
   const [latestAssessment, setLatestAssessment] = useState<any>(null);
   const [assessmentHistory, setAssessmentHistory] = useState<any[]>([]);
   const [selectedAssessmentRecord, setSelectedAssessmentRecord] = useState<any>(null);
-  
+
   // 多選模式評估狀態
-  const [multiSelectAssessments, setMultiSelectAssessments] = useState<{[goalId: string]: string[]}>({});
+  const [multiSelectAssessments, setMultiSelectAssessments] = useState<{ [goalId: string]: string[] }>({});
 
   // 活動管理相關狀態
   const [showActivitySelectionModal, setShowActivitySelectionModal] = useState(false);
@@ -223,11 +223,11 @@ export default function SimpleAbilityAssessmentModal({
     previousLessonActivities: [],
     ongoingActivities: []
   });
-  
+
   // 活動編輯狀態
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
-  const [tempProgress, setTempProgress] = useState<{[activityId: string]: number}>({});
-  
+  const [tempProgress, setTempProgress] = useState<{ [activityId: string]: number }>({});
+
   // 活動篩選狀態
   const [activityFilter, setActivityFilter] = useState<'all' | 'incomplete' | 'completed'>('incomplete');
   const [showCompletionMessage, setShowCompletionMessage] = useState(false);
@@ -237,7 +237,7 @@ export default function SimpleAbilityAssessmentModal({
 
   // 檢查是否為編輯模式
   const isEditMode = !!initialData;
-  
+
   // 編輯模式調試資訊
   if (isEditMode) {
     console.log('🔄 編輯模式啟用');
@@ -249,7 +249,7 @@ export default function SimpleAbilityAssessmentModal({
   // 檢查學生是否有分配成長樹
   const selectedStudent = students.find(s => s.id === selectedStudentId);
   const selectedTree = studentTrees.find(t => t.id === selectedTreeId);
-  
+
   // 調試輸出
   if (selectedTreeId && studentTrees.length > 0) {
     console.log('🔍 成長樹選擇調試:');
@@ -288,23 +288,23 @@ export default function SimpleAbilityAssessmentModal({
     console.log('  - selectedStudentId:', selectedStudentId);
     console.log('  - isEditMode:', isEditMode);
     console.log('  - initialData?.tree_id:', initialData?.tree_id);
-    
+
     if (selectedStudentId) {
       // 編輯模式時傳入目標樹ID
       const targetTreeId = isEditMode ? initialData?.tree_id : undefined;
-      
+
       // 新增模式時，優化：並行載入評估記錄歷史和成長樹
       if (!isEditMode) {
         const loadDataOptimized = async () => {
           console.log('🔄 新增模式：開始並行載入學生資料 -', selectedStudentId);
-          
+
           try {
             // 並行載入評估記錄歷史和成長樹（成長樹列表不依賴評估記錄）
             const [recommendedData] = await Promise.all([
               loadAssessmentHistory(selectedStudentId),
               loadStudentTrees(selectedStudentId, targetTreeId)
             ]);
-            
+
             console.log('📊 並行載入完成，推薦記錄:', recommendedData ? {
               id: recommendedData.id,
               assessment_date: recommendedData.assessment_date,
@@ -312,7 +312,7 @@ export default function SimpleAbilityAssessmentModal({
               tree_id: recommendedData.tree_id,
               tree_name: recommendedData.tree?.tree_name
             } : null);
-            
+
             // 如果有推薦記錄，更新成長樹選擇（使用推薦記錄的 tree_id）
             if (recommendedData?.tree_id) {
               console.log('🔄 根據推薦記錄更新成長樹選擇:', recommendedData.tree_id);
@@ -331,7 +331,7 @@ export default function SimpleAbilityAssessmentModal({
             console.error('❌ loadDataOptimized 發生錯誤:', error);
           }
         };
-        
+
         loadDataOptimized();
       } else {
         // 編輯模式：直接載入成長樹
@@ -348,7 +348,7 @@ export default function SimpleAbilityAssessmentModal({
   useEffect(() => {
     if (selectedTreeId && selectedStudentId && !isEditMode) {
       console.log('🌳 成長樹變化，載入目標和能力以及最新評估記錄:', selectedTreeId);
-      
+
       // 先載入目標和能力
       loadTreeGoalsAndAbilities(selectedTreeId).then(() => {
         // 然後載入該成長樹的最新評估記錄
@@ -381,10 +381,10 @@ export default function SimpleAbilityAssessmentModal({
   useEffect(() => {
     if (initialData) {
       console.log('🔄 initialData 變化，重新初始化狀態:', initialData);
-      
+
       // 修復過往評估記錄的顯示問題
       const fixedInitialData = fixHistoricalAssessmentData(initialData, goals, abilities);
-      
+
       // 更新基本表單狀態
       setSelectedStudentId(fixedInitialData.student_id || '');
       setSelectedTreeId(fixedInitialData.tree_id || '');
@@ -394,11 +394,11 @@ export default function SimpleAbilityAssessmentModal({
       setOverallRating(fixedInitialData.overall_performance_rating || 3);
       setGeneralNotes(fixedInitialData.general_notes || '');
       setNextFocus(fixedInitialData.next_lesson_focus || '');
-      
+
       // 更新能力評估狀態
       setAbilityAssessments(fixedInitialData.ability_assessments || {});
       setSelectedGoals(fixedInitialData.selected_goals || []);
-      
+
       console.log('✅ 狀態重新初始化完成');
     }
   }, [initialData, goals, abilities]);
@@ -430,17 +430,17 @@ export default function SimpleAbilityAssessmentModal({
   const loadStudentsAndTrees = async () => {
     try {
       setLoading(true);
-      
+
       console.log('開始載入學生和成長樹資料...');
       console.log('showOnlyTodayStudents:', showOnlyTodayStudents);
-      
+
       let studentsData: any[] = [];
-      
+
       if (showOnlyTodayStudents) {
         // 只載入當日有課程的學生
         const today = new Date().toISOString().split('T')[0];
         console.log('載入當日學生，日期:', today);
-        
+
         // 先檢查當日是否有任何課程記錄
         const { data: allTodayLessons, error: checkError } = await supabase
           .from('hanami_student_lesson')
@@ -451,32 +451,32 @@ export default function SimpleAbilityAssessmentModal({
           console.error('檢查當日課程失敗:', checkError);
           throw checkError;
         }
-        
+
         console.log('當日所有課程記錄:', allTodayLessons);
-        
+
         // 先獲取當日有課程的學生ID
         const { data: todayLessonDataRaw, error: lessonError } = await supabase
           .from('hanami_student_lesson')
           .select('student_id')
           .eq('lesson_date', today)
           .not('student_id', 'is', null);
-        
-        const todayLessonData = todayLessonDataRaw as Array<{ student_id: string; [key: string]: any; }> | null;
+
+        const todayLessonData = todayLessonDataRaw as Array<{ student_id: string;[key: string]: any; }> | null;
 
         if (lessonError) {
           console.error('載入當日課程失敗:', lessonError);
           throw lessonError;
         }
-        
+
         console.log('當日課程資料:', todayLessonData);
-        
+
         // 去重學生ID
         const uniqueStudentIds = [...new Set(todayLessonData?.map(lesson => lesson.student_id) || [])];
         console.log('去重後的學生ID:', uniqueStudentIds);
-        
+
         if (uniqueStudentIds.length === 0) {
           console.log('當日沒有學生課程，嘗試載入最近7天的課程');
-          
+
           // 獲取最近7天的日期
           const recentDates = [];
           for (let i = 0; i < 7; i++) {
@@ -484,29 +484,29 @@ export default function SimpleAbilityAssessmentModal({
             date.setDate(date.getDate() - i);
             recentDates.push(date.toISOString().split('T')[0]);
           }
-          
+
           console.log('最近7天日期:', recentDates);
-          
+
           // 查詢最近7天的課程記錄
           const { data: recentLessonDataRaw, error: recentError } = await supabase
             .from('hanami_student_lesson')
             .select('student_id')
             .in('lesson_date', recentDates)
             .not('student_id', 'is', null);
-          
-          const recentLessonData = recentLessonDataRaw as Array<{ student_id: string; [key: string]: any; }> | null;
+
+          const recentLessonData = recentLessonDataRaw as Array<{ student_id: string;[key: string]: any; }> | null;
 
           if (recentError) {
             console.error('載入最近課程失敗:', recentError);
             throw recentError;
           }
-          
+
           console.log('最近7天課程資料:', recentLessonData);
-          
+
           // 去重學生ID
           const recentStudentIds = [...new Set(recentLessonData?.map(lesson => lesson.student_id) || [])];
           console.log('最近7天學生ID:', recentStudentIds);
-          
+
           if (recentStudentIds.length === 0) {
             console.log('最近7天也沒有學生課程');
             studentsData = [];
@@ -516,18 +516,18 @@ export default function SimpleAbilityAssessmentModal({
             try {
               const session = getUserSession();
               const userEmail = session?.email || null;
-              
+
               if (!validOrgId) {
                 throw new Error('缺少機構ID');
               }
-              
+
               // 使用 API 端點獲取所有學生
               const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
-              
+
               const response = await fetch(apiUrl, {
                 credentials: 'include',
               });
-              
+
               if (response.ok) {
                 const result = await response.json();
                 const allStudents = result.students || result.data || [];
@@ -553,18 +553,18 @@ export default function SimpleAbilityAssessmentModal({
                 .from('Hanami_Students')
                 .select('id, full_name, nick_name')
                 .in('id', recentStudentIds.filter((id): id is string => id !== null));
-              
+
               if (validOrgId) {
                 recentStudentsQuery = recentStudentsQuery.eq('org_id', validOrgId);
               }
-              
+
               const { data: recentStudentsData, error: studentsError } = await recentStudentsQuery.order('full_name');
 
               if (studentsError) {
                 console.error('載入最近學生失敗:', studentsError);
                 throw studentsError;
               }
-              
+
               studentsData = recentStudentsData || [];
             }
             console.log('最近7天學生資料載入成功:', studentsData);
@@ -575,18 +575,18 @@ export default function SimpleAbilityAssessmentModal({
           try {
             const session = getUserSession();
             const userEmail = session?.email || null;
-            
+
             if (!validOrgId) {
               throw new Error('缺少機構ID');
             }
-            
+
             // 使用 API 端點獲取所有學生
             const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
-            
+
             const response = await fetch(apiUrl, {
               credentials: 'include',
             });
-            
+
             if (response.ok) {
               const result = await response.json();
               const allStudents = result.students || result.data || [];
@@ -612,18 +612,18 @@ export default function SimpleAbilityAssessmentModal({
               .from('Hanami_Students')
               .select('id, full_name, nick_name')
               .in('id', uniqueStudentIds.filter((id): id is string => id !== null));
-            
+
             if (validOrgId) {
               todayStudentsQuery = todayStudentsQuery.eq('org_id', validOrgId);
             }
-            
+
             const { data: todayStudentsData, error: studentsError } = await todayStudentsQuery.order('full_name');
 
             if (studentsError) {
               console.error('載入當日學生失敗:', studentsError);
               throw studentsError;
             }
-            
+
             studentsData = todayStudentsData || [];
           }
           console.log('當日學生資料載入成功:', studentsData);
@@ -634,18 +634,18 @@ export default function SimpleAbilityAssessmentModal({
         try {
           const session = getUserSession();
           const userEmail = session?.email || null;
-          
+
           if (!validOrgId) {
             throw new Error('缺少機構ID');
           }
-          
+
           // 使用 API 端點獲取所有學生
           const apiUrl = `/api/students/list?orgId=${encodeURIComponent(validOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
-          
+
           const response = await fetch(apiUrl, {
             credentials: 'include',
           });
-          
+
           if (response.ok) {
             const result = await response.json();
             const allStudents = result.students || result.data || [];
@@ -667,23 +667,23 @@ export default function SimpleAbilityAssessmentModal({
           let allStudentsQuery = supabase
             .from('Hanami_Students')
             .select('id, full_name, nick_name');
-          
+
           if (validOrgId) {
             allStudentsQuery = allStudentsQuery.eq('org_id', validOrgId);
           }
-          
+
           const { data: allStudentsData, error: studentsError } = await allStudentsQuery.order('full_name');
 
           if (studentsError) {
             console.error('載入學生失敗:', studentsError);
             throw studentsError;
           }
-          
+
           studentsData = allStudentsData || [];
         }
         console.log('所有學生資料載入成功:', studentsData);
       }
-      
+
       // 確保 defaultStudent 總是包含在學生列表中（特別是在鎖定模式下）
       if (defaultStudent && studentsData) {
         const existingStudent = studentsData.find(s => s.id === defaultStudent.id);
@@ -696,7 +696,7 @@ export default function SimpleAbilityAssessmentModal({
           });
         }
       }
-      
+
       setStudents(studentsData || []);
 
       // 載入成長樹列表（根據 org_id 過濾）
@@ -704,18 +704,18 @@ export default function SimpleAbilityAssessmentModal({
         .from('hanami_growth_trees')
         .select('id, tree_name, tree_description')
         .eq('is_active', true);
-      
+
       if (validOrgId) {
         treesQuery = treesQuery.eq('org_id', validOrgId);
       } else {
         // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
         treesQuery = treesQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
       }
-      
+
       const { data: treesData, error: treesError } = await treesQuery.order('tree_name');
 
       if (treesError) throw treesError;
-      
+
       console.log('成長樹資料載入成功:', treesData);
       setTrees(treesData || []);
 
@@ -724,8 +724,8 @@ export default function SimpleAbilityAssessmentModal({
         .from('hanami_employee')
         .select('id, teacher_fullname, teacher_nickname, teacher_email, teacher_role, teacher_status')
         .order('teacher_nickname');
-      
-      const teachersData = teachersDataRaw as Array<{ id: string; teacher_fullname: string | null; teacher_nickname: string | null; teacher_email: string | null; teacher_role: string | null; teacher_status: string | null; [key: string]: any; }> | null;
+
+      const teachersData = teachersDataRaw as Array<{ id: string; teacher_fullname: string | null; teacher_nickname: string | null; teacher_email: string | null; teacher_role: string | null; teacher_status: string | null;[key: string]: any; }> | null;
 
       if (teachersError) {
         console.error('載入教師失敗:', teachersError);
@@ -739,8 +739,8 @@ export default function SimpleAbilityAssessmentModal({
         .from('hanami_admin')
         .select('id, admin_name, admin_email, role')
         .order('admin_name');
-      
-      const adminsData = adminsDataRaw as Array<{ id: string; admin_name: string | null; admin_email: string | null; role: string | null; [key: string]: any; }> | null;
+
+      const adminsData = adminsDataRaw as Array<{ id: string; admin_name: string | null; admin_email: string | null; role: string | null;[key: string]: any; }> | null;
 
       if (adminsError) {
         console.error('載入管理員失敗:', adminsError);
@@ -764,7 +764,7 @@ export default function SimpleAbilityAssessmentModal({
       }));
 
       const allTeachers = [...employeeTeachers, ...adminTeachers];
-      
+
       console.log('合併後的教師資料:', allTeachers);
       console.log('員工數量:', employeeTeachers.length);
       console.log('管理員數量:', adminTeachers.length);
@@ -820,10 +820,10 @@ export default function SimpleAbilityAssessmentModal({
   const loadStudentTrees = async (studentId: string, targetTreeId?: string, latestAssessmentData?: any) => {
     try {
       console.log('載入學生的成長樹:', studentId);
-      
+
       // 優化：並行查詢符合 org_id 的成長樹ID列表和學生的成長樹
       const queries: Promise<any>[] = [];
-      
+
       // 查詢1：符合 org_id 的成長樹ID列表
       if (validOrgId) {
         queries.push(
@@ -836,7 +836,7 @@ export default function SimpleAbilityAssessmentModal({
       } else {
         queries.push(Promise.resolve({ data: null, error: null }));
       }
-      
+
       // 查詢2：學生的成長樹（先不添加 org_id 過濾，等查詢1完成後再決定）
       let studentTreesQuery = supabase
         .from('hanami_student_trees')
@@ -852,27 +852,27 @@ export default function SimpleAbilityAssessmentModal({
         `)
         .eq('student_id', studentId)
         .or('status.eq.active,tree_status.eq.active');
-      
+
       queries.push((studentTreesQuery as unknown) as Promise<any>);
-      
+
       // 並行執行查詢
       const [validTreesResult, studentTreesResult] = await Promise.all(queries);
-      
+
       // 處理查詢1的結果
       let validTreeIds: string[] = [];
       if (validOrgId && validTreesResult.data) {
-        const validTreesData = validTreesResult.data as Array<{ id: string; [key: string]: any; }> | null;
+        const validTreesData = validTreesResult.data as Array<{ id: string;[key: string]: any; }> | null;
         if (validTreesResult.error) {
           console.error('查詢符合 org_id 的成長樹失敗:', validTreesResult.error);
         } else {
           validTreeIds = (validTreesData || []).map(t => t.id);
         }
       }
-      
+
       // 處理查詢2的結果
       const { data: studentTreesDataRaw, error: studentTreesError } = studentTreesResult;
-      
-      const studentTreesData = studentTreesDataRaw as Array<{ hanami_growth_trees: { id: string; tree_name: string; tree_description: string | null; } | null; [key: string]: any; }> | null;
+
+      const studentTreesData = studentTreesDataRaw as Array<{ hanami_growth_trees: { id: string; tree_name: string; tree_description: string | null; } | null;[key: string]: any; }> | null;
 
       if (studentTreesError) {
         console.error('載入學生成長樹失敗:', studentTreesError);
@@ -889,7 +889,7 @@ export default function SimpleAbilityAssessmentModal({
           start_date: item.start_date,
           status: item.status
         }));
-      
+
       // 如果有限制的成長樹ID列表，則過濾
       if (validOrgId && validTreeIds.length > 0) {
         formattedTrees = formattedTrees.filter(tree => validTreeIds.includes(tree.id));
@@ -908,9 +908,9 @@ export default function SimpleAbilityAssessmentModal({
         console.log('  - isEditMode:', isEditMode);
         console.log('  - latestAssessmentData:', latestAssessmentData);
         console.log('  - latestAssessment (狀態):', latestAssessment);
-        
+
         let preferredTreeId = targetTreeId;
-        
+
         // 編輯模式：使用 initialData 中的 tree_id
         if (isEditMode && initialData?.tree_id) {
           preferredTreeId = initialData.tree_id;
@@ -940,14 +940,14 @@ export default function SimpleAbilityAssessmentModal({
             preferredTreeId = formattedTrees[0].id;
             console.log('📝 新增模式：沒有評估記錄，使用第一個成長樹:', preferredTreeId);
           }
-          
+
           // 顯示成長樹名稱
           if (preferredTreeId) {
             const selectedTreeName = formattedTrees.find(tree => tree.id === preferredTreeId)?.tree_name;
             console.log('🌳 對應的成長樹名稱:', selectedTreeName);
           }
         }
-        
+
         if (preferredTreeId) {
           const treeExists = formattedTrees.find(tree => tree.id === preferredTreeId);
           if (treeExists) {
@@ -980,10 +980,10 @@ export default function SimpleAbilityAssessmentModal({
   const loadAssessmentHistory = async (studentId: string) => {
     try {
       console.log('🔍 載入學生評估記錄歷史:', studentId);
-      
+
       const response = await fetch(`/api/student-assessment-history?student_id=${studentId}`);
       const data = await response.json();
-      
+
       if (data.success) {
         console.log('✅ 成功載入評估記錄歷史:', {
           total_records: data.total_records,
@@ -992,9 +992,9 @@ export default function SimpleAbilityAssessmentModal({
           recommended_record_date: data.recommended_record?.assessment_date,
           recommended_tree_id: data.recommended_record?.tree_id
         });
-        
+
         setAssessmentHistory(data.assessments);
-        
+
         // 設置推薦的記錄（有評估資料的最新記錄，或最新的記錄）
         if (data.recommended_record) {
           setSelectedAssessmentRecord(data.recommended_record);
@@ -1006,7 +1006,7 @@ export default function SimpleAbilityAssessmentModal({
             tree_name: data.recommended_record.tree?.tree_name
           });
         }
-        
+
         return data.recommended_record;
       } else {
         console.error('載入評估記錄歷史失敗:', data.error);
@@ -1024,7 +1024,7 @@ export default function SimpleAbilityAssessmentModal({
   const loadLatestAssessment = async (studentId: string, treeId?: string): Promise<any> => {
     try {
       console.log('📋 載入學生最新評估記錄:', { studentId, treeId });
-      
+
       // 如果指定了成長樹，只載入該成長樹的最新評估
       if (treeId) {
         console.log('🎯 查詢指定成長樹的評估記錄:', treeId);
@@ -1035,7 +1035,7 @@ export default function SimpleAbilityAssessmentModal({
           .eq('tree_id', treeId)
           .order('assessment_date', { ascending: false })
           .limit(1);
-        
+
         if (!treeError && treeAssessments && treeAssessments.length > 0) {
           const latest = treeAssessments[0];
           console.log('✅ 找到指定成長樹的最新評估記錄:', latest);
@@ -1047,7 +1047,7 @@ export default function SimpleAbilityAssessmentModal({
           return null;
         }
       }
-      
+
       // 如果沒有指定成長樹，載入該學生的最新評估記錄（任何成長樹）
       console.log('🔍 查詢學生的任何成長樹評估記錄');
       const { data: allAssessmentsRaw, error: allError } = await supabase
@@ -1056,19 +1056,19 @@ export default function SimpleAbilityAssessmentModal({
         .eq('student_id', studentId)
         .order('assessment_date', { ascending: false })
         .limit(1);
-      
-      const allAssessments = allAssessmentsRaw as Array<{ tree_id: string; [key: string]: any; }> | null;
-      
+
+      const allAssessments = allAssessmentsRaw as Array<{ tree_id: string;[key: string]: any; }> | null;
+
       if (allError) {
         console.error('載入最新評估記錄失敗:', allError);
         throw allError;
       }
-      
+
       if (allAssessments && allAssessments.length > 0) {
         const latest = allAssessments[0];
         console.log('✅ 找到學生的最新評估記錄:', latest);
         console.log('🎯 最新評估記錄的成長樹ID:', latest.tree_id);
-        
+
         // 詳細檢查 selected_goals 和 ability_assessments 資料
         console.log('🔍 詳細資料結構檢查:');
         console.log('  - selected_goals 欄位:', latest.selected_goals);
@@ -1077,7 +1077,7 @@ export default function SimpleAbilityAssessmentModal({
         console.log('  - ability_assessments 欄位:', latest.ability_assessments);
         console.log('  - ability_assessments 類型:', typeof latest.ability_assessments);
         console.log('  - 完整記錄鍵值:', Object.keys(latest));
-        
+
         setLatestAssessment(latest);
         return latest;
       } else {
@@ -1085,7 +1085,7 @@ export default function SimpleAbilityAssessmentModal({
         setLatestAssessment(null);
         return null;
       }
-      
+
     } catch (error) {
       console.error('載入最新評估記錄失敗:', error);
       setLatestAssessment(null);
@@ -1096,24 +1096,24 @@ export default function SimpleAbilityAssessmentModal({
   // 載入學生活動
   const loadStudentActivities = async () => {
     if (!selectedStudentId || !lessonDate) return;
-    
+
     try {
       console.log('載入學生活動:', selectedStudentId, lessonDate);
-      
+
       // 構建查詢參數
       const params = new URLSearchParams({
         studentId: selectedStudentId,
         lessonDate: lessonDate
       });
-      
+
       // 添加 orgId 參數
       if (validOrgId) {
         params.append('orgId', validOrgId);
       }
-      
+
       // 添加 timeslot 參數（如果有的話）
       // 這裡我們先不傳 timeslot，讓 API 處理沒有 timeslot 的情況
-      
+
       const response = await fetch(`/api/student-activities?${params.toString()}`);
       if (response.ok) {
         const result = await response.json();
@@ -1123,29 +1123,29 @@ export default function SimpleAbilityAssessmentModal({
           const ongoingActivities = result.data.ongoingActivities || [];
           const completedOngoingActivities = result.data.completedOngoingActivities || [];
           const previousLessonActivities = result.data.previousLessonActivities || [];
-          
+
           console.log('原始數據:', {
             currentLessonActivities: currentLessonActivities.length,
             ongoingActivities: ongoingActivities.length,
             completedOngoingActivities: completedOngoingActivities.length,
             previousLessonActivities: previousLessonActivities.length
           });
-          
+
           // 合併未完成和已完成的正在學習活動，供篩選器使用
           const allOngoingActivities = [
             ...ongoingActivities,
             ...completedOngoingActivities
           ];
-          
+
           console.log('合併後的正在學習活動:', {
             未完成: ongoingActivities.length,
             已完成: completedOngoingActivities.length,
             總計: allOngoingActivities.length
           });
-          
+
           // 創建一個 Map 來避免重複添加相同的活動
           const currentActivityMap = new Map();
-          
+
           // 首先添加本次課堂的活動
           currentLessonActivities.forEach((activity: any) => {
             const key = activity.activityId || activity.id;
@@ -1156,17 +1156,17 @@ export default function SimpleAbilityAssessmentModal({
               });
             }
           });
-          
+
           // 然後添加正在學習的活動（如果不在本次課堂中且未完成）
           let addedOngoingCount = 0;
           let filteredCompletedCount = 0;
-          
+
           ongoingActivities.forEach((activity: any) => {
             const key = activity.activityId || activity.id;
             if (key && !currentActivityMap.has(key)) {
               // 檢查活動是否已完成（進度 >= 100%）
               const isCompleted = (activity.progress || 0) >= 100;
-              
+
               // 只有未完成的活動才添加到本次課堂活動中
               if (!isCompleted) {
                 // 轉換為本次課堂活動的格式
@@ -1183,10 +1183,10 @@ export default function SimpleAbilityAssessmentModal({
               }
             }
           });
-          
+
           // 轉換回數組
           const enhancedCurrentLessonActivities = Array.from(currentActivityMap.values());
-          
+
           console.log('雙重顯示處理完成:', {
             原始本次課堂活動: currentLessonActivities.length,
             原始正在學習活動: ongoingActivities.length,
@@ -1196,19 +1196,19 @@ export default function SimpleAbilityAssessmentModal({
             添加到本次課堂的ongoing活動: addedOngoingCount,
             過濾掉的已完成活動: filteredCompletedCount
           });
-          
+
           // 設置增強後的活動數據，使用合併後的正在學習活動
           setStudentActivities({
             currentLessonActivities: enhancedCurrentLessonActivities,
             previousLessonActivities,
             ongoingActivities: allOngoingActivities // 使用合併後的活動列表
           });
-          
+
           console.log('學生活動載入成功（已實現雙重顯示）:', {
             currentLessonActivities: enhancedCurrentLessonActivities,
             ongoingActivities: allOngoingActivities
           });
-          
+
           // 新增：詳列 ongoingActivities 的每一筆關鍵欄位以偵錯自動安排邏輯的匹配
           try {
             const ongoing = result.data?.ongoingActivities || [];
@@ -1261,23 +1261,23 @@ export default function SimpleAbilityAssessmentModal({
   const loadTreeGoalsAndAbilities = async (treeId: string) => {
     try {
       setLoading(true);
-      
+
       // 載入成長樹的目標（根據 org_id 過濾）
       let goalsQuery = supabase
         .from('hanami_growth_goals')
         .select('*')
         .eq('tree_id', treeId);
-      
+
       if (validOrgId) {
         goalsQuery = goalsQuery.eq('org_id', validOrgId);
       } else {
         // 如果沒有 orgId，查詢一個不存在的 UUID 以確保不返回任何結果
         goalsQuery = goalsQuery.eq('org_id', '00000000-0000-0000-0000-000000000000');
       }
-      
+
       const { data: goalsDataRaw, error: goalsError } = await goalsQuery.order('goal_order');
-      
-      const goalsData = goalsDataRaw as Array<{ required_abilities: string[] | null; [key: string]: any; }> | null;
+
+      const goalsData = goalsDataRaw as Array<{ required_abilities: string[] | null;[key: string]: any; }> | null;
 
       if (goalsError) throw goalsError;
 
@@ -1302,15 +1302,15 @@ export default function SimpleAbilityAssessmentModal({
 
         if (abilitiesError) throw abilitiesError;
         abilitiesData = abilitiesResult || [];
-        
+
         // 載入能力等級內容
         const { data: levelContentsDataRaw, error: levelContentsError } = await supabase
           .from('hanami_ability_levels')
           .select('*')
           .in('ability_id', Array.from(abilityIds))
           .order('level');
-        
-        const levelContentsData = levelContentsDataRaw as Array<{ ability_id: string; level: number; level_title: string | null; level_description: string | null; [key: string]: any; }> | null;
+
+        const levelContentsData = levelContentsDataRaw as Array<{ ability_id: string; level: number; level_title: string | null; level_description: string | null;[key: string]: any; }> | null;
 
         if (!levelContentsError && levelContentsData) {
           // 將等級內容組織到能力中
@@ -1339,12 +1339,12 @@ export default function SimpleAbilityAssessmentModal({
           .select('*')
           .eq('student_id', selectedStudentId)
           .eq('tree_id', treeId);
-        
-        const progressData = progressDataRaw as Array<{ ability_id: string; [key: string]: any; }> | null;
+
+        const progressData = progressDataRaw as Array<{ ability_id: string;[key: string]: any; }> | null;
 
         if (!progressError && progressData) {
           console.log('載入的進度資料:', progressData);
-          
+
           // 將進度資料合併到能力中
           const progressMap = new Map();
           progressData.forEach(progress => {
@@ -1352,7 +1352,7 @@ export default function SimpleAbilityAssessmentModal({
           });
 
           console.log('進度資料映射:', Object.fromEntries(progressMap));
-          
+
           // 載入歷史評估資料並設置初始值
           const { data: assessmentData, error: assessmentError } = await supabase
             .from('hanami_ability_assessments')
@@ -1380,8 +1380,8 @@ export default function SimpleAbilityAssessmentModal({
           });
 
           // 設置目標評估的初始值
-          const initialGoalAssessments: {[key: string]: any} = {};
-          const initialMultiSelectAssessments: {[key: string]: string[]} = {};
+          const initialGoalAssessments: { [key: string]: any } = {};
+          const initialMultiSelectAssessments: { [key: string]: string[] } = {};
 
           // 優先從 initialData（編輯模式）讀取，然後從狀態中的最新評估記錄讀取，最後使用本次查詢的結果
           const stateLatestAssessment = selectedAssessmentRecord || latestAssessment; // 從狀態獲取用戶選擇的記錄
@@ -1395,7 +1395,7 @@ export default function SimpleAbilityAssessmentModal({
           console.log('  - 最終使用的 sourceAssessment:', sourceAssessment);
           console.log('  - sourceAssessment?.selected_goals:', sourceAssessment?.selected_goals);
           console.log('  - sourceAssessment?.ability_assessments:', sourceAssessment?.ability_assessments);
-          
+
           if (sourceAssessment) {
             // 檢查成長樹是否匹配（編輯模式下總是匹配，新增模式下需要檢查）
             const treeMatches = isEditMode || sourceAssessment.tree_id === treeId;
@@ -1409,7 +1409,7 @@ export default function SimpleAbilityAssessmentModal({
             if (sourceAssessment.selected_goals && sourceAssessment.selected_goals.length > 0 && treeMatches) {
               console.log('✅ 成長樹匹配，從 selected_goals 讀取評估資料:', sourceAssessment.selected_goals);
               console.log('資料來源:', isEditMode && initialData ? 'initialData' : 'latestAssessment');
-              
+
               sourceAssessment.selected_goals.forEach((goalData: any) => {
                 const { goal_id, assessment_mode, progress_level, selected_levels } = goalData;
                 console.log(`🎯 處理歷史目標評估: ${goal_id}`, {
@@ -1417,7 +1417,7 @@ export default function SimpleAbilityAssessmentModal({
                   progress_level,
                   selected_levels
                 });
-                
+
                 if (assessment_mode === 'multi_select') {
                   if (selected_levels && selected_levels.length > 0) {
                     initialMultiSelectAssessments[goal_id] = selected_levels;
@@ -1443,31 +1443,31 @@ export default function SimpleAbilityAssessmentModal({
           console.log('  - 當前成長樹目標數量:', goalsData?.length || 0);
           console.log('  - 歷史目標評估數量:', Object.keys(initialGoalAssessments).length);
           console.log('  - 歷史多選評估數量:', Object.keys(initialMultiSelectAssessments).length);
-          
+
           (goalsData || []).forEach(goal => {
             console.log(`🎯 處理當前目標 ${goal.id}:`, goal.goal_name);
             console.log(`目標評估模式:`, (goal as any).assessment_mode);
             console.log(`目標所需能力:`, goal.required_abilities);
-            
+
             // 檢查是否有歷史評估資料
             const hasHistoryGoal = initialGoalAssessments[goal.id];
             const hasHistoryMultiSelect = initialMultiSelectAssessments[goal.id];
             console.log(`歷史進度評估:`, hasHistoryGoal);
             console.log(`歷史多選評估:`, hasHistoryMultiSelect);
-            
+
             // 如果已經有歷史評估資料，跳過重新計算
             if (hasHistoryGoal || hasHistoryMultiSelect) {
               console.log(`⏭️ 目標 ${goal.id} 已有歷史評估資料，跳過重新計算`);
               return;
             }
-            
+
             if ((goal as any).assessment_mode === 'multi_select') {
               // 多選模式：從進度資料中獲取選中的等級
               const goalAbilities = goal.required_abilities || [];
               const selectedLevels: string[] = [];
-              
+
               console.log(`目標 ${goal.id} 的多選等級:`, (goal as any).multi_select_levels);
-              
+
               if (goalAbilities.length > 0) {
                 // 有關聯能力的情況
                 goalAbilities.forEach((abilityId: any) => {
@@ -1492,9 +1492,9 @@ export default function SimpleAbilityAssessmentModal({
                   selectedLevels.push(...virtualProgress.selected_levels);
                 }
               }
-              
+
               console.log(`目標 ${goal.id} 的最終選中等級:`, selectedLevels);
-              
+
               if (selectedLevels.length > 0) {
                 initialMultiSelectAssessments[goal.id] = selectedLevels;
                 console.log(`設置目標 ${goal.id} 的多選初始值:`, selectedLevels);
@@ -1504,7 +1504,7 @@ export default function SimpleAbilityAssessmentModal({
               const goalAbilities = goal.required_abilities || [];
               let totalLevel = 0;
               let abilityCount = 0;
-              
+
               if (goalAbilities.length > 0) {
                 // 有關聯能力的情況
                 goalAbilities.forEach((abilityId: any) => {
@@ -1523,7 +1523,7 @@ export default function SimpleAbilityAssessmentModal({
                   abilityCount = 1;
                 }
               }
-              
+
               if (abilityCount > 0) {
                 const averageLevel = Math.round(totalLevel / abilityCount);
                 initialGoalAssessments[goal.id] = { level: averageLevel };
@@ -1535,7 +1535,7 @@ export default function SimpleAbilityAssessmentModal({
           console.log('📝 準備設置狀態:');
           console.log('  - 目標評估初始值:', initialGoalAssessments);
           console.log('  - 多選評估初始值:', initialMultiSelectAssessments);
-          
+
           // 使用函數式更新確保狀態正確設置
           setGoalAssessments(prev => {
             console.log('🔄 setGoalAssessments 回調執行:', {
@@ -1544,7 +1544,7 @@ export default function SimpleAbilityAssessmentModal({
             });
             return initialGoalAssessments;
           });
-          
+
           setMultiSelectAssessments(prev => {
             console.log('🔄 setMultiSelectAssessments 回調執行:', {
               previous: prev,
@@ -1561,7 +1561,7 @@ export default function SimpleAbilityAssessmentModal({
           }, 100);
           console.log('  - 當前成長樹ID:', treeId);
           console.log('  - 評估記錄來源成長樹ID:', sourceAssessment?.tree_id);
-          
+
           // 檢查成長樹ID是否匹配
           if (sourceAssessment && sourceAssessment.tree_id !== treeId) {
             console.warn('⚠️ 警告：評估記錄來自不同的成長樹！');
@@ -1573,7 +1573,7 @@ export default function SimpleAbilityAssessmentModal({
           if (sourceAssessment && sourceAssessment.ability_assessments) {
             console.log('🎯 從最新評估記錄初始化能力評估:', sourceAssessment.ability_assessments);
             setAbilityAssessments(sourceAssessment.ability_assessments);
-            
+
             // 同時設置其他表單欄位
             if (!isEditMode) {
               if (sourceAssessment.overall_performance_rating) {
@@ -1597,7 +1597,7 @@ export default function SimpleAbilityAssessmentModal({
               return { ...goal, is_completed: false, completion_percentage: 0 };
             }
 
-            const requiredAbilities = goal.required_abilities.map((abilityId: any) => 
+            const requiredAbilities = goal.required_abilities.map((abilityId: any) =>
               abilitiesData.find(activity => activity.id === abilityId)
             ).filter(Boolean);
 
@@ -1614,7 +1614,7 @@ export default function SimpleAbilityAssessmentModal({
               });
               const completionPercentage = Math.round((completedAbilities.length / requiredAbilities.length) * 100);
               const isCompleted = completionPercentage >= 100;
-              
+
               return {
                 ...goal,
                 is_completed: isCompleted,
@@ -1622,19 +1622,19 @@ export default function SimpleAbilityAssessmentModal({
               };
             } else {
               // 進度模式：計算平均進度
-            const totalProgress = requiredAbilities.reduce((sum: number, ability: any) => {
+              const totalProgress = requiredAbilities.reduce((sum: number, ability: any) => {
                 const progress = progressMap.get(ability.id);
                 return sum + (progress?.progress_percentage || 0);
-            }, 0);
+              }, 0);
 
-            const completionPercentage = Math.round(totalProgress / requiredAbilities.length);
-            const isCompleted = completionPercentage >= 100;
+              const completionPercentage = Math.round(totalProgress / requiredAbilities.length);
+              const isCompleted = completionPercentage >= 100;
 
-            return {
-              ...goal,
-              is_completed: isCompleted,
-              completion_percentage: completionPercentage
-            };
+              return {
+                ...goal,
+                is_completed: isCompleted,
+                completion_percentage: completionPercentage
+              };
             }
           });
 
@@ -1676,11 +1676,11 @@ export default function SimpleAbilityAssessmentModal({
       if (initialData && (goalsData || []).length > 0 && (abilitiesData || []).length > 0) {
         console.log('🔧 在載入目標和能力後修復評估記錄');
         const fixedInitialData = fixHistoricalAssessmentData(initialData, (goalsData || []) as any, abilitiesData);
-        
+
         // 更新狀態中的評估資料
         setAbilityAssessments(fixedInitialData.ability_assessments || {});
         setSelectedGoals(fixedInitialData.selected_goals || []);
-        
+
         console.log('✅ 評估記錄修復完成');
       }
 
@@ -1742,9 +1742,9 @@ export default function SimpleAbilityAssessmentModal({
   };
 
   // 活動卡片組件
-  const ActivityCard = ({ 
-    activity, 
-    type, 
+  const ActivityCard = ({
+    activity,
+    type,
     area,
     onEdit,
     onSave,
@@ -1754,9 +1754,9 @@ export default function SimpleAbilityAssessmentModal({
     isEditing,
     tempProgress,
     onProgressChange
-  }: { 
-    activity: any; 
-    type: 'current' | 'previous' | 'ongoing'; 
+  }: {
+    activity: any;
+    type: 'current' | 'previous' | 'ongoing';
     area: 'current_lesson' | 'ongoing';
     onEdit?: (activityId: string, clickedArea: "current_lesson" | "ongoing") => void;
     onSave?: (activityId: string) => Promise<void>;
@@ -1770,7 +1770,7 @@ export default function SimpleAbilityAssessmentModal({
     const isEditingLocal = isEditing || editingActivityId === activity.id;
     const currentProgress = isEditingLocal ? (tempProgress || 0) : (activity.progress || 0);
     const isNotStarted = activity.completionStatus === 'not_started';
-    
+
     const getStatusText = () => {
       if (currentProgress >= 100) return '已完成';
       if (currentProgress > 0) return '進行中';
@@ -1792,7 +1792,7 @@ export default function SimpleAbilityAssessmentModal({
     // 在「正在學習的活動」區域中，所有活動都可以編輯
     // 在「本次課堂活動」區域中，只有 source !== 'ongoing' 的活動可以編輯
     const canEdit = area === 'ongoing' || (area === 'current_lesson' && activity.source !== 'ongoing');
-    
+
     // 調試日誌
     console.log('ActivityCard 調試:', {
       activityId: activity.id,
@@ -1813,11 +1813,10 @@ export default function SimpleAbilityAssessmentModal({
               <span>{activity.activityName}</span>
               {/* 顯示活動來源標記 */}
               {activity.source && (
-                <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${
-                  activity.source === 'ongoing' 
-                    ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${activity.source === 'ongoing'
+                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
                     : 'bg-green-100 text-green-800 border border-green-200'
-                }`}>
+                  }`}>
                   {activity.source === 'ongoing' ? (
                     <>
                       <ArrowPathIcon className="w-3 h-3" />
@@ -1867,7 +1866,7 @@ export default function SimpleAbilityAssessmentModal({
         {isEditingLocal && canEdit && (
           <div className="mb-3 p-3 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
             <h6 className="text-xs font-medium text-[#2B3A3B] mb-2">編輯完成進度</h6>
-            
+
             {/* 進度條 */}
             <div className="mb-3">
               <div className="flex items-center justify-between mb-2">
@@ -1901,11 +1900,10 @@ export default function SimpleAbilityAssessmentModal({
                 {[0, 25, 50, 75, 100].map((progress) => (
                   <button
                     key={progress}
-                    className={`px-3 py-1 text-xs rounded-lg transition-all duration-200 ${
-                      currentProgress === progress
+                    className={`px-3 py-1 text-xs rounded-lg transition-all duration-200 ${currentProgress === progress
                         ? 'bg-[#E8B4A0] text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                      }`}
                     onClick={() => handleProgressChange(activity.id, progress)}
                   >
                     {progress}%
@@ -1953,7 +1951,7 @@ export default function SimpleAbilityAssessmentModal({
               <span className="text-xs text-[#A68A64]">{currentProgress}%</span>
             </div>
             <div className="w-full bg-[#F5F0EB] rounded-full h-2">
-              <div 
+              <div
                 className="bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] h-2 rounded-full transition-all duration-300"
                 style={{ width: `${currentProgress}%` }}
               ></div>
@@ -1977,15 +1975,15 @@ export default function SimpleAbilityAssessmentModal({
 
   const handleActivityAssigned = async (newActivity: any) => {
     console.log('收到活動分配通知:', newActivity);
-    
+
     // 立即更新本地狀態，讓用戶立即看到新分配的活動
     setStudentActivities(prev => ({
       ...prev,
       ongoingActivities: [...prev.ongoingActivities, newActivity]
     }));
-    
+
     console.log('本地狀態已更新，新活動立即顯示');
-    
+
     // 在背景重新載入數據以確保數據一致性
     try {
       console.log('開始在背景重新載入活動數據...');
@@ -2000,30 +1998,30 @@ export default function SimpleAbilityAssessmentModal({
   // 處理活動編輯
   const handleActivityEdit = (activityId: string, clickedArea: 'current_lesson' | 'ongoing') => {
     console.log('handleActivityEdit 被調用，activityId:', activityId, 'clickedArea:', clickedArea);
-    
+
     // 檢查活動是否為正在學習的活動，如果是則不允許編輯
     const activity = [...studentActivities.currentLessonActivities, ...studentActivities.ongoingActivities]
       .find(a => a.id === activityId);
-    
+
     console.log('找到的活動:', activity);
-    
+
     // 根據點擊的區域來決定是否允許編輯
     // 如果在「正在學習的活動」區域點擊，則允許編輯
     // 如果在「本次課堂活動」區域點擊且來源為 ongoing，則不允許編輯
     const isOngoingSource = activity?.source === 'ongoing';
-    
+
     console.log('編輯檢查:', {
       clickedArea,
       isOngoingSource,
       shouldBlock: clickedArea === 'current_lesson' && isOngoingSource
     });
-    
+
     if (clickedArea === 'current_lesson' && isOngoingSource) {
       console.log('正在學習的活動不能在「本次課堂活動」區域編輯進度:', activity);
       toast.error('正在學習的活動需要在「正在學習的活動」區域進行進度修改');
       return;
     }
-    
+
     console.log('允許編輯，設置編輯狀態');
     setEditingActivityId(activityId);
     // 初始化臨時進度
@@ -2047,7 +2045,7 @@ export default function SimpleAbilityAssessmentModal({
   const handleProgressSave = async (activityId: string) => {
     try {
       const progress = tempProgress[activityId] || 0;
-      
+
       const response = await fetch('/api/update-activity-progress', {
         method: 'POST',
         headers: {
@@ -2063,36 +2061,36 @@ export default function SimpleAbilityAssessmentModal({
         const result = await response.json();
         if (result.success) {
           console.log('進度更新成功');
-          
+
           // 立即更新本地狀態，確保活動正確顯示
           setStudentActivities(prev => {
             const updated = {
               ...prev,
-              currentLessonActivities: prev.currentLessonActivities.map(activity => 
-                activity.id === activityId 
+              currentLessonActivities: prev.currentLessonActivities.map(activity =>
+                activity.id === activityId
                   ? { ...activity, progress: progress }
                   : activity
               ),
-              ongoingActivities: prev.ongoingActivities.map(activity => 
-                activity.id === activityId 
+              ongoingActivities: prev.ongoingActivities.map(activity =>
+                activity.id === activityId
                   ? { ...activity, progress: progress }
                   : activity
               )
             };
-            
+
             console.log('本地狀態更新調試:', {
               activityId,
               newProgress: progress,
               updatedCurrentLesson: updated.currentLessonActivities.filter(a => a.id === activityId),
               updatedOngoing: updated.ongoingActivities.filter(a => a.id === activityId)
             });
-            
+
             return updated;
           });
-          
+
           // 清除編輯狀態
           setEditingActivityId(null);
-          
+
           // 如果活動完成（進度 >= 100%），自動切換到「已完成」篩選器
           if (progress >= 100) {
             setActivityFilter('completed');
@@ -2102,7 +2100,7 @@ export default function SimpleAbilityAssessmentModal({
               setShowCompletionMessage(false);
             }, 3000);
           }
-          
+
           // 在背景重新載入數據以確保數據一致性
           try {
             await loadStudentActivities();
@@ -2156,7 +2154,7 @@ export default function SimpleAbilityAssessmentModal({
         completionStatus: a.completionStatus
       }))
     });
-    
+
     let filteredActivities;
     switch (activityFilter) {
       case 'completed':
@@ -2197,7 +2195,7 @@ export default function SimpleAbilityAssessmentModal({
   // 處理活動刪除
   const handleActivityDelete = async (activityId: string) => {
     if (!confirm('確定要刪除此活動嗎？')) return;
-    
+
     try {
       const response = await fetch('/api/remove-single-student-activity', {
         method: 'DELETE',
@@ -2233,7 +2231,7 @@ export default function SimpleAbilityAssessmentModal({
   const handleActivityAssignmentSuccess = async (selectedActivities: any[]) => {
     try {
       console.log('處理活動分配:', selectedActivities);
-      
+
       if (selectedActivities.length === 0) {
         setShowActivitySelectionModal(false);
         return;
@@ -2242,7 +2240,7 @@ export default function SimpleAbilityAssessmentModal({
       // 準備活動分配數據
       const activityIds = selectedActivities.map(activity => activity.id);
       const assignmentType = currentActivityType === 'current' ? 'current_lesson' : 'ongoing';
-      
+
       // 如果分配類型是 current_lesson，同時也分配為 ongoing
       if (assignmentType === 'current_lesson') {
         // 先分配為 current_lesson
@@ -2333,7 +2331,7 @@ export default function SimpleAbilityAssessmentModal({
 
     try {
       setLoading(true);
-      
+
       console.log('準備提交評估資料...');
       console.log('學生:', selectedStudent.full_name);
       console.log('成長樹:', selectedTreeId);
@@ -2407,11 +2405,11 @@ export default function SimpleAbilityAssessmentModal({
       console.log('assessmentWithGoals:', assessmentWithGoals);
       console.log('目標評估數量:', assessmentWithGoals.goals?.length || 0);
       console.log('onSubmit 函數:', onSubmit);
-      
+
       try {
         onSubmit(assessmentWithGoals);
         console.log('✅ onSubmit 調用成功');
-        
+
         // 顯示成功提示（右上角）
         toast.success(isEditMode ? '能力評估更新成功' : '能力評估新增成功', {
           duration: 3000,
@@ -2433,9 +2431,9 @@ export default function SimpleAbilityAssessmentModal({
         console.error('❌ onSubmit 調用失敗:', error);
         throw error;
       }
-      
+
       onClose();
-      
+
     } catch (error) {
       console.error('準備評估資料失敗:', error);
       alert('準備評估資料失敗: ' + (error as Error).message);
@@ -2447,10 +2445,10 @@ export default function SimpleAbilityAssessmentModal({
   // const selectedTree = trees.find(tree => tree.id === selectedTreeId); // 移除此行
 
   // 等級選擇進度條組件
-  const LevelProgressBar = ({ 
-    current, 
-    maxLevel, 
-    label, 
+  const LevelProgressBar = ({
+    current,
+    maxLevel,
+    label,
     onLevelChange,
     interactive = true,
     progressContents = [], // 每個等級對應的內容
@@ -2475,9 +2473,9 @@ export default function SimpleAbilityAssessmentModal({
         onLevelChange(level);
       }
     };
-    
+
     const completionPercentage = maxLevel > 0 ? Math.round((current / maxLevel) * 100) : 0;
-    
+
     return (
       <div className="space-y-3">
         <div className="flex justify-between items-center">
@@ -2498,7 +2496,7 @@ export default function SimpleAbilityAssessmentModal({
             )}
           </div>
         </div>
-        
+
         {/* 等級選擇圓圈 */}
         <div className="flex items-center justify-center space-x-2 relative">
           {Array.from({ length: maxLevel }, (_, index) => {
@@ -2507,7 +2505,7 @@ export default function SimpleAbilityAssessmentModal({
             const isClickable = interactive && onLevelChange;
             const content = progressContents[index] || `等級 ${level}`;
             const isLastAssessment = lastAssessment && level === lastAssessment.level;
-            
+
             return (
               <div key={`level-${index}-${level}`} className="flex flex-col items-center relative">
                 {/* 歷史評估縮圖 */}
@@ -2516,31 +2514,29 @@ export default function SimpleAbilityAssessmentModal({
                     <span className="text-[8px] text-white font-bold">H</span>
                   </div>
                 )}
-                
+
                 <div
-                  className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ease-out flex items-center justify-center text-xs font-bold shadow-sm ${
-                    isSelected
+                  className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ease-out flex items-center justify-center text-xs font-bold shadow-sm ${isSelected
                       ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-md transform scale-105'
                       : isLastAssessment
-                      ? 'bg-gradient-to-br from-[#F0F8FF] to-[#E6F3FF] border-[#B8D4E3] text-[#5A7A8A]'
-                      : 'bg-white border-[#E8D5C4] text-[#8B7355] hover:border-[#D4A5A5] hover:bg-[#FDF6F0]'
-                  } ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}`}
+                        ? 'bg-gradient-to-br from-[#F0F8FF] to-[#E6F3FF] border-[#B8D4E3] text-[#5A7A8A]'
+                        : 'bg-white border-[#E8D5C4] text-[#8B7355] hover:border-[#D4A5A5] hover:bg-[#FDF6F0]'
+                    } ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}`}
                   onClick={() => handleLevelClick(level)}
                   title={isClickable ? `點擊設定為等級 ${level}: ${content}` : content}
                 >
                   {level}
                 </div>
                 {index < maxLevel - 1 && (
-                  <div className={`w-12 h-0.5 mt-2 transition-all duration-300 ${
-                    isSelected ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5]' : 
-                    isLastAssessment ? 'bg-gradient-to-r from-[#B8D4E3] to-[#A8C4D3]' : 'bg-[#E8D5C4]'
-                  }`} />
+                  <div className={`w-12 h-0.5 mt-2 transition-all duration-300 ${isSelected ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5]' :
+                      isLastAssessment ? 'bg-gradient-to-r from-[#B8D4E3] to-[#A8C4D3]' : 'bg-[#E8D5C4]'
+                    }`} />
                 )}
               </div>
             );
           })}
         </div>
-        
+
         {/* 歷史評估信息 */}
         {lastAssessment && (
           <div className="mt-2 p-2 bg-gradient-to-r from-[#F0F8FF] to-[#E6F3FF] rounded-lg border border-[#B8D4E3] shadow-sm">
@@ -2561,7 +2557,7 @@ export default function SimpleAbilityAssessmentModal({
             </div>
           </div>
         )}
-        
+
         {/* 完成度進度條 */}
         {showCompletion && (
           <div className="mt-2">
@@ -2570,14 +2566,14 @@ export default function SimpleAbilityAssessmentModal({
               <span>{completionPercentage}%</span>
             </div>
             <div className="w-full bg-[#F5F0EB] rounded-full h-3 shadow-inner">
-              <div 
+              <div
                 className="bg-gradient-to-r from-[#E8B4A0] via-[#D4A5A5] to-[#C89B9B] h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
                 style={{ width: `${completionPercentage}%` }}
               />
             </div>
           </div>
         )}
-        
+
         {/* 等級內容說明 */}
         {progressContents.length > 0 && (
           <div className="mt-3 p-4 bg-gradient-to-br from-[#FDF6F0] to-[#F5F0EB] rounded-lg border border-[#E8D5C4] shadow-sm">
@@ -2587,22 +2583,20 @@ export default function SimpleAbilityAssessmentModal({
                 const level = index + 1;
                 const isSelected = level <= current;
                 const isLastAssessment = lastAssessment && level === lastAssessment.level;
-                
+
                 return (
                   <div key={`content-${index}-${level}`} className="flex items-start gap-3 text-xs group">
-                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${
-                      isSelected
+                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${isSelected
                         ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-sm'
                         : isLastAssessment
-                        ? 'bg-gradient-to-br from-[#F0F8FF] to-[#E6F3FF] border-[#B8D4E3] text-[#5A7A8A]'
-                        : 'bg-white border-[#E8D5C4] text-[#8B7355] group-hover:border-[#D4A5A5]'
-                    }`}>
+                          ? 'bg-gradient-to-br from-[#F0F8FF] to-[#E6F3FF] border-[#B8D4E3] text-[#5A7A8A]'
+                          : 'bg-white border-[#E8D5C4] text-[#8B7355] group-hover:border-[#D4A5A5]'
+                      }`}>
                       {level}
                     </span>
-                    <span className={`text-[#2B3A3B] transition-all duration-200 ${
-                      isSelected ? 'font-medium text-[#8B7355]' : 
-                      isLastAssessment ? 'text-[#5A7A8A]' : ''
-                    }`}>
+                    <span className={`text-[#2B3A3B] transition-all duration-200 ${isSelected ? 'font-medium text-[#8B7355]' :
+                        isLastAssessment ? 'text-[#5A7A8A]' : ''
+                      }`}>
                       {content}
                     </span>
                   </div>
@@ -2611,7 +2605,7 @@ export default function SimpleAbilityAssessmentModal({
             </div>
           </div>
         )}
-        
+
         {/* 等級說明 */}
         <div className="text-xs text-[#8B7355] text-center italic">
           {current === 0 && "請選擇等級"}
@@ -2646,9 +2640,9 @@ export default function SimpleAbilityAssessmentModal({
         </div>
 
         {/* 能力等級選擇進度條 */}
-        <LevelProgressBar 
-          current={abilityAssessments[ability.id]?.level || currentLevel} 
-          maxLevel={maxLevel} 
+        <LevelProgressBar
+          current={abilityAssessments[ability.id]?.level || currentLevel}
+          maxLevel={maxLevel}
           label={`${ability.ability_name} 能力等級`}
           interactive={true}
           showCompletion={true}
@@ -2661,13 +2655,13 @@ export default function SimpleAbilityAssessmentModal({
             return `等級 ${level}`;
           })}
           onLevelChange={(level) => {
-            const currentLevel = abilityAssessments[ability.id]?.level || 
-                                  (ability.completion_percentage ? Math.ceil(ability.completion_percentage / (100 / maxLevel)) : 0);
-                                
+            const currentLevel = abilityAssessments[ability.id]?.level ||
+              (ability.completion_percentage ? Math.ceil(ability.completion_percentage / (100 / maxLevel)) : 0);
+
             // 如果點擊的是當前等級，則消除等級（設為0）
             const newLevel = currentLevel === level ? 0 : level;
             const newProgress = Math.round((newLevel / maxLevel) * 100);
-                                
+
             // 更新能力評估狀態
             updateAbilityAssessment(ability.id, 'level', newLevel);
             updateAbilityAssessment(ability.id, 'progress_percentage', newProgress);
@@ -2712,14 +2706,14 @@ export default function SimpleAbilityAssessmentModal({
     if (fixedData.ability_assessments && typeof fixedData.ability_assessments === 'object') {
       const fixedAbilityAssessments: any = {};
       const currentAbilityIds = new Set(currentAbilities.map(a => a.id));
-      
+
       Object.entries(fixedData.ability_assessments).forEach(([abilityId, assessment]: [string, any]) => {
         console.log(`🔍 檢查能力評估: ${abilityId}`, assessment);
-        
+
         // 如果能力ID不存在，嘗試通過名稱匹配
         if (!currentAbilityIds.has(abilityId)) {
           console.log(`❌ 能力ID ${abilityId} 不存在於當前能力列表中`);
-          
+
           const matchingAbility = currentAbilities.find(ability => {
             const nameMatch = ability.ability_name === assessment.ability_name;
             const descMatch = ability.ability_description === assessment.ability_description;
@@ -2731,7 +2725,7 @@ export default function SimpleAbilityAssessmentModal({
             });
             return nameMatch || descMatch;
           });
-          
+
           if (matchingAbility) {
             console.log(`🔄 修復能力評估: ${abilityId} -> ${matchingAbility.id}`);
             fixedAbilityAssessments[matchingAbility.id] = {
@@ -2748,7 +2742,7 @@ export default function SimpleAbilityAssessmentModal({
           fixedAbilityAssessments[abilityId] = assessment;
         }
       });
-      
+
       fixedData.ability_assessments = fixedAbilityAssessments;
     }
 
@@ -2756,14 +2750,14 @@ export default function SimpleAbilityAssessmentModal({
     if (fixedData.selected_goals && Array.isArray(fixedData.selected_goals)) {
       const fixedSelectedGoals: any[] = [];
       const currentGoalIds = new Set(currentGoals.map(g => g.id));
-      
+
       fixedData.selected_goals.forEach((goalAssessment: any) => {
         console.log(`🔍 檢查目標評估: ${goalAssessment.goal_id}`, goalAssessment);
-        
+
         // 如果目標ID不存在，嘗試通過名稱匹配
         if (!currentGoalIds.has(goalAssessment.goal_id)) {
           console.log(`❌ 目標ID ${goalAssessment.goal_id} 不存在於當前目標列表中`);
-          
+
           const matchingGoal = currentGoals.find(goal => {
             const nameMatch = goal.goal_name === goalAssessment.goal_name;
             const descMatch = goal.goal_description === goalAssessment.goal_description;
@@ -2775,7 +2769,7 @@ export default function SimpleAbilityAssessmentModal({
             });
             return nameMatch || descMatch;
           });
-          
+
           if (matchingGoal) {
             console.log(`🔄 修復目標評估: ${goalAssessment.goal_id} -> ${matchingGoal.id}`);
             fixedSelectedGoals.push({
@@ -2795,7 +2789,7 @@ export default function SimpleAbilityAssessmentModal({
           fixedSelectedGoals.push(goalAssessment);
         }
       });
-      
+
       fixedData.selected_goals = fixedSelectedGoals;
     }
 
@@ -2820,7 +2814,7 @@ export default function SimpleAbilityAssessmentModal({
   }
 
   const modalContent = (
-    <div 
+    <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
       style={{ pointerEvents: 'auto' }}
       onClick={(e) => {
@@ -2894,11 +2888,10 @@ export default function SimpleAbilityAssessmentModal({
                     </label>
                     <div className="relative">
                       <button
-                        className={`w-full px-3 py-2 border border-[#EADBC8] rounded text-left transition-colors focus:outline-none focus:ring-1 focus:ring-[#A64B2A] text-sm ${
-                          assessmentHistory.length > 0 
-                            ? 'bg-white hover:bg-[#FFF9F2] cursor-pointer' 
+                        className={`w-full px-3 py-2 border border-[#EADBC8] rounded text-left transition-colors focus:outline-none focus:ring-1 focus:ring-[#A64B2A] text-sm ${assessmentHistory.length > 0
+                            ? 'bg-white hover:bg-[#FFF9F2] cursor-pointer'
                             : 'bg-gray-50 cursor-not-allowed'
-                        }`}
+                          }`}
                         type="button"
                         onClick={() => assessmentHistory.length > 0 && setShowAssessmentDropdown(!showAssessmentDropdown)}
                         disabled={assessmentHistory.length === 0}
@@ -2923,7 +2916,7 @@ export default function SimpleAbilityAssessmentModal({
                           </span>
                         )}
                       </button>
-                      
+
                       {showAssessmentDropdown && assessmentHistory.length > 0 && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EADBC8] rounded shadow-lg z-20 max-h-48 overflow-y-auto">
                           <div className="p-2 border-b border-[#EADBC8]">
@@ -2943,11 +2936,11 @@ export default function SimpleAbilityAssessmentModal({
                                     console.log('📊 選中記錄的完整資料:', record);
                                     console.log('📋 選中記錄的 selected_goals:', record.selected_goals);
                                     console.log('🎯 選中記錄的 analysis:', record.analysis);
-                                    
+
                                     setSelectedAssessmentRecord(record);
                                     setLatestAssessment(record);
                                     setShowAssessmentDropdown(false);
-                                    
+
                                     // 重新載入目標和能力，使用新選擇的記錄
                                     if (selectedTreeId) {
                                       console.log('🌳 重新載入目標和能力，成長樹ID:', selectedTreeId);
@@ -3010,7 +3003,7 @@ export default function SimpleAbilityAssessmentModal({
               <h3 className="text-lg font-semibold text-[#2B3A3B] border-b border-[#EADBC8] pb-2">
                 基本資訊
               </h3>
-              
+
               {/* 學生選擇 */}
               <div className="relative student-dropdown">
                 <label className="block text-sm font-medium text-[#2B3A3B] mb-2">
@@ -3024,11 +3017,10 @@ export default function SimpleAbilityAssessmentModal({
                 </label>
                 <div className="relative">
                   <button
-                    className={`w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A] ${
-                      lockStudent 
-                        ? 'bg-gray-100 cursor-not-allowed text-gray-500' 
+                    className={`w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A] ${lockStudent
+                        ? 'bg-gray-100 cursor-not-allowed text-gray-500'
                         : 'bg-white hover:bg-[#FFF9F2]'
-                    }`}
+                      }`}
                     type="button"
                     onClick={() => !lockStudent && setShowStudentDropdown(!showStudentDropdown)}
                     disabled={lockStudent}
@@ -3046,7 +3038,7 @@ export default function SimpleAbilityAssessmentModal({
                           </div>
                           <div className="text-sm text-[#A68A64]">
                             {selectedStudent.nick_name && `${selectedStudent.nick_name} • `}
-                            {studentTrees.length > 0 
+                            {studentTrees.length > 0
                               ? `${studentTrees.length} 個成長樹`
                               : '未分配成長樹'
                             }
@@ -3063,7 +3055,7 @@ export default function SimpleAbilityAssessmentModal({
                     )}
                   </button>
                   {showStudentDropdown && !lockStudent && (
-                    <div 
+                    <div
                       className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#EADBC8] rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto"
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -3105,7 +3097,7 @@ export default function SimpleAbilityAssessmentModal({
                     </div>
                   )}
                 </div>
-                
+
                 {/* 成長樹選擇 */}
                 {selectedStudent && studentTrees.length > 0 && (
                   <div className="relative tree-dropdown">
@@ -3169,7 +3161,7 @@ export default function SimpleAbilityAssessmentModal({
                     </div>
                   </div>
                 )}
-                
+
                 {/* 學生成長樹提醒 */}
                 {selectedStudent && studentTrees.length === 0 && (
                   <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -3346,11 +3338,10 @@ export default function SimpleAbilityAssessmentModal({
                 </label>
                 <div className="relative">
                   <button
-                    className={`w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A] ${
-                      lockTeacher 
-                        ? 'bg-gray-100 cursor-not-allowed text-gray-500' 
+                    className={`w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A] ${lockTeacher
+                        ? 'bg-gray-100 cursor-not-allowed text-gray-500'
                         : 'bg-white hover:bg-[#FFF9F2]'
-                    }`}
+                      }`}
                     type="button"
                     onClick={() => !lockTeacher && setShowTeacherDropdown(!showTeacherDropdown)}
                     disabled={lockTeacher}
@@ -3374,12 +3365,12 @@ export default function SimpleAbilityAssessmentModal({
                         return (
                           <div>
                             <div className="font-medium text-[#2B3A3B]">
-                              {selectedTeacher?.type === 'admin' 
-                                ? selectedTeacher.admin_name 
+                              {selectedTeacher?.type === 'admin'
+                                ? selectedTeacher.admin_name
                                 : selectedTeacher?.teacher_nickname}
                             </div>
                             <div className="text-sm text-[#A68A64]">
-                              {selectedTeacher?.type === 'admin' 
+                              {selectedTeacher?.type === 'admin'
                                 ? `管理員 • ${selectedTeacher.teacher_role || 'admin'} • `
                                 : `${selectedTeacher?.teacher_fullname || ''} • ${selectedTeacher?.teacher_role || ''} • `}
                               {teachers.length} 位教師
@@ -3415,12 +3406,12 @@ export default function SimpleAbilityAssessmentModal({
                             }}
                           >
                             <div className="font-medium text-[#2B3A3B]">
-                              {teacher.type === 'admin' 
-                                ? teacher.admin_name 
+                              {teacher.type === 'admin'
+                                ? teacher.admin_name
                                 : teacher.teacher_nickname}
                             </div>
                             <div className="text-sm text-[#A68A64]">
-                              {teacher.type === 'admin' 
+                              {teacher.type === 'admin'
                                 ? `管理員 • ${teacher.teacher_role || 'admin'} • ${teacher.teacher_email || ''}`
                                 : `${teacher.teacher_fullname || ''} • ${teacher.teacher_role || ''} • ${teacher.teacher_email || ''}`}
                             </div>
@@ -3517,8 +3508,8 @@ export default function SimpleAbilityAssessmentModal({
                       <h4 className="font-medium text-[#2B3A3B] mb-3">學習目標進度</h4>
                       <div className="space-y-4 max-h-60 overflow-y-auto">
                         {goals.map(goal => (
-                          <div 
-                            key={goal.id} 
+                          <div
+                            key={goal.id}
                             className="p-4 border border-[#EADBC8] rounded-lg bg-white hover:border-[#D4A5A5] hover:bg-[#FDF6F0] transition-all duration-200"
                           >
                             <div className="mb-3">
@@ -3553,7 +3544,7 @@ export default function SimpleAbilityAssessmentModal({
                                 <div className="text-sm text-[#87704e] mt-1">{goal.goal_description}</div>
                               )}
                             </div>
-                            
+
                             {/* 根據評估模式顯示不同的評估界面 */}
                             {(goal as any).assessment_mode === 'multi_select' ? (
                               /* 多選模式評估 */
@@ -3570,36 +3561,34 @@ export default function SimpleAbilityAssessmentModal({
                                     </span>
                                   </div>
                                 </div>
-                                
+
                                 {/* 多選等級選擇 */}
                                 <div className="flex items-center justify-center space-x-2 relative">
                                   {(goal as any).multi_select_levels?.map((level: string, index: number) => {
                                     const isSelected = (multiSelectAssessments[goal.id] || []).includes(level);
                                     const isClickable = true;
-                                    
+
                                     return (
                                       <div key={`level-${index}-${level}`} className="flex flex-col items-center relative">
                                         <div
-                                          className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ease-out flex items-center justify-center text-xs font-bold shadow-sm ${
-                                            isSelected
+                                          className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ease-out flex items-center justify-center text-xs font-bold shadow-sm ${isSelected
                                               ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-md transform scale-105'
                                               : 'bg-white border-[#E8D5C4] text-[#8B7355] hover:border-[#D4A5A5] hover:bg-[#FDF6F0]'
-                                          } ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}`}
+                                            } ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}`}
                                           onClick={() => handleMultiSelectAssessmentChange(goal.id, level, !isSelected)}
                                           title={isClickable ? `點擊${isSelected ? '取消' : '選擇'}等級: ${level}` : level}
                                         >
                                           {index + 1}
                                         </div>
                                         {index < ((goal as any).multi_select_levels?.length || 0) - 1 && (
-                                          <div className={`w-12 h-0.5 mt-2 transition-all duration-300 ${
-                                            isSelected ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5]' : 'bg-[#E8D5C4]'
-                                          }`} />
+                                          <div className={`w-12 h-0.5 mt-2 transition-all duration-300 ${isSelected ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5]' : 'bg-[#E8D5C4]'
+                                            }`} />
                                         )}
                                       </div>
                                     );
                                   })}
                                 </div>
-                                
+
                                 {/* 完成度進度條 */}
                                 <div className="mt-2">
                                   <div className="flex justify-between items-center text-xs text-[#8B7355] mb-1">
@@ -3607,39 +3596,36 @@ export default function SimpleAbilityAssessmentModal({
                                     <span>{Math.round(((multiSelectAssessments[goal.id] || []).length / ((goal as any).multi_select_levels?.length || 1)) * 100)}%</span>
                                   </div>
                                   <div className="w-full bg-[#F5F0EB] rounded-full h-3 shadow-inner">
-                                    <div 
+                                    <div
                                       className="bg-gradient-to-r from-[#E8B4A0] via-[#D4A5A5] to-[#C89B9B] h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
                                       style={{ width: `${Math.round(((multiSelectAssessments[goal.id] || []).length / ((goal as any).multi_select_levels?.length || 1)) * 100)}%` }}
                                     />
                                   </div>
                                 </div>
-                                
+
                                 {/* 等級內容說明 */}
                                 <div className="mt-3 p-4 bg-gradient-to-br from-[#FDF6F0] to-[#F5F0EB] rounded-lg border border-[#E8D5C4] shadow-sm">
                                   <h6 className="text-xs font-medium text-[#2B3A3B] mb-3">等級內容說明：</h6>
                                   <div className="space-y-2">
                                     {(goal as any).multi_select_levels?.map((level: string, index: number) => {
                                       const isSelected = (multiSelectAssessments[goal.id] || []).includes(level);
-                                      
+
                                       return (
                                         <div key={`content-${index}-${level}`} className="flex items-start gap-3 text-xs group">
-                                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${
-                                            isSelected
+                                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${isSelected
                                               ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-sm'
                                               : 'bg-white border-[#E8D5C4] text-[#8B7355] group-hover:border-[#D4A5A5]'
-                                          }`}>
+                                            }`}>
                                             {index + 1}
                                           </span>
                                           <div className="flex-1">
-                                            <span className={`text-[#2B3A3B] transition-all duration-200 ${
-                                              isSelected ? 'font-medium text-[#8B7355]' : ''
-                                            }`}>
+                                            <span className={`text-[#2B3A3B] transition-all duration-200 ${isSelected ? 'font-medium text-[#8B7355]' : ''
+                                              }`}>
                                               {level}
                                             </span>
                                             {(goal as any).multi_select_descriptions?.[index] && (
-                                              <p className={`text-[#87704e] transition-all duration-200 ${
-                                                isSelected ? 'font-medium' : ''
-                                              }`}>
+                                              <p className={`text-[#87704e] transition-all duration-200 ${isSelected ? 'font-medium' : ''
+                                                }`}>
                                                 {(goal as any).multi_select_descriptions[index]}
                                               </p>
                                             )}
@@ -3649,7 +3635,7 @@ export default function SimpleAbilityAssessmentModal({
                                     })}
                                   </div>
                                 </div>
-                                
+
                                 {/* 等級說明 */}
                                 <div className="text-xs text-[#8B7355] text-center italic">
                                   {(multiSelectAssessments[goal.id] || []).length === 0 && "請選擇等級"}
@@ -3664,33 +3650,33 @@ export default function SimpleAbilityAssessmentModal({
                               /* 進度模式評估 */
                               <div>
                                 {/* 渲染目標進度項目 */}
-                                <LevelProgressBar 
-                              current={goalAssessments[goal.id]?.level || 
-                                (goal.completion_percentage ? Math.ceil(goal.completion_percentage / (100 / (goal.progress_max || 20))) : 0)
-                              } 
-                              maxLevel={goal.progress_max || 20} 
-                              label={`${goal.goal_name} 完成等級`}
-                              interactive={true}
-                              progressContents={goal.progress_contents || []}
-                              showCompletion={true}
-                              lastAssessment={goal.last_assessment || null}
-                              onLevelChange={(level) => {
-                                const maxLevel = goal.progress_max || 20;
-                                const currentLevel = goalAssessments[goal.id]?.level || 
-                                  (goal.completion_percentage ? Math.ceil(goal.completion_percentage / (100 / maxLevel)) : 0);
-                                
-                                // 如果點擊的是當前等級，則消除等級（設為0）
-                                const newLevel = currentLevel === level ? 0 : level;
-                                const newProgress = Math.round((newLevel / maxLevel) * 100);
-                                
-                                // 更新目標評估狀態
-                                updateGoalAssessment(goal.id, 'level', newLevel);
-                                updateGoalAssessment(goal.id, 'progress_percentage', newProgress);
-                              }}
-                            />
+                                <LevelProgressBar
+                                  current={goalAssessments[goal.id]?.level ||
+                                    (goal.completion_percentage ? Math.ceil(goal.completion_percentage / (100 / (goal.progress_max || 20))) : 0)
+                                  }
+                                  maxLevel={goal.progress_max || 20}
+                                  label={`${goal.goal_name} 完成等級`}
+                                  interactive={true}
+                                  progressContents={goal.progress_contents || []}
+                                  showCompletion={true}
+                                  lastAssessment={goal.last_assessment || null}
+                                  onLevelChange={(level) => {
+                                    const maxLevel = goal.progress_max || 20;
+                                    const currentLevel = goalAssessments[goal.id]?.level ||
+                                      (goal.completion_percentage ? Math.ceil(goal.completion_percentage / (100 / maxLevel)) : 0);
+
+                                    // 如果點擊的是當前等級，則消除等級（設為0）
+                                    const newLevel = currentLevel === level ? 0 : level;
+                                    const newProgress = Math.round((newLevel / maxLevel) * 100);
+
+                                    // 更新目標評估狀態
+                                    updateGoalAssessment(goal.id, 'level', newLevel);
+                                    updateGoalAssessment(goal.id, 'progress_percentage', newProgress);
+                                  }}
+                                />
                               </div>
                             )}
-                            
+
                             {/* 相關能力 */}
                             {goal.required_abilities && goal.required_abilities.length > 0 && (
                               <div className="mt-3">
@@ -3699,7 +3685,7 @@ export default function SimpleAbilityAssessmentModal({
                                   {goal.required_abilities.map(abilityId => {
                                     const ability = abilities.find(a => a.id === abilityId);
                                     return ability ? (
-                                      <span 
+                                      <span
                                         key={abilityId}
                                         className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
                                       >
@@ -3742,196 +3728,193 @@ export default function SimpleAbilityAssessmentModal({
                   <h3 className="text-lg font-semibold text-[#2B3A3B] border-b border-[#EADBC8] pb-2 mb-4">
                     活動管理
                   </h3>
-                  
-                                 {/* 本次課堂活動 */}
-               <div className="mb-8">
-                 <h3 className="text-lg font-semibold mb-4 text-gray-800">
-                   本次課堂活動
-                 </h3>
-                 
-                 {studentActivities.currentLessonActivities.length > 0 ? (
-                   <div className="grid gap-4">
-                     {getFilteredActivities(studentActivities.currentLessonActivities).map((activity) => (
-                       <ActivityCard
-                         key={activity.id}
-                         activity={activity}
-                         type="current"
-                         area="current_lesson"
-                         onEdit={handleActivityEdit}
-                         onSave={handleProgressSave}
-                         onCancel={handleProgressCancel}
-                         onReset={handleProgressReset}
-                         onDelete={handleActivityDelete}
-                         isEditing={editingActivityId === activity.id}
-                         tempProgress={tempProgress[activity.id] || 0}
-                         onProgressChange={handleProgressChange}
-                       />
-                     ))}
-                   </div>
-                 ) : (
-                   <div className="text-center py-8 text-gray-500">
-                     暫無本次課堂活動
-                   </div>
-                 )}
-               </div>
 
-               {/* 正在學習的活動 */}
-               <div className="mb-8">
-                 <div className="flex items-center justify-between mb-4">
-                   <h3 className="text-lg font-semibold text-gray-800">
-                     正在學習的活動
-                   </h3>
-                   <div className="flex items-center gap-2">
-                     {/* 完成訊息 */}
-                     {showCompletionMessage && (
-                       <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs animate-pulse">
-                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                         </svg>
-                         活動已完成！已切換到「已完成」篩選器
-                       </div>
-                     )}
-                     {/* 篩選按鈕 */}
-                     <div className="flex bg-[#F5F0EB] rounded-lg p-1">
-                       <button
-                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
-                           activityFilter === 'incomplete'
-                             ? 'bg-white text-[#2B3A3B] shadow-sm'
-                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
-                         }`}
-                         onClick={() => setActivityFilter('incomplete')}
-                       >
-                         未完成
-                       </button>
-                       <button
-                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
-                           activityFilter === 'completed'
-                             ? 'bg-white text-[#2B3A3B] shadow-sm'
-                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
-                         }`}
-                         onClick={() => setActivityFilter('completed')}
-                       >
-                         已完成
-                       </button>
-                       <button
-                         className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${
-                           activityFilter === 'all'
-                             ? 'bg-white text-[#2B3A3B] shadow-sm'
-                             : 'text-[#8B7355] hover:text-[#2B3A3B]'
-                         }`}
-                         onClick={() => setActivityFilter('all')}
-                       >
-                         全部
-                       </button>
-                     </div>
-                     <button
-                       className="px-3 py-1.5 bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] text-white text-xs rounded-lg hover:from-[#D4A5A5] hover:to-[#C89B9B] transition-all duration-200"
-                       onClick={() => handleActivitySelection('current')}
-                     >
-                       選擇活動
-                     </button>
-                     {studentTrees.length > 0 && (
-                       <button
-                         className="px-3 py-1.5 bg-gradient-to-r from-[#A68A64] to-[#8B7355] text-white text-xs rounded-lg hover:from-[#8B7355] hover:to-[#6B5B47] transition-all duration-200"
-                         onClick={() => setShowGrowthTreePathManager(true)}
-                       >
-                         學習路徑
-                       </button>
-                     )}
-                   </div>
-                 </div>
-                 
-                 {studentActivities.ongoingActivities.length > 0 ? (
-                   <div className="grid gap-4">
-                     {getFilteredActivities(studentActivities.ongoingActivities).map((activity) => (
-                       <ActivityCard
-                         key={activity.id}
-                         activity={activity}
-                         type="ongoing"
-                         area="ongoing"
-                         onEdit={handleActivityEdit}
-                         onSave={handleProgressSave}
-                         onCancel={handleProgressCancel}
-                         onReset={handleProgressReset}
-                         onDelete={handleActivityDelete}
-                         isEditing={editingActivityId === activity.id}
-                         tempProgress={tempProgress[activity.id] || 0}
-                         onProgressChange={handleProgressChange}
-                       />
-                     ))}
-                   </div>
-                 ) : (
-                   <div className="text-center py-8 text-gray-500">
-                     暫無正在學習的活動
-                   </div>
-                 )}
-               </div>
+                  {/* 本次課堂活動 */}
+                  <div className="mb-8">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                      本次課堂活動
+                    </h3>
 
-                                 {/* 上次課堂活動 */}
-               <div className="mb-6">
-                 <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2 mb-3">
-                   <BookOpenIcon className="w-5 h-5 text-[#A68A64]" />
-                   上次課堂活動
-                   <span className="text-xs text-[#A68A64]">（供參考）</span>
-                 </h4>
-                 <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
-                   {studentActivities.previousLessonActivities.length > 0 ? (
-                     <div className="space-y-3">
-                       {studentActivities.previousLessonActivities.map((activity, index) => (
-                         <ActivityCard key={activity.id || index} activity={activity} type="previous" area="current_lesson" />
-                       ))}
-                     </div>
-                   ) : (
-                     <>
-                       <p className="text-[#A68A64] text-sm">暫無上次課堂活動</p>
-                       <p className="text-[#87704e] text-xs mt-1">這是學生上次課堂的活動記錄</p>
-                     </>
-                   )}
-                 </div>
-               </div>
+                    {studentActivities.currentLessonActivities.length > 0 ? (
+                      <div className="grid gap-4">
+                        {getFilteredActivities(studentActivities.currentLessonActivities).map((activity) => (
+                          <ActivityCard
+                            key={activity.id}
+                            activity={activity}
+                            type="current"
+                            area="current_lesson"
+                            onEdit={handleActivityEdit}
+                            onSave={handleProgressSave}
+                            onCancel={handleProgressCancel}
+                            onReset={handleProgressReset}
+                            onDelete={handleActivityDelete}
+                            isEditing={editingActivityId === activity.id}
+                            tempProgress={tempProgress[activity.id] || 0}
+                            onProgressChange={handleProgressChange}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        暫無本次課堂活動
+                      </div>
+                    )}
+                  </div>
 
-                                 {/* 活動統計 */}
-               <div className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-4 rounded-lg border border-[#EADBC8]">
-                 <h4 className="font-medium text-[#2B3A3B] mb-3 flex items-center gap-2">
-                   <span className="text-lg">📊</span>
-                   活動統計
-                 </h4>
-                 <div className="grid grid-cols-3 gap-4">
-                   <div className="text-center">
-                     <div className="text-2xl font-bold text-[#A68A64]">
-                       {studentActivities.currentLessonActivities.length}
-                     </div>
-                     <div className="text-xs text-[#87704e]">本次活動</div>
-                   </div>
-                   <div className="text-center">
-                     <div className="text-2xl font-bold text-[#A68A64]">
-                       {studentActivities.ongoingActivities.length}
-                     </div>
-                     <div className="text-xs text-[#87704e]">進行中活動</div>
-                   </div>
-                   <div className="text-center">
-                     <div className="text-2xl font-bold text-[#A68A64]">
-                       {(() => {
-                         const allActivities = [...studentActivities.currentLessonActivities, ...studentActivities.ongoingActivities];
-                         const completedCount = allActivities.filter(activity => (activity.progress || 0) >= 100).length;
-                         return completedCount;
-                       })()}
-                     </div>
-                     <div className="text-xs text-[#87704e]">已完成</div>
-                   </div>
-                 </div>
-                 {/* 篩選狀態顯示 */}
-                 <div className="mt-3 pt-3 border-t border-[#EADBC8]">
-                   <div className="text-center">
-                     <span className="text-xs text-[#8B7355]">
-                       當前顯示: {
-                         activityFilter === 'completed' ? '已完成活動' :
-                         activityFilter === 'incomplete' ? '未完成活動' : '全部活動'
-                       }
-                     </span>
-                   </div>
-                 </div>
-               </div>
+                  {/* 正在學習的活動 */}
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        正在學習的活動
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        {/* 完成訊息 */}
+                        {showCompletionMessage && (
+                          <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs animate-pulse">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            活動已完成！已切換到「已完成」篩選器
+                          </div>
+                        )}
+                        {/* 篩選按鈕 */}
+                        <div className="flex bg-[#F5F0EB] rounded-lg p-1">
+                          <button
+                            className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${activityFilter === 'incomplete'
+                                ? 'bg-white text-[#2B3A3B] shadow-sm'
+                                : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                              }`}
+                            onClick={() => setActivityFilter('incomplete')}
+                          >
+                            未完成
+                          </button>
+                          <button
+                            className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${activityFilter === 'completed'
+                                ? 'bg-white text-[#2B3A3B] shadow-sm'
+                                : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                              }`}
+                            onClick={() => setActivityFilter('completed')}
+                          >
+                            已完成
+                          </button>
+                          <button
+                            className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${activityFilter === 'all'
+                                ? 'bg-white text-[#2B3A3B] shadow-sm'
+                                : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                              }`}
+                            onClick={() => setActivityFilter('all')}
+                          >
+                            全部
+                          </button>
+                        </div>
+                        <button
+                          className="px-3 py-1.5 bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] text-white text-xs rounded-lg hover:from-[#D4A5A5] hover:to-[#C89B9B] transition-all duration-200"
+                          onClick={() => handleActivitySelection('current')}
+                        >
+                          選擇活動
+                        </button>
+                        {studentTrees.length > 0 && (
+                          <button
+                            className="px-3 py-1.5 bg-gradient-to-r from-[#A68A64] to-[#8B7355] text-white text-xs rounded-lg hover:from-[#8B7355] hover:to-[#6B5B47] transition-all duration-200"
+                            onClick={() => setShowGrowthTreePathManager(true)}
+                          >
+                            學習路徑
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {studentActivities.ongoingActivities.length > 0 ? (
+                      <div className="grid gap-4">
+                        {getFilteredActivities(studentActivities.ongoingActivities).map((activity) => (
+                          <ActivityCard
+                            key={activity.id}
+                            activity={activity}
+                            type="ongoing"
+                            area="ongoing"
+                            onEdit={handleActivityEdit}
+                            onSave={handleProgressSave}
+                            onCancel={handleProgressCancel}
+                            onReset={handleProgressReset}
+                            onDelete={handleActivityDelete}
+                            isEditing={editingActivityId === activity.id}
+                            tempProgress={tempProgress[activity.id] || 0}
+                            onProgressChange={handleProgressChange}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        暫無正在學習的活動
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 上次課堂活動 */}
+                  <div className="mb-6">
+                    <h4 className="font-medium text-[#2B3A3B] flex items-center gap-2 mb-3">
+                      <BookOpenIcon className="w-5 h-5 text-[#A68A64]" />
+                      上次課堂活動
+                      <span className="text-xs text-[#A68A64]">（供參考）</span>
+                    </h4>
+                    <div className="p-4 bg-[#FFF9F2] border border-[#EADBC8] rounded-lg">
+                      {studentActivities.previousLessonActivities.length > 0 ? (
+                        <div className="space-y-3">
+                          {studentActivities.previousLessonActivities.map((activity, index) => (
+                            <ActivityCard key={activity.id || index} activity={activity} type="previous" area="current_lesson" />
+                          ))}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-[#A68A64] text-sm">暫無上次課堂活動</p>
+                          <p className="text-[#87704e] text-xs mt-1">這是學生上次課堂的活動記錄</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 活動統計 */}
+                  <div className="bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] p-4 rounded-lg border border-[#EADBC8]">
+                    <h4 className="font-medium text-[#2B3A3B] mb-3 flex items-center gap-2">
+                      <span className="text-lg">📊</span>
+                      活動統計
+                    </h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-[#A68A64]">
+                          {studentActivities.currentLessonActivities.length}
+                        </div>
+                        <div className="text-xs text-[#87704e]">本次活動</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-[#A68A64]">
+                          {studentActivities.ongoingActivities.length}
+                        </div>
+                        <div className="text-xs text-[#87704e]">進行中活動</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-[#A68A64]">
+                          {(() => {
+                            const allActivities = [...studentActivities.currentLessonActivities, ...studentActivities.ongoingActivities];
+                            const completedCount = allActivities.filter(activity => (activity.progress || 0) >= 100).length;
+                            return completedCount;
+                          })()}
+                        </div>
+                        <div className="text-xs text-[#87704e]">已完成</div>
+                      </div>
+                    </div>
+                    {/* 篩選狀態顯示 */}
+                    <div className="mt-3 pt-3 border-t border-[#EADBC8]">
+                      <div className="text-center">
+                        <span className="text-xs text-[#8B7355]">
+                          當前顯示: {
+                            activityFilter === 'completed' ? '已完成活動' :
+                              activityFilter === 'incomplete' ? '未完成活動' : '全部活動'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -3939,7 +3922,7 @@ export default function SimpleAbilityAssessmentModal({
         </div>
 
         {/* 按鈕區域 */}
-        <div 
+        <div
           className="px-6 py-4 border-t border-[#E8D5C4] bg-gradient-to-r from-[#FDF6F0] to-[#F5F0EB] rounded-b-2xl flex-shrink-0"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
@@ -3963,11 +3946,10 @@ export default function SimpleAbilityAssessmentModal({
             </button>
             <button
               type="button"
-              className={`px-6 py-2 rounded-lg transition-all duration-300 ease-out ${
-                selectedStudent && selectedTreeId
+              className={`px-6 py-2 rounded-lg transition-all duration-300 ease-out ${selectedStudent && selectedTreeId
                   ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] text-white hover:from-[#D4A5A5] hover:to-[#C89B9B] hover:shadow-lg active:scale-95 border border-[#C89B9B]'
                   : 'bg-[#E8D5C4] text-[#8B7355] cursor-not-allowed'
-              }`}
+                }`}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -3979,9 +3961,9 @@ export default function SimpleAbilityAssessmentModal({
               }}
               disabled={!selectedStudent || !selectedTreeId}
             >
-              {!selectedStudent ? '請選擇學生' : 
-               !selectedTreeId ? '請選擇本次評估的成長樹' : 
-               isEditMode ? '更新評估' : '儲存評估'}
+              {!selectedStudent ? '請選擇學生' :
+                !selectedTreeId ? '請選擇本次評估的成長樹' :
+                  isEditMode ? '更新評估' : '儲存評估'}
             </button>
           </div>
         </div>

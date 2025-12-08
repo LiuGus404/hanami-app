@@ -33,7 +33,7 @@ export default function ChildSelectionModal({
   if (!isOpen) return null;
 
   const modalContent = (
-    <div 
+    <div
       style={{
         position: 'fixed',
         top: 0,
@@ -53,7 +53,7 @@ export default function ChildSelectionModal({
         }
       }}
     >
-      <div 
+      <div
         style={{
           backgroundColor: 'rgba(255, 255, 255, 0.8)',
           backdropFilter: 'blur(12px)',
@@ -206,7 +206,7 @@ export default function ChildSelectionModal({
                 const age = Math.floor(child.age_in_months / 12);
                 const months = child.age_in_months % 12;
                 const ageText = months > 0 ? `${age}歲${months}個月` : `${age}歲`;
-                
+
                 return (
                   <button
                     key={child.id}

@@ -366,21 +366,21 @@ export function ContactChatDialog({
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: (systemMessages.length + dateIndex + msgIndex) * 0.05 }}
                             className={`flex ${message.sender === 'user'
-                                ? 'justify-end'
-                                : 'justify-start'
+                              ? 'justify-end'
+                              : 'justify-start'
                               } mb-4`}
                           >
                             <motion.div
                               whileHover={{ scale: 1.02 }}
                               className={`max-w-[75%] rounded-3xl px-5 py-4 relative overflow-hidden ${message.sender === 'user'
-                                  ? 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-lg'
-                                  : 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-900 shadow-lg border border-blue-200'
+                                ? 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-lg'
+                                : 'bg-gradient-to-br from-blue-50 to-blue-100 text-blue-900 shadow-lg border border-blue-200'
                                 }`}
                             >
                               {/* 背景裝飾 */}
                               <div className={`absolute top-0 right-0 w-16 h-16 rounded-full opacity-10 ${message.sender === 'user'
-                                  ? 'bg-white'
-                                  : 'bg-blue-400'
+                                ? 'bg-white'
+                                : 'bg-blue-400'
                                 } -translate-y-8 translate-x-8`}></div>
 
                               {message.sender === 'parent' && (
@@ -395,8 +395,8 @@ export function ContactChatDialog({
                               </div>
 
                               <div className={`flex items-center gap-1 mt-2 text-xs ${message.sender === 'user'
-                                  ? 'text-[#87704e]'
-                                  : 'text-blue-600'
+                                ? 'text-[#87704e]'
+                                : 'text-blue-600'
                                 }`}>
                                 <Clock className="w-3 h-3" />
                                 {message.timestamp.toLocaleTimeString('zh-TW', {
@@ -492,13 +492,13 @@ export function ContactChatDialog({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 ${!inputMessage.trim() || isLoading
-                    ? 'bg-gray-200 cursor-not-allowed'
-                    : 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] hover:shadow-xl hover:from-[#FDE6B8] hover:to-[#EBC9A4]'
+                  ? 'bg-gray-200 cursor-not-allowed'
+                  : 'bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] hover:shadow-xl hover:from-[#FDE6B8] hover:to-[#EBC9A4]'
                   }`}
               >
                 <Send className={`w-6 h-6 ${!inputMessage.trim() || isLoading
-                    ? 'text-gray-400'
-                    : 'text-[#2B3A3B]'
+                  ? 'text-gray-400'
+                  : 'text-[#2B3A3B]'
                   }`} />
               </motion.button>
             </div>

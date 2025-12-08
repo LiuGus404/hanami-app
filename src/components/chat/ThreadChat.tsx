@@ -34,6 +34,7 @@ export interface ChatMessage {
   created_at: string;
   updated_at: string;
   model_used?: string;
+  attachments?: any[];
 }
 
 // 聊天線程介面

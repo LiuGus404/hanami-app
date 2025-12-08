@@ -18,10 +18,10 @@ interface AbilityEditModalProps {
   onUpdate: (updatedAbility: DevelopmentAbility) => void;
 }
 
-export default function AbilityEditModal({ 
-  ability, 
-  onClose, 
-  onUpdate 
+export default function AbilityEditModal({
+  ability,
+  onClose,
+  onUpdate
 }: AbilityEditModalProps) {
   const [categories, setCategories] = useState<AbilityCategory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -63,41 +63,41 @@ export default function AbilityEditModal({
         .order('sort_order');
 
       const defaultCategories: AbilityCategory[] = [
-        { 
-          id: 'physical', 
-          category_name: '身體發展', 
+        {
+          id: 'physical',
+          category_name: '身體發展',
           category_description: '身體發展相關能力',
           category_color: '#FFB6C1',
           sort_order: 1,
           created_at: new Date().toISOString()
         },
-        { 
-          id: 'cognitive', 
-          category_name: '認知發展', 
+        {
+          id: 'cognitive',
+          category_name: '認知發展',
           category_description: '認知發展相關能力',
           category_color: '#87CEEB',
           sort_order: 2,
           created_at: new Date().toISOString()
         },
-        { 
-          id: 'emotional', 
-          category_name: '情緒發展', 
+        {
+          id: 'emotional',
+          category_name: '情緒發展',
           category_description: '情緒發展相關能力',
           category_color: '#98FB98',
           sort_order: 3,
           created_at: new Date().toISOString()
         },
-        { 
-          id: 'language', 
-          category_name: '語言發展', 
+        {
+          id: 'language',
+          category_name: '語言發展',
           category_description: '語言發展相關能力',
           category_color: '#DDA0DD',
           sort_order: 4,
           created_at: new Date().toISOString()
         },
-        { 
-          id: 'artistic', 
-          category_name: '藝術發展', 
+        {
+          id: 'artistic',
+          category_name: '藝術發展',
           category_description: '藝術發展相關能力',
           category_color: '#F0E68C',
           sort_order: 5,
@@ -105,7 +105,7 @@ export default function AbilityEditModal({
         },
       ];
 
-      const typedCustomData = (customData || []) as Array<{ option_value?: string; option_name?: string; sort_order?: number; created_at?: string; [key: string]: any }>;
+      const typedCustomData = (customData || []) as Array<{ option_value?: string; option_name?: string; sort_order?: number; created_at?: string;[key: string]: any }>;
       const customCategories: AbilityCategory[] = typedCustomData.map(item => ({
         id: item.option_value || '',
         category_name: item.option_name || '',
@@ -144,50 +144,50 @@ export default function AbilityEditModal({
       console.log('用戶修改的預設類別:', userModifiedDefaults);
 
       const defaultCategories = [
-        { 
-          id: 'physical', 
-          category_name: '身體發展', 
+        {
+          id: 'physical',
+          category_name: '身體發展',
           category_description: '身體發展相關能力',
           category_color: '#FFB6C1',
           sort_order: 1,
           created_at: new Date().toISOString(),
-          is_default: true 
+          is_default: true
         },
-        { 
-          id: 'cognitive', 
-          category_name: '認知發展', 
+        {
+          id: 'cognitive',
+          category_name: '認知發展',
           category_description: '認知發展相關能力',
           category_color: '#87CEEB',
           sort_order: 2,
           created_at: new Date().toISOString(),
-          is_default: true 
+          is_default: true
         },
-        { 
-          id: 'emotional', 
-          category_name: '情緒發展', 
+        {
+          id: 'emotional',
+          category_name: '情緒發展',
           category_description: '情緒發展相關能力',
           category_color: '#98FB98',
           sort_order: 3,
           created_at: new Date().toISOString(),
-          is_default: true 
+          is_default: true
         },
-        { 
-          id: 'language', 
-          category_name: '語言發展', 
+        {
+          id: 'language',
+          category_name: '語言發展',
           category_description: '語言發展相關能力',
           category_color: '#DDA0DD',
           sort_order: 4,
           created_at: new Date().toISOString(),
-          is_default: true 
+          is_default: true
         },
-        { 
-          id: 'artistic', 
-          category_name: '藝術發展', 
+        {
+          id: 'artistic',
+          category_name: '藝術發展',
           category_description: '藝術發展相關能力',
           category_color: '#F0E68C',
           sort_order: 5,
           created_at: new Date().toISOString(),
-          is_default: true 
+          is_default: true
         },
       ];
 
@@ -214,8 +214,8 @@ export default function AbilityEditModal({
 
       console.log('修改後的預設類別:', modifiedDefaultCategories);
       console.log('自訂預設類別:', customDefaultCategories);
-      
-      const typedCustomDataForEdit = (customData || []) as Array<{ option_value?: string; option_name?: string; sort_order?: number; created_at?: string; [key: string]: any }>;
+
+      const typedCustomDataForEdit = (customData || []) as Array<{ option_value?: string; option_name?: string; sort_order?: number; created_at?: string;[key: string]: any }>;
       const customCategories: AbilityCategory[] = typedCustomDataForEdit.map(item => ({
         id: item.option_value || '',
         category_name: item.option_name || '',
@@ -254,7 +254,7 @@ export default function AbilityEditModal({
         .single();
 
       if (error) throw error;
-      
+
       // 修正 null 欄位為 undefined
       const fixedData = {
         ...data,
@@ -264,7 +264,7 @@ export default function AbilityEditModal({
         category: data.category ?? undefined,
         is_active: true, // 新更新的能力預設為啟用狀態
       };
-      
+
       onUpdate(fixedData);
       onClose();
     } catch (err) {
@@ -321,7 +321,7 @@ export default function AbilityEditModal({
       console.log('=== 開始新增操作 ===');
       console.log('新增類別名稱:', newOptionName.trim());
       console.log('是否設為預設:', isDefaultOption);
-      
+
       if (isDefaultOption) {
         // 新增為預設類別：保存到 localStorage
         const newId = `custom_${Date.now()}`;
@@ -330,16 +330,16 @@ export default function AbilityEditModal({
           category_name: newOptionName.trim(),
           is_default: true,
         };
-        
+
         // 保存到 localStorage
         const userModifiedDefaults = JSON.parse(localStorage.getItem('hanami_modified_defaults') || '{}');
-        userModifiedDefaults[newId] = { 
+        userModifiedDefaults[newId] = {
           name: newOptionName.trim(),
           is_custom_default: true // 標記為自訂預設
         };
         localStorage.setItem('hanami_modified_defaults', JSON.stringify(userModifiedDefaults));
         console.log('已保存新預設類別到 localStorage:', userModifiedDefaults);
-        
+
         setCustomOptions(prev => {
           const newCategories = [...prev.ability_categories, newDefaultCategory];
           console.log('新增後的類別列表:', newCategories);
@@ -348,7 +348,7 @@ export default function AbilityEditModal({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('預設類別新增完成');
         toast.success(`已新增預設類別「${newOptionName.trim()}」！`);
       } else {
@@ -384,7 +384,7 @@ export default function AbilityEditModal({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('自訂類別新增完成');
         toast.success('新增類別成功！');
       }
@@ -406,20 +406,20 @@ export default function AbilityEditModal({
       console.log('編輯選項:', editingOption);
       console.log('新名稱:', newOptionName.trim());
       console.log('當前所有類別:', customOptions.ability_categories);
-      
+
       if (editingOption.is_default) {
         // 預設選項：保存到 localStorage
         console.log('編輯預設選項:', editingOption.name);
-        
+
         // 保存編輯操作到 localStorage
         const userModifiedDefaults = JSON.parse(localStorage.getItem('hanami_modified_defaults') || '{}');
-        userModifiedDefaults[editingOption.id] = { 
+        userModifiedDefaults[editingOption.id] = {
           ...userModifiedDefaults[editingOption.id],
-          name: newOptionName.trim() 
+          name: newOptionName.trim()
         };
         localStorage.setItem('hanami_modified_defaults', JSON.stringify(userModifiedDefaults));
         console.log('已保存編輯操作到 localStorage:', userModifiedDefaults);
-        
+
         setCustomOptions(prev => {
           const newCategories = prev.ability_categories.map(option =>
             option.id === editingOption.id ? { ...option, category_name: newOptionName.trim() } : option
@@ -430,7 +430,7 @@ export default function AbilityEditModal({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('預設選項編輯完成');
         toast.success(`已更新預設類別「${editingOption.name}」為「${newOptionName.trim()}」！`);
       } else {
@@ -460,7 +460,7 @@ export default function AbilityEditModal({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('自訂選項編輯完成');
         toast.success('更新類別成功！');
       }
@@ -477,7 +477,7 @@ export default function AbilityEditModal({
   const handleDeleteCustomOption = async (optionId: string) => {
     try {
       const optionToDelete = customOptions.ability_categories.find(option => option.id === optionId);
-      
+
       if (!optionToDelete) {
         console.error('未找到要刪除的選項！');
         toast.error('未找到要刪除的選項');
@@ -485,10 +485,10 @@ export default function AbilityEditModal({
       }
 
       // 刪除確認對話框
-      const confirmMessage = optionToDelete.is_default 
+      const confirmMessage = optionToDelete.is_default
         ? `確定要刪除預設類別「${optionToDelete.category_name}」嗎？\n\n注意：此操作會將該類別從預設列表中移除，但可以通過「重置預設」按鈕恢復。`
         : `確定要刪除類別「${optionToDelete.category_name}」嗎？\n\n此操作無法撤銷。`;
-      
+
       const isConfirmed = confirm(confirmMessage);
       if (!isConfirmed) {
         console.log('用戶取消刪除操作');
@@ -499,17 +499,17 @@ export default function AbilityEditModal({
       console.log('刪除選項 ID:', optionId);
       console.log('當前所有類別:', customOptions.ability_categories);
       console.log('找到要刪除的選項:', optionToDelete);
-      
+
       if (optionToDelete.is_default) {
         // 預設選項：保存到 localStorage
         console.log('刪除預設選項:', optionToDelete.category_name);
-        
+
         // 保存刪除操作到 localStorage
         const userModifiedDefaults = JSON.parse(localStorage.getItem('hanami_modified_defaults') || '{}');
         userModifiedDefaults[optionToDelete.id] = { deleted: true };
         localStorage.setItem('hanami_modified_defaults', JSON.stringify(userModifiedDefaults));
         console.log('已保存刪除操作到 localStorage:', userModifiedDefaults);
-        
+
         setCustomOptions(prev => {
           const newCategories = prev.ability_categories.filter(option => option.id !== optionId);
           console.log('刪除後的類別列表:', newCategories);
@@ -518,7 +518,7 @@ export default function AbilityEditModal({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('預設選項刪除完成');
         toast.success(`已刪除預設類別「${optionToDelete.category_name}」！`);
       } else {
@@ -544,11 +544,11 @@ export default function AbilityEditModal({
             ability_categories: newCategories,
           };
         });
-        
+
         console.log('自訂選項刪除完成');
         toast.success('刪除類別成功！');
       }
-      
+
       console.log('=== 刪除操作完成 ===');
     } catch (error) {
       console.error('刪除類別失敗:', error);
@@ -616,7 +616,7 @@ export default function AbilityEditModal({
                     value={newOptionName}
                     onChange={(value) => setNewOptionName(value)}
                   />
-                  
+
                   {/* 預設類別選擇 */}
                   {!editingOption && (
                     <div className="flex items-center gap-2">
@@ -635,7 +635,7 @@ export default function AbilityEditModal({
                       </span>
                     </div>
                   )}
-                  
+
                   <div className="flex gap-2">
                     <HanamiButton
                       className="bg-hanami-primary hover:bg-hanami-accent"
@@ -805,7 +805,7 @@ export default function AbilityEditModal({
             <HanamiCard className="p-4">
               <h3 className="font-semibold text-hanami-text mb-2">預覽</h3>
               <div className="flex items-center gap-3">
-                <div 
+                <div
                   className="w-12 h-12 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: '#FFB6C1' }}
                 >

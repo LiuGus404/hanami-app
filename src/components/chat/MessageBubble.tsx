@@ -8,11 +8,46 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
-  const isUser = message.role === 'user';
-  const isAssistant = message.role === 'assistant';
-  const isSystem = message.role === 'system';
+  // Support both 'role' (ThreadChat) and 'sender' (Page) properties
+  const role = message.role || (message as any).sender;
+  const isUser = role === 'user';
+  // Check if it's an AI character (hibi, mori, pic, or assistant/agent)
+  const isAssistant = role === 'assistant' || role === 'agent' || ['hibi', 'mori', 'pico'].includes(role);
+  const isSystem = role === 'system';
   const isError = message.status === 'error';
-  const isProcessing = message.status === 'processing';
+
+  // Robust attachment parsing
+  let safeAttachments: any[] = [];
+  try {
+    const rawAttachments = message.attachments || (message as any).images; // Support 'images' alias if any
+    if (Array.isArray(rawAttachments)) {
+      safeAttachments = rawAttachments;
+    } else if (typeof rawAttachments === 'string') {
+      safeAttachments = JSON.parse(rawAttachments);
+    }
+  } catch (e) {
+    console.error('Error parsing attachments:', e);
+  }
+
+  // Fallback to content_json images
+  let contentJsonImages: any[] = [];
+  try {
+    const cJson = message.content_json;
+    const images = (cJson as any)?.images;
+    if (Array.isArray(images)) {
+      contentJsonImages = images;
+    } else if (typeof images === 'string') {
+      contentJsonImages = JSON.parse(images);
+    }
+  } catch (e) {
+    console.error('Error parsing content_json images:', e);
+  }
+
+  const finalAttachments = [...safeAttachments, ...contentJsonImages];
+
+  if (finalAttachments.length > 0) {
+    console.log('🖼️ [MessageBubble] Has attachments:', finalAttachments.length);
+  }
 
   // 格式化時間
   const formatTime = (timestamp: string) => {
@@ -114,9 +149,26 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             } ${isError ? 'border-red-300 bg-red-50' : ''}`}>
 
             {/* 訊息內容 */}
-            <div className="whitespace-pre-wrap break-words">
-              {message.content}
-            </div>
+            {message.content && (
+              <div className="whitespace-pre-wrap break-words">
+                {message.content}
+              </div>
+            )}
+
+            {/* Attachments */}
+            {finalAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2 relative">
+                {finalAttachments.map((att: any, idx: number) => (
+                  <div key={idx} className="relative w-32 h-32 rounded-lg overflow-hidden border border-[#EADBC8]">
+                    <img
+                      src={att.url || (att.path && att.path.startsWith('http') ? att.path : '/assets/loading-logo.png')}
+                      alt={att.name || 'attachment'}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* 錯誤訊息 */}
             {isError && message.error_message && (
