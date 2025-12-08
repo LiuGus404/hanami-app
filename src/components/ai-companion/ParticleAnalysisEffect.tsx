@@ -50,8 +50,8 @@ export default function ParticleAnalysisEffect({ isVisible, onComplete }: Partic
                         style={{
                             width: p.size,
                             height: p.size,
-                            backgroundColor: i % 2 === 0 ? '#FFD59A' : '#FFB6C1',
-                            boxShadow: `0 0 ${p.size * 2}px ${i % 2 === 0 ? '#FFD59A' : '#FFB6C1'}`,
+                            backgroundColor: p.id % 2 === 0 ? '#FFD59A' : '#FFB6C1',
+                            boxShadow: `0 0 ${p.size * 2}px ${p.id % 2 === 0 ? '#FFD59A' : '#FFB6C1'}`,
                         }}
                     />
                 ))}
