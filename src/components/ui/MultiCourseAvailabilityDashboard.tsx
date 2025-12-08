@@ -2194,8 +2194,8 @@ ${timeSlot}有一個位 ^^
                           slot.is_registration_open ? 'bg-blue-400' : 'bg-orange-400'
                         }`} title={slot.is_registration_open ? '報名開放' : '報名關閉'}></div>
                       </div>
-                      {/* 試堂學生展開按鈕（保留原有功能） */}
-                      {false && slot.trial_students && slot.trial_students.length > 0 && (
+                      {/* 試堂學生展開按鈕（暫時禁用） */}
+                      {/* {slot.trial_students && slot.trial_students.length > 0 && (
                         <div className="flex items-center justify-center gap-2 mt-1">
                           <button
                             className="text-[9px] px-2 py-1 rounded bg-gradient-to-r from-[#FFF9E2] to-[#FFEAA7] text-[#4B4036] border border-yellow-200 hover:from-[#FFEFC2] hover:to-[#FFD93D] transition-all duration-300 transform hover:scale-105"
@@ -2204,7 +2204,7 @@ ${timeSlot}有一個位 ^^
                             {expandedTrial[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] ? '收起' : '展開'}試堂學生（{slot.trial_students.length}）
                           </button>
                         </div>
-                      )}
+                      )} */}
                       {/* 展開時才顯示名單 */}
                       {slot.trial_students && slot.trial_students.length > 0 && expandedTrial[`${slot.weekday}_${slot.time}_${slot.course}_${slot.id}`] && (
                         <div className="flex flex-col gap-1 mt-1">

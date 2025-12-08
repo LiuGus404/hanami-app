@@ -180,7 +180,7 @@ export default function CourseDetailPage() {
                 )}
                 {(org?.contact_phone || orgSettings?.contactPhone) && (() => {
                   const phoneNumber = org?.contact_phone || orgSettings?.contactPhone || '';
-                  const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+                  const cleanPhone = phoneNumber.replace(/[\s\-()]/g, '');
                   const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone.substring(1) : (cleanPhone.startsWith('852') ? cleanPhone : `852${cleanPhone}`);
                   
                   return (

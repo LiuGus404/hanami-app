@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
         if (lessonsData && Array.isArray(lessonsData)) {
           lessonsData.forEach((lesson: any) => {
             const studentId = lesson.student_id;
-            if (studentId && lessonCounts.hasOwnProperty(studentId)) {
+            if (studentId && Object.prototype.hasOwnProperty.call(lessonCounts, studentId)) {
               lessonCounts[studentId] = (lessonCounts[studentId] || 0) + 1;
             }
           });

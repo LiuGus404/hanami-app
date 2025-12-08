@@ -118,8 +118,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     refreshOrganizations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, refreshOrganizations]);
 
   const setCurrentOrganizationId = useCallback(
     (organizationId: string) => {

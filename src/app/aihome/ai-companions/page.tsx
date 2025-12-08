@@ -2429,7 +2429,16 @@ export default function AICompanionsPage() {
                   )}
                 </AnimatePresence>
               </div>
-              <UnifiedRightContent user={user} onLogout={handleLogout} />
+              <UnifiedRightContent
+                user={user}
+                onLogout={handleLogout}
+                onNavigate={(action) => {
+                  if (action.startsWith('view:')) {
+                    const view = action.split(':')[1];
+                    setActiveView(view as any);
+                  }
+                }}
+              />
             </div>
           </div>
         </div>

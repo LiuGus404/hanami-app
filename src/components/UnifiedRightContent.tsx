@@ -14,16 +14,22 @@ import {
     MusicalNoteIcon,
     BookOpenIcon,
     ChatBubbleLeftRightIcon,
-    ArrowRightOnRectangleIcon
+    ArrowRightOnRectangleIcon,
+    PuzzlePieceIcon,
+    UserGroupIcon,
+    UsersIcon,
+    ArchiveBoxIcon,
+    ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 
 interface UnifiedRightContentProps {
     user: any;
     onLogout: () => void;
+    onNavigate?: (key: string) => void;
 }
 
-export default function UnifiedRightContent({ user, onLogout }: UnifiedRightContentProps) {
+export default function UnifiedRightContent({ user, onLogout, onNavigate }: UnifiedRightContentProps) {
     const router = useRouter();
     const {
         isPlaying,
@@ -41,6 +47,16 @@ export default function UnifiedRightContent({ user, onLogout }: UnifiedRightCont
     // 獨立控制各個彈出視窗的開關
     const [showMusicPopup, setShowMusicPopup] = useState(false);
     const [showGearDropdown, setShowGearDropdown] = useState(false);
+
+    const handleItemClick = (item: any) => {
+        if (item.action) {
+            if (onNavigate) {
+                onNavigate(item.action);
+            }
+        } else if (item.href) {
+            router.push(item.href);
+        }
+    };
 
     return (
         <div className="flex items-center space-x-2 relative">
@@ -223,12 +239,15 @@ export default function UnifiedRightContent({ user, onLogout }: UnifiedRightCont
                         </div>
 
                         {[
-                            { name: '使用指南', href: '#', icon: <BookOpenIcon className="w-4 h-4" /> },
-                            { name: '設定', href: '#', icon: <Cog6ToothIcon className="w-4 h-4" /> },
-                            { name: '回饋建議', href: '#', icon: <ChatBubbleLeftRightIcon className="w-4 h-4" /> }
+                            { name: '思維積木', action: 'view:mind', icon: <PuzzlePieceIcon className="w-4 h-4" /> },
+                            { name: '協作室', action: 'view:chat', icon: <UserGroupIcon className="w-4 h-4" /> },
+                            { name: '角色', action: 'view:roles', icon: <UsersIcon className="w-4 h-4" /> },
+                            { name: '記憶', action: 'view:memory', icon: <ArchiveBoxIcon className="w-4 h-4" /> },
+                            { name: '統計', action: 'view:stats', icon: <ChartBarIcon className="w-4 h-4" /> },
                         ].map((item) => (
                             <div
                                 key={item.name}
+                                onClick={() => handleItemClick(item)}
                                 className="flex items-center px-4 py-2 text-sm text-[#6B5142] hover:bg-[#FFF9F2] hover:text-[#4B4036] rounded-lg cursor-pointer transition-colors"
                             >
                                 <span className="mr-3">{item.icon}</span>

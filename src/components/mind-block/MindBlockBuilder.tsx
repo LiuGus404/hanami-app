@@ -285,10 +285,6 @@ export default function MindBlockBuilder() {
                             else if (data.content_json.content || data.content_json.query || data.content_json.prompt) {
                                 blockParams = { ...data.content_json };
                             }
-                            // 如果 content_json 是完整的積木節點
-                            else if (data.content_json.type && data.content_json.params) {
-                                blockParams = { ...data.content_json.params };
-                            }
                         }
 
                         const singleBlock: MindBlockNode = {

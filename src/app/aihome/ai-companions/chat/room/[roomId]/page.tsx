@@ -57,7 +57,10 @@ import { MessageStatusIndicator } from '@/components/ai-companion/MessageStatusI
 import { FoodBalanceDisplay } from '@/components/ai-companion/FoodBalanceDisplay';
 import { SecureImageDisplay } from '@/components/ai-companion/SecureImageDisplay';
 import UnifiedRightContent from '@/components/UnifiedRightContent';
+import ConnectionHint from '@/components/ai-companion/ConnectionHint';
 import { convertToPublicUrl, convertToShortUrl, getShortDisplayUrl, extractStoragePath } from '@/lib/getSignedImageUrl';
+
+const AI_SERVER_URL = process.env.NEXT_PUBLIC_AI_SERVER_URL || 'https://hanami-ai-server.onrender.com';
 
 // ⭐ 全局發送鎖（跨組件實例共享，防止 React Strict Mode 雙重掛載）
 const globalSendingLock = new Map<string, boolean>();
@@ -523,6 +526,15 @@ export default function RoomChatPage() {
   const companionParam = urlParams.companion;
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showHint, setShowHint] = useState(false); // 連線提示顯示狀態
+
+  // 初始化提示
+
+
+  const handleDismissHint = () => {
+    setShowHint(false);
+    sessionStorage.setItem('hanami_connection_hint_shown', 'true');
+  };
 
   // 直接使用 React 狀態，不使用 sessionStorage
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1051,6 +1063,26 @@ export default function RoomChatPage() {
   const [searchResults, setSearchResults] = useState<Message[]>([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
   const [hasLoadedFromDatabase, setHasLoadedFromDatabase] = useState(false);
+
+  // 初始化提示：處理「初次進入」與「連線卡住」
+  useEffect(() => {
+    // 1. 檢查是否為本次會話首次進入
+    const hasShownHint = sessionStorage.getItem('hanami_connection_hint_shown');
+    // 如果沒顯示過，就顯示
+    if (!hasShownHint) {
+      setShowHint(true);
+    }
+
+    // 2. 設置連線超時檢查 (如果 10 秒內未完成資料庫載入，視為連線卡住，強制顯示提示)
+    const stuckTimer = setTimeout(() => {
+      if (!hasLoadedFromDatabase) {
+        console.log('⚠️ [ConnectionHint] 偵測到連線緩慢或卡住，顯示提示');
+        setShowHint(true);
+      }
+    }, 10000);
+
+    return () => clearTimeout(stuckTimer);
+  }, [hasLoadedFromDatabase]);
   const [editingProject, setEditingProject] = useState(false);
   const [editProjectName, setEditProjectName] = useState('');
   const [editProjectDescription, setEditProjectDescription] = useState('');
@@ -5147,6 +5179,22 @@ export default function RoomChatPage() {
 
             {/* 右側操作區 */}
             <div className="flex items-center space-x-2">
+              {/* Mobile Reload Button - 解決連線問題 */}
+              <motion.button
+                onClick={() => window.location.reload()}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-2 rounded-lg hover:bg-[#FFD59A]/20 transition-colors text-[#4B4036] relative"
+                title="重新載入連線"
+              >
+                <ArrowPathIcon className="w-6 h-6" />
+                <ConnectionHint
+                  isVisible={showHint}
+                  onDismiss={handleDismissHint}
+                  className="absolute top-10 -right-4 z-50 flex items-start cursor-pointer group w-[300px] justify-end"
+                />
+              </motion.button>
+
               {/* 食量顯示與歷史記錄 (Popver) */}
               <div className="relative">
                 <motion.button
@@ -5711,7 +5759,8 @@ export default function RoomChatPage() {
           />
         </div >
       </div >
-    </div >
+
+    </div>
   );
 }
 
@@ -6995,6 +7044,7 @@ function RoleSelectorModal({ isOpen, onClose, companions, activeRoles, selectedC
           ))}
         </div>
       </motion.div>
+
     </div>
   );
 }

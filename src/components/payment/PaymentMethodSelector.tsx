@@ -663,7 +663,7 @@ export default function PaymentMethodSelector({
           {/* WhatsApp 聯絡按鍵 */}
           {orgPhone && (() => {
             // 處理電話號碼格式：移除所有空格、括號、破折號等，保留數字和 + 號
-            const cleanPhone = orgPhone.replace(/[\s\-\(\)]/g, '');
+            const cleanPhone = orgPhone.replace(/[\s\-()]/g, '');
             // 如果沒有 + 號，確保有國家代碼（預設 +852）
             const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone.substring(1) : (cleanPhone.startsWith('852') ? cleanPhone : `852${cleanPhone}`);
 
@@ -931,7 +931,7 @@ export default function PaymentMethodSelector({
                           <motion.a
                             href={(() => {
                               // 處理電話號碼格式：移除所有空格、括號、破折號等，保留數字和 + 號
-                              const cleanPhone = orgPhone.replace(/[\s\-\(\)]/g, '');
+                              const cleanPhone = orgPhone.replace(/[\s\-()]/g, '');
                               // 如果沒有 + 號，確保有國家代碼（預設 +852）
                               const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone.substring(1) : (cleanPhone.startsWith('852') ? cleanPhone : `852${cleanPhone}`);
                               return `https://api.whatsapp.com/send/?phone=${formattedPhone}`;
