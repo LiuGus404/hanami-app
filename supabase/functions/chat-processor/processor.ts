@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from "supabase-js";
 // @ts-ignore
 declare var Deno: any;
 import { ChatRequest, ChatResponse, Message, RoleConfig, ModelConfig, MindBlock, ContentPart } from "./types.ts";
-import { callLLM, generateImage } from "./providers.ts";
+import { callLLM, generateImage, analyzeAudioWithGemini } from "./providers.ts";
 
 export async function processChat(
     supabase: SupabaseClient,
@@ -13,6 +13,13 @@ export async function processChat(
     const { message, roomId, companionId, modelId, attachments } = request;
 
     console.log(`Processing chat for user ${userId} in room ${roomId} with companion ${companionId}`);
+
+    // ... (rest of function until lines 172-186) ...
+    // Note: I will use a different strategy for replacement to avoid rewriting the whole file.
+    // I need to import transcribeAudio at the top first, then update the attachment handling block.
+    // But since I can only do ONE replace_file_content call per tool usage effectively or multi_replace.
+    // I will use multi_replace.
+
 
     // 1. Fetch Role Configuration
     let roleConfig: RoleConfig | null = null;
@@ -170,6 +177,9 @@ export async function processChat(
     ];
 
     // Handle attachments (Multi-modal)
+    let audioAnalysisResult: any = null;
+    let audioAnalysisCost = 0;
+
     if (attachments && attachments.length > 0) {
         const lastMsg = messages[messages.length - 1];
         const contentParts: ContentPart[] = [{ type: 'text', text: message }];
@@ -180,6 +190,66 @@ export async function processChat(
                     type: 'image_url',
                     image_url: { url: att.url }
                 });
+            } else if (att.type === 'audio') {
+                // 2-Phase Analysis
+                console.log(`Starting 2-phase analysis for audio: ${att.url}`);
+                const analysis = await analyzeAudioWithGemini(att.url);
+
+                const transcriptionText = analysis.transcription || "[Audio: Transcription failed]";
+                const descriptionText = analysis.description || "[Audio: Description unavailable]";
+
+                console.log(`Audio Analysis: ${JSON.stringify(analysis, null, 2)}`);
+
+                // Update User Message in DB with Analysis (if messageId provided)
+                if (request.messageId) {
+                    try {
+                        await supabase
+                            .from('ai_messages')
+                            .update({
+                                content_json: {
+                                    audio_analysis: analysis
+                                }
+                            })
+                            .eq('id', request.messageId);
+                        console.log(`Saved audio analysis to message ${request.messageId}`);
+                    } catch (e) {
+                        console.error('Failed to save audio analysis to DB:', e);
+                    }
+                }
+
+                // Inject into Context
+                // We present it as direct input so the LLM responds naturally
+                const analysisContext = `
+[Audio Message Transcription]: "${transcriptionText}"
+[Audio Context]: ${descriptionText}
+(Instruction: Respond to the transcription above as if the user spoke it directly.)
+`;
+                if (contentParts[0].text) {
+                    contentParts[0].text += `\n\n${analysisContext}`;
+                } else {
+                    contentParts[0].text = analysisContext;
+                }
+
+                // Track Usage/Cost for Analysis phase
+                // Usage from OpenRouter (Gemini Flash 2.0)
+                // approximate cost: Input tokens + Output tokens.
+                if (analysis.usage) {
+                    const tokens = analysis.usage.total_tokens || 0;
+                    // Cost: 66,000 food per USD?
+                    // Gemini Flash 2.0 is likely cheap/free in preview, but let's charge a small fee to prevent abuse.
+                    // Or just use token count / 100 * factor.
+                    // Let's assume standard pricing: Input $0.10/1M, Output $0.40/1M (hypothetical).
+                    // For now, let's charge 1 food per 10 tokens as a safe estimate?
+                    // Or keep it simple: 100 food fixed?
+                    // Let's use CHARS based on description length + transcription length?
+                    // No, usage tokens is better.
+                    // Let's say 1 food per 100 tokens. (Very cheap).
+                    // 2000 tokens = 20 food.
+                    audioAnalysisCost = Math.ceil(tokens / 100);
+                } else {
+                    audioAnalysisCost = 50; // Fixed fallback
+                }
+                audioAnalysisResult = analysis;
             }
         }
         lastMsg.content = contentParts;
@@ -477,7 +547,7 @@ export async function processChat(
 
     // (Removed global fallback since we handle it per-model now)
 
-    totalFoodCost = textInputCost + textOutputCost + imageCost;
+    totalFoodCost = textInputCost + textOutputCost + imageCost + audioAnalysisCost;
 
     // Ensure we don't charge less than the estimate if it was a simple text request?
     // Actually, accurate pricing is better.
@@ -500,9 +570,11 @@ export async function processChat(
                     input_chars: inputChars,
                     output_chars: outputChars,
                     total_food_cost: totalFoodCost,
-                    image_tokens: imageCost, // Add this to show where the cost comes from
+                    image_tokens: imageCost,
+                    audio_analysis_cost: audioAnalysisCost,
                     CHARS_PER_FOOD
                 },
+                audio_analysis: audioAnalysisResult,
                 mind_name: mindBlocks.map(mb => mb.title).join(', '),
                 debug: {
                     roleId: roleConfig?.id,

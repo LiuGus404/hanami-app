@@ -31,7 +31,8 @@ export default function ReactPortalModal({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(75, 64, 54, 0.2)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -45,18 +46,19 @@ export default function ReactPortalModal({
       }}
     >
       <div
+        className="animate-in fade-in zoom-in duration-300"
         style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(12px)',
-          borderRadius: '24px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          backgroundColor: '#FFF9F2',
+          borderRadius: '40px',
+          boxShadow: '8px 8px 16px #E6D9C5, -8px -8px 16px #FFFFFF',
           width: '100%',
           maxWidth: '600px',
           maxHeight: '85vh',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
-          border: '1px solid #EADBC8'
+          border: 'none',
+          outline: 'none'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -65,24 +67,25 @@ export default function ReactPortalModal({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '24px',
-          borderBottom: '1px solid #EADBC8',
-          borderRadius: '24px 24px 0 0'
+          padding: '32px 32px 24px 32px',
+          borderBottom: 'none',
+          borderRadius: '40px 40px 0 0'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{
-              width: '40px',
-              height: '40px',
-              background: 'linear-gradient(135deg, #FFD59A 0%, #EBC9A4 100%)',
+              width: '48px',
+              height: '48px',
+              background: '#FFF9F2',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              boxShadow: 'inset 3px 3px 6px #D1C3B1, inset -3px -3px 6px #FFFFFF'
             }}>
-              <User style={{ width: '20px', height: '20px', color: '#4B4036' }} />
+              <User style={{ width: '24px', height: '24px', color: '#4B4036' }} />
             </div>
             <h2 style={{
-              fontSize: '20px',
+              fontSize: '24px',
               fontWeight: 'bold',
               color: '#4B4036',
               margin: 0
@@ -93,98 +96,99 @@ export default function ReactPortalModal({
           <button
             onClick={onClose}
             style={{
-              width: '32px',
-              height: '32px',
+              width: '40px',
+              height: '40px',
               borderRadius: '50%',
               border: 'none',
-              background: 'rgba(75, 64, 54, 0.1)',
+              background: '#FFF9F2',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              boxShadow: '5px 5px 10px #E6D9C5, -5px -5px 10px #FFFFFF',
+              color: '#8B7E74'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(75, 64, 54, 0.2)';
-              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.boxShadow = 'inset 2px 2px 4px #D1C3B1, inset -2px -2px 4px #FFFFFF';
+              e.currentTarget.style.color = '#4B4036';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(75, 64, 54, 0.1)';
-              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '5px 5px 10px #E6D9C5, -5px -5px 10px #FFFFFF';
+              e.currentTarget.style.color = '#8B7E74';
             }}
           >
-            <X style={{ width: '16px', height: '16px', color: '#4B4036' }} />
+            <X style={{ width: '20px', height: '20px' }} />
           </button>
         </div>
 
         {/* 內容區域 */}
         <div style={{
-          padding: '24px',
+          padding: '0 32px 24px 32px',
           flex: 1,
           overflowY: 'auto',
-          background: 'linear-gradient(180deg, #FFFDF8 0%, #FFF9F2 100%)'
+          background: 'transparent'
         }}>
           {children}
         </div>
 
         {/* 按鈕區域 */}
         <div style={{
-          padding: '24px',
-          borderTop: '1px solid #EADBC8',
-          background: 'linear-gradient(135deg, #FFF9F2 0%, #FFD59A 100%)',
-          borderRadius: '0 0 24px 24px',
+          padding: '24px 32px 32px 32px',
+          borderTop: 'none',
+          background: 'transparent',
+          borderRadius: '0 0 40px 40px',
           display: 'flex',
-          gap: '12px',
+          gap: '16px',
           justifyContent: 'flex-end'
         }}>
           <button
             onClick={onClose}
             style={{
-              padding: '12px 24px',
-              borderRadius: '12px',
-              border: '2px solid #EADBC8',
-              background: 'rgba(255, 255, 255, 0.8)',
-              color: '#4B4036',
-              fontSize: '14px',
+              padding: '12px 28px',
+              borderRadius: '20px',
+              border: 'none',
+              background: '#FFF9F2',
+              color: '#8B7E74',
+              fontSize: '16px',
               fontWeight: '600',
               cursor: 'pointer',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              boxShadow: '6px 6px 12px #E6D9C5, -6px -6px 12px #FFFFFF'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#EADBC8';
-              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = 'inset 3px 3px 6px #D1C3B1, inset -3px -3px 6px #FFFFFF';
+              e.currentTarget.style.color = '#4B4036';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
-              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '6px 6px 12px #E6D9C5, -6px -6px 12px #FFFFFF';
+              e.currentTarget.style.color = '#8B7E74';
             }}
           >
             取消
           </button>
           <button
-            onClick={() => {
-              console.log('模態框確認按鈕被點擊');
-              onSubmit();
-            }}
+            onClick={onSubmit}
             style={{
-              padding: '12px 24px',
-              borderRadius: '12px',
+              padding: '12px 32px',
+              borderRadius: '20px',
               border: 'none',
-              background: 'linear-gradient(135deg, #FFD59A 0%, #EBC9A4 100%)',
+              background: '#FFF9F2',
               color: '#4B4036',
-              fontSize: '14px',
-              fontWeight: '600',
+              fontSize: '16px',
+              fontWeight: 'bold',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              boxShadow: '0 4px 12px rgba(255, 213, 154, 0.3)'
+              boxShadow: '6px 6px 12px #E6D9C5, -6px -6px 12px #FFFFFF'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(255, 213, 154, 0.4)';
+              e.currentTarget.style.boxShadow = 'inset 3px 3px 6px #D1C3B1, inset -3px -3px 6px #FFFFFF';
+              e.currentTarget.style.borderColor = 'transparent';
+              e.currentTarget.style.color = '#E69138'; // Hover text color for emphasis
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0) scale(1)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 213, 154, 0.3)';
+              e.currentTarget.style.boxShadow = '6px 6px 12px #E6D9C5, -6px -6px 12px #FFFFFF';
+              e.currentTarget.style.color = '#4B4036';
             }}
           >
             {submitButtonText}

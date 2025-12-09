@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  PlusIcon, 
-  PencilIcon, 
-  TrashIcon, 
+import {
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
   UserIcon,
   CalendarIcon,
   HeartIcon,
@@ -37,8 +37,8 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  
-  
+
+
   const [editingChild, setEditingChild] = useState<Child | null>(null);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -56,41 +56,41 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
     try {
       setLoading(true);
       console.log('開始載入孩子資料...');
-      
+
       // 獲取用戶信息 - 使用 email 直接查詢
       console.log('正在獲取用戶信息...');
-      
+
       // 從會話存儲中獲取 email
       const userEmail = 'tqfea12@gmail.com'; // 從日誌中看到的 email
       console.log('使用 email 查詢用戶:', userEmail);
-      
+
       const userResponse = await fetch(`/api/children/get-user-by-email?email=${encodeURIComponent(userEmail)}`);
       const userData = await userResponse.json();
-      
+
       console.log('用戶查詢結果:', userData);
-      
+
       if (!userData.success) {
         console.error('獲取用戶信息失敗:', userData.error);
         alert('獲取用戶信息失敗，請重新登入');
         return;
       }
-      
+
       const user = userData.user;
       console.log('用戶 ID:', user.id);
-      
+
       // 先進行完整的調試測試
       console.log('正在進行完整調試測試...');
       const testResponse = await fetch('/api/children/full-debug');
       const testData = await testResponse.json();
       console.log('完整調試結果:', testData);
-      
+
       if (!testData.success) {
         console.error('調試測試失敗:', testData.error);
         alert(`調試測試失敗: ${testData.error}`);
         setChildren([]);
         return;
       }
-      
+
       // 檢查 hanami_children 表是否可以訪問
       if (!testData.debug.hanami_children.success) {
         console.error('hanami_children 表無法訪問:', testData.debug.hanami_children.error);
@@ -98,12 +98,12 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
         setChildren([]);
         return;
       }
-      
+
       const response = await fetch(`/api/children?userId=${user.id}`);
       const data = await response.json();
-      
+
       console.log('API 響應:', { status: response.status, data });
-      
+
       if (response.ok) {
         setChildren(data.children || []);
         console.log('成功載入孩子資料:', data.children?.length || 0, '個');
@@ -153,31 +153,31 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
     if (e) {
       e.preventDefault();
     }
-    
+
     if (!validateForm()) {
       console.log('表單驗證失敗');
       return;
     }
-    
+
     console.log('開始提交表單，formData:', formData);
 
     try {
       // 獲取用戶信息 - 使用 email 查詢方法
       const userResponse = await fetch('/api/children/get-user-by-email?email=tqfea12@gmail.com');
       const userResult = await userResponse.json();
-      
+
       if (!userResult.success || !userResult.user) {
         alert('無法獲取用戶信息');
         return;
       }
-      
+
       const user = userResult.user;
 
       const url = editingChild ? `/api/children/${editingChild.id}` : '/api/children';
       const method = editingChild ? 'PUT' : 'POST';
-      
+
       const requestData = editingChild ? formData : { ...formData, parent_id: user.id };
-      
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -261,39 +261,39 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
   const handleLoadBoundStudents = async () => {
     try {
       setLoading(true);
-      
+
       // 獲取用戶信息 - 使用 email 直接查詢
       const userEmail = 'tqfea12@gmail.com'; // 從日誌中看到的 email
       console.log('載入綁定學生 - 使用 email 查詢用戶:', userEmail);
-      
+
       const userResponse = await fetch(`/api/children/get-user-by-email?email=${encodeURIComponent(userEmail)}`);
       const userData = await userResponse.json();
-      
+
       console.log('載入綁定學生 - 用戶查詢結果:', userData);
-      
+
       if (!userData.success) {
         console.error('獲取用戶信息失敗:', userData.error);
         alert('獲取用戶信息失敗，請重新登入');
         return;
       }
-      
+
       const user = userData.user;
       console.log('載入綁定學生 - 用戶 ID:', user.id);
-      
+
       // 先進行詳細調試
       console.log('進行詳細調試...');
       const debugResponse = await fetch(`/api/children/debug-bound-students?userId=${user.id}`);
       const debugData = await debugResponse.json();
       console.log('詳細調試結果:', debugData);
-      
+
       const response = await fetch(`/api/children/load-bound-students-cross-db?userId=${user.id}`);
       const data = await response.json();
-      
+
       if (response.ok && data.students && data.students.length > 0) {
         // 批量載入所有綁定的學生
         let successCount = 0;
         let errorCount = 0;
-        
+
         for (const student of data.students) {
           try {
             const childData = {
@@ -306,7 +306,7 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
               health_notes: student.health_notes || '',
               allergies: '' // 現有學生資料中沒有過敏信息
             };
-            
+
             const response = await fetch('/api/children', {
               method: 'POST',
               headers: {
@@ -314,7 +314,7 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
               },
               body: JSON.stringify(childData),
             });
-            
+
             if (response.ok) {
               successCount++;
             } else {
@@ -325,10 +325,10 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
             errorCount++;
           }
         }
-        
+
         // 重新載入孩子列表
         await loadChildren();
-        
+
         // 顯示結果
         if (successCount > 0) {
           alert(`成功載入 ${successCount} 個孩子的資料${errorCount > 0 ? `，${errorCount} 個載入失敗` : ''}`);
@@ -374,17 +374,17 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
       {/* 標題和添加按鈕 */}
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-bold text-[#4B4036]">孩子資料</h3>
-        <div className="flex space-x-3">
+        <div className="flex space-x-4">
           <button
             onClick={handleLoadBoundStudents}
-            className="w-10 h-10 bg-[#EBC9A4] text-[#4B4036] rounded-full hover:bg-[#FFD59A] transition-colors flex items-center justify-center shadow-lg hover:shadow-xl"
+            className="w-10 h-10 bg-[#FFF9F2] text-[#4B4036] rounded-2xl shadow-[5px_5px_10px_#E6D9C5,-5px_-5px_10px_#FFFFFF] hover:shadow-[inset_3px_3px_6px_#E6D9C5,inset_-3px_-3px_6px_#FFFFFF] transition-all flex items-center justify-center active:scale-95"
             title="載入綁定學生資料"
           >
             <ArrowPathIcon className="w-5 h-5" />
           </button>
           <button
             onClick={() => setShowAddForm(true)}
-            className="w-10 h-10 bg-[#FFD59A] text-[#4B4036] rounded-full hover:bg-[#EBC9A4] transition-colors flex items-center justify-center shadow-lg hover:shadow-xl"
+            className="w-10 h-10 bg-[#FFF9F2] text-[#4B4036] rounded-2xl shadow-[5px_5px_10px_#E6D9C5,-5px_-5px_10px_#FFFFFF] hover:shadow-[inset_3px_3px_6px_#E6D9C5,inset_-3px_-3px_6px_#FFFFFF] transition-all flex items-center justify-center active:scale-95"
             title="添加孩子"
           >
             <PlusIcon className="w-5 h-5" />
@@ -401,55 +401,55 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-[#EADBC8] hover:shadow-lg transition-shadow"
+              className="rounded-[2.5rem] p-6 bg-[#FFF9F2] shadow-[8px_8px_16px_#E6D9C5,-8px_-8px_16px_#FFFFFF] transition-all hover:-translate-y-1 duration-300"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center">
-                  <div className="w-10 h-10 bg-[#FFD59A] rounded-full flex items-center justify-center mr-3">
-                    <UserIcon className="w-5 h-5 text-[#4B4036]" />
+                  <div className="w-14 h-14 rounded-full bg-[#FFF9F2] shadow-[inset_3px_3px_6px_#D1C3B1,inset_-3px_-3px_6px_#FFFFFF] flex items-center justify-center mr-4 text-[#EBC9A4]">
+                    <UserIcon className="w-7 h-7" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-[#4B4036]">{child.full_name}</h4>
+                    <h4 className="font-bold text-lg text-[#4B4036]">{child.full_name}</h4>
                     {child.nick_name && (
-                      <p className="text-sm text-[#4B4036]/70">暱稱: {child.nick_name}</p>
+                      <p className="text-sm text-[#8B7E74]">暱稱: {child.nick_name}</p>
                     )}
                   </div>
                 </div>
-                <div className="flex space-x-1">
+                <div className="flex space-x-2">
                   <button
                     onClick={() => handleEdit(child)}
-                    className="p-1 text-[#4B4036] hover:bg-[#FFD59A]/20 rounded"
+                    className="p-2 text-[#8B7E74] bg-[#FFF9F2] rounded-xl shadow-[4px_4px_8px_#E6D9C5,-4px_-4px_8px_#FFFFFF] hover:shadow-[inset_2px_2px_4px_#E6D9C5,inset_-2px_-2px_4px_#FFFFFF] hover:text-[#4B4036] transition-all active:scale-95"
                   >
                     <PencilIcon className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(child.id, child.full_name)}
-                    className="p-1 text-red-500 hover:bg-red-50 rounded"
+                    className="p-2 text-[#8B7E74] bg-[#FFF9F2] rounded-xl shadow-[4px_4px_8px_#E6D9C5,-4px_-4px_8px_#FFFFFF] hover:shadow-[inset_2px_2px_4px_#E6D9C5,inset_-2px_-2px_4px_#FFFFFF] hover:text-red-500 transition-all active:scale-95"
                   >
                     <TrashIcon className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center text-[#4B4036]/70">
+              <div className="space-y-3 text-sm mt-4 pl-1">
+                <div className="flex items-center text-[#8B7E74]">
                   <CalendarIcon className="w-4 h-4 mr-2" />
                   <span>{getAgeDisplay(child.age_months)}</span>
-                  <span className="mx-2">•</span>
+                  <span className="mx-2 text-[#E6D9C5]">•</span>
                   <span>{child.gender}</span>
                 </div>
-                
+
                 {child.preferences && (
-                  <div className="flex items-start text-[#4B4036]/70">
+                  <div className="flex items-start text-[#8B7E74]">
                     <HeartIcon className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                    <span>{child.preferences}</span>
+                    <span className="line-clamp-2">{child.preferences}</span>
                   </div>
                 )}
-                
+
                 {(child.health_notes || child.allergies) && (
-                  <div className="flex items-start text-[#4B4036]/70">
-                    <ExclamationTriangleIcon className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                    <div>
+                  <div className="flex items-start text-[#8B7E74]">
+                    <ExclamationTriangleIcon className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0 text-orange-400" />
+                    <div className="space-y-1">
                       {child.health_notes && <div>健康: {child.health_notes}</div>}
                       {child.allergies && <div>過敏: {child.allergies}</div>}
                     </div>
@@ -465,20 +465,22 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
         <div className="text-center py-8">
           <UserIcon className="w-16 h-16 text-[#4B4036]/30 mx-auto mb-4" />
           <p className="text-[#4B4036]/70 mb-6">還沒有添加任何孩子資料</p>
-          <div className="flex justify-center space-x-4">
+          <div className="flex justify-center space-x-6">
             <button
               onClick={handleLoadBoundStudents}
-              className="w-12 h-12 bg-[#EBC9A4] text-[#4B4036] rounded-full hover:bg-[#FFD59A] transition-colors flex items-center justify-center shadow-lg hover:shadow-xl"
+              className="px-6 py-3 bg-[#FFF9F2] text-[#4B4036] rounded-2xl shadow-[6px_6px_12px_#E6D9C5,-6px_-6px_12px_#FFFFFF] hover:shadow-[inset_3px_3px_6px_#E6D9C5,inset_-3px_-3px_6px_#FFFFFF] transition-all flex items-center justify-center gap-2 font-bold active:scale-95"
               title="載入綁定學生資料"
             >
-              <ArrowPathIcon className="w-6 h-6" />
+              <ArrowPathIcon className="w-5 h-5" />
+              <span>載入學生</span>
             </button>
             <button
               onClick={() => setShowAddForm(true)}
-              className="w-12 h-12 bg-[#FFD59A] text-[#4B4036] rounded-full hover:bg-[#EBC9A4] transition-colors flex items-center justify-center shadow-lg hover:shadow-xl"
+              className="px-6 py-3 bg-[#FFF9F2] text-[#4B4036] rounded-2xl shadow-[6px_6px_12px_#E6D9C5,-6px_-6px_12px_#FFFFFF] hover:shadow-[inset_3px_3px_6px_#E6D9C5,inset_-3px_-3px_6px_#FFFFFF] transition-all flex items-center justify-center gap-2 font-bold active:scale-95"
               title="添加第一個孩子"
             >
-              <PlusIcon className="w-6 h-6" />
+              <PlusIcon className="w-5 h-5" />
+              <span>添加孩子</span>
             </button>
           </div>
         </div>
@@ -494,10 +496,10 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
       >
         <div className="space-y-6">
           {/* 基本資料區塊 */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-[#EADBC8]">
+          <div className="bg-[#FFF9F2] rounded-[2rem] p-6 shadow-[8px_8px_16px_#E6D9C5,-8px_-8px_16px_#FFFFFF]">
             <h3 className="text-lg font-semibold text-[#4B4036] mb-4 flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                <UserIcon className="w-3 h-3 text-[#4B4036]" />
+              <div className="w-8 h-8 bg-[#FFF9F2] rounded-full flex items-center justify-center shadow-[inset_2px_2px_4px_#D1C3B1,inset_-2px_-2px_4px_#FFFFFF]">
+                <UserIcon className="w-4 h-4 text-[#8B7E74]" />
               </div>
               基本資料
             </h3>
@@ -511,9 +513,8 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
                   type="text"
                   value={formData.full_name}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all ${
-                    errors.full_name ? 'border-red-500 bg-red-50' : 'border-[#EADBC8] bg-[#FFF9F2]'
-                  }`}
+                  className={`w-full px-5 py-3 border-none rounded-xl bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#D1C3B1,inset_-2px_-2px_5px_#FFFFFF] focus:ring-0 focus:shadow-[inset_3px_3px_6px_#D1C3B1,inset_-3px_-3px_6px_#FFFFFF] transition-all text-[#4B4036] placeholder-[#8B7E74]/50 ${errors.full_name ? 'ring-2 ring-red-500' : ''
+                    }`}
                   placeholder="請輸入孩子全名"
                 />
                 {errors.full_name && (
@@ -528,7 +529,7 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
                   type="text"
                   value={formData.nick_name}
                   onChange={(e) => setFormData({ ...formData, nick_name: e.target.value })}
-                  className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent bg-[#FFF9F2] transition-all"
+                  className="w-full px-5 py-3 border-none rounded-xl bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#D1C3B1,inset_-2px_-2px_5px_#FFFFFF] focus:ring-0 focus:shadow-[inset_3px_3px_6px_#D1C3B1,inset_-3px_-3px_6px_#FFFFFF] transition-all text-[#4B4036] placeholder-[#8B7E74]/50"
                   placeholder="請輸入暱稱（選填）"
                 />
               </div>
@@ -542,9 +543,8 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
                   type="date"
                   value={formData.birth_date}
                   onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent transition-all ${
-                    errors.birth_date ? 'border-red-500 bg-red-50' : 'border-[#EADBC8] bg-[#FFF9F2]'
-                  }`}
+                  className={`w-full px-5 py-3 border-none rounded-xl bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#D1C3B1,inset_-2px_-2px_5px_#FFFFFF] focus:ring-0 focus:shadow-[inset_3px_3px_6px_#D1C3B1,inset_-3px_-3px_6px_#FFFFFF] transition-all text-[#4B4036] ${errors.birth_date ? 'ring-2 ring-red-500' : ''
+                    }`}
                 />
                 {errors.birth_date && (
                   <p className="text-red-500 text-sm mt-1">{errors.birth_date}</p>
@@ -557,26 +557,34 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
                   性別 <span className="text-red-500">*</span>
                 </label>
                 <div className="flex space-x-6">
-                  <label className="flex items-center p-3 rounded-xl border border-[#EADBC8] bg-[#FFF9F2] cursor-pointer transition-all hover:bg-[#FFD59A]/20">
-                    <input
-                      type="radio"
-                      value="男孩"
-                      checked={formData.gender === '男孩'}
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value as '男孩' | '女孩' })}
-                      className="mr-3 w-4 h-4 text-[#FFD59A] focus:ring-[#FFD59A]"
-                    />
-                    <span className="text-[#4B4036] font-medium">男孩</span>
-                  </label>
-                  <label className="flex items-center p-3 rounded-xl border border-[#EADBC8] bg-[#FFF9F2] cursor-pointer transition-all hover:bg-[#FFD59A]/20">
-                    <input
-                      type="radio"
-                      value="女孩"
-                      checked={formData.gender === '女孩'}
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value as '男孩' | '女孩' })}
-                      className="mr-3 w-4 h-4 text-[#FFD59A] focus:ring-[#FFD59A]"
-                    />
-                    <span className="text-[#4B4036] font-medium">女孩</span>
-                  </label>
+                  <div className="flex space-x-6">
+                    <label className={`flex items-center p-3 rounded-xl cursor-pointer transition-all ${formData.gender === '男孩'
+                      ? 'bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#D1C3B1,inset_-2px_-2px_5px_#FFFFFF] text-[#E69138]'
+                      : 'bg-[#FFF9F2] shadow-[5px_5px_10px_#E6D9C5,-5px_-5px_10px_#FFFFFF] text-[#8B7E74] hover:text-[#4B4036]'
+                      }`}>
+                      <input
+                        type="radio"
+                        value="男孩"
+                        checked={formData.gender === '男孩'}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value as '男孩' | '女孩' })}
+                        className="hidden"
+                      />
+                      <span className="font-bold px-2">男孩</span>
+                    </label>
+                    <label className={`flex items-center p-3 rounded-xl cursor-pointer transition-all ${formData.gender === '女孩'
+                      ? 'bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#D1C3B1,inset_-2px_-2px_5px_#FFFFFF] text-[#E69138]'
+                      : 'bg-[#FFF9F2] shadow-[5px_5px_10px_#E6D9C5,-5px_-5px_10px_#FFFFFF] text-[#8B7E74] hover:text-[#4B4036]'
+                      }`}>
+                      <input
+                        type="radio"
+                        value="女孩"
+                        checked={formData.gender === '女孩'}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value as '男孩' | '女孩' })}
+                        className="hidden"
+                      />
+                      <span className="font-bold px-2">女孩</span>
+                    </label>
+                  </div>
                 </div>
                 {errors.gender && (
                   <p className="text-red-500 text-sm mt-1">{errors.gender}</p>
@@ -586,10 +594,11 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
           </div>
 
           {/* 詳細資料區塊 */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-[#EADBC8]">
+          {/* 詳細資料區塊 */}
+          <div className="bg-[#FFF9F2] rounded-[2rem] p-6 shadow-[8px_8px_16px_#E6D9C5,-8px_-8px_16px_#FFFFFF] mt-6">
             <h3 className="text-lg font-semibold text-[#4B4036] mb-4 flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center">
-                <HeartIcon className="w-3 h-3 text-[#4B4036]" />
+              <div className="w-8 h-8 bg-[#FFF9F2] rounded-full flex items-center justify-center shadow-[inset_2px_2px_4px_#D1C3B1,inset_-2px_-2px_4px_#FFFFFF]">
+                <HeartIcon className="w-4 h-4 text-[#8B7E74]" />
               </div>
               詳細資料
             </h3>
@@ -602,7 +611,7 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
                 <textarea
                   value={formData.preferences}
                   onChange={(e) => setFormData({ ...formData, preferences: e.target.value })}
-                  className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent bg-[#FFF9F2] transition-all resize-none"
+                  className="w-full px-5 py-3 border-none rounded-xl bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#D1C3B1,inset_-2px_-2px_5px_#FFFFFF] focus:ring-0 focus:shadow-[inset_3px_3px_6px_#D1C3B1,inset_-3px_-3px_6px_#FFFFFF] transition-all text-[#4B4036] placeholder-[#8B7E74]/50 resize-none"
                   rows={3}
                   placeholder="請描述孩子的喜好物..."
                 />
@@ -614,7 +623,7 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
                 <textarea
                   value={formData.health_notes}
                   onChange={(e) => setFormData({ ...formData, health_notes: e.target.value })}
-                  className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent bg-[#FFF9F2] transition-all resize-none"
+                  className="w-full px-5 py-3 border-none rounded-xl bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#D1C3B1,inset_-2px_-2px_5px_#FFFFFF] focus:ring-0 focus:shadow-[inset_3px_3px_6px_#D1C3B1,inset_-3px_-3px_6px_#FFFFFF] transition-all text-[#4B4036] placeholder-[#8B7E74]/50 resize-none"
                   rows={2}
                   placeholder="請描述健康情況（選填）"
                 />
@@ -626,7 +635,7 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
                 <textarea
                   value={formData.allergies}
                   onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
-                  className="w-full px-4 py-3 border border-[#EADBC8] rounded-xl focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent bg-[#FFF9F2] transition-all resize-none"
+                  className="w-full px-5 py-3 border-none rounded-xl bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#D1C3B1,inset_-2px_-2px_5px_#FFFFFF] focus:ring-0 focus:shadow-[inset_3px_3px_6px_#D1C3B1,inset_-3px_-3px_6px_#FFFFFF] transition-all text-[#4B4036] placeholder-[#8B7E74]/50 resize-none"
                   rows={2}
                   placeholder="請描述過敏情況（選填）"
                 />

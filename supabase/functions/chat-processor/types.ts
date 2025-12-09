@@ -1,9 +1,11 @@
 export interface ChatRequest {
     message: string;
-    roomId: string;
+    roomId: string; // This is actually the room UUID
     companionId?: string; // slug or id
     modelId?: string;
     attachments?: Attachment[];
+    userId?: string; // Optional, usually injected by Edge Function middleware or passed explicitly
+    messageId?: string; // The ID of the user message being processed
 }
 
 export interface Attachment {
@@ -11,6 +13,14 @@ export interface Attachment {
     url: string;
     name?: string;
     mimeType?: string;
+}
+
+export interface AudioAnalysis {
+    transcription: string;
+    description: string;
+    usage?: any;
+    model?: string;
+    food_cost_deducted?: number; // Optional tracking
 }
 
 export interface ChatResponse {

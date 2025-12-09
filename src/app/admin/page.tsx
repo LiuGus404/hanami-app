@@ -14,7 +14,7 @@ const mockTasks = [
   { id: '3', model: 'Hibi', icon: '🦉', status: 'error', timestamp: '2024/4/26 15:23' },
 ];
 
-const mockModels = [
+const initialModels = [
   { name: 'Hibi', icon: '🦉', status: 'idle' },
   { name: 'Lulu', icon: '🦊', status: 'busy' },
   { name: 'Taku', icon: '🐻', status: 'idle' },
@@ -37,6 +37,11 @@ export default function AdminPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState('');
+  const [models, setModels] = useState(initialModels);
+  
+  const handleAddModel = (newModel: any) => {
+    setModels(prev => [...prev, newModel]);
+  };
   
   // 檢查 URL 查詢參數或路徑來設置默認標籤
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
@@ -198,7 +203,7 @@ export default function AdminPage() {
   });
 
   // 強化模型狀態顯示
-  const enhancedModels = mockModels.map(model => {
+  const enhancedModels = models.map(model => {
     let statusLabel = '';
     let statusColor = '';
 
@@ -268,11 +273,12 @@ export default function AdminPage() {
               </button>
             </div>
             <AIControlPanel
-              models={mockModels}
+              models={enhancedModels}
               onCancelTask={handleCancelTask}
               onCreateTask={handleCreateTask}
               onFilterChange={handleFilterChange}
               onViewLogs={() => setActiveTab('logs')}
+              onAddModel={handleAddModel}
             />
           </div>
         )}

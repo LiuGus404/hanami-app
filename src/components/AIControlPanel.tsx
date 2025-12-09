@@ -36,6 +36,7 @@ interface Props {
   onCancelTask: () => void
   onFilterChange: (status: string[]) => void
   onViewLogs?: () => void
+  onAddModel?: (model: Model) => void
 }
 
 const getModelImage = (name: string) => {
@@ -64,6 +65,7 @@ export default function AIControlPanel({
   onCancelTask,
   onFilterChange,
   onViewLogs,
+  onAddModel,
 }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<'processing' | 'done'>('processing');
@@ -77,8 +79,29 @@ export default function AIControlPanel({
   const [taskDescription, setTaskDescription] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Add Model States
+  const [showAddModelForm, setShowAddModelForm] = useState(false);
+  const [newModelName, setNewModelName] = useState('');
+
   const router = useRouter();
   const supabase = createClientComponentClient<Database>();
+
+  const handleAddModel = () => {
+    if (!newModelName.trim()) {
+      alert('請輸入模型名稱');
+      return;
+    }
+
+    if (onAddModel) {
+      onAddModel({
+        name: newModelName,
+        icon: '🎯', // Default icon based on user preference
+        status: 'idle',
+      });
+    }
+    setShowAddModelForm(false);
+    setNewModelName('');
+  };
 
   // 取得任務列表
   const fetchTasks = useCallback(async () => {
@@ -327,7 +350,15 @@ export default function AIControlPanel({
 
             {/* Model Status */}
             <div>
-              <h2 className="text-xl font-semibold mb-2">角色狀態</h2>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xl font-semibold">角色狀態</h2>
+                <button
+                  className="px-3 py-1 rounded-full bg-[#FFF8E6] border border-[#DDD2BA] text-[#2B3A3B] text-sm font-semibold hover:bg-[#F5EAD4] transition-colors"
+                  onClick={() => setShowAddModelForm(true)}
+                >
+                  ＋ 新增模型
+                </button>
+              </div>
               <div className="space-y-4">
                 {models.map((model) => (
                   <div key={model.name} className="flex items-center justify-between p-3 rounded-2xl border border-[#E8E3D5] bg-[#FFFCF2] shadow-sm">
@@ -464,6 +495,40 @@ export default function AIControlPanel({
           onChange={(val) => setSelectedModel(val as string)}
           onConfirm={() => setShowModelSelect(false)}
         />
+      )}
+
+      {showAddModelForm && (
+        <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-[#FFFDF8] border border-[#D8CDBF] rounded-[24px] w-96 p-6 shadow-xl text-[#4B4B4B]">
+            <h2 className="text-xl font-bold text-center mb-4">新增模型</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">模型名稱</label>
+                <input
+                  className="w-full border border-[#D8CDBF] rounded-xl px-4 py-2 text-sm"
+                  placeholder="例如：Kiki"
+                  type="text"
+                  value={newModelName}
+                  onChange={(e) => setNewModelName(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-around mt-6">
+              <button
+                className="px-4 py-2 border border-[#D8CDBF] rounded-xl hover:bg-[#F3F0E5]"
+                onClick={() => setShowAddModelForm(false)}
+              >
+                取消
+              </button>
+              <button
+                className="px-6 py-2 bg-[#A68A64] text-white font-semibold rounded-xl hover:bg-[#937654]"
+                onClick={handleAddModel}
+              >
+                新增
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -846,6 +846,46 @@ export default function AdminControlCenterPage() {
     updateModelConfigs(modelId, () => clonedSnapshot);
   };
 
+  const handleAddNewModel = () => {
+    const newId = `new-${Date.now()}`;
+    const newModel: EditableModelConfig = {
+      id: newId,
+      model_id: '',
+      display_name: '新模型',
+      provider: '',
+      description: '',
+      model_type: '',
+      input_cost_usd: '0',
+      output_cost_usd: '0',
+      modalities: { ...DEFAULT_MODALITIES_STATE },
+      otherModalities: [],
+      supportsSearch: false,
+      otherCapabilities: [],
+      pricingDetails: {},
+      metadata: {},
+      foodRatio: '300',
+      foodTokens: {
+        text_input: '',
+        text_output: '',
+        image_input: '',
+        image_output: '',
+        audio_input: '',
+        audio_output: '',
+        video_input: '',
+        video_output: '',
+      },
+      isSaving: false,
+    };
+    
+    setModelConfigs((prev) => [newModel, ...prev]);
+    setExpandedModelIds((prev) => {
+      const next = new Set(prev);
+      next.add(newId);
+      return next;
+    });
+    toast.success('已新增一個空白模型，請填寫詳細資訊後儲存');
+  };
+
   const handleSaveModel = async (modelId: string) => {
     const model = modelConfigs.find((item) => item.id === modelId);
     if (!model) return;
@@ -927,9 +967,9 @@ export default function AdminControlCenterPage() {
 
       const updates: Record<string, any> = {
         display_name: model.display_name,
-        provider: model.provider,
+        provider: model.provider || 'unknown',
         description: model.description,
-        model_type: model.model_type || null,
+        model_type: model.model_type || 'text',
         input_cost_usd: inputCost,
         output_cost_usd: outputCost,
         supported_modalities: modalitiesPayload,
@@ -937,15 +977,44 @@ export default function AdminControlCenterPage() {
         pricing_details: updatedPricingDetails,
         metadata: updatedMetadata,
         model_id: model.model_id,
+        // model_name is required by DB but not in UI, mapping from display_name
+        model_name: model.display_name || model.model_id, 
       };
 
-      const { error: updateError } = await (supabase as any)
-        .from('model_configs')
-        .update(updates)
-        .eq('id', model.id);
+      // Check if it's a new model (id starts with 'new-')
+      const isNewModel = modelId.startsWith('new-');
+      let savedData = null;
 
-      if (updateError) {
-        throw updateError;
+      if (isNewModel) {
+        // Ensure model_id is present for new models as it might be required
+        if (!updates.model_id) {
+          throw new Error('請輸入模型 ID');
+        }
+
+        // Set default values for new models to ensure they appear in the list
+        updates.is_active = true;
+        updates.is_available = true;
+        updates.is_free = false; // Default to false, can be updated later if we add UI for it
+
+        const { data, error: insertError } = await (supabase as any)
+          .from('model_configs')
+          .insert(updates)
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        savedData = data;
+      } else {
+        // For existing models, perform UPDATE
+        const { data, error: updateError } = await (supabase as any)
+          .from('model_configs')
+          .update(updates)
+          .eq('id', model.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        savedData = data;
       }
 
       const normalizedInputCost = inputCost === null ? '' : String(inputCost);
@@ -953,19 +1022,53 @@ export default function AdminControlCenterPage() {
       const normalizedFoodRatio = foodRatioNumber === null ? '' : String(foodRatioNumber);
       const cleanedOtherCapabilities = finalCapabilities.filter((item) => item.toLowerCase() !== 'search');
 
-      updateModelConfigs(modelId, (config) => ({
-        ...config,
-        isSaving: false,
-        input_cost_usd: normalizedInputCost,
-        output_cost_usd: normalizedOutputCost,
-        foodRatio: normalizedFoodRatio,
-        otherCapabilities: cleanedOtherCapabilities,
-        pricingDetails: updatedPricingDetails,
-        metadata: updatedMetadata,
-      }));
+      // If it was a new model, we need to replace the temp ID in the state with the real ID
+      if (isNewModel && savedData) {
+        const realId = savedData.id;
+        
+        // Update the item in the list with the new ID and data
+        setModelConfigs(prev => prev.map(item => {
+          if (item.id === modelId) {
+            return {
+              ...item,
+              id: realId,
+              isSaving: false,
+              input_cost_usd: normalizedInputCost,
+              output_cost_usd: normalizedOutputCost,
+              foodRatio: normalizedFoodRatio,
+              otherCapabilities: cleanedOtherCapabilities,
+              pricingDetails: updatedPricingDetails,
+              metadata: updatedMetadata,
+            };
+          }
+          return item;
+        }));
+
+        // Also update expandedModelIds to use the new ID
+        setExpandedModelIds(prev => {
+          const next = new Set(prev);
+          if (next.has(modelId)) {
+            next.delete(modelId);
+            next.add(realId);
+          }
+          return next;
+        });
+
+      } else {
+        updateModelConfigs(modelId, (config) => ({
+          ...config,
+          isSaving: false,
+          input_cost_usd: normalizedInputCost,
+          output_cost_usd: normalizedOutputCost,
+          foodRatio: normalizedFoodRatio,
+          otherCapabilities: cleanedOtherCapabilities,
+          pricingDetails: updatedPricingDetails,
+          metadata: updatedMetadata,
+        }));
+      }
 
       const newSnapshot: ModelConfigSnapshot = {
-        id: model.id,
+        id: isNewModel && savedData ? savedData.id : model.id,
         model_id: model.model_id,
         display_name: model.display_name,
         provider: model.provider,
@@ -983,12 +1086,20 @@ export default function AdminControlCenterPage() {
         foodTokens: { ...model.foodTokens },
       };
 
-      setOriginalModelConfigs((prev) => ({
-        ...prev,
-        [modelId]: newSnapshot,
-      }));
+      setOriginalModelConfigs((prev) => {
+        const next = { ...prev };
+        // If it was a new model, remove the temp ID key if you want, 
+        // but mainly we want to add the new real ID key.
+        if (isNewModel) {
+            delete next[modelId];
+            next[newSnapshot.id] = newSnapshot;
+        } else {
+            next[modelId] = newSnapshot;
+        }
+        return next;
+      });
 
-      toast.success(`${model.display_name} 模型設定已更新`);
+      toast.success(`${model.display_name} 模型設定已${isNewModel ? '新增' : '更新'}`);
     } catch (error: any) {
       console.error('儲存模型設定失敗:', error);
       updateModelConfigs(modelId, (config) => ({ ...config, isSaving: false }));
@@ -1207,10 +1318,20 @@ export default function AdminControlCenterPage() {
                     className="space-y-6"
                   >
                     <div className="bg-white/85 backdrop-blur-md border border-[#EADBC8] rounded-3xl shadow-lg p-6">
-                      <h2 className="text-xl font-semibold text-[#4B4036] flex items-center gap-2">
-                        <AdjustmentsHorizontalIcon className="w-5 h-5" />
-                        AI 模型庫管理
-                      </h2>
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold text-[#4B4036] flex items-center gap-2">
+                          <AdjustmentsHorizontalIcon className="w-5 h-5" />
+                          AI 模型庫管理
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={handleAddNewModel}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white text-sm font-semibold shadow hover:shadow-lg transition flex items-center gap-2"
+                        >
+                          <PlusIcon className="w-4 h-4" />
+                          新增模型
+                        </button>
+                      </div>
                       <p className="mt-2 text-sm text-[#2B3A3B]/70">
                         管理可用模型的能力、成本與食量換算比例。這些設定會用於角色預設模型與食量計算。
                       </p>

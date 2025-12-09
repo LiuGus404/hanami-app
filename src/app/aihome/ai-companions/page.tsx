@@ -4425,7 +4425,18 @@ function RoleSelectionGrid({
   onConfirm: (selectedRoles: string[]) => void;
   onCancel: () => void;
 }) {
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  // 預設選擇所有角色
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(() => 
+    companions.map(c => c.name)
+  );
+
+  // 當 companions 變化時，自動更新選擇的角色列表
+  useEffect(() => {
+    if (companions.length > 0) {
+      const allRoleNames = companions.map(c => c.name);
+      setSelectedRoles(allRoleNames);
+    }
+  }, [companions]);
 
   const listVariants = {
     hidden: { opacity: 0, y: 8 },

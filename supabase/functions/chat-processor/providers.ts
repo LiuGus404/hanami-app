@@ -1,5 +1,9 @@
 import { ModelConfig, Message } from "./types.ts";
 
+import { Buffer } from "node:buffer";
+
+declare const Deno: any;
+
 export interface LLMResponse {
     content: string;
     usage?: {
@@ -180,6 +184,267 @@ export async function generateImage(prompt: string, modelId: string = "openai/da
     return { url: imageUrl };
 }
 
+// Helper to buffer to base64
+async function blobToBase64(blob: Blob): Promise<string> {
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+export interface AudioAnalysis {
+    transcription: string;
+    description: string;
+    usage?: any;
+    model?: string;
+}
+
+export async function analyzeAudioWithGemini(audioUrl: string): Promise<AudioAnalysis> {
+    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    const openRouterKey = Deno.env.get('OPENROUTER_API_KEY');
+
+    // Always prefer OpenRouter for this specific feature as we want Gemini 2.5 Flash Preview
+    const apiKey = openRouterKey || openaiKey;
+
+    if (!apiKey) {
+        console.warn('Skipping audio analysis: No API Key found');
+        return {
+            transcription: "[Audio: Analysis unavailable - Key missing]",
+            description: "Unable to process audio due to missing configuration."
+        };
+    }
+
+    // Correction: Using the specific model ID requested by the user.
+    const TARGET_MODEL = "google/gemini-2.5-flash-preview-09-2025";
+
+    try {
+
+        console.log(`Analyzing audio from: ${audioUrl} using ${TARGET_MODEL}`);
+        const audioRes = await fetch(audioUrl);
+        if (!audioRes.ok) {
+            throw new Error(`Failed to fetch audio file: ${audioRes.statusText} `);
+        }
+        const arrayBuffer = await audioRes.arrayBuffer();
+        const mimeType = audioRes.headers.get('Content-Type') || 'audio/webm'; // Derive mimeType from response headers
+        // Use Buffer.from() if available (Node/Deno compat in Supabase), or fall back to a robust binary string conversion
+        let base64Audio = '';
+        try {
+            // @ts-ignore - Buffer is globally available in some runtimes like Deno/Node
+            base64Audio = Buffer.from(arrayBuffer).toString('base64');
+        } catch (e) {
+            console.warn("Buffer not available, using fallback binary string conversion");
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            base64Audio = btoa(binary);
+        }
+
+        let format = 'webm';
+        if (mimeType.includes('wav')) format = 'wav';
+        else if (mimeType.includes('mp3')) format = 'mp3';
+        else if (mimeType.includes('ogg')) format = 'ogg';
+        else if (mimeType.includes('mp4') || mimeType.includes('m4a')) format = 'm4a';
+        else if (mimeType.includes('aac')) format = 'aac';
+
+        console.log(`Audio Analysis Debug: MimeType=${mimeType}, Format=${format}, Base64Length=${base64Audio.length}`);
+
+
+        // Prompt for 2-phase analysis: Transcription + Description
+        const promptText = `
+Please analyze this audio file.
+1. Provide a verbatim transcription.
+2. Provide a visual or contextual description of the audio(tone, background sounds, emotion, or what is happening).
+
+Output format(JSON):
+        {
+            "transcription": "...",
+                "description": "..."
+        }
+        `;
+
+        const payload = {
+            model: TARGET_MODEL,
+            response_format: { type: "json_object" }, // Force JSON
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: promptText },
+                        {
+                            type: "input_audio",
+                            input_audio: {
+                                data: base64Audio,
+                                format: format
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey} `,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://hanami.ai',
+                'X-Title': 'Hanami AI'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(`OpenRouter Analysis Error: ${res.status} ${err} `);
+        }
+
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content;
+
+        let result: AudioAnalysis = {
+            transcription: "[Audio: specific transcription failed]",
+            description: "[Audio: specific description failed]",
+            usage: data.usage,
+            model: TARGET_MODEL
+        };
+
+        try {
+            const parsed = JSON.parse(content);
+            result.transcription = parsed.transcription || result.transcription;
+            result.description = parsed.description || result.description;
+        } catch (e) {
+            console.warn('Failed to parse JSON response from audio analysis, falling back to raw text');
+            result.transcription = content || "[Audio: Blank]";
+            result.description = "Raw analysis: " + (content || "");
+        }
+
+        console.log('Audio Analysis success:', result);
+        return result;
+
+    } catch (error) {
+        console.error('Audio Analysis failed:', error);
+        return {
+            transcription: `[Audio: Analysis failed - ${(error as any).message}]`,
+            description: "Error processing audio attachment.",
+            usage: null
+        };
+    }
+}
+
+export async function transcribeAudio(audioUrl: string): Promise<string> {
+    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    const openRouterKey = Deno.env.get('OPENROUTER_API_KEY');
+
+    // Default to OpenAI if available, otherwise check OpenRouter
+    let shouldUseOpenRouter = !openaiKey && !!openRouterKey;
+    const apiKey = openaiKey || openRouterKey;
+
+    if (!apiKey) {
+        console.warn('Skipping transcription: No OPENAI_API_KEY or OPENROUTER_API_KEY');
+        return "[Audio: Transcription unavailable - Service configuration missing]";
+    }
+
+    try {
+        console.log(`Transcribing audio from: ${audioUrl} `);
+        const audioRes = await fetch(audioUrl);
+        if (!audioRes.ok) {
+            throw new Error(`Failed to fetch audio file: ${audioRes.statusText} `);
+        }
+        const blob = await audioRes.blob();
+
+        if (shouldUseOpenRouter) {
+            // OpenRouter Logic: Use chat/completions with multimodal input
+            // Model: google/gemini-1.5-flash (supports audio and is cost-effective)
+            console.log('ℹ️ [Transcription] Using OpenRouter (google/gemini-1.5-flash) via chat/completions');
+
+            const base64Audio = await blobToBase64(blob);
+            // Detect format from URL or MIME type if possible, default to wav or mp3
+            // OpenRouter docs examples show "wav". 
+            // The file from recorder is usually "audio/webm".
+            const mimeType = blob.type || 'audio/webm';
+            // Simple mapping or pass raw format string if supported. 
+            // format: 'wav', 'mp3', 'webm' etc.
+            let format = 'webm';
+            if (mimeType.includes('wav')) format = 'wav';
+            if (mimeType.includes('mp3')) format = 'mp3';
+            if (mimeType.includes('m4a')) format = 'm4a';
+
+            const payload = {
+                model: "google/gemini-1.5-flash",
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: "Transcribe this audio file exactly. Output only the transcription text, nothing else." },
+                            {
+                                type: "input_audio",
+                                input_audio: {
+                                    data: base64Audio,
+                                    format: format
+                                }
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey} `,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://hanami.ai',
+                    'X-Title': 'Hanami AI'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(`OpenRouter Transcription Error: ${res.status} ${err} `);
+            }
+
+            const data = await res.json();
+            const text = data.choices?.[0]?.message?.content || "[Audio: Blank]";
+            console.log('Transcription success (OpenRouter):', text.substring(0, 50) + '...');
+            return text;
+
+        } else {
+            // OpenAI Whisper Logic (Legacy/Direct)
+            const formData = new FormData();
+            const filename = audioUrl.split('/').pop()?.split('?')[0] || 'audio.webm';
+            formData.append('file', blob, filename);
+            formData.append('model', 'whisper-1');
+
+            const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey} `
+                },
+                body: formData
+            });
+
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(`Whisper API Error: ${res.status} ${err} `);
+            }
+
+            const data = await res.json();
+            console.log('Transcription success (OpenAI):', data.text?.substring(0, 50) + '...');
+            return data.text || "[Audio: Blank]";
+        }
+
+    } catch (error) {
+        console.error('Transcription failed:', error);
+        return `[Audio: Transcription failed - ${(error as any).message}]`;
+    }
+}
+
 async function callOpenAICompatible(config: ModelConfig, messages: Message[]): Promise<LLMResponse> {
     const envKey = config.api_key_env || 'OPENAI_API_KEY';
     const specificKey = Deno.env.get(envKey);
@@ -213,7 +478,7 @@ async function callOpenAICompatible(config: ModelConfig, messages: Message[]): P
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${apiKey} `,
             ...(baseUrl.includes('openrouter.ai') ? {
                 'HTTP-Referer': 'https://hanami.ai', // TODO: Update with real site
                 'X-Title': 'Hanami AI'
@@ -228,7 +493,7 @@ async function callOpenAICompatible(config: ModelConfig, messages: Message[]): P
 
     if (!res.ok) {
         const err = await res.text();
-        throw new Error(`API Error (${config.provider}): ${res.status} ${err}`);
+        throw new Error(`API Error(${config.provider}): ${res.status} ${err} `);
     }
 
     const data = await res.json();

@@ -289,6 +289,15 @@ export function SecureImageDisplay({
               className="relative group max-w-[85vw] max-h-[85vh] bg-white rounded-xl shadow-2xl overflow-auto flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Close Button - Explicitly added for mobile usability */}
+              <button
+                onClick={handleCloseZoom}
+                className="absolute top-3 right-3 z-50 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-sm transition-all shadow-lg border border-white/20 active:scale-95"
+                title="關閉預覽"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+
               {/* 錯誤狀態 */}
               {hasError && ( // Changed 'error' to 'hasError' to match existing state
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-500 text-xs p-2 text-center">

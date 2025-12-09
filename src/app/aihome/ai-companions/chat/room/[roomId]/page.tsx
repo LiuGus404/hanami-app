@@ -34,7 +34,8 @@ import {
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
   CheckIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 
 // Helper to parse raw multi-model content
@@ -56,6 +57,7 @@ import Image from 'next/image';
 import { MessageStatusIndicator } from '@/components/ai-companion/MessageStatusIndicator';
 import { FoodBalanceDisplay } from '@/components/ai-companion/FoodBalanceDisplay';
 import { SecureImageDisplay } from '@/components/ai-companion/SecureImageDisplay';
+import { VoiceMessagePlayer } from '@/components/chat/VoiceMessagePlayer';
 import UnifiedRightContent from '@/components/UnifiedRightContent';
 import ConnectionHint from '@/components/ai-companion/ConnectionHint';
 import { convertToPublicUrl, convertToShortUrl, getShortDisplayUrl, extractStoragePath } from '@/lib/getSignedImageUrl';
@@ -565,6 +567,15 @@ export default function RoomChatPage() {
   const [showCameraModal, setShowCameraModal] = useState(false); // New state
   const [analyzingImages, setAnalyzingImages] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
+
+  // Voice Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mimeTypeRef = useRef<string>('audio/webm');
+  const wavRecorderRef = useRef<any>(null); // Use custom WavRecorder
 
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
@@ -1294,14 +1305,24 @@ export default function RoomChatPage() {
 
       if (error) {
         console.error('載入模型配置錯誤:', error);
-        setAvailableModels([]);
+        // Fallback models when API fails
+        setAvailableModels([
+          { model_id: 'gpt-4o-mini', display_name: 'GPT-4o Mini', provider: 'OpenAI', is_free: true, input_cost_usd: 0 },
+          { model_id: 'gemini-1.5-flash', display_name: 'Gemini 1.5 Flash', provider: 'Google', is_free: true, input_cost_usd: 0 },
+          { model_id: 'claude-3-5-haiku', display_name: 'Claude 3.5 Haiku', provider: 'Anthropic', is_free: false, input_cost_usd: 0.00025 }
+        ]);
       } else {
         console.log('✅ 成功載入模型配置:', data?.length || 0, '個模型');
         setAvailableModels(data || []);
       }
     } catch (error) {
       console.error('載入模型配置異常:', error);
-      setAvailableModels([]);
+      // Fallback models when API fails
+      setAvailableModels([
+        { model_id: 'gpt-4o-mini', display_name: 'GPT-4o Mini', provider: 'OpenAI', is_free: true, input_cost_usd: 0 },
+        { model_id: 'gemini-1.5-flash', display_name: 'Gemini 1.5 Flash', provider: 'Google', is_free: true, input_cost_usd: 0 },
+        { model_id: 'claude-3-5-haiku', display_name: 'Claude 3.5 Haiku', provider: 'Anthropic', is_free: false, input_cost_usd: 0.00025 }
+      ]);
     } finally {
       setLoadingPicoModels(false);
       setLoadingMoriModels(false);
@@ -1843,7 +1864,7 @@ export default function RoomChatPage() {
           .filter(Boolean);
 
         if (roleInstanceIds.length > 0) {
-          // 第二步：查 role_instances 取得完整資訊
+          // Second step: Query role_instances to get full information
           const { data: roleInstancesData, error: roleInstancesError } = await supabase
             .from('role_instances')
             .select('*')
@@ -3626,7 +3647,7 @@ export default function RoomChatPage() {
     response += '🚀 **建議的執行步驟（濃縮版）**\n\n';
     response += '• **第1週：** 確定範圍與題目、地區與族群、主要指標與量表；完成檢索策略與納入/排除條件\n';
     response += '• **第2–4週：** 文獻檢索與雙人篩選、品質評估、資料擷取；初步統合分析與視覺化（森林圖、成長曲線）\n';
-    response += '• **第5–8週：** 撰寫報告與建議；如需原始資料，並行準備IRB文件、問卷與資料蒐集SOP、試點收案\n';
+    response += '• **第5–8週：：** 撰寫報告與建議；如需原始資料，並行準備IRB文件、問卷與資料蒐集SOP、試點收案\n';
     response += '• **第9–12週（選配）：** 完成試點分析、修訂報告、交付工具包與簡報\n\n';
 
     response += '若你先回覆上述「需要你確認的事項」，我就能立刻把檢索式、量表套件、以及第一版的研究計畫書與報告大綱產出給你。需要雙語或特定學校/園所合作模板也可以直接指定。';
@@ -4502,22 +4523,27 @@ export default function RoomChatPage() {
   };
 
   // 呼叫 Edge Function 處理聊天
-  const callChatProcessor = async (userMessage: string, roomId: string, roleHint: string, messageData?: any) => {
+  const callChatProcessor = async (userMessage: string, roomId: string, roleHint: string, messageData?: any, userMessageId?: string) => {
     try {
       console.log('🚀 呼叫 chat-processor Edge Function...');
+      const payload = {
+        message: userMessage,
+        roomId: roomId,
+        companionId: roleHint,
+        userId: user?.id, // Pass userId for service role calls
+        messageId: userMessageId, // Pass messageId for updates
+        modelId: roleHint === 'mori'
+          ? moriSelectedModelsMulti.join(',')
+          : roleHint === 'hibi' ? hibiSelectedModel
+            : roleHint === 'pico' ? picoSelectedModel
+              : undefined,
+        attachments: (messageData as any).attachments // Pass attachments to Edge Function
+      };
+
+      console.log('📦 [Edge] Request Payload (Attachments):', payload.attachments);
+
       const { data, error } = await saasSupabase.functions.invoke('chat-processor', {
-        body: {
-          message: userMessage,
-          roomId: roomId,
-          companionId: roleHint,
-          userId: user?.id, // Pass userId for service role calls
-          modelId: roleHint === 'mori'
-            ? moriSelectedModelsMulti.join(',')
-            : roleHint === 'hibi' ? hibiSelectedModel
-              : roleHint === 'pico' ? picoSelectedModel
-                : undefined,
-          attachments: (messageData as any).attachments // Pass attachments to Edge Function
-        }
+        body: payload
       });
 
       if (error) {
@@ -4633,6 +4659,222 @@ export default function RoomChatPage() {
     setShowCameraModal(true);
   };
 
+  // Voice Recording Time Limit Check
+  useEffect(() => {
+    if (isRecording && recordingTime >= 180) {
+      import('react-hot-toast').then(({ default: toast }) => {
+        toast.error('已達到錄音時間上限 (3分鐘)', { duration: 4000 });
+      });
+      handleStopRecording(true);
+    }
+  }, [isRecording, recordingTime]);
+
+  // Voice Recording Logic
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Detect supported mime type
+      const mimeTypes = [
+        'audio/wav',
+        'audio/mp4',
+        'audio/webm',
+        'audio/webm;codecs=opus',
+        'audio/ogg;codecs=opus'
+      ];
+
+      let selectedMimeType = '';
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          selectedMimeType = type;
+          break;
+        }
+      }
+
+      // If no robust mime type found (likely Safari only supporting mp4), use manual WAV recorder
+      if (!selectedMimeType || selectedMimeType.includes('mp4')) {
+        console.log('🎤 [Recording] Using manual WavRecorder fallback for Safari');
+        const { WavRecorder } = await import('@/lib/wavRecorder');
+        wavRecorderRef.current = new WavRecorder();
+
+        wavRecorderRef.current.onStop = (blob: Blob) => {
+          const audioFile = new File([blob], `voice_message_${Date.now()}.wav`, { type: 'audio/wav' });
+          handleSendVoiceMessage(audioFile);
+          setIsRecording(false);
+          setRecordingTime(0);
+        };
+
+        await wavRecorderRef.current.start();
+        setIsRecording(true);
+        setRecordingTime(0);
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingTime((prev) => prev + 1);
+        }, 1000);
+        return;
+      }
+
+      console.log('🎤 [Recording] Selected MIME type:', selectedMimeType);
+      mimeTypeRef.current = selectedMimeType;
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      const { default: toast } = await import('react-hot-toast');
+      toast.error('無法存取麥克風，請檢查權限設定');
+      // If NotSupportedError specifically
+      if (error instanceof Error && error.name === 'NotSupportedError') {
+        console.warn('⚠️ Legacy browser or secure context issue?');
+      }
+    }
+  };
+
+  const handleStopRecording = async (shouldSend = false) => {
+    if (wavRecorderRef.current && isRecording) {
+      if (shouldSend) {
+        await wavRecorderRef.current.stop();
+      } else {
+        wavRecorderRef.current.cancel();
+        setIsRecording(false);
+        setRecordingTime(0);
+      }
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      wavRecorderRef.current = null;
+      return;
+    }
+
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+
+      // Stop all tracks
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+
+      // Wait for dataavailable
+      mediaRecorderRef.current.onstop = async () => {
+        const mimeType = mimeTypeRef.current;
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        setIsRecording(false);
+        setRecordingTime(0);
+
+        if (shouldSend) {
+          let extension = 'webm';
+          if (mimeType.includes('mp4')) extension = 'mp4';
+          if (mimeType.includes('wav')) extension = 'wav';
+
+          const audioFile = new File([audioBlob], `voice_message_${Date.now()}.${extension}`, { type: mimeType });
+          handleSendVoiceMessage(audioFile);
+        }
+        audioChunksRef.current = [];
+      };
+    }
+  };
+
+  const handleCancelRecording = () => {
+    if (wavRecorderRef.current) {
+      wavRecorderRef.current.cancel();
+      wavRecorderRef.current = null;
+    }
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    setIsRecording(false);
+    setRecordingTime(0);
+    audioChunksRef.current = [];
+  };
+
+  const handleSendVoiceMessage = async (audioFile: File) => {
+    if (!user?.id || !roomId) return;
+
+    const lockKey = `${roomId}-audio-${Date.now()}`;
+    if (globalSendingLock.get(lockKey)) return;
+    globalSendingLock.set(lockKey, true);
+    setIsSending(true);
+
+    const tempMessageId = generateUUID();
+    const roleHint = selectedCompanion || (activeRoles[0] ?? 'auto');
+
+    // Optimistic UI
+    const optimisticAttachment = {
+      type: 'audio',
+      url: URL.createObjectURL(audioFile),
+      name: '語音訊息',
+      mimeType: audioFile.type
+    };
+
+    const userMessage: Message = {
+      id: tempMessageId,
+      content: '[語音訊息]', // Text fallback for AI
+      sender: 'user',
+      timestamp: new Date(),
+      type: 'text',
+      status: 'processing',
+      attachments: [optimisticAttachment]
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    processedMessageIds.current.add(tempMessageId);
+
+    // Set processing state
+    if (roleHint && ['hibi', 'mori', 'pico'].includes(roleHint)) {
+      setProcessingCompanion(roleHint as 'hibi' | 'mori' | 'pico');
+    }
+
+    try {
+      // Upload
+      const realAttachments = await uploadFilesToStorage([audioFile], roomId);
+      userMessage.attachments = realAttachments;
+
+      // Save to Supabase
+      const savedMessageId = await saveMessageToSupabase(userMessage, roomId);
+      if (savedMessageId) {
+        processedMessageIds.current.add(savedMessageId);
+        // Update IDs in UI
+        setMessages(prev => prev.map(msg =>
+          msg.id === tempMessageId ? { ...msg, id: savedMessageId, attachments: realAttachments, status: 'sent' } : msg
+        ));
+        processedMessageIds.current.delete(tempMessageId);
+      }
+
+      // Voice message sent to DB, now waiting for AI
+      // Crucial: Set Loading/Typing States for UI "Thinking" indicator
+      setIsLoading(true);
+      setIsTyping(true);
+
+      // Call Chat Processor
+      await callChatProcessor('', roomId, roleHint || 'hibi', userMessage, savedMessageId || undefined);
+
+    } catch (error) {
+      console.error('Failed to send voice message:', error);
+      setMessages(prev => prev.map(msg =>
+        msg.id === tempMessageId ? { ...msg, status: 'error' } : msg
+      ));
+    } finally {
+      globalSendingLock.delete(lockKey);
+      setIsSending(false);
+      setIsLoading(false);
+      setIsTyping(false);
+      setProcessingCompanion(null);
+    }
+  };
+
   const uploadFilesToStorage = async (files: File[], roomId: string): Promise<any[]> => {
     if (!user?.id) return [];
 
@@ -4659,34 +4901,43 @@ export default function RoomChatPage() {
         }
         console.log('✅ [Storage] Upload success for:', file.name);
 
-        // Get public URL or signed URL
-        // Assuming we want a signed URL for privacy or public if the bucket is public
-        // For now, let's assume we can get a path and let the backend handle signing or public access
-        // The backend expects attachments to have { type, url, name, size }
-
-        // Use getPublicUrl for simplicity if bucket is public, otherwise createSignedUrl
-        // But for chat uploads, usually we want some security.
-        // Let's store the full path and let the UI/Backend handle convertToSignedUrl
-        // or actually, call `getPublicUrl` if it's public.
-        // Let's assume standard behavior.
-
-        const { data: { publicUrl } } = supabase.storage
+        // Use Signed URL for better security and to ensure backend access even if bucket is private
+        const { data: signedData, error: signedError } = await supabase.storage
           .from('hanami-content')
-          .getPublicUrl(filePath);
+          .createSignedUrl(filePath, 3600); // 1 hour expiry
 
-        uploadedAttachments.push({
-          type: 'image',
-          url: publicUrl, // Send proper URL to Edge Function
-          path: filePath,
-          name: file.name,
-          size: file.size,
-          mimeType: file.type
-        });
+        if (signedError || !signedData?.signedUrl) {
+          console.warn('⚠️ [Storage] createSignedUrl failed, falling back to public URL', signedError);
+          // Fallback
+          const { data: { publicUrl } } = supabase.storage
+            .from('hanami-content')
+            .getPublicUrl(filePath);
+
+          uploadedAttachments.push({
+            type: file.type.startsWith('audio/') ? 'audio' : 'image',
+            url: publicUrl,
+            path: filePath,
+            name: file.name,
+            size: file.size,
+            mimeType: file.type
+          });
+        } else {
+          console.log('🔑 [Storage] Generated signed URL for backend access');
+          uploadedAttachments.push({
+            type: file.type.startsWith('audio/') ? 'audio' : 'image',
+            url: signedData.signedUrl,
+            path: filePath,
+            name: file.name,
+            size: file.size,
+            mimeType: file.type
+          });
+        }
 
       } catch (err) {
         console.error('File upload exception:', err);
       }
     }
+    console.log('📦 [Storage] Returning attachments:', uploadedAttachments);
     return uploadedAttachments;
   };
 
@@ -4935,7 +5186,7 @@ export default function RoomChatPage() {
       }
 
       // 2. 呼叫 Edge Function
-      await callChatProcessor(messageContent, roomId, roleHint || 'hibi', userMessage);
+      await callChatProcessor(messageContent, roomId, roleHint || 'hibi', userMessage, savedMessageId);
 
       // 3. 完成
       console.log('✅ [Edge] 訊息處理完成');
@@ -5706,106 +5957,171 @@ export default function RoomChatPage() {
                       <div className="w-full relative flex items-end gap-2 bg-white/80 backdrop-blur-md border border-[#EADBC8] p-1.5 rounded-[24px] shadow-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-[#FFB6C1]/50 focus-within:border-[#FFB6C1] focus-within:shadow-md pointer-events-auto">
 
 
-                        {/* Attach Button */}
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          className="p-2.5 text-[#4B4036]/60 hover:text-[#4B4036] hover:bg-[#F8F5EC] rounded-full transition-colors hidden sm:block"
-                          title="添加圖片"
-                          onClick={() => {
-                            if (checkModelImageSupport()) {
-                              setShowImagePicker(true);
-                            } else {
-                              const { default: toast } = require('react-hot-toast');
-                              toast.error('當前模型不支援圖片輸入');
-                            }
-                          }}
-                        >
-                          <PhotoIcon className="w-6 h-6" />
-                        </motion.button>
-                        {/* Mobile Attach Button */}
-                        <motion.button
-                          whileTap={{ scale: 0.9 }}
-                          className="p-2 text-[#4B4036]/60 hover:text-[#4B4036] rounded-full sm:hidden"
-                          onClick={() => {
-                            if (checkModelImageSupport()) {
-                              setShowImagePicker(true);
-                            } else {
-                              const { default: toast } = require('react-hot-toast');
-                              toast.error('當前模型不支援圖片輸入');
-                            }
-                          }}
-                        >
-                          <PlusIcon className="w-6 h-6" />
-                        </motion.button>
+                        <AnimatePresence mode="wait">
+                          {isRecording ? (
+                            <motion.div
+                              key="recording-ui"
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              className="flex-1 flex items-center justify-between bg-[#FFF9F2] rounded-[20px] px-2 py-1.5 min-h-[44px]"
+                            >
+                              {/* Cancel */}
+                              <button
+                                onClick={handleCancelRecording}
+                                className="p-2 text-red-400 hover:bg-red-50 rounded-full transition-colors active:scale-90"
+                                title="取消錄音"
+                              >
+                                <TrashIcon className="w-5 h-5" />
+                              </button>
 
-                        {/* Selected Images Preview */}
-                        {selectedImages.length > 0 && (
-                          <div className="flex gap-2 p-2 overflow-x-auto my-2">
-                            {selectedImages.map((file, index) => (
-                              <div key={index} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-[#EADBC8] group">
-                                <img
-                                  src={URL.createObjectURL(file)}
-                                  alt={`preview-${index}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveImage(index);
-                                  }}
-                                  className="absolute top-1 right-1 bg-white/90 text-red-500 rounded-full p-1 shadow-md hover:bg-white transition-all transform hover:scale-110"
-                                >
-                                  <XMarkIcon className="w-3.5 h-3.5" />
-                                </button>
+                              {/* Waveform & Timer */}
+                              <div className="flex items-center gap-4 flex-1 justify-center overflow-hidden">
+                                <div className="flex items-center gap-1 h-5">
+                                  {[...Array(8)].map((_, i) => (
+                                    <motion.div
+                                      key={i}
+                                      animate={{ height: [6, 16 + Math.random() * 10, 6] }}
+                                      transition={{ duration: 0.4 + Math.random() * 0.2, repeat: Infinity, ease: "easeInOut" }}
+                                      className="w-1 bg-gradient-to-t from-[#FFD59A] to-[#FFB6C1] rounded-full"
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-sm font-bold text-[#FFB6C1] font-mono min-w-[3rem]">
+                                  {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                                </span>
                               </div>
-                            ))}
-                          </div>
-                        )}
 
-                        {/* Text Input */}
-                        <textarea
-                          value={inputMessage}
-                          onChange={(e) => setInputMessage(e.target.value)}
-                          onKeyDown={handleKeyPress}
-                          placeholder={
-                            activeRoles.length === 1
-                              ? `與 ${companion.name} 對話...`
-                              : '輸入訊息...'
-                          }
-                          className="flex-1 max-h-32 min-h-[44px] py-2.5 px-2 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-transparent text-[#4B4036] placeholder-[#2B3A3B]/40 resize-none text-base leading-relaxed"
-                          rows={1}
-                          style={{ height: 'auto', minHeight: '44px' }}
-                          onInput={(e) => {
-                            const target = e.target as HTMLTextAreaElement;
-                            target.style.height = 'auto';
-                            target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
-                          }}
-                        />
-
-                        {/* Send Button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            console.log('👆 [SendButton] Click triggered');
-                            handleSendMessage();
-                          }}
-                          onMouseDown={(e) => {
-                            // Prevent focus loss only
-                            e.preventDefault();
-                          }}
-                          disabled={(!inputMessage.trim() && selectedImages.length === 0) || isLoading || isTyping || isSending || !user}
-                          className={`relative z-50 p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${(inputMessage.trim() || selectedImages.length > 0) && !isLoading && !isSending && user
-                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-[#FFB6C1]/30 cursor-pointer pointer-events-auto'
-                            : 'bg-[#F0EAE0] text-[#4B4036]/30 shadow-none cursor-not-allowed'
-                            }`}
-                        >
-                          {isLoading || isTyping ? (
-                            <ClockIcon className="w-5 h-5 animate-spin" />
+                              {/* Stop & Send */}
+                              <button
+                                onClick={() => handleStopRecording(true)}
+                                className="p-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-full shadow-md hover:shadow-lg transition-all active:scale-95 transform hover:-translate-y-0.5"
+                                title="發送語音"
+                              >
+                                <PaperAirplaneIcon className="w-5 h-5" />
+                              </button>
+                            </motion.div>
                           ) : (
-                            <PaperAirplaneIcon className="w-5 h-5 translate-x-0.5 -translate-y-0.5" />
+                            <>
+                              {/* Attach Button */}
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                className="p-2.5 text-[#4B4036]/60 hover:text-[#4B4036] hover:bg-[#F8F5EC] rounded-full transition-colors hidden sm:block"
+                                title="添加圖片"
+                                onClick={() => {
+                                  if (checkModelImageSupport()) {
+                                    setShowImagePicker(true);
+                                  } else {
+                                    const { default: toast } = require('react-hot-toast');
+                                    toast.error('當前模型不支援圖片輸入');
+                                  }
+                                }}
+                              >
+                                <PhotoIcon className="w-6 h-6" />
+                              </motion.button>
+                              {/* Mobile Attach Button */}
+                              <motion.button
+                                whileTap={{ scale: 0.9 }}
+                                className="p-2 text-[#4B4036]/60 hover:text-[#4B4036] rounded-full sm:hidden"
+                                onClick={() => {
+                                  if (checkModelImageSupport()) {
+                                    setShowImagePicker(true);
+                                  } else {
+                                    const { default: toast } = require('react-hot-toast');
+                                    toast.error('當前模型不支援圖片輸入');
+                                  }
+                                }}
+                              >
+                                <PlusIcon className="w-6 h-6" />
+                              </motion.button>
+
+                              {/* Selected Images Preview */}
+                              {selectedImages.length > 0 && (
+                                <div className="flex gap-2 p-2 overflow-x-auto my-2">
+                                  {selectedImages.map((file, index) => (
+                                    <div key={index} className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border border-[#EADBC8] group">
+                                      <img
+                                        src={URL.createObjectURL(file)}
+                                        alt={`preview-${index}`}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveImage(index);
+                                        }}
+                                        className="absolute top-1 right-1 bg-white/90 text-red-500 rounded-full p-1 shadow-md hover:bg-white transition-all transform hover:scale-110"
+                                      >
+                                        <XMarkIcon className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Text Input */}
+                              <textarea
+                                value={inputMessage}
+                                onChange={(e) => setInputMessage(e.target.value)}
+                                onKeyDown={handleKeyPress}
+                                placeholder={
+                                  activeRoles.length === 1
+                                    ? `與 ${companion.name} 對話...`
+                                    : '輸入訊息...'
+                                }
+                                className="flex-1 max-h-32 min-h-[44px] py-2.5 px-2 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-transparent text-[#4B4036] placeholder-[#2B3A3B]/40 resize-none text-base leading-relaxed"
+                                rows={1}
+                                style={{ height: 'auto', minHeight: '44px' }}
+                                onInput={(e) => {
+                                  const target = e.target as HTMLTextAreaElement;
+                                  target.style.height = 'auto';
+                                  target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+                                }}
+                              />
+
+                              {/* Voice Record Button (Shown when empty) */}
+                              {!inputMessage.trim() && selectedImages.length === 0 && (
+                                <motion.button
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  exit={{ scale: 0 }}
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={handleStartRecording}
+                                  className="p-2.5 text-[#4B4036]/60 hover:text-[#4B4036] hover:bg-[#F8F5EC] rounded-full transition-colors"
+                                  title="錄製語音"
+                                >
+                                  <MicrophoneIcon className="w-6 h-6" />
+                                </motion.button>
+                              )}
+
+                              {/* Send Button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  console.log('👆 [SendButton] Click triggered');
+                                  handleSendMessage();
+                                }}
+                                onMouseDown={(e) => {
+                                  // Prevent focus loss only
+                                  e.preventDefault();
+                                }}
+                                disabled={(!inputMessage.trim() && selectedImages.length === 0) || isLoading || isTyping || isSending || !user}
+                                className={`relative z-50 p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${(inputMessage.trim() || selectedImages.length > 0) && !isLoading && !isSending && user
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-[#FFB6C1]/30 cursor-pointer pointer-events-auto'
+                                  : 'bg-[#F0EAE0] text-[#4B4036]/30 shadow-none cursor-not-allowed'
+                                  }`}
+                              >
+                                {isLoading || isTyping ? (
+                                  <ClockIcon className="w-5 h-5 animate-spin" />
+                                ) : (
+                                  <PaperAirplaneIcon className="w-5 h-5 translate-x-0.5 -translate-y-0.5" />
+                                )}
+                              </button>
+                            </>
                           )}
-                        </button>
+                        </AnimatePresence>
                       </div>
                     </div>
                   </div>,
@@ -6150,6 +6466,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [moriViewMode, setMoriViewMode] = useState<'stack' | 'deck'>('deck');
   const [activeMoriIndex, setActiveMoriIndex] = useState(0);
+  const [showAudioAnalysis, setShowAudioAnalysis] = useState(false);
   const picoAvatarSrc = companion?.imagePath || '/3d-character-backgrounds/studio/Pico/Pico.png';
 
   const isMoriMulti =
@@ -6177,6 +6494,16 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
     console.error('Error parsing attachments in inline MessageBubble:', e);
   }
 
+  // Check if message has audio attachment
+  const hasAudioAttachment = safeAttachments.some(att =>
+    att.type === 'audio' ||
+    att.mimeType?.startsWith('audio/') ||
+    att.name?.endsWith('.webm') ||
+    att.name?.endsWith('.mp3') ||
+    att.name?.endsWith('.m4a') ||
+    att.name?.endsWith('.wav')
+  );
+
   const renderPlainText = () => {
     // Robust splitting for different newline formats
     const lines = message.content.split(/\r\n|\r|\n/);
@@ -6184,20 +6511,42 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
 
     // 🟣 Inline Debug Box removed
 
+    // Check if message has audio attachment - REUSED from above
+    // const hasAudioAttachment = ... (Hoisted)
+
     const attachmentImages = safeAttachments.length > 0 ? (
-      <div key="attachments-container" className="flex flex-wrap gap-2 my-2">
-        {safeAttachments.map((att, idx) => (
-          <div key={`att-${idx}`} className="relative w-48 h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
-            <SecureImageDisplay
-              imageUrl={att.url || att.path}
-              alt="Attachment"
-            />
-          </div>
-        ))}
+      <div key="attachments-container" className="flex flex-wrap gap-2 my-2 w-full">
+        {safeAttachments.map((att, idx) => {
+          // Check if audio
+          const isAudio = att.type === 'audio' || att.mimeType?.startsWith('audio/') || att.name?.endsWith('.webm') || att.name?.endsWith('.mp3') || att.name?.endsWith('.m4a') || att.name?.endsWith('.wav');
+
+          if (isAudio) {
+            return (
+              <div key={`att-${idx}`} className="w-full max-w-sm">
+                <VoiceMessagePlayer src={att.url} sender={isUser ? 'user' : 'ai'} />
+                {/* <div className="text-[10px] text-[#8C7A6B] mt-1 truncate px-1">{att.name || '語音訊息'}</div> */}
+              </div>
+            );
+          }
+
+          return (
+            <div key={`att-${idx}`} className="relative w-48 h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+              <SecureImageDisplay
+                imageUrl={att.url || att.path}
+                alt="Attachment"
+              />
+            </div>
+          );
+        })}
       </div>
     ) : null;
 
     const renderedLines = lines.map((line, index) => {
+      // Hide default voice message text if audio is present
+      if (hasAudioAttachment && line.trim() === '[語音訊息]') {
+        return null;
+      }
+
       // ⭐ 優先檢查是否為圖片 markdown 格式（必須在直接 URL 檢查之前）
       // 改進正則：匹配 ![alt](url) 格式，支援 URL 中包含特殊字符
       const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
@@ -6758,6 +7107,50 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
     );
   };
 
+  const renderAudioAnalysis = () => {
+    const analysis = message.content_json?.audio_analysis;
+    if (!analysis) return null;
+
+    return (
+      <div className="mt-3 pt-2 border-t border-[#EADBC8]/50">
+        <button
+          onClick={() => setShowAudioAnalysis(!showAudioAnalysis)}
+          className="flex items-center gap-1.5 text-xs font-medium text-[#B08968] hover:text-[#8C7A6B] transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+          <span>語音分析細節</span>
+          <svg className={`w-3 h-3 transition-transform ${showAudioAnalysis ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showAudioAnalysis && (
+          <div className="mt-2 bg-[#F8F5EC] rounded-lg p-3 text-xs space-y-3 text-[#4B4036] border border-[#EADBC8]/50">
+            {analysis.transcription && (
+              <div>
+                <div className="font-bold mb-1 opacity-70">逐字稿</div>
+                <div className="leading-relaxed font-mono bg-white/50 p-2 rounded shadow-sm">{analysis.transcription}</div>
+              </div>
+            )}
+            {analysis.description && (
+              <div>
+                <div className="font-bold mb-1 opacity-70">情境描述</div>
+                <div className="leading-relaxed bg-white/50 p-2 rounded shadow-sm">{analysis.description}</div>
+              </div>
+            )}
+            {analysis.model && (
+              <div className="text-[10px] opacity-40 text-right mt-1">
+                Analysis by {analysis.model}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderMetadataFooter = () => {
     if (isUser || isSystem) return null;
 
@@ -6924,15 +7317,18 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
-            className={`group relative ${isMoriDeck ? 'px-0 py-0' : 'px-4 py-3'
-              } rounded-2xl shadow-sm ${isUser
-                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-br-md'
-                : isSystem
-                  ? 'bg-[#F8F5EC] border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
-                  : isMoriDeck
-                    ? 'bg-transparent border border-transparent text-[#2B3A3B]'
-                    : 'bg-white border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
-              }`}
+            className={
+              hasAudioAttachment
+                ? "group relative" // Minimized styling for voice messages (User) to float freely
+                : `group relative ${isMoriDeck ? 'px-0 py-0' : 'px-4 py-3'} rounded-2xl shadow-sm ${isUser
+                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-br-md'
+                  : isSystem
+                    ? 'bg-[#F8F5EC] border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
+                    : isMoriDeck
+                      ? 'bg-transparent border border-transparent text-[#2B3A3B]'
+                      : 'bg-white border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
+                }`
+            }
           >
             {isMoriMulti ? (
               renderMoriMulti()
@@ -6945,6 +7341,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
               return (
                 <div className="whitespace-pre-wrap break-words overflow-x-auto max-w-full">
                   {renderPlainText()}
+                  {renderAudioAnalysis()}
                   {renderMetadataFooter()}
                 </div>
               );

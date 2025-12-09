@@ -153,7 +153,7 @@ async function getUserCreatedOrganizations(
 
   try {
     console.log('getUserCreatedOrganizations: 開始查詢', { userId, userEmail });
-    
+
     // 先嘗試通過 userId 查詢（如果提供）
     if (userId) {
       const { data: orgs, error } = await client
@@ -185,7 +185,7 @@ async function getUserCreatedOrganizations(
     // 注意：這需要檢查是否有其他表可以關聯 email 和 created_by
     // 但由於 created_by 是 UUID，無法直接通過 email 查詢
     // 所以我們依賴其他函數（如 getUserIdentityOrganizations）來通過 email 查找
-    
+
   } catch (err) {
     console.error('getUserCreatedOrganizations: 異常', err);
   }
@@ -208,7 +208,7 @@ async function getUserIdentityOrganizations(
 
   try {
     console.log('getUserIdentityOrganizations: 開始查詢', { userId, userEmail });
-    
+
     const query = client
       .from('hanami_org_identities')
       .select(
@@ -275,7 +275,7 @@ async function getUserMemberOrganizations(
 
   try {
     console.log('getUserMemberOrganizations: 開始查詢', { userId, userEmail });
-    
+
     const query = client
       .from('hanami_user_organizations')
       .select(
@@ -342,7 +342,7 @@ async function getUserEmployeeOrganizations(
 
   try {
     console.log('getUserEmployeeOrganizations: 開始查詢', { userEmail });
-    
+
     const { data: employees, error } = await client
       .from('hanami_employee')
       .select('org_id, teacher_status, hanami_organizations ( id, org_name, org_slug, status )')
