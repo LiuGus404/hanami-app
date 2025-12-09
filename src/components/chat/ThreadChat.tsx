@@ -23,7 +23,7 @@ export interface ChatMessage {
   agent_id?: string;
   content: string;
   content_json: any;
-  status: 'queued' | 'processing' | 'completed' | 'error';
+  status: 'queued' | 'processing' | 'completed' | 'error' | 'sent';
   client_msg_id: string;
   turn_no: number;
   parent_id?: string;
