@@ -83,7 +83,7 @@ export const ReferenceImagePicker: React.FC<ReferenceImagePickerProps> = ({
                     {/* Close Button */}
                     <button
                         onClick={onClose}
-                        className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/50 text-[#4B4036]/40 hover:text-[#4B4036] transition-all duration-300 transform hover:rotate-90"
+                        className="absolute top-4 right-4 p-2 rounded-full bg-white/60 hover:bg-white text-[#4B4036] border border-[#EADBC8]/50 shadow-sm transition-all duration-300 transform hover:rotate-90 hover:scale-105 active:scale-95 z-20"
                     >
                         <XMarkIcon className="w-5 h-5" />
                     </button>

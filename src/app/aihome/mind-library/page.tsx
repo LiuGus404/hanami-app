@@ -42,7 +42,7 @@ import MindBlockDetailModal from '@/components/mind-block/MindBlockDetailModal';
 export default function MindLibraryPage() {
     const router = useRouter();
     const supabase = getSaasSupabaseClient();
-    const { user } = useSaasAuth();
+    const { user, logout } = useSaasAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -54,11 +54,12 @@ export default function MindLibraryPage() {
 
     const handleLogout = async () => {
         try {
-            await supabase.auth.signOut();
-            router.push('/auth/login');
+            await logout();
+            router.push('/aihome/auth/login');
         } catch (error) {
-            console.error('Logout failed:', error);
-            router.push('/auth/login');
+            console.error('登出失敗:', error);
+            // 即使登出失敗，也導航到登入頁面
+            router.push('/aihome/auth/login');
         }
     };
 

@@ -72,7 +72,7 @@ export default function UnifiedRightContent({ user, onLogout, onNavigate }: Unif
                     setShowMusicPopup(!showMusicPopup);
                     setShowGearDropdown(false); // 互斥
                 }}
-                className={`relative flex items-center justify-center p-2 rounded-xl font-medium transition-all ${isPlaying
+                className={`relative hidden md:flex items-center justify-center p-2 rounded-xl font-medium transition-all ${isPlaying
                     ? 'text-[#8B5E3C] bg-[#EADBC8]/30'
                     : 'text-[#4B4036] hover:bg-black/5'
                     }`}
@@ -240,6 +240,18 @@ export default function UnifiedRightContent({ user, onLogout, onNavigate }: Unif
                         <div className="px-3 py-2 border-b border-[#EADBC8]/30 mb-1">
                             <div className="font-bold text-[#4B4036] text-sm">HanamiEcho</div>
                             <div className="text-[10px] text-[#8C7A6B]">您的AI工作和學習夥伴</div>
+                        </div>
+
+                        {/* Mobile Only: Hanami Lo-Fi Trigger */}
+                        <div
+                            onClick={() => {
+                                setShowMusicPopup(true);
+                                setShowGearDropdown(false);
+                            }}
+                            className="flex md:hidden items-center px-4 py-2 text-sm text-[#8B5E3C] hover:bg-[#FFF9F2] hover:text-[#4B4036] rounded-lg cursor-pointer transition-colors"
+                        >
+                            <span className="mr-3"><MusicalNoteIcon className="w-4 h-4" /></span>
+                            Hanami Lo-Fi
                         </div>
 
                         {[

@@ -21,7 +21,7 @@ import AppSidebar from '@/components/AppSidebar';
 import UnifiedNavbar from '@/components/UnifiedNavbar';
 
 export default function AIHomePage() {
-  const { user: saasUser, loading } = useSaasAuth();
+  const { user: saasUser, loading, logout } = useSaasAuth();
   const router = useRouter();
   const [isLoaded, setIsLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -48,8 +48,15 @@ export default function AIHomePage() {
     }
   };
 
-  const handleLogout = () => {
-    window.location.href = '/aihome/logout';
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/aihome/auth/login');
+    } catch (error) {
+      console.error('登出失敗:', error);
+      // 即使登出失敗，也導航到登入頁面
+      router.push('/aihome/auth/login');
+    }
   };
 
   if (loading) {

@@ -82,7 +82,7 @@ export function TeacherLinkShell({
   contentClassName,
 }: TeacherLinkShellProps) {
   const router = useRouter();
-  const { user: saasUser, loading: authLoading } = useSaasAuth();
+  const { user: saasUser, loading: authLoading, logout } = useSaasAuth();
   const {
     currentOrganization: sharedOrganization,
     setCurrentOrganizationId,
@@ -585,10 +585,25 @@ export function TeacherLinkShell({
   };
 
   // 登出處理
-  const handleLogout = () => {
-    console.log('登出按鈕被點擊，使用直接登出邏輯...');
-    // 直接跳轉到登出頁面，確保完全清除所有狀態
-    window.location.href = '/aihome/logout';
+  const handleLogout = async () => {
+    try {
+      console.log('登出按鈕被點擊，開始登出流程...');
+      await logout();
+      console.log('登出成功，導航到登入頁面');
+      router.push('/aihome/auth/login');
+    } catch (error) {
+      console.error('登出失敗:', error);
+      // 即使登出失敗，也導航到登入頁面
+      router.push('/aihome/auth/login');
+    }
+  };
+
+  // 處理導航
+  const handleNavigate = (action: string) => {
+    if (action.startsWith('view:')) {
+      const view = action.split(':')[1];
+      router.push(`/aihome/ai-companions?view=${view}`);
+    }
   };
 
   const contextValue = useMemo(
@@ -625,7 +640,7 @@ export function TeacherLinkShell({
               onLogout={handleLogout}
               onLogin={() => router.push('/aihome/auth/login')}
               onRegister={() => router.push('/aihome/auth/register')}
-              customRightContent={<UnifiedRightContent user={saasUser} onLogout={handleLogout} />}
+              customRightContent={<UnifiedRightContent user={saasUser} onLogout={handleLogout} onNavigate={handleNavigate} />}
             />
             <div className="bg-white/80 border-b border-[#EADBC8]">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

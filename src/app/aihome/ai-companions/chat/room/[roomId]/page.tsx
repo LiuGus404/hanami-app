@@ -485,7 +485,7 @@ const safeJsonParse = async (response: Response, context: string = 'API') => {
   }
 };
 export default function RoomChatPage() {
-  const { user } = useSaasAuth();
+  const { user, logout } = useSaasAuth();
   const userId = user?.id;
   const router = useRouter();
   const params = useParams();
@@ -1054,11 +1054,12 @@ export default function RoomChatPage() {
 
   const handleLogout = async () => {
     try {
-      const supabase = createSaasClient();
-      await supabase.auth.signOut();
-      router.push('/login');
+      await logout();
+      router.push('/aihome/auth/login');
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('登出失敗:', error);
+      // 即使登出失敗，也導航到登入頁面
+      router.push('/aihome/auth/login');
     }
   };
   const [openPanels, setOpenPanels] = useState<{ roles: boolean; invite: boolean }>({ roles: false, invite: false });
@@ -5753,9 +5754,9 @@ export default function RoomChatPage() {
                                     e.stopPropagation();
                                     handleRemoveImage(index);
                                   }}
-                                  className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full p-0.5 hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100"
+                                  className="absolute top-1 right-1 bg-white/90 text-red-500 rounded-full p-1 shadow-md hover:bg-white transition-all transform hover:scale-110"
                                 >
-                                  <XMarkIcon className="w-3 h-3" />
+                                  <XMarkIcon className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             ))}
@@ -6184,7 +6185,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
     // 🟣 Inline Debug Box removed
 
     const attachmentImages = safeAttachments.length > 0 ? (
-      <div className="flex flex-wrap gap-2 my-2">
+      <div key="attachments-container" className="flex flex-wrap gap-2 my-2">
         {safeAttachments.map((att, idx) => (
           <div key={`att-${idx}`} className="relative w-48 h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
             <SecureImageDisplay

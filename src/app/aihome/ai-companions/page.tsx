@@ -113,7 +113,7 @@ const getUserAccessibleRoomIds = async (userId: string): Promise<string> => {
 
 
 export default function AICompanionsPage() {
-  const { user, loading } = useSaasAuth();
+  const { user, loading, logout } = useSaasAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const saasSupabaseClient = getSaasSupabaseClient();
@@ -156,10 +156,12 @@ export default function AICompanionsPage() {
 
   const handleLogout = async () => {
     try {
-      await saasSupabaseClient.auth.signOut();
-      router.push('/login');
+      await logout();
+      router.push('/aihome/auth/login');
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('登出失敗:', error);
+      // 即使登出失敗，也導航到登入頁面
+      router.push('/aihome/auth/login');
     }
   };
 

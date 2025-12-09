@@ -24,15 +24,16 @@ import MindBlockBuilder from '@/components/mind-block/MindBlockBuilder';
 
 export default function MindBuilderPage() {
     const router = useRouter();
-    const { user, loading } = useSaasAuth();
+    const { user, loading, logout } = useSaasAuth();
     const supabase = getSaasSupabaseClient();
     const handleLogout = async () => {
         try {
-            await supabase.auth.signOut();
-            router.push('/auth/login');
+            await logout();
+            router.push('/aihome/auth/login');
         } catch (error) {
-            console.error('Logout failed:', error);
-            router.push('/auth/login');
+            console.error('登出失敗:', error);
+            // 即使登出失敗，也導航到登入頁面
+            router.push('/aihome/auth/login');
         }
     };
     const [sidebarOpen, setSidebarOpen] = useState(false);

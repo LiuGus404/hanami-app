@@ -35,7 +35,7 @@ import UnifiedNavbar from '@/components/UnifiedNavbar';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, loading } = useSaasAuth();
+  const { user, loading, logout } = useSaasAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -50,9 +50,16 @@ export default function DashboardPage() {
     setIsLoaded(true);
   }, []);
 
-  // 登出處理 - 使用直接登出邏輯
-  const handleLogout = () => {
-    window.location.href = '/aihome/logout';
+  // 登出處理
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/aihome/auth/login');
+    } catch (error) {
+      console.error('登出失敗:', error);
+      // 即使登出失敗，也導航到登入頁面
+      router.push('/aihome/auth/login');
+    }
   };
 
   // 認證保護
