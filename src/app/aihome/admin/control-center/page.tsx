@@ -415,8 +415,8 @@ export default function AdminControlCenterPage() {
         .trim()
         .toLowerCase();
 
-      if (normalizedRoleFromUser === 'super_admin') {
-        console.log('AdminControlCenter: 從 user 對象檢測到 super_admin 身份');
+      if (normalizedRoleFromUser === 'super_admin' || normalizedRoleFromUser === 'admin') {
+        console.log('AdminControlCenter: 從 user 對象檢測到 super_admin/admin 身份');
         setIsSuperAdmin(true);
         setRoleLoading(false);
         return;
@@ -449,7 +449,7 @@ export default function AdminControlCenterPage() {
             setIsSuperAdmin(false);
           } else {
             const role = (userData as { user_role: string } | null)?.user_role || 'user';
-            const isSuperAdminRole = role.toLowerCase() === 'super_admin';
+            const isSuperAdminRole = role.toLowerCase() === 'super_admin' || role.toLowerCase() === 'admin';
             console.log('AdminControlCenter: 從數據庫讀取 user_role:', role, 'isSuperAdmin:', isSuperAdminRole);
             setIsSuperAdmin(isSuperAdminRole);
           }
@@ -876,7 +876,7 @@ export default function AdminControlCenterPage() {
       },
       isSaving: false,
     };
-    
+
     setModelConfigs((prev) => [newModel, ...prev]);
     setExpandedModelIds((prev) => {
       const next = new Set(prev);
@@ -978,7 +978,7 @@ export default function AdminControlCenterPage() {
         metadata: updatedMetadata,
         model_id: model.model_id,
         // model_name is required by DB but not in UI, mapping from display_name
-        model_name: model.display_name || model.model_id, 
+        model_name: model.display_name || model.model_id,
       };
 
       // Check if it's a new model (id starts with 'new-')
@@ -1025,7 +1025,7 @@ export default function AdminControlCenterPage() {
       // If it was a new model, we need to replace the temp ID in the state with the real ID
       if (isNewModel && savedData) {
         const realId = savedData.id;
-        
+
         // Update the item in the list with the new ID and data
         setModelConfigs(prev => prev.map(item => {
           if (item.id === modelId) {
@@ -1091,10 +1091,10 @@ export default function AdminControlCenterPage() {
         // If it was a new model, remove the temp ID key if you want, 
         // but mainly we want to add the new real ID key.
         if (isNewModel) {
-            delete next[modelId];
-            next[newSnapshot.id] = newSnapshot;
+          delete next[modelId];
+          next[newSnapshot.id] = newSnapshot;
         } else {
-            next[modelId] = newSnapshot;
+          next[modelId] = newSnapshot;
         }
         return next;
       });

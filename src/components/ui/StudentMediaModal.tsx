@@ -1,8 +1,8 @@
 'use client';
 
-import { 
-  XMarkIcon, 
-  PlusIcon, 
+import {
+  XMarkIcon,
+  PlusIcon,
   PhotoIcon,
   ArrowUpTrayIcon,
   EyeIcon,
@@ -23,14 +23,14 @@ import { PlanUpgradeModal } from '@/components/ui/PlanUpgradeModal';
 import MediaEditor from './MediaEditor';
 import { supabase } from '@/lib/supabase';
 import { StudentMedia, StudentMediaQuota, DEFAULT_MEDIA_LIMITS } from '@/types/progress';
-import { 
-  validateFile, 
-  uploadFile, 
-  deleteFile, 
-  getFileUrl, 
-  formatFileSize, 
+import {
+  validateFile,
+  uploadFile,
+  deleteFile,
+  getFileUrl,
+  formatFileSize,
   formatDuration,
-  getVideoDuration 
+  getVideoDuration
 } from '@/lib/storageUtils';
 
 interface StudentWithMedia {
@@ -91,7 +91,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     setShowLessonSelector(false);
     setSelectedMediaForLesson(null);
     setSelectedLessonId('');
-    
+
     // 調用原始的 onClose
     onClose();
   };
@@ -104,28 +104,28 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedMedia, setSelectedMedia] = useState<StudentMedia | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  
+
   // 新增：媒體改名相關狀態
   const [editingMedia, setEditingMedia] = useState<StudentMedia | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [isEditing, setIsEditing] = useState(false);
-  
+
   // 新增：課程關聯相關狀態
   const [studentLessons, setStudentLessons] = useState<StudentLesson[]>([]);
   const [showLessonSelector, setShowLessonSelector] = useState(false);
   const [selectedMediaForLesson, setSelectedMediaForLesson] = useState<StudentMedia | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string>('');
-  
+
   // 新增：方案升級相關狀態
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  
+
   // 新增：展開/收起狀態
   const [showQuotaDetails, setShowQuotaDetails] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
 
   // 新增：配額等級狀態
   const [quotaLevel, setQuotaLevel] = useState<MediaQuotaLevel | null>(null);
-  
+
   // 新增：媒體編輯器相關狀態
   const [showMediaEditor, setShowMediaEditor] = useState(false);
   const [fileToEdit, setFileToEdit] = useState<File | null>(null);
@@ -153,21 +153,21 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
   // 新增：載入學生課程
   const loadStudentLessons = async () => {
     if (!student) return;
-    
+
     try {
       const { data: dataRaw, error } = await supabase
         .from('hanami_student_lesson')
         .select('id, lesson_date, lesson_status, lesson_teacher, lesson_activities, notes, video_url')
         .eq('student_id', student.id)
         .order('lesson_date', { ascending: false });
-      
-      const data = dataRaw as Array<{ id: string; lesson_date: string | null; lesson_status: string | null; lesson_teacher: string | null; lesson_activities: string | null; notes: string | null; video_url: string | null; [key: string]: any; }> | null;
+
+      const data = dataRaw as Array<{ id: string; lesson_date: string | null; lesson_status: string | null; lesson_teacher: string | null; lesson_activities: string | null; notes: string | null; video_url: string | null;[key: string]: any; }> | null;
 
       if (error) {
         console.error('載入課程資料庫錯誤:', error);
         throw error;
       }
-      
+
       setStudentLessons((data || []).map(lesson => ({
         id: lesson.id,
         lesson_date: lesson.lesson_date || '',
@@ -202,7 +202,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
   const loadStudentMedia = async () => {
     if (!student) return;
-    
+
     setLoading(true);
     try {
       const { data: dataRaw, error } = await supabase
@@ -210,14 +210,14 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         .select('*')
         .eq('student_id', student.id)
         .order('created_at', { ascending: false });
-      
-      const data = dataRaw as Array<{ media_type: string; file_duration: number | null; thumbnail_path: string | null; title: string | null; description: string | null; uploaded_by: string | null; is_favorite: boolean | null; [key: string]: any; }> | null;
+
+      const data = dataRaw as Array<{ media_type: string; file_duration: number | null; thumbnail_path: string | null; title: string | null; description: string | null; uploaded_by: string | null; is_favorite: boolean | null;[key: string]: any; }> | null;
 
       if (error) {
         console.error('載入媒體資料庫錯誤:', error);
         throw error;
       }
-      
+
       setMedia((data || []).map((media: any) => ({
         ...media,
         media_type: media.media_type as 'video' | 'photo',
@@ -260,7 +260,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    
+
     // 重置上傳狀態
     setUploading(false);
     setUploadProgress({});
@@ -268,7 +268,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     setShowUploadArea(true);
 
     const fileArray = Array.from(files);
-    
+
     // 立即檢查容量是否足夠
     const capacityCheck = await checkStudentCapacity(fileArray);
     if (!capacityCheck.hasSpace) {
@@ -284,7 +284,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         errors.push('學生ID無效');
         return;
       }
-      
+
       const { data: quota, error: quotaError } = await supabase
         .from('hanami_student_media_quota')
         .select('*')
@@ -295,7 +295,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         console.error('獲取學生配額失敗:', quotaError);
         errors.push('無法獲取學生配額設定');
       } else {
-        studentQuota = quota as { plan_type: string; lesson_date: string | null; [key: string]: any } | null;
+        studentQuota = quota as { plan_type: string; lesson_date: string | null;[key: string]: any } | null;
       }
     } catch (error) {
       console.error('獲取配額錯誤:', error);
@@ -327,7 +327,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           console.error('獲取配額等級失敗:', levelError);
           errors.push('無法獲取配額等級設定');
         } else {
-          quotaLevel = level as { video_size_limit_mb: number; photo_size_limit_mb: number; [key: string]: any } | null;
+          quotaLevel = level as { video_size_limit_mb: number; photo_size_limit_mb: number;[key: string]: any } | null;
         }
       } catch (error) {
         console.error('獲取配額等級錯誤:', error);
@@ -336,49 +336,49 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     }
 
     for (const file of fileArray) {
-      
+
       const mediaType = file.type.startsWith('video/') ? 'video' : 'photo';
-      
+
       // 基本驗證
       const limits = DEFAULT_MEDIA_LIMITS[mediaType];
-      
+
       // 檢查檔案格式
       if (!limits.allowedTypes.includes(file.type)) {
         errors.push(`不支援的檔案格式: ${file.type}`);
       }
-      
+
       // 檢查檔案大小限制（使用配額等級的實際限制）
       const fileSizeMB = file.size / (1024 * 1024);
       let sizeLimit = 0;
-      
+
       if (quotaLevel) {
         sizeLimit = mediaType === 'video' ? quotaLevel.video_size_limit_mb : quotaLevel.photo_size_limit_mb;
       } else {
         // 如果無法獲取配額等級，使用預設限制
         sizeLimit = mediaType === 'video' ? 20 : 1;
       }
-      
+
       if (fileSizeMB > sizeLimit) {
         errors.push(`${mediaType === 'video' ? '影片' : '相片'}檔案大小超過限制 (${fileSizeMB.toFixed(1)}MB > ${sizeLimit}MB)`);
       }
-      
+
       // 檢查數量限制（使用配額等級的實際限制）
       const currentCount = media.filter(m => m.media_type === mediaType).length;
       let countLimit = 0;
-      
+
       if (quotaLevel) {
         countLimit = mediaType === 'video' ? quotaLevel.video_limit : quotaLevel.photo_limit;
       } else {
         // 如果無法獲取配額等級，使用預設限制
         countLimit = mediaType === 'video' ? 5 : 10;
       }
-      
+
       // 計算同類型檔案的數量
       const sameTypeFiles = fileArray.filter(f => {
         const fMediaType = f.type.startsWith('video/') ? 'video' : 'photo';
         return fMediaType === mediaType;
       }).length;
-      
+
       if (currentCount + sameTypeFiles > countLimit) {
         errors.push(`上傳後將超過${mediaType === 'video' ? '影片' : '相片'}數量上限 (當前: ${currentCount}, 新增: ${sameTypeFiles}, 限制: ${countLimit})`);
         // 立即返回，不繼續檢查其他檔案
@@ -400,7 +400,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
   const handleMediaEditorSave = useCallback((editedFile: File) => {
     // 找到被編輯的文件在 selectedFiles 中的索引
     const editedFileIndex = selectedFiles.findIndex(file => file === fileToEdit);
-    
+
     if (editedFileIndex !== -1) {
       // 用編輯後的文件替換原文件
       const newFiles = [...selectedFiles];
@@ -410,7 +410,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       // 如果找不到原文件，直接設置為編輯後的文件
       setSelectedFiles([editedFile]);
     }
-    
+
     setShowMediaEditor(false);
     setFileToEdit(null);
     setEditingFileType(null);
@@ -445,7 +445,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             .select('plan_type')
             .eq('student_id', student.id)
             .single();
-          
+
           if (studentQuota && (studentQuota as { plan_type: string }).plan_type) {
             const planTypeToLevelName = (planType: string) => {
               const mapping: { [key: string]: string } = {
@@ -456,17 +456,17 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
               };
               return mapping[planType] || '基礎版';
             };
-            
+
             let levelQuery = supabase
               .from('hanami_media_quota_levels')
               .select('storage_limit_mb')
               .eq('level_name', planTypeToLevelName((studentQuota as { plan_type: string }).plan_type))
               .eq('is_active', true);
-            
+
             if (orgId) {
               levelQuery = levelQuery.eq('org_id', orgId);
             }
-            
+
             const { data: level } = await levelQuery.single();
             storageLimitMB = (level as { storage_limit_mb?: number } | null)?.storage_limit_mb;
           }
@@ -521,23 +521,23 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       // 容量檢查日誌已移除以提高性能
 
       if (totalVideoCount > videoLimit) {
-        return { 
-          hasSpace: false, 
-          message: `影片數量將超過上限 (當前: ${currentVideoCount}, 新增: ${newVideoCount}, 限制: ${videoLimit})` 
+        return {
+          hasSpace: false,
+          message: `影片數量將超過上限 (當前: ${currentVideoCount}, 新增: ${newVideoCount}, 限制: ${videoLimit})`
         };
       }
 
       if (totalPhotoCount > photoLimit) {
-        return { 
-          hasSpace: false, 
-          message: `相片數量將超過上限 (當前: ${currentPhotoCount}, 新增: ${newPhotoCount}, 限制: ${photoLimit})` 
+        return {
+          hasSpace: false,
+          message: `相片數量將超過上限 (當前: ${currentPhotoCount}, 新增: ${newPhotoCount}, 限制: ${photoLimit})`
         };
       }
 
       if (totalStorageUsedMB > storageLimitMB) {
-        return { 
-          hasSpace: false, 
-          message: `儲存空間將超過上限 (當前: ${currentStorageUsedMB.toFixed(2)}MB, 新增: ${newStorageSizeMB.toFixed(2)}MB, 限制: ${storageLimitMB}MB)` 
+        return {
+          hasSpace: false,
+          message: `儲存空間將超過上限 (當前: ${currentStorageUsedMB.toFixed(2)}MB, 新增: ${newStorageSizeMB.toFixed(2)}MB, 限制: ${storageLimitMB}MB)`
         };
       }
 
@@ -552,23 +552,23 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
   const getCurrentCapacityStatus = () => {
     const videoCount = media.filter(m => m.media_type === 'video').length;
     const photoCount = media.filter(m => m.media_type === 'photo').length;
-    
+
     // 優先使用 quotaLevel 中的設定，如果沒有則從 student.quota 獲取，最後才使用預設值
     const videoLimit = quotaLevel?.video_limit || student?.quota?.video_limit || 5;
     const photoLimit = quotaLevel?.photo_limit || student?.quota?.photo_limit || 10;
     // 儲存空間限制：必須從 quotaLevel 獲取，因為這個值只在 hanami_media_quota_levels 表中
     const storageLimitMB = quotaLevel?.storage_limit_mb || 250; // 如果沒有配額等級，使用預設 250MB
-    
+
     // 計算當前使用的儲存空間
     const currentStorageUsedMB = media.reduce((total, item) => {
       return total + ((item.file_size || 0) / (1024 * 1024));
     }, 0);
-    
+
     // 檢查是否達到任何限制
     const isVideoFull = videoCount >= videoLimit;
     const isPhotoFull = photoCount >= photoLimit;
     const isStorageFull = currentStorageUsedMB >= storageLimitMB;
-    
+
     if (isVideoFull || isPhotoFull || isStorageFull) {
       return { status: 'full', message: '容量已滿' };
     } else if (videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2 || currentStorageUsedMB >= storageLimitMB * 0.9) {
@@ -619,7 +619,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     try {
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD 格式
-      
+
       const { data: lessons, error } = await supabase
         .from('hanami_student_lesson')
         .select('*')
@@ -627,13 +627,13 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         .eq('lesson_date', todayStr)
         .order('actual_timeslot', { ascending: true })
         .limit(1);
-      
+
       if (error) {
         console.error('獲取今天課堂信息失敗:', error);
         return null;
       }
-      
-      return lessons && lessons.length > 0 ? (lessons[0] as { id: string; [key: string]: any }) : null;
+
+      return lessons && lessons.length > 0 ? (lessons[0] as { id: string;[key: string]: any }) : null;
     } catch (error) {
       console.error('獲取今天課堂信息錯誤:', error);
       return null;
@@ -645,22 +645,22 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
     const timeStr = today.toTimeString().split(' ')[0].replace(/:/g, ''); // HHMMSS
-    
+
     // 獲取文件擴展名
     const fileExt = originalName.split('.').pop();
-    
+
     // 如果有課堂信息，使用課堂時間
     let timeIdentifier = timeStr;
     if (lesson && lesson.actual_timeslot) {
       timeIdentifier = lesson.actual_timeslot.replace(/:/g, '').replace(/-/g, '');
     }
-    
+
     // 直接使用 student_id 作為檔名前綴，確保安全
     const safeStudentId = (studentId || 'student').toString().replace(/[^\w-]/g, '_');
-    
+
     // 生成新文件名：student_id_日期_時間.擴展名
     const newFileName = `${safeStudentId}_${dateStr}_${timeIdentifier}.${fileExt}`;
-    
+
     return newFileName;
   };
 
@@ -677,7 +677,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       toast.error(`容量不足，無法上傳：${capacityCheck.message}`);
       return;
     }
-    
+
     // 重置並開始上傳
     setUploading(true);
     setUploadProgress({});
@@ -691,182 +691,89 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
       for (const file of selectedFiles) {
         try {
-        
-        const mediaType = file.type.startsWith('video/') ? 'video' : 'photo';
 
-        // 獲取檔案大小限制
-        let maxSizeMB = 20; // 預設值
-        if (quotaLevel) {
-          maxSizeMB = mediaType === 'video' ? quotaLevel.video_size_limit_mb : quotaLevel.photo_size_limit_mb;
-        }
-        
-        // 檢查檔案大小是否超過媒體配額限制
-        const fileSizeMB = file.size / (1024 * 1024);
-        if (fileSizeMB > maxSizeMB) {
-          throw new Error(`檔案 ${file.name} (${fileSizeMB.toFixed(1)}MB) 超過媒體配額限制 (${maxSizeMB}MB)。請壓縮檔案後再試。`);
-        }
-        
-        // 壓縮檔案（如果需要）
-        const compressedFile = await compressFile(file, maxSizeMB);
-        
-        console.log('檔案壓縮後大小:', (compressedFile.size / (1024 * 1024)).toFixed(2) + 'MB');
+          const mediaType = file.type.startsWith('video/') ? 'video' : 'photo';
 
-        // 首先嘗試使用 API 路由上傳
-        try {
-          const formData = new FormData();
-          formData.append('file', compressedFile);
-          formData.append('studentId', student.id);
-          formData.append('mediaType', mediaType);
-          if (orgId) {
-            formData.append('orgId', orgId);
+          // 獲取檔案大小限制
+          let maxSizeMB = 20; // 預設值
+          if (quotaLevel) {
+            maxSizeMB = mediaType === 'video' ? quotaLevel.video_size_limit_mb : quotaLevel.photo_size_limit_mb;
           }
 
-          const response = await fetch('/api/student-media/upload', {
-            method: 'POST',
-            body: formData
-          });
+          // 檢查檔案大小是否超過媒體配額限制
+          const fileSizeMB = file.size / (1024 * 1024);
+          if (fileSizeMB > maxSizeMB) {
+            throw new Error(`檔案 ${file.name} (${fileSizeMB.toFixed(1)}MB) 超過媒體配額限制 (${maxSizeMB}MB)。請壓縮檔案後再試。`);
+          }
 
-          console.log('API 響應狀態:', response.status);
+          // 壓縮檔案（如果需要）
+          const compressedFile = await compressFile(file, maxSizeMB);
 
-          if (response.ok) {
-            const result = await response.json();
+          console.log('檔案壓縮後大小:', (compressedFile.size / (1024 * 1024)).toFixed(2) + 'MB');
+
+          // 嘗試使用 API 上傳
+          try {
+            // 準備 FormData
+            const formData = new FormData();
+            formData.append('file', compressedFile);
+            formData.append('studentId', student.id);
+            formData.append('mediaType', mediaType);
+            if (orgId) {
+              formData.append('orgId', orgId);
+            }
+
+            const response = await fetch('/api/student-media/upload', {
+              method: 'POST',
+              body: formData,
+            });
+
+            let result;
+            try {
+              result = await response.json();
+            } catch (e) {
+              console.error('API 回應解析失敗:', e);
+              throw new Error(`上傳失敗: 伺服器回應格式錯誤 (${response.status})`);
+            }
+
+            if (!response.ok) {
+              throw new Error(result.error || `上傳失敗 (${response.status})`);
+            }
+
             console.log('API 上傳成功:', result);
             setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
             localSuccessCount += 1;
-            continue; // 成功，繼續下一個檔案
-          } else {
-            console.log('API 上傳失敗，嘗試客戶端上傳...');
+
+            if (result.data) {
+              const typedDbData = result.data;
+              setMedia(prev => [...prev, {
+                id: typedDbData.id,
+                student_id: typedDbData.student_id,
+                media_type: typedDbData.media_type as 'video' | 'photo',
+                file_name: typedDbData.file_name,
+                file_path: typedDbData.file_path,
+                file_size: typedDbData.file_size,
+                file_duration: typedDbData.file_duration ?? undefined,
+                thumbnail_path: typedDbData.thumbnail_path ?? undefined,
+                title: typedDbData.title ?? undefined,
+                description: typedDbData.description ?? undefined,
+                uploaded_by: typedDbData.uploaded_by ?? undefined,
+                lesson_id: typedDbData.lesson_id ?? undefined,
+                created_at: typedDbData.created_at || new Date().toISOString(),
+                updated_at: typedDbData.updated_at || new Date().toISOString(),
+                is_favorite: typedDbData.is_favorite ?? undefined
+              }]);
+            }
+
+          } catch (apiError) {
+            console.error(`API 上傳失敗:`, apiError);
+            // 直接拋出錯誤，不再嘗試客戶端上傳
+            throw apiError;
           }
-        } catch (apiError) {
-          console.log('API 路由錯誤，嘗試客戶端上傳:', apiError);
-        }
-
-        // 如果 API 路由失敗，使用客戶端上傳
-        console.log('使用客戶端上傳...');
-        
-        // 生成新的文件名格式：學生名＋今日上課日期時間
-        const newFileName = generateFileName(file.name, student.id, todayLesson);
-        
-        // 生成檔案路徑
-        const fileExt = newFileName.split('.').pop();
-        const fileName = `${student.id}/${mediaType}s/${newFileName}`;
-
-        // 注意：Supabase Pro 版本支援更大的檔案，讓 Supabase 自己處理檔案大小限制
-
-        // 直接上傳到 Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('hanami-media')
-          .upload(fileName, compressedFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (uploadError) {
-          console.error('Storage 上傳錯誤:', uploadError);
-          throw new Error(`Storage 上傳失敗: ${uploadError.message}`);
-        }
-
-        console.log('Storage 上傳成功:', uploadData);
-
-        // 獲取公開 URL
-        const { data: urlData } = supabase.storage
-          .from('hanami-media')
-          .getPublicUrl(fileName);
-
-        // 準備資料庫資料
-        const mediaData: any = {
-          student_id: student.id,
-          media_type: mediaType,
-          file_name: newFileName, // 使用新的文件名
-          file_path: fileName,
-          file_size: compressedFile.size,
-          title: newFileName.replace(/\.[^/.]+$/, ''), // 使用新文件名作為標題
-          uploaded_by: null, // 設為 null 而不是字串
-          lesson_id: todayLesson?.id || null // 關聯到今天的課堂
-        };
-
-        // 如果有 org_id，添加到資料中
-        if (orgId) {
-          mediaData.org_id = orgId;
-        }
-
-        console.log('準備插入的資料:', mediaData);
-        console.log('學生 ID 類型:', typeof student.id);
-        console.log('學生 ID 值:', student.id);
-
-        // 驗證學生 ID 格式
-        if (!student.id || typeof student.id !== 'string') {
-          throw new Error('無效的學生 ID');
-        }
-
-        // 驗證 UUID 格式
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(student.id)) {
-          console.error('學生 ID 不是有效的 UUID 格式:', student.id);
-          throw new Error('學生 ID 格式錯誤');
-        }
-
-        // 儲存到資料庫
-        const { data: dbData, error: dbError } = await supabase
-          .from('hanami_student_media')
-          .insert(mediaData)
-          .select()
-          .single();
-
-        if (dbError) {
-          console.error('資料庫插入錯誤:', dbError);
-          // 如果資料庫插入失敗，刪除已上傳的檔案
-          await supabase.storage
-            .from('hanami-media')
-            .remove([fileName]);
-          throw new Error(`資料庫插入失敗: ${dbError.message}`);
-        }
-
-        console.log('資料庫插入成功:', dbData);
-        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
-        localSuccessCount += 1;
-        
-        // 立即更新本地媒體列表，確保容量檢查準確
-        const typedDbData = dbData as { 
-          id: string; 
-          student_id: string;
-          media_type: string; 
-          file_name: string;
-          file_path: string;
-          file_size: number;
-          file_duration?: number | null; 
-          thumbnail_path?: string | null; 
-          title?: string | null; 
-          description?: string | null; 
-          uploaded_by?: string | null; 
-          lesson_id?: string | null;
-          is_favorite?: boolean | null;
-          created_at: string;
-          updated_at: string;
-          [key: string]: any;
-        };
-        setMedia(prev => [...prev, {
-          id: typedDbData.id,
-          student_id: typedDbData.student_id,
-          media_type: typedDbData.media_type as 'video' | 'photo',
-          file_name: typedDbData.file_name,
-          file_path: typedDbData.file_path,
-          file_size: typedDbData.file_size,
-          file_duration: typedDbData.file_duration ?? undefined,
-          thumbnail_path: typedDbData.thumbnail_path ?? undefined,
-          title: typedDbData.title ?? undefined,
-          description: typedDbData.description ?? undefined,
-          uploaded_by: typedDbData.uploaded_by ?? undefined,
-          lesson_id: typedDbData.lesson_id ?? undefined,
-          created_at: typedDbData.created_at,
-          updated_at: typedDbData.updated_at,
-          is_favorite: typedDbData.is_favorite ?? undefined
-        }]);
         } catch (fileError) {
-        console.error(`檔案 ${file.name} 上傳失敗:`, fileError);
-        toast.error(`檔案 ${file.name} 上傳失敗: ${fileError instanceof Error ? fileError.message : '未知錯誤'}`);
-        setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // -1 表示錯誤
-        localErrorCount += 1;
+          console.error(`檔案 ${file.name} 上傳失敗:`, fileError);
+          toast.error(`檔案 ${file.name} 上傳失敗: ${fileError instanceof Error ? fileError.message : '未知錯誤'}`);
+          setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // -1 表示錯誤
+          localErrorCount += 1;
           continue; // 繼續處理下一個檔案
         }
       }
@@ -884,7 +791,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       setUploadProgress({});
       setShowUploadArea(false);
       loadStudentMedia(); // 重新載入媒體列表
-      
+
       // 通知父組件配額已更改，觸發按鈕顏色更新
       if (onQuotaChanged) {
         onQuotaChanged();
@@ -923,7 +830,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
       toast.success('媒體檔案已刪除');
       loadStudentMedia(); // 重新載入媒體列表
-      
+
       // 通知父組件配額已更改，觸發按鈕顏色更新
       if (onQuotaChanged) {
         onQuotaChanged();
@@ -943,14 +850,14 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         .eq('id', mediaId);
 
       if (error) throw error;
-      
+
       // 更新本地狀態
-      setMedia(prev => prev.map(item => 
-        item.id === mediaId 
+      setMedia(prev => prev.map(item =>
+        item.id === mediaId
           ? { ...item, is_favorite: !currentFavorite }
           : item
       ));
-      
+
       toast.success(currentFavorite ? '已取消收藏' : '已加入收藏');
     } catch (error) {
       console.error('切換收藏狀態失敗:', error);
@@ -983,21 +890,21 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       const { error } = await supabase
         .from('hanami_student_media')
         // @ts-ignore - hanami_student_media table type may not be fully defined
-        .update({ 
+        .update({
           title: editTitle.trim(),
           updated_at: new Date().toISOString()
         })
         .eq('id', editingMedia.id);
 
       if (error) throw error;
-      
+
       // 更新本地狀態
-      setMedia(prev => prev.map(item => 
-        item.id === editingMedia.id 
+      setMedia(prev => prev.map(item =>
+        item.id === editingMedia.id
           ? { ...item, title: editTitle.trim(), updated_at: new Date().toISOString() }
           : item
       ));
-      
+
       toast.success('標題更新成功！');
       cancelEdit();
     } catch (error) {
@@ -1032,21 +939,21 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       const { error } = await supabase
         .from('hanami_student_media')
         // @ts-ignore - hanami_student_media table type may not be fully defined
-        .update({ 
+        .update({
           lesson_id: selectedLessonId || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', selectedMediaForLesson.id);
 
       if (error) throw error;
-      
+
       // 更新本地狀態
-      setMedia(prev => prev.map(item => 
-        item.id === selectedMediaForLesson.id 
+      setMedia(prev => prev.map(item =>
+        item.id === selectedMediaForLesson.id
           ? { ...item, lesson_id: selectedLessonId || undefined, updated_at: new Date().toISOString() }
           : item
       ));
-      
+
       toast.success('課程關聯設定成功！');
       setShowLessonSelector(false);
       setSelectedMediaForLesson(null);
@@ -1096,7 +1003,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     if (quotaLevel?.storage_limit_mb) {
       return quotaLevel.storage_limit_mb * 1024 * 1024; // 轉換為 bytes
     }
-    
+
     // 如果沒有 quotaLevel，使用 plan_type 映射
     const planType = student?.quota?.plan_type;
     switch (planType) {
@@ -1117,12 +1024,12 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
   const getPlanTypeText = useMemo(() => {
     // 優先使用 quotaLevel 中的等級名稱和儲存空間限制
     if (quotaLevel?.level_name && quotaLevel?.storage_limit_mb) {
-      const sizeText = quotaLevel.storage_limit_mb >= 1024 
+      const sizeText = quotaLevel.storage_limit_mb >= 1024
         ? `${(quotaLevel.storage_limit_mb / 1024).toFixed(0)}GB`
         : `${quotaLevel.storage_limit_mb}MB`;
       return `${quotaLevel.level_name} (${sizeText})`;
     }
-    
+
     // 如果沒有 quotaLevel，使用 plan_type 映射
     const planType = student?.quota?.plan_type;
     switch (planType) {
@@ -1144,7 +1051,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     if (mediaItem.thumbnail_path) {
       return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/hanami-media/${mediaItem.thumbnail_path}`;
     }
-    
+
     // 如果沒有縮圖，返回原檔案 URL
     return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/hanami-media/${mediaItem.file_path}`;
   };
@@ -1206,7 +1113,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         .eq('student_id', student.id);
       const { data: quotaData, error: quotaError } = await quotaQuery.single();
       if (!quotaError && quotaData) {
-        studentQuota = quotaData as { plan_type: string; [key: string]: any } | null;
+        studentQuota = quotaData as { plan_type: string;[key: string]: any } | null;
       }
 
       const targetLevel = planTypeToLevelName((studentQuota as { plan_type?: string } | null)?.plan_type ?? 'free');
@@ -1248,12 +1155,12 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
           const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
           const compressionRatio = ((file.size - compressedFile.size) / file.size * 100).toFixed(1);
-          
+
           toast(`檔案 ${file.name} 已壓縮: ${originalSizeMB}MB → ${compressedSizeMB}MB (節省 ${compressionRatio}%)`, {
             icon: '🎯',
             duration: 3000
           });
-          
+
           resolve(compressedFile);
         }).catch(error => {
           console.error('壓縮失敗:', error);
@@ -1264,12 +1171,12 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         if (file.type.startsWith('video/')) {
           const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
           const maxSizeMBFormatted = maxSizeMB.toString();
-          
+
           toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制 (${maxSizeMBFormatted}MB)，但將嘗試上傳。`, {
             icon: '⚠️',
             duration: 5000
           });
-          
+
           const compressedFile = new File([file], file.name, {
             type: file.type,
             lastModified: file.lastModified,
@@ -1283,12 +1190,12 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           const img = new Image();
-          
+
           img.onload = () => {
             // 計算壓縮比例 - 更激進的壓縮
             const maxDimension = 1280; // 降低最大尺寸
             let { width, height } = img;
-            
+
             if (width > height && width > maxDimension) {
               height = (height * maxDimension) / width;
               width = maxDimension;
@@ -1296,13 +1203,13 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
               width = (width * maxDimension) / height;
               height = maxDimension;
             }
-            
+
             canvas.width = width;
             canvas.height = height;
-            
+
             // 繪製壓縮後的圖片
             ctx?.drawImage(img, 0, 0, width, height);
-            
+
             // 轉換為 Blob，使用更低的品質
             canvas.toBlob((blob) => {
               if (blob) {
@@ -1310,10 +1217,10 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                   type: file.type,
                   lastModified: file.lastModified,
                 });
-                
+
                 const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
                 const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
-                
+
                 toast.success(`圖片 ${file.name} 已壓縮: ${originalSizeMB}MB → ${compressedSizeMB}MB`);
                 resolve(compressedFile);
               } else {
@@ -1321,12 +1228,12 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
               }
             }, file.type, 0.6); // 降低到 60% 品質
           };
-          
+
           img.onerror = () => {
             toast.error(`圖片 ${file.name} 壓縮失敗`);
             resolve(file);
           };
-          
+
           img.src = URL.createObjectURL(file);
         } else {
           // 對於其他檔案類型，顯示配額警告但允許上傳
@@ -1384,7 +1291,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                   const photoLimit = quotaLevel?.photo_limit || 10;
                   const isNearLimit = videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2;
                   const isAtLimit = videoCount >= videoLimit || photoCount >= photoLimit;
-                  
+
                   if (isAtLimit) {
                     return (
                       <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
@@ -1424,9 +1331,8 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           </div>
 
           {/* 配額詳細資訊 - 可展開/收起 */}
-          <div className={`transition-all duration-500 ease-out overflow-hidden ${
-            showQuotaDetails ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-          }`}>
+          <div className={`transition-all duration-500 ease-out overflow-hidden ${showQuotaDetails ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            }`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {/* 影片數量統計 */}
               <div className="bg-white p-3 sm:p-4 rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105">
@@ -1441,15 +1347,15 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                   <span className="text-[#2B3A3B] font-semibold">{student.media_count.video} 個</span>
                 </div>
                 <div className="w-full bg-[#FFF9F2] rounded-full h-2 overflow-hidden">
-                  <div 
+                  <div
                     className="h-2 rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]"
                     style={{ width: `${Math.min((student.media_count.video / 50) * 100, 100)}%` }}
                   />
                 </div>
                 <div className="text-xs text-[#2B3A3B] mt-1">
-                  {student.media_count.video === 0 ? '尚無影片' : 
-                   student.media_count.video === 1 ? '1 個影片' : 
-                   `${student.media_count.video} 個影片`}
+                  {student.media_count.video === 0 ? '尚無影片' :
+                    student.media_count.video === 1 ? '1 個影片' :
+                      `${student.media_count.video} 個影片`}
                 </div>
               </div>
 
@@ -1466,15 +1372,15 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                   <span className="text-[#2B3A3B] font-semibold">{student.media_count.photo} 張</span>
                 </div>
                 <div className="w-full bg-[#FFF9F2] rounded-full h-2 overflow-hidden">
-                  <div 
+                  <div
                     className="h-2 rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]"
                     style={{ width: `${Math.min((student.media_count.photo / 100) * 100, 100)}%` }}
                   />
                 </div>
                 <div className="text-xs text-[#2B3A3B] mt-1">
-                  {student.media_count.photo === 0 ? '尚無相片' : 
-                   student.media_count.photo === 1 ? '1 張相片' : 
-                   `${student.media_count.photo} 張相片`}
+                  {student.media_count.photo === 0 ? '尚無相片' :
+                    student.media_count.photo === 1 ? '1 張相片' :
+                      `${student.media_count.photo} 張相片`}
                 </div>
               </div>
 
@@ -1488,7 +1394,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                   </div>
                   <span className="font-medium text-sm sm:text-base text-[#A64B2A]">總計統計</span>
                 </div>
-                
+
                 {/* 圓形圖表 */}
                 <div className="flex items-center justify-center mb-3">
                   <div className="relative w-16 h-16 sm:w-20 sm:h-20">
@@ -1503,11 +1409,10 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                       />
                       {/* 進度圓圈 */}
                       <path
-                        className={`transition-all duration-1000 ease-out ${
-                          getPlanSize > 0 && (getTotalUsedSize / getPlanSize) >= 0.8 
-                            ? 'text-red-400' 
+                        className={`transition-all duration-1000 ease-out ${getPlanSize > 0 && (getTotalUsedSize / getPlanSize) >= 0.8
+                            ? 'text-red-400'
                             : 'text-[#FFD59A]'
-                        }`}
+                          }`}
                         stroke="currentColor"
                         strokeWidth="3"
                         strokeLinecap="round"
@@ -1526,7 +1431,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                     </div>
                   </div>
                 </div>
-                
+
                 {/* 容量資訊 */}
                 <div className="text-center space-y-1">
                   <div className="text-lg sm:text-xl font-bold text-[#A64B2A]">
@@ -1539,7 +1444,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                     {getPlanTypeText}
                   </div>
                 </div>
-                
+
                 {/* 詳細資訊 */}
                 <div className="mt-3 text-xs text-[#2B3A3B] space-y-1">
                   <div className="flex justify-between">
@@ -1617,16 +1522,15 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           </div>
 
           {/* 操作按鈕 - 可展開/收起 */}
-          <div className={`transition-all duration-500 ease-out overflow-hidden ${
-            showActionButtons ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-          }`}>
+          <div className={`transition-all duration-500 ease-out overflow-hidden ${showActionButtons ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            }`}>
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-center sm:justify-between">
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <div className="flex items-center gap-2">
                   {(() => {
                     const capacityStatus = getCurrentCapacityStatus();
                     const isCapacityFull = capacityStatus.status === 'full';
-                    
+
                     return (
                       <button
                         onClick={() => {
@@ -1637,11 +1541,10 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                           setShowUploadArea(true);
                         }}
                         disabled={showUploadArea || isCapacityFull}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 w-full sm:w-auto justify-center shadow-md hover:shadow-lg transform hover:scale-105 disabled:transform-none ${
-                          isCapacityFull 
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 w-full sm:w-auto justify-center shadow-md hover:shadow-lg transform hover:scale-105 disabled:transform-none ${isCapacityFull
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             : 'bg-gradient-to-r from-[#A64B2A] to-[#8B3A1F] text-white hover:from-[#8B3A1F] hover:to-[#6B2A0F]'
-                        }`}
+                          }`}
                       >
                         <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                         <span className="font-medium">
@@ -1650,7 +1553,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                       </button>
                     );
                   })()}
-                  
+
                   {/* 容量狀態提示 */}
                   {(() => {
                     const videoCount = media.filter(m => m.media_type === 'video').length;
@@ -1659,7 +1562,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                     const photoLimit = quotaLevel?.photo_limit || 10;
                     const isNearLimit = videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2;
                     const isAtLimit = videoCount >= videoLimit || photoCount >= photoLimit;
-                    
+
                     if (isAtLimit) {
                       return (
                         <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs border border-red-200">
@@ -1683,7 +1586,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                       );
                     }
                   })()}
-                  
+
                   {/* 方案升級按鈕 */}
                   <button
                     onClick={() => setShowUpgradeModal(true)}
@@ -1693,7 +1596,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                     升級方案
                   </button>
                 </div>
-                
+
                 <button
                   onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
                   className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] text-[#A64B2A] rounded-xl hover:from-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-200 w-full sm:w-auto justify-center shadow-sm hover:shadow-md transform hover:scale-105 border border-[#EADBC8]"
@@ -1777,7 +1680,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                 <p className="text-sm sm:text-base text-[#2B3A3B] mb-4">
                   拖拽檔案到此處或點擊選擇檔案 ✨
                 </p>
-                
+
                 {/* 簡化版本 - 直接使用原生按鈕 */}
                 <input
                   type="file"
@@ -1801,12 +1704,12 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                     <span className="p-1 bg-[#EBC9A4] rounded-full">📸</span>
                     相片: 最多 {quotaLevel?.photo_limit || DEFAULT_MEDIA_LIMITS.photo.maxCount} 張，每張 ≤ {quotaLevel?.photo_size_limit_mb || DEFAULT_MEDIA_LIMITS.photo.maxSize / (1024 * 1024)}MB
                   </p>
-                  
+
                   {/* 檔案上傳指南連結 */}
                   <div className="mt-3 pt-3 border-t border-[#EADBC8]">
-                    <a 
-                      href="/admin/file-upload-guide" 
-                      target="_blank" 
+                    <a
+                      href="/admin/file-upload-guide"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-[#A64B2A] hover:text-[#8B3A1F] transition-colors text-xs"
                     >
@@ -1825,7 +1728,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                         const isVideo = file.type.startsWith('video/');
                         const isPhoto = file.type.startsWith('image/');
                         const canEdit = isVideo || isPhoto;
-                        
+
                         return (
                           <div key={index} className="flex items-center justify-between bg-white p-3 rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1890,7 +1793,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                         );
                       })}
                     </div>
-                    
+
                     <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
                       <button
                         onClick={uploadFiles}
@@ -2036,8 +1939,8 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                             </div>
                           ) : (
                             // 顯示模式
-                            <h4 className="font-medium truncate cursor-pointer hover:text-[#A64B2A] transition-colors group" 
-                                onClick={() => startEditTitle(item)}>
+                            <h4 className="font-medium truncate cursor-pointer hover:text-[#A64B2A] transition-colors group"
+                              onClick={() => startEditTitle(item)}>
                               {item.title || item.file_name}
                               <span className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#A64B2A]">
                                 ✏️
@@ -2089,7 +1992,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                               <TrashIcon className="h-4 w-4" />
                             </HanamiButton>
                           </div>
-                          
+
                           {/* 課程關聯顯示 */}
                           {getMediaLesson(item) && (
                             <div className="mt-2 p-2 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] rounded-lg border border-[#EADBC8]">
@@ -2178,8 +2081,8 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                           ) : (
                             // 顯示模式
                             <>
-                              <h4 className="font-medium cursor-pointer hover:text-[#A64B2A] transition-colors group" 
-                                  onClick={() => startEditTitle(item)}>
+                              <h4 className="font-medium cursor-pointer hover:text-[#A64B2A] transition-colors group"
+                                onClick={() => startEditTitle(item)}>
                                 {item.title || item.file_name}
                                 <span className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#A64B2A]">
                                   ✏️
@@ -2234,7 +2137,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                             <TrashIcon className="h-4 w-4" />
                           </HanamiButton>
                         </div>
-                        
+
                         {/* 課程關聯顯示 */}
                         {getMediaLesson(item) && (
                           <div className="mt-2 p-2 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] rounded-lg border border-[#EADBC8]">
@@ -2402,7 +2305,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           onUpgradeSuccess={handleUpgradeSuccess}
         />
       )}
-      
+
       {/* 媒體編輯器 */}
       {showMediaEditor && fileToEdit && editingFileType && (
         <MediaEditor

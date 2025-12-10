@@ -92,8 +92,8 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         .trim()
         .toLowerCase();
 
-      if (normalizedRoleFromUser === 'super_admin') {
-        console.log('AppSidebar: 從 user 對象檢測到 super_admin 身份');
+      if (normalizedRoleFromUser === 'super_admin' || normalizedRoleFromUser === 'admin') {
+        console.log('AppSidebar: 從 user 對象檢測到 super_admin/admin 身份');
         setIsSuperAdmin(true);
         setRoleLoading(false);
         return;
@@ -126,7 +126,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
             setIsSuperAdmin(false);
           } else {
             const role = (userData as { user_role: string } | null)?.user_role || 'user';
-            const isSuperAdminRole = role.toLowerCase() === 'super_admin';
+            const isSuperAdminRole = role.toLowerCase() === 'super_admin' || role.toLowerCase() === 'admin';
             console.log('AppSidebar: 從數據庫讀取 user_role:', role, 'isSuperAdmin:', isSuperAdminRole);
             setIsSuperAdmin(isSuperAdminRole);
           }
@@ -286,13 +286,13 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
                     transition={{ delay: index * 0.1 }}
                     onClick={() => handleItemClick(item.href)}
                     className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200 ${isActive
-                        ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md'
-                        : 'text-[#2B3A3B] hover:bg-[#FFD59A]/20'
+                      ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] shadow-md'
+                      : 'text-[#2B3A3B] hover:bg-[#FFD59A]/20'
                       }`}
                   >
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isActive
-                        ? 'bg-white/80'
-                        : 'bg-[#FFD59A]/20'
+                      ? 'bg-white/80'
+                      : 'bg-[#FFD59A]/20'
                       }`}>
                       <item.icon className={`w-5 h-5 ${isActive ? 'text-[#4B4036]' : 'text-[#4B4036]'
                         }`} />
