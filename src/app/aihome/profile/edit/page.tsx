@@ -14,6 +14,7 @@ import {
     Loader2,
     Phone,
     Mail,
+    Check,
     CheckCircle2,
     AlertCircle,
     Eye,
@@ -21,25 +22,31 @@ import {
     Image as ImageIcon
 } from 'lucide-react';
 import UnifiedRightContent from '@/components/UnifiedRightContent';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import {
+    Bars3Icon,
+    UserCircleIcon,
+    CpuChipIcon,
+    AcademicCapIcon,
+    PaintBrushIcon
+} from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import AppSidebar from '@/components/AppSidebar';
 import { useFoodDisplay } from '@/hooks/useFoodDisplay';
 
 // Country Codes Data
 const COUNTRY_CODES = [
-    { code: '852', flag: '🇭🇰', name: 'Hong Kong' },
-    { code: '86', flag: '🇨🇳', name: 'China' },
-    { code: '853', flag: '🇲🇴', name: 'Macau' },
-    { code: '886', flag: '🇹🇼', name: 'Taiwan' },
-    { code: '1', flag: '🇺🇸', name: 'USA/Canada' },
-    { code: '44', flag: '🇬🇧', name: 'UK' },
-    { code: '81', flag: '🇯🇵', name: 'Japan' },
-    { code: '82', flag: '🇰🇷', name: 'Korea' },
-    { code: '65', flag: '🇸🇬', name: 'Singapore' },
-    { code: '60', flag: '🇲🇾', name: 'Malaysia' },
-    { code: '66', flag: '🇹🇭', name: 'Thailand' },
-    { code: '61', flag: '🇦🇺', name: 'Australia' },
+    { code: '852', flag: '🇭🇰', name: '香港' },
+    { code: '86', flag: '🇨🇳', name: '中國' },
+    { code: '853', flag: '🇲🇴', name: '澳門' },
+    { code: '886', flag: '🇹🇼', name: '台灣' },
+    { code: '1', flag: '🇺🇸', name: '美國/加拿大' },
+    { code: '44', flag: '🇬🇧', name: '英國' },
+    { code: '81', flag: '🇯🇵', name: '日本' },
+    { code: '82', flag: '🇰🇷', name: '韓國' },
+    { code: '65', flag: '🇸🇬', name: '新加坡' },
+    { code: '60', flag: '🇲🇾', name: '馬來西亞' },
+    { code: '66', flag: '🇹🇭', name: '泰國' },
+    { code: '61', flag: '🇦🇺', name: '澳洲' },
 ];
 
 export default function ProfileEditPage() {
@@ -116,9 +123,9 @@ export default function ProfileEditPage() {
         try {
             // 1. Validate Password Change First (if provided)
             if (formData.newPassword) {
-                if (!formData.currentPassword) throw new Error('Please enter your current password to change it.');
-                if (formData.newPassword !== formData.confirmPassword) throw new Error('New passwords do not match.');
-                if (formData.newPassword.length < 6) throw new Error('Password must be at least 6 characters.');
+                if (!formData.currentPassword) throw new Error('請輸入目前密碼以進行更改。');
+                if (formData.newPassword !== formData.confirmPassword) throw new Error('新密碼不相符。');
+                if (formData.newPassword.length < 6) throw new Error('密碼至少需 6 個字元。');
 
                 // Verify Current Password by signing in
                 const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -126,7 +133,7 @@ export default function ProfileEditPage() {
                     password: formData.currentPassword
                 });
 
-                if (signInError) throw new Error('Current password is incorrect.');
+                if (signInError) throw new Error('目前密碼不正確。');
 
                 // Update Password
                 const { error: updateError } = await supabase.auth.updateUser({ password: formData.newPassword });
@@ -189,7 +196,7 @@ export default function ProfileEditPage() {
                 }
             }
 
-            setMessage({ type: 'success', text: 'Profile updated successfully!' });
+            setMessage({ type: 'success', text: '個人資料更新成功！' });
             setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' })); // Clear sensitive fields
 
             // Refresh user session data locally if needed or rely on SWR re-fetch
@@ -200,7 +207,7 @@ export default function ProfileEditPage() {
 
         } catch (error: any) {
             console.error('Error updating profile:', error);
-            setMessage({ type: 'error', text: error.message || 'Failed to update profile' });
+            setMessage({ type: 'error', text: error.message || '個人資料更新失敗' });
         } finally {
             setSaving(false);
         }
@@ -250,15 +257,74 @@ export default function ProfileEditPage() {
                                 </motion.button>
                                 <AnimatePresence>
                                     {showFoodHistory && (
-                                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="absolute top-12 right-0 w-64 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden">
-                                            <div className="text-xs font-bold text-[#8C7A6B] mb-2 px-1">Recent History</div>
-                                            <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                                                {foodHistory.length === 0 ? <div className="text-center text-xs text-gray-400 py-2">No history</div> : foodHistory.map((r: any) => (
-                                                    <div key={r.id} className="flex justify-between text-xs p-2 bg-[#F8F5EC] rounded-lg">
-                                                        <span>{r.amount > 0 ? '+' : ''}{r.amount}</span>
-                                                        <span className="text-[#8C7A6B]">{new Date(r.created_at).toLocaleDateString()}</span>
-                                                    </div>
-                                                ))}
+                                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="absolute top-12 right-0 w-80 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden">
+                                            <div className="text-xs font-bold text-[#8C7A6B] mb-2 px-1">近期紀錄</div>
+                                            <div className="space-y-2 max-h-80 overflow-y-auto no-scrollbar">
+                                                {foodHistory.length === 0 ? <div className="text-center text-xs text-gray-400 py-2">無紀錄</div> : foodHistory.map((record: any) => {
+                                                    let characterName = '未知';
+                                                    let Icon = UserCircleIcon;
+                                                    let iconColor = 'text-gray-400';
+                                                    let bgColor = 'bg-gray-100';
+
+                                                    const roleId = record.ai_messages?.role_instances?.role_id || record.ai_messages?.role_id;
+
+                                                    if (roleId) {
+                                                        if (roleId.includes('hibi')) {
+                                                            characterName = '希希';
+                                                            Icon = CpuChipIcon;
+                                                            iconColor = 'text-orange-500';
+                                                            bgColor = 'bg-orange-50';
+                                                        } else if (roleId.includes('mori')) {
+                                                            characterName = '墨墨';
+                                                            Icon = AcademicCapIcon;
+                                                            iconColor = 'text-amber-600';
+                                                            bgColor = 'bg-amber-50';
+                                                        } else if (roleId.includes('pico')) {
+                                                            characterName = '皮可';
+                                                            Icon = PaintBrushIcon;
+                                                            iconColor = 'text-blue-500';
+                                                            bgColor = 'bg-blue-50';
+                                                        }
+                                                    } else if (record.description) {
+                                                        const desc = record.description.toLowerCase();
+                                                        if (desc.includes('hibi') || desc.includes('希希')) {
+                                                            characterName = '希希';
+                                                            Icon = CpuChipIcon;
+                                                            iconColor = 'text-orange-500';
+                                                            bgColor = 'bg-orange-50';
+                                                        } else if (desc.includes('mori') || desc.includes('墨墨')) {
+                                                            characterName = '墨墨';
+                                                            Icon = AcademicCapIcon;
+                                                            iconColor = 'text-amber-600';
+                                                            bgColor = 'bg-amber-50';
+                                                        } else if (desc.includes('pico') || desc.includes('皮可')) {
+                                                            characterName = '皮可';
+                                                            Icon = PaintBrushIcon;
+                                                            iconColor = 'text-blue-500';
+                                                            bgColor = 'bg-blue-50';
+                                                        }
+                                                    }
+
+                                                    return (
+                                                        <div key={record.id} className="flex justify-between items-center text-xs p-2 bg-[#F8F5EC] rounded-lg">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-8 h-8 rounded-full ${bgColor} flex items-center justify-center`}>
+                                                                    <Icon className={`w-4 h-4 ${iconColor}`} />
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-bold text-[#4B4036] flex items-center gap-1.5">
+                                                                        {characterName} Use
+                                                                    </span>
+                                                                    <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 font-bold text-[#4B4036]">
+                                                                <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
+                                                                <span>{record.amount > 0 ? '+' : ''}{record.amount}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </motion.div>
                                     )}
@@ -279,7 +345,7 @@ export default function ProfileEditPage() {
                         <NeuButton onClick={() => router.back()} className="w-12 h-12 rounded-xl flex items-center justify-center !p-0">
                             <ArrowLeft className="w-5 h-5 text-[#8B7E74]" />
                         </NeuButton>
-                        <h1 className="text-2xl font-bold text-[#4B4036]">Edit Profile</h1>
+                        <h1 className="text-2xl font-bold text-[#4B4036]">編輯個人資料</h1>
                     </div>
 
                     <motion.div
@@ -326,15 +392,15 @@ export default function ProfileEditPage() {
                                 accept="image/*"
                                 className="hidden"
                             />
-                            <p className="text-xs text-[#8B7E74] mt-2 font-medium">Click to upload new picture</p>
+                            <p className="text-xs text-[#8B7E74] mt-2 font-medium">點擊更換照片</p>
                         </div>
 
                         {/* Public Info */}
                         <div className="space-y-6 mb-10">
-                            <h3 className="text-lg font-bold text-[#4B4036] border-l-4 border-[#FFD59A] pl-3">Personal Info</h3>
+                            <h3 className="text-lg font-bold text-[#4B4036] border-l-4 border-[#FFD59A] pl-3">個人資料</h3>
 
                             <NeuInput
-                                label="Full Name"
+                                label="全名"
                                 name="full_name"
                                 value={formData.full_name}
                                 onChange={handleChange}
@@ -342,7 +408,7 @@ export default function ProfileEditPage() {
                             />
 
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-[#8B7E74] ml-1 uppercase tracking-wide">Phone Number</label>
+                                <label className="text-xs font-bold text-[#8B7E74] ml-1 uppercase tracking-wide">電話號碼</label>
                                 <div className="flex gap-3">
                                     <div className="relative min-w-[140px]">
                                         <select
@@ -374,7 +440,7 @@ export default function ProfileEditPage() {
 
                             <div className="opacity-60 cursor-not-allowed">
                                 <NeuInput
-                                    label="Email (Cannot be changed)"
+                                    label="電子郵件（無法更改）"
                                     name="email"
                                     value={user.email || ''}
                                     onChange={() => { }}
@@ -388,33 +454,33 @@ export default function ProfileEditPage() {
                         <div className="space-y-6 mb-10 p-6 rounded-2xl bg-[#FFF9F2] shadow-[inset_6px_6px_14px_#E6D9C5,inset_-6px_-6px_14px_#FFFFFF]">
                             <div className="flex items-center gap-2 mb-2">
                                 <Lock className="w-5 h-5 text-red-400" />
-                                <h3 className="text-lg font-bold text-[#4B4036]">Security</h3>
+                                <h3 className="text-lg font-bold text-[#4B4036]">安全性</h3>
                             </div>
 
-                            <p className="text-xs text-[#8B7E74]">To change your password, you must verify your current password first.</p>
+                            <p className="text-xs text-[#8B7E74]">若要更改密碼，您必須先驗證目前的密碼。</p>
 
                             <NeuPasswordInput
-                                label="Current Password"
+                                label="目前密碼"
                                 name="currentPassword"
                                 value={formData.currentPassword}
                                 onChange={handleChange}
-                                placeholder="Required to set new password"
+                                placeholder="若要設定新密碼，此為必填"
                             />
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#EADBC8]/50">
                                 <NeuPasswordInput
-                                    label="New Password"
+                                    label="新密碼"
                                     name="newPassword"
                                     value={formData.newPassword}
                                     onChange={handleChange}
-                                    placeholder="Min 6 chars"
+                                    placeholder="至少 6 個字元"
                                 />
                                 <NeuPasswordInput
-                                    label="Confirm Password"
+                                    label="確認新密碼"
                                     name="confirmPassword"
                                     value={formData.confirmPassword}
                                     onChange={handleChange}
-                                    placeholder="Re-enter new password"
+                                    placeholder="請再次輸入新密碼"
                                 />
                             </div>
                         </div>
@@ -437,7 +503,7 @@ export default function ProfileEditPage() {
                         {/* Actions */}
                         <div className="flex justify-end gap-4 pt-6 border-t border-[#EADBC8]/30">
                             <NeuButton onClick={() => router.back()} className="px-6 py-3 rounded-xl font-bold text-[#8B7E74]">
-                                Cancel
+                                取消
                             </NeuButton>
                             <NeuButton
                                 onClick={handleSave}
@@ -445,7 +511,7 @@ export default function ProfileEditPage() {
                                 className="px-8 py-3 rounded-xl bg-[#FFD59A]/10 text-[#4B4036] font-bold flex items-center gap-2 hover:text-[#E89234]"
                             >
                                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Save Changes
+                                儲存變更
                             </NeuButton>
                         </div>
 

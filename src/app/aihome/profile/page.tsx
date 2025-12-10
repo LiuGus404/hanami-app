@@ -21,7 +21,11 @@ import {
 import {
   Bars3Icon,
   BuildingLibraryIcon,
-  IdentificationIcon
+  IdentificationIcon,
+  CpuChipIcon,
+  AcademicCapIcon,
+  PaintBrushIcon,
+  UserCircleIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import Image from 'next/image';
@@ -256,32 +260,74 @@ export default function ProfilePage() {
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="absolute top-12 right-0 w-64 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden"
+                        className="absolute top-12 right-0 w-80 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden"
                       >
                         <div className="text-xs font-bold text-[#8C7A6B] mb-2 px-1">最近 5 次食量記錄</div>
-                        <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                        <div className="space-y-2 max-h-80 overflow-y-auto no-scrollbar">
                           {foodHistory.length === 0 ? (
                             <div className="text-center text-xs text-gray-400 py-2">尚無記錄</div>
                           ) : (
                             foodHistory.map((record: any) => {
-                              let characterName = '';
+                              let characterName = '未知';
+                              let Icon = UserCircleIcon;
+                              let iconColor = 'text-gray-400';
+                              let bgColor = 'bg-gray-100';
+
                               const roleId = record.ai_messages?.role_instances?.role_id || record.ai_messages?.role_id;
+
                               if (roleId) {
-                                const roleNameMap: Record<string, string> = {
-                                  'hibi': '希希',
-                                  'mori': '墨墨',
-                                  'pico': '皮可'
-                                };
-                                characterName = roleNameMap[roleId] || roleId;
+                                if (roleId.includes('hibi')) {
+                                  characterName = '希希';
+                                  Icon = CpuChipIcon;
+                                  iconColor = 'text-orange-500';
+                                  bgColor = 'bg-orange-50';
+                                } else if (roleId.includes('mori')) {
+                                  characterName = '墨墨';
+                                  Icon = AcademicCapIcon;
+                                  iconColor = 'text-amber-600';
+                                  bgColor = 'bg-amber-50';
+                                } else if (roleId.includes('pico')) {
+                                  characterName = '皮可';
+                                  Icon = PaintBrushIcon;
+                                  iconColor = 'text-blue-500';
+                                  bgColor = 'bg-blue-50';
+                                }
+                              } else if (record.description) {
+                                const desc = record.description.toLowerCase();
+                                if (desc.includes('hibi') || desc.includes('希希')) {
+                                  characterName = '希希';
+                                  Icon = CpuChipIcon;
+                                  iconColor = 'text-orange-500';
+                                  bgColor = 'bg-orange-50';
+                                } else if (desc.includes('mori') || desc.includes('墨墨')) {
+                                  characterName = '墨墨';
+                                  Icon = AcademicCapIcon;
+                                  iconColor = 'text-amber-600';
+                                  bgColor = 'bg-amber-50';
+                                } else if (desc.includes('pico') || desc.includes('皮可')) {
+                                  characterName = '皮可';
+                                  Icon = PaintBrushIcon;
+                                  iconColor = 'text-blue-500';
+                                  bgColor = 'bg-blue-50';
+                                }
                               }
+
                               return (
                                 <div key={record.id} className="flex justify-between items-center text-xs p-2 bg-[#F8F5EC] rounded-lg">
-                                  <div className="flex flex-col">
-                                    <span className="font-medium text-[#4B4036] flex items-center gap-1.5">
-                                      <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
-                                      <span>{record.amount > 0 ? '+' : ''}{record.amount} {characterName}</span>
-                                    </span>
-                                    <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full ${bgColor} flex items-center justify-center`}>
+                                      <Icon className={`w-4 h-4 ${iconColor}`} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="font-bold text-[#4B4036] flex items-center gap-1.5">
+                                        {characterName} Use
+                                      </span>
+                                      <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 font-bold text-[#4B4036]">
+                                    <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
+                                    <span>{record.amount > 0 ? '+' : ''}{record.amount}</span>
                                   </div>
                                 </div>
                               );
@@ -492,6 +538,15 @@ export default function ProfilePage() {
                             </div>
                           </div>
                           <div className="space-y-4">
+                            {/* Current Balance Header */}
+                            <div className="mb-6 pb-6 border-b border-[#EADBC8]/50 flex items-center justify-between">
+                              <span className="text-sm font-bold text-[#8B7E74]">目前餘額</span>
+                              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFF9F2] shadow-[inset_2px_2px_5px_#E6D9C5,inset_-2px_-2px_5px_#FFFFFF]">
+                                <img src="/apple-icon.svg" alt="Food" className="w-5 h-5" />
+                                <span className="text-xl font-bold text-[#4B4036]">{foodBalance}</span>
+                              </div>
+                            </div>
+
                             <UsageStatsDisplay userId={user.id} className="!p-0 !bg-transparent !shadow-none !border-none" />
                           </div>
                         </div>

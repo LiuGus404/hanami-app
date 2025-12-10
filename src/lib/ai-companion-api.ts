@@ -574,41 +574,41 @@ export const messageAPI = {
       } else if (message) {
         const messageContent = (message as { content?: string }).content;
         if (messageContent) {
-          // 2. 檢查並提取圖片路徑
-          // 匹配 markdown 圖片語法: ![...](url)
-          const imageRegex = /!\[.*?\]\((.*?)\)/g;
-          let match;
-          const pathsToDelete: string[] = [];
+        // 2. 檢查並提取圖片路徑
+        // 匹配 markdown 圖片語法: ![...](url)
+        const imageRegex = /!\[.*?\]\((.*?)\)/g;
+        let match;
+        const pathsToDelete: string[] = [];
 
           while ((match = imageRegex.exec(messageContent)) !== null) {
-            const imageUrl = match[1];
-            // 使用 extractStoragePath 提取路徑
-            // 我們需要動態導入或假設它可用。由於這是 API 文件，我們最好在這裡實現簡單的提取邏輯或導入
-            // 簡單提取邏輯：
-            try {
-              if (imageUrl.includes('ai-images')) {
-                // 嘗試提取路徑：user_id/companion_id/timestamp.ext
-                // URL 格式可能是 .../public/ai-images/PATH 或 .../sign/ai-images/PATH
-                const pathMatch = imageUrl.match(/ai-images\/(.+?)(\?|$)/);
-                if (pathMatch && pathMatch[1]) {
-                  pathsToDelete.push(decodeURIComponent(pathMatch[1]));
-                }
+          const imageUrl = match[1];
+          // 使用 extractStoragePath 提取路徑
+          // 我們需要動態導入或假設它可用。由於這是 API 文件，我們最好在這裡實現簡單的提取邏輯或導入
+          // 簡單提取邏輯：
+          try {
+            if (imageUrl.includes('ai-images')) {
+              // 嘗試提取路徑：user_id/companion_id/timestamp.ext
+              // URL 格式可能是 .../public/ai-images/PATH 或 .../sign/ai-images/PATH
+              const pathMatch = imageUrl.match(/ai-images\/(.+?)(\?|$)/);
+              if (pathMatch && pathMatch[1]) {
+                pathsToDelete.push(decodeURIComponent(pathMatch[1]));
               }
-            } catch (e) {
-              console.warn('解析圖片路徑失敗:', imageUrl, e);
             }
+          } catch (e) {
+            console.warn('解析圖片路徑失敗:', imageUrl, e);
           }
+        }
 
-          // 3. 刪除 Storage 中的圖片
-          if (pathsToDelete.length > 0) {
-            console.log('刪除關聯圖片:', pathsToDelete);
-            const { error: storageError } = await supabase.storage
-              .from('ai-images')
-              .remove(pathsToDelete);
+        // 3. 刪除 Storage 中的圖片
+        if (pathsToDelete.length > 0) {
+          console.log('刪除關聯圖片:', pathsToDelete);
+          const { error: storageError } = await supabase.storage
+            .from('ai-images')
+            .remove(pathsToDelete);
 
-            if (storageError) {
-              console.error('刪除 Storage 圖片失敗:', storageError);
-              // 不阻擋訊息刪除
+          if (storageError) {
+            console.error('刪除 Storage 圖片失敗:', storageError);
+            // 不阻擋訊息刪除
             }
           }
         }

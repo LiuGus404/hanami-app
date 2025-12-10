@@ -78,6 +78,10 @@
     "out",
     "dist",
     "build",
-    "supabase"
+    "supabase",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
   ]
 }

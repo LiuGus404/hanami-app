@@ -9,8 +9,7 @@ import {
   UserGroupIcon,
   Cog6ToothIcon,
   ShieldCheckIcon,
-  AcademicCapIcon,
-  ClipboardDocumentListIcon
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import toast from 'react-hot-toast';
@@ -265,7 +264,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
         id: 'mobile-nav-teacher-link',
         icon: AcademicCapIcon,
         href: '/aihome/teacher-link',
-        label: '花見老師專區'
+        label: '老師專區'
       };
 
       // 插入到設定按鈕之前
@@ -278,7 +277,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
         id: 'mobile-nav-legacy-admin',
         icon: ShieldCheckIcon,
         href: '/admin',
-        label: '舊系統管理'
+        label: '舊系統'
       };
 
       // 計算插入位置：如果有機構身份，插入到花見老師專區按鈕之後，否則插入到設定之前
@@ -322,7 +321,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
           id: 'mobile-nav-admin',
           icon: ShieldCheckIcon,
           href: '/admin',
-          label: '新系統管理'
+          label: '新系統'
         });
       }
     }
@@ -331,13 +330,6 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
   };
 
   const navigationItems = getNavigationItems();
-
-  // 檢查當前活動項目
-  const getActiveItem = () => {
-    return navigationItems.find(item => pathname.startsWith(item.href)) || navigationItems[0];
-  };
-
-  const activeItem = getActiveItem();
 
   // 處理導航點擊
   const handleNavigation = (href: string) => {
@@ -360,145 +352,98 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
     return null;
   }
 
+  // 檢查當前活動路徑
+  const isItemActive = (href: string) => {
+    // 特殊處理首頁，避免所有路徑都匹配 '/'
+    if (href === '/' || href === '/aihome/dashboard') {
+      return pathname === '/' || pathname === '/aihome/dashboard';
+    }
+    return pathname.startsWith(href);
+  };
+
   return (
     <AnimatePresence>
-      {/* 為內容添加底部間距，避免被導航遮擋 - 優化高度 */}
-      <div key="mobile-nav-spacer" className="fixed bottom-0 left-0 right-0 pointer-events-none">
-        <div className="h-20 lg:hidden"></div>
+      {/* 底部間距，防止內容被遮擋 */}
+      <div key="mobile-nav-spacer" className="fixed bottom-0 left-0 right-0 pointer-events-none z-0">
+        <div className="h-28 lg:hidden"></div>
       </div>
 
+      {/* 懸浮式導航條 - 膠囊設計 */}
       <motion.div
         key="mobile-nav-main"
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        className={`fixed bottom-0 left-0 right-0 z-50 pointer-events-auto overflow-hidden ${className}`}
-        style={{
-          // 確保背景完全覆蓋，無穿透 - 超強保護
-          background: '#FFF8E7',
-          backgroundImage: `
-            linear-gradient(to top, #FFF8E7 0%, #FFF8E7 100%),
-            linear-gradient(to top, #FFF8E7 0%, #FFF8E7 100%)
-          `,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          // 額外保護
-          borderTop: '1px solid #FFF8E7',
-          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.1)'
-        }}
+        transition={{ duration: 0.4, type: "spring", bounce: 0.3 }}
+        className={`fixed bottom-6 left-4 right-4 z-50 pointer-events-auto flex justify-center ${className}`}
       >
-        {/* 弧形背景容器 - 終極無穿透設計 */}
-        <div className="absolute inset-0 overflow-hidden">
-          {/* 弧形頂部層 - 減少高度，保持覆蓋 */}
-          <div className="absolute -top-12 left-0 right-0 h-24 bg-[#FFF8E7]"
-            style={{
-              borderRadius: '50% 50% 0 0 / 90% 90% 0 0',
-              boxShadow: '0 -8px 16px rgba(0, 0, 0, 0.08)'
-            }}>
-          </div>
-
-          {/* 第二層弧形覆蓋 */}
-          <div className="absolute -top-8 left-0 right-0 h-16 bg-[#FFF8E7]"
-            style={{
-              borderRadius: '50% 50% 0 0 / 80% 80% 0 0'
-            }}>
-          </div>
-
-          {/* 第三層弧形覆蓋 */}
-          <div className="absolute -top-4 left-0 right-0 h-12 bg-[#FFF8E7]"
-            style={{
-              borderRadius: '50% 50% 0 0 / 70% 70% 0 0'
-            }}>
-          </div>
-
-          {/* 過渡層 - 簡化設計 */}
-          <div className="absolute -top-2 left-0 right-0 h-8 bg-[#FFF8E7]"></div>
-
-          {/* 主體背景層 */}
-          <div className="absolute inset-0 bg-[#FFF8E7]"></div>
-
-          {/* 邊緣保護層 */}
-          <div className="absolute -top-1 left-0 right-0 h-4 bg-[#FFF8E7]"></div>
-          <div className="absolute top-0 left-0 right-0 h-2 bg-[#FFF8E7]"></div>
-        </div>
-
-        {/* 動態導航按鈕 - 弧形佈局 - 減少高度 */}
-        <div className="relative px-4 py-2">
-          <div className="flex justify-around items-end">
-            {navigationItems.map((item, index) => {
-              const isActive = pathname.startsWith(item.href);
-              // 中間的按鈕（AI夥伴）稍微高一些
-              const isCenter = index === 1;
-              // 檢查是否為花見老師專區按鈕（老師連結）
-              const isTeacherButton = item.id.includes('teacher-link') || item.id.includes('teacher-zone');
-              // 檢查是否為舊系統管理員按鈕
-              const isLegacyAdminButton = item.id.includes('legacy-admin');
-
-              return (
-                <motion.button
-                  key={item.id}
-                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{
-                    delay: index * 0.05,
-                    type: 'spring',
-                    stiffness: 100,
-                    damping: 15
-                  }}
-                  whileHover={{
-                    scale: 1.1,
-                    y: -2
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleNavigation(item.href)}
-                  className={`flex items-center justify-center p-1 transition-all duration-200 ${isCenter ? 'mb-1' : ''
-                    }`}
-                >
-                  <motion.div
-                    className={`flex items-center justify-center rounded-full transition-all duration-200 ${isActive
-                        ? isTeacherButton
-                          ? 'w-10 h-10 bg-gradient-to-br from-[#FF8C42] to-[#FFB366] text-white shadow-lg border-2 border-[#FF8C42]'
-                          : isLegacyAdminButton
-                            ? 'w-10 h-10 bg-gradient-to-br from-[#8B5CF6] to-[#A855F7] text-white shadow-lg border-2 border-[#8B5CF6]'
-                            : 'w-10 h-10 bg-[#FFD59A] text-white shadow-lg border-2 border-[#EBC9A4]'
-                        : isTeacherButton
-                          ? 'w-8 h-8 bg-gradient-to-br from-[#FF8C42]/20 to-[#FFB366]/20 text-[#FF8C42] border border-[#FF8C42]/30 hover:from-[#FF8C42]/30 hover:to-[#FFB366]/30 hover:border-[#FF8C42]/50'
-                          : isLegacyAdminButton
-                            ? 'w-8 h-8 bg-gradient-to-br from-[#8B5CF6]/20 to-[#A855F7]/20 text-[#8B5CF6] border border-[#8B5CF6]/30 hover:from-[#8B5CF6]/30 hover:to-[#A855F7]/30 hover:border-[#8B5CF6]/50'
-                            : 'w-8 h-8 bg-white/90 text-[#4B4036] border border-[#F0E68C] hover:bg-[#FFD59A]/10 hover:border-[#FFD59A]'
-                      }`}
-                    whileHover={{
-                      scale: 1.1,
-                      y: -2
-                    }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <item.icon className={`w-3.5 h-3.5 stroke-2 ${isActive
-                        ? 'text-white'
-                        : isTeacherButton
-                          ? 'text-[#FF8C42]'
-                          : isLegacyAdminButton
-                            ? 'text-[#8B5CF6]'
-                            : 'text-[#4B4036]/70'
-                      }`} />
-                  </motion.div>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 底部安全區域 - 超強無穿透背景 */}
         <div
-          className="h-safe-area-bottom"
+          className="flex items-center justify-between bg-[#FFF9F2] rounded-full p-2 shadow-[8px_8px_16px_#E6D9C5,-8px_-8px_16px_#FFFFFF] border border-[#EADBC8]/50 max-w-md w-full"
           style={{
-            background: '#FFF8E7',
-            backgroundImage: 'linear-gradient(to top, #FFF8E7 0%, #FFF8E7 100%)',
-            borderTop: '2px solid #FFF8E7',
-            boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.05)'
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
           }}
-        ></div>
+        >
+          {navigationItems.map((item) => {
+            const isActive = isItemActive(item.href);
+            // 檢查特殊角色顏色
+            const isTeacherButton = item.id.includes('teacher-link') || item.id.includes('teacher-zone');
+            const isLegacyAdminButton = item.id.includes('legacy-admin') || item.id.includes('admin');
+
+            let activeBgColor = "bg-[#FFD59A]";
+            let activeTextColor = "text-[#4B4036]";
+            let activeIconColor = "text-[#4B4036]";
+
+            if (isTeacherButton) {
+              activeBgColor = "bg-gradient-to-r from-orange-400 to-amber-400";
+              activeTextColor = "text-white";
+              activeIconColor = "text-white";
+            } else if (isLegacyAdminButton) {
+              activeBgColor = "bg-gradient-to-r from-purple-500 to-indigo-500";
+              activeTextColor = "text-white";
+              activeIconColor = "text-white";
+            }
+
+            return (
+              <motion.button
+                key={item.id}
+                layout
+                onClick={() => handleNavigation(item.href)}
+                className={`
+                    relative flex items-center justify-center rounded-full h-10 px-4 transition-colors duration-300
+                    ${isActive ? `${activeBgColor} shadow-inner` : 'bg-transparent hover:bg-[#EADBC8]/20'}
+                `}
+                whileTap={{ scale: 0.95 }}
+                // 添加 layoutId 確保平滑過渡
+                transition={{
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 30
+                }}
+              >
+                <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
+                  <item.icon
+                    className={`w-5 h-5 flex-shrink-0 transition-colors duration-300 ${isActive ? activeIconColor : 'text-[#8B7E74]'}`}
+                    strokeWidth={isActive ? 2.5 : 2}
+                  />
+
+                  {isActive && (
+                    <motion.span
+                      layout="position"
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: "auto" }}
+                      exit={{ opacity: 0, width: 0 }}
+                      transition={{ duration: 0.2, delay: 0.1 }}
+                      className={`text-xs font-bold ${activeTextColor}`}
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
       </motion.div>
     </AnimatePresence>
   );
