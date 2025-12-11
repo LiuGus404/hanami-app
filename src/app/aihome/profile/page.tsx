@@ -25,15 +25,18 @@ import {
   CpuChipIcon,
   AcademicCapIcon,
   PaintBrushIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  RocketLaunchIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import Image from 'next/image';
 import UnifiedRightContent from '@/components/UnifiedRightContent';
+import FoodBalanceButton from '@/components/aihome/FoodBalanceButton';
 import UsageStatsDisplay from '@/components/ai-companion/UsageStatsDisplay';
 import { useFoodDisplay } from '@/hooks/useFoodDisplay';
 import { getUserOrganizations, type UserOrganizationIdentity } from '@/lib/organizationUtils';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSaasSupabaseClient } from '@/lib/supabase';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -46,19 +49,9 @@ export default function ProfilePage() {
   const [organizations, setOrganizations] = useState<UserOrganizationIdentity[]>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(true);
 
-  // Custom hook for food stats - Now including history
-  const {
-    foodBalance,
-    fetchFoodInfo,
-    foodHistory,
-    showFoodHistory,
-    toggleFoodHistory
-  } = useFoodDisplay(user?.id);
+  // Restore hook for Dashboard usage
+  const { foodBalance } = useFoodDisplay(user?.id);
 
-  // Auto refresh food info
-  useEffect(() => {
-    if (user?.id) fetchFoodInfo();
-  }, [user?.id, fetchFoodInfo]);
 
   // Load children count - same logic as ChildrenManagement
   const loadChildrenCount = useCallback(async () => {
@@ -243,101 +236,8 @@ export default function ProfilePage() {
 
               <div className="flex items-center space-x-4">
                 {/* Food Display */}
-                <div className="relative mx-2">
-                  <motion.button
-                    onClick={toggleFoodHistory}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
-                  >
-                    <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
-                    <span className="text-sm font-bold text-[#4B4036]">{foodBalance}</span>
-                  </motion.button>
-
-                  <AnimatePresence>
-                    {showFoodHistory && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="absolute top-12 right-0 w-80 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden"
-                      >
-                        <div className="text-xs font-bold text-[#8C7A6B] mb-2 px-1">最近 5 次食量記錄</div>
-                        <div className="space-y-2 max-h-80 overflow-y-auto no-scrollbar">
-                          {foodHistory.length === 0 ? (
-                            <div className="text-center text-xs text-gray-400 py-2">尚無記錄</div>
-                          ) : (
-                            foodHistory.map((record: any) => {
-                              let characterName = '未知';
-                              let Icon = UserCircleIcon;
-                              let iconColor = 'text-gray-400';
-                              let bgColor = 'bg-gray-100';
-
-                              const roleId = record.ai_messages?.role_instances?.role_id || record.ai_messages?.role_id;
-
-                              if (roleId) {
-                                if (roleId.includes('hibi')) {
-                                  characterName = '希希';
-                                  Icon = CpuChipIcon;
-                                  iconColor = 'text-orange-500';
-                                  bgColor = 'bg-orange-50';
-                                } else if (roleId.includes('mori')) {
-                                  characterName = '墨墨';
-                                  Icon = AcademicCapIcon;
-                                  iconColor = 'text-amber-600';
-                                  bgColor = 'bg-amber-50';
-                                } else if (roleId.includes('pico')) {
-                                  characterName = '皮可';
-                                  Icon = PaintBrushIcon;
-                                  iconColor = 'text-blue-500';
-                                  bgColor = 'bg-blue-50';
-                                }
-                              } else if (record.description) {
-                                const desc = record.description.toLowerCase();
-                                if (desc.includes('hibi') || desc.includes('希希')) {
-                                  characterName = '希希';
-                                  Icon = CpuChipIcon;
-                                  iconColor = 'text-orange-500';
-                                  bgColor = 'bg-orange-50';
-                                } else if (desc.includes('mori') || desc.includes('墨墨')) {
-                                  characterName = '墨墨';
-                                  Icon = AcademicCapIcon;
-                                  iconColor = 'text-amber-600';
-                                  bgColor = 'bg-amber-50';
-                                } else if (desc.includes('pico') || desc.includes('皮可')) {
-                                  characterName = '皮可';
-                                  Icon = PaintBrushIcon;
-                                  iconColor = 'text-blue-500';
-                                  bgColor = 'bg-blue-50';
-                                }
-                              }
-
-                              return (
-                                <div key={record.id} className="flex justify-between items-center text-xs p-2 bg-[#F8F5EC] rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-full ${bgColor} flex items-center justify-center`}>
-                                      <Icon className={`w-4 h-4 ${iconColor}`} />
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="font-bold text-[#4B4036] flex items-center gap-1.5">
-                                        {characterName} Use
-                                      </span>
-                                      <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1 font-bold text-[#4B4036]">
-                                    <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
-                                    <span>{record.amount > 0 ? '+' : ''}{record.amount}</span>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                {/* Food Display */}
+                <FoodBalanceButton />
 
                 {/* Unified Right Content */}
                 <UnifiedRightContent
@@ -411,7 +311,7 @@ export default function ProfilePage() {
 
                 <div className="flex justify-between items-center px-1">
                   <div className="flex flex-col items-center">
-                    <div className="text-2xl xl:text-3xl font-bold text-[#4B4036] drop-shadow-sm">{foodBalance}</div>
+                    <div className="text-2xl xl:text-3xl font-bold text-[#4B4036] drop-shadow-sm"><FoodBalanceButton /></div>
                     <div className="text-[9px] font-bold text-[#8B7E74]/70 mt-1 uppercase">食物</div>
                   </div>
 
@@ -524,6 +424,75 @@ export default function ProfilePage() {
                           )}
                         </div>
 
+                        {/* Current Plan Status Card - Soft Neumorphism Redesign */}
+                        <div className={`rounded-[2.5rem] p-8 relative overflow-hidden transition-all duration-300 ${user?.subscription_plan_id === 'starter' ? 'bg-gradient-to-br from-blue-100 to-blue-50 shadow-[8px_8px_16px_#DAE4EF,-8px_-8px_16px_#FFFFFF]' :
+                          user?.subscription_plan_id === 'plus' ? 'bg-gradient-to-br from-amber-100 to-orange-50 shadow-[8px_8px_16px_#EEDCC0,-8px_-8px_16px_#FFFFFF]' :
+                            user?.subscription_plan_id === 'pro' ? 'bg-gradient-to-br from-purple-100 to-pink-50 shadow-[8px_8px_16px_#E3D5EA,-8px_-8px_16px_#FFFFFF]' :
+                              'bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#E5E5E5]'
+                          }`}>
+
+                          <div className="flex items-center justify-between mb-8">
+                            <div>
+                              <h3 className="font-bold text-lg text-[#5D5449] tracking-wide">當前計劃</h3>
+                              <div className="text-xs text-[#8B7E74] font-medium mt-1 pl-0.5">
+                                {user?.subscription_plan_id ? '您的訂閱詳情' : '解鎖更多 AI 能力'}
+                              </div>
+                            </div>
+
+                            {/* Neumorphic/Glassy Badge */}
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xs uppercase border ${user?.subscription_plan_id
+                              ? 'bg-white/30 border-white/40 text-[#4B4036] backdrop-blur-sm shadow-sm'
+                              : 'bg-[#F7F7F7] border border-[#E5E5E5] text-[#4B4036]'
+                              }`}>
+                              {user?.subscription_plan_id ? user.subscription_plan_id.substring(0, 3) : 'FREE'}
+                            </div>
+                          </div>
+
+                          {/* Sunken "Screen" Area */}
+                          <div className={`rounded-2xl p-6 mb-8 border-b border-white/40 ${user?.subscription_plan_id
+                            ? 'bg-white/20 backdrop-blur-sm shadow-inner border-white/30'
+                            : 'bg-[#FAFAFA] border border-[#F0F0F0]'
+                            }`}>
+                            <div className="flex flex-col items-center text-center">
+                              {/* Plan Title */}
+                              <h4 className="text-2xl font-black text-[#4B4036] tracking-tight mb-2">
+                                {user?.subscription_plan_id === 'starter' ? 'Starter 輕量版' :
+                                  user?.subscription_plan_id === 'plus' ? 'Plus 進階版' :
+                                    user?.subscription_plan_id === 'pro' ? 'Pro 專業版' : 'Free 免費版'}
+                              </h4>
+
+                              {/* Divider Line */}
+                              <div className="w-12 h-1 bg-[#D9CfC1]/50 rounded-full my-3"></div>
+
+                              {/* Plan Description */}
+                              <p className="text-sm font-medium text-[#8B7E74]">
+                                {user?.subscription_plan_id ? '∞ L1 模型無限任用' : 'L1 模型每次消耗 3 點食量'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Neumorphic Actions */}
+                          {!user?.subscription_plan_id ? (
+                            <button
+                              onClick={() => router.push('/aihome/pricing')}
+                              className="w-full py-4 rounded-2xl bg-white border border-[#E5E5E5] shadow-sm hover:shadow-md text-[#4B4036] font-bold text-sm transition-all flex items-center justify-center gap-2 group"
+                            >
+                              <RocketLaunchIcon className="w-4 h-4 text-[#D48347] group-hover:scale-110 transition-transform" />
+                              升級模型計劃
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => router.push('/aihome/pricing')}
+                              className={`w-full py-4 rounded-2xl text-[#4B4036] font-bold text-sm transition-all border ${user?.subscription_plan_id
+                                ? 'bg-white/30 hover:bg-white/50 backdrop-blur-md shadow-sm border-white/40'
+                                : 'bg-white border-[#E5E5E5] shadow-sm hover:shadow-md'
+                                }`}
+                            >
+                              管理計劃
+                            </button>
+                          )}
+                        </div>
+
                         {/* AI Food Usage Statistics */}
                         <div className="rounded-[2.5rem] p-8 bg-[#FFF9F2] shadow-[8px_8px_16px_#E6D9C5,-8px_-8px_16px_#FFFFFF] min-h-[400px]">
                           <div className="flex items-center justify-between mb-8">
@@ -548,6 +517,13 @@ export default function ProfilePage() {
                             </div>
 
                             <UsageStatsDisplay userId={user.id} className="!p-0 !bg-transparent !shadow-none !border-none" />
+
+                            <NeuButton
+                              onClick={() => router.push('/aihome/pricing')}
+                              className="w-full py-3 mt-4 text-sm font-bold text-[#D48347] border border-[#FFD59A]/50"
+                            >
+                              購買食量 / 升級方案
+                            </NeuButton>
                           </div>
                         </div>
                       </div>
@@ -588,17 +564,17 @@ export default function ProfilePage() {
                   </motion.div>
                 </AnimatePresence>
               </div>
-            </div>
+            </div >
 
-          </div>
-        </div>
-      </div>
+          </div >
+        </div >
+      </div >
 
       <GrowthWitnessPopup
         isOpen={showWitnessPopup}
         onClose={() => setShowWitnessPopup(false)}
       />
-    </div>
+    </div >
   );
 }
 

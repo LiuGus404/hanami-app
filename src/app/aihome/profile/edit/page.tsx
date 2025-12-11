@@ -31,7 +31,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import AppSidebar from '@/components/AppSidebar';
-import { useFoodDisplay } from '@/hooks/useFoodDisplay';
+import FoodBalanceButton from '@/components/aihome/FoodBalanceButton';
 
 // Country Codes Data
 const COUNTRY_CODES = [
@@ -57,8 +57,7 @@ export default function ProfileEditPage() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { logout } = useSaasAuth();
 
-    // Food Display Hook
-    const { foodBalance, foodHistory, showFoodHistory, toggleFoodHistory, fetchFoodInfo } = useFoodDisplay(user?.id);
+
 
     // Form States
     const [formData, setFormData] = useState({
@@ -77,7 +76,6 @@ export default function ProfileEditPage() {
     // Load User Data
     useEffect(() => {
         if (user) {
-            if (user.id) fetchFoodInfo(); // Ensure food info is loaded
 
             // Parse Phone Number if it contains code
             let code = '852';
@@ -100,7 +98,7 @@ export default function ProfileEditPage() {
             }));
             setAvatarPreview(user.avatar_url || null);
         }
-    }, [user, fetchFoodInfo]);
+    }, [user]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -250,86 +248,8 @@ export default function ProfileEditPage() {
 
                         <div className="flex items-center space-x-4">
                             {/* Food Display */}
-                            <div className="relative mx-2">
-                                <motion.button onClick={toggleFoodHistory} className="flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer">
-                                    <img src="/apple-icon.svg" alt="Food" className="w-4 h-4" />
-                                    <span className="text-sm font-bold text-[#4B4036]">{foodBalance}</span>
-                                </motion.button>
-                                <AnimatePresence>
-                                    {showFoodHistory && (
-                                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="absolute top-12 right-0 w-80 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden">
-                                            <div className="text-xs font-bold text-[#8C7A6B] mb-2 px-1">近期紀錄</div>
-                                            <div className="space-y-2 max-h-80 overflow-y-auto no-scrollbar">
-                                                {foodHistory.length === 0 ? <div className="text-center text-xs text-gray-400 py-2">無紀錄</div> : foodHistory.map((record: any) => {
-                                                    let characterName = '未知';
-                                                    let Icon = UserCircleIcon;
-                                                    let iconColor = 'text-gray-400';
-                                                    let bgColor = 'bg-gray-100';
-
-                                                    const roleId = record.ai_messages?.role_instances?.role_id || record.ai_messages?.role_id;
-
-                                                    if (roleId) {
-                                                        if (roleId.includes('hibi')) {
-                                                            characterName = '希希';
-                                                            Icon = CpuChipIcon;
-                                                            iconColor = 'text-orange-500';
-                                                            bgColor = 'bg-orange-50';
-                                                        } else if (roleId.includes('mori')) {
-                                                            characterName = '墨墨';
-                                                            Icon = AcademicCapIcon;
-                                                            iconColor = 'text-amber-600';
-                                                            bgColor = 'bg-amber-50';
-                                                        } else if (roleId.includes('pico')) {
-                                                            characterName = '皮可';
-                                                            Icon = PaintBrushIcon;
-                                                            iconColor = 'text-blue-500';
-                                                            bgColor = 'bg-blue-50';
-                                                        }
-                                                    } else if (record.description) {
-                                                        const desc = record.description.toLowerCase();
-                                                        if (desc.includes('hibi') || desc.includes('希希')) {
-                                                            characterName = '希希';
-                                                            Icon = CpuChipIcon;
-                                                            iconColor = 'text-orange-500';
-                                                            bgColor = 'bg-orange-50';
-                                                        } else if (desc.includes('mori') || desc.includes('墨墨')) {
-                                                            characterName = '墨墨';
-                                                            Icon = AcademicCapIcon;
-                                                            iconColor = 'text-amber-600';
-                                                            bgColor = 'bg-amber-50';
-                                                        } else if (desc.includes('pico') || desc.includes('皮可')) {
-                                                            characterName = '皮可';
-                                                            Icon = PaintBrushIcon;
-                                                            iconColor = 'text-blue-500';
-                                                            bgColor = 'bg-blue-50';
-                                                        }
-                                                    }
-
-                                                    return (
-                                                        <div key={record.id} className="flex justify-between items-center text-xs p-2 bg-[#F8F5EC] rounded-lg">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`w-8 h-8 rounded-full ${bgColor} flex items-center justify-center`}>
-                                                                    <Icon className={`w-4 h-4 ${iconColor}`} />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-bold text-[#4B4036] flex items-center gap-1.5">
-                                                                        {characterName} Use
-                                                                    </span>
-                                                                    <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-1 font-bold text-[#4B4036]">
-                                                                <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
-                                                                <span>{record.amount > 0 ? '+' : ''}{record.amount}</span>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
+                            {/* Food Display */}
+                            <FoodBalanceButton />
                             <UnifiedRightContent user={user} onLogout={logout} onNavigate={() => { }} />
                         </div>
                     </div>

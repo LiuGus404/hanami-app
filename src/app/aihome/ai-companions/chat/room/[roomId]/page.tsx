@@ -55,7 +55,7 @@ import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { createSaasClient } from '@/lib/supabase-saas';
 import Image from 'next/image';
 import { MessageStatusIndicator } from '@/components/ai-companion/MessageStatusIndicator';
-import { FoodBalanceDisplay } from '@/components/ai-companion/FoodBalanceDisplay';
+import FoodBalanceButton from '@/components/aihome/FoodBalanceButton';
 import { SecureImageDisplay } from '@/components/ai-companion/SecureImageDisplay';
 import { VoiceMessagePlayer } from '@/components/chat/VoiceMessagePlayer';
 import UnifiedRightContent from '@/components/UnifiedRightContent';
@@ -622,56 +622,6 @@ export default function RoomChatPage() {
     };
   }, []);
 
-  // 食量顯示與歷史記錄邏輯
-  const [foodBalance, setFoodBalance] = useState<number>(0);
-  const [foodHistory, setFoodHistory] = useState<any[]>([]);
-  const [showFoodHistory, setShowFoodHistory] = useState(false);
-
-  const fetchFoodInfo = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const supabase = createSaasClient();
-
-      // 1. 獲取餘額 (從 user_food_balance 表)
-      const { data: balanceData, error: balanceError } = await supabase
-        .from('user_food_balance')
-        .select('current_balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!balanceError && balanceData) {
-        setFoodBalance((balanceData as any).current_balance || 0);
-      }
-
-      // 2. 獲取最近 5 筆交易記錄
-      const { data: historyData, error: historyError } = await supabase
-        .from('food_transactions')
-        .select(`
-          *,
-          ai_messages (
-            sender_role_instance_id,
-            role_instances (
-              role_id
-            )
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (!historyError && historyData) {
-        setFoodHistory(historyData);
-      }
-    } catch (error) {
-      console.error('❌ 獲取食量資訊失敗:', error);
-    }
-  }, [user?.id]);
-
-  // 初始加載和定時更新（可選）
-  useEffect(() => {
-    fetchFoodInfo();
-  }, [fetchFoodInfo]);
-
 
   // 監聽模型選擇開啟事件（從 ChatSettingsPanel 觸發）
   useEffect(() => {
@@ -908,7 +858,7 @@ export default function RoomChatPage() {
             if (newMap[roleKey]) {
               newMap[roleKey] = {
                 ...newMap[roleKey],
-        settings: {
+                settings: {
                   ...newMap[roleKey].settings,
                   equipped_blocks: {
                     ...(newMap[roleKey].settings?.equipped_blocks || {}),
@@ -920,7 +870,7 @@ export default function RoomChatPage() {
             return newMap;
           });
 
-      setLoadoutModalState(prev => ({ ...prev, isOpen: false }));
+          setLoadoutModalState(prev => ({ ...prev, isOpen: false }));
 
           const { default: toast } = await import('react-hot-toast');
           toast.success('已更新此房間的思維積木');
@@ -1594,10 +1544,10 @@ export default function RoomChatPage() {
 
       if (updateError) {
         console.error('❌ [Save] 更新房間設定失敗:', updateError);
-          const { default: toast } = await import('react-hot-toast');
+        const { default: toast } = await import('react-hot-toast');
         toast.error('保存設定失敗');
-          return;
-        }
+        return;
+      }
 
       console.log('✅ [Save] 模型設定已更新到房間:', newSettings);
 
@@ -1624,32 +1574,32 @@ export default function RoomChatPage() {
         });
       } else {
         // 設置新模型邏輯
-      if (roleId === 'pico') {
-        setPicoSelectedModel(resolvedModel);
-        const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
-        setPicoModelSearch(modelData?.display_name || resolvedModel);
-      } else if (roleId === 'mori') {
-        if (Array.isArray(modelId)) {
-          setMoriSelectedModelsMulti(modelId);
-          setMoriSelectedModel(DEFAULT_MODEL_SENTINEL);
-        } else {
-          setMoriSelectedModel(resolvedModel);
-          setMoriSelectedModelsMulti([]);
+        if (roleId === 'pico') {
+          setPicoSelectedModel(resolvedModel);
           const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
-          setMoriModelSearch(modelData?.display_name || resolvedModel);
+          setPicoModelSearch(modelData?.display_name || resolvedModel);
+        } else if (roleId === 'mori') {
+          if (Array.isArray(modelId)) {
+            setMoriSelectedModelsMulti(modelId);
+            setMoriSelectedModel(DEFAULT_MODEL_SENTINEL);
+          } else {
+            setMoriSelectedModel(resolvedModel);
+            setMoriSelectedModelsMulti([]);
+            const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
+            setMoriModelSearch(modelData?.display_name || resolvedModel);
+          }
+        } else {
+          setHibiSelectedModel(resolvedModel);
+          const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
+          setHibiModelSearch(modelData?.display_name || resolvedModel);
         }
-      } else {
-        setHibiSelectedModel(resolvedModel);
-        const modelData = availableModels.find((m: any) => m.model_id === resolvedModel);
-        setHibiModelSearch(modelData?.display_name || resolvedModel);
-      }
 
-      const { default: toast } = await import('react-hot-toast');
+        const { default: toast } = await import('react-hot-toast');
         toast.success('已更新此房間的模型設定', {
           icon: <CpuChipIcon className="w-5 h-5 text-blue-600" />,
-        duration: 2000,
+          duration: 2000,
           style: { background: '#fff', color: '#4B4036' }
-      });
+        });
       }
     } catch (error) {
       console.error(`保存${roleId}模型設定異常:`, error);
@@ -3073,13 +3023,13 @@ export default function RoomChatPage() {
         attempt++;
         const supabase = createSaasClient();
 
-      // 檢查用戶是否已經是房間成員
+        // 檢查用戶是否已經是房間成員
         // 優化：使用 head: true 只獲取數量，不獲取資料，減少傳輸
         // 增加超時時間到 15s 以應對網絡波動
         const checkPromise = supabase
-        .from('room_members')
+          .from('room_members')
           .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId)
+          .eq('room_id', roomId)
           .eq('user_id', userId);
 
         const timeoutPromise = new Promise((_, reject) =>
@@ -3090,7 +3040,7 @@ export default function RoomChatPage() {
         const result: any = await Promise.race([checkPromise, timeoutPromise]);
         const { count, error: checkError } = result;
 
-      if (checkError) {
+        if (checkError) {
           console.warn(`⚠️ [Membership] 第 ${attempt} 次檢查失敗:`, checkError);
           if (attempt === maxRetries) throw checkError;
           await new Promise(r => setTimeout(r, 1000)); // 等待 1s
@@ -3101,36 +3051,36 @@ export default function RoomChatPage() {
         if (count === 0) {
           console.log('👤 [Membership] 用戶不是房間成員，正在添加...');
           const { error: insertError } = await (supabase
-          .from('room_members') as any)
-          .insert({
-            room_id: roomId,
-            user_id: userId,
-            role: 'member',
-            user_type: 'hanami_user'
-          });
+            .from('room_members') as any)
+            .insert({
+              room_id: roomId,
+              user_id: userId,
+              role: 'member',
+              user_type: 'hanami_user'
+            });
 
-        if (insertError) {
-          if (insertError.code === '23505') {
+          if (insertError) {
+            if (insertError.code === '23505') {
               console.log('✅ [Membership] 用戶已是房間成員（重複鍵錯誤）');
-          } else {
+            } else {
               console.error('❌ [Membership] 添加房間成員失敗:', insertError);
               // 添加失敗也當作本輪失敗，重試
               if (attempt === maxRetries) throw insertError;
               await new Promise(r => setTimeout(r, 1000));
               continue;
+            }
+          } else {
+            console.log('✅ [Membership] 用戶已添加為房間成員');
           }
         } else {
-            console.log('✅ [Membership] 用戶已添加為房間成員');
-        }
-      } else {
           console.log('✅ [Membership] 用戶已是房間成員');
-      }
+        }
 
         // 成功，標記並退出
         membershipCheckedRef.current = roomId;
         return;
 
-    } catch (error) {
+      } catch (error) {
         console.warn(`⚠️ [Membership] 第 ${attempt} 次嘗試發生錯誤:`, error);
         if (attempt === maxRetries) {
           console.error('❌ 確保房間成員身份多次嘗試後失敗');
@@ -3223,10 +3173,10 @@ export default function RoomChatPage() {
 
       // 使用 requestAnimationFrame 確保在渲染後滾動
       requestAnimationFrame(() => {
-      setTimeout(() => {
-        scrollToBottom();
+        setTimeout(() => {
+          scrollToBottom();
           console.log('📜 [Scroll] 嘗試滾動到底部');
-      }, 200);
+        }, 200);
       });
     } catch (error) {
       console.error('❌ 載入訊息錯誤:', error);
@@ -4527,10 +4477,10 @@ export default function RoomChatPage() {
     try {
       console.log('🚀 呼叫 chat-processor Edge Function...');
       const payload = {
-          message: userMessage,
-          roomId: roomId,
-          companionId: roleHint,
-          userId: user?.id, // Pass userId for service role calls
+        message: userMessage,
+        roomId: roomId,
+        companionId: roleHint,
+        userId: user?.id, // Pass userId for service role calls
         messageId: userMessageId, // Pass messageId for updates
         modelId: roleHint === 'mori'
           ? moriSelectedModelsMulti.join(',')
@@ -5612,7 +5562,7 @@ export default function RoomChatPage() {
                   height={40}
                   className="w-full h-full object-contain"
                 />
-            </div>
+              </div>
 
               {/* 活躍角色頭像堆疊 - 點擊打開團隊選單 */}
               <motion.div
@@ -5652,7 +5602,7 @@ export default function RoomChatPage() {
                   );
                 })}
               </motion.div>
-              </div>
+            </div>
 
 
 
@@ -5674,74 +5624,11 @@ export default function RoomChatPage() {
                 />
               </motion.button>
 
-              {/* 食量顯示與歷史記錄 (Popver) */}
-              <div className="relative">
-                <motion.button
-                  onClick={() => {
-                    setShowFoodHistory(!showFoodHistory);
-                    if (!showFoodHistory) fetchFoodInfo(); // 點擊時刷新
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
-                >
-                  <Image
-                    src="/apple-icon.svg"
-                    alt="Food"
-                    width={20}
-                    height={20}
-                    className="w-5 h-5 object-contain"
-                  />
-                  <span className="text-sm font-bold text-[#4B4036]">{foodBalance}</span>
-                </motion.button>
-
-                <AnimatePresence>
-                  {showFoodHistory && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                      className="absolute top-12 right-0 w-64 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden"
-                    >
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#8C7A6B] mb-2 px-1">
-                        <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
-                        <span>最近 5 次食量記錄</span>
-                      </div>
-                      <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                        {foodHistory.length === 0 ? (
-                          <div className="text-center text-xs text-gray-400 py-2">尚無記錄</div>
-                        ) : (
-                          foodHistory.map((record) => {
-                            // 解析角色名稱
-                            let characterName = '消耗';
-                            const roleId = record.ai_messages?.role_instances?.role_id;
-                            if (roleId) {
-                              const companion = companions.find(c => c.id === roleId);
-                              if (companion) characterName = companion.name;
-                            }
-
-                            return (
-                              <div key={record.id} className="flex justify-between items-center text-xs p-2 bg-[#F8F5EC] rounded-lg">
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-[#4B4036] flex items-center gap-1.5">
-                                    <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
-                                    <span>{record.amount > 0 ? '+' : ''}{record.amount} {characterName}</span>
-                        </span>
-                                  <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              <FoodBalanceButton />
               {/* 統一的下拉菜單 (桌面 + 移動端) */}
               <div className="flex items-center space-x-2 relative">
                 <UnifiedRightContent user={user} onLogout={handleLogout} />
-            </div>
+              </div>
             </div>
           </div>
         </div>
@@ -5751,10 +5638,10 @@ export default function RoomChatPage() {
       < div className="flex h-[calc(100vh-64px)] overflow-hidden" >
 
         <AppSidebar
-        isOpen={sidebarOpen}
+          isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-        currentPath="/aihome/ai-companions"
-      />
+          currentPath="/aihome/ai-companions"
+        />
 
         {/* 聊天區域 */}
         <div className="flex-1 flex flex-col relative w-full">
@@ -5764,12 +5651,12 @@ export default function RoomChatPage() {
             className="flex-1 overflow-y-auto p-4 space-y-4 pb-64 lg:pb-40 no-scrollbar"
             onScroll={handleMessagesScroll}
           >
-                  {messages.map((message, index) => (
-                      <MessageBubble
+            {messages.map((message, index) => (
+              <MessageBubble
                 key={message.id || index}
-                        message={message}
-                        companion={getCompanionInfo(message.sender as any)}
-                        onDelete={handleDeleteMessage}
+                message={message}
+                companion={getCompanionInfo(message.sender as any)}
+                onDelete={handleDeleteMessage}
               />
             ))}
 
@@ -5784,17 +5671,17 @@ export default function RoomChatPage() {
                   <div className="flex flex-row items-end space-x-3 max-w-[95%] sm:max-w-[90%] md:max-w-[82%] xl:max-w-[70%]">
                     <div className="flex-shrink-0">
                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${info.color} p-0.5`}>
-                      <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                            <Image
+                        <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                          <Image
                             src={info.imagePath}
                             alt={info.name}
                             width={28}
                             height={28}
                             className="w-7 h-7 object-cover opacity-80"
                           />
+                        </div>
                       </div>
-                      </div>
-                          </div>
+                    </div>
                     <div className="ml-3">
                       <div className="px-5 py-3 rounded-2xl shadow-sm bg-white/80 backdrop-blur-sm border border-[#EADBC8] text-[#4B4036] rounded-bl-md flex items-center space-x-3">
                         {/* Custom Animated SVG Cloud - Dynamic & Hanami Style */}
@@ -5843,41 +5730,41 @@ export default function RoomChatPage() {
                           </motion.svg>
 
                           {/* Mini particles */}
-                        <motion.div
+                          <motion.div
                             className="absolute top-0 right-0 w-1.5 h-1.5 bg-[#FFD59A] rounded-full"
                             animate={{ y: [-10, -20], opacity: [0, 1, 0] }}
                             transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 }}
-                        />
-                        <motion.div
+                          />
+                          <motion.div
                             className="absolute bottom-1 -left-1 w-1 h-1 bg-[#FFB6C1] rounded-full"
                             animate={{ scale: [0, 1.5, 0] }}
                             transition={{ duration: 2, repeat: Infinity, delay: 1.2 }}
-                        />
-                      </div>
+                          />
+                        </div>
 
                         {/* Thinking Text with Character Name */}
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-[#FF9BB3] mb-0.5">{info.name}</span>
                           <span className="text-xs text-[#2B3A3B]/70 tracking-wider">正在思考中...</span>
-                      </div>
+                        </div>
 
                         {/* Subtle Loading Dots */}
                         <div className="flex space-x-1 items-center mt-1">
                           <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0 }} className="w-1 h-1 bg-[#FFB6C1] rounded-full" />
                           <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }} className="w-1 h-1 bg-[#FFB6C1] rounded-full" />
                           <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }} className="w-1 h-1 bg-[#FFB6C1] rounded-full" />
-                      </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               );
-                          })()}
+            })()}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Unified Input Portal (Replaces Desktop Input) */}
-                          {(() => {
+          {(() => {
             const companion = companions.find(c => c.id === (selectedCompanion || activeRoles[0]));
             if (!companion) return null;
 
@@ -5894,7 +5781,7 @@ export default function RoomChatPage() {
                       {/* 1. Chips Row */}
                       <div className="w-full px-2 pb-2 flex items-center gap-2 overflow-x-auto no-scrollbar pointer-events-auto">
                         {/* Role Indicator */}
-                  <button
+                        <button
                           onClick={() => setRoleSelectorOpen(true)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white/50 backdrop-blur-sm transition-all hover:bg-white/80 active:scale-95 flex-shrink-0 ${roleId === 'hibi' ? 'border-purple-200 text-purple-700' :
                             roleId === 'mori' ? 'border-amber-200 text-amber-700' :
@@ -5907,7 +5794,7 @@ export default function RoomChatPage() {
                             ) : (
                               <companion.icon className="w-full h-full" />
                             )}
-          </div>
+                          </div>
                           <span className="text-xs font-bold">{companion.name}</span>
                           <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -5931,7 +5818,7 @@ export default function RoomChatPage() {
                             ) : (
                               modelName
                             )}
-                </span>
+                          </span>
                         </button>
 
                         {/* Mind Blocks Chip */}
@@ -5951,7 +5838,7 @@ export default function RoomChatPage() {
                             {mindTitle !== '未裝備' ? mindTitle : '思維積木'}
                           </span>
                         </button>
-                    </div>
+                      </div>
 
                       {/* Input Area */}
                       <div className="w-full relative flex items-end gap-2 bg-white/80 backdrop-blur-md border border-[#EADBC8] p-1.5 rounded-[24px] shadow-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-[#FFB6C1]/50 focus-within:border-[#FFB6C1] focus-within:shadow-md pointer-events-auto">
@@ -5959,7 +5846,7 @@ export default function RoomChatPage() {
 
                         <AnimatePresence mode="wait">
                           {isRecording ? (
-                      <motion.div
+                            <motion.div
                               key="recording-ui"
                               initial={{ opacity: 0, scale: 0.95 }}
                               animate={{ opacity: 1, scale: 1 }}
@@ -5985,12 +5872,12 @@ export default function RoomChatPage() {
                                       transition={{ duration: 0.4 + Math.random() * 0.2, repeat: Infinity, ease: "easeInOut" }}
                                       className="w-1 bg-gradient-to-t from-[#FFD59A] to-[#FFB6C1] rounded-full"
                                     />
-                ))}
-              </div>
+                                  ))}
+                                </div>
                                 <span className="text-sm font-bold text-[#FFB6C1] font-mono min-w-[3rem]">
                                   {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
-                      </span>
-                  </div>
+                                </span>
+                              </div>
 
                               {/* Stop & Send */}
                               <button
@@ -6019,7 +5906,7 @@ export default function RoomChatPage() {
                                 }}
                               >
                                 <PhotoIcon className="w-6 h-6" />
-                            </motion.button>
+                              </motion.button>
                               {/* Mobile Attach Button */}
                               <motion.button
                                 whileTap={{ scale: 0.9 }}
@@ -6082,19 +5969,19 @@ export default function RoomChatPage() {
 
                               {/* Voice Record Button (Shown when empty) */}
                               {!inputMessage.trim() && selectedImages.length === 0 && (
-                              <motion.button
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
+                                <motion.button
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
                                   exit={{ scale: 0 }}
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
                                   onClick={handleStartRecording}
                                   className="p-2.5 text-[#4B4036]/60 hover:text-[#4B4036] hover:bg-[#F8F5EC] rounded-full transition-colors"
                                   title="錄製語音"
                                 >
                                   <MicrophoneIcon className="w-6 h-6" />
-                              </motion.button>
-                            )}
+                                </motion.button>
+                              )}
 
                               {/* Send Button */}
                               <button
@@ -6120,21 +6007,21 @@ export default function RoomChatPage() {
                                 )}
                               </button>
                             </>
-                  )}
-                </AnimatePresence>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
-                            </div>
                   </div>,
                   document.body as HTMLElement
                 )}
 
-                                {typeof document !== 'undefined' && modelState.modelSelectOpen && createPortal(
+                {typeof document !== 'undefined' && modelState.modelSelectOpen && createPortal(
                   <div className="fixed inset-0 z-[100] flex items-center justify-center">
                     {/* Backdrop */}
                     <div
                       className="absolute inset-0 bg-black/20 backdrop-blur-sm z-[10]"
-                                        onClick={() => modelState.setModelSelectOpen(false)}
-                                      />
+                      onClick={() => modelState.setModelSelectOpen(false)}
+                    />
 
                     {/* Modal Container */}
                     <div
@@ -6146,40 +6033,40 @@ export default function RoomChatPage() {
                     >
                       {/* Header */}
                       <div className="flex items-center justify-between px-5 py-4 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFB6C1]/10 to-[#FFD59A]/10">
-                                          <div className="flex items-center gap-3">
-                                            <CpuChipIcon className={`w-6 h-6 ${roleId === 'pico' ? 'text-[#FFB6C1]' : roleId === 'mori' ? 'text-amber-500' : 'text-orange-500'}`} />
+                        <div className="flex items-center gap-3">
+                          <CpuChipIcon className={`w-6 h-6 ${roleId === 'pico' ? 'text-[#FFB6C1]' : roleId === 'mori' ? 'text-amber-500' : 'text-orange-500'}`} />
                           <h3 className="text-lg font-semibold text-[#4B4036]">
                             {roleId === 'mori' ? `選擇 ${companion.name} 的模型組合` : `選擇 ${companion.name} 的大腦`}
                           </h3>
-                                          </div>
+                        </div>
                         <button onClick={() => modelState.setModelSelectOpen(false)} className="p-2 hover:bg-black/5 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
-                                        </div>
+                      </div>
                       {/* Search */}
                       <div className="px-5 py-3 border-b border-[#EADBC8]">
-                                          <input
-                                            type="text"
-                                            value={modelState.modelSearch}
+                        <input
+                          type="text"
+                          value={modelState.modelSearch}
                           onChange={(e) => modelState.setModelSearch(e.target.value)}
-                                            placeholder="搜尋模型..."
+                          placeholder="搜尋模型..."
                           className="w-full p-2.5 bg-[#F8F5EC] border-transparent focus:bg-white border focus:border-[#FFB6C1] rounded-xl focus:ring-0 text-[#4B4036] pointer-events-auto select-text"
                           onClick={() => console.log('Input clicked')}
-                                          />
-                                        </div>
+                        />
+                      </div>
                       {/* Model List */}
                       <div className="overflow-y-auto flex-1 p-2 space-y-1 relative z-30" style={{ pointerEvents: 'auto' }}>
                         {/* System Default Option */}
                         <button
                           onMouseDown={() => {
-                                              if (roleId === 'mori' && modelState.setSelectedModelsMulti) {
+                            if (roleId === 'mori' && modelState.setSelectedModelsMulti) {
                               // Multi-select for Mori: Revert to default
                               // Just mark as default mode, don't close.
                               // DB saves [] to indicate default.
-                                                modelState.setSelectedModelsMulti([]);
+                              modelState.setSelectedModelsMulti([]);
                               modelState.setSelectedModel(DEFAULT_MODEL_SENTINEL);
                               modelState.saveFunction([]);
                             } else {
                               modelState.setSelectedModel(DEFAULT_MODEL_SENTINEL);
-                                              modelState.saveFunction(DEFAULT_MODEL_SENTINEL);
+                              modelState.saveFunction(DEFAULT_MODEL_SENTINEL);
                               modelState.setModelSelectOpen(false); // Single select still closes
                             }
                           }}
@@ -6193,13 +6080,13 @@ export default function RoomChatPage() {
                             {modelState.selectedModel === DEFAULT_MODEL_SENTINEL && (
                               <CheckIcon className="w-5 h-5 text-white" />
                             )}
-                                              </div>
+                          </div>
                         </button>
 
                         {modelState.getFilteredModels?.().filter((m: any) => {
-                                            if (!modelState.modelSearch.trim()) return true;
+                          if (!modelState.modelSearch.trim()) return true;
                           return (m.display_name?.toLowerCase().includes(modelState.modelSearch.toLowerCase()));
-                                          }).map((model: any) => {
+                        }).map((model: any) => {
                           const isMori = roleId === 'mori';
 
                           // Parse defaults for logic
@@ -6222,9 +6109,9 @@ export default function RoomChatPage() {
                           // Check selection limit (4)
                           const isLimitReached = isMori && !isSelected && (modelState.selectedModelsMulti?.length || 0) >= 4;
 
-                                            return (
+                          return (
                             <button
-                                                key={model.model_id}
+                              key={model.model_id}
                               style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                               id={`model-btn-${model.model_id}`}
                               disabled={isLimitReached}
@@ -6232,7 +6119,7 @@ export default function RoomChatPage() {
                                 // console.log('[ModelSelector] MouseDown triggered for:', model.model_id);
 
                                 // Prevent any default behavior that might close the modal
-                                                  e.preventDefault();
+                                e.preventDefault();
                                 e.stopPropagation();
 
                                 const { default: toast } = await import('react-hot-toast');
@@ -6244,7 +6131,7 @@ export default function RoomChatPage() {
                                     if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL) {
                                       currentSelection = [...defaults];
                                       modelState.setSelectedModel('');
-                                                    } else {
+                                    } else {
                                       currentSelection = modelState.selectedModelsMulti || [];
                                     }
 
@@ -6254,9 +6141,9 @@ export default function RoomChatPage() {
 
                                     modelState.setSelectedModelsMulti(newSelection);
                                     // DO NOT close modal here for Mori multi-select
-                                                  } else {
+                                  } else {
                                     // Handle Single Select
-                                                    modelState.setSelectedModel(model.model_id);
+                                    modelState.setSelectedModel(model.model_id);
                                     modelState.setModelSelectOpen(false); // Close for single select
                                     toast.success('已選擇 ' + (model.display_name || model.model_id));
                                     await modelState.saveFunction(model.model_id);
@@ -6267,32 +6154,32 @@ export default function RoomChatPage() {
                                 }
                               }}
                               className={`relative z-[51] w-full text-left px-4 py-3 rounded-xl transition-all ${isSelected
-                                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
+                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
                                 : isLimitReached
                                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                   : 'hover:bg-[#F8F5EC] text-[#4B4036]'
-                                                  }`}
-                                              >
-                                                <div className="flex items-center justify-between">
+                                }`}
+                            >
+                              <div className="flex items-center justify-between">
                                 <div>
                                   <div className="font-bold text-sm">{model.display_name || model.model_id}</div>
                                   <div className={`text-xs ${isSelected ? 'text-white/80' : 'text-[#4B4036]/60'}`}>
                                     {model.provider} {model.price_tier ? `• ${model.price_tier}` : ''}
-                                                    </div>
-                                                  </div>
+                                  </div>
+                                </div>
                                 {isSelected && <CheckIcon className="w-5 h-5 text-white" />}
-                                                    </div>
+                              </div>
                             </button>
-                                            );
-                                          })}
-                                        </div>
+                          );
+                        })}
+                      </div>
                       {/* Footer for Multi-select */}
                       {roleId === 'mori' && (
                         <div className="p-4 border-t border-[#EADBC8] bg-[#F8F5EC] flex items-center justify-between">
                           <div className="text-xs text-[#4B4036] font-medium">
                             已選 {modelState.selectedModelsMulti?.length || 0} / 4 (至少 2 個)
-                              </div>
-                                        <button
+                          </div>
+                          <button
                             onMouseDown={async (e) => {
                               e.preventDefault();
                               const { default: toast } = await import('react-hot-toast');
@@ -6314,16 +6201,16 @@ export default function RoomChatPage() {
                             className="px-4 py-2 bg-[#FFD59A] hover:bg-[#FFC570] text-[#4B4036] font-bold rounded-lg transition-colors shadow-sm"
                           >
                             確認選擇
-                                    </button>
-                                </div>
-                              )}
-                                          </div>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>,
                   document.body
-                          )}
-                        </div>
-              );
-            })()}
+                )}
+              </div>
+            );
+          })()}
 
           {/* Camera Modal Portal */}
           <AnimatePresence>
@@ -6359,52 +6246,52 @@ export default function RoomChatPage() {
 
 
           {/* Modals & Panels */}
-        <AnimatePresence mode="wait">
-          {showSettingsPanel && (
-            <>
-              <motion.div
-                initial={{ x: 300, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: 300, opacity: 0 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          <AnimatePresence mode="wait">
+            {showSettingsPanel && (
+              <>
+                <motion.div
+                  initial={{ x: 300, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: 300, opacity: 0 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
                   className="fixed top-0 right-0 h-full bg-white shadow-2xl z-50 w-80 md:w-96"
-              >
-                <ChatSettingsPanel
+                >
+                  <ChatSettingsPanel
                     roleInstance={selectedCompanion && roleInstancesMap[selectedCompanion] ? roleInstancesMap[selectedCompanion] : Object.values(roleInstancesMap)[0]}
-                  roleInstances={Object.values(roleInstancesMap)}
+                    roleInstances={Object.values(roleInstancesMap)}
                     onUpdateRole={async (updates) => {
                       const instance = selectedCompanion && roleInstancesMap[selectedCompanion] ? roleInstancesMap[selectedCompanion] : Object.values(roleInstancesMap)[0];
-                    if (instance) {
+                      if (instance) {
                         await handleUpdateRoleInstance(instance.id, updates);
-                    }
-                  }}
-                  onUpdateRoleInstance={handleUpdateRoleInstance}
-                  onClose={() => setShowSettingsPanel(false)}
-                  tasks={tasks}
-                  activeRoles={activeRoles}
-                  room={room}
-                  editingProject={editingProject}
-                  editProjectName={editProjectName}
-                  setEditProjectName={setEditProjectName}
-                  editProjectDescription={editProjectDescription}
-                  setEditProjectDescription={setEditProjectDescription}
-                  handleStartEditProject={handleStartEditProject}
-                  handleUpdateProject={handleUpdateProject}
-                  setEditingProject={setEditingProject}
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                      }
+                    }}
+                    onUpdateRoleInstance={handleUpdateRoleInstance}
+                    onClose={() => setShowSettingsPanel(false)}
+                    tasks={tasks}
+                    activeRoles={activeRoles}
+                    room={room}
+                    editingProject={editingProject}
+                    editProjectName={editProjectName}
+                    setEditProjectName={setEditProjectName}
+                    editProjectDescription={editProjectDescription}
+                    setEditProjectDescription={setEditProjectDescription}
+                    handleStartEditProject={handleStartEditProject}
+                    handleUpdateProject={handleUpdateProject}
+                    setEditingProject={setEditingProject}
+                  />
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-                onClick={() => setShowSettingsPanel(false)}
+                  onClick={() => setShowSettingsPanel(false)}
                 />
-            </>
-          )}
-        </AnimatePresence>
+              </>
+            )}
+          </AnimatePresence>
 
-        <AnimatePresence>
+          <AnimatePresence>
             {showInviteModal && (
               <InviteModal
                 isOpen={showInviteModal}
@@ -6414,16 +6301,16 @@ export default function RoomChatPage() {
                 onInvite={handleInviteRole}
                 onRemove={handleRemoveRole}
               />
-                        )}
-                      </AnimatePresence>
+            )}
+          </AnimatePresence>
 
           <BlockSelectionModal
-        isOpen={loadoutModalState.isOpen}
-        onClose={() => setLoadoutModalState(prev => ({ ...prev, isOpen: false }))}
-        onSelect={handleBlockSelect}
-        slotType={loadoutModalState.slotType}
-        roleInstanceId={loadoutModalState.roleInstanceId}
-      />
+            isOpen={loadoutModalState.isOpen}
+            onClose={() => setLoadoutModalState(prev => ({ ...prev, isOpen: false }))}
+            onSelect={handleBlockSelect}
+            slotType={loadoutModalState.slotType}
+            roleInstanceId={loadoutModalState.roleInstanceId}
+          />
 
           <RoleSelectorModal
             isOpen={roleSelectorOpen}
@@ -6957,7 +6844,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                                       onDownload={() => downloadImage(imageUrl)}
                                     />
                                     {textAfter && <p className="mt-2">{textAfter}</p>}
-                          </div>
+                                  </div>
                                 );
                               }
 
@@ -6974,7 +6861,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                                       className="rounded-lg shadow-lg"
                                       onDownload={() => downloadImage(imageUrl)}
                                     />
-                        </div>
+                                  </div>
                                 );
                               }
 
@@ -7032,7 +6919,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                     {(idx === 0) && (
                       <span className="px-2 py-0.5 bg-[#FFD59A]/20 text-[#B08968] text-[10px] rounded-full">
                         主要回答
-                    </span>
+                      </span>
                     )}
                   </div>
 
@@ -7057,7 +6944,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                                 onDownload={() => downloadImage(imageUrl)}
                               />
                               {textAfter && <p className="mt-2">{textAfter}</p>}
-                  </div>
+                            </div>
                           );
                         }
 
@@ -7074,13 +6961,13 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
                                 className="rounded-lg shadow-lg"
                                 onDownload={() => downloadImage(imageUrl)}
                               />
-                    </div>
+                            </div>
                           );
                         }
 
                         return <div key={i} className="min-h-[1.5em]">{line}</div>;
                       })}
-                      </div>
+                    </div>
 
                     {(total > 0 || estimatedFood) && (
                       <div className="flex items-center gap-3 mt-4 pt-3 border-t border-[#EADBC8]/30">
@@ -7321,12 +7208,12 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false }: 
               hasAudioAttachment
                 ? "group relative" // Minimized styling for voice messages (User) to float freely
                 : `group relative ${isMoriDeck ? 'px-0 py-0' : 'px-4 py-3'} rounded-2xl shadow-sm ${isUser
-                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-br-md'
-                : isSystem
-                  ? 'bg-[#F8F5EC] border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
-                  : isMoriDeck
-                    ? 'bg-transparent border border-transparent text-[#2B3A3B]'
-                    : 'bg-white border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
+                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-br-md'
+                  : isSystem
+                    ? 'bg-[#F8F5EC] border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
+                    : isMoriDeck
+                      ? 'bg-transparent border border-transparent text-[#2B3A3B]'
+                      : 'bg-white border border-[#EADBC8] text-[#4B4036] rounded-bl-md'
                 }`
             }
           >

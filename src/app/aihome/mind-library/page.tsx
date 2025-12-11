@@ -35,7 +35,7 @@ import AppSidebar from '@/components/AppSidebar';
 import { MindBlock, MindBlockType } from '@/types/mind-block';
 import { getSaasSupabaseClient } from '@/lib/supabase';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
-import { useFoodDisplay } from '@/hooks/useFoodDisplay';
+import FoodBalanceButton from '@/components/aihome/FoodBalanceButton';
 
 import MindBlockDetailModal from '@/components/mind-block/MindBlockDetailModal';
 
@@ -49,8 +49,8 @@ export default function MindLibraryPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const activeView = 'mind'; // Force active view for styling
 
-    // 食量顯示
-    const { foodBalance, foodHistory, showFoodHistory, toggleFoodHistory } = useFoodDisplay(user?.id);
+    // 食量顯示 component used instead
+
 
     const handleLogout = async () => {
         try {
@@ -252,66 +252,7 @@ export default function MindLibraryPage() {
                         </div>
 
                         <div className="flex items-center space-x-4">
-                            {user?.id && (
-                                <div className="relative mx-2">
-                                    <motion.button
-                                        onClick={toggleFoodHistory}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        className="flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
-                                    >
-                                        <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
-                                        <span className="text-sm font-bold text-[#4B4036]">{foodBalance}</span>
-                                    </motion.button>
-
-                                    <AnimatePresence>
-                                        {showFoodHistory && (
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                                className="absolute top-12 right-0 w-64 bg-white rounded-xl shadow-xl border border-[#EADBC8] p-3 z-50 overflow-hidden"
-                                            >
-                                                <div className="flex items-center gap-1.5 text-xs font-bold text-[#8C7A6B] mb-2 px-1">
-                                                    <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
-                                                    <span>最近 5 次食量記錄</span>
-                                                </div>
-                                                <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                                                    {foodHistory.length === 0 ? (
-                                                        <div className="text-center text-xs text-gray-400 py-2">尚無記錄</div>
-                                                    ) : (
-                                                        foodHistory.map((record) => {
-                                                            let characterName = '';
-                                                            const roleId = record.ai_messages?.role_instances?.role_id || record.ai_messages?.role_id;
-
-                                                            if (roleId) {
-                                                                const roleNameMap: Record<string, string> = {
-                                                                    'hibi': '希希',
-                                                                    'mori': '墨墨',
-                                                                    'pico': '皮可'
-                                                                };
-                                                                characterName = roleNameMap[roleId] || roleId;
-                                                            }
-
-                                                            return (
-                                                                <div key={record.id} className="flex justify-between items-center text-xs p-2 bg-[#F8F5EC] rounded-lg">
-                                                                    <div className="flex flex-col">
-                                                                        <span className="font-medium text-[#4B4036] flex items-center gap-1.5">
-                                                                            <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5" />
-                                                                            <span>{record.amount > 0 ? '+' : ''}{record.amount} {characterName}</span>
-                                                                        </span>
-                                                                        <span className="text-[10px] text-[#8C7A6B]">{new Date(record.created_at).toLocaleString()}</span>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })
-                                                    )}
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            )}
+                            <FoodBalanceButton />
                             <UnifiedRightContent user={user} onLogout={handleLogout} />
                         </div>
                     </div>

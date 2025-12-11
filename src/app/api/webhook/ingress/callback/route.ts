@@ -43,7 +43,7 @@ function verifySignature(payload: string, signature: string, secret: string): bo
       .createHmac('sha256', secret)
       .update(payload)
       .digest('hex');
-    
+
     return crypto.timingSafeEqual(
       Buffer.from(signature, 'hex'),
       Buffer.from(expectedSignature, 'hex')
@@ -117,10 +117,28 @@ async function recordMessageCost(
   costInfo: any
 ): Promise<void> {
   try {
-    // 計算食量成本 (3倍定價)
-    const foodCostUsd = costInfo.total_cost_usd * 3.0;
-    const foodAmount = Math.ceil(foodCostUsd * 100); // 轉換為食量單位
+    // 1. 獲取用戶計劃
+    const { data: user } = await supabase
+      .from('saas_users')
+      .select('subscription_plan_id')
+      .eq('id', userId)
+      .single();
 
+    const isFreePlan = !user?.subscription_plan_id || !['basic', 'pro'].includes(user?.subscription_plan_id);
+
+    // 2. 計算食量成本
+    let foodAmount = 0;
+    const foodCostUsd = costInfo.total_cost_usd * 3.0;
+
+    if (isFreePlan) {
+      // Free user: fixed 3 credits per use
+      foodAmount = 3;
+    } else {
+      // Standard calculation
+      foodAmount = Math.ceil(foodCostUsd * 100);
+    }
+
+    // 3. 記錄詳細成本 (Message Costs)
     const { error } = await supabase
       .from('message_costs')
       .insert({
@@ -141,14 +159,23 @@ async function recordMessageCost(
 
     if (error) {
       console.error('記錄訊息成本錯誤:', error);
-      throw error;
+      // Don't throw here, prioritize deduction
     }
 
-    // 更新用戶食量餘額
-    await updateUserFoodBalance(userId, -foodAmount);
+    // 4. 使用 RPC 扣除食量 (Credit Ledger System)
+    // 這會自動更新餘額並記錄交易
+    const { error: deductionError } = await supabase.rpc('deduct_user_food', {
+      p_user_id: userId,
+      p_amount: foodAmount,
+      p_reason: 'AI 對話消耗', // Description
+      p_ai_message_id: messageId,
+      p_ai_room_id: null // Optional
+    });
 
-    // 記錄食量交易
-    await recordFoodTransaction(userId, 'spend', -foodAmount, messageId, threadId, 'AI 對話消耗');
+    if (deductionError) {
+      console.error('扣除食量失敗:', deductionError);
+      throw deductionError;
+    }
 
     console.log('成功記錄訊息成本:', messageId, '食量消耗:', foodAmount);
   } catch (error) {
@@ -157,78 +184,14 @@ async function recordMessageCost(
   }
 }
 
-// 更新用戶食量餘額
-async function updateUserFoodBalance(userId: string, amount: number): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('user_food_balance')
-      .upsert({
-        user_id: userId,
-        current_balance: amount, // 這裡應該是增量更新，實際應該用 SQL 的增量操作
-        total_spent: Math.abs(amount), // 如果是負數，表示消耗
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id'
-      });
 
-    if (error) {
-      console.error('更新用戶食量餘額錯誤:', error);
-      throw error;
-    }
-  } catch (error) {
-    console.error('更新用戶食量餘額異常:', error);
-    throw error;
-  }
-}
-
-// 記錄食量交易
-async function recordFoodTransaction(
-  userId: string,
-  transactionType: string,
-  amount: number,
-  messageId?: string,
-  threadId?: string,
-  description?: string
-): Promise<void> {
-  try {
-    // 獲取當前餘額
-    const { data: balanceData } = await supabase
-      .from('user_food_balance')
-      .select('current_balance')
-      .eq('user_id', userId)
-      .single();
-
-    const currentBalance = balanceData?.current_balance || 0;
-    const balanceAfter = currentBalance + amount;
-
-    const { error } = await supabase
-      .from('food_transactions')
-      .insert({
-        user_id: userId,
-        transaction_type: transactionType,
-        amount: amount,
-        balance_after: balanceAfter,
-        message_id: messageId,
-        thread_id: threadId,
-        description: description
-      });
-
-    if (error) {
-      console.error('記錄食量交易錯誤:', error);
-      throw error;
-    }
-  } catch (error) {
-    console.error('記錄食量交易異常:', error);
-    throw error;
-  }
-}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // 1. 獲取請求體
     const body = await request.text();
     const signature = request.headers.get('X-Signature') || '';
-    
+
     // 2. 驗證簽名
     if (!verifySignature(body, signature, ingressSecret)) {
       console.error('簽名驗證失敗');
@@ -270,7 +233,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (status === 'processing') {
       // 更新為處理中狀態
       await updateMessageStatus(message_id, 'processing');
-      
+
     } else if (status === 'completed' && result) {
       // 處理完成，創建 AI 回應訊息
       const aiMessageId = await createAIMessage(

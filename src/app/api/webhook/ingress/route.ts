@@ -63,13 +63,13 @@ function verifyJWT(authHeader: string): boolean {
 
     const token = authHeader.substring(7); // 移除 "Bearer " 前綴
     const decoded = jwt.verify(token, n8nJwtSecret);
-    
+
     // 檢查 JWT 是否包含必要的聲明
     if (typeof decoded === 'object' && decoded !== null) {
       const payload = decoded as any;
       return payload.admin === true && payload.name === 'HanamiEcho';
     }
-    
+
     return false;
   } catch (error) {
     console.error('JWT 驗證錯誤:', error);
@@ -84,7 +84,7 @@ function verifySignature(payload: string, signature: string, secret: string): bo
       .createHmac('sha256', secret)
       .update(payload)
       .digest('hex');
-    
+
     return crypto.timingSafeEqual(
       Buffer.from(signature, 'hex'),
       Buffer.from(expectedSignature, 'hex')
@@ -252,7 +252,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<IngressRe
     const body = await request.text();
     const signature = request.headers.get('X-Signature') || '';
     const authHeader = request.headers.get('Authorization') || '';
-    
+
     // 2. 驗證 JWT 認證（優先）
     if (authHeader) {
       if (!verifyJWT(authHeader)) {
@@ -467,7 +467,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<IngressRe
     }
 
     // 7. 檢查用戶食量餘額 (預估成本)
-    const estimatedCost = 10; // 預估食量消耗
+    // 獲取用戶計劃以調整預估成本
+    const { data: user } = await supabase
+      .from('saas_users')
+      .select('subscription_plan_id')
+      .eq('id', userId)
+      .single();
+
+    const isFreePlan = !user?.subscription_plan_id || !['basic', 'pro'].includes(user?.subscription_plan_id);
+    const estimatedCost = isFreePlan ? 3 : 10; // Free plan (L1) needs 3, others estimate 10
+
     const hasEnoughBalance = await checkUserFoodBalance(userId, estimatedCost);
     if (!hasEnoughBalance) {
       return NextResponse.json({
