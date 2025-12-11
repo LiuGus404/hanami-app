@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PlusIcon,
@@ -13,6 +13,7 @@ import {
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import ReactPortalModal from './ReactPortalModal';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 
 interface Child {
   id: string;
@@ -28,16 +29,15 @@ interface Child {
   updated_at: string;
 }
 
-
 interface ChildrenManagementProps {
   onClose?: () => void;
 }
 
 export default function ChildrenManagement({ onClose }: ChildrenManagementProps) {
+  const { user } = useSaasAuth();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-
 
   const [editingChild, setEditingChild] = useState<Child | null>(null);
   const [formData, setFormData] = useState({
@@ -52,74 +52,33 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // 載入孩子列表
-  const loadChildren = async () => {
+  const loadChildren = useCallback(async () => {
+    if (!user?.id) return;
+
     try {
       setLoading(true);
-      console.log('開始載入孩子資料...');
-
-      // 獲取用戶信息 - 使用 email 直接查詢
-      console.log('正在獲取用戶信息...');
-
-      // 從會話存儲中獲取 email
-      const userEmail = 'tqfea12@gmail.com'; // 從日誌中看到的 email
-      console.log('使用 email 查詢用戶:', userEmail);
-
-      const userResponse = await fetch(`/api/children/get-user-by-email?email=${encodeURIComponent(userEmail)}`);
-      const userData = await userResponse.json();
-
-      console.log('用戶查詢結果:', userData);
-
-      if (!userData.success) {
-        console.error('獲取用戶信息失敗:', userData.error);
-        alert('獲取用戶信息失敗，請重新登入');
-        return;
-      }
-
-      const user = userData.user;
-      console.log('用戶 ID:', user.id);
-
-      // 先進行完整的調試測試
-      console.log('正在進行完整調試測試...');
-      const testResponse = await fetch('/api/children/full-debug');
-      const testData = await testResponse.json();
-      console.log('完整調試結果:', testData);
-
-      if (!testData.success) {
-        console.error('調試測試失敗:', testData.error);
-        alert(`調試測試失敗: ${testData.error}`);
-        setChildren([]);
-        return;
-      }
-
-      // 檢查 hanami_children 表是否可以訪問
-      if (!testData.debug.hanami_children.success) {
-        console.error('hanami_children 表無法訪問:', testData.debug.hanami_children.error);
-        alert(`hanami_children 表無法訪問: ${testData.debug.hanami_children.error}`);
-        setChildren([]);
-        return;
-      }
-
       const response = await fetch(`/api/children?userId=${user.id}`);
       const data = await response.json();
 
-      console.log('API 響應:', { status: response.status, data });
-
       if (response.ok) {
         setChildren(data.children || []);
-        console.log('成功載入孩子資料:', data.children?.length || 0, '個');
       } else {
         console.error('載入孩子資料失敗:', data.error);
-        alert(`載入失敗: ${data.error}`);
         setChildren([]);
       }
     } catch (error) {
       console.error('載入孩子資料失敗:', error);
-      alert('載入失敗，請稍後再試');
       setChildren([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadChildren();
+    }
+  }, [loadChildren, user?.id]);
 
   // 驗證表單
   const validateForm = () => {
@@ -149,30 +108,20 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
 
   // 提交表單
   const handleSubmit = async (e?: React.FormEvent) => {
-    console.log('handleSubmit 被調用');
     if (e) {
       e.preventDefault();
     }
 
     if (!validateForm()) {
-      console.log('表單驗證失敗');
       return;
     }
 
-    console.log('開始提交表單，formData:', formData);
+    if (!user?.id) {
+      alert('無法獲取用戶信息，請重新登入');
+      return;
+    }
 
     try {
-      // 獲取用戶信息 - 使用 email 查詢方法
-      const userResponse = await fetch('/api/children/get-user-by-email?email=tqfea12@gmail.com');
-      const userResult = await userResponse.json();
-
-      if (!userResult.success || !userResult.user) {
-        alert('無法獲取用戶信息');
-        return;
-      }
-
-      const user = userResult.user;
-
       const url = editingChild ? `/api/children/${editingChild.id}` : '/api/children';
       const method = editingChild ? 'PUT' : 'POST';
 
@@ -259,32 +208,10 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
 
   // 處理載入綁定學生資料
   const handleLoadBoundStudents = async () => {
+    if (!user?.id) return;
+
     try {
       setLoading(true);
-
-      // 獲取用戶信息 - 使用 email 直接查詢
-      const userEmail = 'tqfea12@gmail.com'; // 從日誌中看到的 email
-      console.log('載入綁定學生 - 使用 email 查詢用戶:', userEmail);
-
-      const userResponse = await fetch(`/api/children/get-user-by-email?email=${encodeURIComponent(userEmail)}`);
-      const userData = await userResponse.json();
-
-      console.log('載入綁定學生 - 用戶查詢結果:', userData);
-
-      if (!userData.success) {
-        console.error('獲取用戶信息失敗:', userData.error);
-        alert('獲取用戶信息失敗，請重新登入');
-        return;
-      }
-
-      const user = userData.user;
-      console.log('載入綁定學生 - 用戶 ID:', user.id);
-
-      // 先進行詳細調試
-      console.log('進行詳細調試...');
-      const debugResponse = await fetch(`/api/children/debug-bound-students?userId=${user.id}`);
-      const debugData = await debugResponse.json();
-      console.log('詳細調試結果:', debugData);
 
       const response = await fetch(`/api/children/load-bound-students-cross-db?userId=${user.id}`);
       const data = await response.json();
@@ -356,11 +283,7 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
     return `${years}歲${months}個月`;
   };
 
-  useEffect(() => {
-    loadChildren();
-  }, []);
-
-  if (loading) {
+  if (loading && !children.length) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFD59A]"></div>
@@ -593,7 +516,6 @@ export default function ChildrenManagement({ onClose }: ChildrenManagementProps)
             </div>
           </div>
 
-          {/* 詳細資料區塊 */}
           {/* 詳細資料區塊 */}
           <div className="bg-[#FFF9F2] rounded-[2rem] p-6 shadow-[8px_8px_16px_#E6D9C5,-8px_-8px_16px_#FFFFFF] mt-6">
             <h3 className="text-lg font-semibold text-[#4B4036] mb-4 flex items-center gap-2">

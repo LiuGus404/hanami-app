@@ -152,35 +152,58 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
 
   // 聯繫天數現在通過 useBatchContactDays Hook 處理
 
+  // 老師選項快取 - key為 'global' 或 orgId
+  const teacherOptionsCacheRef = useRef<Record<string, { label: string, value: string }[]>>({});
+
   useEffect(() => {
-    // 如果已經載入過老師選項，直接使用快取
-    if (teacherOptionsCache) {
-      setTeacherOptions(teacherOptionsCache);
+    const cacheKey = orgId || 'global';
+
+    // 如果已經載入過該機構的老師選項，直接使用快取
+    if (teacherOptionsCacheRef.current[cacheKey]) {
+      setTeacherOptions(teacherOptionsCacheRef.current[cacheKey]);
       return;
     }
 
     // 防止重複載入
     if (teacherOptionsFetchedRef.current || teacherOptionsLoading) return;
-    teacherOptionsFetchedRef.current = true;
-    teacherOptionsLoading = true;
 
     const fetchTeacherOptions = async () => {
+      teacherOptionsFetchedRef.current = true;
+      teacherOptionsLoading = true;
+
       try {
-        const { data } = await supabase.from('hanami_employee').select('teacher_nickname');
-        if (data) {
-          const options = data.map((item: any) => ({
-            label: item.teacher_nickname,
-            value: item.teacher_nickname,
-          }));
-          setTeacherOptions(options);
-          teacherOptionsCache = options; // 快取結果
+        let query = supabase.from('hanami_employee').select('teacher_nickname');
+
+        // 如果有 orgId，只搜尋該機構的老師
+        if (orgId) {
+          query = query.eq('org_id', orgId);
         }
+
+        const { data } = await query;
+
+        if (data) {
+          // 去除重複的老師名稱
+          const uniqueNames = Array.from(new Set(data.map((item: any) => item.teacher_nickname)))
+            .filter(Boolean);
+
+          const options = uniqueNames.map((nickname) => ({
+            label: nickname as string,
+            value: nickname as string,
+          }));
+
+          setTeacherOptions(options);
+          teacherOptionsCacheRef.current[cacheKey] = options; // 快取結果
+        }
+      } catch (error) {
+        console.error('Error fetching teachers:', error);
       } finally {
         teacherOptionsLoading = false;
+        teacherOptionsFetchedRef.current = false; // 重置以便可以再次觸發（如果切換機構）
       }
     };
+
     fetchTeacherOptions();
-  }, []);
+  }, [orgId]);
 
   useEffect(() => {
     setTempGender(formData.gender || '');

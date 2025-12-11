@@ -13,7 +13,11 @@ import { Sparkles } from 'lucide-react';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useFoodDisplay } from '@/hooks/useFoodDisplay';
 
-export default function FoodBalanceButton() {
+interface FoodBalanceButtonProps {
+    readonly?: boolean;
+}
+
+export default function FoodBalanceButton({ readonly = false }: FoodBalanceButtonProps) {
     const router = useRouter();
     const { user } = useSaasAuth();
 
@@ -34,17 +38,17 @@ export default function FoodBalanceButton() {
     return (
         <div className="relative mx-2">
             <motion.button
-                onClick={toggleFoodHistory}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer"
+                onClick={readonly ? undefined : toggleFoodHistory}
+                whileHover={readonly ? {} : { scale: 1.05 }}
+                whileTap={readonly ? {} : { scale: 0.95 }}
+                className={`flex items-center space-x-1 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#FFD59A] rounded-full shadow-sm ${readonly ? 'cursor-default' : 'hover:shadow-md cursor-pointer'} transition-all`}
             >
                 <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
                 <span className="text-sm font-bold text-[#4B4036]">{foodBalance}</span>
             </motion.button>
 
             <AnimatePresence>
-                {showFoodHistory && (
+                {!readonly && showFoodHistory && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -91,7 +95,11 @@ export default function FoodBalanceButton() {
                             >
                                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/5 h-1.5 bg-[#FFD59A] blur-md opacity-40 group-hover:opacity-70 transition-opacity rounded-full" />
                                 <Sparkles className="w-4 h-4 text-[#D48347]" />
-                                <span className="text-xs font-bold text-[#4B4036] tracking-wide">升級方案</span>
+                                <span className="text-xs font-bold text-[#4B4036] tracking-wide">
+                                    {(!user?.subscription_plan_id || user.subscription_plan_id.toLowerCase() === 'free')
+                                        ? '升級至無限使用'
+                                        : '升級計劃'}
+                                </span>
                             </motion.button>
                         </div>
 

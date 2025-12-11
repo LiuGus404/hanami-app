@@ -311,7 +311,7 @@ export default function ProfilePage() {
 
                 <div className="flex justify-between items-center px-1">
                   <div className="flex flex-col items-center">
-                    <div className="text-2xl xl:text-3xl font-bold text-[#4B4036] drop-shadow-sm"><FoodBalanceButton /></div>
+                    <div className="text-2xl xl:text-3xl font-bold text-[#4B4036] drop-shadow-sm"><FoodBalanceButton readonly={true} /></div>
                     <div className="text-[9px] font-bold text-[#8B7E74]/70 mt-1 uppercase">食物</div>
                   </div>
 

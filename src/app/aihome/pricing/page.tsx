@@ -592,11 +592,11 @@ export default function PricingPage() {
               <div className="p-8 rounded-[2rem] bg-white border border-[#EADBC8] shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 font-bold text-slate-600 text-xl">L1</div>
                 <h3 className="text-xl font-bold mb-2">自動模式 (Fast)</h3>
-                <div className="text-sm font-bold text-green-600 mb-4 bg-green-50 inline-block px-3 py-1 rounded-full">付費無限 (免費: 3 食量)</div>
+                <div className="text-sm font-bold text-green-600 mb-4 bg-green-50 inline-block px-3 py-1 rounded-full">付費無限用</div>
                 <p className="text-sm text-[#8B7E74] mb-4">日常小幫手，適合回覆 WhatsApp/Email、翻譯、標題靈感。</p>
                 <div className="text-xs text-[#8B7E74] p-3 bg-[#F8F5EC] rounded-xl flex items-center gap-1">
                   <InformationCircleIcon className="w-4 h-4 flex-shrink-0" />
-                  簡單講：「我平時想問 ChatGPT 的東西」全部交給 L1。(免費版每次 3 Credits)
+                  簡單講：「我平時想問 ChatGPT 的東西」全部交給 L1。
                 </div>
               </div>
 
