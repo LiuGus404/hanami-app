@@ -19,7 +19,9 @@ import {
     UserGroupIcon,
     UsersIcon,
     ArchiveBoxIcon,
-    ChartBarIcon
+    ChartBarIcon,
+    UserPlusIcon,
+    UserIcon
 } from '@heroicons/react/24/outline';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 
@@ -273,12 +275,38 @@ export default function UnifiedRightContent({ user, onLogout, onNavigate }: Unif
 
                         <div className="border-t border-[#EADBC8]/30 my-1"></div>
 
-                        <div
-                            onClick={onLogout}
-                            className="flex items-center px-4 py-2 text-sm text-[#E57373] hover:bg-[#FFF9F2] hover:text-[#D32F2F] rounded-lg cursor-pointer transition-colors"
-                        >
-                            <span className="mr-3"><ArrowRightOnRectangleIcon className="w-4 h-4" /></span> 登出
-                        </div>
+                        {user ? (
+                            <div
+                                onClick={() => {
+                                    onLogout();
+                                    setShowGearDropdown(false);
+                                }}
+                                className="flex items-center px-4 py-2 text-sm text-[#E57373] hover:bg-[#FFF9F2] hover:text-[#D32F2F] rounded-lg cursor-pointer transition-colors"
+                            >
+                                <span className="mr-3"><ArrowRightOnRectangleIcon className="w-4 h-4" /></span> 登出
+                            </div>
+                        ) : (
+                            <div className="flex flex-col space-y-1">
+                                <div
+                                    onClick={() => {
+                                        router.push('/aihome/auth/login');
+                                        setShowGearDropdown(false);
+                                    }}
+                                    className="flex items-center px-4 py-2 text-sm text-[#6B5142] hover:bg-[#FFF9F2] hover:text-[#4B4036] rounded-lg cursor-pointer transition-colors"
+                                >
+                                    <span className="mr-3"><UserIcon className="w-4 h-4" /></span> 登入
+                                </div>
+                                <div
+                                    onClick={() => {
+                                        router.push('/aihome/auth/register');
+                                        setShowGearDropdown(false);
+                                    }}
+                                    className="flex items-center px-4 py-2 text-sm text-[#6B5142] hover:bg-[#FFF9F2] hover:text-[#4B4036] rounded-lg cursor-pointer transition-colors"
+                                >
+                                    <span className="mr-3"><UserPlusIcon className="w-4 h-4" /></span> 註冊
+                                </div>
+                            </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

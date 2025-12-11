@@ -122,12 +122,12 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
 
         if (!cancelled) {
           if (error) {
-            console.error('AppSidebar: 讀取 user_role 失敗:', error.message);
+            console.error(`AppSidebar: 讀取 user_role 失敗 (User: ${userEmail})`, error.message);
             setIsSuperAdmin(false);
           } else {
             const role = (userData as { user_role: string } | null)?.user_role || 'user';
             const isSuperAdminRole = role.toLowerCase() === 'super_admin' || role.toLowerCase() === 'admin';
-            console.log('AppSidebar: 從數據庫讀取 user_role:', role, 'isSuperAdmin:', isSuperAdminRole);
+            console.log(`AppSidebar: 檢查用戶 ${userEmail} 權限:`, { role, isSuperAdmin: isSuperAdminRole });
             setIsSuperAdmin(isSuperAdminRole);
           }
           setRoleLoading(false);
@@ -258,7 +258,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-[#4B4036]">HanamiEcho</h2>
-                    <p className="text-sm text-[#2B3A3B]">選單</p>
+                    <p className="text-sm text-[#2B3A3B]">選單 {isSuperAdmin && <span className="text-xs bg-red-100 text-red-600 px-1 rounded ml-1">Admin</span>}</p>
                   </div>
                 </div>
                 {!isDesktop && (

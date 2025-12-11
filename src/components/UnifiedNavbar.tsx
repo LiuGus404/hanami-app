@@ -66,7 +66,7 @@ export default function UnifiedNavbar({
 
           <div className="flex items-center space-x-2">
             {/* 食量顯示 */}
-            <FoodBalanceButton />
+            {user && <FoodBalanceButton />}
 
             {customRightContent ? (
               customRightContent
