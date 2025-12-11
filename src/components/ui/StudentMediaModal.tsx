@@ -32,6 +32,7 @@ import {
   formatDuration,
   getVideoDuration
 } from '@/lib/storageUtils';
+import { getCompressionWorker } from '@/lib/compressionWorker';
 
 interface StudentWithMedia {
   id: string;
@@ -96,6 +97,28 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     onClose();
   };
   const [media, setMedia] = useState<StudentMedia[]>([]);
+  // Drag and Drop state
+  const [dragActive, setDragActive] = useState(false);
+
+  // Drag handlers
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showUploadArea, setShowUploadArea] = useState(false);
@@ -689,9 +712,9 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       let localSuccessCount = 0;
       let localErrorCount = 0;
 
-      for (const file of selectedFiles) {
+      // 定義單個檔案上傳函數
+      const processFile = async (file: File) => {
         try {
-
           const mediaType = file.type.startsWith('video/') ? 'video' : 'photo';
 
           // 獲取檔案大小限制
@@ -716,7 +739,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             // 準備 FormData
             const formData = new FormData();
             formData.append('file', compressedFile);
-            formData.append('studentId', student.id);
+            formData.append('studentId', student!.id);
             formData.append('mediaType', mediaType);
             if (orgId) {
               formData.append('orgId', orgId);
@@ -766,7 +789,6 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
           } catch (apiError) {
             console.error(`API 上傳失敗:`, apiError);
-            // 直接拋出錯誤，不再嘗試客戶端上傳
             throw apiError;
           }
         } catch (fileError) {
@@ -774,8 +796,22 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           toast.error(`檔案 ${file.name} 上傳失敗: ${fileError instanceof Error ? fileError.message : '未知錯誤'}`);
           setUploadProgress(prev => ({ ...prev, [file.name]: -1 })); // -1 表示錯誤
           localErrorCount += 1;
-          continue; // 繼續處理下一個檔案
         }
+      };
+
+      // 並行上傳邏輯
+      const CONCURRENCY = 3; // 同時上傳數量
+      const files = [...selectedFiles];
+
+      // 將檔案分組
+      const chunks = [];
+      for (let i = 0; i < files.length; i += CONCURRENCY) {
+        chunks.push(files.slice(i, i + CONCURRENCY));
+      }
+
+      // 批量處理
+      for (const chunk of chunks) {
+        await Promise.all(chunk.map(file => processFile(file)));
       }
 
       if (localSuccessCount > 0) {
@@ -785,7 +821,9 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           toast.success(`部分檔案上傳成功！成功 ${localSuccessCount} 個，失敗 ${localErrorCount} 個`);
         }
       } else {
-        toast.error('所有檔案上傳失敗！');
+        if (selectedFiles.length > 0) {
+          toast.error('所有檔案上傳失敗！');
+        }
       }
       setSelectedFiles([]);
       setUploadProgress({});
@@ -1142,14 +1180,40 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
   // 新增：智能檔案壓縮功能
   const compressFile = async (file: File, maxSizeMB: number): Promise<File> => {
-    return new Promise((resolve) => {
-      // 如果檔案已經小於配額限制，直接返回
-      if (file.size <= maxSizeMB * 1024 * 1024) {
-        resolve(file);
-        return;
-      }
+    // 如果檔案已經小於配額限制，直接返回
+    if (file.size <= maxSizeMB * 1024 * 1024) {
+      return file;
+    }
 
-      // 使用智能壓縮
+    // 圖片使用 Worker 壓縮
+    if (file.type.startsWith('image/')) {
+      try {
+        const worker = getCompressionWorker();
+        const result = await worker.compressFile(file, {
+          maxWidth: 1920,
+          maxHeight: 1080,
+          quality: 0.8,
+          format: 'webp'
+        });
+
+        if (result.success && result.compressedFile) {
+          const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+          const compressedSizeMB = (result.compressedFile.size / (1024 * 1024)).toFixed(1);
+          const compressionRatio = ((file.size - result.compressedFile.size) / file.size * 100).toFixed(1);
+
+          toast(`圖片 ${file.name} 已壓縮 (Worker): ${originalSizeMB}MB → ${compressedSizeMB}MB (節省 ${compressionRatio}%)`, {
+            icon: '🚀',
+            duration: 3000
+          });
+          return result.compressedFile;
+        }
+      } catch (err) {
+        console.error('Worker 壓縮失敗，回退到主線程:', err);
+      }
+    }
+
+    // 回退邏輯：使用主線程壓縮 (smartCompress or fallback)
+    return new Promise((resolve) => {
       import('@/lib/mediaCompression').then(({ smartCompress }) => {
         smartCompress(file, maxSizeMB).then(compressedFile => {
           const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
@@ -1167,81 +1231,32 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           resolve(file); // 壓縮失敗時使用原始檔案
         });
       }).catch(() => {
-        // 如果模組載入失敗，使用原始壓縮邏輯
+        console.error('無法載入壓縮模組，使用最基礎回退');
+        // 如果模組載入失敗，使用最基礎邏輯
         if (file.type.startsWith('video/')) {
-          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-          const maxSizeMBFormatted = maxSizeMB.toString();
-
-          toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制 (${maxSizeMBFormatted}MB)，但將嘗試上傳。`, {
-            icon: '⚠️',
-            duration: 5000
-          });
-
-          const compressedFile = new File([file], file.name, {
-            type: file.type,
-            lastModified: file.lastModified,
-          });
-          resolve(compressedFile);
-          return;
-        }
-
-        // 對於圖片檔案，使用更強的壓縮
-        if (file.type.startsWith('image/')) {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const img = new Image();
-
-          img.onload = () => {
-            // 計算壓縮比例 - 更激進的壓縮
-            const maxDimension = 1280; // 降低最大尺寸
-            let { width, height } = img;
-
-            if (width > height && width > maxDimension) {
-              height = (height * maxDimension) / width;
-              width = maxDimension;
-            } else if (height > maxDimension) {
-              width = (width * maxDimension) / height;
-              height = maxDimension;
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-
-            // 繪製壓縮後的圖片
-            ctx?.drawImage(img, 0, 0, width, height);
-
-            // 轉換為 Blob，使用更低的品質
-            canvas.toBlob((blob) => {
-              if (blob) {
-                const compressedFile = new File([blob], file.name, {
-                  type: file.type,
-                  lastModified: file.lastModified,
-                });
-
-                const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-                const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
-
-                toast.success(`圖片 ${file.name} 已壓縮: ${originalSizeMB}MB → ${compressedSizeMB}MB`);
-                resolve(compressedFile);
-              } else {
-                resolve(file);
-              }
-            }, file.type, 0.6); // 降低到 60% 品質
-          };
-
-          img.onerror = () => {
-            toast.error(`圖片 ${file.name} 壓縮失敗`);
-            resolve(file);
-          };
-
-          img.src = URL.createObjectURL(file);
-        } else {
-          // 對於其他檔案類型，顯示配額警告但允許上傳
           const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
           toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制，但將嘗試上傳。`, {
             icon: '⚠️',
-            duration: 4000
+            duration: 5000
           });
+          resolve(file);
+        } else if (file.type.startsWith('image/')) {
+          // 簡單的 Canvas 壓縮回退
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 1280;
+            let { width, height } = img;
+            if (width > height && width > maxDim) { height = (height * maxDim) / width; width = maxDim; }
+            else if (height > maxDim) { width = (width * maxDim) / height; height = maxDim; }
+            canvas.width = width; canvas.height = height;
+            ctx?.drawImage(img, 0, 0, width, height);
+            canvas.toBlob(blob => resolve(blob ? new File([blob], file.name, { type: file.type }) : file), file.type, 0.6);
+          };
+          img.onerror = () => resolve(file);
+          img.src = URL.createObjectURL(file);
+        } else {
           resolve(file);
         }
       });
@@ -1251,37 +1266,37 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
   if (!isOpen || !student) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl w-full h-full sm:h-[90vh] sm:max-w-6xl flex flex-col shadow-2xl border border-[#EADBC8] animate-in slide-in-from-bottom-4 duration-500">
+    <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center z-50 p-2 sm:p-4 animate-in fade-in duration-300">
+      <div className="bg-white/80 backdrop-blur-xl rounded-[32px] w-full h-full sm:h-[90vh] sm:max-w-6xl flex flex-col shadow-2xl border border-white/50 animate-in slide-in-from-bottom-4 duration-500 overflow-hidden">
         {/* 標題欄 */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[#EADBC8] flex-shrink-0 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] rounded-t-2xl">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-100 flex-shrink-0 bg-white/90 rounded-t-[32px]">
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl sm:text-2xl font-bold text-[#A64B2A] truncate">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 truncate">
               {student.full_name} 的媒體庫
             </h2>
-            <p className="text-sm sm:text-base text-[#2B3A3B] mt-1 truncate">
+            <p className="text-sm sm:text-base text-gray-500 mt-1 truncate font-medium">
               管理 {student.full_name} 的影片和相片檔案 ✨
             </p>
           </div>
           <button
             onClick={handleClose}
-            className="p-2 hover:bg-[#FFF9F2] rounded-full transition-all duration-200 flex-shrink-0 ml-2 group"
+            className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 flex-shrink-0 ml-2 group"
           >
-            <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#A64B2A] group-hover:text-[#8B3A1F] transition-colors" />
+            <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400 group-hover:text-gray-600 transition-colors" />
           </button>
         </div>
 
         {/* 配額狀態 */}
-        <div className="p-4 sm:p-6 border-b border-[#EADBC8] flex-shrink-0 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB]">
+        <div className="p-4 sm:p-6 border-b border-gray-100 flex-shrink-0 bg-white/50 backdrop-blur-sm">
           {/* 配額標題和展開按鈕 */}
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-lg">
-                <svg className="h-4 w-4 text-[#A64B2A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <svg className="h-4 w-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-[#A64B2A]">媒體統計</h3>
+              <h3 className="text-base sm:text-lg font-bold text-gray-700">媒體統計</h3>
               {/* 容量狀態指示器 */}
               <div className="flex items-center gap-1 ml-2">
                 {(() => {
@@ -1319,7 +1334,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             </div>
             <button
               onClick={() => setShowQuotaDetails(!showQuotaDetails)}
-              className="flex items-center gap-1 text-xs sm:text-sm text-[#2B3A3B] hover:text-[#A64B2A] transition-all duration-200 p-2 rounded-lg hover:bg-[#FFF9F2] group"
+              className="flex items-center gap-1 text-xs sm:text-sm text-gray-500 hover:text-blue-500 transition-all duration-200 p-2 rounded-lg hover:bg-blue-50 group"
             >
               {showQuotaDetails ? '收起' : '展開'}
               {showQuotaDetails ? (
@@ -1335,24 +1350,24 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             }`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {/* 影片數量統計 */}
-              <div className="bg-white p-3 sm:p-4 rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105">
+              <div className="bg-gradient-to-br from-[#FF9A9E] to-[#FECFEF] p-3 sm:p-4 rounded-[24px] shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-white border border-white/20">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 bg-[#FFD59A] rounded-lg">
-                    <Video className="h-4 w-4 sm:h-5 sm:w-5 text-[#A64B2A]" />
+                  <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-lg">
+                    <Video className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <span className="font-medium text-sm sm:text-base text-[#A64B2A]">影片數量</span>
+                  <span className="font-bold text-sm sm:text-base text-white drop-shadow-sm">影片數量</span>
                 </div>
-                <div className="flex justify-between text-xs sm:text-sm mb-1">
-                  <span className="text-[#2B3A3B]">當前數量</span>
-                  <span className="text-[#2B3A3B] font-semibold">{student.media_count.video} 個</span>
+                <div className="flex justify-between text-xs sm:text-sm mb-1 text-white/90">
+                  <span className="drop-shadow-sm">當前數量</span>
+                  <span className="font-bold drop-shadow-sm">{student.media_count.video} 個</span>
                 </div>
-                <div className="w-full bg-[#FFF9F2] rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-black/10 rounded-full h-2 overflow-hidden backdrop-blur-sm">
                   <div
-                    className="h-2 rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]"
+                    className="h-2 rounded-full transition-all duration-1000 ease-out bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
                     style={{ width: `${Math.min((student.media_count.video / 50) * 100, 100)}%` }}
                   />
                 </div>
-                <div className="text-xs text-[#2B3A3B] mt-1">
+                <div className="text-xs text-white/90 mt-1 font-medium drop-shadow-sm">
                   {student.media_count.video === 0 ? '尚無影片' :
                     student.media_count.video === 1 ? '1 個影片' :
                       `${student.media_count.video} 個影片`}
@@ -1360,24 +1375,24 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
               </div>
 
               {/* 相片數量統計 */}
-              <div className="bg-white p-3 sm:p-4 rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105">
+              <div className="bg-gradient-to-br from-[#a18cd1] to-[#fbc2eb] p-3 sm:p-4 rounded-[24px] shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-white border border-white/20">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 bg-[#EBC9A4] rounded-lg">
-                    <PhotoIcon className="h-4 w-4 sm:h-5 sm:w-5 text-[#A64B2A]" />
+                  <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-lg">
+                    <PhotoIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <span className="font-medium text-sm sm:text-base text-[#A64B2A]">相片數量</span>
+                  <span className="font-bold text-sm sm:text-base text-white drop-shadow-sm">相片數量</span>
                 </div>
-                <div className="flex justify-between text-xs sm:text-sm mb-1">
-                  <span className="text-[#2B3A3B]">當前數量</span>
-                  <span className="text-[#2B3A3B] font-semibold">{student.media_count.photo} 張</span>
+                <div className="flex justify-between text-xs sm:text-sm mb-1 text-white/90">
+                  <span className="drop-shadow-sm">當前數量</span>
+                  <span className="font-bold drop-shadow-sm">{student.media_count.photo} 張</span>
                 </div>
-                <div className="w-full bg-[#FFF9F2] rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-black/10 rounded-full h-2 overflow-hidden backdrop-blur-sm">
                   <div
-                    className="h-2 rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]"
+                    className="h-2 rounded-full transition-all duration-1000 ease-out bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
                     style={{ width: `${Math.min((student.media_count.photo / 100) * 100, 100)}%` }}
                   />
                 </div>
-                <div className="text-xs text-[#2B3A3B] mt-1">
+                <div className="text-xs text-white/90 mt-1 font-medium drop-shadow-sm">
                   {student.media_count.photo === 0 ? '尚無相片' :
                     student.media_count.photo === 1 ? '1 張相片' :
                       `${student.media_count.photo} 張相片`}
@@ -1385,14 +1400,14 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
               </div>
 
               {/* 總計統計 */}
-              <div className="bg-white p-3 sm:p-4 rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 sm:col-span-2 lg:col-span-1">
+              <div className="bg-gradient-to-br from-[#84fab0] to-[#8fd3f4] p-3 sm:p-4 rounded-[24px] shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 sm:col-span-2 lg:col-span-1 text-white border border-white/20">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 bg-[#FFD59A] rounded-lg">
-                    <svg className="h-4 w-4 text-[#A64B2A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-lg">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                   </div>
-                  <span className="font-medium text-sm sm:text-base text-[#A64B2A]">總計統計</span>
+                  <span className="font-bold text-sm sm:text-base text-white drop-shadow-sm">總計統計</span>
                 </div>
 
                 {/* 圓形圖表 */}
@@ -1410,8 +1425,8 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                       {/* 進度圓圈 */}
                       <path
                         className={`transition-all duration-1000 ease-out ${getPlanSize > 0 && (getTotalUsedSize / getPlanSize) >= 0.8
-                            ? 'text-red-400'
-                            : 'text-[#FFD59A]'
+                          ? 'text-red-400'
+                          : 'text-[#FFD59A]'
                           }`}
                         stroke="currentColor"
                         strokeWidth="3"
@@ -1496,10 +1511,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           )}
         </div>
 
-        {/* 操作按鈕 */}
-        <div className="p-4 sm:p-6 border-b border-[#EADBC8] flex-shrink-0 bg-gradient-to-r from-[#FFFCEB] to-[#FFF9F2]">
+        {/* 操作按鈕 - 圓形圖標風格 */}
+        <div className="border-b border-gray-100 flex-shrink-0 bg-white transition-all duration-300">
+
           {/* 操作標題和展開按鈕 */}
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-gradient-to-br from-[#EBC9A4] to-[#FFD59A] rounded-lg">
                 <svg className="h-4 w-4 text-[#A64B2A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1521,187 +1537,144 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             </button>
           </div>
 
-          {/* 操作按鈕 - 可展開/收起 */}
-          <div className={`transition-all duration-500 ease-out overflow-hidden ${showActionButtons ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-            }`}>
-            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-center sm:justify-between">
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <div className="flex items-center gap-2">
-                  {(() => {
-                    const capacityStatus = getCurrentCapacityStatus();
-                    const isCapacityFull = capacityStatus.status === 'full';
+          {/* 可展開/收起的操作區域 */}
+          <div className={`transition-all duration-500 ease-out overflow-hidden ${showActionButtons ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+            <div className="p-6 pt-0 flex items-start justify-center sm:justify-start gap-4 sm:gap-8 flex-wrap">
 
-                    return (
-                      <button
-                        onClick={() => {
-                          if (isCapacityFull) {
-                            toast.error('容量已滿，無法上傳新檔案');
-                            return;
-                          }
-                          setShowUploadArea(true);
-                        }}
-                        disabled={showUploadArea || isCapacityFull}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 w-full sm:w-auto justify-center shadow-md hover:shadow-lg transform hover:scale-105 disabled:transform-none ${isCapacityFull
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-[#A64B2A] to-[#8B3A1F] text-white hover:from-[#8B3A1F] hover:to-[#6B2A0F]'
-                          }`}
-                      >
-                        <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="font-medium">
-                          {isCapacityFull ? '容量已滿' : '上傳媒體'}
-                        </span>
-                      </button>
-                    );
-                  })()}
-
-                  {/* 容量狀態提示 */}
-                  {(() => {
-                    const videoCount = media.filter(m => m.media_type === 'video').length;
-                    const photoCount = media.filter(m => m.media_type === 'photo').length;
-                    const videoLimit = quotaLevel?.video_limit || 5;
-                    const photoLimit = quotaLevel?.photo_limit || 10;
-                    const isNearLimit = videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2;
-                    const isAtLimit = videoCount >= videoLimit || photoCount >= photoLimit;
-
-                    if (isAtLimit) {
-                      return (
-                        <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs border border-red-200">
-                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                          容量已滿
-                        </div>
-                      );
-                    } else if (isNearLimit) {
-                      return (
-                        <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs border border-yellow-200">
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                          容量緊張
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs border border-green-200">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          可上傳
-                        </div>
-                      );
-                    }
-                  })()}
-
-                  {/* 方案升級按鈕 */}
-                  <button
-                    onClick={() => setShowUpgradeModal(true)}
-                    className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs border border-blue-200 hover:bg-blue-200 transition-colors"
-                  >
-                    <Cog6ToothIcon className="h-3 w-3" />
-                    升級方案
-                  </button>
-                </div>
-
+              {/* 1. 上傳按鈕 */}
+              <div className="flex flex-col items-center gap-2 group">
                 <button
-                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] text-[#A64B2A] rounded-xl hover:from-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-200 w-full sm:w-auto justify-center shadow-sm hover:shadow-md transform hover:scale-105 border border-[#EADBC8]"
+                  onClick={() => {
+                    const status = getCurrentCapacityStatus();
+                    if (status.status === 'full') {
+                      toast.error('容量已滿');
+                      return;
+                    }
+                    setShowUploadArea(!showUploadArea);
+                  }}
+                  disabled={getCurrentCapacityStatus().status === 'full'}
+                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110 active:scale-95 ${getCurrentCapacityStatus().status === 'full'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-[#9EE3F5] text-white hover:shadow-xl hover:shadow-blue-200'
+                    }`}
                 >
-                  {viewMode === 'grid' ? (
-                    <>
-                      <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                      </svg>
-                      <span className="font-medium">列表檢視</span>
-                    </>
+                  <ArrowUpTrayIcon className="w-6 h-6 sm:w-8 sm:h-8" />
+                </button>
+                <span className="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-gray-800">
+                  上傳媒體
+                </span>
+              </div>
+
+              {/* 2. 可上傳 (配額狀態) */}
+              <div className="flex flex-col items-center gap-2 group">
+                <button
+                  onClick={() => setShowQuotaDetails(!showQuotaDetails)}
+                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110 active:scale-95 ${getCurrentCapacityStatus().status === 'full' ? 'bg-[#FFADAD] text-white' // Red
+                      : getCurrentCapacityStatus().status === 'warning' ? 'bg-[#FFD6A5] text-white' // Orange
+                        : 'bg-[#CAFFBF] text-white' // Green
+                    }`}
+                >
+                  {getCurrentCapacityStatus().status === 'full' ? (
+                    <XMarkIcon className="w-6 h-6 sm:w-8 sm:h-8" />
                   ) : (
-                    <>
-                      <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                      </svg>
-                      <span className="font-medium">網格檢視</span>
-                    </>
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                   )}
                 </button>
+                <span className="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-gray-800">
+                  {getCurrentCapacityStatus().status === 'full' ? '容量已滿' : '可上傳'}
+                </span>
               </div>
 
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-[#2B3A3B] justify-center sm:justify-start">
-                <div className="p-1.5 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-lg">
-                  <svg className="h-4 w-4 text-[#A64B2A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              {/* 3. 升級方案 */}
+              <div className="flex flex-col items-center gap-2 group">
+                <button
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#BDB2FF] text-white flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110 active:scale-95 hover:shadow-xl hover:shadow-purple-200"
+                >
+                  <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
-                </div>
-                <span>共 {media.length} 個檔案</span>
+                </button>
+                <span className="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-gray-800">
+                  升級方案
+                </span>
               </div>
+
+              {/* 4. 網格/列表 檢視 */}
+              <div className="flex flex-col items-center gap-2 group">
+                <button
+                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#FCC1D1] text-white flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110 active:scale-95 hover:shadow-xl hover:shadow-pink-200"
+                >
+                  {viewMode === 'grid' ? (
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  )}
+                </button>
+                <span className="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-gray-800">
+                  {viewMode === 'grid' ? '列表檢視' : '網格檢視'}
+                </span>
+              </div>
+
             </div>
           </div>
-
-          {/* 簡化的操作摘要 - 當收起時顯示 */}
-          {!showActionButtons && (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm text-[#2B3A3B] animate-in fade-in duration-300">
-              <div className="flex gap-2 justify-center sm:justify-start">
-                <button
-                  onClick={() => setShowUploadArea(true)}
-                  className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#A64B2A] rounded-lg hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 shadow-sm hover:shadow-md transform hover:scale-105"
-                >
-                  <PlusIcon className="h-3 w-3" />
-                  <span>上傳</span>
-                </button>
-                <button
-                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                  className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] text-[#A64B2A] rounded-lg hover:from-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-200 shadow-sm hover:shadow-md transform hover:scale-105 border border-[#EADBC8]"
-                >
-                  {viewMode === 'grid' ? (
-                    <>
-                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                      </svg>
-                      <span>列表</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                      </svg>
-                      <span>網格</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <span className="text-center sm:text-left">共 {media.length} 個檔案</span>
-            </div>
-          )}
         </div>
 
         {/* 可滾動內容區域 */}
         <div className="flex-1 overflow-y-auto bg-white">
           {/* 上傳區域 */}
           {showUploadArea && (
-            <div className="p-4 sm:p-6 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] animate-in slide-in-from-top-4 duration-500">
-              <div className="border-2 border-dashed border-[#EADBC8] rounded-2xl p-4 sm:p-6 text-center bg-white shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="p-3 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full w-16 h-16 mx-auto mb-3 sm:mb-4 flex items-center justify-center">
-                  <ArrowUpTrayIcon className="h-8 w-8 sm:h-10 sm:w-10 text-[#A64B2A]" />
+            <div className="p-4 sm:p-6 border-b border-white/20 bg-white/30 backdrop-blur-md animate-in slide-in-from-top-4 duration-500">
+              <div
+                className={`border-2 border-dashed rounded-[24px] p-4 sm:p-6 text-center backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group ${dragActive
+                  ? 'border-blue-400 bg-white/60 scale-[1.02] shadow-xl'
+                  : 'border-slate-300 bg-white/40 hover:border-blue-300 hover:bg-white/60'
+                  }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('media-upload-input')?.click()}
+              >
+                <div className={`p-3 rounded-full w-16 h-16 mx-auto mb-3 sm:mb-4 flex items-center justify-center pointer-events-none transition-all duration-300 ${dragActive ? 'bg-white shadow-lg scale-110' : 'bg-blue-100'}`}>
+                  <ArrowUpTrayIcon className={`h-8 w-8 sm:h-10 sm:w-10 text-blue-500 transition-transform duration-300 ${dragActive ? 'animate-bounce' : ''}`} />
                 </div>
-                <h3 className="text-base sm:text-lg font-medium text-[#A64B2A] mb-2">上傳媒體檔案</h3>
-                <p className="text-sm sm:text-base text-[#2B3A3B] mb-4">
-                  拖拽檔案到此處或點擊選擇檔案 ✨
+                <h3 className="text-base sm:text-lg font-bold text-gray-700 mb-2 pointer-events-none drop-shadow-sm">上傳媒體檔案</h3>
+                <p className="text-sm sm:text-base text-gray-500 mb-4 pointer-events-none font-medium">
+                  {dragActive ? '放開以添加檔案 ✨' : '拖拽檔案到此處或點擊選擇檔案 ✨'}
                 </p>
 
-                {/* 簡化版本 - 直接使用原生按鈕 */}
+                {/* Hidden File Input */}
                 <input
+                  id="media-upload-input"
                   type="file"
                   multiple
                   accept="video/*,image/*"
                   onChange={(e) => {
                     console.log('檔案選擇事件觸發');
-                    console.log('選擇的檔案:', e.target.files);
-                    handleFileSelect(e.target.files);
+                    if (e.target.files && e.target.files.length > 0) {
+                      console.log('選擇的檔案:', e.target.files);
+                      handleFileSelect(e.target.files);
+                    }
                   }}
-                  className="block w-full text-xs sm:text-sm text-[#2B3A3B] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-gradient-to-r file:from-[#FFD59A] file:to-[#EBC9A4] file:text-[#A64B2A] hover:file:from-[#EBC9A4] hover:file:to-[#FFD59A] transition-all duration-200"
+                  className="hidden"
                 />
 
                 {/* 上傳限制提示 */}
-                <div className="mt-4 text-xs sm:text-sm text-[#2B3A3B] space-y-1">
+                <div className="mt-4 text-xs sm:text-sm text-gray-500 space-y-1">
                   <p className="flex items-center gap-1 justify-center">
-                    <span className="p-1 bg-[#FFD59A] rounded-full">📹</span>
+                    <span className="p-1 bg-blue-100 rounded-full text-blue-500">📹</span>
                     影片: 最多 {quotaLevel?.video_limit || DEFAULT_MEDIA_LIMITS.video.maxCount} 個，每個 ≤ {quotaLevel?.video_size_limit_mb || DEFAULT_MEDIA_LIMITS.video.maxSize / (1024 * 1024)}MB
                   </p>
                   <p className="flex items-center gap-1 justify-center">
-                    <span className="p-1 bg-[#EBC9A4] rounded-full">📸</span>
+                    <span className="p-1 bg-red-100 rounded-full text-red-500">📸</span>
                     相片: 最多 {quotaLevel?.photo_limit || DEFAULT_MEDIA_LIMITS.photo.maxCount} 張，每張 ≤ {quotaLevel?.photo_size_limit_mb || DEFAULT_MEDIA_LIMITS.photo.maxSize / (1024 * 1024)}MB
                   </p>
 
@@ -1719,82 +1692,65 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                   </div>
                 </div>
 
-                {/* 選中的檔案 */}
+                {/* 選中的檔案 - 水平預覽清單 */}
                 {selectedFiles.length > 0 && (
-                  <div className="mt-4 animate-in fade-in duration-300">
-                    <h4 className="font-medium mb-2 text-sm sm:text-base text-[#A64B2A]">選中的檔案:</h4>
-                    <div className="space-y-2">
+                  <div className="mt-4 animate-in fade-in duration-300 w-full overflow-hidden">
+                    <h4 className="font-medium mb-2 text-sm sm:text-base text-gray-700 text-left">選中的檔案:</h4>
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                       {selectedFiles.map((file, index) => {
                         const isVideo = file.type.startsWith('video/');
                         const isPhoto = file.type.startsWith('image/');
-                        const canEdit = isVideo || isPhoto;
 
                         return (
-                          <div key={index} className="flex items-center justify-between bg-white p-3 rounded-xl border border-[#EADBC8] shadow-sm hover:shadow-md transition-all duration-200">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="flex-shrink-0">
-                                {isVideo ? (
-                                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                                    </svg>
-                                  </div>
-                                ) : isPhoto ? (
-                                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                ) : (
-                                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                          <div key={index} className="relative flex-shrink-0 w-24 h-24 rounded-xl border border-[#EADBC8] shadow-sm overflow-hidden group">
+                            {/* Thumbnail / Icon */}
+                            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                              {isPhoto ? (
+                                <img
+                                  src={URL.createObjectURL(file)}
+                                  alt={file.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : isVideo ? (
+                                <div className="flex flex-col items-center justify-center p-2 text-center">
+                                  <Video className="w-8 h-8 text-blue-400 mb-1" />
+                                  <span className="text-[10px] text-gray-500 truncate w-full px-1">{file.name}</span>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center p-2 text-center">
+                                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mb-1">
+                                    <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                                     </svg>
                                   </div>
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs sm:text-sm truncate text-[#2B3A3B] font-medium">{file.name}</div>
-                                <div className="text-xs text-[#2B3A3B] opacity-75">{getFileSize(file.size)}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {canEdit && (
-                                <button
-                                  onClick={() => {
-                                    setFileToEdit(file);
-                                    setEditingFileType(isVideo ? 'video' : 'photo');
-                                    setShowMediaEditor(true);
-                                  }}
-                                  className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-xs shadow-sm hover:shadow-md transform hover:scale-105"
-                                  title={`編輯${isVideo ? '影片' : '相片'}`}
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                  <span>編輯</span>
-                                </button>
+                                  <span className="text-[10px] text-gray-500 truncate w-full px-1">{file.name}</span>
+                                </div>
                               )}
-                              <button
-                                onClick={() => {
-                                  const newFiles = selectedFiles.filter((_, i) => i !== index);
-                                  setSelectedFiles(newFiles);
-                                }}
-                                className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 text-xs shadow-sm hover:shadow-md transform hover:scale-105"
-                                title="移除檔案"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                <span>移除</span>
-                              </button>
+                            </div>
+
+                            {/* Remove Button (Top Right) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newFiles = selectedFiles.filter((_, i) => i !== index);
+                                setSelectedFiles(newFiles);
+                              }}
+                              className="absolute top-1 right-1 bg-white/90 text-gray-500 rounded-full p-1 shadow-md hover:bg-white transition-all hover:scale-110 opacity-0 group-hover:opacity-100"
+                              title="移除"
+                            >
+                              <XMarkIcon className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Size Badge (Bottom) */}
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5 text-center truncate">
+                              {getFileSize(file.size)}
                             </div>
                           </div>
                         );
                       })}
                     </div>
 
-                    <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
                       <button
                         onClick={uploadFiles}
                         disabled={uploading}

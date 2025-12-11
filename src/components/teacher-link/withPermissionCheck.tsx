@@ -28,7 +28,7 @@ export function WithPermissionCheck({
   const { organizationResolved, orgId, userOrganizations } = useTeacherLinkOrganization();
   const { hasPermission, canAccessCurrentPage, currentPagePermission, role } =
     useTeacherLinkPermissions();
-  
+
   const [isCheckingPermission, setIsCheckingPermission] = useState(true);
 
   // 使用 useEffect 來判斷是否還在載入權限資訊
@@ -41,10 +41,11 @@ export function WithPermissionCheck({
 
     // 機構已解析，給一個短暫的延遲來確保所有相關數據都已載入
     // 這可以避免在數據載入完成前就顯示權限不足
+    // 性能優化：將延遲從 300ms 減少到 50ms，提高感知速度
     const timer = setTimeout(() => {
       setIsCheckingPermission(false);
-    }, 300);
-    
+    }, 50);
+
     return () => clearTimeout(timer);
   }, [organizationResolved, orgId, userOrganizations, role]);
 

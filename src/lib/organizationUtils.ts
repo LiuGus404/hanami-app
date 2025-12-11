@@ -403,28 +403,44 @@ export async function getUserOrganizations(
 
   const allIdentities: UserOrganizationIdentity[] = [];
 
-  // 1. 獲取創建的機構
-  console.log('getUserOrganizations: 查詢創建的機構...');
-  const createdOrgs = await getUserCreatedOrganizations(client, userId, userEmail);
-  console.log('getUserOrganizations: 創建的機構數量:', createdOrgs.length);
+  // 1. 2. 3. 4. 平行執行所有查詢以提高速度
+  console.log('getUserOrganizations: 開始平行查詢所有機構身份...');
+
+  const [createdOrgs, identityOrgs, memberOrgs, employeeOrgs] = await Promise.all([
+    // 1. 獲取創建的機構
+    getUserCreatedOrganizations(client, userId, userEmail)
+      .then(res => {
+        console.log('getUserOrganizations: 創建的機構查詢完成', res.length);
+        return res;
+      }),
+
+    // 2. 獲取身份表中的身份
+    getUserIdentityOrganizations(client, userId, userEmail)
+      .then(res => {
+        console.log('getUserOrganizations: 身份表查詢完成', res.length);
+        return res;
+      }),
+
+    // 3. 獲取成員身份
+    getUserMemberOrganizations(client, userId, userEmail)
+      .then(res => {
+        console.log('getUserOrganizations: 成員身份查詢完成', res.length);
+        return res;
+      }),
+
+    // 4. 獲取員工身份
+    getUserEmployeeOrganizations(client, userEmail)
+      .then(res => {
+        console.log('getUserOrganizations: 員工身份查詢完成', res.length);
+        return res;
+      })
+  ]);
+
+  console.log('getUserOrganizations: 所有查詢完成，開始合併結果');
+
   allIdentities.push(...createdOrgs);
-
-  // 2. 獲取身份表中的身份
-  console.log('getUserOrganizations: 查詢身份表中的身份...');
-  const identityOrgs = await getUserIdentityOrganizations(client, userId, userEmail);
-  console.log('getUserOrganizations: 身份表中的身份數量:', identityOrgs.length);
   allIdentities.push(...identityOrgs);
-
-  // 3. 獲取成員身份
-  console.log('getUserOrganizations: 查詢成員身份...');
-  const memberOrgs = await getUserMemberOrganizations(client, userId, userEmail);
-  console.log('getUserOrganizations: 成員身份數量:', memberOrgs.length);
   allIdentities.push(...memberOrgs);
-
-  // 4. 獲取員工身份
-  console.log('getUserOrganizations: 查詢員工身份...');
-  const employeeOrgs = await getUserEmployeeOrganizations(client, userEmail);
-  console.log('getUserOrganizations: 員工身份數量:', employeeOrgs.length);
   allIdentities.push(...employeeOrgs);
 
   // 去重：如果同一個機構有多個身份，保留優先級最高的
