@@ -7,7 +7,7 @@ async function getTodayLesson(supabase: any, studentId: string) {
   try {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD 格式
-    
+
     const { data: lessons, error } = await supabase
       .from('hanami_student_lesson')
       .select('*')
@@ -15,12 +15,12 @@ async function getTodayLesson(supabase: any, studentId: string) {
       .eq('lesson_date', todayStr)
       .order('actual_timeslot', { ascending: true })
       .limit(1);
-    
+
     if (error) {
       console.error('獲取今天課堂信息失敗:', error);
       return null;
     }
-    
+
     return lessons && lessons.length > 0 ? lessons[0] : null;
   } catch (error) {
     console.error('獲取今天課堂信息錯誤:', error);
@@ -33,28 +33,29 @@ function generateFileName(originalName: string, studentId: string, lesson?: any)
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
   const timeStr = today.toTimeString().split(' ')[0].replace(/:/g, ''); // HHMMSS
-  
+
   // 獲取文件擴展名
   const fileExt = originalName.split('.').pop();
-  
+
   // 如果有課堂信息，使用課堂時間
   let timeIdentifier = timeStr;
   if (lesson && lesson.actual_timeslot) {
     timeIdentifier = lesson.actual_timeslot.replace(/:/g, '').replace(/-/g, '');
   }
-  
+
   // 生成新文件名：student_id_日期_時間.擴展名
   const safeStudentId = (studentId || 'student').toString().replace(/[^\w-]/g, '_');
   const newFileName = `${safeStudentId}_${dateStr}_${timeIdentifier}.${fileExt}`;
-  
+
   return newFileName;
 }
 
 export async function POST(request: NextRequest) {
+  // 定定義一個變數來追蹤進度，方便除錯
+  let step = 'init';
+
   try {
-    // 記錄上傳開始時間
-    const uploadStartTime = Date.now();
-    
+    step = 'check_env';
     // 檢查環境變數
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -65,11 +66,12 @@ export async function POST(request: NextRequest) {
         supabaseServiceKey: !!supabaseServiceKey
       });
       return NextResponse.json(
-        { error: '伺服器配置錯誤' },
+        { error: '伺服器配置錯誤: 缺少必要的 Supabase 環境變數' },
         { status: 500 }
       );
     }
 
+    step = 'create_client';
     // 創建服務端 Supabase 客戶端
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    step = 'parse_form';
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const studentId = formData.get('studentId') as string;
@@ -86,11 +89,12 @@ export async function POST(request: NextRequest) {
 
     if (!file || !studentId || !mediaType) {
       return NextResponse.json(
-        { error: '缺少必要參數' },
+        { error: '缺少必要參數 (file, studentId, mediaType)' },
         { status: 400 }
       );
     }
 
+    step = 'get_student_info';
     // 獲取學生信息和今天的課堂信息
     const { data: studentData, error: studentError } = await supabase
       .from('Hanami_Students')
@@ -106,6 +110,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    step = 'get_lesson_info';
     const todayLesson = await getTodayLesson(supabase, studentId);
     console.log('今天的課堂信息:', todayLesson);
 
@@ -118,11 +123,8 @@ export async function POST(request: NextRequest) {
       mediaType
     });
 
-    // 注意：Supabase 免費計劃有 50MB 檔案大小限制
-    // 如果檔案超過此限制，會在上傳時失敗
-    // 建議升級到 Pro 計劃或壓縮檔案
-
     // 檢查配額限制
+    step = 'check_quota';
     try {
       const quotaChecker = new QuotaChecker();
       const quotaCheck = await quotaChecker.checkUploadQuota(
@@ -154,9 +156,10 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-  // 生成新的文件名格式：使用 student_id 作為前綴
-  const newFileName = generateFileName(file.name, studentId, todayLesson);
-    
+    step = 'upload_storage';
+    // 生成新的文件名格式：使用 student_id 作為前綴
+    const newFileName = generateFileName(file.name, studentId, todayLesson);
+
     // 生成檔案路徑
     const fileExt = newFileName.split('.').pop();
     const fileName = `${studentId}/${mediaType}s/${newFileName}`;
@@ -179,11 +182,13 @@ export async function POST(request: NextRequest) {
 
     console.log('Storage 上傳成功:', uploadData);
 
+    step = 'get_public_url';
     // 獲取公開 URL
     const { data: urlData } = supabase.storage
       .from('hanami-media')
       .getPublicUrl(fileName);
 
+    step = 'insert_db';
     // 準備資料庫資料
     const mediaData: any = {
       student_id: studentId,
@@ -214,7 +219,7 @@ export async function POST(request: NextRequest) {
       await supabase.storage
         .from('hanami-media')
         .remove([fileName]);
-      
+
       return NextResponse.json(
         { error: `資料庫插入失敗: ${dbError.message}` },
         { status: 500 }
@@ -223,6 +228,7 @@ export async function POST(request: NextRequest) {
 
     console.log('資料庫插入成功:', dbData);
 
+    step = 'update_quota';
     // 更新學生配額使用情況
     try {
       const { data: currentQuota, error: quotaError } = await supabase
@@ -233,13 +239,13 @@ export async function POST(request: NextRequest) {
 
       if (!quotaError && currentQuota) {
         const updates: any = {};
-        
+
         if (mediaType === 'video') {
           updates.video_count = (currentQuota.video_count || 0) + 1;
         } else {
           updates.photo_count = (currentQuota.photo_count || 0) + 1;
         }
-        
+
         updates.total_used_space = (currentQuota.total_used_space || 0) + file.size;
         updates.last_updated = new Date().toISOString();
 
@@ -258,6 +264,7 @@ export async function POST(request: NextRequest) {
       console.error('配額更新錯誤:', quotaUpdateError);
     }
 
+    step = 'success';
     // 確保返回的資料是有效的 JSON
     const responseData = {
       success: true,
@@ -276,9 +283,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(responseData);
 
   } catch (error) {
-    console.error('上傳處理錯誤:', error);
+    console.error(`上傳處理核心錯誤 (步驟: ${step}):`, error);
+    // 確保即使發生預期外的錯誤，也返回 JSON
     return NextResponse.json(
-      { error: '上傳處理失敗' },
+      {
+        error: '上傳處理失敗 (Internal Server Error)',
+        step: step,
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }

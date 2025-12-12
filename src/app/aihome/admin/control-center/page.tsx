@@ -1268,6 +1268,165 @@ export default function AdminControlCenterPage() {
     }
   };
 
+  const handleSetSystemDefaultModel = async (newModelId: string, systemKey: string, previousModelId?: string) => {
+    // Defines the metadata key for each system capability
+    const flagMap: Record<string, string> = {
+      image_gen: 'is_system_default_image_output',
+      image_input: 'is_system_default_image_input',
+      audio_input: 'is_system_default_audio_input',
+      video_input: 'is_system_default_video_input',
+      doc_input: 'is_system_default_doc_input'
+    };
+
+    const flagKey = flagMap[systemKey];
+    if (!flagKey) return;
+
+    // 1. Identify all affected models
+    const allModels = [...modelConfigs];
+    const targetModel = allModels.find(m => m.id === newModelId);
+
+    // For swapping condition
+    const previousModel = previousModelId ? allModels.find(m => m.id === previousModelId) : null;
+
+    if (!targetModel && newModelId !== '') { // Empty string means clear all
+      toast.error('找不到目標模型');
+      return;
+    }
+
+    const updates: typeof modelConfigs = [];
+    const allowMultiple = systemKey === 'doc_input';
+
+    // 2. Prepare updates
+    // A. Set New Model
+    if (targetModel) {
+      const newMeta = {
+        ...targetModel.metadata,
+        [flagKey]: true
+      };
+
+      // Preserve condition from previous model if we are swapping
+      if (previousModel?.metadata?.system_condition) {
+        newMeta.system_condition = previousModel.metadata.system_condition;
+      }
+
+      updates.push({
+        ...targetModel,
+        metadata: newMeta,
+        isSaving: true
+      });
+    }
+
+    // B. Unset Previous Model (Swap logic)
+    if (previousModel && previousModel.id !== newModelId) {
+      const prevMeta = { ...previousModel.metadata };
+      delete prevMeta[flagKey];
+      prevMeta[flagKey] = false;
+
+      updates.push({
+        ...previousModel,
+        metadata: prevMeta,
+        isSaving: true
+      });
+    }
+
+    // C. Enforce Single Default for others (Clear ALL others)
+    if (!allowMultiple) {
+      const existingDefaults = allModels.filter(m =>
+        m.metadata?.[flagKey] === true &&
+        m.id !== newModelId &&
+        m.id !== previousModelId
+      );
+
+      existingDefaults.forEach(m => {
+        const newMeta = { ...m.metadata };
+        delete newMeta[flagKey]; // Remove the flag or set false
+        // Or set to false? The migration used explicit true. Absence usually means false, but explicit false is safer if mixed.
+        // Let's iterate and just delete it or set false. Usually false is clearer in JSON.
+        // But let's check migration usage... it checked for boolean true presence.
+        // Ideally set to false to be explicit.
+        newMeta[flagKey] = false;
+
+        updates.push({
+          ...m,
+          metadata: newMeta,
+          isSaving: true
+        });
+      });
+    }
+
+    // Optimistic Update
+    setModelConfigs((prev) =>
+      prev.map((m) => {
+        const update = updates.find((u) => u.id === m.id);
+        return update || m;
+      })
+    );
+
+    // 3. Save to DB
+    try {
+      await Promise.all(
+        updates.map(async (model) => {
+          const { id, metadata } = model;
+          const { error } = await supabase
+            .from('model_configs')
+            .update({ metadata: metadata })
+            .eq('id', id);
+          if (error) throw error;
+        })
+      );
+
+      // Success: clear isSaving
+      setModelConfigs((prev) =>
+        prev.map((m) => {
+          if (updates.find((u) => u.id === m.id)) {
+            return { ...m, isSaving: false };
+          }
+          return m;
+        })
+      );
+      if (targetModel) toast.success(`已設定 ${targetModel.display_name} 為預設模型`);
+      else if (previousModel) toast.success('已移除預設模型');
+    } catch (err: any) {
+      console.error('Failed to set system default model', err);
+      toast.error('更新預設模型失敗');
+      // Revert
+      setModelConfigs((prev) =>
+        prev.map((m) => {
+          if (updates.find((u) => u.id === m.id)) {
+            return { ...m, isSaving: false };
+          }
+          return m;
+        })
+      );
+    }
+  };
+
+  const handleUpdateSystemCondition = async (modelId: string, condition: string) => {
+    const model = modelConfigs.find(m => m.id === modelId);
+    if (!model) return;
+
+    const newMeta = { ...model.metadata, system_condition: condition };
+    const updatedModel = { ...model, metadata: newMeta, isSaving: true };
+
+    setModelConfigs(prev => prev.map(m => m.id === modelId ? updatedModel : m));
+
+    try {
+      const { error } = await supabase
+        .from('model_configs')
+        .update({ metadata: newMeta })
+        .eq('id', modelId);
+
+      if (error) throw error;
+
+      setModelConfigs(prev => prev.map(m => m.id === modelId ? { ...m, isSaving: false } : m));
+      toast.success('已更新條件說明');
+    } catch (err) {
+      console.error('Update condition failed', err);
+      toast.error('更新失敗');
+      setModelConfigs(prev => prev.map(m => m.id === modelId ? model : m));
+    }
+  };
+
   const filteredRoleConfigs = useMemo(() => {
     const keyword = roleSearchTerm.trim().toLowerCase();
     if (!keyword) return roleConfigs;
@@ -1585,11 +1744,82 @@ export default function AdminControlCenterPage() {
                           {
                             Object.entries(familyGroups.systems).map(([key, system]) => (
                               <div key={key} className="bg-white/60 backdrop-blur-sm border border-[#EADBC8] rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
-                                {/* ... existing system group code ... */}
-                                <div className="flex items-center gap-2 border-b border-[#EADBC8]/60 pb-2 mb-3">
-                                  <div className="w-2 h-8 rounded-full bg-[#EADBC8]" />
-                                  <h3 className="font-bold text-[#4B4036]">{system.title}</h3>
+                                <div className="flex items-center justify-between border-b border-[#EADBC8]/60 pb-2 mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-8 rounded-full bg-[#EADBC8]" />
+                                    <h3 className="font-bold text-[#4B4036]">{system.title}</h3>
+                                  </div>
+
+                                  {/* Default Selectors */}
+                                  <div className="flex flex-col gap-2 items-end">
+                                    {(() => {
+                                      const allSystemModels = Object.values(system.levels).flat();
+
+                                      // Find currently selected defaults
+                                      const currentDefaults = allSystemModels.filter(m => {
+                                        if (key === 'image_gen') return m.metadata?.is_system_default_image_output;
+                                        if (key === 'image_input') return m.metadata?.is_system_default_image_input;
+                                        if (key === 'audio_input') return m.metadata?.is_system_default_audio_input;
+                                        if (key === 'video_input') return m.metadata?.is_system_default_video_input;
+                                        if (key === 'doc_input') return m.metadata?.is_system_default_doc_input;
+                                        return false;
+                                      }).sort((a, b) => (a.metadata?.system_condition || '').localeCompare(b.metadata?.system_condition || ''));
+
+                                      // Determine slots
+                                      const isDocs = key === 'doc_input';
+
+                                      // For Docs: Show all defaults + 1 empty slot (if count < 2)
+                                      // For Others: Show 1 slot (either filled or empty)
+                                      let renderSlots: (EditableModelConfig | null)[] = [];
+
+                                      if (isDocs) {
+                                        renderSlots = [...currentDefaults];
+                                        if (renderSlots.length < 2) renderSlots.push(null);
+                                      } else {
+                                        renderSlots = [currentDefaults[0] || null];
+                                      }
+
+                                      return renderSlots.map((defaultModel, index) => (
+                                        <div key={defaultModel?.id || `new-${index}`} className="flex items-center gap-2">
+                                          {/* Condition Input (Only for Docs or if condition exists) */}
+                                          {(isDocs || defaultModel?.metadata?.system_condition) && (
+                                            <input
+                                              type="text"
+                                              value={defaultModel?.metadata?.system_condition || ''}
+                                              onChange={(e) => {
+                                                if (defaultModel) handleUpdateSystemCondition(defaultModel.id, e.target.value);
+                                              }}
+                                              placeholder={isDocs ? (index === 0 ? "≤ 1 MB" : "> 1 MB") : "條件"}
+                                              className="w-16 text-xs border border-[#EADBC8] rounded px-1 py-1 text-right bg-white/50 focus:bg-white transition-colors placeholder-gray-300"
+                                              disabled={!defaultModel}
+                                            />
+                                          )}
+
+                                          <GlassySelect
+                                            value={defaultModel?.id || ''}
+                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                              const newVal = e.target.value;
+                                              // Pass previous model ID to handle swapping for this specific slot
+                                              handleSetSystemDefaultModel(newVal, key, defaultModel?.id);
+                                            }}
+                                            options={[
+                                              { label: '未設定預設', value: '' },
+                                              ...allSystemModels
+                                                .sort((a, b) => a.display_name.localeCompare(b.display_name))
+                                                .map(m => ({
+                                                  label: m.display_name,
+                                                  value: m.id
+                                                }))
+                                            ]}
+                                            placeholder="選擇預設模型"
+                                            className="min-w-[140px] text-xs"
+                                          />
+                                        </div>
+                                      ));
+                                    })()}
+                                  </div>
                                 </div>
+
                                 <div className="space-y-3">
                                   {Object.entries(system.levels).map(([level, models]) => (
                                     <div key={level} className="flex gap-2 text-xs">

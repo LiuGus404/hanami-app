@@ -340,19 +340,6 @@ export interface TaskActivity {
   created_at: string;
 }
 
-// 任務模板介面
-export interface TaskTemplate {
-  id: string;
-  name: string;
-  description?: string;
-  category: TaskCategory[];
-  priority: TaskPriority;
-  estimated_duration?: number;
-  difficulty_level: number;
-  is_public: boolean;
-  created_by?: string;
-  created_at: string;
-}
 
 // 任務重複設定介面
 export interface TaskRecurrence {

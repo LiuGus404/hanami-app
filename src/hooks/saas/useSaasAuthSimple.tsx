@@ -19,6 +19,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   resendVerificationEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  supabase: any; // Using exact type is better but 'any' avoids import hell for now, or import SupabaseClient
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -690,6 +691,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
     resetPassword,
     resendVerificationEmail,
     logout,
+    supabase,
   };
 
   return (

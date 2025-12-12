@@ -1554,8 +1554,8 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                   }}
                   disabled={getCurrentCapacityStatus().status === 'full'}
                   className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110 active:scale-95 ${getCurrentCapacityStatus().status === 'full'
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-[#9EE3F5] text-white hover:shadow-xl hover:shadow-blue-200'
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-[#9EE3F5] text-white hover:shadow-xl hover:shadow-blue-200'
                     }`}
                 >
                   <ArrowUpTrayIcon className="w-6 h-6 sm:w-8 sm:h-8" />
@@ -1570,8 +1570,8 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                 <button
                   onClick={() => setShowQuotaDetails(!showQuotaDetails)}
                   className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110 active:scale-95 ${getCurrentCapacityStatus().status === 'full' ? 'bg-[#FFADAD] text-white' // Red
-                      : getCurrentCapacityStatus().status === 'warning' ? 'bg-[#FFD6A5] text-white' // Orange
-                        : 'bg-[#CAFFBF] text-white' // Green
+                    : getCurrentCapacityStatus().status === 'warning' ? 'bg-[#FFD6A5] text-white' // Orange
+                      : 'bg-[#CAFFBF] text-white' // Green
                     }`}
                 >
                   {getCurrentCapacityStatus().status === 'full' ? (
@@ -1752,7 +1752,10 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
                     <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
                       <button
-                        onClick={uploadFiles}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          uploadFiles();
+                        }}
                         disabled={uploading}
                         className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#A64B2A] to-[#8B3A1F] text-white rounded-xl hover:from-[#8B3A1F] hover:to-[#6B2A0F] disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 w-full sm:w-auto justify-center shadow-md hover:shadow-lg transform hover:scale-105 disabled:transform-none"
                       >
@@ -1771,9 +1774,14 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                         )}
                       </button>
                       <button
-                        onClick={uploading ? cancelUpload : () => {
-                          setSelectedFiles([]);
-                          setShowUploadArea(false);
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (uploading) {
+                            cancelUpload();
+                          } else {
+                            setSelectedFiles([]);
+                            setShowUploadArea(false);
+                          }
                         }}
                         className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] text-[#A64B2A] rounded-xl hover:from-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-200 w-full sm:w-auto justify-center shadow-sm hover:shadow-md transform hover:scale-105 border border-[#EADBC8]"
                       >
@@ -1790,7 +1798,10 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                 {selectedFiles.length === 0 && (
                   <div className="mt-4">
                     <button
-                      onClick={() => setShowUploadArea(false)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowUploadArea(false);
+                      }}
                       className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#FFF9F2] to-[#FFFCEB] text-[#A64B2A] rounded-xl hover:from-[#FFD59A] hover:to-[#EBC9A4] transition-all duration-200 w-full sm:w-auto justify-center shadow-sm hover:shadow-md transform hover:scale-105 mx-auto border border-[#EADBC8]"
                     >
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

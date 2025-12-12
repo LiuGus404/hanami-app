@@ -441,7 +441,7 @@ export default function AihomeTaskManagementPage() {
                       key={editingTask?.id || 'new-task'}
                       task={editingTask || undefined}
                       onSubmit={handleTaskSubmit}
-                      orgId={user?.org_id}
+                      orgId={(user as any)?.org_id}
                       onCancel={() => {
                         setShowTaskForm(false);
                         setEditingTask(null);

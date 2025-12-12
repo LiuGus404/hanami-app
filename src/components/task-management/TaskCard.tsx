@@ -34,7 +34,7 @@ export default function TaskCard({
 }: TaskCardProps) {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [showAssignMenu, setShowAssignMenu] = useState(false);
-  const [allStaff, setAllStaff] = useState<any[]>([]);
+  const [allStaff, setAllStaff] = useState<{ id: string; name: string; type: string }[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const assignMenuRef = useRef<HTMLDivElement>(null);
@@ -49,23 +49,23 @@ export default function TaskCard({
   useEffect(() => {
     const loadData = async () => {
       try {
-        const { data: employeesData } = await supabase
-          .from('hanami_employee')
+        const { data: employeesData } = await (supabase
+          .from('hanami_employee') as any)
           .select('id, teacher_fullname, teacher_nickname')
           .order('teacher_fullname');
 
-        const { data: adminsData } = await supabase
-          .from('hanami_admin')
+        const { data: adminsData } = await (supabase
+          .from('hanami_admin') as any)
           .select('id, admin_name')
           .order('admin_name');
 
-        const employees = (employeesData || []).map(emp => ({
+        const employees = (employeesData || []).map((emp: any) => ({
           id: emp.id,
           name: emp.teacher_nickname || emp.teacher_fullname || '',
           type: 'employee'
         }));
 
-        const admins = (adminsData || []).map(admin => ({
+        const admins = (adminsData || []).map((admin: any) => ({
           id: admin.id,
           name: admin.admin_name || '',
           type: 'admin'

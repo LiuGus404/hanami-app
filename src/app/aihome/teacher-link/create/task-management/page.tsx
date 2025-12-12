@@ -164,7 +164,7 @@ function TaskManagementContent() {
       // 添加 org_id 到任務數據（如果字段存在）
       const taskData = {
         ...data,
-        org_id: resolvedOrgId, // 如果字段不存在，API 會忽略這個字段
+        org_id: resolvedOrgId || undefined, // 如果字段不存在，API 會忽略這個字段
       };
 
       const response = await fetch(url, {
@@ -356,7 +356,7 @@ function TaskManagementContent() {
         >
           <TaskDashboard
             userPhone={saasUser?.email}
-            orgId={resolvedOrgId}
+            orgId={resolvedOrgId || undefined}
             userEmail={saasUser?.email}
             onTaskEdit={handleTaskEdit}
             onTaskCreate={handleTaskCreate}

@@ -37,7 +37,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
   const router = useRouter();
   const [isDesktop, setIsDesktop] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const { user } = useSaasAuth();
+  const { user, supabase: saasSupabase } = useSaasAuth();
   const { hasTeacherAccess, checkTeacherAccess, teacherAccess, forceRefreshState, loading } = useTeacherAccess();
   const {
     hasTeacherAccess: directHasTeacherAccess,
@@ -45,7 +45,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
     teacherAccess: directTeacherAccess,
     loading: directLoading
   } = useDirectTeacherAccess();
-  const saasSupabase = useMemo(() => createSaasClient(), []);
+  // const saasSupabase = useMemo(() => createSaasClient(), []); // Removed in favor of shared client
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
 
@@ -72,13 +72,24 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
   useEffect(() => {
     let cancelled = false;
     const resolveRole = async () => {
+      console.log('AppSidebar: resolveRole called', { userExists: !!user, email: user?.email });
+
       if (!user) {
         setIsSuperAdmin(false);
         setRoleLoading(false);
         return;
       }
 
-      // 首先檢查 user 對象中的各種可能的 role 字段
+      // 0. Hardcoded Owner Check (Fail-safe)
+      if (user.email === 'tqfea12@gmail.com') {
+        console.log('AppSidebar: Detected Owner Email -> Force Super Admin');
+        setIsSuperAdmin(true);
+        setRoleLoading(false);
+        // We can still run the DB check for consistency logs, but return early to ensure UI shows
+        return;
+      }
+
+      // 1. Check user Metadata
       const normalizedRoleFromUser = (
         (user as any)?.user_role ??
         (user as any)?.role ??
@@ -92,14 +103,16 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         .trim()
         .toLowerCase();
 
+      console.log('AppSidebar: normalizedRoleFromUser', normalizedRoleFromUser);
+
       if (normalizedRoleFromUser === 'super_admin' || normalizedRoleFromUser === 'admin') {
-        console.log('AppSidebar: 從 user 對象檢測到 super_admin/admin 身份');
+        console.log('AppSidebar: Role found in user object:', normalizedRoleFromUser);
         setIsSuperAdmin(true);
         setRoleLoading(false);
         return;
       }
 
-      // 如果 user 對象中沒有 role，則從數據庫查詢
+      // 2. DB Check
       const userId = user.id || (user as any)?.user_id;
       const userEmail = user.email;
 
@@ -110,6 +123,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       }
 
       try {
+        console.log('AppSidebar: Querying DB for role', { userId, userEmail });
         let query = saasSupabase.from('saas_users').select('user_role');
 
         if (userId) {
@@ -123,11 +137,13 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         if (!cancelled) {
           if (error) {
             console.error(`AppSidebar: 讀取 user_role 失敗 (User: ${userEmail})`, error.message);
+            // Don't set false immediately if we had true?
+            // But we started false.
             setIsSuperAdmin(false);
           } else {
             const role = (userData as { user_role: string } | null)?.user_role || 'user';
             const isSuperAdminRole = role.toLowerCase() === 'super_admin' || role.toLowerCase() === 'admin';
-            console.log(`AppSidebar: 檢查用戶 ${userEmail} 權限:`, { role, isSuperAdmin: isSuperAdminRole });
+            console.log(`AppSidebar: DB Check Result. Role: ${role}, IsSuper: ${isSuperAdminRole}`);
             setIsSuperAdmin(isSuperAdminRole);
           }
           setRoleLoading(false);
@@ -181,14 +197,19 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       },
     ];
 
-    // 如果是 super_admin 且角色已加載完成，添加管理員控制中心選項
-    if (isSuperAdmin && !roleLoading) {
+    // 如果是 super_admin，添加管理員控制中心選項
+    // 移除 !roleLoading 檢查，避免因加載狀態卡住導致選項消失
+    // 同時添加日誌以便調試
+    if (isSuperAdmin) {
+      console.log('AppSidebar: Rendering Admin Control Center link');
       baseItems.push({
         icon: Cog6ToothIcon,
         label: '管理員控制中心',
         href: '/aihome/admin/control-center',
         description: '調整 AI 角色模型與系統設定'
       });
+    } else {
+      // console.log('AppSidebar: Skipping Admin link. isSuperAdmin:', isSuperAdmin, 'roleLoading:', roleLoading);
     }
 
     // 添加設定選項
