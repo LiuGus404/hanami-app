@@ -88,8 +88,14 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 
         if (isPlaying) {
             audioRef.current.play().catch(e => {
-                console.error("Play failed:", e);
-                setIsPlaying(false);
+                // Ignore NotAllowedError (autoplay blocked), log others
+                if (e.name !== 'NotAllowedError') {
+                    console.error("Play failed:", e);
+                }
+                // If blocked, we sync state to false
+                if (e.name === 'NotAllowedError') {
+                    setIsPlaying(false);
+                }
             });
         } else {
             audioRef.current.pause();

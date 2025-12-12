@@ -19,6 +19,7 @@ import {
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { GlassySelect } from '@/components/ui/GlassySelect';
 import Image from 'next/image';
 import AppSidebar from '@/components/AppSidebar';
 
@@ -78,14 +79,32 @@ interface ModelConfigSnapshot {
   provider: string;
   description: string;
   model_type?: string | null;
-  input_cost_usd: string;
-  output_cost_usd: string;
+  input_cost_hkd: string;
+  output_cost_hkd: string;
   modalities: Record<ModalityKey, boolean>;
   otherModalities: string[];
   supportsSearch: boolean;
   otherCapabilities: string[];
   pricingDetails: Record<string, any>;
-  metadata: Record<string, any>;
+  metadata: {
+    family?: string;
+    level?: string;
+    is_family_default?: boolean;
+    is_backup?: boolean;
+    image_input_level?: string;
+    image_output_level?: string;
+    audio_input_level?: string;
+    video_input_level?: string;
+    doc_input_level?: string;
+    is_system_default_image_input?: boolean;
+    is_system_default_image_output?: boolean;
+    is_system_default_doc_input?: boolean;
+    is_system_default_audio_input?: boolean;
+    is_system_default_video_input?: boolean;
+    backup_condition?: string;
+    system_condition?: string;
+    [key: string]: any;
+  };
   foodRatio: string;
   foodTokens: FoodTokenConfig;
 }
@@ -197,6 +216,53 @@ export default function AdminControlCenterPage() {
     );
   }, []);
 
+  const familyGroups = useMemo(() => {
+    const families = ['chatgpt', 'gemini', 'claude', 'grok', 'deepseek', 'qwen'];
+    const groups: Record<string, Record<string, EditableModelConfig[]>> = {};
+
+    families.forEach(f => {
+      groups[f] = { L1: [], L2: [], L3: [] };
+    });
+
+    // Initialize system groups with robust typing
+    const systems: Record<string, { title: string, levels: Record<string, EditableModelConfig[]> }> = {
+      image_gen: { title: '圖像輸出 (Gen)', levels: { L1: [], L2: [], L3: [] } },
+      image_input: { title: '圖像輸入 (Vision)', levels: { L1: [], L2: [], L3: [] } },
+      audio_input: { title: '語音輸入 (Audio)', levels: { L1: [], L2: [], L3: [] } },
+      video_input: { title: '影片輸入 (Video)', levels: { L1: [], L2: [], L3: [] } },
+      doc_input: { title: '文檔分析 (Docs)', levels: { L1: [], L2: [], L3: [] } },
+    };
+
+    modelConfigs.forEach(model => {
+      const meta = model.metadata || {};
+
+      // Family Grouping
+      if (meta.family && groups[meta.family]) {
+        const level = meta.level || 'L1';
+        if (['L1', 'L2', 'L3'].includes(level)) {
+          groups[meta.family][level].push(model);
+        }
+      }
+
+      // System Grouping Helpers
+      const addToSystem = (key: string, levelStr?: string) => {
+        if (!levelStr) return;
+        // Handle combined levels like 'L2_L3' -> add to both? or primary? Let's take primary L2.
+        // Or if it's exact match
+        const l = levelStr.split('_')[0]; // simple parsing
+        if (systems[key].levels[l]) systems[key].levels[l].push(model);
+      };
+
+      if (model.model_type === 'image_generation' || meta.image_output_level) addToSystem('image_gen', meta.image_output_level);
+      addToSystem('image_input', meta.image_input_level);
+      addToSystem('audio_input', meta.audio_input_level);
+      addToSystem('video_input', meta.video_input_level);
+      addToSystem('doc_input', meta.doc_input_level);
+    });
+
+    return { groups, systems };
+  }, [modelConfigs]);
+
   const ensureObject = (value: any): Record<string, any> => {
     if (!value) return {};
     if (typeof value === 'string') {
@@ -281,9 +347,7 @@ export default function AdminControlCenterPage() {
           .order('name', { ascending: true }),
         supabase
           .from('model_configs')
-          .select('id, model_id, display_name, provider, description, model_type, input_cost_usd, output_cost_usd, supported_modalities, capabilities, pricing_details, metadata')
-          .eq('is_active', true)
-          .eq('is_available', true)
+          .select('id, model_id, display_name, provider, description, model_type, input_cost_hkd, output_cost_hkd, supported_modalities, capabilities, pricing_details, metadata, is_active')
           .order('display_name', { ascending: true }),
       ]);
 
@@ -322,8 +386,8 @@ export default function AdminControlCenterPage() {
           provider: (model as any).provider || '',
           description: (model as any).description || '',
           model_type: (model as any).model_type || '',
-          input_cost_usd: toStringOrEmpty((model as any).input_cost_usd),
-          output_cost_usd: toStringOrEmpty((model as any).output_cost_usd),
+          input_cost_hkd: toStringOrEmpty((model as any).input_cost_hkd),
+          output_cost_hkd: toStringOrEmpty((model as any).output_cost_hkd),
           modalities: modalitiesState,
           otherModalities,
           supportsSearch,
@@ -803,7 +867,7 @@ export default function AdminControlCenterPage() {
 
   const handleModelValueChange = (
     modelId: string,
-    field: 'display_name' | 'provider' | 'description' | 'model_type' | 'input_cost_usd' | 'output_cost_usd' | 'foodRatio' | 'model_id',
+    field: 'display_name' | 'provider' | 'description' | 'model_type' | 'input_cost_hkd' | 'output_cost_hkd' | 'foodRatio' | 'model_id',
     value: string
   ) => {
     updateModelConfigs(modelId, (config) => ({ ...config, [field]: value }));
@@ -855,8 +919,8 @@ export default function AdminControlCenterPage() {
       provider: '',
       description: '',
       model_type: '',
-      input_cost_usd: '0',
-      output_cost_usd: '0',
+      input_cost_hkd: '0',
+      output_cost_hkd: '0',
       modalities: { ...DEFAULT_MODALITIES_STATE },
       otherModalities: [],
       supportsSearch: false,
@@ -904,8 +968,8 @@ export default function AdminControlCenterPage() {
     let outputCost: number | null;
 
     try {
-      inputCost = parseCostValue('輸入成本', model.input_cost_usd);
-      outputCost = parseCostValue('輸出成本', model.output_cost_usd);
+      inputCost = parseCostValue('輸入成本', model.input_cost_hkd);
+      outputCost = parseCostValue('輸出成本', model.output_cost_hkd);
     } catch (error) {
       return;
     }
@@ -970,8 +1034,8 @@ export default function AdminControlCenterPage() {
         provider: model.provider || 'unknown',
         description: model.description,
         model_type: model.model_type || 'text',
-        input_cost_usd: inputCost,
-        output_cost_usd: outputCost,
+        input_cost_hkd: inputCost,
+        output_cost_hkd: outputCost,
         supported_modalities: modalitiesPayload,
         capabilities: finalCapabilities,
         pricing_details: updatedPricingDetails,
@@ -1033,8 +1097,8 @@ export default function AdminControlCenterPage() {
               ...item,
               id: realId,
               isSaving: false,
-              input_cost_usd: normalizedInputCost,
-              output_cost_usd: normalizedOutputCost,
+              input_cost_hkd: normalizedInputCost,
+              output_cost_hkd: normalizedOutputCost,
               foodRatio: normalizedFoodRatio,
               otherCapabilities: cleanedOtherCapabilities,
               pricingDetails: updatedPricingDetails,
@@ -1058,8 +1122,8 @@ export default function AdminControlCenterPage() {
         updateModelConfigs(modelId, (config) => ({
           ...config,
           isSaving: false,
-          input_cost_usd: normalizedInputCost,
-          output_cost_usd: normalizedOutputCost,
+          input_cost_hkd: normalizedInputCost,
+          output_cost_hkd: normalizedOutputCost,
           foodRatio: normalizedFoodRatio,
           otherCapabilities: cleanedOtherCapabilities,
           pricingDetails: updatedPricingDetails,
@@ -1074,8 +1138,8 @@ export default function AdminControlCenterPage() {
         provider: model.provider,
         description: model.description,
         model_type: model.model_type || '',
-        input_cost_usd: normalizedInputCost,
-        output_cost_usd: normalizedOutputCost,
+        input_cost_hkd: normalizedInputCost,
+        output_cost_hkd: normalizedOutputCost,
         modalities: { ...model.modalities },
         otherModalities: [...model.otherModalities],
         supportsSearch: model.supportsSearch,
@@ -1104,6 +1168,103 @@ export default function AdminControlCenterPage() {
       console.error('儲存模型設定失敗:', error);
       updateModelConfigs(modelId, (config) => ({ ...config, isSaving: false }));
       toast.error(error?.message || '儲存模型設定失敗');
+    }
+  };
+
+  const handleSetFamilyMainModel = async (newMainModelId: string, family: string, level: string) => {
+    // 1. Identify all affected models
+    // Case A: The new target model (needs to move here and become default)
+    // Case B: Models currently in this target slot (need to lose default status)
+
+    // We get ALL models to find the target one
+    const allModels = [...modelConfigs];
+    const targetModel = allModels.find(m => m.id === newMainModelId);
+
+    if (!targetModel) {
+      toast.error('找不到目標模型');
+      return;
+    }
+
+    // 2. Optimistic update
+    const updates: typeof modelConfigs = [];
+
+    // Process target model
+    const newMetadata = {
+      ...targetModel.metadata,
+      family: family,
+      level: level,
+      is_family_default: true,
+      // If promoting to main, unset backup status
+      is_backup: false,
+      backup_condition: undefined
+    };
+    updates.push({
+      ...targetModel,
+      metadata: newMetadata,
+      isSaving: true
+    });
+
+    // Process other models currently in this slot (unset their default)
+    const existingDefaults = allModels.filter(
+      m => m.metadata?.family === family &&
+        m.metadata?.level === level &&
+        m.id !== newMainModelId && // Don't process target again
+        m.metadata?.is_family_default // Only care if they were default
+    );
+
+    existingDefaults.forEach(m => {
+      updates.push({
+        ...m,
+        metadata: {
+          ...m.metadata,
+          is_family_default: false
+        },
+        isSaving: true
+      });
+    });
+
+    setModelConfigs((prev) =>
+      prev.map((m) => {
+        const update = updates.find((u) => u.id === m.id);
+        return update || m;
+      })
+    );
+
+    // 3. Save to database
+    try {
+      await Promise.all(
+        updates.map(async (model) => {
+          const { id, metadata } = model;
+          const { error } = await supabase
+            .from('model_configs')
+            .update({ metadata: metadata })
+            .eq('id', id);
+          if (error) throw error;
+        })
+      );
+
+      // Success: clear isSaving
+      setModelConfigs((prev) =>
+        prev.map((m) => {
+          if (updates.find((u) => u.id === m.id)) {
+            return { ...m, isSaving: false };
+          }
+          return m;
+        })
+      );
+      toast.success(`已將 ${targetModel.display_name} 設為 ${family} ${level} 主模型`);
+    } catch (err: any) {
+      console.error('Failed to set family main model', err);
+      toast.error('更新主模型失敗');
+      // Revert optimistic update by clearing saving state (user can retry or refresh)
+      setModelConfigs((prev) =>
+        prev.map((m) => {
+          if (updates.find((u) => u.id === m.id)) {
+            return { ...m, isSaving: false };
+          }
+          return m;
+        })
+      );
     }
   };
 
@@ -1332,6 +1493,153 @@ export default function AdminControlCenterPage() {
                           新增模型
                         </button>
                       </div>
+
+                      {/* Family & System Defaults Overview */}
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {Object.entries(familyGroups.groups).map(([familyKey, levels]) => (
+                            <div key={familyKey} className="bg-white/60 backdrop-blur-sm border border-[#EADBC8] rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
+                              <div className="flex items-center gap-2 border-b border-[#EADBC8]/50 pb-2">
+                                <div className="w-2 h-8 rounded-full bg-gradient-to-b from-[#FFB6C1] to-[#FFD59A]" />
+                                <h3 className="font-bold text-[#4B4036] capitalize">{familyKey} 家族</h3>
+                              </div>
+                              <div className="space-y-2">
+                                {(['L1', 'L2', 'L3'] as const).map(level => {
+                                  const items = levels[level];
+                                  const backupModel = items.find(i => i.metadata?.is_backup);
+                                  const mainModel = items.find(i => i.metadata?.is_family_default) || items.find(i => !i.metadata?.is_backup) || (items.length > 0 && !backupModel ? items[0] : null);
+
+                                  let shownCount = 0;
+                                  if (mainModel) shownCount++;
+                                  if (backupModel && backupModel.id !== mainModel?.id) shownCount++;
+                                  const remainingCount = items.length - shownCount;
+
+                                  return (
+                                    <div key={level} className="flex items-start justify-between text-sm bg-white/50 rounded-lg p-2">
+                                      <span className="font-semibold text-[#8F7A65] w-8 pt-0.5">{level}</span>
+                                      <div className="flex-1 flex flex-col min-w-0">
+                                        {items.length > 0 ? (
+                                          <GlassySelect
+                                            value={mainModel?.id || ''}
+                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                              if (e.target.value) {
+                                                handleSetFamilyMainModel(e.target.value, familyKey, level);
+                                              }
+                                            }}
+                                            options={[
+                                              ...(!mainModel ? [{ label: '未設定', value: '' }] : []),
+                                              ...modelConfigs
+                                                .sort((a, b) => a.display_name.localeCompare(b.display_name))
+                                                .map(m => {
+                                                  const isCurrent = m.metadata?.family === familyKey && m.metadata?.level === level;
+                                                  let suffix = '';
+                                                  if (!isCurrent) {
+                                                    const loc = [];
+                                                    if (m.metadata?.family) loc.push(m.metadata.family);
+                                                    if (m.metadata?.level) loc.push(m.metadata.level);
+                                                    if (loc.length > 0) suffix = ` (目前: ${loc.join(' ')})`;
+                                                    else suffix = ' (未分類)';
+                                                  } else if (m.metadata?.is_backup) {
+                                                    suffix = ' (輪候)';
+                                                  }
+
+                                                  return {
+                                                    label: `${m.display_name}${suffix}`,
+                                                    value: m.id
+                                                  };
+                                                })
+                                            ]}
+                                            placeholder={!mainModel ? "未設定" : undefined}
+                                            className="min-w-[120px]"
+                                          />
+                                        ) : (
+                                          <span className="text-gray-400 italic px-2 py-1">未設定</span>
+                                        )}
+
+                                        {backupModel && backupModel.id !== mainModel?.id && (
+                                          <span className="text-[11px] text-gray-500 truncate flex items-center gap-1">
+                                            <span className="bg-gray-200 text-gray-600 px-1 rounded text-[9px]">備用</span>
+                                            <span>{backupModel.display_name}</span>
+                                            {backupModel.metadata?.backup_condition && (
+                                              <span className="text-gray-400 italic border-l border-gray-300 pl-1 ml-0.5">
+                                                {backupModel.metadata.backup_condition}
+                                              </span>
+                                            )}
+                                          </span>
+                                        )}
+
+                                        {remainingCount > 0 && (
+                                          <span className="text-[10px] text-gray-500">+{remainingCount} 個候選</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* System Groups */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {
+                            Object.entries(familyGroups.systems).map(([key, system]) => (
+                              <div key={key} className="bg-white/60 backdrop-blur-sm border border-[#EADBC8] rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
+                                {/* ... existing system group code ... */}
+                                <div className="flex items-center gap-2 border-b border-[#EADBC8]/60 pb-2 mb-3">
+                                  <div className="w-2 h-8 rounded-full bg-[#EADBC8]" />
+                                  <h3 className="font-bold text-[#4B4036]">{system.title}</h3>
+                                </div>
+                                <div className="space-y-3">
+                                  {Object.entries(system.levels).map(([level, models]) => (
+                                    <div key={level} className="flex gap-2 text-xs">
+                                      <span className="font-mono font-bold text-[#8F7A65] w-6 shrink-0 pt-0.5">{level}</span>
+                                      <div className="flex flex-wrap gap-2">
+                                        {models.length > 0 ? (
+                                          models.map(m => (
+                                            <span key={m.id} className={`px-2 py-0.5 rounded border ${(key === 'image_gen' && m.metadata?.is_system_default_image_output) ||
+                                              (key === 'image_input' && m.metadata?.is_system_default_image_input) ||
+                                              (key === 'doc_input' && m.metadata?.is_system_default_doc_input) ||
+                                              (key === 'audio_input' && m.metadata?.is_system_default_audio_input) ||
+                                              (key === 'video_input' && m.metadata?.is_system_default_video_input)
+                                              ? 'bg-[#FFD59A]/30 border-[#FFD59A] text-[#4B4036] font-medium'
+                                              : 'bg-white border-[#EADBC8] text-[#2B3A3B]/70'
+                                              }`}>
+                                              {m.display_name}
+                                              {m.metadata?.system_condition && (
+                                                <span className="text-[10px] text-gray-500 ml-1 font-normal">
+                                                  ({m.metadata.system_condition})
+                                                </span>
+                                              )}
+                                              {((key === 'image_gen' && m.metadata?.is_system_default_image_output) ||
+                                                (key === 'image_input' && m.metadata?.is_system_default_image_input) ||
+                                                (key === 'doc_input' && m.metadata?.is_system_default_doc_input) ||
+                                                (key === 'audio_input' && m.metadata?.is_system_default_audio_input) ||
+                                                (key === 'video_input' && m.metadata?.is_system_default_video_input)) && (
+                                                  <CheckCircleIcon className="w-3 h-3 inline-block ml-1 text-[#FFB6C1]" />
+                                                )}
+                                            </span>
+                                          ))
+                                        ) : (
+                                          <span className="text-[#2B3A3B]/30 italic">Empty</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))
+                          }
+                        </div>
+
+                        {/* Legend for Checkmark */}
+                        <div className="flex items-center justify-end gap-2 text-xs text-[#8F7A65] px-2">
+                          <CheckCircleIcon className="w-4 h-4 text-[#FFB6C1]" />
+                          <span>代表該家族等級或系統的預設模型</span>
+                        </div>
+
+                      </div>
+
                       <p className="mt-2 text-sm text-[#2B3A3B]/70">
                         管理可用模型的能力、成本與食量換算比例。這些設定會用於角色預設模型與食量計算。
                       </p>
@@ -1537,6 +1845,28 @@ export default function AdminControlCenterPage() {
                                     )}
                                     <Cog6ToothIcon className="w-5 h-5 text-[#FFB6C1]" />
                                     <h3 className="text-lg font-semibold text-[#4B4036]">{model.display_name || '未命名模型'}</h3>
+                                    {model.metadata?.family && (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#FFD59A]/20 text-[#8F7A65] border border-[#FFD59A]/50 uppercase tracking-wide">
+                                        {model.metadata.family}
+                                      </span>
+                                    )}
+                                    {model.metadata?.level && (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#EADBC8]/30 text-[#8F7A65] border border-[#EADBC8] font-mono">
+                                        {model.metadata.level}
+                                      </span>
+                                    )}
+                                    {model.metadata?.is_backup && (
+                                      <div className="flex items-center gap-1">
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                                          輪候 (Backup)
+                                        </span>
+                                        {model.metadata.backup_condition && (
+                                          <span className="text-[10px] text-gray-400 italic">
+                                            — {model.metadata.backup_condition}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                   <p className="text-xs text-[#2B3A3B]/60 mt-1 sm:mt-0">
                                     模型 ID：{model.model_id || '未設定'}
@@ -1564,6 +1894,57 @@ export default function AdminControlCenterPage() {
                                     transition={{ duration: 0.25, ease: 'easeInOut' }}
                                     className="px-6 pb-6"
                                   >
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-[#EADBC8]/60 pb-4 mb-4">
+                                      <div>
+                                        <label className="block text-xs font-semibold text-[#8F7A65] mb-2 uppercase">所屬家族 (Family)</label>
+                                        <select
+                                          value={model.metadata.family || ''}
+                                          onChange={(e) => updateModelConfigs(model.id, (cfg) => ({ ...cfg, isSaving: false, metadata: { ...cfg.metadata, family: e.target.value } }))}
+                                          className="w-full px-4 py-2 rounded-xl border border-[#EADBC8] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]"
+                                        >
+                                          <option value="">無</option>
+                                          <option value="chatgpt">ChatGPT (OpenAI)</option>
+                                          <option value="gemini">Gemini (Google)</option>
+                                          <option value="claude">Claude (Anthropic)</option>
+                                          <option value="grok">Grok (xAI)</option>
+                                          <option value="deepseek">DeepSeek</option>
+                                          <option value="qwen">Qwen (Ali/Tongyi)</option>
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-semibold text-[#8F7A65] mb-2 uppercase">等級 (Level)</label>
+                                        <select
+                                          value={model.metadata.level || ''}
+                                          onChange={(e) => updateModelConfigs(model.id, (cfg) => ({ ...cfg, isSaving: false, metadata: { ...cfg.metadata, level: e.target.value } }))}
+                                          className="w-full px-4 py-2 rounded-xl border border-[#EADBC8] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#FFB6C1]"
+                                        >
+                                          <option value="">無</option>
+                                          <option value="L1">L1</option>
+                                          <option value="L2">L2</option>
+                                          <option value="L3">L3</option>
+                                        </select>
+                                      </div>
+                                      <div className="flex flex-col justify-end pb-2 gap-2">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                          <input
+                                            type="checkbox"
+                                            checked={model.metadata.is_backup || false}
+                                            onChange={(e) => updateModelConfigs(model.id, (cfg) => ({ ...cfg, isSaving: false, metadata: { ...cfg.metadata, is_backup: e.target.checked } }))}
+                                            className="h-5 w-5 rounded border-[#EADBC8] text-gray-500 focus:ring-gray-400"
+                                          />
+                                          <span className="text-sm font-medium text-[#4B4036]">設為輪候模型 (Backup)</span>
+                                        </label>
+                                        {model.metadata.is_backup && (
+                                          <input
+                                            type="text"
+                                            value={model.metadata.backup_condition || ''}
+                                            onChange={(e) => updateModelConfigs(model.id, (cfg) => ({ ...cfg, isSaving: false, metadata: { ...cfg.metadata, backup_condition: e.target.value } }))}
+                                            placeholder="觸發條件 (例如: Context > 400K)"
+                                            className="w-full px-3 py-1.5 rounded border border-[#EADBC8] text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
                                     <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 pb-4 border-b border-[#EADBC8]/60 mb-6">
                                       <div className="flex flex-col gap-1 text-xs text-[#2B3A3B]/70">
                                         <span>模型特質：{model.model_type || '未設定'}</span>
@@ -1656,28 +2037,31 @@ export default function AdminControlCenterPage() {
                                             className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
                                           />
                                         </label>
-
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                          <label className="block text-sm font-medium text-[#4B4036]">
-                                            輸入成本（USD / 1M tokens）
+                                          <div>
+                                            <label className="block text-xs font-semibold text-[#8F7A65] mb-2 tracking-wide uppercase">
+                                              Input 成本 ($/1M tokens) - HKD
+                                            </label>
                                             <input
-                                              type="number"
-                                              step="0.0001"
-                                              value={model.input_cost_usd}
-                                              onChange={(event) => handleModelValueChange(model.id, 'input_cost_usd', event.target.value)}
-                                              className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                              type="text"
+                                              value={model.input_cost_hkd}
+                                              onChange={(event) => handleModelValueChange(model.id, 'input_cost_hkd', event.target.value)}
+                                              placeholder="0.00"
+                                              className="w-full px-4 py-2 rounded-xl border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm text-[#4B4036]"
                                             />
-                                          </label>
-                                          <label className="block text-sm font-medium text-[#4B4036]">
-                                            輸出成本（USD / 1M tokens）
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-semibold text-[#8F7A65] mb-2 tracking-wide uppercase">
+                                              Output 成本 ($/1M tokens) - HKD
+                                            </label>
                                             <input
-                                              type="number"
-                                              step="0.0001"
-                                              value={model.output_cost_usd}
-                                              onChange={(event) => handleModelValueChange(model.id, 'output_cost_usd', event.target.value)}
-                                              className="mt-2 w-full px-3 py-2 rounded-lg border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm"
+                                              type="text"
+                                              value={model.output_cost_hkd}
+                                              onChange={(event) => handleModelValueChange(model.id, 'output_cost_hkd', event.target.value)}
+                                              placeholder="0.00"
+                                              className="w-full px-4 py-2 rounded-xl border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent text-sm text-[#4B4036]"
                                             />
-                                          </label>
+                                          </div>
                                         </div>
 
                                         <label className="block text-sm font-medium text-[#4B4036]">
@@ -1695,48 +2079,7 @@ export default function AdminControlCenterPage() {
                                         </label>
                                       </div>
 
-                                      <div className="border-t border-[#EADBC8]/60 pt-4 mt-2">
-                                        <h4 className="text-sm font-semibold text-[#8F7A65] mb-3 uppercase tracking-wide">
-                                          Food Token Settings (Granular)
-                                        </h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#FFFDF8] p-4 rounded-xl border border-[#EADBC8]/50">
-                                          {[
-                                            { key: 'text', label: '文字 (Text)' },
-                                            { key: 'image', label: '圖像 (Image)' },
-                                            { key: 'audio', label: '語音 (Audio)' },
-                                            { key: 'video', label: '影片 (Video)' },
-                                          ].map((type) => (
-                                            <div key={type.key} className="space-y-3">
-                                              <p className="text-xs font-bold text-[#4B4036]">{type.label}</p>
-                                              <div className="grid grid-cols-2 gap-2">
-                                                <label className="block text-xs text-[#2B3A3B]/70">
-                                                  Input
-                                                  <input
-                                                    type="number"
-                                                    value={model.foodTokens[`${type.key}_input` as keyof FoodTokenConfig] || ''}
-                                                    onChange={(e) => handleFoodTokenChange(model.id, `${type.key}_input` as keyof FoodTokenConfig, e.target.value)}
-                                                    placeholder="Auto"
-                                                    className="mt-1 w-full px-2 py-1.5 rounded border border-[#EADBC8] text-xs focus:ring-1 focus:ring-[#FFB6C1]"
-                                                  />
-                                                </label>
-                                                <label className="block text-xs text-[#2B3A3B]/70">
-                                                  Output
-                                                  <input
-                                                    type="number"
-                                                    value={model.foodTokens[`${type.key}_output` as keyof FoodTokenConfig] || ''}
-                                                    onChange={(e) => handleFoodTokenChange(model.id, `${type.key}_output` as keyof FoodTokenConfig, e.target.value)}
-                                                    placeholder="Auto"
-                                                    className="mt-1 w-full px-2 py-1.5 rounded border border-[#EADBC8] text-xs focus:ring-1 focus:ring-[#FFB6C1]"
-                                                  />
-                                                </label>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        <p className="mt-2 text-[10px] text-[#2B3A3B]/50">
-                                          * 設定具體的 Food Token 數值。若留空則使用預設計算方式 (USD Cost * Ratio)。
-                                        </p>
-                                      </div>
+
 
                                       <div className="space-y-4">
                                         <div>
@@ -1786,7 +2129,8 @@ export default function AdminControlCenterPage() {
                                       </div>
                                     </div>
                                   </motion.div>
-                                )}
+                                )
+                                }
                               </AnimatePresence>
                             </motion.div>
                           );
@@ -2227,6 +2571,18 @@ export default function AdminControlCenterPage() {
                                                                 預設
                                                               </span>
                                                             )}
+                                                            {model.metadata?.is_backup && (
+                                                              <div className="flex items-center gap-1">
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                                                                  輪候 (Backup)
+                                                                </span>
+                                                                {model.metadata.backup_condition && (
+                                                                  <span className="text-[10px] text-gray-400 italic">
+                                                                    — {model.metadata.backup_condition}
+                                                                  </span>
+                                                                )}
+                                                              </div>
+                                                            )}
                                                           </div>
                                                           <p className="text-xs text-[#2B3A3B]/60 mt-1">
                                                             模型 ID：{model.model_id} · 模型特質：{model.model_type || '未設定'}
@@ -2456,45 +2812,47 @@ export default function AdminControlCenterPage() {
             </section>
           </div>
         </div>
-      </div>
+      </div >
 
       {/* 對話詳情視窗 */}
-      {showLogDialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
-          onClick={() => setShowLogDialog(false)}
-        >
+      {
+        showLogDialog && (
           <div
-            className="w-full max-w-3xl bg-white rounded-2xl p-4 ring-1 ring-[#EADBC8] max-h-[80vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
+            onClick={() => setShowLogDialog(false)}
           >
-            <div className="flex items-center justify-between mb-3 flex-shrink-0">
-              <h3 className="text-lg font-bold text-[#2B3A3B]">{logDialogTitle}</h3>
-              <button
-                className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#2B3A3B] transition-colors"
-                onClick={() => setShowLogDialog(false)}
-              >
-                關閉
-              </button>
-            </div>
-            <div className="max-h-[70vh] overflow-auto space-y-2 flex-1">
-              {logDialogItems.length === 0 ? (
-                <div className="text-center text-[#2B3A3B] py-6">沒有對話內容</div>
-              ) : (
-                logDialogItems.map((it: any) => (
-                  <div key={it.id} className="p-3 rounded-xl border border-[#EADBC8]">
-                    <p className="text-xs text-gray-600 mb-1">{formatHK(it.created_at)} · {it.sender_type}</p>
-                    <p className="text-[#2B3A3B] whitespace-pre-wrap">{it.content || it.content_json?.text || '(空白)'}</p>
-                    {(((it.status && it.status !== 'sent') ? true : false) || (it.error_message && it.error_message.trim() !== '')) && (
-                      <p className="text-xs text-rose-600 mt-1">狀態: {it.status || 'error'} · {it.error_message}</p>
-                    )}
-                  </div>
-                ))
-              )}
+            <div
+              className="w-full max-w-3xl bg-white rounded-2xl p-4 ring-1 ring-[#EADBC8] max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                <h3 className="text-lg font-bold text-[#2B3A3B]">{logDialogTitle}</h3>
+                <button
+                  className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#2B3A3B] transition-colors"
+                  onClick={() => setShowLogDialog(false)}
+                >
+                  關閉
+                </button>
+              </div>
+              <div className="max-h-[70vh] overflow-auto space-y-2 flex-1">
+                {logDialogItems.length === 0 ? (
+                  <div className="text-center text-[#2B3A3B] py-6">沒有對話內容</div>
+                ) : (
+                  logDialogItems.map((it: any) => (
+                    <div key={it.id} className="p-3 rounded-xl border border-[#EADBC8]">
+                      <p className="text-xs text-gray-600 mb-1">{formatHK(it.created_at)} · {it.sender_type}</p>
+                      <p className="text-[#2B3A3B] whitespace-pre-wrap">{it.content || it.content_json?.text || '(空白)'}</p>
+                      {(((it.status && it.status !== 'sent') ? true : false) || (it.error_message && it.error_message.trim() !== '')) && (
+                        <p className="text-xs text-rose-600 mt-1">狀態: {it.status || 'error'} · {it.error_message}</p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }
